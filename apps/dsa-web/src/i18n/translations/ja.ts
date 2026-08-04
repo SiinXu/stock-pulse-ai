@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "管理者認証は有効です。下のパスワード変更を使って更新してください。",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "パスワードはまだ設定されていません。認証を有効にする前に初期の管理者パスワードを設定してください。",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "以前の管理者パスワードは保持されました。認証を素早く再有効にするには入力してください。",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "現在のログインセッションがまだ有効であれば、認証を直接無効にできます。 セッションが無効の場合は、現在の管理者パスワードを入力してください。",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "認証を閉じる前に本人確認が必要かもしれません",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "認証の無効化には常に現在の管理者パスワードが必要です。有効なセッション cookie だけでは不十分です。",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "認証を無効にする前に現在の管理者パスワードを入力してください",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "認証を再有効化するために古いパスワードを入力してください",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "現在のパスワードを入力してください",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "新しいパスワードが必要です",
@@ -4321,4 +4321,34 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "デシジョン ツリーには最大 {limit} ノードを含めることができます。",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "フレームワークには最大 {limit} のリスク ルールを含めることができます。",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "フレームワークには最大で {limit} 個の追跡基準を含めることができます。",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "全市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "中国A株",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "送信時にサーバーが決定",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "今回のレビュー対象市場を1つ以上選択してください。",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "香港",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "日本",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "韓国",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "今回の実行のみに適用され、グローバル設定は変更されません。",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "市場レビュー対象を選択",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "サーバー既定",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "今回のレビュー市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "米国",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}；対象市場：{region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "タスク状態：{status}（{progress}）；対象市場：{region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "認証を無効にする前に現在の管理者パスワードを入力してください",
+
 };

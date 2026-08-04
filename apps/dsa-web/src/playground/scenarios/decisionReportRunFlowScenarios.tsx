@@ -35,6 +35,8 @@ import { ReportStrata } from '../../components/report/ReportStrata';
 import { ReportStrategy } from '../../components/report/ReportStrategy';
 import { ReportStructuredInsights } from '../../components/report/ReportStructuredInsights';
 import { ReportSummary } from '../../components/report/ReportSummary';
+import { ShareImageButton } from '../../components/report/ShareImageButton';
+import { MarketReviewRegionSelector } from '../../components/market-review/MarketReviewRegionSelector';
 import { RunFlowEventList } from '../../components/run-flow/RunFlowEventList';
 import { RunFlowGraph } from '../../components/run-flow/RunFlowGraph';
 import { RunFlowNodeDetails } from '../../components/run-flow/RunFlowNodeDetails';
@@ -426,6 +428,22 @@ const RunFlowPanelStory = () => {
 
 const RunFlowSummaryBarStory = () => <RunFlowSummaryBar snapshot={fixtureRunFlowSnapshot} />;
 
+
+const ShareImageButtonStory = () => (
+  <div className="flex justify-end p-4">
+    <ShareImageButton recordId={FIXTURE_RECORD_ID} reportTitle="Playground report" reportLanguage="en" />
+  </div>
+);
+
+const MarketReviewRegionSelectorStory = () => {
+  const [regions, setRegions] = useState<Array<'cn' | 'hk' | 'us' | 'jp' | 'kr'> | undefined>(undefined);
+  return (
+    <div className="flex justify-end p-4">
+      <MarketReviewRegionSelector value={regions} onChange={setRegions} />
+    </div>
+  );
+};
+
 export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'decision-signal-card': DecisionSignalCardStory,
   'decision-signal-details': DecisionSignalDetailsStory,
@@ -448,6 +466,8 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-markdown-panel': ReportMarkdownPanelStory,
   'report-news': ReportNewsStory,
   'report-overview': ReportOverviewStory,
+  'share-image-button': ShareImageButtonStory,
+  'market-review-region-selector': MarketReviewRegionSelectorStory,
   'report-strata': ReportStrataStory,
   'report-strategy': ReportStrategyStory,
   'report-structured-insights': ReportStructuredInsightsStory,

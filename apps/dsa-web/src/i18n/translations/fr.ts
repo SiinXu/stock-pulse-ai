@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "L’authentification administrateur est activée. Utilisez Changer le mot de passe ci-dessous pour le mettre à jour.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Aucun mot de passe n’a encore été défini. Définissez un mot de passe administrateur initial avant d’activer l’authentification.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Le mot de passe administrateur précédent a été conservé. Entrez-le pour réactiver rapidement l’authentification.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Si la session de connexion actuelle est toujours valide, vous pouvez désactiver directement l’authentification ; Si la session est invalide, veuillez entrer le mot de passe administrateur actuel.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Vous devrez peut-être vérifier votre identité avant de désactiver l’authentification",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Désactiver l’authentification exige toujours le mot de passe administrateur actuel. Un cookie de session valide ne suffit pas.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Saisissez le mot de passe administrateur actuel avant de désactiver",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Saisissez l’ancien mot de passe pour réactiver l’authentification",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Veuillez entrer votre mot de passe actuel",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Un nouveau mot de passe est nécessaire",
@@ -4321,4 +4321,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Un arbre de décision peut contenir au plus {limit} nœuds.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Un cadre peut contenir au plus {limit} règles de risque.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Un cadre peut contenir au plus {limit} critères de suivi.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Saisissez le mot de passe administrateur actuel avant de désactiver l’authentification",
 };

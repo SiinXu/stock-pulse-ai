@@ -7456,6 +7456,18 @@
             "title": "Query Id",
             "type": "string"
           },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Canonical market coverage for market-review records",
+            "title": "Region"
+          },
           "report_type": {
             "anyOf": [
               {
@@ -10405,6 +10417,11 @@
             "title": "Message Params",
             "type": "object"
           },
+          "region": {
+            "description": "Canonical market coverage for this task",
+            "title": "Region",
+            "type": "string"
+          },
           "send_notification": {
             "description": "是否发送通知",
             "title": "Send Notification",
@@ -10443,7 +10460,8 @@
         },
         "required": [
           "message",
-          "send_notification"
+          "send_notification",
+          "region"
         ],
         "title": "MarketReviewAccepted",
         "type": "object"
@@ -10451,6 +10469,20 @@
       "MarketReviewRequest": {
         "description": "Market review trigger parameters.",
         "properties": {
+          "region": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Request-scoped market coverage for this review. Valid tokens: cn, hk, us, jp, kr, both. When omitted, MARKET_REVIEW_REGION is used.",
+            "title": "Region"
+          },
           "report_language": {
             "anyOf": [
               {
@@ -16903,6 +16935,18 @@
             "title": "Progress",
             "type": "integer"
           },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Canonical market coverage for market-review tasks",
+            "title": "Region"
+          },
           "report_type": {
             "default": "detailed",
             "description": "报告类型",
@@ -17155,6 +17199,18 @@
             ],
             "description": "进度百分比 (0-100)",
             "title": "Progress"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Canonical market coverage for market-review tasks",
+            "title": "Region"
           },
           "result": {
             "anyOf": [
@@ -23571,6 +23627,75 @@
           }
         },
         "summary": "获取历史报告关联新闻",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/share-image": {
+      "get": {
+        "description": "Build a deterministic PNG share image from the historical report Markdown and any persisted structured payload.",
+        "operationId": "get_history_share_image_api_v1_history__record_id__share_image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {}
+            },
+            "description": "PNG share image"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Report not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Report generation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Image renderer unavailable"
+          }
+        },
+        "summary": "Generate a history report share image",
         "tags": [
           "History"
         ]
