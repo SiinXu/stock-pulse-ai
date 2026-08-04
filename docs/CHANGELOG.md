@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
 - [Fixed] Rejected desktop update IPC requests that do not originate from the Electron main Web window.
 - [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
 - [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
