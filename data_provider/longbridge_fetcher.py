@@ -414,13 +414,15 @@ def _is_us_code(stock_code: str) -> bool:
 
 
 def _is_hk_code(stock_code: str) -> bool:
+    """Return whether a symbol follows the shared Hong Kong code contract."""
     normalized = (stock_code or "").strip().upper()
     if normalized.startswith("HK"):
         digits = normalized[2:]
         return digits.isdigit() and 1 <= len(digits) <= 5
     if normalized.endswith(".HK"):
-        return True
-    if normalized.isdigit() and len(normalized) == 5:
+        base = normalized[:-3]
+        return base.isdigit() and 1 <= len(base) <= 5
+    if normalized.isdigit() and 4 <= len(normalized) <= 5:
         return True
     return False
 
@@ -782,13 +784,15 @@ class LongbridgeFetcher(BaseFetcher):
         try:
             from longbridge.openapi import Period, AdjustType
 
+            # Keyword arguments keep this call compatible with Longbridge SDK
+            # versions whose positional ``time`` and ``count`` order differs.
             candles = ctx.history_candlesticks_by_offset(
-                symbol,
-                Period.Day,
-                AdjustType.NoAdjust,
-                False,
-                6,
-                datetime.now(),
+                symbol=symbol,
+                period=Period.Day,
+                adjust_type=AdjustType.NoAdjust,
+                forward=False,
+                time=datetime.now(),
+                count=6,
             )
             if not candles or len(candles) < 2:
                 return None
@@ -808,7 +812,7 @@ class LongbridgeFetcher(BaseFetcher):
                 return None
 
             return round(today_volume / avg_vol, 2)
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the optional volume-ratio fallback.
             log_safe_exception(
                 logger,
                 "Longbridge volume ratio calculation failed",

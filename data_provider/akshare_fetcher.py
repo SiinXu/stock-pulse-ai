@@ -27,7 +27,7 @@ import logging
 import multiprocessing
 import os
 import random
-import time
+import threading, time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
@@ -84,7 +84,17 @@ USER_AGENTS = [
 _realtime_cache: Dict[str, Any] = {
     'data': None,
     'timestamp': 0,
-    'ttl': 1200  # 20-minute cache expiration time
+    'ttl': 1200,  # 20-minute cache expiration time
+    # ``stock_hk_spot_em`` returns the full Hong Kong market, so reuse one
+    # validated snapshot across per-symbol requests.
+    'hk': {
+        'data': None,
+        'timestamp': 0,
+        'ttl': 1200,
+        'failure_ttl': 30,
+        'last_result': None,
+        'lock': threading.Lock(),
+    },
 }
 
 # ETF Real-time Quote Cache
@@ -93,7 +103,6 @@ _etf_realtime_cache: Dict[str, Any] = {
     'timestamp': 0,
     'ttl': 1200  # 20-minute cache expiration time
 }
-
 
 def _is_etf_code(stock_code: str) -> bool:
     """
@@ -115,12 +124,10 @@ def _is_etf_code(stock_code: str) -> bool:
 
 
 def _is_hk_code(stock_code: str) -> bool:
-    """
-    判断代码是否为港股
+    """Return whether a symbol is a Hong Kong stock code.
 
-    港股代码规则：
-    - 5位数字代码，如 '00700' (腾讯控股)
-    - 部分港股代码可能带有前缀，如 'hk00700', 'hk1810'
+    This provider-level check must match the manager and peer-provider market
+    contract: explicit ``HK``/``.HK`` forms and four- to five-digit bare codes.
 
     Args:
         stock_code: 股票代码
@@ -137,8 +144,8 @@ def _is_hk_code(stock_code: str) -> bool:
         # Any prefix with 'hk' must be Hong Kong stocks, remove the prefix and it should be a pure number (1-5 digits)
         numeric_part = code[2:]
         return numeric_part.isdigit() and 1 <= len(numeric_part) <= 5
-    # Without a prefix, only 5-digit numbers are considered Hong Kong stocks (to avoid misjudging A-shares codes)
-    return code.isdigit() and len(code) == 5
+    # Mainland and Beijing stock codes use six digits, so they do not overlap.
+    return code.isdigit() and 4 <= len(code) <= 5
 
 
 def _normalize_tencent_volume(fields: List[str]) -> Optional[int]:
@@ -1554,10 +1561,7 @@ class AkshareFetcher(BaseFetcher):
         circuit_breaker = get_realtime_circuit_breaker()
         em_key = "akshare_hk_em"
         sina_key = "akshare_hk_sina"
-
-        # Anti-ban strategy
-        self._set_random_user_agent()
-        self._enforce_rate_limit()
+        hk_cache = _realtime_cache['hk']
 
         # Ensure code formatting is correct (5-digit number)
         raw_code = stock_code.strip().lower()
@@ -1567,63 +1571,149 @@ class AkshareFetcher(BaseFetcher):
             raw_code = raw_code[2:]
         code = raw_code.zfill(5)
 
-        # --- Master Data Source: Eastmoney ---
-        if circuit_breaker.is_available(em_key):
+        def build_em_quote(df: pd.DataFrame) -> Optional[UnifiedRealtimeQuote]:
+            if df.empty:
+                logger.info("Akshare Eastmoney HK realtime snapshot is empty")
+                return None
+
+            row = df[df['代码'] == code]
+            if row.empty:
+                logger.info(
+                    "Akshare Eastmoney HK realtime snapshot has no row for %s",
+                    code,
+                )
+                return None
+
+            row = row.iloc[0]
+            quote = UnifiedRealtimeQuote(
+                code=stock_code,
+                name=str(row.get('名称', '')),
+                source=RealtimeSource.AKSHARE_EM,
+                price=safe_float(row.get('最新价')),
+                change_pct=safe_float(row.get('涨跌幅')),
+                change_amount=safe_float(row.get('涨跌额')),
+                volume=safe_int(row.get('成交量')),
+                amount=safe_float(row.get('成交额')),
+                volume_ratio=safe_float(row.get('量比')),
+                turnover_rate=safe_float(row.get('换手率')),
+                amplitude=safe_float(row.get('振幅')),
+                pe_ratio=safe_float(row.get('市盈率')),
+                pb_ratio=safe_float(row.get('市净率')),
+                total_mv=safe_float(row.get('总市值')),
+                circ_mv=safe_float(row.get('流通市值')),
+                high_52w=safe_float(row.get('52周最高')),
+                low_52w=safe_float(row.get('52周最低')),
+            )
+            logger.info(
+                "Akshare HK realtime quote resolved for %s: price=%s change_pct=%s turnover_rate=%s",
+                stock_code,
+                quote.price,
+                quote.change_pct,
+                quote.turnover_rate,
+            )
+            return quote
+
+        def read_cached_em_quote() -> Tuple[bool, Optional[UnifiedRealtimeQuote]]:
+            current_time = time.time()
+            cache_data = hk_cache['data']
+            cache_age = current_time - hk_cache['timestamp']
+            if (
+                hk_cache.get('last_result') == 'failure'
+                and cache_age < hk_cache.get('failure_ttl', 0)
+            ):
+                logger.debug(
+                    "Akshare Eastmoney HK realtime negative cache hit: age=%ds ttl=%ss",
+                    int(cache_age),
+                    hk_cache.get('failure_ttl', 0),
+                )
+                return True, None
+
+            if cache_data is None or cache_age >= hk_cache['ttl']:
+                return False, None
+
+            logger.debug(
+                "Akshare Eastmoney HK realtime cache hit: age=%ds ttl=%ss",
+                int(cache_age),
+                hk_cache['ttl'],
+            )
             try:
-                logger.info(f"[API调用] ak.stock_hk_spot_em() 获取港股实时行情...")
-                import time as _time
-                api_start = _time.time()
-
-                df = ak.stock_hk_spot_em()
-
-                api_elapsed = _time.time() - api_start
-                logger.info(f"[API返回] ak.stock_hk_spot_em 成功: 返回 {len(df)} 只港股, 耗时 {api_elapsed:.2f}s")
-                circuit_breaker.record_success(em_key)
-
-                # Find specified Hong Kong stocks
-                row = df[df['代码'] == code]
-                if row.empty:
-                    logger.info(f"[API返回] 未找到港股 {code} 的实时行情 (stock_hk_spot_em)")
-                else:
-                    row = row.iloc[0]
-                    quote = UnifiedRealtimeQuote(
-                        code=stock_code,
-                        name=str(row.get('名称', '')),
-                        source=RealtimeSource.AKSHARE_EM,
-                        price=safe_float(row.get('最新价')),
-                        change_pct=safe_float(row.get('涨跌幅')),
-                        change_amount=safe_float(row.get('涨跌额')),
-                        volume=safe_int(row.get('成交量')),
-                        amount=safe_float(row.get('成交额')),
-                        volume_ratio=safe_float(row.get('量比')),
-                        turnover_rate=safe_float(row.get('换手率')),
-                        amplitude=safe_float(row.get('振幅')),
-                        pe_ratio=safe_float(row.get('市盈率')),
-                        pb_ratio=safe_float(row.get('市净率')),
-                        total_mv=safe_float(row.get('总市值')),
-                        circ_mv=safe_float(row.get('流通市值')),
-                        high_52w=safe_float(row.get('52周最高')),
-                        low_52w=safe_float(row.get('52周最低')),
-                    )
-                    logger.info(f"[港股实时行情] {stock_code} {quote.name}: 价格={quote.price}, 涨跌={quote.change_pct}%, "
-                                f"换手率={quote.turnover_rate}%")
-                    return quote
-
-            except Exception as e:
+                return True, build_em_quote(cache_data)
+            except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics precede the preserved Sina fallback.
                 log_safe_exception(
                     logger,
-                    "Akshare Eastmoney HK realtime quote failed; trying Sina fallback",
-                    e,
-                    error_code="akshare_hk_eastmoney_realtime_quote_failed",
+                    "Akshare Eastmoney HK realtime cache parse failed; trying Sina fallback",
+                    exc,
+                    error_code="akshare_hk_eastmoney_cache_parse_failed",
                     level=logging.WARNING,
                     context={"symbol": stock_code},
                 )
-                circuit_breaker.record_failure(
-                    em_key,
-                    "akshare_hk_eastmoney_realtime_quote_failed",
-                )
-        else:
-            logger.info(f"[熔断] 数据源 {em_key} 处于熔断状态，尝试使用备用链路")
+                return True, None
+
+        cache_hit, quote = read_cached_em_quote()
+        if quote is not None:
+            return quote
+
+        # Coalesce concurrent full-market refreshes and recheck after acquiring
+        # the lock so only one request populates a cold cache.
+        if not cache_hit:
+            with hk_cache['lock']:
+                cache_hit, quote = read_cached_em_quote()
+                if quote is not None:
+                    return quote
+
+                if circuit_breaker.is_available(em_key) and not cache_hit:
+                    try:
+                        # Rate limiting applies only to a real network refresh;
+                        # hot-cache reads should return without artificial delay.
+                        self._set_random_user_agent()
+                        self._enforce_rate_limit()
+
+                        logger.info("Fetching Akshare Eastmoney HK realtime market snapshot")
+                        api_start = time.time()
+                        df = ak.stock_hk_spot_em()
+                        api_elapsed = time.time() - api_start
+
+                        if not isinstance(df, pd.DataFrame):
+                            raise TypeError("stock_hk_spot_em did not return a DataFrame")
+                        if '代码' not in df.columns:
+                            raise KeyError("stock_hk_spot_em response is missing the code column")
+                        if df.empty:
+                            raise ValueError("stock_hk_spot_em returned an empty market snapshot")
+
+                        hk_cache['data'] = df
+                        hk_cache['timestamp'] = time.time()
+                        hk_cache['last_result'] = 'success'
+                        logger.info(
+                            "Cached Akshare Eastmoney HK realtime snapshot: records=%d elapsed=%.2fs ttl=%ss",
+                            len(df),
+                            api_elapsed,
+                            hk_cache['ttl'],
+                        )
+
+                        quote = build_em_quote(df)
+                        circuit_breaker.record_success(em_key)
+                        if quote is not None:
+                            return quote
+                    except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics and circuit state preserve the Sina fallback.
+                        hk_cache['data'] = None
+                        hk_cache['timestamp'] = time.time()
+                        hk_cache['last_result'] = 'failure'
+                        log_safe_exception(
+                            logger,
+                            "Akshare Eastmoney HK realtime quote failed; trying Sina fallback",
+                            exc,
+                            error_code="akshare_hk_eastmoney_realtime_quote_failed",
+                            level=logging.WARNING,
+                            context={"symbol": stock_code},
+                        )
+                        circuit_breaker.record_failure(
+                            em_key,
+                            "akshare_hk_eastmoney_realtime_quote_failed",
+                        )
+                elif not cache_hit:
+                    logger.info(
+                        "Akshare Eastmoney HK realtime circuit is open; trying Sina fallback"
+                    )
 
         # --- Backup Data Source: Sina ---
         if not circuit_breaker.is_available(sina_key):
@@ -1631,6 +1721,9 @@ class AkshareFetcher(BaseFetcher):
             return None
 
         try:
+            self._set_random_user_agent()
+            self._enforce_rate_limit()
+
             logger.info(f"[API调用] ak.stock_hk_spot() 获取港股实时行情（备用）...")
             import time as _time
             api_start = _time.time()
@@ -1660,7 +1753,7 @@ class AkshareFetcher(BaseFetcher):
             logger.info(f"[港股实时行情-备用] {stock_code} {quote.name}: 价格={quote.price}, 涨跌={quote.change_pct}%")
             return quote
 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics and circuit state preserve provider failover.
             log_safe_exception(
                 logger,
                 "Akshare Sina HK realtime quote fallback failed",

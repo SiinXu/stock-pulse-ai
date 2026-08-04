@@ -10,6 +10,18 @@ import pandas as pd
 from data_provider.tencent_fetcher import TencentFetcher, _to_tencent_symbol
 
 
+def test_tencent_priority_defaults_to_final_fallback_and_allows_override() -> None:
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "5"}):
+        assert TencentFetcher().priority == 5
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "2"}):
+        assert TencentFetcher().priority == 2
+
+
+def test_invalid_tencent_priority_falls_back_to_final_position() -> None:
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "invalid"}):
+        assert TencentFetcher().priority == 5
+
+
 def test_tencent_symbol_conversion_supports_a_share_markets() -> None:
     assert _to_tencent_symbol("600519") == "sh600519"
     assert _to_tencent_symbol("000001") == "sz000001"
