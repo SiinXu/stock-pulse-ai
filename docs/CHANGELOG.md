@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Kept Tencent direct daily K-lines as the final built-in A-share fallback while preserving configurable provider priority and failure failover.
 - [Fixed] Routed bare four- and five-digit Hong Kong stock codes to Yahoo Finance's `.HK` market instead of the Shenzhen fallback.
 - [Fixed] Made Longbridge volume-ratio history calls use keyword arguments so SDK versions with different positional `time` and `count` ordering remain compatible.
 
