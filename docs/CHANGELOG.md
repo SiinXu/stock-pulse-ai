@@ -13,7 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Kept Tencent direct daily K-lines as the final built-in A-share fallback while preserving configurable provider priority and failure failover.
 - [Fixed] Routed bare four- and five-digit Hong Kong stock codes to Yahoo Finance's `.HK` market instead of the Shenzhen fallback.
 - [Fixed] Made Longbridge volume-ratio history calls use keyword arguments so SDK versions with different positional `time` and `count` ordering remain compatible.
+
+- [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
+- [Fixed] Rejected desktop update IPC requests that do not originate from the Electron main Web window.
+- [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
+- [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
+- [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
+
+- [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
+- [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
+- [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
+- [Docs] Complete the AGENTS.md CI verification matrix with `changes` and `pydanticai-installed`.
+- [Tests] Enforce Copilot/AGENTS Unreleased type token parity via `scripts/check_ai_assets.py`.
 
 ## [3.27.0] - 2026-08-04
 
