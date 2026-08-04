@@ -326,6 +326,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 
 > Behavior note: Search and social sentiment are optional enhancement services. If either service fails to initialize, the system logs a warning and degrades gracefully by skipping that stage without blocking the core analysis flow.
 
+> Foreign-stock English news: mapped U.S./Hong Kong forms such as `AAPL.US`, `HK00700`, and `00700.HK` are canonicalized before search. Even when the display name is Chinese, news, event/comprehensive-intelligence queries, and relevance scoring use the shared English company aliases. Unmapped tickers retain the existing fallback behavior.
+
 ### Data Source Configuration
 
 | Variable | Description | Default | Required |

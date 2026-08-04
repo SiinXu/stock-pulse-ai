@@ -2177,6 +2177,162 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         parsed = SearchService._normalize_news_publish_date(rfc_text)
         self.assertEqual(parsed, expected_local_date)
 
+    def test_is_foreign_stock_accepts_canonical_suffix_forms(self) -> None:
+        """Foreign-stock detection must accept bare, prefixed, and suffixed forms."""
+        for code, expected in (
+            ("AAPL", True),
+            ("AAPL.US", True),
+            ("AAPL.N", True),
+            ("00700", True),
+            ("00700.HK", True),
+            ("HK00700", True),
+            ("BRK.B", True),
+            ("600519", False),
+            ("600519.SH", False),
+            ("", False),
+        ):
+            with self.subTest(stock_code=code):
+                self.assertEqual(SearchService._is_foreign_stock(code), expected)
+
+    def test_foreign_english_aliases_resolve_only_chinese_display_names(self) -> None:
+        """Mapped foreign tickers should expose canonical aliases only when needed."""
+        from src.data.stock_mapping import foreign_stock_english_aliases
+
+        cases = (
+            ("AAPL", "苹果", ("Apple Inc.", "Apple")),
+            ("00700.HK", "腾讯控股", ("Tencent Holdings", "Tencent")),
+            ("BABA", "阿里巴巴", ("Alibaba Group Holding Limited", "Alibaba")),
+            ("09988", "阿里巴巴", ("Alibaba Group Holding", "Alibaba")),
+            ("PDD", "拼多多", ("PDD Holdings Inc.", "Pinduoduo")),
+        )
+        for code, name, expected in cases:
+            with self.subTest(stock_code=code):
+                self.assertEqual(
+                    foreign_stock_english_aliases(code, name),
+                    expected,
+                )
+
+        for code, name in (("AMD", "AMD"), ("META", "Meta"), ("COIN", "Coinbase")):
+            with self.subTest(stock_code=code, stock_name=name):
+                self.assertEqual(
+                    foreign_stock_english_aliases(code, name),
+                    (),
+                )
+
+    def test_score_news_relevance_uses_english_alias_for_chinese_display_name(self) -> None:
+        """English headlines should count as direct news for Chinese display names."""
+        fresh = datetime.now().date().isoformat()
+        cases = (
+            ("AAPL", "苹果", "Apple reports earnings beat", "Quarterly results surpass estimates."),
+            ("AAPL.US", "苹果", "Apple reports earnings beat", "Quarterly results surpass estimates."),
+            ("00700", "腾讯控股", "Tencent reports profit rise", "Quarterly profit up 12% YoY"),
+            ("00700.HK", "腾讯控股", "Tencent reports profit rise", "Quarterly profit up 12% YoY"),
+            ("BABA", "阿里巴巴", "Alibaba reports earnings beat", "Quarterly revenue up 9% YoY"),
+            ("AMZN", "亚马逊", "Amazon reports earnings beat", "AWS growth re-accelerates"),
+            ("PDD", "拼多多", "Pinduoduo reports quarterly earnings", "Active buyers up 15% QoQ"),
+        )
+        for code, name, title, snippet in cases:
+            with self.subTest(stock_code=code):
+                scored = SearchService._score_news_relevance(
+                    _result(title, fresh, snippet=snippet),
+                    stock_code=code,
+                    stock_name=name,
+                )
+                self.assertEqual(scored.relevance_category, "direct_company_news")
+                self.assertIn(
+                    "英文别名",
+                    "；".join(scored.relevance_reasons or []),
+                )
+
+    def test_foreign_queries_use_english_alias_for_chinese_display_name(self) -> None:
+        """News, event, and comprehensive-intel queries must use English aliases."""
+        fresh = datetime.now().date().isoformat()
+
+        service = SearchService(
+            bocha_keys=["dummy_key"],
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        news_queries: list[str] = []
+        news_provider = SimpleNamespace(
+            is_available=True,
+            name="USProvider",
+            search=MagicMock(
+                side_effect=lambda query, max_results, **kwargs: (
+                    news_queries.append(query)
+                    or _response([_result("Apple earnings beat", fresh)])
+                )
+            ),
+        )
+        service._providers = [news_provider]
+        service.search_stock_news("AAPL", "苹果", max_results=5)
+        self.assertTrue(news_queries)
+        self.assertIn("Apple", news_queries[0])
+        self.assertNotIn("苹果", news_queries[0])
+
+        event_queries: list[str] = []
+        news_provider.search.side_effect = lambda query, max_results, **kwargs: (
+            event_queries.append(query)
+            or _response([_result("Microsoft earnings beat", fresh)])
+        )
+        service.search_stock_events("MSFT", "微软")
+        self.assertIn("Microsoft", event_queries[0])
+        self.assertNotIn("微软", event_queries[0])
+
+        intel_queries: list[str] = []
+        news_provider.search.side_effect = lambda query, max_results, **kwargs: (
+            intel_queries.append(query)
+            or _response([_result("Amazon latest news", fresh)])
+        )
+        with patch("src.search_service.time.sleep"):
+            service.search_comprehensive_intel(
+                stock_code="AMZN",
+                stock_name="亚马逊",
+                max_searches=3,
+            )
+        self.assertTrue(intel_queries)
+        self.assertTrue(all("Amazon" in query for query in intel_queries))
+        self.assertTrue(all("亚马逊" not in query for query in intel_queries))
+
+    def test_stock_english_name_map_matches_stock_name_map_foreign_keys(self) -> None:
+        """Every mapped foreign ticker should have exactly one alias-map entry."""
+        from src.data.stock_mapping import (
+            STOCK_ENGLISH_NAME_MAP,
+            STOCK_NAME_MAP,
+            canonicalize_foreign_stock_code,
+        )
+
+        stock_name_foreign_keys = {
+            canonicalize_foreign_stock_code(code)
+            for code in STOCK_NAME_MAP
+            if SearchService._is_foreign_stock(code)
+        }
+        english_map_keys = {
+            canonicalize_foreign_stock_code(code)
+            for code in STOCK_ENGLISH_NAME_MAP
+        }
+        self.assertEqual(english_map_keys, stock_name_foreign_keys)
+
+    def test_english_alias_dedup_prevents_snippet_double_count(self) -> None:
+        """Legal and short aliases must not count one snippet identity twice."""
+        item = SearchResult(
+            title="US stocks mixed after Fed comments",
+            snippet="Apple reports earnings beat and revenue grows.",
+            url="",
+            source="",
+        )
+        scored = SearchService._score_news_relevance(
+            item,
+            stock_code="AAPL",
+            stock_name="苹果",
+        )
+        self.assertEqual(scored.relevance_category, "sector_related_news")
+        self.assertLess(scored.relevance_score or 0, 38)
+        reasons = "；".join(scored.relevance_reasons or [])
+        self.assertIn("摘要命中公司英文别名 Apple", reasons)
+        self.assertNotIn("标题命中公司英文别名", reasons)
+
 
 if __name__ == "__main__":
     unittest.main()
