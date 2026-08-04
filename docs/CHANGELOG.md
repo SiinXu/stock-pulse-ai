@@ -12,12 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
+- [Changed] Pilot runtime validation on the Web stocks API module so response shape mismatches surface through ParsedApiError.
 - [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
 - [Fixed] Rejected desktop update IPC requests that do not originate from the Electron main Web window.
 - [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
 - [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
 
+- [Tests] Patched the stock-index data boundary instead of `resolve_index_stock_code` so the report-code normalization matrix exercises the real resolver on every delivery path.
 - [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
 - [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
 - [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.

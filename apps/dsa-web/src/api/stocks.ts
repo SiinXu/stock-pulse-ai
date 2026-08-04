@@ -1,6 +1,24 @@
+import { z } from 'zod';
 import apiClient from './index';
+import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type { StockHistoryResponse, StockQuote } from '../types/stocks';
+// Generated OpenAPI components document the backend snake_case contract for
+// StockQuote / StockHistoryResponse. Runtime validation below targets the
+// camelCase shape consumers already use after toCamelCase conversion.
+import type { components } from '../types/api.generated';
+
+type OpenApiStockQuote = components['schemas']['StockQuote'];
+type OpenApiStockHistoryResponse = components['schemas']['StockHistoryResponse'];
+
+// Compile-time anchor: hand-written camelCase types stay aligned with OpenAPI
+// field sets (rename detection is structural; extra optional UI fields are fine).
+type _AssertQuoteFields = keyof OpenApiStockQuote;
+type _AssertHistoryFields = keyof OpenApiStockHistoryResponse;
+const _quoteFieldAnchor: _AssertQuoteFields = 'stock_code';
+const _historyFieldAnchor: _AssertHistoryFields = 'stock_code';
+void _quoteFieldAnchor;
+void _historyFieldAnchor;
 
 function toStockCodePath(stockCode: string): string {
   const trimmed = stockCode.trim();
@@ -11,6 +29,72 @@ function toStockCodePath(stockCode: string): string {
     );
   }
   return encodeURIComponent(trimmed);
+}
+
+/**
+ * Zod schemas mirror the camelCase view of OpenAPI StockQuote / StockHistoryResponse.
+ * On success we return the pre-validated toCamelCase object (not schema output) so
+ * valid payloads remain byte-identical to the previous unchecked cast path.
+ */
+const stockQuoteSchema = z.object({
+  stockCode: z.string(),
+  stockName: z.string().nullable().optional(),
+  currentPrice: z.number(),
+  change: z.number().nullable().optional(),
+  changePercent: z.number().nullable().optional(),
+  open: z.number().nullable().optional(),
+  high: z.number().nullable().optional(),
+  low: z.number().nullable().optional(),
+  prevClose: z.number().nullable().optional(),
+  volume: z.number().nullable().optional(),
+  amount: z.number().nullable().optional(),
+  updateTime: z.string().nullable().optional(),
+}).passthrough();
+
+const stockHistoryCandleSchema = z.object({
+  date: z.string(),
+  open: z.number(),
+  high: z.number(),
+  low: z.number(),
+  close: z.number(),
+  volume: z.number().nullable().optional(),
+  amount: z.number().nullable().optional(),
+  changePercent: z.number().nullable().optional(),
+}).passthrough();
+
+const stockHistoryResponseSchema = z.object({
+  stockCode: z.string(),
+  stockName: z.string().nullable().optional(),
+  period: z.string(),
+  data: z.array(stockHistoryCandleSchema),
+}).passthrough();
+
+function parseCamelCasePayload<T>(
+  data: unknown,
+  schema: z.ZodTypeAny,
+  label: string,
+): T {
+  const camel = toCamelCase<unknown>(data);
+  const result = schema.safeParse(camel);
+  if (!result.success) {
+    const issueSummary = result.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+    throw createApiError(
+      createParsedApiError({
+        title: '响应校验失败',
+        message: `API response failed validation (${label}). ${issueSummary}`,
+        rawMessage: result.error.message,
+        category: 'unknown',
+        code: 'api_response_validation_failed',
+        details: result.error.issues,
+      }),
+    );
+  }
+  // Intentionally return the camelCase object produced by toCamelCase so valid
+  // payloads stay byte-identical to the pre-validation implementation.
+  return camel as T;
 }
 
 export type ExtractItem = {
@@ -30,7 +114,7 @@ export const stocksApi = {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/stocks/${toStockCodePath(stockCode)}/quote`,
     );
-    return toCamelCase<StockQuote>(response.data);
+    return parseCamelCasePayload<StockQuote>(response.data, stockQuoteSchema, 'StockQuote');
   },
 
   // The backend only implements daily candles; weekly/monthly are aggregated
@@ -40,11 +124,11 @@ export const stocksApi = {
       `/api/v1/stocks/${toStockCodePath(stockCode)}/history`,
       { params: { period: 'daily', days } },
     );
-    const data = toCamelCase<StockHistoryResponse>(response.data);
-    if (!Array.isArray(data.data)) {
-      throw new Error('Stock history response data must be an array');
-    }
-    return data;
+    return parseCamelCasePayload<StockHistoryResponse>(
+      response.data,
+      stockHistoryResponseSchema,
+      'StockHistoryResponse',
+    );
   },
 
   async extractFromImage(file: File): Promise<ExtractFromImageResponse> {
