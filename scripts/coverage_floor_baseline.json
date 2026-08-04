@@ -7,9 +7,9 @@
     "data_provider",
     "bot"
   ],
-  "floor_percent": 0.0,
-  "measured_percent": 0.0,
+  "floor_percent": 82.08,
+  "measured_percent": 82.5785,
   "epsilon": 0.5,
   "measured_command": "python -m pytest -m 'not network and not benchmark' --cov=src --cov=api --cov=data_provider --cov=bot --cov-report=json:coverage.json",
-  "notes": "PROVISIONAL: floor 0 until first measured offline suite; will be replaced with measured-epsilon after a clean run."
+  "notes": "Measured from local offline suite on 2026-08-04 (7836 passed, 10 benchmark deselected); floor = measured - 0.5pt epsilon."
 }
