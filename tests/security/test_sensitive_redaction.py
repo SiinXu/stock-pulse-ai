@@ -8,6 +8,7 @@ import logging
 import time
 from urllib.parse import quote
 
+import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
@@ -1571,9 +1572,11 @@ def test_set_cookie_redaction_handles_folded_and_combined_fields() -> None:
     assert "Set-Cookie: [REDACTED] next" in rendered_log
 
 
+@pytest.mark.benchmark
 def test_field_scanner_checks_one_public_boundary_per_whitespace_run(
     monkeypatch,
 ) -> None:
+    """Wall-clock: hostile near-matches must stay under 0.5s (noisy CI)."""
     original_pattern = sanitize_module._PUBLIC_DIAGNOSTIC_FIELD_PATTERN
 
     class CountingPattern:
