@@ -6,7 +6,7 @@
 - 决策者: Maintainer（SiinXu）
 - 实施基线: `main@b8983fc7`
 - 关联文档:
-  - `docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md`（2026-07-19 改判：恢复实验 Runtime，Native 默认不变）
+  - `docs/adr/ADR-002-pydanticai-runtime-reinstatement.md`（2026-07-19 改判：恢复实验 Runtime，Native 默认不变）
   - `docs/architecture/pydanticai-runtime-adoption-decision.md`（裁决证据与实施结果）
   - `docs/architecture/pydanticai-runtime-development-plan.md`（历史计划，已停止）
   - `docs/architecture/pydanticai-runtime-recovery-plan.md`（历史恢复计划，已停止）

@@ -141,7 +141,8 @@ describe('MarketReviewPage', () => {
     expect(primaryActions.every((button) => button.getAttribute('data-variant') === 'primary')).toBe(true);
     const historyRail = screen.getByTestId('home-history-list-scroll')
       .closest('aside')?.parentElement;
-    expect(historyRail).toHaveClass('self-start');
+    expect(historyRail).toHaveClass('h-full');
+    expect(historyRail).not.toHaveClass('self-start');
     expect(historyRail).not.toHaveClass('min-h-96');
   });
 

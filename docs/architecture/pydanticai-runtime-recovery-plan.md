@@ -11,7 +11,7 @@
 - 日期：2026-07-19
 - 审计基线：`main@309268760699cd9a833e702b6b8b0b1a8545376a`
 - 合并来源：[PR #18](https://github.com/SiinXu/stock-pulse-ai/pull/18)
-- 上位架构决策：`docs/architecture/ADR-001-agent-runtime.md`（`Accepted`）
+- 上位架构决策：`docs/adr/ADR-001-agent-runtime.md`（`Accepted`）
 - 原始开发计划：`docs/architecture/pydanticai-runtime-development-plan.md`（历史）
 - 用途：记录 PR #18 合入后的真实实现状态，并把未达到原计划验收条件的部分拆成可独立验证、独立回滚的小 PR。
 
@@ -107,7 +107,7 @@ StockPulse Native Architecture
 
 - `docs/architecture/pydanticai-runtime-recovery-plan.md`
 - `docs/stockpulse-work-tracker.md`
-- 必要时更新 `docs/architecture/ADR-001-agent-runtime.md` 的实施状态附注，但不改变已批准决策。
+- 必要时更新 `docs/adr/ADR-001-agent-runtime.md` 的实施状态附注，但不改变已批准决策。
 
 **验证**
 

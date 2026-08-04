@@ -90,6 +90,10 @@ export interface SystemConfigFieldSchema {
   examples?: string[];
   docs?: SystemConfigDocLink[];
   warningCodes?: string[];
+  /** True when the field remains supported but is not the recommended path. */
+  deprecated?: boolean;
+  /** Canonical replacement when deprecated is true. */
+  replacement?: string | null;
   contract?: ConfigFieldContract;
   uiPlacement?: SystemConfigUIPlacement | null;
 }

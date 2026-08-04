@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy import desc
 
 from src.core.market_review import MARKET_REVIEW_HISTORY_CODE, MARKET_REVIEW_REPORT_TYPE
-from src.market_analyzer import MarketAnalyzer
+from src.market.analyzer import MarketAnalyzer
 from src.schemas.market_light import MarketLightSnapshot
 from src.storage import AnalysisHistory, DatabaseManager
 from src.utils.sanitize import log_safe_exception

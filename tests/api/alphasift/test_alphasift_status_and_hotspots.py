@@ -851,6 +851,14 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
                     "src.services.alphasift_service._import_alphasift_hotspot",
                     return_value=SimpleNamespace(discover_hotspots=MagicMock(return_value=rows)),
                 ),
+                patch(
+                    "src.services.alphasift_service.DsaEastMoneyHotspotProvider.hotspot_rows",
+                    return_value=[],
+                ) as provider_rows_mock,
+                patch(
+                    "requests.sessions.Session.request",
+                    side_effect=AssertionError("detail prefetch test must not perform outbound requests"),
+                ) as outbound_request,
                 patch.object(alphasift_service.AlphaSiftService, "hotspot_detail", side_effect=detail_side_effect) as detail_mock,
             ):
                 payload = self._hotspots(config=config, provider="akshare", top=2, refresh=True, include_details=True)
@@ -861,6 +869,8 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         self.assertEqual(payload["details"]["Moly"]["route"][0]["title"], "Moly event")
         self.assertEqual(cache_payload["payload"]["details"]["Copper"]["summary"], "Copper summary")
         self.assertEqual(detail_mock.call_count, 2)
+        provider_rows_mock.assert_called()
+        outbound_request.assert_not_called()
 
     def test_hotspot_news_local_summary_extracts_event_instead_of_truncating(self) -> None:
         text = (

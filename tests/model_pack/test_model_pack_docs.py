@@ -43,7 +43,11 @@ def test_changelog_keeps_the_model_pack_entry_flat() -> None:
     changelog = (ROOT / "docs/CHANGELOG.md").read_text(encoding="utf-8")
     unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## ", 1)[0]
 
-    assert "- [Added] Added a versioned data-only Model Pack format" in unreleased
+    # The entry stays documented wherever it currently lives: it carries the
+    # flat `- [Added] ` prefix while unreleased, and loses it once a release
+    # consolidates it under a `### Added` heading. Only the flat-format rule for
+    # `[Unreleased]` is positional.
+    assert "Added a versioned data-only Model Pack format" in changelog
     assert "\n### " not in unreleased
 
 

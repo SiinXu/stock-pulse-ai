@@ -3,13 +3,8 @@
   "description": "Allowlisted production importers of ADR-006 legacy facade modules. New production imports must use the canonical package and must not expand this list without an explicit migration plan.",
   "facades": {
     "src.analysis_context_pack_overview": [
-      "api/v1/endpoints/analysis.py",
-      "api/v1/endpoints/history.py",
       "src/core/pipeline.py",
-      "src/core/stages/persistence.py",
-      "src/services/alert_service.py",
-      "src/services/alert_worker.py",
-      "src/services/run_flow.py"
+      "src/core/stages/persistence.py"
     ],
     "src.analysis_context_pack_prompt": [
       "src/core/pipeline.py",
@@ -17,16 +12,13 @@
       "src/phase_decision_guardrail.py"
     ],
     "src.market_analyzer": [
-      "src/core/market_review.py",
-      "src/services/market_light_service.py"
+      "src/core/market_review.py"
     ],
     "src.market_context": [
-      "bot/stock_symbols.py",
       "src/agent/chat_context.py",
       "src/agent/executor.py",
       "src/agent/executor_parts/run.py",
-      "src/analyzer.py",
-      "src/services/stock_code_utils.py"
+      "src/analyzer.py"
     ],
     "src.market_phase_prompt": [
       "src/agent/agents/base_agent.py",
@@ -35,8 +27,6 @@
       "src/analyzer.py"
     ],
     "src.market_phase_summary": [
-      "api/v1/endpoints/analysis.py",
-      "api/v1/endpoints/history.py",
       "src/analysis_context_pack/overview.py",
       "src/core/pipeline.py",
       "src/core/stages/analysis.py",
@@ -46,13 +36,7 @@
       "src/core/stages/analysis_stock.py",
       "src/core/stages/persistence.py",
       "src/notification.py",
-      "src/phase_decision_guardrail.py",
-      "src/services/alert_service.py",
-      "src/services/alert_worker.py",
-      "src/services/analysis_service.py",
-      "src/services/backtest_service.py",
-      "src/services/history_service.py",
-      "src/services/report_renderer.py"
+      "src/phase_decision_guardrail.py"
     ],
     "src.market_sector_analysis": [
       "src/market/analyzer.py"
@@ -70,13 +54,8 @@
       "canonical": "src.analysis_context_pack.overview",
       "definition": "src/analysis_context_pack_overview.py",
       "importers": [
-        "api/v1/endpoints/analysis.py",
-        "api/v1/endpoints/history.py",
         "src/core/pipeline.py",
-        "src/core/stages/persistence.py",
-        "src/services/alert_service.py",
-        "src/services/alert_worker.py",
-        "src/services/run_flow.py"
+        "src/core/stages/persistence.py"
       ]
     },
     "src.analysis_context_pack_prompt": {
@@ -92,20 +71,17 @@
       "canonical": "src.market.analyzer",
       "definition": "src/market_analyzer.py",
       "importers": [
-        "src/core/market_review.py",
-        "src/services/market_light_service.py"
+        "src/core/market_review.py"
       ]
     },
     "src.market_context": {
       "canonical": "src.market.context",
       "definition": "src/market_context.py",
       "importers": [
-        "bot/stock_symbols.py",
         "src/agent/chat_context.py",
         "src/agent/executor.py",
         "src/agent/executor_parts/run.py",
-        "src/analyzer.py",
-        "src/services/stock_code_utils.py"
+        "src/analyzer.py"
       ]
     },
     "src.market_phase_prompt": {
@@ -122,8 +98,6 @@
       "canonical": "src.market.phase_summary",
       "definition": "src/market_phase_summary.py",
       "importers": [
-        "api/v1/endpoints/analysis.py",
-        "api/v1/endpoints/history.py",
         "src/analysis_context_pack/overview.py",
         "src/core/pipeline.py",
         "src/core/stages/analysis.py",
@@ -133,13 +107,7 @@
         "src/core/stages/analysis_stock.py",
         "src/core/stages/persistence.py",
         "src/notification.py",
-        "src/phase_decision_guardrail.py",
-        "src/services/alert_service.py",
-        "src/services/alert_worker.py",
-        "src/services/analysis_service.py",
-        "src/services/backtest_service.py",
-        "src/services/history_service.py",
-        "src/services/report_renderer.py"
+        "src/phase_decision_guardrail.py"
       ]
     },
     "src.market_sector_analysis": {

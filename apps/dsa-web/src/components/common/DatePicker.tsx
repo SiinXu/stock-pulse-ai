@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
@@ -83,6 +83,10 @@ export const DatePicker = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const calendarButtonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const isControlDisabled = useCallback(
+    () => inputRef.current?.matches(':disabled') === true,
+    [],
+  );
   const [isOpen, setIsOpen] = useState(false);
   const selectedDate = parseIsoDate(value);
   const today = useMemo(() => new Date(), []);
@@ -113,7 +117,7 @@ export const DatePicker = ({
   }), [language]);
 
   const openPicker = useCallback(() => {
-    if (disabled) return;
+    if (isControlDisabled()) return;
     const initialDate = parseIsoDate(value) ?? today;
     let initialIso = toIsoDate(initialDate);
     if (min && initialIso < min) initialIso = min;
@@ -123,7 +127,7 @@ export const DatePicker = ({
     setFocusedDateIso(initialIso);
     prepareForOpen();
     setIsOpen(true);
-  }, [disabled, max, min, prepareForOpen, today, value]);
+  }, [isControlDisabled, max, min, prepareForOpen, today, value]);
 
   const closePicker = useCallback((restoreFocus = false) => {
     setIsOpen(false);
@@ -134,6 +138,28 @@ export const DatePicker = ({
       });
     }
   }, [resetPosition]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const observer = new MutationObserver(() => {
+      if (isControlDisabled()) {
+        closePicker();
+      }
+    });
+    observer.observe(input, { attributes: true, attributeFilter: ['disabled'] });
+
+    let ancestor = input.parentElement;
+    while (ancestor) {
+      if (ancestor instanceof HTMLFieldSetElement) {
+        observer.observe(ancestor, { attributes: true, attributeFilter: ['disabled'] });
+      }
+      ancestor = ancestor.parentElement;
+    }
+
+    return () => observer.disconnect();
+  }, [closePicker, isControlDisabled]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -173,6 +199,7 @@ export const DatePicker = ({
 
   const resolvedAriaLabel = ariaLabel ?? label;
   const resolvedPlaceholder = placeholder ?? t('common.selectPlaceholder');
+  const resolvedFieldLabel = resolvedAriaLabel ?? resolvedPlaceholder;
   const errorId = error ? `${resolvedId}-error` : undefined;
   const describedBy = [ariaDescribedBy, errorId].filter(Boolean).join(' ') || undefined;
   const isValueInvalid = value !== '' && (
@@ -244,8 +271,9 @@ export const DatePicker = ({
         ref={triggerRef}
         data-control="date-picker"
         data-size={size}
+        onClick={() => (isOpen ? closePicker() : openPicker())}
         className={cn(
-          'flex w-full cursor-text items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+          'flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
           DATE_PICKER_SIZE_STYLES[size].trigger,
           triggerClassName,
@@ -255,7 +283,6 @@ export const DatePicker = ({
           ref={inputRef}
           id={resolvedId}
           type="text"
-          inputMode="numeric"
           data-testid={testId}
           data-value={value}
           value={value}
@@ -263,31 +290,71 @@ export const DatePicker = ({
           required={required}
           pattern="\d{4}-\d{2}-\d{2}"
           aria-label={resolvedAriaLabel}
+          aria-readonly="true"
           aria-invalid={Boolean(error || isValueInvalid) || undefined}
           aria-describedby={describedBy}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           placeholder={resolvedPlaceholder}
-          onChange={(event) => onChange(event.target.value)}
+          inputMode="none"
+          onBeforeInput={(event) => event.preventDefault()}
+          onPaste={(event) => event.preventDefault()}
+          onCut={(event) => event.preventDefault()}
+          onDrop={(event) => event.preventDefault()}
+          onChange={(event) => {
+            event.currentTarget.value = value;
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && isOpen) {
               event.preventDefault();
               closePicker();
-            } else if (event.altKey && event.key === 'ArrowDown') {
+            } else if (
+              !isOpen
+              && (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown')
+            ) {
               event.preventDefault();
               openPicker();
+            } else if (
+              event.key === 'Backspace'
+              || event.key === 'Delete'
+              || (
+                event.key.length === 1
+                && !event.ctrlKey
+                && !event.metaKey
+                && !event.altKey
+              )
+            ) {
+              event.preventDefault();
             }
           }}
-          className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-text tabular-nums sm:text-xs"
+          className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-base text-foreground outline-none placeholder:text-muted-text tabular-nums sm:text-xs"
         />
+        {!required && value && !disabled ? (
+          <button
+            type="button"
+            aria-label={`${t('common.clear')} ${resolvedFieldLabel}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (isControlDisabled()) return;
+              onChange('');
+              closePicker();
+              inputRef.current?.focus();
+            }}
+            className={cn(
+              'flex shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20',
+              DATE_PICKER_SIZE_STYLES[size].action,
+            )}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
         <button
           ref={calendarButtonRef}
           type="button"
           disabled={disabled}
-          aria-label={formatUiText(t('common.openCalendar'), { field: resolvedAriaLabel ?? resolvedPlaceholder })}
+          aria-label={formatUiText(t('common.openCalendar'), { field: resolvedFieldLabel })}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
-          onClick={() => (isOpen ? closePicker() : openPicker())}
           className={cn(
             'flex shrink-0 items-center justify-center gap-1 rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60',
             DATE_PICKER_SIZE_STYLES[size].action,
@@ -359,6 +426,10 @@ export const DatePicker = ({
                   onFocus={() => setFocusedDateIso(isoDate)}
                   onKeyDown={(event) => handleDayKeyDown(date, event)}
                   onClick={() => {
+                    if (isControlDisabled()) {
+                      closePicker();
+                      return;
+                    }
                     onChange(isoDate);
                     closePicker(true);
                   }}

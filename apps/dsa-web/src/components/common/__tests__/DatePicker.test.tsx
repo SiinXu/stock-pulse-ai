@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DatePicker } from '../DatePicker';
 
@@ -9,7 +9,7 @@ describe('DatePicker', () => {
       <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="交易日期" />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 交易日期 日历' }));
+    fireEvent.click(screen.getByRole('textbox', { name: '交易日期' }));
     expect(screen.getByRole('dialog', { name: '交易日期' })).toBeInTheDocument();
 
     const nextDate = document.querySelector<HTMLButtonElement>('[data-date="2026-07-20"]');
@@ -32,18 +32,123 @@ describe('DatePicker', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 日期 日历' }));
+    fireEvent.click(screen.getByRole('textbox', { name: '日期' }));
     expect(document.querySelector('[data-date="2026-07-09"]')).toBeDisabled();
     expect(document.querySelector('[data-date="2026-07-20"]')).not.toBeDisabled();
   });
 
-  it('keeps focus in the editable input instead of opening the calendar on focus', () => {
-    render(<DatePicker value="2026-07-18" onChange={() => undefined} ariaLabel="日期" />);
+  it('keeps the date field picker-only and opens the calendar from the keyboard', () => {
+    const onChange = vi.fn();
+    render(<DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />);
 
     const input = screen.getByRole('textbox', { name: '日期' });
+    expect(input).not.toHaveAttribute('readonly');
+    expect(input).toHaveAttribute('aria-readonly', 'true');
     input.focus();
 
     expect(input).toHaveFocus();
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: '2026-07-19' } });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input).toHaveValue('2026-07-18');
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('dialog', { name: '日期' })).toBeInTheDocument();
+  });
+
+  it('keeps native required and pattern validation active', () => {
+    const { rerender } = render(
+      <DatePicker value="" onChange={() => undefined} ariaLabel="交易日期" required />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '交易日期' }) as HTMLInputElement;
+    expect(input.willValidate).toBe(true);
+    expect(input.validity.valueMissing).toBe(true);
+    expect(input.checkValidity()).toBe(false);
+
+    rerender(
+      <DatePicker value="07/18/2026" onChange={() => undefined} ariaLabel="交易日期" required />,
+    );
+    expect(input.validity.patternMismatch).toBe(true);
+    expect(input.checkValidity()).toBe(false);
+  });
+
+  it('clears only optional values without opening the calendar and returns focus to the field', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '清除 日期' }));
+    expect(onChange).toHaveBeenCalledWith('');
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '日期' })).toHaveFocus();
+
+    rerender(
+      <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" required />,
+    );
+    expect(screen.queryByRole('button', { name: '清除 日期' })).not.toBeInTheDocument();
+  });
+
+  it('does not open or expose a clear action while disabled', () => {
+    render(
+      <DatePicker value="2026-07-18" onChange={() => undefined} ariaLabel="日期" disabled />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '日期' });
+    expect(input).toBeDisabled();
+    expect(screen.getByRole('button', { name: '打开 日期 日历' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '清除 日期' })).not.toBeInTheDocument();
+    fireEvent.click(input.parentElement!);
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+  });
+
+  it('inherits disabled fieldset semantics across wrapper and portal interactions', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <fieldset>
+        <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />
+      </fieldset>,
+    );
+
+    const input = screen.getByRole('textbox', { name: '日期' });
+    fireEvent.click(input.parentElement!);
+    expect(screen.getByRole('dialog', { name: '日期' })).toBeInTheDocument();
+
+    rerender(
+      <fieldset disabled>
+        <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />
+      </fieldset>,
+    );
+
+    expect(input).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(input.parentElement!);
+
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('guards an open portal when its ancestor fieldset becomes disabled outside React', () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <fieldset>
+        <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />
+      </fieldset>,
+    );
+
+    fireEvent.click(screen.getByRole('textbox', { name: '日期' }).parentElement!);
+    const day = document.querySelector<HTMLButtonElement>('[data-date="2026-07-20"]');
+    expect(day).not.toBeNull();
+
+    container.querySelector('fieldset')!.disabled = true;
+    fireEvent.click(day!);
+
+    expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
   });
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.market_context import detect_market
+from src.market.context import detect_market
 from src.services.stock_code_utils import (
     canonicalize_analysis_stock_code,
     normalize_code,

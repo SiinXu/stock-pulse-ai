@@ -558,7 +558,7 @@ class Config:
 
 
 _CONFIG_METHOD_GROUPS = (
-    (_ConfigLoadingMethods, ("_load_from_env",)),
+    (_ConfigLoadingMethods, ("_load_from_env", "_maybe_log_legacy_schedule_deprecation")),
     (
         _ConfigLLMMethods,
         (

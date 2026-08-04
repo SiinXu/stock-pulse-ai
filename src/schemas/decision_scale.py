@@ -99,22 +99,20 @@ def score_band_metadata(value: Any) -> dict[str, Any]:
     }
 
 
+def _mapping_or_empty(value: Any) -> Mapping[Any, Any]:
+    """Return value when it is a mapping; otherwise an empty mapping."""
+
+    return value if isinstance(value, Mapping) else {}
+
+
 def extract_decision_guardrail_reason(payload: Any) -> Optional[str]:
     """Extract an applied score/action guardrail reason from a result payload."""
 
-    data = payload if isinstance(payload, Mapping) else {}
-    dashboard = data.get("dashboard") if isinstance(data.get("dashboard"), Mapping) else {}
-    calibration = (
-        dashboard.get("decision_score_calibration")
-        if isinstance(dashboard.get("decision_score_calibration"), Mapping)
-        else {}
-    )
-    stability = (
-        dashboard.get("decision_stability")
-        if isinstance(dashboard.get("decision_stability"), Mapping)
-        else {}
-    )
-    metadata = data.get("metadata") if isinstance(data.get("metadata"), Mapping) else {}
+    data = _mapping_or_empty(payload)
+    dashboard = _mapping_or_empty(data.get("dashboard"))
+    calibration = _mapping_or_empty(dashboard.get("decision_score_calibration"))
+    stability = _mapping_or_empty(dashboard.get("decision_stability"))
+    metadata = _mapping_or_empty(data.get("metadata"))
 
     stability_applied = stability.get("applied")
     include_stability_reason = stability_applied not in (False, 0, "0", "false", "False")
