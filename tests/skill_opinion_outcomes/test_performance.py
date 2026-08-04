@@ -271,6 +271,9 @@ def test_filters_and_ordering_use_exact_bucket_identity(isolated_db) -> None:
         for bucket in filtered
     ] == [("alpha", "10d")]
 
+    single_skill = service.get_stats(skill_id="beta")["buckets"]
+    assert [bucket["skill_id"] for bucket in single_skill] == ["beta"]
+
 
 @pytest.mark.parametrize(
     "filters",

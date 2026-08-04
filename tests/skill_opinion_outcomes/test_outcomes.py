@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 import json
+import logging
 
 import pytest
 
@@ -12,8 +13,12 @@ from src.repositories.skill_opinion_sample_repo import (
     SkillOpinionSampleRepository,
 )
 from src.schemas.skill_opinion_outcome import (
+    AnalysisHistoryProjection,
     SkillOpinionInput,
+    SkillOpinionOutcomeCandidate,
+    SkillOpinionOutcomeEvaluation,
     SkillOpinionOutcomeEvaluator,
+    SkillOpinionSample,
     StockDailyBar,
 )
 from src.services.skill_opinion_outcome_service import (
@@ -98,6 +103,38 @@ def _seed_bars(
             )
 
 
+def _detached_candidate(
+    *,
+    stock_code: str = "600519",
+    history_code: str | None = None,
+) -> SkillOpinionOutcomeCandidate:
+    return SkillOpinionOutcomeCandidate(
+        sample=SkillOpinionSample(
+            id=1,
+            analysis_history_id=1,
+            stock_code=stock_code,
+            skill_id="alpha",
+            skill_version=None,
+            signal="buy",
+            confidence=0.8,
+            horizon=None,
+            data_quality_level=None,
+            opinion_created_at=None,
+            sample_schema_version="skill-opinion-sample-v1",
+            created_at=datetime(2024, 1, 2, 18, 0, 0),
+        ),
+        history=AnalysisHistoryProjection(
+            id=1,
+            stock_code=history_code if history_code is not None else stock_code,
+            raw_result="{}",
+            context_snapshot=_snapshot("2024-01-02"),
+            created_at=datetime(2024, 1, 2, 18, 0, 0),
+        ),
+        horizon="1d",
+        existing_outcome=None,
+    )
+
+
 @pytest.mark.parametrize(
     ("signal", "end_close", "expected_outcome", "expected_correct"),
     [
@@ -161,6 +198,50 @@ def test_pure_evaluator_defers_non_finite_computed_return() -> None:
     assert result.stock_return_pct is None
 
 
+@pytest.mark.parametrize(
+    ("signal", "horizon", "analysis_day", "start_close", "end_close", "status", "reason"),
+    [
+        ("moon", "1d", date(2024, 1, 2), 100.0, 101.0, "unable", "invalid_signal"),
+        ("buy", "2d", date(2024, 1, 2), 100.0, 101.0, "unable", "unsupported_horizon"),
+        ("buy", "1d", None, 100.0, 101.0, "unable", "missing_analysis_date"),
+        ("buy", "1d", date(2024, 1, 2), None, 101.0, "pending", "missing_start_close"),
+        ("buy", "1d", date(2024, 1, 2), object(), 101.0, "pending", "invalid_start_price"),
+        ("buy", "1d", date(2024, 1, 2), 100.0, None, "pending", "missing_end_close"),
+        ("buy", "1d", date(2024, 1, 2), 100.0, object(), "pending", "invalid_end_close"),
+    ],
+)
+def test_pure_evaluator_reports_boundary_failures(
+    signal,
+    horizon,
+    analysis_day,
+    start_close,
+    end_close,
+    status,
+    reason,
+) -> None:
+    result = SkillOpinionOutcomeEvaluator.evaluate(
+        signal=signal,
+        horizon=horizon,
+        analysis_date=analysis_day,
+        start_bar=StockDailyBar(
+            code="600519",
+            date=date(2024, 1, 2),
+            close=start_close,
+        ),
+        forward_bars=(
+            StockDailyBar(
+                code="600519",
+                date=date(2024, 1, 3),
+                close=end_close,
+            ),
+        ),
+    )
+
+    assert result.eval_status == status
+    assert result.unable_reason == reason
+    assert SkillOpinionOutcomeEvaluator._positive_finite_float(True) is None
+
+
 def test_run_materializes_and_evaluates_each_skill_own_signal(
     isolated_db,
 ) -> None:
@@ -197,6 +278,34 @@ def test_run_materializes_and_evaluates_each_skill_own_signal(
     assert by_skill["observer"]["eval_status"] == "observational"
     assert by_skill["observer"]["direction_correct"] is None
     assert by_skill["observer"]["directional_return_pct"] is None
+
+
+def test_unscoped_run_materializes_then_applies_exact_filters(
+    isolated_db,
+) -> None:
+    _add_history(isolated_db)
+    _seed_bars(
+        isolated_db,
+        code="600519",
+        bars=[
+            (date(2024, 1, 2), 100.0),
+            (date(2024, 1, 3), 105.0),
+        ],
+    )
+
+    result = SkillOpinionOutcomeService(
+        db_manager=isolated_db
+    ).run_outcomes(
+        skill_id="alpha",
+        stock_code="600519",
+        horizons=["1d", "1d"],
+        limit="2",
+    )
+
+    assert result["histories_scanned"] == 1
+    assert result["samples_created"] == 1
+    assert result["processed_keys"] == 1
+    assert result["items"][0]["outcome"] == "hit"
 
 
 def test_pending_retries_then_terminal_outcome_is_immutable(
@@ -249,6 +358,49 @@ def test_pending_retries_then_terminal_outcome_is_immutable(
     )
     assert stored is not None
     assert stored.stock_return_pct == pytest.approx(5.0)
+
+
+def test_repository_missing_sample_and_terminal_skip_are_explicit(
+    isolated_db,
+) -> None:
+    repo = SkillOpinionOutcomeRepository(isolated_db)
+    evaluation = SkillOpinionOutcomeEvaluation(
+        eval_status="unable",
+        unable_reason="invalid_metadata",
+    )
+
+    assert repo.persist_outcome(
+        sample_id=999_999,
+        horizon="1d",
+        engine_version=SKILL_OPINION_OUTCOME_ENGINE_VERSION,
+        evaluation=evaluation,
+    ) == (None, "missing_sample")
+
+    history_id = _add_history(isolated_db)
+    SkillOpinionSampleService(db_manager=isolated_db).materialize_history(
+        history_id
+    )
+    sample_id = SkillOpinionSampleRepository(
+        isolated_db
+    ).list_for_history(history_id)[0].id
+    outcome_id, status = repo.persist_outcome(
+        sample_id=sample_id,
+        horizon="1d",
+        engine_version=SKILL_OPINION_OUTCOME_ENGINE_VERSION,
+        evaluation=evaluation,
+    )
+    skipped_id, skipped_status = repo.persist_outcome(
+        sample_id=sample_id,
+        horizon="1d",
+        engine_version=SKILL_OPINION_OUTCOME_ENGINE_VERSION,
+        evaluation=SkillOpinionOutcomeEvaluation(
+            eval_status="pending",
+            unable_reason="should-not-overwrite",
+        ),
+    )
+
+    assert status == "created"
+    assert (skipped_id, skipped_status) == (outcome_id, "skipped")
 
 
 def test_run_limit_counts_outcome_keys_across_horizons(isolated_db) -> None:
@@ -568,3 +720,177 @@ def test_us_alias_and_canonical_history_code_share_one_identity(
 
     assert item["eval_status"] == "evaluated"
     assert item["outcome"] == "hit"
+
+
+@pytest.mark.parametrize("retry_marker_fails", [False, True])
+def test_candidate_failure_isolated_and_retry_marker_attempted(
+    monkeypatch,
+    caplog,
+    retry_marker_fails,
+) -> None:
+    candidate = _detached_candidate()
+
+    class StubRepo:
+        def list_candidate_keys(self, **_kwargs):
+            return [candidate]
+
+        def persist_outcome(self, **_kwargs):
+            if retry_marker_fails:
+                raise RuntimeError("retry marker failed")
+            return 1, "created"
+
+    service = SkillOpinionOutcomeService(
+        repo=StubRepo(),
+        sample_service=object(),
+    )
+
+    def _raise(_candidate):
+        raise RuntimeError("candidate failed")
+
+    monkeypatch.setattr(service, "_evaluate_candidate", _raise)
+    caplog.set_level(logging.WARNING)
+
+    result = service.run_outcomes(sample_id=1, horizons=["1d"])
+
+    assert result["processed_keys"] == 1
+    assert result["failed"] == 1
+    assert result["errors"] == [
+        {"sample_id": 1, "horizon": "1d", "error_type": "RuntimeError"}
+    ]
+    assert "skill_opinion_outcome_evaluation_deferred" in caplog.text
+    if retry_marker_fails:
+        assert "skill_opinion_outcome_retry_marker_failed" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("persist_status", "expected_created", "expected_skipped"),
+    [
+        ("missing_sample", 0, 1),
+        ("created", 1, 0),
+    ],
+)
+def test_service_handles_disappeared_sample_and_absent_readback(
+    monkeypatch,
+    persist_status,
+    expected_created,
+    expected_skipped,
+) -> None:
+    candidate = _detached_candidate()
+
+    class StubRepo:
+        def list_candidate_keys(self, **_kwargs):
+            return [candidate]
+
+        def persist_outcome(self, **_kwargs):
+            return None, persist_status
+
+        def get_outcome(self, **_kwargs):
+            return None
+
+    service = SkillOpinionOutcomeService(
+        repo=StubRepo(),
+        sample_service=object(),
+    )
+    monkeypatch.setattr(
+        service,
+        "_evaluate_candidate",
+        lambda _candidate: SkillOpinionOutcomeEvaluation(
+            eval_status="pending",
+            unable_reason="not-ready",
+        ),
+    )
+
+    result = service.run_outcomes(sample_id=1, horizons=["1d"])
+
+    assert result["created"] == expected_created
+    assert result["skipped"] == expected_skipped
+    assert result["items"] == []
+
+
+def test_candidate_defensive_identity_failures_are_terminal(
+    monkeypatch,
+) -> None:
+    candidate = _detached_candidate(stock_code="", history_code="")
+    service = SkillOpinionOutcomeService(
+        repo=object(),
+        sample_service=object(),
+    )
+    monkeypatch.setattr(
+        service,
+        "_resolve_analysis_date",
+        lambda _history: (date(2024, 1, 2), None),
+    )
+    monkeypatch.setattr(service, "_codes_equivalent", lambda *_args: True)
+    monkeypatch.setattr(
+        service,
+        "_resolve_expected_start_date",
+        lambda **_kwargs: (None, None),
+    )
+
+    unresolvable = service._evaluate_candidate(candidate)
+    assert unresolvable.eval_status == "unable"
+    assert unresolvable.unable_reason == "unresolvable_expected_start_date"
+
+    monkeypatch.setattr(
+        service,
+        "_resolve_expected_start_date",
+        lambda **_kwargs: (date(2024, 1, 2), None),
+    )
+    invalid_code = service._evaluate_candidate(candidate)
+    assert invalid_code.eval_status == "unable"
+    assert invalid_code.unable_reason == "invalid_stock_code"
+
+
+def test_outcome_service_pure_helpers_fail_closed() -> None:
+    projection = AnalysisHistoryProjection(
+        id=1,
+        stock_code="600519",
+        raw_result=None,
+        context_snapshot=None,
+        created_at=None,
+    )
+
+    assert SkillOpinionOutcomeService._resolve_analysis_date(projection) == (
+        None,
+        "missing_analysis_date",
+    )
+    assert SkillOpinionOutcomeService._resolve_expected_start_date(
+        stock_code="600519",
+        context_snapshot={},
+        analysis_date=None,
+    ) == (None, "missing_analysis_date")
+    assert SkillOpinionOutcomeService._resolve_expected_start_date(
+        stock_code="@@@",
+        context_snapshot={
+            "market_phase_summary": {
+                "market": "cn",
+                "effective_daily_bar_date": "2024-01-02",
+            }
+        },
+        analysis_date=date(2024, 1, 2),
+    ) == (None, "invalid_stock_code")
+    assert SkillOpinionOutcomeService._resolve_expected_start_date(
+        stock_code="600519",
+        context_snapshot={"market_phase_summary": {"market": "cn"}},
+        analysis_date=date(2024, 1, 2),
+    ) == (None, "missing_effective_daily_bar_date")
+    assert SkillOpinionOutcomeService._code_candidates(None) == []
+    assert SkillOpinionOutcomeService._code_candidates("@@@") == []
+    assert SkillOpinionOutcomeService._mapping(None) is None
+    assert SkillOpinionOutcomeService._mapping("not-json") is None
+    assert SkillOpinionOutcomeService._mapping("[]") is None
+    assert SkillOpinionOutcomeService._parse_date(
+        datetime(2024, 1, 2, 12, 0)
+    ) == date(2024, 1, 2)
+    assert SkillOpinionOutcomeService._parse_date(date(2024, 1, 3)) == date(
+        2024,
+        1,
+        3,
+    )
+    assert SkillOpinionOutcomeService._parse_date(123) is None
+    assert SkillOpinionOutcomeService._bounded_positive_int(
+        "2",
+        "limit",
+    ) == 2
+    with pytest.raises(ValueError, match="limit must be a positive integer"):
+        SkillOpinionOutcomeService._bounded_positive_int(object(), "limit")

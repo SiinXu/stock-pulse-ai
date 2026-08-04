@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 
 import pytest
@@ -234,3 +234,246 @@ def test_explicit_persistence_rejects_invalid_confidence(
     assert SkillOpinionSampleRepository(isolated_db).list_for_history(
         history_id
     ) == []
+
+
+def test_sample_identity_and_duplicate_skill_validation(isolated_db) -> None:
+    history_id = _add_history(isolated_db, raw_result="{}")
+    service = SkillOpinionSampleService(db_manager=isolated_db)
+    valid = SkillOpinionInput(
+        skill_id="alpha",
+        signal="buy",
+        confidence=0.5,
+    )
+
+    with pytest.raises(ValueError, match="stock_code is required"):
+        service.persist(
+            analysis_history_id=history_id,
+            stock_code="",
+            opinions=(valid,),
+        )
+    with pytest.raises(ValueError, match="stock_code exceeds"):
+        service.persist(
+            analysis_history_id=history_id,
+            stock_code="X" * 17,
+            opinions=(valid,),
+        )
+    with pytest.raises(ValueError, match="one row per skill_id"):
+        service.persist(
+            analysis_history_id=history_id,
+            stock_code="600519",
+            opinions=(valid, valid),
+        )
+    with pytest.raises(ValueError, match="analysis_history_id"):
+        service.persist(
+            analysis_history_id=0,
+            stock_code="600519",
+            opinions=(valid,),
+        )
+
+
+def test_sample_repository_rejects_ineligible_batches(isolated_db) -> None:
+    repo = SkillOpinionSampleRepository(isolated_db)
+    service = SkillOpinionSampleService(repo=repo)
+
+    assert repo.insert_missing([]) == 0
+    assert repo.insert_missing([{"skill_id": "missing-history"}]) == 0
+    assert repo.insert_missing(
+        [
+            {
+                "analysis_history_id": 999_999,
+                "stock_code": "600519",
+                "skill_id": "missing-history",
+            }
+        ]
+    ) == 0
+    assert repo.get_history(999_999) is None
+    assert service.materialize_history(999_999) == 0
+
+    empty_history_id = _add_history(isolated_db, raw_result="{}")
+    assert service.materialize_history(empty_history_id) == 0
+
+
+def test_pending_materialization_validates_and_applies_stock_filter(
+    isolated_db,
+) -> None:
+    matching_id = _add_history(
+        isolated_db,
+        code="600519",
+        raw_result=_raw_result(
+            {"skill_id": "alpha", "signal": "buy", "confidence": 0.7}
+        ),
+    )
+    other_id = _add_history(
+        isolated_db,
+        code="000001",
+        raw_result=_raw_result(
+            {"skill_id": "beta", "signal": "sell", "confidence": 0.6}
+        ),
+    )
+    service = SkillOpinionSampleService(db_manager=isolated_db)
+
+    assert service.materialize_pending(limit="2", stock_code="600519") == {
+        "histories_scanned": 1,
+        "samples_created": 1,
+    }
+    assert len(
+        SkillOpinionSampleRepository(isolated_db).list_for_history(matching_id)
+    ) == 1
+    assert SkillOpinionSampleRepository(isolated_db).list_for_history(
+        other_id
+    ) == []
+    with pytest.raises(ValueError, match="stock_code must not be blank"):
+        service.materialize_pending(stock_code="   ")
+    with pytest.raises(ValueError, match="limit must be a positive integer"):
+        service.materialize_pending(limit=object())
+    with pytest.raises(ValueError, match="limit must be a positive integer"):
+        service.materialize_pending(limit=True)
+
+
+def test_projection_supports_persisted_payload_shapes_and_malformed_inputs(
+) -> None:
+    item = {"skill_id": "alpha", "signal": "buy", "confidence": 0.7}
+    synthesis = {
+        "strategy_synthesis": {
+            "supporting_skills": [item],
+            "opposing_skills": {},
+        }
+    }
+
+    direct = SkillOpinionSampleService._opinions_from_raw_result(synthesis)
+    nested_raw = SkillOpinionSampleService._opinions_from_raw_result(
+        {"raw_response": json.dumps(synthesis)}
+    )
+
+    assert [opinion.skill_id for opinion in direct] == ["alpha"]
+    assert nested_raw == direct
+    assert SkillOpinionSampleService._opinions_from_raw_result(None) == []
+    assert SkillOpinionSampleService._opinions_from_raw_result("not-json") == []
+    assert SkillOpinionSampleService._opinions_from_raw_result([]) == []
+    assert SkillOpinionSampleService._strategy_synthesis(
+        {"raw_response": "{}"}
+    ) is None
+    assert SkillOpinionSampleService._project_opinion("not-a-mapping") is None
+    assert SkillOpinionSampleService._project_opinion(
+        {"skill_id": "X" * 129, "signal": "buy", "confidence": 0.5}
+    ) is None
+    assert SkillOpinionSampleService._project_opinion(
+        {"skill_id": "alpha", "signal": "buy", "confidence": float("nan")}
+    ) is None
+
+
+def test_data_quality_projection_fails_closed_for_malformed_context() -> None:
+    service = SkillOpinionSampleService
+
+    assert service._data_quality_level(None) is None
+    assert service._data_quality_level({}) is None
+    assert service._data_quality_level(
+        {"analysis_context_pack_overview": "invalid"}
+    ) is None
+    assert service._data_quality_level(
+        {"analysis_context_pack_overview": {"data_quality": "invalid"}}
+    ) is None
+    assert service._data_quality_level(
+        {
+            "analysis_context_pack_overview": {
+                "data_quality": {"level": "unexpected"}
+            }
+        }
+    ) is None
+    assert service._mapping(json.dumps({"ok": True})) == {"ok": True}
+    assert service._mapping(json.dumps(["not", "a", "mapping"])) is None
+
+
+@pytest.mark.parametrize(
+    ("opinion", "message"),
+    [
+        (object(), "SkillOpinionInput"),
+        (
+            SkillOpinionInput(skill_id="", signal="buy", confidence=0.5),
+            "valid skill_id",
+        ),
+        (
+            SkillOpinionInput(
+                skill_id="X" * 129,
+                signal="buy",
+                confidence=0.5,
+            ),
+            "skill_id exceeds",
+        ),
+        (
+            SkillOpinionInput(skill_id="alpha", signal="buy", confidence=True),
+            "confidence must be numeric",
+        ),
+        (
+            SkillOpinionInput(
+                skill_id="alpha",
+                signal="buy",
+                confidence=object(),
+            ),
+            "confidence must be numeric",
+        ),
+        (
+            SkillOpinionInput(
+                skill_id="alpha",
+                signal="buy",
+                confidence=0.5,
+                skill_version="X" * 65,
+            ),
+            "text exceeds 64",
+        ),
+        (
+            SkillOpinionInput(
+                skill_id="alpha",
+                signal="buy",
+                confidence=0.5,
+                observed_at="not-a-datetime",
+            ),
+            "observed_at must be a datetime",
+        ),
+    ],
+)
+def test_explicit_opinion_shape_validation(opinion, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        SkillOpinionSampleService._validated_opinion(opinion)
+
+
+def test_explicit_persistence_normalizes_optional_and_aware_fields(
+    isolated_db,
+) -> None:
+    history_id = _add_history(isolated_db, raw_result="{}")
+    observed_at = datetime(
+        2024,
+        1,
+        2,
+        20,
+        30,
+        tzinfo=timezone(timedelta(hours=8)),
+    )
+    service = SkillOpinionSampleService(db_manager=isolated_db)
+
+    assert service.persist(
+        analysis_history_id=str(history_id),
+        stock_code="600519",
+        opinions=(
+            SkillOpinionInput(
+                skill_id=" alpha ",
+                signal=" BUY ",
+                confidence="0.75",
+                skill_version=" v1 ",
+                horizon=" 1d ",
+                observed_at=observed_at,
+            ),
+        ),
+        data_quality_level="UNEXPECTED",
+    ) == 1
+
+    row = SkillOpinionSampleRepository(isolated_db).list_for_history(
+        history_id
+    )[0]
+    assert row.skill_id == "alpha"
+    assert row.signal == "buy"
+    assert row.confidence == 0.75
+    assert row.skill_version == "v1"
+    assert row.horizon == "1d"
+    assert row.opinion_created_at == datetime(2024, 1, 2, 12, 30)
+    assert row.data_quality_level is None
