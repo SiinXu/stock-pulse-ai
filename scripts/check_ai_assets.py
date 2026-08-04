@@ -34,11 +34,13 @@ REQUIRED_GITIGNORE_SNIPPETS = (
     "!.claude/skills/**",
 )
 
-# Canonical Unreleased changelog type tokens, e.g. `Added`/`Changed`/`Fixed`/...
-CHANGELOG_TYPE_TOKEN_RE = re.compile(
-    r"`(Added|Changed|Fixed|Docs|Tests|Chore)`(?:/`(Added|Changed|Fixed|Docs|Tests|Chore)`)*"
+# Match the complete declared token list instead of only recognizing already-valid
+# values. Otherwise an extra token such as `Bugfix` would be silently ignored.
+CHANGELOG_TYPE_DECLARATION_RE = re.compile(
+    r"(?:Allowed `Type` values are|where type is one of)\s+"
+    r"(?P<tokens>`[^`\n]+`(?:/`[^`\n]+`)+)"
 )
-CHANGELOG_TYPE_SPLIT_RE = re.compile(r"`(Added|Changed|Fixed|Docs|Tests|Chore)`")
+BACKTICK_TOKEN_RE = re.compile(r"`([^`\n]+)`")
 EXPECTED_CHANGELOG_TYPES = {"Added", "Changed", "Fixed", "Docs", "Tests", "Chore"}
 
 
@@ -80,10 +82,28 @@ def ensure_copilot_entry() -> None:
 
 def extract_changelog_type_tokens(text: str) -> set[str]:
     """Extract the allowed `[Unreleased]` type tokens from governance prose."""
-    tokens: set[str] = set()
-    for match in CHANGELOG_TYPE_TOKEN_RE.finditer(text):
-        tokens.update(CHANGELOG_TYPE_SPLIT_RE.findall(match.group(0)))
-    return tokens
+    declarations = list(CHANGELOG_TYPE_DECLARATION_RE.finditer(text))
+    if len(declarations) != 1:
+        raise ValueError(
+            "expected exactly one [Unreleased] changelog type declaration, "
+            f"found {len(declarations)}"
+        )
+    return set(BACKTICK_TOKEN_RE.findall(declarations[0].group("tokens")))
+
+
+def ensure_changelog_type_parser_contract() -> None:
+    """Prove the parser retains invalid extra tokens for the parity check."""
+    valid = (
+        "Allowed `Type` values are "
+        "`Added`/`Changed`/`Fixed`/`Docs`/`Tests`/`Chore`, and descriptions."
+    )
+    if extract_changelog_type_tokens(valid) != EXPECTED_CHANGELOG_TYPES:
+        fail("changelog type parser rejected the canonical declaration")
+
+    invalid = valid.replace("`Chore`", "`Chore`/`Bugfix`")
+    parsed_invalid = extract_changelog_type_tokens(invalid)
+    if parsed_invalid != EXPECTED_CHANGELOG_TYPES | {"Bugfix"}:
+        fail("changelog type parser failed to retain an invalid extra token")
 
 
 def ensure_changelog_type_tokens_aligned() -> None:
@@ -91,14 +111,18 @@ def ensure_changelog_type_tokens_aligned() -> None:
     ensure_file_exists(AGENTS, "canonical AGENTS.md")
     ensure_file_exists(COPILOT, "repository Copilot instructions")
 
-    agents_tokens = extract_changelog_type_tokens(AGENTS.read_text(encoding="utf-8"))
+    try:
+        agents_tokens = extract_changelog_type_tokens(AGENTS.read_text(encoding="utf-8"))
+        copilot_tokens = extract_changelog_type_tokens(COPILOT.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        fail(str(exc))
+
     if agents_tokens != EXPECTED_CHANGELOG_TYPES:
         fail(
             "AGENTS.md does not declare the expected [Unreleased] changelog type set "
             f"{sorted(agents_tokens)}"
         )
 
-    copilot_tokens = extract_changelog_type_tokens(COPILOT.read_text(encoding="utf-8"))
     if copilot_tokens != agents_tokens:
         fail(
             ".github/copilot-instructions.md changelog type tokens must match AGENTS.md; "
@@ -150,6 +174,7 @@ def ensure_no_tracked_claude_artifacts() -> None:
 
 
 def main() -> None:
+    ensure_changelog_type_parser_contract()
     ensure_symlink()
     ensure_copilot_entry()
     ensure_changelog_type_tokens_aligned()
