@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
 
+- [Fixed] Made AI governance type parity reject undeclared changelog tokens and kept model examples provider-neutral.
 - [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
 - [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
 - [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
