@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Made Longbridge volume-ratio history calls use keyword arguments so SDK versions with different positional `time` and `count` ordering remain compatible.
 
 ## [3.27.0] - 2026-08-04
 

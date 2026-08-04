@@ -570,6 +570,40 @@ class TestLongbridgeFetcherMocked(unittest.TestCase):
         expected_ratio = round(50000000 / avg_vol, 2)
         self.assertEqual(quote.volume_ratio, expected_ratio)
 
+    def test_volume_ratio_history_call_uses_keyword_arguments(self):
+        """Keep time/count compatible across Longbridge SDK signatures."""
+        from datetime import datetime as datetime_type
+
+        mock_lb_module = types.ModuleType("longbridge")
+        mock_lb_openapi = types.ModuleType("longbridge.openapi")
+        mock_lb_openapi.Period = MagicMock()
+        mock_lb_openapi.AdjustType = MagicMock()
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "longbridge": mock_lb_module,
+                "longbridge.openapi": mock_lb_openapi,
+            },
+        ):
+            fetcher, ctx = self._make_fetcher_with_mock_ctx()
+            ctx.history_candlesticks_by_offset.return_value = []
+
+            fetcher._compute_volume_ratio("AAPL.US", 50000000)
+
+        ctx.history_candlesticks_by_offset.assert_called_once()
+        call = ctx.history_candlesticks_by_offset.call_args
+        self.assertEqual(call.args, ())
+        self.assertEqual(call.kwargs["symbol"], "AAPL.US")
+        self.assertEqual(call.kwargs["count"], 6)
+        self.assertIsInstance(call.kwargs["time"], datetime_type)
+        self.assertFalse(call.kwargs["forward"])
+        self.assertIs(call.kwargs["period"], mock_lb_openapi.Period.Day)
+        self.assertIs(
+            call.kwargs["adjust_type"],
+            mock_lb_openapi.AdjustType.NoAdjust,
+        )
+
     def test_quote_api_failure_returns_none(self):
         """If ctx.quote() raises, return None gracefully."""
         fetcher, ctx = self._make_fetcher_with_mock_ctx()

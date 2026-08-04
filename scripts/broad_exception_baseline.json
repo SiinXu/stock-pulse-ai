@@ -199,7 +199,6 @@
     {"path":"data_provider/fundamental_adapter.py","scope":"<module>._filter_rows_by_code","caught":["Exception"],"digest":"0c4efff719ae0ec12701f71087a9bb431254e3615d1be424b53879d687f5dafb"},
     {"path":"data_provider/fundamental_adapter.py","scope":"<module>._safe_datetime","caught":["Exception"],"digest":"751a1e6427746147a06da1dda91b60d09035767e19c73d3e693bcd6dc1fb51f6"},
     {"path":"data_provider/fundamental_adapter.py","scope":"<module>._safe_datetime","caught":["Exception"],"digest":"828b21cc7c63a995bd98e6234368bd5e43767842418f5f4f67501afb5fc5dced"},
-    {"path":"data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._compute_volume_ratio","caught":["Exception"],"digest":"cc7f7d7b5d1fa6e54b29d74af9f7b525b89d71cba76de689c188bc7143b3d065"},
     {"path":"data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"2ce4dd372ce91d9e8fcb7924d0db740875da9ba7f061eae836c407a51f1a0f85"},
     {"path":"data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"3d08df0ccaec74c4a07839c0c63d2cbe287f9b3dd3340ffbb13733fda3af3304"},
     {"path":"data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"81b93f82bf1e64a360b083d053e6d61e86f8c3737c1021c1dce0abd3df49a651"},

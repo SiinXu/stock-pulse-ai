@@ -782,13 +782,15 @@ class LongbridgeFetcher(BaseFetcher):
         try:
             from longbridge.openapi import Period, AdjustType
 
+            # Keyword arguments keep this call compatible with Longbridge SDK
+            # versions whose positional ``time`` and ``count`` order differs.
             candles = ctx.history_candlesticks_by_offset(
-                symbol,
-                Period.Day,
-                AdjustType.NoAdjust,
-                False,
-                6,
-                datetime.now(),
+                symbol=symbol,
+                period=Period.Day,
+                adjust_type=AdjustType.NoAdjust,
+                forward=False,
+                time=datetime.now(),
+                count=6,
             )
             if not candles or len(candles) < 2:
                 return None
@@ -808,7 +810,7 @@ class LongbridgeFetcher(BaseFetcher):
                 return None
 
             return round(today_volume / avg_vol, 2)
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the optional volume-ratio fallback.
             log_safe_exception(
                 logger,
                 "Longbridge volume ratio calculation failed",
