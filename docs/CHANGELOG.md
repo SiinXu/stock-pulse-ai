@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
 - [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
+- [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
+- [Added] Added read-only per-skill outcome statistics with independent horizon and engine-version buckets and a 30-evaluated-sample publication threshold.
 
 - [Fixed] Made AI governance type parity reject undeclared changelog tokens and kept model examples provider-neutral.
 - [Tests] Patched the stock-index data boundary instead of `resolve_index_stock_code` so the report-code normalization matrix exercises the real resolver on every delivery path.
