@@ -1,0 +1,27 @@
+{
+  "action": "opened",
+  "number": 712,
+  "pull_request": {
+    "number": 712,
+    "title": "chore: stop dependabot from editing the generated dependency lock",
+    "body": "## PR Type\n\n- [x] chore\n\n## Background And Problem\n\nThe root pip Dependabot entry proposes direct edits to `constraints.txt`, but that file is generated and digest-verified by `scripts/check_dependency_locks.py`. Those bot PRs therefore fail the dependency-lock gate by construction. At the start of this work, the repository also had no active ruleset protecting `main`, so required CI results were not enforced at merge time; ruleset `20376987` was created as the API-object part of this task.\n\n## Scope Of Change\n\n- Total files and line changes: **2 files, +1 / -4**\n- Complete file list:\n  - `.github/dependabot.yml`\n  - `docs/CHANGELOG.md`\n- Documentation files updated (`docs/**`): `docs/CHANGELOG.md`\n\nThis PR removes only the root pip ecosystem entry. GitHub Actions Dependabot remains enabled. Python dependency updates continue through the reviewed lock-refresh command documented in `docs/supply-chain-maintenance.md`: `python scripts/check_dependency_locks.py --update`.\n\n## Issue Link\n\nNo linked issue. Acceptance criteria are that Dependabot no longer edits the generated Python lock, GitHub Actions updates remain enabled, and the required `main` ruleset is active.\n\n## Repository Ruleset Status\n\nRuleset `20376987` was created successfully and a GET verified it is active:\n\n```bash\ngh api repos/SiinXu/stock-pulse-ai/rulesets/20376987 \\\n  --jq '{id,name,target,enforcement,conditions,rules,bypass_actors}'\n```\n\n```json\n{\"bypass_actors\":[],\"conditions\":{\"ref_name\":{\"exclude\":[],\"include\":[\"refs/heads/main\"]}},\"enforcement\":\"active\",\"id\":20376987,\"name\":\"Protect main with required CI\",\"rules\":[{\"type\":\"deletion\"},{\"type\":\"non_fast_forward\"},{\"parameters\":{\"do_not_enforce_on_create\":false,\"required_status_checks\":[{\"context\":\"ai-governance\"},{\"context\":\"backend-gate\"},{\"context\":\"python-minimum\"},{\"context\":\"docker-build\"}],\"strict_required_status_checks_policy\":false},\"type\":\"required_status_checks\"}],\"target\":\"branch\"}\n```\n\n## Verification Commands And Results\n\n```bash\npytho",
+    "html_url": "https://github.com/SiinXu/stock-pulse-ai/pull/712",
+    "base": {
+      "ref": "main",
+      "sha": "fd6d57f97e80c2bf30f494bc787632bf0c43f47e"
+    },
+    "head": {
+      "ref": "agent/stop-dependabot-generated-lock",
+      "sha": "091bc2ecf79e30b714d31556f072d020f4467c91",
+      "repo": {
+        "id": 1297934654
+      }
+    }
+  },
+  "repository": {
+    "id": 1297934654,
+    "default_branch": "main",
+    "name": "stock-pulse-ai",
+    "full_name": "SiinXu/stock-pulse-ai"
+  }
+}
