@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
+- [Tests] Keep AlphaSift hotspot FakeProvider offline by stubbing board-change probes that previously hung under the new per-test timeout.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
 - [Changed] Pilot runtime validation on the Web stocks API module so response shape mismatches surface through ParsedApiError.
