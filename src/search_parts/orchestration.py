@@ -54,15 +54,26 @@ class _OrchestrationMethods:
         )
 
         # Build search query (optimize search effect)
+        from src.data.stock_mapping import foreign_stock_english_aliases
+
         is_foreign = self._is_foreign_stock(stock_code)
+        english_aliases = foreign_stock_english_aliases(stock_code, stock_name)
+        effective_name = english_aliases[0] if english_aliases else stock_name
+        short_name = english_aliases[-1] if english_aliases else None
         if focus_keywords:
             # If keywords are provided, use them directly as queries.
             query = " ".join(focus_keywords)
         elif prefer_chinese:
             query = f"{stock_name} {stock_code} 股票 最新消息"
         elif is_foreign:
-            # Use English search keywords for Hong Kong/U.S. stocks
-            query = f"{stock_name} {stock_code} stock latest news"
+            # Use both legal and common English identities when available.
+            if english_aliases and short_name and short_name != effective_name:
+                query = (
+                    f"{effective_name} {short_name} {stock_code} "
+                    "stock latest news"
+                )
+            else:
+                query = f"{effective_name} {stock_code} stock latest news"
         else:
             # Default main query: Stock Name + Core Keywords
             query = f"{stock_name} {stock_code} 股票 最新消息"
@@ -350,8 +361,12 @@ class _OrchestrationMethods:
                 event_types = ["年报预告", "减持公告", "业绩快报"]
 
         # Build targeted query
+        from src.data.stock_mapping import foreign_stock_english_aliases
+
+        english_aliases = foreign_stock_english_aliases(stock_code, stock_name)
+        effective_name = english_aliases[0] if english_aliases else stock_name
         event_query = " OR ".join(event_types)
-        query = f"{stock_name} ({event_query})"
+        query = f"{effective_name} ({event_query})"
 
         logger.info(f"搜索股票事件: {stock_name}({stock_code}) - {event_types}")
 
@@ -402,17 +417,24 @@ class _OrchestrationMethods:
         is_index_etf = self.is_index_or_etf(stock_code, stock_name)
 
         if is_foreign:
+            from src.data.stock_mapping import foreign_stock_english_aliases
+
+            english_aliases = foreign_stock_english_aliases(
+                stock_code,
+                stock_name,
+            )
+            effective_name = english_aliases[0] if english_aliases else stock_name
             search_dimensions = [
                 {
                     'name': 'latest_news',
-                    'query': f"{stock_name} {stock_code} latest news events",
+                    'query': f"{effective_name} {stock_code} latest news events",
                     'desc': '最新消息',
                     'tavily_topic': 'news',
                     'strict_freshness': True,
                 },
                 {
                     'name': 'market_analysis',
-                    'query': f"{stock_name} analyst rating target price report",
+                    'query': f"{effective_name} analyst rating target price report",
                     'desc': '机构分析',
                     'tavily_topic': None,
                     'strict_freshness': False,
@@ -420,8 +442,8 @@ class _OrchestrationMethods:
                 {
                     'name': 'risk_check',
                     'query': (
-                        f"{stock_name} {stock_code} index performance outlook tracking error"
-                        if is_index_etf else f"{stock_name} risk insider selling lawsuit litigation"
+                        f"{effective_name} {stock_code} index performance outlook tracking error"
+                        if is_index_etf else f"{effective_name} risk insider selling lawsuit litigation"
                     ),
                     'desc': '风险排查',
                     'tavily_topic': None if is_index_etf else 'news',
@@ -430,8 +452,8 @@ class _OrchestrationMethods:
                 {
                     'name': 'earnings',
                     'query': (
-                        f"{stock_name} {stock_code} index performance composition outlook"
-                        if is_index_etf else f"{stock_name} earnings revenue profit growth forecast"
+                        f"{effective_name} {stock_code} index performance composition outlook"
+                        if is_index_etf else f"{effective_name} earnings revenue profit growth forecast"
                     ),
                     'desc': '业绩预期',
                     'tavily_topic': None,
@@ -440,8 +462,8 @@ class _OrchestrationMethods:
                 {
                     'name': 'industry',
                     'query': (
-                        f"{stock_name} {stock_code} index sector allocation holdings"
-                        if is_index_etf else f"{stock_name} industry competitors market share outlook"
+                        f"{effective_name} {stock_code} index sector allocation holdings"
+                        if is_index_etf else f"{effective_name} industry competitors market share outlook"
                     ),
                     'desc': '行业分析',
                     'tavily_topic': None,

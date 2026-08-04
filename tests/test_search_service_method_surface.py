@@ -20,7 +20,7 @@ EXPECTED_SERVICE_RAW_SURFACE_SHA256 = (
     "01fa9cc33dafc7c34c2211c64fd7ebcb2a499cabeff3654c88953a7882e7fe94"
 )
 EXPECTED_SERVICE_REFLECTION_SHA256 = (
-    "ca753430115eef646f762dd716bce7854086468b483dc2fe086353498ba7990d"
+    "3d700bc48f781104d7bbdf556b9abfc5ff5d085b5fce7fed8f6a1bad51ee929f"
 )
 
 EXPECTED_METHOD_AST_GROUPS = (
@@ -47,8 +47,8 @@ EXPECTED_METHOD_AST_GROUPS = (
             "_put_cache",
             "_effective_news_window_days",
         ),
-        "56800ed57640116db8ca983015a0f792d76e2f0ad544a399f453a43315132b79",
-        195,
+        "8469395f3e00e45adf0dfe0e68f988958816554348bb512c434a5122ff9ee7d4",
+        203,
     ),
     (
         "news_processing.py",
@@ -80,8 +80,8 @@ EXPECTED_METHOD_AST_GROUPS = (
             "_elapsed_ms",
             "_record_news_search_run",
         ),
-        "6ad381bae9f14968e8692c07af1e275f40282a025ba90663e1a869cf436c727a",
-        971,
+        "d19b64976e365d93bc82cc0a2c82a9a67450e602aa60de23f5dc7a250167eba9",
+        995,
     ),
     (
         "orchestration.py",
@@ -96,11 +96,11 @@ EXPECTED_METHOD_AST_GROUPS = (
             "search_stock_with_enhanced_fallback",
             "format_price_search_context",
         ),
-        "2576de57ba5268e7c18f394151cedef379dcbb7062d6f50a0e34db97f56a3cfb",
-        864,
+        "161304dc8d39af068d6d18a28c979c863a9e330bff40db76004b4fb9d2647999",
+        886,
     ),
 )
-EXPECTED_MOVED_METHOD_AST_LINES = 2_030
+EXPECTED_MOVED_METHOD_AST_LINES = 2_084
 MOVED_METHOD_NAMES = tuple(
     name
     for _, _, expected_names, _, _ in EXPECTED_METHOD_AST_GROUPS

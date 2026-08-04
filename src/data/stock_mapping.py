@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import re
+from typing import Dict, Tuple
+
 """
 ===================================
 股票代码与名称映射
@@ -105,6 +108,110 @@ STOCK_NAME_MAP = {
     "00941": "中国移动",
     "00883": "中国海洋石油",
 }
+
+
+# Canonical English company identities for every foreign ticker above. Legal
+# names come first and common media names follow so queries and relevance
+# scoring share one alias source instead of maintaining separate heuristics.
+STOCK_ENGLISH_NAME_MAP: Dict[str, Tuple[str, ...]] = {
+    # U.S. stocks
+    "AAPL": ("Apple Inc.", "Apple"),
+    "TSLA": ("Tesla, Inc.", "Tesla"),
+    "MSFT": ("Microsoft Corporation", "Microsoft"),
+    "GOOGL": ("Alphabet Inc.", "Google"),
+    "GOOG": ("Alphabet Inc.", "Google"),
+    "AMZN": ("Amazon.com, Inc.", "Amazon"),
+    "NVDA": ("NVIDIA Corporation", "NVIDIA"),
+    "META": ("Meta Platforms, Inc.", "Meta"),
+    "AMD": ("Advanced Micro Devices, Inc.", "AMD"),
+    "INTC": ("Intel Corporation", "Intel"),
+    "BABA": ("Alibaba Group Holding Limited", "Alibaba"),
+    "PDD": ("PDD Holdings Inc.", "Pinduoduo"),
+    "JD": ("JD.com, Inc.", "JD.com"),
+    "BIDU": ("Baidu, Inc.", "Baidu"),
+    "NIO": ("NIO Inc.", "NIO"),
+    "XPEV": ("XPeng Inc.", "XPeng"),
+    "LI": ("Li Auto Inc.", "Li Auto"),
+    "COIN": ("Coinbase Global, Inc.", "Coinbase"),
+    "MSTR": ("MicroStrategy Incorporated", "MicroStrategy"),
+    # Hong Kong stocks
+    "00700": ("Tencent Holdings", "Tencent"),
+    "03690": ("Meituan",),
+    "01810": ("Xiaomi Corporation", "Xiaomi"),
+    "09988": ("Alibaba Group Holding", "Alibaba"),
+    "09618": ("JD.com",),
+    "09888": ("Baidu Inc.", "Baidu"),
+    "01024": ("Kuaishou Technology", "Kuaishou"),
+    "00981": ("SMIC",),
+    "02015": ("Li Auto Inc.", "Li Auto"),
+    "09868": ("XPeng Inc.", "XPeng"),
+    "00005": ("HSBC Holdings", "HSBC"),
+    "01299": ("AIA Group", "AIA"),
+    "00941": ("China Mobile",),
+    "00883": ("CNOOC",),
+}
+
+
+def _assert_foreign_english_map_invariant() -> None:
+    """Require an English identity for every foreign STOCK_NAME_MAP entry."""
+    foreign_name_keys = {
+        code
+        for code in STOCK_NAME_MAP
+        if not (code.isdigit() and len(code) == 6)
+    }
+    english_keys = set(STOCK_ENGLISH_NAME_MAP)
+    if english_keys != foreign_name_keys:
+        raise AssertionError(
+            "STOCK_ENGLISH_NAME_MAP drift detected: "
+            f"extra={sorted(english_keys - foreign_name_keys)}, "
+            f"missing={sorted(foreign_name_keys - english_keys)}"
+        )
+
+
+_assert_foreign_english_map_invariant()
+
+_CONTAINS_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+
+
+def canonicalize_foreign_stock_code(stock_code: str) -> str:
+    """Normalize supported U.S./HK ticker shapes to alias-map key form."""
+    code = (stock_code or "").strip().upper()
+    if not code:
+        return ""
+
+    if code.endswith(".US"):
+        return code[:-3]
+
+    for suffix in (".N", ".O", ".A"):
+        if code.endswith(suffix):
+            base = code[: -len(suffix)]
+            # Preserve unknown share-class tickers such as BRK.A while still
+            # resolving exchange suffixes for mapped symbols.
+            return base if base in STOCK_ENGLISH_NAME_MAP else code
+
+    if code.startswith("HK") and 1 <= len(code[2:]) <= 5 and code[2:].isdigit():
+        return code[2:].zfill(5)
+
+    if code.endswith(".HK"):
+        digits = code[:-3]
+        if 1 <= len(digits) <= 5 and digits.isdigit():
+            return digits.zfill(5)
+
+    return code
+
+
+def foreign_stock_english_aliases(
+    stock_code: str,
+    stock_name: str,
+) -> Tuple[str, ...]:
+    """Return mapped English aliases when a foreign display name is Chinese."""
+    display_name = (stock_name or "").strip()
+    if not display_name or not _CONTAINS_CJK_RE.search(display_name):
+        return ()
+
+    canonical_code = canonicalize_foreign_stock_code(stock_code)
+    aliases = STOCK_ENGLISH_NAME_MAP.get(canonical_code)
+    return tuple(aliases) if aliases else ()
 
 
 def is_meaningful_stock_name(name: str | None, stock_code: str) -> bool:
