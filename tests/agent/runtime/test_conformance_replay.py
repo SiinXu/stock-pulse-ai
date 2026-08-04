@@ -18,7 +18,7 @@ registry, and the two runtimes are asserted to honor one shared Contract:
 * **Intentional difference** (timeout / cancelrace): terminal *classification*
   equivalence only. The experimental runtime fences timeout/cancel after the
   current step's tools while native fences before, so tool logs may differ.
-  Recorded in ``docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md``;
+  Recorded in ``docs/adr/ADR-002-pydanticai-runtime-reinstatement.md``;
   neither runtime ever fakes success and the dashboard stays absent on both.
   The native side is read from the frozen ``expected`` baseline (already gated
   by the compatibility suite) rather than re-run, so these fixtures' real

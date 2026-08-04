@@ -10,7 +10,7 @@ import re
 from typing import Optional
 
 from data_provider.base import canonical_stock_code, is_bse_code, normalize_stock_code
-from src.market_context import detect_market
+from src.market.context import detect_market
 from src.services.market_symbol_utils import normalize_suffix_market_symbol
 from src.utils.sanitize import log_safe_exception
 

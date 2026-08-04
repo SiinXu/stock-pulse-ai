@@ -119,9 +119,9 @@ infer that composition occurred.
 
 ## Architecture Decision Boundary
 
-This focused contract stays within [ADR-001 D3](architecture/ADR-001-agent-runtime.md#d3-stockpulse-保持单一业务权威),
+This focused contract stays within [ADR-001 D3](adr/ADR-001-agent-runtime.md#d3-stockpulse-保持单一业务权威),
 which keeps Prompt/Skill, runtime facts, persistence, and public API ownership
-inside StockPulse, and [ADR-001 D4](architecture/ADR-001-agent-runtime.md#d4-现有-native-行为保持兼容),
+inside StockPulse, and [ADR-001 D4](adr/ADR-001-agent-runtime.md#d4-现有-native-行为保持兼容),
 which requires compatible Native behavior. One StockPulse-owned composer and
 an additive optional Chat response field strengthen those accepted authorities;
 they do not introduce another runtime, composition root, provider route,

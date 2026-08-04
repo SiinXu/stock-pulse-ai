@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from src.analysis_context_pack_overview import extract_analysis_context_pack_overview
+from src.analysis_context_pack.overview import extract_analysis_context_pack_overview
 from src.schemas.run_flow import RunFlowSnapshot
 from src.services.run_diagnostics import (
     safe_diagnostic_key,

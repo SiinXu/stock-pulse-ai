@@ -8,7 +8,7 @@ reinstated as an executable POC by ADR-002. It has no factory, config,
 environment, API or product selector: tests and evidence harnesses must
 construct it directly with explicit dependencies. Native remains the only
 product assembly path (see
-``docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md``).
+``docs/adr/ADR-002-pydanticai-runtime-reinstatement.md``).
 PydanticAI is an
 *optional* dependency; every import is lazy so a StockPulse install
 without ``pydantic-ai-slim`` starts and runs Native unaffected, and asking

@@ -58,6 +58,48 @@ from src.utils.sanitize import log_safe_exception
 if TYPE_CHECKING:
     from src.config_parts.model import Config
 
+# Legacy day-batch env vars (still supported; prefer versioned scheduled tasks).
+LEGACY_SCHEDULE_ENV_KEYS = (
+    "SCHEDULE_ENABLED",
+    "SCHEDULE_TIME",
+    "SCHEDULE_TIMES",
+    "SCHEDULE_RUN_IMMEDIATELY",
+)
+_LEGACY_SCHEDULE_DEPRECATION_LOGGED = False
+
+
+def emit_legacy_schedule_deprecation_if_needed(
+    *,
+    had_bootstrap_key,
+    get_env_file_value,
+) -> None:
+    """Emit one process-wide deprecation line when any legacy SCHEDULE_* key is set.
+
+    ``had_bootstrap_key`` / ``get_env_file_value`` are callables ``(key) -> ...``
+    so this stays free of Config facade-global binding issues.
+    """
+    global _LEGACY_SCHEDULE_DEPRECATION_LOGGED
+    if _LEGACY_SCHEDULE_DEPRECATION_LOGGED:
+        return
+
+    present = [
+        key
+        for key in LEGACY_SCHEDULE_ENV_KEYS
+        if had_bootstrap_key(key) or get_env_file_value(key) is not None
+    ]
+    if not present:
+        return
+
+    _LEGACY_SCHEDULE_DEPRECATION_LOGGED = True
+    logger.warning(
+        "Deprecation: legacy schedule env vars are set (%s). "
+        "Prefer versioned scheduled tasks "
+        "(Web Settings → Saved schedule definitions; docs/scheduled-tasks.md). "
+        "SCHEDULE_* remain fully supported; removal is reserved for a future major "
+        "or an explicit removal PR — no hard removal date is scheduled.",
+        ", ".join(present),
+    )
+
 
 def setup_env() -> None:
     from src import config as config_module
@@ -66,6 +108,21 @@ def setup_env() -> None:
 
 
 class _ConfigLoadingMethods:
+
+    @classmethod
+    def _maybe_log_legacy_schedule_deprecation(cls) -> None:
+        """Config-bound entry: emit one deprecation line for legacy SCHEDULE_* keys.
+
+        Installed onto Config via model.py. After facade cloning into ``src.config``
+        globals, module helpers are reached via import (not free-name globals).
+        """
+        from src.config_parts.loading import emit_legacy_schedule_deprecation_if_needed
+
+        emit_legacy_schedule_deprecation_if_needed(
+            had_bootstrap_key=cls._had_bootstrap_runtime_env_key,
+            get_env_file_value=cls._get_env_file_value,
+        )
+
     @classmethod
     def _load_from_env(cls) -> 'Config':
         """
@@ -515,6 +572,8 @@ class _ConfigLoadingMethods:
             default='',
             prefer_env_file=True,
         )
+        # One process-wide deprecation line for legacy SCHEDULE_* (not per tick/stock).
+        cls._maybe_log_legacy_schedule_deprecation()
 
         report_language_raw = cls._resolve_report_language_env_value(
             preexisting_report_language

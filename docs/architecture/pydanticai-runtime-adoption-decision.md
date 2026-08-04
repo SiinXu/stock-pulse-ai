@@ -6,8 +6,8 @@
 - 证据状态：`Historical / Partial`（只保留已证明的离线子集，不代表 RF-06 全部证据完成）
 - 版本：v1.4
 - 日期：2026-07-19
-- 上位决策：`docs/architecture/ADR-001-agent-runtime.md`（`Accepted`）
-- 改判决策：`docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md`（`Accepted`，2026-07-19）
+- 上位决策：`docs/adr/ADR-001-agent-runtime.md`（`Accepted`）
+- 改判决策：`docs/adr/ADR-002-pydanticai-runtime-reinstatement.md`（`Accepted`，2026-07-19）
 - 修复计划：`docs/architecture/pydanticai-runtime-recovery-plan.md`（历史，RF-00～RF-07 已结束）
 - 用途：汇总 RF-06 阶段已收集的证据并记录 RF-07 裁决。维护者于 2026-07-18 裁决 `Native Only`（recovery plan 默认结论），据此收尾 RF-00～RF-07 修复计划。
 
@@ -121,7 +121,7 @@ RF-07 的 `Native Only` 是 recovery plan 的默认规则结果：`Continue Expe
 所需证据（真实 provider benchmark、Desktop 多平台打包等）依赖维护者资源，无人
 值守流程无法产出，因此按默认路径收尾。2026-07-19 维护者本人裁决改判为
 `Continue Experimental`，恢复实验 PydanticAI Runtime 为测试/证据 POC；完整决策见
-`docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md`。
+`docs/adr/ADR-002-pydanticai-runtime-reinstatement.md`。
 
 改判不改变本报告第 3～5 章的历史记录与证据边界：
 

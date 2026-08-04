@@ -13,7 +13,7 @@ from sqlalchemy import and_, select
 from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.config import get_config
 from src.core.backtest_engine import OVERALL_SENTINEL_CODE, BacktestEngine, EvaluationConfig
-from src.market_phase_summary import extract_market_phase_summary, normalize_analysis_phase_bucket
+from src.market.phase_summary import extract_market_phase_summary, normalize_analysis_phase_bucket
 from src.repositories.backtest_repo import BacktestRepository
 from src.repositories.stock_repo import StockRepository
 from src.schemas.decision_action import build_action_fields

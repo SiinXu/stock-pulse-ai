@@ -1,7 +1,7 @@
 # Legacy Facade Import Policy
 
 - Status: `Living`
-- Last verified: 2026-07-26
+- Last verified: 2026-08-04
 - Related: [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md), Issue #623
 
 ## Purpose
@@ -51,16 +51,16 @@ Summary at the time this policy was introduced:
 
 | Legacy facade | Canonical module | Production importers | Facade definition |
 | --- | --- | --- | --- |
-| `src.market_context` | `src.market.context` | 6 | `src/market_context.py` |
+| `src.market_context` | `src.market.context` | 4 | `src/market_context.py` |
 | `src.market_phase_prompt` | `src.market.phase_prompt` | 4 | `src/market_phase_prompt.py` |
-| `src.market_phase_summary` | `src.market.phase_summary` | 18 | `src/market_phase_summary.py` |
+| `src.market_phase_summary` | `src.market.phase_summary` | 10 | `src/market_phase_summary.py` |
 | `src.market_structure_prompt` | `src.market.structure_prompt` | 5 | `src/market_structure_prompt.py` |
 | `src.market_sector_analysis` | `src.market.sector_analysis` | 1 | `src/market_sector_analysis.py` |
-| `src.market_analyzer` | `src.market.analyzer` | 2 | `src/market_analyzer.py` |
-| `src.analysis_context_pack_overview` | `src.analysis_context_pack.overview` | 7 | `src/analysis_context_pack_overview.py` |
+| `src.market_analyzer` | `src.market.analyzer` | 1 | `src/market_analyzer.py` |
+| `src.analysis_context_pack_overview` | `src.analysis_context_pack.overview` | 2 | `src/analysis_context_pack_overview.py` |
 | `src.analysis_context_pack_prompt` | `src.analysis_context_pack.prompt` | 3 | `src/analysis_context_pack_prompt.py` |
 
-**Total allowlisted production importer rows: 46** (one file may appear under
+**Total allowlisted production importer rows: 30** (one file may appear under
 multiple facades).
 
 `data_provider.base` is **not** listed as a banned legacy facade in this guard.
