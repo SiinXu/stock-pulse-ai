@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 
-## [3.27.0] - 2026-08-04
+## [4.0.0] - 2026-08-04
+
+> **Version policy:** StockPulse is an independent fork and has diverged from upstream's 3.x numbering. Upstream `v3.27.0` and later releases are unrelated to this fork's 4.x release line.
 
 ### Release Highlights
 
@@ -2464,13 +2466,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ---
 
 [Unreleased]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.3...HEAD
+[4.0.0]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.3...HEAD
 [3.26.3]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.2...v3.26.3
+[3.26.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.25.0...v3.26.0
 [3.25.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.1...v3.25.0
 [3.24.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.0...v3.24.1
 [3.24.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.23.0...v3.24.0
 [3.23.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.22.0...v3.23.0
 [3.22.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.21.1...v3.22.0
-[3.21.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.21.0...v3.21.1
 [3.21.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.20.0...v3.21.0
 [3.20.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.19.0...v3.20.0
 [3.19.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.18.0...v3.19.0
@@ -2500,6 +2503,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 [3.3.22]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.3.12...v3.3.22
 [3.3.12]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.11...v3.3.12
 [3.2.11]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.10...v3.2.11
+[3.2.10]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.9...v3.2.10
+[3.2.9]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.8...v3.2.9
+[3.2.8]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.7...v3.2.8
+[3.2.7]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.6...v3.2.7
+[3.2.6]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.5...v3.2.6
+[3.2.5]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.4...v3.2.5
+[3.2.4]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.3...v3.2.4
+[3.2.3]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.2...v3.2.3
+[3.2.2]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.1...v3.2.2
+[3.2.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.2.0...v3.2.1
+[3.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.13...v3.2.0
+[3.1.13]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.12...v3.1.13
+[3.1.12]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.11...v3.1.12
+[3.1.11]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.10...v3.1.11
+[3.1.10]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.9...v3.1.10
+[3.1.9]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.8...v3.1.9
+[3.1.8]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.7...v3.1.8
+[3.1.7]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.6...v3.1.7
+[3.1.6]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.5...v3.1.6
+[3.1.5]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.4...v3.1.5
+[3.1.4]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.3...v3.1.4
+[3.1.3]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.2...v3.1.3
+[3.1.2]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.1...v3.1.2
+[3.1.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.1.0...v3.1.1
+[3.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.0.5...v3.1.0
+[3.0.5]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.0.4...v3.0.5
+[3.0.4]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.0.3...v3.0.4
+[3.0.3]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.0.2...v3.0.3
+[3.0.2]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.0.1...v3.0.2
+[3.0.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.0.0...v3.0.1
+[3.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v2.3.0...v3.0.0
 [2.3.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v2.2.5...v2.3.0
 [2.2.5]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v2.2.4...v2.2.5
 [2.2.4]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v2.2.3...v2.2.4
@@ -2523,10 +2557,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 [2.1.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.6.0...v2.0.0
-[1.6.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.5.0...v1.6.0
-[1.5.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.4.0...v1.5.0
-[1.4.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.0.0...v1.1.0
+[1.6.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v1.0.0...v1.6.0
+[1.5.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/91facfe23f0c067a4d8ca6527e478abfd8356b23
+[1.4.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/e88d2248fe5fec8a47a1977be64e3d33cc01f95b
+[1.3.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/704ff9a7c2dcda8e0070522796897ea615180f18
+[1.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/4df277e109c38604e31e2184fcff36f561f8ffa5
+[1.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/5d5c095be55ff8cc2b0ed219ea35a9135536de38
 [1.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v1.0.0
