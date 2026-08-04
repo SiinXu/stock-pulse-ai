@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Updated the pinned stale-item automation action to v11.0.0.
+- [Tests] Stub DsaEastMoneyHotspotProvider.hotspot_rows in AlphaSift status/hotspot API tests to prevent live EastMoney hangs under per-test timeout.
+
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Tests] Keep AlphaSift hotspot FakeProvider offline by stubbing board-change probes that previously hung under the new per-test timeout.

@@ -30,7 +30,37 @@ from tests.alphasift_api_test_support import (
 )
 
 
+
 class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
+    def setUp(self) -> None:
+        """Keep hotspot unit tests offline under the CI per-test timeout.
+
+        Refresh paths can call DsaEastMoneyHotspotProvider.hotspot_rows after a
+        mocked AlphaSift discover. Stub that entrypoint so offline tests never
+        open live EastMoney/akshare sockets under the 120s per-test timeout.
+        Tests that need real provider methods can still patch.object over this.
+        """
+        super().setUp()
+        self._offline_network_patches = [
+            patch.object(
+                alphasift_service.DsaEastMoneyHotspotProvider,
+                "hotspot_rows",
+                return_value=[],
+            ),
+            patch.object(
+                alphasift_service.DsaEastMoneyHotspotProvider,
+                "_enrich_constituent_quotes",
+                side_effect=lambda stocks: stocks,
+            ),
+        ]
+        for item in self._offline_network_patches:
+            item.start()
+
+    def tearDown(self) -> None:
+        for item in reversed(getattr(self, "_offline_network_patches", [])):
+            item.stop()
+        super().tearDown()
+
     def test_hotspot_cache_failure_logs_topic_metadata_without_private_text(self) -> None:
         private_topic = (
             "Board discussion about Northwind acquiring Contoso before announcement"
