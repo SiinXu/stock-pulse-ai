@@ -25,6 +25,7 @@ import { getUiLocale } from '../../utils/uiLocale';
 import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, Spinner, useClipboard } from '../common';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
+import { ShareImageButton } from './ShareImageButton';
 
 interface MarketReviewReportViewProps {
   report?: AnalysisReport;
@@ -438,6 +439,11 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
+            <ShareImageButton
+              recordId={recordId}
+              reportTitle={displayTitle}
+              reportLanguage={reportLanguage}
+            />
             {canOpenRunFlow ? (
               <IconButton
                 type="button"

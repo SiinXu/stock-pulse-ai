@@ -85,6 +85,13 @@ export const historyApi = {
     return response.data.content;
   },
 
+  getShareImage: async (recordId: number): Promise<Blob> => {
+    const response = await apiClient.get<Blob>(`/api/v1/history/${recordId}/share-image`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
   /**
    * Get historical report run diagnostic summary
    * @param recordId Analysis historical record primary key ID

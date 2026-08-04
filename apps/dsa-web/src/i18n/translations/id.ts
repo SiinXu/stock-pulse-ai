@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "Autentikasi admin diaktifkan. Gunakan Ubah kata sandi di bawah ini untuk memperbaruinya.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Belum ada kata sandi yang ditetapkan. Tetapkan sandi admin awal sebelum mengaktifkan autentikasi.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Kata sandi admin sebelumnya dipertahankan. Masukkan untuk mengaktifkan kembali autentikasi dengan cepat.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Jika sesi login saat ini masih valid, Anda dapat langsung menonaktifkan otentikasi; Jika sesi tidak valid, masukkan kata sandi administrator saat ini.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Anda mungkin perlu memverifikasi identitas sebelum menonaktifkan autentikasi",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Disabling authentication always requires the current admin password. A valid session cookie alone is not enough.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Enter the current admin password before disabling authentication",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Masukkan kata sandi lama untuk mengaktifkan kembali otentikasi",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Silakan masukkan kata sandi Anda saat ini",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Kata sandi baru diperlukan",
@@ -4321,4 +4321,34 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Pohon keputusan dapat berisi paling banyak {limit} node.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Sebuah kerangka kerja dapat berisi paling banyak {limit} aturan risiko.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Kerangka kerja dapat berisi paling banyak {limit} kriteria pelacakan.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Enter the current admin password before disabling authentication",
+
 };

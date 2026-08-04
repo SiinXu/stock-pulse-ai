@@ -14,6 +14,7 @@ import { InlineAlert } from '../common/InlineAlert';
 import { Spinner } from '../common/Spinner';
 import { useClipboard } from '../common/useClipboard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
+import { ShareImageButton } from './ShareImageButton';
 
 export interface ReportMarkdownPanelProps {
   recordId: number;
@@ -28,6 +29,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   stockName,
   stockCode,
   onRequestClose,
+  reportLanguage,
 }) => {
   const { language: uiLanguage } = useUiLanguage();
   const text = REPORT_CHROME_TEXT[uiLanguage];
@@ -97,6 +99,11 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          <ShareImageButton
+            recordId={recordId}
+            reportTitle={`${stockName || stockCode}-${stockCode}`}
+            reportLanguage={reportLanguage}
+          />
           <IconButton
             type="button"
             variant="outline"
