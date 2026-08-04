@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Added a time-bounded vulnerability exception for cryptography CVE-2026-69247 until the lock cutoff can include 50.0.0.
 - [Added] Added a mypy type-checking ratchet for `src/schemas/` only (follow-imports=skip), wired into `ci_gate.sh` deterministic checks.
 - [Fixed] Made shared Web date fields picker-only while preserving required validation, optional-date clearing, and inherited disabled-fieldset locks, and improved Market Review history height fill, Backtest validation-mode contrast in dark mode, and adaptive Deep Research stock input layout.
 - [Fixed] Routed DingTalk-only aggregate reports through the canonical notification dispatch policy.
