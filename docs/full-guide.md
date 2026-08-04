@@ -166,7 +166,7 @@ stock-pulse-ai/
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
-| `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`）；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
+| `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`），可通过 Web 设置或 `.env` 配置；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | 可选 |
 | `LONGBRIDGE_OAUTH_CLIENT_ID` | [Longbridge OpenAPI](https://open.longbridge.com/) OAuth client_id；留空且无 Legacy Access Token 时会兼容使用 `LONGBRIDGE_APP_KEY` | 可选 |
 | `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | OAuth token 缓存文件的 base64 内容，供 GitHub Actions / Docker 等 headless 环境恢复 SDK token 缓存 | 可选 |

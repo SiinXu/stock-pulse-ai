@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
+- [Added] Exposed the existing `TUSHARE_HTTP_URL` custom endpoint through the configuration registry and Web Settings schema.
 - [Fixed] Made backtests resolve market-aware legacy stock identities and require an authoritative same-code daily-bar window, preventing missed JP/KR history and cross-alias price splicing.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.

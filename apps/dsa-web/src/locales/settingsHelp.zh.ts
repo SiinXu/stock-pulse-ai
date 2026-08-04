@@ -277,6 +277,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响部分 A 股基础数据、股票列表和相关增强数据获取。'],
     notes: ['不要把 token 提交到仓库或公开日志。'],
   },
+  'settings.data_source.TUSHARE_HTTP_URL': {
+    title: 'Tushare Pro API 地址',
+    summary: '可选地将 Tushare Pro 请求路由到兼容网关或镜像。',
+    usage: '留空使用官方端点；仅在需要自定义端点时填写完整的 HTTP 或 HTTPS 地址。',
+    valueNotes: ['私网或内网地址还必须加入 OUTBOUND_HTTP_ALLOWLIST。'],
+    impact: ['影响所有 Tushare Pro 请求，配置的端点可能接收 token 和请求内容。'],
+    notes: ['保存自定义地址前，请确认你信任该端点运营方。'],
+    examples: ['https://tushare.example.com'],
+  },
   'settings.data_source.TICKFLOW_API_KEY': {
     title: 'TickFlow API Key',
     summary: '用于启用 TickFlow A 股日 K、实时行情、股票列表/名称与大盘复盘增强数据。',

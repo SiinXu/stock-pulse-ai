@@ -146,6 +146,39 @@ class TestDingTalkGroupWebhookFieldsRegistered(unittest.TestCase):
         self.assertTrue(set(self._DINGTALK_GROUP_KEYS).issubset(field_keys))
 
 
+class TestTushareHttpUrlRegistered(unittest.TestCase):
+    """The optional Tushare endpoint must be explicit and Web-editable."""
+
+    def test_field_contract_is_optional_non_sensitive_url(self):
+        field = get_field_definition("TUSHARE_HTTP_URL")
+
+        self.assertEqual(field["category"], "data_source")
+        self.assertEqual(field["ui_control"], "text")
+        self.assertFalse(field["is_sensitive"])
+        self.assertFalse(field["is_required"])
+        self.assertIsNone(field["default_value"])
+        self.assertEqual(field["validation"]["item_type"], "url")
+        self.assertEqual(
+            field["validation"]["allowed_schemes"],
+            ["http", "https"],
+        )
+        self.assertNotEqual(field["display_order"], 9000)
+        self.assertNotIn("TUSHARE_HTTP_URL", WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_schema_response_includes_tushare_http_url(self):
+        schema = build_schema_response()
+        data_source = next(
+            category
+            for category in schema["categories"]
+            if category["category"] == "data_source"
+        )
+
+        self.assertIn(
+            "TUSHARE_HTTP_URL",
+            {field["key"] for field in data_source["fields"]},
+        )
+
+
 class TestAstrBotFieldsRegistered(unittest.TestCase):
     """AstrBot config keys must be explicitly registered for settings UI."""
 
