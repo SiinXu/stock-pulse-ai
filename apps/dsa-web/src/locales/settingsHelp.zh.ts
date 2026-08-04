@@ -569,18 +569,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.system.WEBUI_HOST': {
     title: 'WebUI 监听地址',
     summary: '控制 WebUI 服务绑定在哪个网络地址上。',
-    usage: '本机访问通常使用 127.0.0.1；云服务器、Docker 或需要外部访问时通常使用 0.0.0.0。',
+    usage: '本机访问通常使用 127.0.0.1；使用 0.0.0.0、局域网地址或其他非本机监听前，必须启用 ADMIN_AUTH_ENABLED。',
     valueNotes: [
       '启动时显式传入的 --host 会优先生效；若未传 --host，则会使用运行时配置中的 WEBUI_HOST（或其默认值）。',
       '在设置页保存后，只会写入 .env 并重载运行时配置对象，不会让当前 WebUI/API 进程重新绑定监听地址。',
-      'Docker Compose 中通常会在容器内使用 0.0.0.0，宿主机访问还取决于端口映射。',
+      'Docker Compose 中通常会在容器内使用 0.0.0.0，因此必须启用管理员认证；宿主机访问还取决于端口映射。',
     ],
     impact: [
       '影响重启后浏览器能否从本机、局域网或公网访问 WebUI。',
     ],
     notes: [
+      '所有非本机监听都要求 ADMIN_AUTH_ENABLED；认证关闭时服务会拒绝启动。',
       '修改 WEBUI_HOST 后需要重启当前进程、Docker 容器或服务管理器才会生效。',
-      '直连公网时建议同时启用 ADMIN_AUTH_ENABLED。',
       '如果部署在反向代理后面，登录限流与真实 IP 识别还需要评估 TRUST_X_FORWARDED_FOR。',
     ],
   },
