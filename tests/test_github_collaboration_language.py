@@ -100,7 +100,7 @@ def test_pr_review_fetches_every_changed_file() -> None:
 def test_pr_review_escapes_dynamic_step_summary_paths() -> None:
     workflow = (GITHUB_DIR / "workflows" / "pr-review.yml").read_text(encoding="utf-8")
 
-    assert workflow.count("escape_dynamic_text() {") == 4
+    assert workflow.count("escape_dynamic_text() {") == 5
     assert "([^\\x00-\\x7F]|&)" in workflow
     assert "const unsafeDynamicPattern = /[^\\x00-\\x7F]|&/gu;" in workflow
     assert 'echo "$SENSITIVE_FILES" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY' in workflow
