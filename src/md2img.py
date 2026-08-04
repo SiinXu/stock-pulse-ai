@@ -97,13 +97,13 @@ def _markdown_to_image_playwright(
         stderr = result.stderr.decode("utf-8", errors="replace")
         logger.error("Playwright image conversion failed: %s", stderr[:500])
         return None
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - Renderer availability varies by host; share API returns 503.
         logger.error("Playwright image conversion error: %s", exc)
         return None
     finally:
         try:
             shutil.rmtree(temp_dir)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: cleanup - Temporary share-image workdir cleanup is best-effort.
             logger.debug("Failed to remove temp dir %s: %s", temp_dir, exc)
 
 
@@ -156,7 +156,7 @@ def _markdown_to_image_m2f(
     except subprocess.TimeoutExpired:
         logger.warning("m2f conversion timed out (60s)")
         return None
-    except Exception as e:
+    except Exception as e:  # broad-exception: fallback_recorded - Optional m2f CLI may fail for many host reasons; caller falls back.
         logger.warning("markdown_to_image (m2f) failed: %s", e)
         return None
     finally:
@@ -204,7 +204,7 @@ def _markdown_to_image_wkhtml(
         else:
             logger.warning("imgkit/wkhtmltoimage error: %s", e)
         return None
-    except Exception as e:
+    except Exception as e:  # broad-exception: fallback_recorded - Optional imgkit/wkhtml path failure; caller falls back to text/503.
         logger.warning("markdown_to_image conversion failed: %s", e)
         return None
 
@@ -247,7 +247,8 @@ def markdown_to_image(
         config = get_config()
         engine = getattr(config, "md2img_engine", "wkhtmltoimage")
         branding = _share_image_branding(config)
-    except Exception:
+    except Exception:  # broad-exception: fallback_recorded - Config load failure must not break optional image conversion.
+        logger.debug("Share-image config unavailable; using defaults", exc_info=True)
         engine = "wkhtmltoimage"
         branding = ShareImageBranding()
 
