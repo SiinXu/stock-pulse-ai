@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
 
 - [Tests] Patched the stock-index data boundary instead of `resolve_index_stock_code` so the report-code normalization matrix exercises the real resolver on every delivery path.
+- [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
+- [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
+- [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
+- [Docs] Complete the AGENTS.md CI verification matrix with `changes` and `pydanticai-installed`.
+- [Tests] Enforce Copilot/AGENTS Unreleased type token parity via `scripts/check_ai_assets.py`.
+
 ## [3.27.0] - 2026-08-04
 
 ### Release Highlights

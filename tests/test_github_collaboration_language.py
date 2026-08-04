@@ -19,12 +19,7 @@ HAN_PATTERN = re.compile(
     r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\U00020000-\U0002ebef\U00030000-\U0003134f]"
 )
 ALLOWED_LOCALIZED_LINES = {
-    GITHUB_DIR / "copilot-instructions.md": {
-        "- In `docs/CHANGELOG.md`, the `[Unreleased]` section uses a **flat format**: one line per entry "
-        "formatted as `- [type] description`, where type is one of `新功能`/`改进`/`修复`/`文档`/`测试`/`chore`. "
-        "**Do not add `### category headers` inside `[Unreleased]`** to minimize merge conflicts in concurrent "
-        "PRs. A maintainer will reorganize into the full categorized format at release time.",
-    },
+    # Intentional Chinese regex fragment for historical release-note section titles.
     GITHUB_DIR / "scripts" / "build_release_notes.py": {
         'r"^### 发布亮点\\s*(.*?)(?=^### |\\Z)",',
     },

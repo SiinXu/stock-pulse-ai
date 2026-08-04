@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: 📖 Documentation
-    url: https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/README_EN.md#-quick-start
+    url: https://github.com/SiinXu/stock-pulse-ai/blob/main/README.md#quick-start
     about: Read the project overview and setup guide
   - name: 📋 English Docs Index
     url: https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/INDEX_EN.md
