@@ -8,7 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
+- [Fixed] Routed Feishu Stream connections and reply clients through the configured international Lark API domain when `FEISHU_DOMAIN=lark`.
+- [Fixed] Cached and coalesced AkShare Hong Kong full-market realtime snapshots, including short failed-refresh caching and validation before reuse, while preserving the Sina fallback.
+- [Fixed] Kept Tencent direct daily K-lines as the final built-in A-share fallback while preserving configurable provider priority and failure failover.
+- [Fixed] Aligned manager, AkShare, Longbridge, and Yahoo routing for bare four- and five-digit Hong Kong codes, including Yahoo's four-digit symbol normalization.
+- [Fixed] Made Longbridge volume-ratio history calls use keyword arguments so SDK versions with different positional `time` and `count` ordering remain compatible.
 
+- [Chore] Updated the pinned stale-item automation action to v11.0.0.
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
@@ -22,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
 - [Added] Added read-only per-skill outcome statistics with independent horizon and engine-version buckets and a 30-evaluated-sample publication threshold.
 
+- [Fixed] Made AI governance type parity reject undeclared changelog tokens and kept model examples provider-neutral.
 - [Tests] Patched the stock-index data boundary instead of `resolve_index_stock_code` so the report-code normalization matrix exercises the real resolver on every delivery path.
 - [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
 - [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
