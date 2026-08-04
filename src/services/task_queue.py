@@ -187,6 +187,7 @@ class TaskInfo:
     skills: Optional[List[str]] = None
     report_language: Optional[str] = None
     trace_id: Optional[str] = None
+    region: Optional[str] = None
     flow_events: List[Dict[str, Any]] = field(default_factory=list)
 
     def public_error(self) -> Optional[str]:
@@ -199,7 +200,7 @@ class TaskInfo:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert task info into an API-friendly dictionary."""
-        return {
+        payload = {
             "task_id": self.task_id,
             "trace_id": self.trace_id or self.task_id,
             "stock_code": self.stock_code,
@@ -219,6 +220,9 @@ class TaskInfo:
             "selection_source": self.selection_source,
             "skills": self.skills,
         }
+        if self.region is not None:
+            payload["region"] = self.region
+        return payload
     
     def copy(self) -> 'TaskInfo':
         """Create a shallow copy of the task information."""
@@ -250,6 +254,7 @@ class TaskInfo:
             skills=copy.deepcopy(self.skills),
             report_language=self.report_language,
             trace_id=self.trace_id or self.task_id,
+            region=self.region,
             flow_events=copy.deepcopy(self.flow_events),
         )
 
@@ -839,6 +844,7 @@ class AnalysisTaskQueue:
             portfolio_context=copy.deepcopy(metadata.get("portfolio_context")),
             skills=copy.deepcopy(metadata.get("skills")),
             report_language=metadata.get("report_language"),
+            region=metadata.get("region"),
             created_at=now,
             updated_at=now,
         )
@@ -1419,6 +1425,7 @@ class AnalysisTaskQueue:
         trace_id: Optional[str] = None,
         failure_error_code: str = "task_failed",
         retry_factory: Optional[Callable[[], TaskCommand]] = None,
+        region: Optional[str] = None,
     ) -> TaskInfo:
         """
         Submit a generic background callable with task lifecycle tracking.
@@ -1431,6 +1438,7 @@ class AnalysisTaskQueue:
             "stock_name": stock_name,
             "report_type": report_type,
             "message": message,
+            "region": region,
         }
 
         command = TaskCommand(

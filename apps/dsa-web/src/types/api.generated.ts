@@ -1253,6 +1253,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/{record_id}/share-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate a history report share image
+         * @description Build a deterministic PNG share image from the historical report Markdown and any persisted structured payload.
+         */
+        get: operations["get_history_share_image_api_v1_history__record_id__share_image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/intelligence/items": {
         parameters: {
             query?: never;
@@ -5430,6 +5450,11 @@ export interface components {
              */
             query_id: string;
             /**
+             * Region
+             * @description Canonical market coverage for market-review records
+             */
+            region?: string | null;
+            /**
              * Report Type
              * @description 报告类型
              */
@@ -6646,6 +6671,11 @@ export interface components {
                 [key: string]: unknown;
             };
             /**
+             * Region
+             * @description Canonical market coverage for this task
+             */
+            region: string;
+            /**
              * Send Notification
              * @description 是否发送通知
              */
@@ -6672,6 +6702,11 @@ export interface components {
          * @description Market review trigger parameters.
          */
         MarketReviewRequest: {
+            /**
+             * Region
+             * @description Request-scoped market coverage for this review. Valid tokens: cn, hk, us, jp, kr, both. When omitted, MARKET_REVIEW_REGION is used.
+             */
+            region?: string | null;
             /**
              * Report Language
              * @description 本次大盘复盘报告输出语言；未传时使用全局 REPORT_LANGUAGE
@@ -9425,6 +9460,11 @@ export interface components {
              */
             progress: number;
             /**
+             * Region
+             * @description Canonical market coverage for market-review tasks
+             */
+            region?: string | null;
+            /**
              * Report Type
              * @description 报告类型
              * @default detailed
@@ -9565,6 +9605,11 @@ export interface components {
              * @description 进度百分比 (0-100)
              */
             progress?: number | null;
+            /**
+             * Region
+             * @description Canonical market coverage for market-review tasks
+             */
+            region?: string | null;
             /** @description 分析结果（仅在 completed 时存在） */
             result?: components["schemas"]["AnalysisResultResponse"] | null;
             /**
@@ -13453,6 +13498,64 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_history_share_image_api_v1_history__record_id__share_image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PNG share image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                };
+            };
+            /** @description Report not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Report generation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Image renderer unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
