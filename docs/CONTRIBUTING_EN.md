@@ -206,3 +206,5 @@ Feel free to:
 - Browse existing Issues.
 
 Thank you for contributing! 🎉
+
+<!-- pr-review e2e validation touch; safe to close without merge -->
