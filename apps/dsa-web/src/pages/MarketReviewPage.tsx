@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -17,6 +17,7 @@ import {
 } from '../components/common';
 import { DashboardStateBlock } from '../components/dashboard';
 import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
+import { MarketReviewRegionSelector } from '../components/market-review/MarketReviewRegionSelector';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { RunFlowPanel } from '../components/run-flow';
@@ -31,6 +32,7 @@ import {
   RESEARCH_MARKET_ACTION_VALUES,
   RESEARCH_MARKET_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
+import type { MarketReviewRegion } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
 
@@ -44,6 +46,9 @@ const MarketReviewPage: React.FC = () => {
   const navigate = useNavigate();
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const handledActionRef = useRef<string | null>(null);
+  const [marketReviewRegionOverride, setMarketReviewRegionOverride] = useState<
+    MarketReviewRegion[] | undefined
+  >(undefined);
   const {
     error,
     reportDetailError,
@@ -105,6 +110,7 @@ const MarketReviewPage: React.FC = () => {
   }, []);
   const runner = useMarketReviewRunner({
     notify,
+    regions: marketReviewRegionOverride,
     refreshMarketReviewHistory,
     onPersistedReport: urlState.replaceRecord,
     onFeedback: scrollFeedbackIntoView,
@@ -242,8 +248,14 @@ const MarketReviewPage: React.FC = () => {
         description={t('home.marketReviewHistoryEmptyDescription')}
         actions={(
           <>
+            <MarketReviewRegionSelector
+              value={marketReviewRegionOverride}
+              disabled={runner.isSubmitting}
+              onChange={setMarketReviewRegionOverride}
+            />
             <Checkbox
               checked={notify}
+              disabled={runner.isSubmitting}
               onChange={(event) => setNotify(event.target.checked)}
               label={t('home.notify')}
             />
