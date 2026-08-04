@@ -18,17 +18,116 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import Optional
+from pathlib import Path
+from typing import Any, Mapping, Optional
 
-from src.formatters import markdown_to_html_document
+from src.share_image import ShareImageBranding, build_share_image_html
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 
-def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
+def _share_image_branding(config: object) -> ShareImageBranding:
+    return ShareImageBranding(
+        xiaohongshu_url=str(getattr(config, "share_image_xiaohongshu_url", None) or ""),
+        xiaohongshu_handle=str(getattr(config, "share_image_xiaohongshu_handle", None) or ""),
+        xiaohongshu_id=str(getattr(config, "share_image_xiaohongshu_id", None) or ""),
+        xiaohongshu_qr_path=str(getattr(config, "share_image_xiaohongshu_qr_path", None) or ""),
+    )
+
+
+def _resolve_playwright_command() -> Optional[str]:
+    """Resolve a global or repository-local Playwright CLI executable."""
+    command = shutil.which("playwright")
+    if command:
+        return command
+
+    repository_root = Path(__file__).resolve().parent.parent
+    executable_name = "playwright.cmd" if os.name == "nt" else "playwright"
+    local_command = repository_root / "apps" / "dsa-web" / "node_modules" / ".bin" / executable_name
+    if local_command.is_file():
+        return str(local_command)
+    return None
+
+
+def _markdown_to_image_playwright(
+    markdown_text: str,
+    structured_payload: Optional[Mapping[str, Any]] = None,
+    branding: Optional[ShareImageBranding] = None,
+) -> Optional[bytes]:
+    """Convert a share-poster HTML document to PNG with Playwright Chromium."""
+    playwright_command = _resolve_playwright_command()
+    if playwright_command is None:
+        logger.warning(
+            "Playwright CLI not found. Install Web dependencies with: "
+            "cd apps/dsa-web && npm ci. Fallback to text."
+        )
+        return None
+
+    temp_dir = tempfile.mkdtemp()
+    html_path = Path(temp_dir) / "report.html"
+    png_path = Path(temp_dir) / "report.png"
+    try:
+        html_path.write_text(
+            build_share_image_html(
+                markdown_text,
+                structured_payload=structured_payload,
+                branding=branding,
+            ),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [
+                playwright_command,
+                "screenshot",
+                "--browser",
+                "chromium",
+                "--viewport-size",
+                "1080,720",
+                "--full-page",
+                html_path.resolve().as_uri(),
+                str(png_path),
+            ],
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode == 0 and png_path.exists():
+            return png_path.read_bytes()
+
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        logger.error("Playwright image conversion failed: %s", stderr[:500])
+        return None
+    except Exception as exc:  # broad-exception: fallback_recorded - Renderer availability varies by host; share API returns 503.
+        log_safe_exception(
+            logger,
+            "Playwright image conversion error",
+            exc,
+            error_code="playwright_image_conversion_failed",
+            level=logging.ERROR,
+        )
+        return None
+    finally:
+        try:
+            shutil.rmtree(temp_dir)
+        except Exception as exc:  # broad-exception: cleanup - Temporary share-image workdir cleanup is best-effort.
+            log_safe_exception(
+                logger,
+                "Playwright image temporary directory cleanup failed",
+                exc,
+                error_code="playwright_image_temp_cleanup_failed",
+                level=logging.DEBUG,
+            )
+
+
+def _markdown_to_image_m2f(
+    markdown_text: str,
+    structured_payload: Optional[Mapping[str, Any]] = None,
+    branding: Optional[ShareImageBranding] = None,
+) -> Optional[bytes]:
     """Convert Markdown to PNG via markdown-to-file (m2f) CLI. Better emoji support (Issue #455)."""
-    if shutil.which("m2f") is None:
+    m2f_command = shutil.which("m2f")
+    if m2f_command is None:
         logger.warning(
             "m2f (markdown-to-file) not found in PATH. "
             "Install with: npm i -g markdown-to-file. Fallback to text."
@@ -40,10 +139,18 @@ def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
         temp_dir = tempfile.mkdtemp()
         md_path = os.path.join(temp_dir, "report.md")
         with open(md_path, "w", encoding="utf-8") as f:
-            f.write(markdown_text)
+            # m2f keeps raw HTML in Markdown input, allowing both engines to
+            # share the same deterministic poster layout and embedded QR codes.
+            f.write(
+                build_share_image_html(
+                    markdown_text,
+                    structured_payload=structured_payload,
+                    branding=branding,
+                )
+            )
 
         result = subprocess.run(
-            ["m2f", md_path, "png", f"outputDirectory={temp_dir}"],
+            [m2f_command, md_path, "png", f"outputDirectory={temp_dir}"],
             capture_output=True,
             timeout=60,
             check=False,
@@ -62,11 +169,11 @@ def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
     except subprocess.TimeoutExpired:
         logger.warning("m2f conversion timed out (60s)")
         return None
-    except Exception as exc:
+    except Exception as e:  # broad-exception: fallback_recorded - Optional m2f CLI may fail for many host reasons; caller falls back.
         log_safe_exception(
             logger,
             "Markdown-to-file image conversion failed",
-            exc,
+            e,
             error_code="markdown_to_file_conversion_failed",
             level=logging.WARNING,
         )
@@ -75,17 +182,21 @@ def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
         if temp_dir and os.path.isdir(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
-            except OSError as exc:
+            except OSError as e:
                 log_safe_exception(
                     logger,
                     "Markdown image temporary directory cleanup failed",
-                    exc,
+                    e,
                     error_code="markdown_image_temp_cleanup_failed",
                     level=logging.DEBUG,
                 )
 
 
-def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
+def _markdown_to_image_wkhtml(
+    markdown_text: str,
+    structured_payload: Optional[Mapping[str, Any]] = None,
+    branding: Optional[ShareImageBranding] = None,
+) -> Optional[bytes]:
     """Convert Markdown to PNG via imgkit/wkhtmltoimage."""
     try:
         import imgkit
@@ -93,11 +204,18 @@ def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
         logger.debug("imgkit not installed, markdown_to_image unavailable")
         return None
 
-    html = markdown_to_html_document(markdown_text)
     try:
+        html = build_share_image_html(
+            markdown_text,
+            structured_payload=structured_payload,
+            branding=branding,
+        )
         options = {
             "format": "png",
             "encoding": "UTF-8",
+            "width": 1080,
+            "disable-smart-width": "",
+            "quality": 95,
             "quiet": "",
         }
         out = imgkit.from_string(html, False, options=options)
@@ -105,41 +223,45 @@ def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
             return out
         logger.warning("imgkit.from_string returned empty or invalid result")
         return None
-    except OSError as exc:
-        if "wkhtmltoimage" in str(exc).lower() or "wkhtmltopdf" in str(exc).lower():
+    except OSError as e:
+        if "wkhtmltoimage" in str(e).lower() or "wkhtmltopdf" in str(e).lower():
             log_safe_exception(
-                logger,
-                "wkhtmltoimage executable is unavailable",
-                exc,
-                error_code="wkhtmltoimage_unavailable",
-                level=logging.DEBUG,
-            )
+            logger,
+            "wkhtmltoimage executable is unavailable",
+            e,
+            error_code="wkhtmltoimage_unavailable",
+            level=logging.DEBUG,
+        )
         else:
             log_safe_exception(
-                logger,
-                "wkhtmltoimage conversion failed",
-                exc,
-                error_code="wkhtmltoimage_conversion_failed",
-                level=logging.WARNING,
-            )
+            logger,
+            "wkhtmltoimage conversion failed",
+            e,
+            error_code="wkhtmltoimage_conversion_failed",
+            level=logging.WARNING,
+        )
         return None
-    except Exception as exc:
+    except Exception as e:  # broad-exception: fallback_recorded - Optional imgkit/wkhtml path failure; caller falls back to text/503.
         log_safe_exception(
             logger,
             "Markdown image conversion failed",
-            exc,
+            e,
             error_code="markdown_image_conversion_failed",
             level=logging.WARNING,
         )
         return None
 
 
-def markdown_to_image(markdown_text: str, max_chars: int = 15000) -> Optional[bytes]:
+def markdown_to_image(
+    markdown_text: str,
+    max_chars: int = 15000,
+    structured_payload: Optional[Mapping[str, Any]] = None,
+) -> Optional[bytes]:
     """
     Convert Markdown to PNG image bytes.
 
-    Engine is read from config.md2img_engine: wkhtmltoimage (default) or
-    markdown-to-file (better emoji support, Issue #455).
+    Engine is read from config.md2img_engine: wkhtmltoimage (default),
+    markdown-to-file, or playwright.
 
     When conversion fails or dependencies unavailable, returns None so caller
     can fall back to text sending.
@@ -148,6 +270,8 @@ def markdown_to_image(markdown_text: str, max_chars: int = 15000) -> Optional[by
         markdown_text: Raw Markdown content.
         max_chars: Skip conversion and return None if content exceeds this length
             (avoids huge images). Default 15000.
+        structured_payload: Optional stock-analysis or market-review JSON. Exact
+            structured fields take precedence over Markdown extraction.
 
     Returns:
         PNG bytes, or None if conversion fails or dependencies unavailable.
@@ -163,10 +287,22 @@ def markdown_to_image(markdown_text: str, max_chars: int = 15000) -> Optional[by
     try:
         from src.config import get_config
 
-        engine = getattr(get_config(), "md2img_engine", "wkhtmltoimage")
-    except Exception:
+        config = get_config()
+        engine = getattr(config, "md2img_engine", "wkhtmltoimage")
+        branding = _share_image_branding(config)
+    except Exception as exc:  # broad-exception: fallback_recorded - Config load failure must not break optional image conversion.
+        log_safe_exception(
+            logger,
+            "Share-image config unavailable; using defaults",
+            exc,
+            error_code="share_image_config_unavailable",
+            level=logging.DEBUG,
+        )
         engine = "wkhtmltoimage"
+        branding = ShareImageBranding()
 
     if engine == "markdown-to-file":
-        return _markdown_to_image_m2f(markdown_text)
-    return _markdown_to_image_wkhtml(markdown_text)
+        return _markdown_to_image_m2f(markdown_text, structured_payload, branding)
+    if engine == "playwright":
+        return _markdown_to_image_playwright(markdown_text, structured_payload, branding)
+    return _markdown_to_image_wkhtml(markdown_text, structured_payload, branding)

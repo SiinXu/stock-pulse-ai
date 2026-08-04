@@ -118,6 +118,7 @@ describe('MarketReviewPage', () => {
     vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewReport);
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: true,
       message: '大盘复盘任务已提交',
     });
@@ -207,6 +208,7 @@ describe('MarketReviewPage', () => {
     vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewReport);
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: true,
       message: '大盘复盘任务已提交',
       taskId: 'market-task',

@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "管理員認證已啟用。如需更新密碼，請使用下方的“修改密碼”功能。",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "系統尚未設定密碼。啟用認證前請先設定初始管理員密碼，設定後請妥善保管。",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "系統已保留之前設定的管理員密碼。輸入當前密碼即可快速重新啟用認證。",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "若當前登入會話仍有效，可直接關閉認證；若會話已失效，請輸入當前管理員密碼。",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "關閉認證前可能需要驗證身份",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "關閉認證必須再次輸入目前管理員密碼。有效工作階段 cookie 不足以關閉認證。",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "關閉認證前請輸入目前管理員密碼",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "輸入舊密碼以重新啟用認證",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "請輸入當前密碼",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "設定新密碼是必填項",
@@ -4329,4 +4329,34 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "決策樹最多可以包含 {limit} 個節點。",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "框架最多可以包含 {limit} 條風險規則。",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "框架最多可以包含 {limit} 追蹤條件。",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "全部市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A 股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "由伺服器在提交時決定",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "選擇本次復盤覆蓋的市場，可單選或多選。",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "港股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "日股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "韓股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "僅影響本次觸發，不會修改全域配置。",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "選擇大盤復盤市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "伺服器預設",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "本次復盤市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "美股",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}；實際市場：{region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "任務狀態：{status}（{progress}）；實際市場：{region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "關閉認證前請輸入目前管理員密碼",
+
 };

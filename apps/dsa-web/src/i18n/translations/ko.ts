@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "관리자 인증이 활성화되어 있습니다. 아래의 비밀번호 변경을 사용해 업데이트하세요.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "아직 비밀번호는 설정되지 않았습니다. 인증을 활성화하기 전에 초기 관리자 비밀번호를 설정하세요.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "이전 관리자 비밀번호는 유지되었습니다. 입력하면 빠르게 인증을 재활성화할 수 있습니다.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "현재 로그인 세션이 유효하다면, 직접 인증을 비활성화할 수 있습니다; 세션이 유효하지 않은 경우, 현재 관리자 비밀번호를 입력해 주세요.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "인증을 종료하기 전에 신원 확인이 필요할 수 있습니다",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "인증 비활성화에는 항상 현재 관리자 비밀번호가 필요합니다. 유효한 세션 쿠키만으로는 부족합니다.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "이전 비밀번호를 입력해 인증을 재활성화합니다",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "현재 비밀번호를 입력해 주세요",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "새로운 비밀번호가 필요합니다",
@@ -4329,4 +4329,34 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "의사결정 트리에는 최대 {limit}개의 노드가 포함될 수 있습니다.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "프레임워크에는 최대 {limit}개의 위험 규칙이 포함될 수 있습니다.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "프레임워크에는 최대 {limit} 추적 기준이 포함될 수 있습니다.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "전체 시장",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A주",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "제출 시 서버가 결정",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "이번 리뷰에 포함할 시장을 하나 이상 선택하세요.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "홍콩",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "일본",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "한국",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "이번 실행에만 적용되며 전역 설정은 변경되지 않습니다.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "시장 리뷰 지역 선택",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "서버 기본값",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "이번 리뷰 시장",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "미국",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; 실제 시장: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "작업 상태: {status} ({progress}); 실제 시장: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요",
+
 };

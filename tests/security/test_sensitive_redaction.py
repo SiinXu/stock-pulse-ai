@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pytest
 import json
 import logging
 import time
@@ -1962,3 +1963,29 @@ def test_provider_and_tool_diagnostics_use_the_central_pattern_set() -> None:
     assert redact_local_cli_text("already [REDACTED]") == "already [REDACTED]"
     assert alphasift["api_key"] == "[REDACTED]"
     assert redact_sensitive_text("ordinary provider failure") == "ordinary provider failure"
+
+
+@pytest.mark.parametrize(
+    ("payload", "secret"),
+    [
+        ("OPENAI_API_KEY=short", "short"),
+        ("OPENAI_API_KEY=ab", "ab"),
+        ("API_KEY=x", "x"),
+        ("PASSWORD=1", "1"),
+        ("SECRET=tiny", "tiny"),
+        ("API Key: tiny-secret session_id=ok", "tiny-secret"),
+        ("Client Secret: tiny-secret session_id=ok", "tiny-secret"),
+        ("PASSWORD='abc def ghi' next", "abc def ghi"),
+        ("OPENAI_API_KEY=sk-12345", "sk-12345"),
+    ],
+)
+def test_short_credentials_in_cli_diagnostics_are_redacted(payload: str, secret: str) -> None:
+    """Upstream ee3d3da1 counterexample: short secrets must not survive redaction.
+
+    Ported-from: ZhuLinsen/daily_stock_analysis@ee3d3da1
+    """
+    for redactor in (redact_sensitive_text, redact_local_cli_text):
+        redacted = redactor(payload)
+        assert secret not in redacted, (
+            f"{redactor.__name__} leaked {secret!r} from {payload!r}: {redacted!r}"
+        )

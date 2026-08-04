@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "Admin-Authentifizierung ist aktiviert. Verwenden Sie unten das Passwort ändern, um es zu aktualisieren.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Es wurde noch kein Passwort festgelegt. Setze ein initiales Admin-Passwort, bevor du die Authentifizierung aktivierst.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Das vorherige Admin-Passwort wurde behalten. Geben Sie sie ein, um die Authentifizierung schnell wieder zu aktivieren.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Wenn die aktuelle Anmeldesitzung noch gültig ist, können Sie die Authentifizierung direkt deaktivieren; Wenn die Sitzung ungültig ist, geben Sie bitte das aktuelle Administrator-Passwort ein.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Möglicherweise müssen Sie Ihre Identität bestätigen, bevor Sie die Authentifizierung deaktivieren.",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Zum Deaktivieren der Authentifizierung ist immer das aktuelle Admin-Passwort erforderlich. Ein gültiges Sitzungs-Cookie allein reicht nicht aus.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Geben Sie vor dem Deaktivieren das aktuelle Admin-Passwort ein",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Geben Sie das alte Passwort ein, um die Authentifizierung wieder zu aktivieren",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Bitte geben Sie Ihr aktuelles Passwort ein",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Ein neues Passwort ist erforderlich",
@@ -4329,4 +4329,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Ein Entscheidungsbaum kann höchstens {limit} Knoten enthalten.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Ein Framework kann höchstens {limit} Risikoregeln enthalten.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Ein Framework kann höchstens {limit} Trackingkriterien enthalten.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Geben Sie vor dem Deaktivieren der Authentifizierung das aktuelle Admin-Passwort ein",
 };

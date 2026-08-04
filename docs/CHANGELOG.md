@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
 - [Fixed] Routed Feishu Stream connections and reply clients through the configured international Lark API domain when `FEISHU_DOMAIN=lark`.
 - [Fixed] Cached and coalesced AkShare Hong Kong full-market realtime snapshots, including short failed-refresh caching and validation before reuse, while preserving the Sina fallback.
 - [Fixed] Kept Tencent direct daily K-lines as the final built-in A-share fallback while preserving configurable provider priority and failure failover.
@@ -16,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Chore] Updated the pinned stale-item automation action to v11.0.0.
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
+- [Added] On-demand report share images via `GET /api/v1/history/{id}/share-image` and Web one-click share
+- [Added] Web/API per-market market-review trigger with request-scoped `region`
+- [Fixed] Auth disable UI requires current admin password re-confirmation (backend already enforced)
+- [Tests] Short-credential CLI diagnostic redaction counterexamples from upstream ee3d3da1
+
+
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Fixed] Resolved canonical English company aliases for mapped U.S./Hong Kong tickers so Chinese display names no longer suppress English news queries or relevance matches.
 - [Added] Exposed the existing `TUSHARE_HTTP_URL` custom endpoint through the configuration registry and Web Settings schema.
