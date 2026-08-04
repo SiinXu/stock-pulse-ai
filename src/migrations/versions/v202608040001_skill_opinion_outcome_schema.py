@@ -109,6 +109,21 @@ _INDEX_STATEMENTS = (
 
 _TRIGGER_STATEMENTS = (
     """
+    CREATE TRIGGER IF NOT EXISTS trg_skill_opinion_sample_immutable
+    BEFORE UPDATE ON skill_opinion_samples
+    BEGIN
+        SELECT RAISE(ABORT, 'skill_opinion_samples are immutable');
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_skill_opinion_outcome_terminal_immutable
+    BEFORE UPDATE ON skill_opinion_outcomes
+    WHEN OLD.eval_status IN ('evaluated', 'observational', 'unable')
+    BEGIN
+        SELECT RAISE(ABORT, 'terminal skill_opinion_outcomes are immutable');
+    END
+    """,
+    """
     CREATE TRIGGER IF NOT EXISTS trg_skill_opinion_history_delete
     AFTER DELETE ON analysis_history
     BEGIN

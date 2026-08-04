@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 import json
 
+import pytest
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from src.config import Config
 from src.migrations.registry import (
@@ -87,6 +89,8 @@ def test_schema_is_registered_idempotently_and_has_constraints(
         "ck_skill_opinion_outcome_state_fields",
     } <= set(outcome_ddl.split())
     assert trigger_names >= {
+        "trg_skill_opinion_sample_immutable",
+        "trg_skill_opinion_outcome_terminal_immutable",
         "trg_skill_opinion_history_delete",
         "trg_skill_opinion_sample_delete",
     }
@@ -129,3 +133,70 @@ def test_history_deletion_trigger_removes_samples_and_outcomes(
         ).scalar_one()
     assert samples == 0
     assert outcomes == 0
+
+
+def test_database_rejects_sample_updates(isolated_db) -> None:
+    history_id, sample_id = _add_sample(isolated_db)
+
+    with pytest.raises(
+        IntegrityError,
+        match="skill_opinion_samples are immutable",
+    ):
+        with isolated_db.session_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE skill_opinion_samples "
+                    "SET signal = 'sell' WHERE id = :sample_id"
+                ),
+                {"sample_id": sample_id},
+            )
+
+    row = SkillOpinionSampleRepository(isolated_db).list_for_history(
+        history_id
+    )[0]
+    assert row.signal == "buy"
+
+
+def test_database_rejects_terminal_outcome_updates(isolated_db) -> None:
+    _, sample_id = _add_sample(isolated_db)
+    repo = SkillOpinionOutcomeRepository(isolated_db)
+    repo.persist_outcome(
+        sample_id=sample_id,
+        horizon="1d",
+        engine_version="skill-opinion-outcome-v1",
+        evaluation=SkillOpinionOutcomeEvaluation(
+            eval_status="pending",
+            unable_reason="missing_start_bar",
+        ),
+    )
+    repo.persist_outcome(
+        sample_id=sample_id,
+        horizon="1d",
+        engine_version="skill-opinion-outcome-v1",
+        evaluation=SkillOpinionOutcomeEvaluation(
+            eval_status="unable",
+            unable_reason="invalid_analysis_date",
+        ),
+    )
+
+    with pytest.raises(
+        IntegrityError,
+        match="terminal skill_opinion_outcomes are immutable",
+    ):
+        with isolated_db.session_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE skill_opinion_outcomes "
+                    "SET unable_reason = 'different_reason' "
+                    "WHERE skill_opinion_sample_id = :sample_id"
+                ),
+                {"sample_id": sample_id},
+            )
+
+    stored = repo.get_outcome(
+        sample_id=sample_id,
+        horizon="1d",
+        engine_version="skill-opinion-outcome-v1",
+    )
+    assert stored is not None
+    assert stored.unable_reason == "invalid_analysis_date"
