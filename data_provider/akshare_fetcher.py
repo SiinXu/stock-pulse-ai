@@ -124,12 +124,10 @@ def _is_etf_code(stock_code: str) -> bool:
 
 
 def _is_hk_code(stock_code: str) -> bool:
-    """
-    判断代码是否为港股
+    """Return whether a symbol is a Hong Kong stock code.
 
-    港股代码规则：
-    - 5位数字代码，如 '00700' (腾讯控股)
-    - 部分港股代码可能带有前缀，如 'hk00700', 'hk1810'
+    This provider-level check must match the manager and peer-provider market
+    contract: explicit ``HK``/``.HK`` forms and four- to five-digit bare codes.
 
     Args:
         stock_code: 股票代码
@@ -146,8 +144,8 @@ def _is_hk_code(stock_code: str) -> bool:
         # Any prefix with 'hk' must be Hong Kong stocks, remove the prefix and it should be a pure number (1-5 digits)
         numeric_part = code[2:]
         return numeric_part.isdigit() and 1 <= len(numeric_part) <= 5
-    # Without a prefix, only 5-digit numbers are considered Hong Kong stocks (to avoid misjudging A-shares codes)
-    return code.isdigit() and len(code) == 5
+    # Mainland and Beijing stock codes use six digits, so they do not overlap.
+    return code.isdigit() and 4 <= len(code) <= 5
 
 
 def _normalize_tencent_volume(fields: List[str]) -> Optional[int]:
