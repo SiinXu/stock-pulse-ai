@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
