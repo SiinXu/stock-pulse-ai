@@ -187,7 +187,7 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
           disabled={running}
         />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} hint={t('research.stockCodeHint')} className="sm:w-64">
+          <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} className="w-full sm:min-w-0 sm:flex-1">
             <StockAutocomplete
               id="deep-research-stock"
               value={stockCode}

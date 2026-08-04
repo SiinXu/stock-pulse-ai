@@ -45,10 +45,22 @@ describe('DeepResearchPanel', () => {
   it('shows the empty hint before a run', () => {
     renderPanel();
     expect(screen.getByText('Enter a question to start deep research.')).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: 'Related stock code' })).toHaveAttribute(
+    const stockInput = screen.getByRole('combobox', { name: 'Related stock code' });
+    expect(stockInput).toHaveAttribute(
       'aria-haspopup',
       'listbox',
     );
+    expect(stockInput).toHaveAttribute(
+      'placeholder',
+      'Optional, e.g. 600519, HK00700, AAPL',
+    );
+    expect(stockInput.parentElement?.parentElement).toHaveClass(
+      'w-full',
+      'sm:min-w-0',
+      'sm:flex-1',
+    );
+    expect(stockInput.parentElement?.parentElement).not.toHaveClass('sm:w-64');
+    expect(screen.queryByText('Optional, e.g. 600519, HK00700, AAPL')).not.toBeInTheDocument();
   });
 
   it('keeps the empty hint lightweight and the research configuration at the bottom', () => {

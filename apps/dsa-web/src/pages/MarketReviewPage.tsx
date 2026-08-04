@@ -306,7 +306,7 @@ const MarketReviewPage: React.FC = () => {
           className={
             marketReviewHistoryHasMore
               ? 'h-[min(36rem,calc(100dvh-10rem))] min-h-72'
-              : 'self-start'
+              : 'h-full'
           }
           title={t('home.marketReviewHistoryTitle')}
           emptyTitle={t('home.marketReviewHistoryEmptyTitle')}

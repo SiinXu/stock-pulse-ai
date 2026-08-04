@@ -28,6 +28,15 @@ function chooseOption(trigger: HTMLElement, value: string) {
   fireEvent.click(option);
 }
 
+function chooseVisibleDate(label: string): string {
+  fireEvent.click(screen.getByRole('textbox', { name: label }));
+  const dialog = screen.getByRole('dialog', { name: label });
+  const day = dialog.querySelector<HTMLButtonElement>('button[data-calendar-day="true"]:not(:disabled)')!;
+  const value = day.dataset.date!;
+  fireEvent.click(day);
+  return value;
+}
+
 const {
   getAccounts,
   getSnapshot,
@@ -1921,6 +1930,38 @@ describe('PortfolioPage FX refresh', () => {
       await pendingTrade.promise;
     });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '手工录入：交易' })).not.toBeInTheDocument());
+  });
+
+  it('removes event-log date filters after both dates are set and cleared', async () => {
+    renderPortfolioPage();
+    fireEvent.click(await screen.findByRole('button', { name: '事件记录' }));
+    const from = chooseVisibleDate('开始日期');
+    const to = chooseVisibleDate('结束日期');
+    listTrades.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '刷新流水' }));
+
+    await waitFor(() => {
+      expect(listTrades).toHaveBeenLastCalledWith(expect.objectContaining({
+        dateFrom: from,
+        dateTo: to,
+      }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '清除 开始日期' }));
+    fireEvent.click(screen.getByRole('button', { name: '清除 结束日期' }));
+    expect(screen.getByLabelText('开始日期')).toHaveValue('');
+    expect(screen.getByLabelText('结束日期')).toHaveValue('');
+    await waitFor(() => expect(screen.getByRole('button', { name: '刷新流水' })).toBeEnabled());
+
+    listTrades.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '刷新流水' }));
+
+    await waitFor(() => {
+      expect(listTrades).toHaveBeenLastCalledWith(expect.objectContaining({
+        dateFrom: undefined,
+        dateTo: undefined,
+      }));
+    });
   });
 
   it('reuses a failed CSV commit operation and keeps result mode separate from the checkbox', async () => {
