@@ -135,8 +135,6 @@
     {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._fetch_us_data","caught":["Exception"],"digest":"9da6d1f31d31a6614a27d11d4ce80c0bc064e8fa1013467e7a6d35139ef7b457"},
     {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_etf_realtime_quote","caught":["Exception"],"digest":"3c14b1deb082d7d3457bac0da373faa6be2f5aaf0ed77f6d03ab1a7eb59654d4"},
     {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_etf_realtime_quote","caught":["Exception"],"digest":"904bb3f202e828e0d7b05b520ba21efdb625ce4721c11a3cfa3496ac1577344f"},
-    {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_hk_realtime_quote","caught":["Exception"],"digest":"8c497baa025118bdd00b59ec291da7d8548c61d34d09271726c032ff8cd67854"},
-    {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_hk_realtime_quote","caught":["Exception"],"digest":"95cc3d54f2c8d79c76a7118b6ee92ecdedbc00b18ac7541cf878eaeb751ca9db"},
     {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_stock_realtime_quote_em","caught":["Exception"],"digest":"43d2f2d80a431e6fa35c7f63c1b94f118f8d43241418b320a403ffa78e38923b"},
     {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_stock_realtime_quote_em","caught":["Exception"],"digest":"4a13adb59eb850df880353e703611bd91fc5fe8a6ccc1063b780b90676a1c108"},
     {"path":"data_provider/akshare_fetcher.py","scope":"<module>.AkshareFetcher._get_stock_realtime_quote_sina","caught":["Exception"],"digest":"7cd55f9348a8fd5a11399c15bd4f405ec3756505d3632b74fe97b0ea445ada0b"},
