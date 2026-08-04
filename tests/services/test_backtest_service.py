@@ -20,7 +20,30 @@ from src.config import Config
 from src.core.backtest_engine import OVERALL_SENTINEL_CODE
 from src.repositories.backtest_repo import BacktestRepository
 from src.services.backtest_service import BacktestService
+from src.services.stock_code_utils import resolve_daily_stock_identity
 from src.storage import AnalysisHistory, BacktestResult, BacktestSummary, DatabaseManager, StockDaily
+
+
+def _phase_snapshot(
+    analysis_date: date,
+    *,
+    market: str = "cn",
+    phase: str = "postmarket",
+    effective_date: date | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "enhanced_context": {"date": analysis_date.isoformat()},
+            "market_phase_summary": {
+                "phase": phase,
+                "market": market,
+                "effective_daily_bar_date": (
+                    effective_date or analysis_date
+                ).isoformat(),
+                "trigger_source": "test",
+            },
+        }
+    )
 
 
 class BacktestServiceTestCase(unittest.TestCase):
@@ -70,6 +93,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                             "market_phase_summary": {
                                 "phase": "premarket",
                                 "market": "cn",
+                                "effective_daily_bar_date": "2024-01-01",
                                 "trigger_source": "api",
                             },
                         }
@@ -112,6 +136,8 @@ class BacktestServiceTestCase(unittest.TestCase):
         forward_bars: list[StockDaily],
         phase: str = "intraday",
     ) -> None:
+        identity = resolve_daily_stock_identity(code)
+        market = identity.market if identity is not None else "cn"
         with self.db.get_session() as session:
             session.add(
                 AnalysisHistory(
@@ -131,7 +157,8 @@ class BacktestServiceTestCase(unittest.TestCase):
                             "enhanced_context": {"date": analysis_date.isoformat()},
                             "market_phase_summary": {
                                 "phase": phase,
-                                "market": "cn",
+                                "market": market,
+                                "effective_daily_bar_date": analysis_date.isoformat(),
                                 "trigger_source": "api",
                             },
                         }
@@ -220,6 +247,17 @@ class BacktestServiceTestCase(unittest.TestCase):
         self.assertEqual(stats3["saved"], 1)
         self.assertEqual(self._count_results(), 1)
 
+    def test_run_backtest_rejects_invalid_eval_window_days_at_entry(self) -> None:
+        service = BacktestService(self.db)
+        for invalid_value in (0, -1, True, 1.5, "1"):
+            with self.subTest(invalid_value=invalid_value):
+                with self.assertRaisesRegex(ValueError, "positive integer"):
+                    service.run_backtest(
+                        code="600519",
+                        eval_window_days=invalid_value,
+                        min_age_days=0,
+                    )
+
     def test_run_backtest_accepts_dotted_exchange_prefix_and_filters_analysis_date_range(self) -> None:
         service = BacktestService(self.db)
 
@@ -303,7 +341,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 2, 15, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-02-15"}}',
+                    context_snapshot=_phase_snapshot(date(2024, 2, 15)),
                 )
             )
             session.add(
@@ -391,7 +429,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 2, 25, 0, 0, 0),
-                    context_snapshot=json.dumps({"enhanced_context": {"date": "2024-02-25"}}),
+                    context_snapshot=_phase_snapshot(date(2024, 2, 25)),
                 )
             )
             session.add(
@@ -455,7 +493,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 3, 1, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-03-01"}}',
+                    context_snapshot=_phase_snapshot(date(2024, 3, 1)),
                 )
             )
             session.add(
@@ -507,7 +545,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 4, 1, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-04-01"}}',
+                    context_snapshot=_phase_snapshot(date(2024, 4, 1)),
                 )
             )
             session.add(
@@ -546,38 +584,48 @@ class BacktestServiceTestCase(unittest.TestCase):
         data = service.get_recent_evaluations(code="BJ920748", eval_window_days=2, limit=10, page=1)
         self.assertEqual(data["total"], 1)
 
-    def test_build_market_code_variants_includes_compact_prefix_and_bj_forms(self) -> None:
-        sh_variants = BacktestRepository._build_market_code_variants("600519", "600519")
+    def test_daily_identity_includes_compact_prefix_and_market_forms(self) -> None:
+        sh_identity = resolve_daily_stock_identity("600519")
+        self.assertIsNotNone(sh_identity)
+        assert sh_identity is not None
+        sh_variants = sh_identity.code_candidates
         self.assertIn("SH600519", sh_variants)
         self.assertIn("SH.600519", sh_variants)
         self.assertIn("SS600519", sh_variants)
 
-        bj_variants = BacktestRepository._build_market_code_variants("920748", "920748")
+        bj_identity = resolve_daily_stock_identity("920748")
+        self.assertIsNotNone(bj_identity)
+        assert bj_identity is not None
+        bj_variants = bj_identity.code_candidates
         self.assertIn("BJ920748", bj_variants)
         self.assertIn("920748.BJ", bj_variants)
 
-        us_bare_variants = BacktestRepository._build_market_code_variants("AAPL", "AAPL")
-        self.assertIn("AAPL.US", us_bare_variants)
-        us_suffix_variants = BacktestRepository._build_market_code_variants("AAPL.US", "AAPL.US")
-        self.assertIn("AAPL", us_suffix_variants)
+        us_bare_identity = resolve_daily_stock_identity("AAPL")
+        self.assertIsNotNone(us_bare_identity)
+        assert us_bare_identity is not None
+        self.assertIn("AAPL.US", us_bare_identity.code_candidates)
+        us_suffix_identity = resolve_daily_stock_identity("AAPL.US")
+        self.assertIsNotNone(us_suffix_identity)
+        assert us_suffix_identity is not None
+        self.assertIn("AAPL", us_suffix_identity.code_candidates)
 
-    def test_daily_refill_codes_normalize_legacy_ss_aliases_once(self) -> None:
-        candidates = BacktestService._build_daily_code_candidates("605066.SH")
+    def test_daily_identity_normalizes_legacy_ss_aliases_once(self) -> None:
+        identity = resolve_daily_stock_identity("605066.SH")
+        self.assertIsNotNone(identity)
+        assert identity is not None
+        candidates = identity.code_candidates
 
         self.assertIn("SS605066", candidates)
         self.assertEqual(normalize_stock_code("SS605066"), "605066")
         for alias in ("605066.SH", "605066", "SH605066", "SH.605066", "605066.SS", "SS.605066"):
             with self.subTest(alias=alias):
-                self.assertEqual(BacktestService._normalize_daily_refill_code(alias), "605066")
-        self.assertEqual(
-            BacktestService._ordered_daily_refill_codes(
-                code_candidates=candidates,
-                preferred_code="605066.SH",
-            ),
-            ["605066"],
-        )
+                alias_identity = resolve_daily_stock_identity(alias)
+                self.assertIsNotNone(alias_identity)
+                assert alias_identity is not None
+                self.assertEqual(alias_identity.refill_code, "605066")
+        self.assertEqual(identity.refill_code, "605066")
 
-    def test_try_fill_daily_data_uses_normalized_a_share_code_for_legacy_ss_alias(self) -> None:
+    def test_try_fill_daily_data_uses_resolved_refill_code(self) -> None:
         requested_codes = []
 
         class FakeDataFetcherManager:
@@ -602,7 +650,7 @@ class BacktestServiceTestCase(unittest.TestCase):
         service = BacktestService(self.db)
         with patch("data_provider.base.DataFetcherManager", FakeDataFetcherManager):
             service._try_fill_daily_data(
-                code="SS605066",
+                code="605066",
                 analysis_date=date(2024, 7, 1),
                 eval_window_days=1,
             )
@@ -614,25 +662,19 @@ class BacktestServiceTestCase(unittest.TestCase):
         )
         self.assertEqual(self.db.get_data_range("SS605066", date(2024, 7, 1), date(2024, 7, 1)), [])
 
-    def test_build_market_code_variants_rejects_hk_suffix_with_6_digit_base(self) -> None:
-        invalid_variants = BacktestRepository._build_market_code_variants("600519.HK", "600519.HK")
-        self.assertNotIn("600519", invalid_variants)
-        self.assertNotIn("600519.HK", invalid_variants)
+    def test_daily_identity_rejects_hk_suffix_with_6_digit_base(self) -> None:
+        self.assertIsNone(resolve_daily_stock_identity("600519.HK"))
 
-        valid_variants = BacktestRepository._build_market_code_variants("1810.HK", "01810")
-        self.assertIn("01810.HK", valid_variants)
-        self.assertIn("HK01810", valid_variants)
-        self.assertIn("HK.01810", valid_variants)
+        valid_identity = resolve_daily_stock_identity("1810.HK")
+        self.assertIsNotNone(valid_identity)
+        assert valid_identity is not None
+        self.assertIn("01810.HK", valid_identity.code_candidates)
+        self.assertIn("HK01810", valid_identity.code_candidates)
+        self.assertIn("HK.01810", valid_identity.code_candidates)
 
-    def test_build_market_code_variants_rejects_wrong_explicit_exchange_for_bse_code(self) -> None:
-        self.assertEqual(
-            BacktestRepository._build_market_code_variants("920748.SH", "920748"),
-            [],
-        )
-        self.assertEqual(
-            BacktestRepository._build_market_code_variants("SH920748", "920748"),
-            [],
-        )
+    def test_daily_identity_rejects_wrong_explicit_exchange_for_bse_code(self) -> None:
+        self.assertIsNone(resolve_daily_stock_identity("920748.SH"))
+        self.assertIsNone(resolve_daily_stock_identity("SH920748"))
 
     def test_get_candidates_does_not_match_invalid_a_share_hk_cross_input(self) -> None:
         repo = BacktestRepository(self.db)
@@ -646,6 +688,47 @@ class BacktestServiceTestCase(unittest.TestCase):
         )
 
         self.assertEqual(len(matches), 0)
+
+    def test_jp_suffix_filter_reaches_legacy_bare_history(self) -> None:
+        with self.db.get_session() as session:
+            session.add(
+                AnalysisHistory(
+                    query_id="q_jp_legacy_bare_filter",
+                    code="7203",
+                    name="Toyota",
+                    report_type="simple",
+                    sentiment_score=60,
+                    operation_advice="buy",
+                    trend_prediction="bullish",
+                    analysis_summary="legacy bare JP identity",
+                    created_at=datetime(2024, 10, 1, 0, 0, 0),
+                    context_snapshot=json.dumps(
+                        {
+                            "enhanced_context": {"date": "2024-10-01"},
+                            "market_phase_summary": {
+                                "phase": "postmarket",
+                                "market": "jp",
+                                "effective_daily_bar_date": "2024-10-01",
+                            },
+                        }
+                    ),
+                )
+            )
+            session.commit()
+
+        matches = BacktestRepository(self.db).get_candidates(
+            code="7203.T",
+            min_age_days=0,
+            limit=10,
+            eval_window_days=1,
+            engine_version="v1",
+            force=True,
+        )
+
+        self.assertEqual(
+            [candidate.query_id for candidate in matches],
+            ["q_jp_legacy_bare_filter"],
+        )
 
     def test_get_candidates_does_not_match_explicit_wrong_a_share_market(self) -> None:
         repo = BacktestRepository(self.db)
@@ -775,7 +858,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 2, 5, 0, 0, 0),
-                    context_snapshot=json.dumps({"enhanced_context": {"date": "2024-02-05"}}),
+                    context_snapshot=_phase_snapshot(date(2024, 2, 5)),
                 )
             )
             session.add(
@@ -815,7 +898,7 @@ class BacktestServiceTestCase(unittest.TestCase):
             self.assertEqual(result.start_price, 100.0)
             self.assertEqual(result.end_close, 105.0)
 
-    def test_run_backtest_uses_forward_bars_from_other_code_shape_when_start_daily_shape_differs(self) -> None:
+    def test_run_backtest_does_not_mix_start_and_forward_bars_across_code_shapes(self) -> None:
         with self.db.get_session() as session:
             session.add(
                 AnalysisHistory(
@@ -830,7 +913,16 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 2, 10, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-02-10"}}',
+                    context_snapshot=json.dumps(
+                        {
+                            "enhanced_context": {"date": "2024-02-10"},
+                            "market_phase_summary": {
+                                "phase": "postmarket",
+                                "market": "cn",
+                                "effective_daily_bar_date": "2024-02-10",
+                            },
+                        }
+                    ),
                 )
             )
             session.add(
@@ -852,26 +944,27 @@ class BacktestServiceTestCase(unittest.TestCase):
             session.commit()
 
         service = BacktestService(self.db)
-        stats = service.run_backtest(
-            code="600519",
-            force=False,
-            eval_window_days=2,
-            min_age_days=0,
-            analysis_date_from=date(2024, 2, 10),
-            analysis_date_to=date(2024, 2, 10),
-            limit=10,
-        )
+        with patch.object(service, "_try_fill_daily_data"):
+            stats = service.run_backtest(
+                code="600519",
+                force=False,
+                eval_window_days=2,
+                min_age_days=0,
+                analysis_date_from=date(2024, 2, 10),
+                analysis_date_to=date(2024, 2, 10),
+                limit=10,
+            )
 
         self.assertEqual(stats["processed"], 1)
         self.assertEqual(stats["saved"], 1)
-        self.assertEqual(stats["completed"], 1)
-        self.assertEqual(stats["insufficient"], 0)
+        self.assertEqual(stats["completed"], 0)
+        self.assertEqual(stats["insufficient"], 1)
 
         with self.db.get_session() as session:
             result = session.query(BacktestResult).filter(BacktestResult.code == "600519").one()
             self.assertEqual(result.analysis_date, date(2024, 2, 10))
-            self.assertEqual(result.start_price, 100.0)
-            self.assertEqual(result.end_close, 108.0)
+            self.assertIsNone(result.start_price)
+            self.assertIsNone(result.end_close)
 
     def test_run_backtest_supports_us_suffix_code_shape_when_run_with_suffix(self) -> None:
         self._seed_analysis(
@@ -1088,7 +1181,7 @@ class BacktestServiceTestCase(unittest.TestCase):
         )
         self.assertIsNotNone(suffix_summary)
         assert suffix_summary is not None
-        self.assertEqual(suffix_summary["code"], "AAPL.US")
+        self.assertEqual(suffix_summary["code"], "AAPL")
         self.assertEqual(suffix_summary["total_evaluations"], 1)
 
         bare_query = service.get_recent_evaluations(
@@ -1129,7 +1222,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 1, 1, 0, 0, 0),
-                    context_snapshot=json.dumps({"enhanced_context": {"date": "2024-01-01"}}),
+                    context_snapshot=_phase_snapshot(date(2024, 1, 1), market="hk"),
                 )
             )
             session.add(
@@ -1189,7 +1282,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 1, 1, 0, 0, 0),
-                    context_snapshot=json.dumps({"enhanced_context": {"date": "2024-01-01"}}),
+                    context_snapshot=_phase_snapshot(date(2024, 1, 1), market="hk"),
                 )
             )
             session.add(
@@ -1249,7 +1342,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 1, 1, 0, 0, 0),
-                    context_snapshot=json.dumps({"enhanced_context": {"date": "2024-01-01"}}),
+                    context_snapshot=_phase_snapshot(date(2024, 1, 1), market="hk"),
                 )
             )
             session.add(
@@ -1324,7 +1417,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 1, 10, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-01-01"}}',
+                    context_snapshot=_phase_snapshot(date(2024, 1, 1)),
                 )
             )
             session.add(
@@ -1356,7 +1449,7 @@ class BacktestServiceTestCase(unittest.TestCase):
             result = session.query(BacktestResult).filter(BacktestResult.code == "000003").one()
             self.assertEqual(result.analysis_date, date(2024, 1, 1))
 
-    def test_run_backtest_persists_snapshot_date_when_start_daily_falls_back(self) -> None:
+    def test_run_backtest_uses_persisted_effective_date_on_non_trading_day(self) -> None:
         with self.db.get_session() as session:
             session.add(
                 AnalysisHistory(
@@ -1371,7 +1464,11 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 1, 7, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-01-07"}}',
+                    context_snapshot=_phase_snapshot(
+                        date(2024, 1, 7),
+                        phase="non_trading",
+                        effective_date=date(2024, 1, 5),
+                    ),
                 )
             )
             session.add(
@@ -1669,7 +1766,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=datetime(2024, 1, 1, 0, 0, 0),
-                    context_snapshot='{"enhanced_context": {"date": "2024-01-01"}}',
+                    context_snapshot=_phase_snapshot(date(2024, 1, 1)),
                 )
             )
             session.add(
@@ -2320,7 +2417,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     stop_loss=None,
                     take_profit=None,
                     created_at=old_created_at,
-                    context_snapshot='{"enhanced_context": {"date": "2024-01-01"}}',
+                    context_snapshot=_phase_snapshot(date(2024, 1, 1)),
                 )
             )
             session.add(

@@ -1384,6 +1384,8 @@ The backtesting module automatically validates historical AI analysis records ag
 4. Evaluates stop-loss/take-profit hit conditions and simulates execution returns
 5. Aggregates into overall and per-stock performance metrics
 
+The backtest start date first uses `market_phase_summary.effective_daily_bar_date` from the historical snapshot; older snapshots use the trading calendar only when their market and phase are trustworthy. The start bar and forward window must come from one market identity and one stored code shape, so prices are never spliced across aliases. A missing authoritative start or usable window is reported as insufficient data instead of falling back to an arbitrary stale bar.
+
 ### Operation Advice Mapping
 
 | Operation Advice | Position | Expected Direction | Win Condition |

@@ -421,7 +421,6 @@
     {"path":"src/services/alphasift_service.py","scope":"<module>._alphasift_dsa_daily_history_provider.fetch_daily_history_with_dsa","caught":["Exception"],"digest":"3ef08f16abb666e6d1a269e92e96a62bc6927779989c12625c7b65e977e1acd2"},
     {"path":"src/services/alphasift_service.py","scope":"<module>._alphasift_litellm_headers","caught":["Exception"],"digest":"b2e496939e46991a061814dfdc75ca0d96b82494429171877641b85ad51a7e09"},
     {"path":"src/services/backtest_service.py","scope":"<module>.BacktestService._try_fill_daily_data","caught":["Exception"],"digest":"700868a4722679a1b9583d56038ea5005c51ca14479b3613f2e670808a3b1a35"},
-    {"path":"src/services/backtest_service.py","scope":"<module>.BacktestService.run_backtest","caught":["Exception"],"digest":"9c4e1302da5e15783cdae9bba4d7e08d3f2d293a5f5ac4907a74a1df6ff1d7af"},
     {"path":"src/services/daily_market_context.py","scope":"<module>.DailyMarketContextService._load_same_day_history","caught":["Exception"],"digest":"df0d9c0860761f4d8c864a7f34bdc6319e56ef7f024d2d4e0e44bb2382ca5de6"},
     {"path":"src/services/daily_market_context.py","scope":"<module>.DailyMarketContextService._run_market_review_context","caught":["Exception"],"digest":"c50d9a66fe355d0a1d17446b209b7f453d8785084d60320bf61fa18df6b919c6"},
     {"path":"src/services/daily_market_context.py","scope":"<module>._loads_mapping","caught":["Exception"],"digest":"fb993c5ddfb3d1fbb16ad40bc374b6c2dd3c910b125cdeacc440eac004feb0e7"},
