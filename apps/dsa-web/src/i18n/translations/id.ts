@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "Autentikasi admin diaktifkan. Gunakan Ubah kata sandi di bawah ini untuk memperbaruinya.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Belum ada kata sandi yang ditetapkan. Tetapkan sandi admin awal sebelum mengaktifkan autentikasi.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Kata sandi admin sebelumnya dipertahankan. Masukkan untuk mengaktifkan kembali autentikasi dengan cepat.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Disabling authentication always requires the current admin password. A valid session cookie alone is not enough.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Enter the current admin password before disabling authentication",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Menonaktifkan autentikasi selalu memerlukan kata sandi admin saat ini. Cookie sesi yang valid saja tidak cukup.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Masukkan kata sandi admin saat ini sebelum menonaktifkan",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Masukkan kata sandi lama untuk mengaktifkan kembali otentikasi",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Silakan masukkan kata sandi Anda saat ini",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Kata sandi baru diperlukan",
@@ -4349,6 +4349,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Enter the current admin password before disabling authentication",
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata sandi admin saat ini sebelum menonaktifkan autentikasi",
 };

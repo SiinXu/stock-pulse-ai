@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "La autenticación de administrador está activada. Utiliza Cambiar contraseña abajo para actualizarlo.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Aún no se ha puesto ninguna contraseña. Establece una contraseña inicial de administrador antes de habilitar la autenticación.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Se mantuvo la contraseña anterior de administrador. Introdúcelo para volver a activar la autenticación rápidamente.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Disabling authentication always requires the current admin password. A valid session cookie alone is not enough.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Enter the current admin password before disabling authentication",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Desactivar la autenticación siempre requiere la contraseña de administrador actual. Una cookie de sesión válida no es suficiente.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Introduzca la contraseña de administrador actual antes de desactivar",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Introduce la contraseña antigua para reactivar la autenticación",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Por favor, introduzca su contraseña actual",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Se requiere una nueva contraseña",
@@ -4349,6 +4349,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Enter the current admin password before disabling authentication",
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Introduzca la contraseña de administrador actual antes de desactivar la autenticación",
 };

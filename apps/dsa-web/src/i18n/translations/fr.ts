@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "L’authentification administrateur est activée. Utilisez Changer le mot de passe ci-dessous pour le mettre à jour.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Aucun mot de passe n’a encore été défini. Définissez un mot de passe administrateur initial avant d’activer l’authentification.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Le mot de passe administrateur précédent a été conservé. Entrez-le pour réactiver rapidement l’authentification.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Disabling authentication always requires the current admin password. A valid session cookie alone is not enough.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Enter the current admin password before disabling authentication",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Désactiver l’authentification exige toujours le mot de passe administrateur actuel. Un cookie de session valide ne suffit pas.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Saisissez le mot de passe administrateur actuel avant de désactiver",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Saisissez l’ancien mot de passe pour réactiver l’authentification",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Veuillez entrer votre mot de passe actuel",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Un nouveau mot de passe est nécessaire",
@@ -4349,6 +4349,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Enter the current admin password before disabling authentication",
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Saisissez le mot de passe administrateur actuel avant de désactiver l’authentification",
 };

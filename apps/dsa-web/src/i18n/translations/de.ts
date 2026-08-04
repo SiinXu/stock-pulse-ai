@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "Admin-Authentifizierung ist aktiviert. Verwenden Sie unten das Passwort ändern, um es zu aktualisieren.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Es wurde noch kein Passwort festgelegt. Setze ein initiales Admin-Passwort, bevor du die Authentifizierung aktivierst.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Das vorherige Admin-Passwort wurde behalten. Geben Sie sie ein, um die Authentifizierung schnell wieder zu aktivieren.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Disabling authentication always requires the current admin password. A valid session cookie alone is not enough.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Enter the current admin password before disabling authentication",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Zum Deaktivieren der Authentifizierung ist immer das aktuelle Admin-Passwort erforderlich. Ein gültiges Sitzungs-Cookie allein reicht nicht aus.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Geben Sie vor dem Deaktivieren das aktuelle Admin-Passwort ein",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Geben Sie das alte Passwort ein, um die Authentifizierung wieder zu aktivieren",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Bitte geben Sie Ihr aktuelles Passwort ein",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Ein neues Passwort ist erforderlich",
@@ -4349,6 +4349,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Enter the current admin password before disabling authentication",
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Geben Sie vor dem Deaktivieren der Authentifizierung das aktuelle Admin-Passwort ein",
 };
