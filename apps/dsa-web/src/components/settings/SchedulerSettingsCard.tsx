@@ -108,8 +108,8 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [runNowSuccess, setRunNowSuccess] = useState('');
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
   const [isAddingTime, setIsAddingTime] = useState(false);
-  // Live dual-track probe: true only when list(enabled=true) succeeds with ≥1 item.
-  // null = not yet known / probe failed — never invent a dual-track state.
+  // Live probe: true only when list(enabled=true) succeeds with ≥1 item.
+  // null = not yet known / probe failed — never invent an overlap state.
   const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
 
   const refreshVersionedTaskOverlap = useCallback(async () => {
@@ -119,7 +119,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
       const hasTotal = (response.total ?? 0) > 0;
       setHasEnabledVersionedTasks(hasItems || hasTotal);
     } catch {
-      // Fail soft: missing dual-track data must not block legacy controls.
+      // Fail soft: missing versioned-task probe must not block legacy controls.
       setHasEnabledVersionedTasks(null);
     }
   }, []);
@@ -172,7 +172,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const timeTargetKey = scheduleTimesItem ? 'SCHEDULE_TIMES' : 'SCHEDULE_TIME';
   const statusEnabled = status?.enabled ?? scheduleEnabled;
   const displayedScheduleEnabled = scheduleEnabledOverride ?? statusEnabled;
-  const showDualTrackWarning = displayedScheduleEnabled && hasEnabledVersionedTasks === true;
+  // Directional migration notice when legacy is on; stronger copy if versioned tasks also enabled.
+  const showMigrationNotice = displayedScheduleEnabled;
+  const bothTracksActive = displayedScheduleEnabled && hasEnabledVersionedTasks === true;
   const effectiveStatusTimes = status?.scheduleTimes?.length ? status.scheduleTimes : scheduleTimes.filter(Boolean);
   const validationIssues = [
     ...(issueByKey.SCHEDULE_ENABLED || []),
@@ -222,12 +224,16 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             </>
           )}
         />
-        {showDualTrackWarning ? (
+        {showMigrationNotice ? (
           <InlineAlert
             variant="warning"
-            data-testid="scheduler-dual-track-warning"
-            title={t('settings.schedulerDualTrackTitle')}
-            message={t('settings.schedulerDualTrackWarning')}
+            data-testid="scheduler-migration-notice"
+            title={t('settings.schedulerMigrationTitle')}
+            message={
+              bothTracksActive
+                ? t('settings.schedulerMigrationNoticeBothActive')
+                : t('settings.schedulerMigrationNotice')
+            }
           />
         ) : null}
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 xl:items-start">
