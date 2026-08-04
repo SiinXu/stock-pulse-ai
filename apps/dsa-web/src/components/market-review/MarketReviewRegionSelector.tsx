@@ -129,7 +129,7 @@ export const MarketReviewRegionSelector: React.FC<MarketReviewRegionSelectorProp
               close(true);
             }
           }}
-          className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-subtle bg-surface/95 p-2 shadow-2xl shadow-black/25 backdrop-blur-xl"
+          className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-subtle bg-surface/95 p-2 shadow-2xl shadow-black/25 backdrop-blur-sm"
         >
           <div className="border-b border-subtle px-2.5 py-2">
             <p className="text-sm font-semibold text-foreground">{t('home.marketRegionTitle')}</p>
@@ -190,14 +190,14 @@ export const MarketReviewRegionSelector: React.FC<MarketReviewRegionSelectorProp
                       className="h-4 w-4 rounded border-border accent-primary"
                     />
                     <span>{regionLabels[region]}</span>
-                    <span className="ml-auto text-[11px] uppercase text-muted-text">{region}</span>
+                    <span className="ml-auto text-xs uppercase text-muted-text">{region}</span>
                   </label>
                 );
               })}
             </div>
           </div>
 
-          <p className="px-2.5 pb-1 text-[11px] leading-4 text-muted-text">
+          <p className="px-2.5 pb-1 text-xs leading-4 text-muted-text">
             {t('home.marketRegionOneTimeHint')}
           </p>
         </div>

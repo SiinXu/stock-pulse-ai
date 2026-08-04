@@ -172,7 +172,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:className'],
   }]],
   ['../report/ReportOverview.tsx', [
-    ...[308, 331].map((line) => ({
+    ...[304, 327].map((line) => ({
       line,
       owner: 'UIUX-HARNESS' as const,
       removeWhen: 'Report insight cards receive an owner-approved semantic Surface migration with light/dark visual QA.',
