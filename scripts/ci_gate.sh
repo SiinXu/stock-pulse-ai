@@ -30,6 +30,8 @@ deterministic_checks() {
   python scripts/check_dependency_vulnerabilities.py --self-test
   python scripts/check_legacy_facade_imports.py --self-test
   python scripts/check_legacy_facade_imports.py
+  echo "==> backend-gate: mypy type check (src/schemas only)"
+  python -m mypy --config-file mypy.ini
   ./scripts/test.sh code
   ./scripts/test.sh yfinance
 }

@@ -23,7 +23,7 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
 )
-from src.market_phase_summary import extract_market_phase_summary
+from src.market.phase_summary import extract_market_phase_summary
 from src.schemas.decision_action import build_action_fields
 from src.schemas.request_context import AnalysisRequestContext
 from src.services.run_diagnostics import (

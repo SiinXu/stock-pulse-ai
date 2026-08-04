@@ -5,7 +5,9 @@ from typing import Any, Dict
 SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_TIME": {
         "title": "Schedule Time",
-        "description": "Daily schedule time in HH:MM format.",
+        "description": (
+            "Deprecated legacy day-batch daily time (HH:MM). Prefer versioned scheduled tasks. Still supported for compatibility."
+        ),
         "category": "system",
         "data_type": "time",
         "ui_control": "time",
@@ -24,15 +26,25 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "docs": [
             {
+                "label": "Scheduled tasks: legacy SCHEDULE day-batch deprecation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/scheduled-tasks.md#legacy-schedule-day-batch-deprecation",
+            },
+            {
                 "label": "完整指南：其他配置",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
         "warning_codes": ["local_timezone"],
+        "deprecated": True,
+        "replacement": (
+            "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
+        ),
     },
     "SCHEDULE_TIMES": {
         "title": "Schedule Times",
-        "description": "Comma-separated daily schedule times in HH:MM format. Falls back to SCHEDULE_TIME when empty.",
+        "description": (
+            "Deprecated legacy day-batch multi-time list (comma-separated HH:MM). Falls back to SCHEDULE_TIME when empty. Prefer versioned scheduled tasks."
+        ),
         "category": "system",
         "data_type": "string",
         "ui_control": "text",
@@ -51,11 +63,19 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "docs": [
             {
+                "label": "Scheduled tasks: legacy SCHEDULE day-batch deprecation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/scheduled-tasks.md#legacy-schedule-day-batch-deprecation",
+            },
+            {
                 "label": "Full guide: configuration",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
         "warning_codes": ["local_timezone"],
+        "deprecated": True,
+        "replacement": (
+            "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
+        ),
     },
     "HTTP_PROXY": {
         "title": "HTTP Proxy",
@@ -283,7 +303,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "SCHEDULE_ENABLED": {
         "title": "Schedule Enabled",
-        "description": "Enable daily scheduled analysis run.",
+        "description": (
+            "Deprecated legacy day-batch switch for whole-watchlist daily analysis. Prefer versioned scheduled tasks. Still supported for compatibility."
+        ),
         "category": "system",
         "data_type": "boolean",
         "ui_control": "switch",
@@ -302,11 +324,19 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "docs": [
             {
+                "label": "Scheduled tasks: legacy SCHEDULE day-batch deprecation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/scheduled-tasks.md#legacy-schedule-day-batch-deprecation",
+            },
+            {
                 "label": "完整指南：其他配置",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
         "warning_codes": ["restart_required"],
+        "deprecated": True,
+        "replacement": (
+            "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
+        ),
     },
     "ADMIN_AUTH_ENABLED": {
         "title": "Admin Auth Enabled",
@@ -370,7 +400,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "SCHEDULE_RUN_IMMEDIATELY": {
         "title": "Schedule Run Immediately",
-        "description": "Whether to run one analysis immediately on startup in schedule mode.",
+        "description": (
+            "Deprecated legacy schedule-mode startup flag: run one analysis immediately when schedule mode starts. Prefer versioned scheduled tasks. Still supported."
+        ),
         "category": "system",
         "data_type": "boolean",
         "ui_control": "switch",
@@ -388,11 +420,19 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "docs": [
             {
+                "label": "Scheduled tasks: legacy SCHEDULE day-batch deprecation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/scheduled-tasks.md#legacy-schedule-day-batch-deprecation",
+            },
+            {
                 "label": "完整指南：其他配置",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
         "warning_codes": ["restart_required"],
+        "deprecated": True,
+        "replacement": (
+            "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
+        ),
     },
     "TRADING_DAY_CHECK_ENABLED": {
         "title": "Trading Day Check",

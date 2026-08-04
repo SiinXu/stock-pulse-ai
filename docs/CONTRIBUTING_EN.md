@@ -124,6 +124,8 @@ Separately, the repository also has a non-blocking `network-smoke` workflow in `
 
 **Running checks locally:**
 
+Type checking is a narrow ratchet (currently `src/schemas/` only). See [Python Type Checking](type-checking.md) for scope and how to expand it.
+
 ```bash
 # Backend gate (recommended)
 python -m pip install --upgrade --constraint constraints.txt pip

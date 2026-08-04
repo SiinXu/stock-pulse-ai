@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
-REPORT_STRATA_SCHEMA_VERSION = "report-strata-v1"
+REPORT_STRATA_SCHEMA_VERSION: Literal["report-strata-v1"] = "report-strata-v1"
 
 FrameworkAlignmentStatus = Literal[
     "aligned",
@@ -255,9 +255,10 @@ def normalize_report_strata(
         try:
             strata = ReportStrata.model_validate(payload)
         except ValidationError as exc:
-            strata = _coerce_partial_dict(payload, language=language)
-            if strata is None:
+            coerced = _coerce_partial_dict(payload, language=language)
+            if coerced is None:
                 raise exc
+            strata = coerced
     else:
         return None
 

@@ -1,19 +1,61 @@
 # Scheduled Tasks
 
-## Two schedulers (read this first)
+## Forward path (read this first)
 
-StockPulse currently has **two independent schedule tracks**. They share the
+**Canonical scheduling path:** versioned scheduled tasks
+(`POST/GET /api/v1/scheduled-tasks`, Settings → **Saved schedule definitions**).
+
+The env-driven `SCHEDULE_*` day-batch is **deprecated but still fully
+supported**. New setups should use only versioned definitions. Existing
+`SCHEDULE_*` deployments keep working until an explicit future removal.
+
+### Legacy SCHEDULE day-batch deprecation
+
+| Item | Detail |
+| --- | --- |
+| Deprecated keys | `SCHEDULE_ENABLED`, `SCHEDULE_TIME`, `SCHEDULE_TIMES`, `SCHEDULE_RUN_IMMEDIATELY` |
+| Replacement | Versioned scheduled tasks (API + **Saved schedule definitions** UI) |
+| Runtime behavior | Unchanged — values still drive the legacy day-batch |
+| Startup signal | One process-wide deprecation log line when any of these keys is set in process env or `.env` |
+| Config registry | Each key is marked `deprecated: true` with a `replacement` string |
+| Web Settings | Legacy card shows a directional migration notice → versioned definitions panel |
+| Hard removal date | **None scheduled.** Repo policy for similar aliases is “future major or versioned API / explicit removal PR” (e.g. deprecated `detail` envelope alias). No calendar date is invented here. |
+
+#### Migration steps
+
+1. Open **Settings → System & Security → Scheduling → Saved schedule definitions**.
+2. Create versioned definitions that cover the stocks/times you currently run via `STOCK_LIST` + `SCHEDULE_*` (one definition per stock/time contract you care about, or the equivalent research types).
+3. Confirm versioned tasks appear on Home (**Versioned scheduled tasks today**) and that runs succeed.
+4. Set `SCHEDULE_ENABLED=false` (or turn off the legacy switch) and remove or leave dormant `SCHEDULE_TIME` / `SCHEDULE_TIMES` / `SCHEDULE_RUN_IMMEDIATELY`.
+5. Prefer not to run both tracks enabled at once (see overlap note below).
+
+#### Removal criteria (when maintainers may delete `SCHEDULE_*`)
+
+All of the following should be true before a removal PR:
+
+- Versioned scheduled tasks cover the documented operator workflows that
+  previously required whole-watchlist day-batch.
+- Docs, Docker/Compose samples, and `.env.example` no longer present `SCHEDULE_*`
+  as the primary path (already deprecated here).
+- A major version bump **or** an explicit maintainer-approved removal PR exists;
+  compatibility aliases in this repo are not dropped on minor/patch alone by
+  existing practice.
+
+## Two schedulers (compatibility window)
+
+StockPulse still has **two independent schedule tracks**. They share the
 process-local analysis queue when work is admitted, but they are **not** one
-unified scheduler UI or migration wizard.
+unified scheduler UI or automatic migration wizard.
 
-| Track | Config / API | What it runs | Settings surface | Home surface |
-| --- | --- | --- | --- | --- |
-| **Legacy day-batch** | `SCHEDULE_ENABLED`, `SCHEDULE_TIME` / `SCHEDULE_TIMES`, plus `STOCK_LIST` | Whole watchlist analysis at fixed daily times | **Legacy day-batch schedule** card (`SchedulerSettingsCard`) | Not listed as versioned “today” rows |
-| **Versioned scheduled tasks** | `POST/GET /api/v1/scheduled-tasks`, SQLite definitions | Per-definition stock analysis or research (`schema_version` 1/2) | **Saved schedule definitions** panel | **Versioned scheduled tasks today** card |
+| Track | Config / API | What it runs | Settings surface | Home surface | Status |
+| --- | --- | --- | --- | --- | --- |
+| **Legacy day-batch** | `SCHEDULE_ENABLED`, `SCHEDULE_TIME` / `SCHEDULE_TIMES`, plus `STOCK_LIST` | Whole watchlist analysis at fixed daily times | **Legacy day-batch schedule** card (`SchedulerSettingsCard`) | Not listed as versioned “today” rows | **Deprecated** (still supported) |
+| **Versioned scheduled tasks** | `POST/GET /api/v1/scheduled-tasks`, SQLite definitions | Per-definition stock analysis or research (`schema_version` 1/2) | **Saved schedule definitions** panel | **Versioned scheduled tasks today** card | **Canonical** |
 
 Both tracks may be enabled at once. That can produce overlapping analysis load
 (the queue may coalesce identical execution contracts, but it does not merge
-unrelated jobs). Prefer enabling only the track you intend to use.
+unrelated jobs). Prefer only the versioned track for new work; disable legacy
+after migration.
 
 **Process ownership** is deployment-role based (`--serve`, `--schedule`, Compose
 `analyzer` vs `server`, Desktop `--serve-only`). The internal
@@ -179,8 +221,8 @@ The product surface is intentionally small:
 
 | Surface | Behavior |
 | --- | --- |
-| Settings → System & Security → Scheduling → Legacy day-batch | Configures `SCHEDULE_*` + shows legacy status only. Copy labels it as legacy and warns when both tracks appear enabled. |
-| Settings → System & Security → Scheduling → Saved definitions | Create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next/latest status, enable/disable supported definitions, and expand durable run history. Unsupported future schemas are visible but not mutable. |
+| Settings → System & Security → Scheduling → Legacy day-batch | Configures deprecated `SCHEDULE_*` + shows legacy status only. Copy labels it as deprecated and shows a directional migration notice toward **Saved schedule definitions** when the legacy switch is on (stronger copy when versioned tasks are also enabled). |
+| Settings → System & Security → Scheduling → Saved definitions | **Canonical** path: create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next/latest status, enable/disable supported definitions, and expand durable run history. Unsupported future schemas are visible but not mutable. |
 | Home → Configurable area → Versioned scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today` (versioned track only). Empty state links to Settings management. |
 
 Defaults and framing:

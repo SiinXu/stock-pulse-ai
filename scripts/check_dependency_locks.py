@@ -233,8 +233,8 @@ def _load_policy(path: Path) -> tuple[dict, list[str]]:
     }
     if not isinstance(policy, dict) or set(policy) != expected_keys:
         return {}, [f"{path}: expected exactly {sorted(expected_keys)}"]
-    if policy["schema_version"] != 2:
-        errors.append(f"{path}: schema_version must be 2")
+    if policy["schema_version"] != 3:
+        errors.append(f"{path}: schema_version must be 3")
     if not isinstance(policy["lock_file"], str) or not policy["lock_file"]:
         errors.append(f"{path}: lock_file must be a non-empty string")
     if not isinstance(policy["build_constraint_file"], str) or not policy["build_constraint_file"]:
@@ -246,6 +246,7 @@ def _load_policy(path: Path) -> tuple[dict, list[str]]:
         "python_version",
         "python_versions",
         "exclude_newer",
+        "exclude_newer_packages",
         "universal",
     }
     if not isinstance(resolver, dict) or set(resolver) != resolver_keys:
@@ -266,6 +267,19 @@ def _load_policy(path: Path) -> tuple[dict, list[str]]:
             errors.append(f"{path}: resolver.python_versions must be a unique Python 3.x string array")
         elif python_versions[0] != resolver["python_version"]:
             errors.append(f"{path}: resolver.python_versions must start with resolver.python_version")
+        package_cutoffs = resolver.get("exclude_newer_packages")
+        if not isinstance(package_cutoffs, dict):
+            errors.append(f"{path}: resolver.exclude_newer_packages must be a mapping")
+        elif not all(
+            isinstance(package, str)
+            and package == canonicalize_name(package)
+            and isinstance(cutoff, str)
+            and cutoff
+            for package, cutoff in package_cutoffs.items()
+        ):
+            errors.append(
+                f"{path}: resolver.exclude_newer_packages must map canonical package names to timestamps"
+            )
         if resolver["universal"] is not True:
             errors.append(f"{path}: resolver.universal must be true")
     for field in ("source_files", "exact_source_files"):
@@ -367,6 +381,11 @@ def _render_header(policy: dict, source_sha: str) -> str:
             f"# Source-SHA256: {source_sha}",
             f"# Python-Minimum: {resolver['python_version']}",
             f"# Exclude-Newer: {resolver['exclude_newer']}",
+            "# Exclude-Newer-Packages: "
+            + ",".join(
+                f"{package}={cutoff}"
+                for package, cutoff in sorted(resolver["exclude_newer_packages"].items())
+            ),
             "# Platforms: universal (Linux, macOS, Windows)",
             "# Regenerate: python scripts/check_dependency_locks.py --update",
             "",
@@ -586,20 +605,33 @@ def check_repository(
         errors.append(f"{lock_path}: Python minimum header does not match policy")
     if _header_value(lock_text, "Exclude-Newer") != policy["resolver"]["exclude_newer"]:
         errors.append(f"{lock_path}: resolution cutoff header does not match policy")
+    expected_package_cutoffs = ",".join(
+        f"{package}={cutoff}"
+        for package, cutoff in sorted(policy["resolver"]["exclude_newer_packages"].items())
+    )
+    if _header_value(lock_text, "Exclude-Newer-Packages") != expected_package_cutoffs:
+        errors.append(f"{lock_path}: package resolution cutoffs header does not match policy")
     actual_lock_sha = _content_sha256(lock_bytes)
     if policy["lock_sha256"] != actual_lock_sha:
         errors.append(f"{lock_path}: lock digest drift; use the reviewed update command")
 
     now = datetime.now(timezone.utc)
     current_date = today or now.date()
-    cutoff = policy["resolver"]["exclude_newer"]
-    if not CUTOFF_RE.fullmatch(cutoff):
-        errors.append(f"{policy_path}: resolver.exclude_newer must be a fixed UTC timestamp")
-    else:
+    cutoffs = {
+        "exclude_newer": policy["resolver"]["exclude_newer"],
+        **{
+            f"exclude_newer_packages.{package}": cutoff
+            for package, cutoff in policy["resolver"]["exclude_newer_packages"].items()
+        },
+    }
+    for field, cutoff in cutoffs.items():
+        if not isinstance(cutoff, str) or not CUTOFF_RE.fullmatch(cutoff):
+            errors.append(f"{policy_path}: resolver.{field} must be a fixed UTC timestamp")
+            continue
         try:
             cutoff_time = datetime.strptime(cutoff, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         except ValueError:
-            errors.append(f"{policy_path}: resolver.exclude_newer is not a valid timestamp")
+            errors.append(f"{policy_path}: resolver.{field} is not a valid timestamp")
         else:
             comparison_time = (
                 datetime.combine(current_date, datetime.max.time(), tzinfo=timezone.utc)
@@ -607,7 +639,7 @@ def check_repository(
                 else now
             )
             if cutoff_time > comparison_time:
-                errors.append(f"{policy_path}: resolver.exclude_newer must not be in the future")
+                errors.append(f"{policy_path}: resolver.{field} must not be in the future")
     exceptions, exception_errors = _load_exceptions(exception_path, current_date)
     errors.extend(exception_errors)
     used_exceptions: set[tuple[str, str, str]] = set()
@@ -720,6 +752,8 @@ def _generate_lock_content(root: Path, policy: dict, uv_binary: str) -> str:
             "--output-file",
             str(raw_lock_path),
         ]
+        for package, cutoff in sorted(resolver["exclude_newer_packages"].items()):
+            command.extend(["--exclude-newer-package", f"{package}={cutoff}"])
         subprocess.run(command, cwd=root, check=True)
         raw_lock = raw_lock_path.read_text(encoding="utf-8").strip() + "\n"
 
@@ -790,7 +824,7 @@ def _write_fixture(
     exception_path = root / "scripts" / "dependency_lock_exceptions.json"
     exception_path.write_text('{"exceptions": []}\n', encoding="utf-8")
     policy = {
-        "schema_version": 2,
+        "schema_version": 3,
         "lock_file": "constraints.txt",
         "build_constraint_file": "build-constraints.txt",
         "resolver": {
@@ -799,6 +833,7 @@ def _write_fixture(
             "python_version": "3.10",
             "python_versions": ["3.10", "3.11", "3.12", "3.13", "3.14"],
             "exclude_newer": "2030-01-01T00:00:00Z",
+            "exclude_newer_packages": {"foo": "2030-01-01T00:00:00Z"},
             "universal": True,
         },
         "source_files": [
@@ -906,6 +941,15 @@ def _run_self_tests() -> None:
         policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
         _refresh_fixture_lock(root, "bar==2\nfoo==1\nsetuptools==1\n")
         validate(root, "must not be in the future")
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        root = Path(temporary_directory)
+        policy_path, _ = _write_fixture(root)
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        policy["resolver"]["exclude_newer_packages"]["foo"] = "2031-01-01T00:00:00Z"
+        policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+        _refresh_fixture_lock(root, "bar==2\nfoo==1\nsetuptools==1\n")
+        validate(root, "exclude_newer_packages.foo must not be in the future")
 
     with tempfile.TemporaryDirectory() as temporary_directory:
         root = Path(temporary_directory)
