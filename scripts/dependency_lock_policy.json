@@ -56,6 +56,7 @@
       ],
       "packages": [
         "flake8",
+        "mypy",
         "pip",
         "pip-audit",
         "uv",
@@ -94,5 +95,5 @@
       ]
     }
   },
-  "lock_sha256": "2ac5109c226a5d0a8d36f7baa4721bb5c6b4f8ec85d675da27cac6c52ef4bbad"
+  "lock_sha256": "9ea5695a3711f1085ada068433c3f8f5991a6f42e9c3afbbf2a2d349db06015c"
 }

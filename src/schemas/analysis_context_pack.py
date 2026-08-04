@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 from src.utils.sanitize import redact_sensitive_mapping
 
 
-PACK_VERSION = "1.0"
+PACK_VERSION: Literal["1.0"] = "1.0"
 _PACK_VERSION_ADAPTER = TypeAdapter(Literal["1.0"])
 
 
