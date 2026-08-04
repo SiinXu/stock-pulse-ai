@@ -472,6 +472,32 @@ test('main BrowserWindow navigation guards keep navigation on its selected Web o
   }
 });
 
+test('main BrowserWindow opens only HTTP and HTTPS links outside the app', (t) => {
+  const mainModule = loadMainModule(t);
+  const openedUrls = [];
+  const openHandler = mainModule.createMainWindowOpenHandler((url) => {
+    openedUrls.push(url);
+  });
+
+  assert.deepEqual(openHandler({ url: 'https://docs.example/path?q=1' }), { action: 'deny' });
+  assert.deepEqual(openHandler({ url: 'http://news.example/article' }), { action: 'deny' });
+  assert.deepEqual(openedUrls, [
+    'https://docs.example/path?q=1',
+    'http://news.example/article',
+  ]);
+
+  for (const blockedUrl of [
+    'file:///tmp/secret.txt',
+    'smb://fileserver/private',
+    'javascript:alert(document.domain)',
+    'stockpulse://app/settings',
+    'custom-app://open/resource',
+  ]) {
+    assert.deepEqual(openHandler({ url: blockedUrl }), { action: 'deny' }, blockedUrl);
+  }
+  assert.equal(openedUrls.length, 2);
+});
+
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {
   const mainModule = loadMainModule(t);
   const assistantWebContents = {

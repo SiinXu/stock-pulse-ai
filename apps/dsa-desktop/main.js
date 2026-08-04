@@ -3394,6 +3394,31 @@ function registerMainWindowNavigationGuards(
   webContents.on('will-redirect', guardNavigation);
 }
 
+function sanitizeExternalWebUrl(candidateUrl) {
+  if (typeof candidateUrl !== 'string' || !candidateUrl.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(candidateUrl.trim());
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.toString()
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function createMainWindowOpenHandler(openExternal = shell.openExternal) {
+  return ({ url } = {}) => {
+    const externalUrl = sanitizeExternalWebUrl(url);
+    if (externalUrl) {
+      void openExternal(externalUrl);
+    }
+    return { action: 'deny' };
+  };
+}
+
 ipcMain.handle('desktop:get-update-state', () => desktopUpdateState);
 ipcMain.handle('desktop:check-for-updates', () => performDesktopUpdateCheck({ manual: true }));
 ipcMain.handle('desktop:install-downloaded-update', () => installDownloadedUpdate());
@@ -3578,10 +3603,7 @@ async function createWindow(brandMigrationResult) {
     }
   );
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  mainWindow.webContents.setWindowOpenHandler(createMainWindowOpenHandler());
 
   const appDir = resolveAppDir();
   const envPath = path.join(appDir, '.env');
@@ -3852,6 +3874,8 @@ module.exports = {
   buildMainWindowOptions,
   isAllowedMainWindowNavigation,
   registerMainWindowNavigationGuards,
+  sanitizeExternalWebUrl,
+  createMainWindowOpenHandler,
   buildDesktopAssistantRoute,
   buildDesktopAssistantState,
   buildDesktopDeepLinkTargetUrl,
