@@ -3335,6 +3335,12 @@ function assertLocalModelSender(event) {
   }
 }
 
+function assertDesktopUpdateSender(event) {
+  if (!isLocalModelSender(event)) {
+    throw new Error('Unauthorized desktop update IPC sender');
+  }
+}
+
 async function runLocalModelOperation(operation) {
   if (localModelOperationInFlight) {
     return { ok: false, error: 'busy', message: 'Another local model operation is in progress.' };
@@ -3347,10 +3353,92 @@ async function runLocalModelOperation(operation) {
   }
 }
 
-ipcMain.handle('desktop:get-update-state', () => desktopUpdateState);
-ipcMain.handle('desktop:check-for-updates', () => performDesktopUpdateCheck({ manual: true }));
-ipcMain.handle('desktop:install-downloaded-update', () => installDownloadedUpdate());
-ipcMain.handle('desktop:open-release-page', async (_event, releaseUrl) => {
+function buildMainWindowOptions() {
+  return {
+    width: 1200,
+    height: 800,
+    minWidth: 960,
+    minHeight: 640,
+    backgroundColor: resolveWindowBackgroundColor(),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      additionalArguments: [`--dsa-desktop-version=${app.getVersion()}`],
+    },
+  };
+}
+
+function isAllowedMainWindowNavigation(targetUrl, allowedPageUrl) {
+  if (typeof targetUrl !== 'string' || typeof allowedPageUrl !== 'string') {
+    return false;
+  }
+
+  try {
+    const target = new URL(targetUrl);
+    const allowed = new URL(allowedPageUrl);
+    const isTargetWebOrigin = target.protocol === 'http:' || target.protocol === 'https:';
+    const isAllowedWebOrigin = allowed.protocol === 'http:' || allowed.protocol === 'https:';
+    return isTargetWebOrigin && isAllowedWebOrigin && target.origin === allowed.origin;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function registerMainWindowNavigationGuards(
+  webContents,
+  getAllowedPageUrl = () => desktopMainPageUrl
+) {
+  const guardNavigation = (event, targetUrl) => {
+    if (isAllowedMainWindowNavigation(targetUrl, getAllowedPageUrl())) {
+      return;
+    }
+    event.preventDefault();
+  };
+  webContents.on('will-navigate', guardNavigation);
+  webContents.on('will-redirect', guardNavigation);
+}
+
+function sanitizeExternalWebUrl(candidateUrl) {
+  if (typeof candidateUrl !== 'string' || !candidateUrl.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(candidateUrl.trim());
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.toString()
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function createMainWindowOpenHandler(openExternal = shell.openExternal) {
+  return ({ url } = {}) => {
+    const externalUrl = sanitizeExternalWebUrl(url);
+    if (externalUrl) {
+      void openExternal(externalUrl);
+    }
+    return { action: 'deny' };
+  };
+}
+
+ipcMain.handle('desktop:get-update-state', (event) => {
+  assertDesktopUpdateSender(event);
+  return desktopUpdateState;
+});
+ipcMain.handle('desktop:check-for-updates', (event) => {
+  assertDesktopUpdateSender(event);
+  return performDesktopUpdateCheck({ manual: true });
+});
+ipcMain.handle('desktop:install-downloaded-update', (event) => {
+  assertDesktopUpdateSender(event);
+  return installDownloadedUpdate();
+});
+ipcMain.handle('desktop:open-release-page', async (event, releaseUrl) => {
+  assertDesktopUpdateSender(event);
   await shell.openExternal(sanitizeReleaseUrl(releaseUrl));
   return true;
 });
@@ -3480,20 +3568,9 @@ async function createWindow(brandMigrationResult) {
 
   logStartup('createWindow started');
 
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 960,
-    minHeight: 640,
-    backgroundColor: resolveWindowBackgroundColor(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      additionalArguments: [`--dsa-desktop-version=${app.getVersion()}`],
-    },
-  });
+  mainWindow = new BrowserWindow(buildMainWindowOptions());
   logStartup('BrowserWindow created');
+  registerMainWindowNavigationGuards(mainWindow.webContents);
 
   if (typeof mainWindow.on === 'function') {
     mainWindow.on('close', handleMainWindowClose);
@@ -3542,10 +3619,7 @@ async function createWindow(brandMigrationResult) {
     }
   );
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  mainWindow.webContents.setWindowOpenHandler(createMainWindowOpenHandler());
 
   const appDir = resolveAppDir();
   const envPath = path.join(appDir, '.env');
@@ -3813,6 +3887,11 @@ module.exports = {
   fetchLatestReleaseJson,
   findAvailablePort,
   buildMainPageUrl,
+  buildMainWindowOptions,
+  isAllowedMainWindowNavigation,
+  registerMainWindowNavigationGuards,
+  sanitizeExternalWebUrl,
+  createMainWindowOpenHandler,
   buildDesktopAssistantRoute,
   buildDesktopAssistantState,
   buildDesktopDeepLinkTargetUrl,
