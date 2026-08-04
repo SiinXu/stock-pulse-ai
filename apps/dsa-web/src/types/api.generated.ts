@@ -4359,10 +4359,7 @@ export interface components {
              * @default false
              */
             dry_run: boolean;
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: string;
             /**
              * Operation Id
@@ -4382,7 +4379,6 @@ export interface components {
         Body_import_model_pack_api_v1_model_packs_import_post: {
             /**
              * File
-             * Format: binary
              * @description A .modelpack or ZIP archive
              */
             file: string;
@@ -4394,10 +4390,7 @@ export interface components {
              * @description Broker id: huatai/citic/cmb
              */
             broker: string;
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: string;
         };
         /** CallTypeBreakdown */
@@ -9979,6 +9972,10 @@ export interface components {
         };
         /** ValidationError */
         ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
             /** Location */
             loc: (string | number)[];
             /** Message */

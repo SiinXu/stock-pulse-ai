@@ -54,6 +54,12 @@ product env, writes a temporary `ENV_FILE`, points `DATABASE_PATH` at a temp
 sqlite file, and stubs optional heavy imports. Run it twice and `diff` the
 outputs when diagnosing non-determinism.
 
+**Version pin:** regenerate with the same FastAPI / Pydantic versions as
+`.github/requirements-ci.txt` / `constraints.txt` (for example
+`fastapi==0.140.0`). A newer or older FastAPI can change binary-upload and
+`ValidationError` OpenAPI shapes and will fail `openapi-types-gate` even when
+route contracts are unchanged.
+
 ## Runtime-validation pilot pattern
 
 Pilot module: `apps/dsa-web/src/api/stocks.ts` (`getQuote`, `getDailyHistory`).

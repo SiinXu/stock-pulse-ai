@@ -166,6 +166,7 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/ci.yml", "python-minimum", "contents", "read"),
         (".github/workflows/ci.yml", "pydanticai-installed", "contents", "read"),
         (".github/workflows/ci.yml", "docker-build", "contents", "read"),
+        (".github/workflows/ci.yml", "openapi-types-gate", "contents", "read"),
         (".github/workflows/ci.yml", "web-gate", "contents", "read"),
         (".github/workflows/ci.yml", "web-e2e", "contents", "read"),
         (".github/workflows/create-release.yml", "release", "contents", "write"),

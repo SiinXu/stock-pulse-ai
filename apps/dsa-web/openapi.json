@@ -4317,7 +4317,7 @@
             "type": "boolean"
           },
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           },
@@ -4347,7 +4347,7 @@
           "file": {
             "anyOf": [
               {
-                "format": "binary",
+                "contentMediaType": "application/octet-stream",
                 "type": "string"
               },
               {
@@ -4364,8 +4364,8 @@
       "Body_import_model_pack_api_v1_model_packs_import_post": {
         "properties": {
           "file": {
+            "contentMediaType": "application/octet-stream",
             "description": "A .modelpack or ZIP archive",
-            "format": "binary",
             "title": "File",
             "type": "string"
           }
@@ -4384,7 +4384,7 @@
             "type": "string"
           },
           "file": {
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
           }
@@ -18025,6 +18025,13 @@
       },
       "ValidationError": {
         "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
           "loc": {
             "items": {
               "anyOf": [
