@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -32,6 +33,13 @@ REQUIRED_GITIGNORE_SNIPPETS = (
     "!.claude/skills/",
     "!.claude/skills/**",
 )
+
+# Canonical Unreleased changelog type tokens, e.g. `Added`/`Changed`/`Fixed`/...
+CHANGELOG_TYPE_TOKEN_RE = re.compile(
+    r"`(Added|Changed|Fixed|Docs|Tests|Chore)`(?:/`(Added|Changed|Fixed|Docs|Tests|Chore)`)*"
+)
+CHANGELOG_TYPE_SPLIT_RE = re.compile(r"`(Added|Changed|Fixed|Docs|Tests|Chore)`")
+EXPECTED_CHANGELOG_TYPES = {"Added", "Changed", "Fixed", "Docs", "Tests", "Chore"}
 
 
 def fail(message: str) -> None:
@@ -68,6 +76,34 @@ def ensure_copilot_entry() -> None:
     for fragment in required_fragments:
         if fragment not in content:
             fail(f".github/copilot-instructions.md is missing required text: {fragment!r}")
+
+
+def extract_changelog_type_tokens(text: str) -> set[str]:
+    """Extract the allowed `[Unreleased]` type tokens from governance prose."""
+    tokens: set[str] = set()
+    for match in CHANGELOG_TYPE_TOKEN_RE.finditer(text):
+        tokens.update(CHANGELOG_TYPE_SPLIT_RE.findall(match.group(0)))
+    return tokens
+
+
+def ensure_changelog_type_tokens_aligned() -> None:
+    """Enforce that Copilot mirrors the canonical Unreleased changelog type set."""
+    ensure_file_exists(AGENTS, "canonical AGENTS.md")
+    ensure_file_exists(COPILOT, "repository Copilot instructions")
+
+    agents_tokens = extract_changelog_type_tokens(AGENTS.read_text(encoding="utf-8"))
+    if agents_tokens != EXPECTED_CHANGELOG_TYPES:
+        fail(
+            "AGENTS.md does not declare the expected [Unreleased] changelog type set "
+            f"{sorted(agents_tokens)}"
+        )
+
+    copilot_tokens = extract_changelog_type_tokens(COPILOT.read_text(encoding="utf-8"))
+    if copilot_tokens != agents_tokens:
+        fail(
+            ".github/copilot-instructions.md changelog type tokens must match AGENTS.md; "
+            f"agents={sorted(agents_tokens)} copilot={sorted(copilot_tokens)}"
+        )
 
 
 def ensure_instruction_files() -> None:
@@ -116,6 +152,7 @@ def ensure_no_tracked_claude_artifacts() -> None:
 def main() -> None:
     ensure_symlink()
     ensure_copilot_entry()
+    ensure_changelog_type_tokens_aligned()
     ensure_instruction_files()
     ensure_skill_files()
     ensure_gitignore_rules()
