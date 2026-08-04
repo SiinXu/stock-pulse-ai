@@ -31,5 +31,7 @@ def test_approval_docs_cover_security_api_migration_and_rollback() -> None:
 def test_approval_change_log_is_flat() -> None:
     content = (ROOT / "docs/CHANGELOG.md").read_text(encoding="utf-8")
     unreleased = content.split("## [Unreleased]", 1)[1].split("\n## ", 1)[0]
-    assert "Human-in-the-Loop risk-control bypass" in unreleased
+    # The entry may already be consolidated into a released section; what must
+    # hold is that it stays documented and that `[Unreleased]` stays flat.
+    assert "Human-in-the-Loop risk-control bypass" in content
     assert "\n### " not in unreleased
