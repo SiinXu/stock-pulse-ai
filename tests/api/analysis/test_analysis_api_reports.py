@@ -1769,9 +1769,6 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 display_code.strip().upper(): display_code,
             }
 
-            def resolve_display_code(code: object) -> str | None:
-                return display_code_by_alias.get(str(code or "").strip().upper())
-
             case_raw_result = deepcopy(raw_result)
             case_raw_result["dashboard"]["phase_decision"]["phase_context"][
                 "market"
@@ -1855,8 +1852,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     case_raw_result,
                 ),
             ), patch(
-                "api.v1.endpoints.analysis.resolve_index_stock_code",
-                side_effect=resolve_display_code,
+                "src.data.stock_index_loader._STOCK_CODE_LOOKUP_CACHE",
+                display_code_by_alias,
             ):
                 sync_result = _handle_sync_analysis(
                     storage_code,
@@ -1907,8 +1904,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     case_raw_result,
                 ),
             ), patch(
-                "api.v1.endpoints.analysis.resolve_index_stock_code",
-                side_effect=resolve_display_code,
+                "src.data.stock_index_loader._STOCK_CODE_LOOKUP_CACHE",
+                display_code_by_alias,
             ):
                 queue_mock.return_value.get_task.return_value = task
                 memory_status = get_analysis_status(case_query_id)
@@ -1949,15 +1946,15 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "src.storage.DatabaseManager.get_instance",
                 return_value=database,
             ), patch(
-                "api.v1.endpoints.analysis.resolve_index_stock_code",
-                side_effect=resolve_display_code,
+                "src.data.stock_index_loader._STOCK_CODE_LOOKUP_CACHE",
+                display_code_by_alias,
             ):
                 queue_mock.return_value.get_task.return_value = None
                 database_status = get_analysis_status(case_query_id)
 
             with patch(
-                "src.services.history_service.resolve_index_stock_code",
-                side_effect=resolve_display_code,
+                "src.data.stock_index_loader._STOCK_CODE_LOOKUP_CACHE",
+                display_code_by_alias,
             ):
                 history_report = get_history_detail(
                     case_query_id,
