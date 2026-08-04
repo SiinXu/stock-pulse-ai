@@ -31,6 +31,7 @@ from src.migrations.registry import (
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
     SECURITY_AUDIT_EVENTS_MIGRATION,
+    SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
     SCHEDULED_TASK_SCHEMA_MIGRATION,
     TARGET_VERSION,
     get_migrations,
@@ -199,6 +200,7 @@ def test_pending_cli_subprocess_is_read_only(
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
         INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
         APPROVAL_GATE_SCHEMA_MIGRATION.id,
+        SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -265,6 +267,7 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
         INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
         APPROVAL_GATE_SCHEMA_MIGRATION.id,
+        SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}

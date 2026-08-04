@@ -19,6 +19,12 @@ from src.migrations.versions.v202607240003_investment_framework_schema import (
 from src.storage import DatabaseManager
 
 
+_ALL_MIGRATIONS = get_migrations()
+_FRAMEWORK_MIGRATIONS = _ALL_MIGRATIONS[
+    : _ALL_MIGRATIONS.index(APPROVAL_GATE_SCHEMA_MIGRATION) + 1
+]
+
+
 def _database_url(path: Path) -> str:
     return f"sqlite:///{path}"
 
@@ -33,7 +39,9 @@ def _engine_before_framework_migration(path: Path):
             "applied_at DATETIME NOT NULL, "
             "checksum VARCHAR(64))"
         )
-        for migration in get_migrations()[:-2]:
+        for migration in _ALL_MIGRATIONS:
+            if migration.id == INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id:
+                break
             connection.exec_driver_sql(
                 "INSERT INTO schema_migrations "
                 "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
@@ -151,7 +159,7 @@ def test_fresh_database_has_framework_tables_and_applied_migration() -> None:
             "investment_framework_versions",
         }.issubset(_tables(database._engine))
         status = MigrationRunner().status(database._engine)
-        assert status.current_version == APPROVAL_GATE_SCHEMA_MIGRATION.id
+        assert status.current_version == _ALL_MIGRATIONS[-1].id
         assert status.pending_ids == ()
     finally:
         DatabaseManager.reset_instance()
@@ -160,7 +168,7 @@ def test_fresh_database_has_framework_tables_and_applied_migration() -> None:
 def test_framework_migration_upgrades_legacy_registry_once(tmp_path: Path) -> None:
     engine = _engine_before_framework_migration(tmp_path / "legacy.sqlite")
     try:
-        result = MigrationRunner().apply_pending(engine)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(engine)
         assert result.success is True
         assert result.executed_ids == (
             INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
@@ -171,7 +179,7 @@ def test_framework_migration_upgrades_legacy_registry_once(tmp_path: Path) -> No
             "investment_framework_versions",
         }.issubset(_tables(engine))
 
-        rerun = MigrationRunner().apply_pending(engine)
+        rerun = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(engine)
         assert rerun.success is True
         assert rerun.executed_ids == ()
     finally:
@@ -194,7 +202,7 @@ def test_framework_migration_rolls_back_tables_when_applied_row_fails(
             super()._insert_applied(connection, migration)
 
     try:
-        result = AppliedInsertFailureRunner().apply_pending(engine)
+        result = AppliedInsertFailureRunner(_FRAMEWORK_MIGRATIONS).apply_pending(engine)
         assert result.success is False
         assert result.failure_code == "applied_registry_write_failed"
         assert result.failed_migration_id == INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id
@@ -246,7 +254,7 @@ def test_framework_migration_rejects_lookalike_table_shape(
                 ")"
             )
 
-        result = MigrationRunner().apply_pending(engine)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(engine)
         assert result.success is False
         assert result.failure_code == "migration_upgrade_failed"
         assert result.failed_migration_id == INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id
@@ -302,7 +310,7 @@ def test_framework_migration_rejects_partial_unique_lookalikes(
                 "WHERE version < 0"
             )
 
-        result = MigrationRunner().apply_pending(engine)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(engine)
         assert result.success is False
         assert result.failure_code == "migration_upgrade_failed"
         assert result.failed_migration_id == INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id
@@ -385,7 +393,7 @@ def test_framework_migration_rejects_noncanonical_ddl_semantics_without_mutation
             )
             before = _framework_schema_snapshot(connection)
 
-        result = MigrationRunner().apply_pending(engine)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(engine)
 
         assert result.success is False
         assert result.failure_code == "migration_upgrade_failed"
@@ -441,7 +449,7 @@ def test_framework_migration_rejects_table_triggers_without_mutation(
         before = _framework_schema_snapshot(connection)
         connection.rollback()
 
-        result = MigrationRunner().apply_pending(connection)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(connection)
 
         assert result.success is False
         assert result.failure_code == "migration_upgrade_failed"
@@ -487,7 +495,7 @@ def test_framework_migration_rejects_auxiliary_schema_objects_without_mutation(
         before = _framework_schema_snapshot(connection)
         connection.rollback()
 
-        result = MigrationRunner().apply_pending(connection)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(connection)
 
         assert result.success is False
         assert result.failure_code == "migration_upgrade_failed"
@@ -518,7 +526,7 @@ def test_framework_migration_rejects_bad_main_shape_behind_temp_shadow(
         before = _framework_schema_snapshot(connection)
         connection.rollback()
 
-        result = MigrationRunner().apply_pending(connection)
+        result = MigrationRunner(_FRAMEWORK_MIGRATIONS).apply_pending(connection)
 
         assert result.success is False
         assert result.failure_code == "migration_upgrade_failed"
