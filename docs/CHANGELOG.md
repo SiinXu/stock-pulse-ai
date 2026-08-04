@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Fixed] Resolved canonical English company aliases for mapped U.S./Hong Kong tickers so Chinese display names no longer suppress English news queries or relevance matches.
 - [Added] Exposed the existing `TUSHARE_HTTP_URL` custom endpoint through the configuration registry and Web Settings schema.
