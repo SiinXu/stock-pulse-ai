@@ -498,6 +498,30 @@ test('main BrowserWindow opens only HTTP and HTTPS links outside the app', (t) =
   assert.equal(openedUrls.length, 2);
 });
 
+test('desktop update IPC rejects foreign renderers', async (t) => {
+  const mainModule = loadMainModule(t);
+  const mainWebContents = { send: () => undefined };
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    webContents: mainWebContents,
+  });
+  t.after(() => mainModule.__setMainWindowForTest(null));
+
+  for (const channel of [
+    'desktop:get-update-state',
+    'desktop:check-for-updates',
+    'desktop:install-downloaded-update',
+    'desktop:open-release-page',
+  ]) {
+    const handler = mainModule.__getIpcMainHandler(channel);
+    await assert.rejects(
+      async () => handler({ sender: { id: 'foreign-renderer' } }, 'https://evil.example'),
+      /Unauthorized desktop update IPC sender/,
+      channel
+    );
+  }
+});
+
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {
   const mainModule = loadMainModule(t);
   const assistantWebContents = {
@@ -1968,20 +1992,22 @@ test('auto download prompt falls back to error when install path fails', async (
   fs.writeFileSync(envFile, 'RUN_MODE=desktop\n');
   fs.writeFileSync(uninstallPath, '');
 
+  const mainWebContents = {
+    send: () => undefined,
+  };
   mainModule.__setMainWindowForTest({
     isDestroyed: () => false,
-    webContents: {
-      send: () => undefined,
-    },
+    webContents: mainWebContents,
   });
 
-  await mainModule.__getIpcMainHandler('desktop:check-for-updates')();
-  let state = await mainModule.__getIpcMainHandler('desktop:get-update-state')();
+  const mainSenderEvent = { sender: mainWebContents };
+  await mainModule.__getIpcMainHandler('desktop:check-for-updates')(mainSenderEvent);
+  let state = await mainModule.__getIpcMainHandler('desktop:get-update-state')(mainSenderEvent);
   for (let idx = 0; idx < 12 && state.status !== mainModule.UPDATE_STATUS.ERROR; idx += 1) {
     await new Promise((resolve) => {
       setTimeout(resolve, 30);
     });
-    state = await mainModule.__getIpcMainHandler('desktop:get-update-state')();
+    state = await mainModule.__getIpcMainHandler('desktop:get-update-state')(mainSenderEvent);
   }
 
   assert.equal(state.status, mainModule.UPDATE_STATUS.ERROR);
@@ -2051,14 +2077,17 @@ test('auto update backup copies AlphaSift hotspot detail directories recursively
   fs.writeFileSync(uninstallPath, '');
   fs.writeFileSync(detailFile, '{"topic":"AI算力"}\n', 'utf-8');
 
+  const mainWebContents = {
+    send: () => undefined,
+  };
   mainModule.__setMainWindowForTest({
     isDestroyed: () => false,
-    webContents: {
-      send: () => undefined,
-    },
+    webContents: mainWebContents,
   });
 
-  await mainModule.__getIpcMainHandler('desktop:check-for-updates')();
+  await mainModule.__getIpcMainHandler('desktop:check-for-updates')({
+    sender: mainWebContents,
+  });
   for (let idx = 0; idx < 12 && !quitAndInstallArgs; idx += 1) {
     await new Promise((resolve) => {
       setTimeout(resolve, 30);
@@ -2844,21 +2873,23 @@ test('createWindow startup routes a pending deep link after restore and backend 
   const loadedUrls = [];
   let startupError;
   let updateCheckRequested = false;
+  let mainWebContents = null;
   const originalResourcesPathDescriptor = Object.getOwnPropertyDescriptor(process, 'resourcesPath');
   const resourcesPath = path.join(tempRoot, 'resources');
   const backupRoot = path.join(userDataDir, '.dsa-desktop-update-backup');
   const manifestPath = path.join(backupRoot, 'runtime-state.json');
 
   function fakeBrowserWindow() {
+    mainWebContents = {
+      on: () => undefined,
+      setWindowOpenHandler: () => undefined,
+      send: () => undefined,
+    };
     return {
       isDestroyed: () => false,
       setBackgroundColor: () => undefined,
       once: () => undefined,
-      webContents: {
-        on: () => undefined,
-        setWindowOpenHandler: () => undefined,
-        send: () => undefined,
-      },
+      webContents: mainWebContents,
       loadFile: async (file) => {
         loadedFiles.push(file);
         return undefined;
@@ -2991,7 +3022,9 @@ test('createWindow startup routes a pending deep link after restore and backend 
   assert.equal(updateCheckRequested, true);
   assert.equal(startupError, undefined);
   assert.equal(fs.existsSync(backupRoot), false);
-  const updateState = await mainModule.__getIpcMainHandler('desktop:get-update-state')();
+  const updateState = await mainModule.__getIpcMainHandler('desktop:get-update-state')({
+    sender: mainWebContents,
+  });
   assert.notEqual(updateState.status, mainModule.UPDATE_STATUS.ERROR);
   assert.equal(updateState.updateMode, mainModule.UPDATE_MODE.AUTO);
 

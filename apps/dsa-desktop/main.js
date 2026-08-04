@@ -3335,6 +3335,12 @@ function assertLocalModelSender(event) {
   }
 }
 
+function assertDesktopUpdateSender(event) {
+  if (!isLocalModelSender(event)) {
+    throw new Error('Unauthorized desktop update IPC sender');
+  }
+}
+
 async function runLocalModelOperation(operation) {
   if (localModelOperationInFlight) {
     return { ok: false, error: 'busy', message: 'Another local model operation is in progress.' };
@@ -3419,10 +3425,20 @@ function createMainWindowOpenHandler(openExternal = shell.openExternal) {
   };
 }
 
-ipcMain.handle('desktop:get-update-state', () => desktopUpdateState);
-ipcMain.handle('desktop:check-for-updates', () => performDesktopUpdateCheck({ manual: true }));
-ipcMain.handle('desktop:install-downloaded-update', () => installDownloadedUpdate());
-ipcMain.handle('desktop:open-release-page', async (_event, releaseUrl) => {
+ipcMain.handle('desktop:get-update-state', (event) => {
+  assertDesktopUpdateSender(event);
+  return desktopUpdateState;
+});
+ipcMain.handle('desktop:check-for-updates', (event) => {
+  assertDesktopUpdateSender(event);
+  return performDesktopUpdateCheck({ manual: true });
+});
+ipcMain.handle('desktop:install-downloaded-update', (event) => {
+  assertDesktopUpdateSender(event);
+  return installDownloadedUpdate();
+});
+ipcMain.handle('desktop:open-release-page', async (event, releaseUrl) => {
+  assertDesktopUpdateSender(event);
   await shell.openExternal(sanitizeReleaseUrl(releaseUrl));
   return true;
 });
