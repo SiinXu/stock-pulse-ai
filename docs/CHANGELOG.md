@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Tests] Wait for decision-memory controls and legacy usage-route synchronization before asserting or interacting, eliminating full-suite timing races.
 - [Tests] Cover share-image parsing, merge, localization, safety, and branding contracts so the repository coverage floor remains enforceable after the upstream parity merge.
 - [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
 - [Fixed] Routed Feishu Stream connections and reply clients through the configured international Lark API domain when `FEISHU_DOMAIN=lark`.

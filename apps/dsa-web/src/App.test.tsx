@@ -291,7 +291,9 @@ describe('App routing behavior', () => {
     expect(searchParams.get('period')).toBe('today');
     expect(searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section))
       .toBe(SETTINGS_SECTION_IDS.usage);
-    expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.settings);
+    await waitFor(() => {
+      expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.settings);
+    });
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
   });
 
