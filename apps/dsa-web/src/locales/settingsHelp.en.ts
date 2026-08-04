@@ -534,16 +534,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.system.WEBUI_HOST': {
     title: 'WebUI Host',
     summary: 'Controls the network address the WebUI service binds to.',
-    usage: 'Use 127.0.0.1 for local-only access. Use 0.0.0.0 for cloud, Docker, or external access.',
+    usage: 'Use 127.0.0.1 for local-only access. Enable ADMIN_AUTH_ENABLED before using 0.0.0.0, a LAN address, or any other non-local bind.',
     valueNotes: [
       'An explicit --host has higher priority at startup; if --host is not provided, runtime-configured WEBUI_HOST (or its default) is used.',
       'Saving it from the settings page writes .env and reloads runtime config objects, but the running WebUI/API process will not rebind its host.',
-      'Docker Compose commonly binds 0.0.0.0 inside the container; host access also depends on port mapping.',
+      'Docker Compose commonly binds 0.0.0.0 inside the container, which requires administrator authentication; host access also depends on port mapping.',
     ],
     impact: ['Affects whether the WebUI can be reached locally, on the LAN, or from the public internet after restart.'],
     notes: [
+      'Every non-local bind requires ADMIN_AUTH_ENABLED; startup fails closed when authentication is disabled.',
       'Restart the process, Docker container, or service manager after changing WEBUI_HOST.',
-      'Enable ADMIN_AUTH_ENABLED when exposing the service publicly.',
       'Behind a reverse proxy, also evaluate TRUST_X_FORWARDED_FOR for login rate limiting and real IP detection.',
     ],
   },
