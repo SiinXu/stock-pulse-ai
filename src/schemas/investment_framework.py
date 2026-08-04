@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, List, Literal, Optional, cast
 
 from pydantic import (
     BaseModel,
@@ -18,8 +18,12 @@ from pydantic import (
 from pydantic_core import InitErrorDetails, PydanticCustomError
 
 
-INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION = "investment-framework-content-v1"
-INVESTMENT_FRAMEWORK_CONTEXT_SCHEMA_VERSION = "investment-framework-context-v1"
+INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION: Literal[
+    "investment-framework-content-v1"
+] = "investment-framework-content-v1"
+INVESTMENT_FRAMEWORK_CONTEXT_SCHEMA_VERSION: Literal[
+    "investment-framework-context-v1"
+] = "investment-framework-context-v1"
 INVESTMENT_FRAMEWORK_CASEFOLD_UNICODE_VERSION = "15.0.0"
 
 # Generated from Unicode CaseFolding-15.0.0.txt using the default full
@@ -478,7 +482,8 @@ class InvestmentFrameworkContent(BaseModel):
                     visiting.remove(node_id)
                     visited.add(node_id)
 
-                visit(self.root_node_id)
+                # root_is_valid already requires a non-None root_node_id.
+                visit(cast(str, self.root_node_id))
                 for node_index, node in enumerate(self.decision_tree):
                     if node.node_id not in visited:
                         add_error(

@@ -220,6 +220,14 @@ class SystemConfigFieldSchema(BaseModel):
     examples: List[str] = Field(default_factory=list, description="Safe example values for help panels")
     docs: List[SystemConfigDocLink] = Field(default_factory=list, description="Related documentation links")
     warning_codes: List[str] = Field(default_factory=list, description="Stable warning identifiers for help panels")
+    deprecated: bool = Field(
+        False,
+        description="True when the field remains supported but is no longer the recommended configuration path",
+    )
+    replacement: Optional[str] = Field(
+        None,
+        description="Canonical replacement when deprecated is true (human-readable path or API)",
+    )
     contract: Optional[SystemConfigFieldContract] = Field(
         None,
         description="Authoritative requirement, condition, and connection-test metadata",

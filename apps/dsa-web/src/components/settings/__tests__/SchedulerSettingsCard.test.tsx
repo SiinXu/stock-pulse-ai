@@ -55,7 +55,7 @@ const defaultItems: SystemConfigItem[] = [
   scheduleItem('SCHEDULE_TIMES', '09:20,15:10'),
 ];
 
-describe('SchedulerSettingsCard dual-schedule honesty', () => {
+describe('SchedulerSettingsCard legacy migration notice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
@@ -69,7 +69,7 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
     });
   });
 
-  it('labels the card as legacy day-batch and documents process ownership', async () => {
+  it('labels the card as deprecated legacy day-batch and documents process ownership', async () => {
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 0, items: [] });
 
     render(
@@ -91,10 +91,14 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
     expect(screen.getByTestId('scheduler-legacy-track-note')).toBeInTheDocument();
     expect(screen.getByTestId('scheduler-owner-note')).toBeInTheDocument();
     expect(screen.getByText(/DSA_SCHEDULED_TASK_OWNER/)).toBeInTheDocument();
-    expect(screen.queryByTestId('scheduler-dual-track-warning')).not.toBeInTheDocument();
+    const notice = await screen.findByTestId('scheduler-migration-notice');
+    expect(notice).toBeInTheDocument();
+    expect(notice).toHaveTextContent(/Migrate to versioned scheduled tasks/);
+    // Scope to the notice: card description also mentions "Saved schedule definitions".
+    expect(notice).toHaveTextContent(/Saved schedule definitions/);
   });
 
-  it('shows a dual-track warning when legacy is enabled and a versioned task is enabled', async () => {
+  it('uses the both-active migration copy when a versioned task is also enabled', async () => {
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({
       total: 1,
       items: [{
@@ -122,11 +126,13 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
       />,
     );
 
-    expect(await screen.findByTestId('scheduler-dual-track-warning')).toBeInTheDocument();
+    const notice = await screen.findByTestId('scheduler-migration-notice');
+    expect(notice).toBeInTheDocument();
+    expect(notice).toHaveTextContent(/both enabled/i);
     expect(scheduledTasksApi.list).toHaveBeenCalledWith({ enabled: true, limit: 1 });
   });
 
-  it('does not invent a dual-track warning when the versioned list probe fails', async () => {
+  it('still shows the directional migration notice when the versioned list probe fails', async () => {
     vi.mocked(scheduledTasksApi.list).mockRejectedValue(new Error('network'));
 
     render(
@@ -144,18 +150,28 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
     await waitFor(() => {
       expect(scheduledTasksApi.list).toHaveBeenCalled();
     });
-    expect(screen.queryByTestId('scheduler-dual-track-warning')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('scheduler-migration-notice')).toBeInTheDocument();
+    expect(screen.queryByText(/both enabled/i)).not.toBeInTheDocument();
   });
 
-  it('treats a positive total as dual-track even when items are empty', async () => {
-    vi.mocked(scheduledTasksApi.list).mockResolvedValue({
-      total: 2,
-      items: [],
+  it('does not show the migration notice when legacy day-batch is disabled', async () => {
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 2, items: [] });
+    vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
+      enabled: false,
+      running: false,
+      scheduleTimes: ['09:20'],
+      nextRunAt: null,
+      lastRunAt: null,
+      lastSuccessAt: null,
+      lastError: null,
     });
 
     render(
       <SchedulerSettingsCard
-        items={defaultItems}
+        items={[
+          scheduleItem('SCHEDULE_ENABLED', 'false'),
+          scheduleItem('SCHEDULE_TIMES', '09:20'),
+        ]}
         disabled={false}
         issueByKey={{}}
         statusRefreshToken={0}
@@ -165,6 +181,9 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
       />,
     );
 
-    expect(await screen.findByTestId('scheduler-dual-track-warning')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalled();
+    });
+    expect(screen.queryByTestId('scheduler-migration-notice')).not.toBeInTheDocument();
   });
 });

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Dict, Iterable, List, Literal, Optional
+from typing import Any, Dict, Iterable, List, Literal, Optional, cast
 
 from typing_extensions import NotRequired, TypedDict
 
@@ -24,7 +24,9 @@ from src.utils.data_processing import (
 )
 
 
-REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION = "report-structured-insights-v1"
+REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION: Literal[
+    "report-structured-insights-v1"
+] = "report-structured-insights-v1"
 
 
 class ReportStructuredPhaseContext(TypedDict, total=False):
@@ -267,7 +269,7 @@ def _project_phase_decision(
     if not isinstance(value, dict):
         return None
 
-    projected: ReportStructuredPhaseDecision = {}
+    projected: Dict[str, Any] = {}
     phase_context = value.get("phase_context")
     if isinstance(phase_context, dict):
         projected_context: Dict[str, Any] = {}
@@ -287,7 +289,9 @@ def _project_phase_decision(
         if warnings:
             projected_context["warnings"] = warnings
         if projected_context:
-            projected["phase_context"] = projected_context
+            projected["phase_context"] = cast(
+                ReportStructuredPhaseContext, projected_context
+            )
 
     for field in _PHASE_DECISION_TEXT_FIELDS:
         text = _clean_text(value.get(field))
@@ -301,7 +305,7 @@ def _project_phase_decision(
     if data_limitations:
         projected["data_limitations"] = data_limitations
 
-    return projected or None
+    return cast(ReportStructuredPhaseDecision, projected) if projected else None
 
 
 def _project_signal_attribution(
@@ -316,7 +320,7 @@ def _project_signal_attribution(
     if not normalized or not signal_attribution_has_content(normalized):
         return None
 
-    projected: ReportStructuredSignalAttribution = {}
+    projected: Dict[str, Any] = {}
     for field in _SIGNAL_ATTRIBUTION_WEIGHT_FIELDS:
         number = _clean_number(normalized.get(field))
         if number is not None:
@@ -325,7 +329,7 @@ def _project_signal_attribution(
         text = _clean_text(normalized.get(field))
         if text is not None:
             projected[field] = text
-    return projected or None
+    return cast(ReportStructuredSignalAttribution, projected) if projected else None
 
 
 def _project_strategy_skill(
@@ -336,7 +340,7 @@ def _project_strategy_skill(
     if not isinstance(value, dict):
         return None
 
-    projected: ReportStructuredStrategySkill = {}
+    projected: Dict[str, Any] = {}
     for field in ("skill_id", "agent_name", "signal", "reasoning"):
         text = _clean_text(value.get(field))
         if text is not None:
@@ -350,7 +354,7 @@ def _project_strategy_skill(
         projected["conditions_met"] = conditions_met
     if isinstance(value.get("invalid_signal"), bool):
         projected["invalid_signal"] = value["invalid_signal"]
-    return projected or None
+    return cast(ReportStructuredStrategySkill, projected) if projected else None
 
 
 def _project_strategy_conflict(
@@ -361,7 +365,7 @@ def _project_strategy_conflict(
     if not isinstance(value, dict):
         return None
 
-    projected: ReportStructuredStrategyConflict = {}
+    projected: Dict[str, Any] = {}
     for field in ("conflict_type", "severity", "description_key"):
         text = _clean_text(value.get(field))
         if text is not None:
@@ -369,7 +373,7 @@ def _project_strategy_conflict(
     participants = _clean_string_list(value.get("participants"))
     if participants:
         projected["participants"] = participants
-    return projected or None
+    return cast(ReportStructuredStrategyConflict, projected) if projected else None
 
 
 def _project_strategy_synthesis(
@@ -381,7 +385,7 @@ def _project_strategy_synthesis(
     if not normalized:
         return None
 
-    projected: ReportStructuredStrategySynthesis = {}
+    projected: Dict[str, Any] = {}
     for field in _STRATEGY_TEXT_FIELDS:
         text = _clean_text(normalized.get(field))
         if text is not None:
@@ -426,7 +430,9 @@ def _project_strategy_synthesis(
             if number is not None:
                 projected_summary[field] = number
         if projected_summary:
-            projected["summary_params"] = projected_summary
+            projected["summary_params"] = cast(
+                ReportStructuredStrategySummary, projected_summary
+            )
 
     meaningful = (
         bool(projected.get("final_signal"))
@@ -435,7 +441,7 @@ def _project_strategy_synthesis(
         or bool(projected.get("opposing_skills"))
         or bool(projected.get("conflicts"))
     )
-    return projected if meaningful else None
+    return cast(ReportStructuredStrategySynthesis, projected) if meaningful else None
 
 
 def _first_projected_section(
@@ -483,11 +489,17 @@ def project_report_structured_insights_for_api(
             "schema_version": REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION,
         }
         if phase_decision is not None:
-            result["phase_decision"] = phase_decision
+            result["phase_decision"] = cast(
+                ReportStructuredPhaseDecision, phase_decision
+            )
         if signal_attribution is not None:
-            result["signal_attribution"] = signal_attribution
+            result["signal_attribution"] = cast(
+                ReportStructuredSignalAttribution, signal_attribution
+            )
         if strategy_synthesis is not None:
-            result["strategy_synthesis"] = strategy_synthesis
+            result["strategy_synthesis"] = cast(
+                ReportStructuredStrategySynthesis, strategy_synthesis
+            )
         return result
     except Exception as exc:  # broad-exception: fallback_recorded - projection failure must not break report delivery
         log_safe_exception(

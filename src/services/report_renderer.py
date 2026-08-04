@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.analyzer import AnalysisResult
 from src.config import get_config
-from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
+from src.market.phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
 from src.plugins import ReportRenderRequest, normalize_report_platform
 from src.plugins.registry import freeze_json_metadata
 from src.report_language import (

@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SECURITY_AUDIT_SCHEMA_VERSION = "security-audit-v1"
+SECURITY_AUDIT_SCHEMA_VERSION: Literal["security-audit-v1"] = "security-audit-v1"
 SECURITY_AUDIT_RETENTION_DAYS = 90
 SECURITY_AUDIT_MAX_PAGE_SIZE = 100
 SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS = 64

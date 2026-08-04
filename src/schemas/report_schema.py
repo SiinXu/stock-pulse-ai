@@ -152,7 +152,7 @@ class SignalAttribution(BaseModel):
         - Set invalid values to None
         """
         contrib_fields = ['technical_indicators', 'news_sentiment', 'fundamentals', 'market_conditions']
-        values = {}
+        values: dict[str, Optional[float]] = {}
 
         for field in contrib_fields:
             val = getattr(self, field)
@@ -201,17 +201,19 @@ class SignalAttribution(BaseModel):
             if total > 0:
                 # Normalize non-zero sum to 100
                 for field in contrib_fields:
-                    if values[field] is not None:
-                        values[field] = round(values[field] * 100 / total)
+                    current = values[field]
+                    if current is not None:
+                        values[field] = round(current * 100 / total)
 
                 # Adjust rounding errors to keep non-zero sums at 100
-                final_sum = sum(values[f] for f in contrib_fields)
+                final_sum = sum(v for v in values.values() if v is not None)
                 if final_sum != 100:
                     # Add/subtract the difference to/from the first non-zero value
                     diff = 100 - final_sum
                     for field in contrib_fields:
-                        if values[field] > 0:
-                            values[field] += diff
+                        current = values[field]
+                        if current is not None and current > 0:
+                            values[field] = current + diff
                             break
 
         # Update the model fields

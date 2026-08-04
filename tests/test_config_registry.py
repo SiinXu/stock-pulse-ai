@@ -304,6 +304,20 @@ class TestScheduleTimesFieldRegistered(unittest.TestCase):
         self.assertIsNone(pattern.fullmatch("09:20,"))
         self.assertIsNone(pattern.fullmatch("25:70"))
 
+    def test_legacy_schedule_keys_are_marked_deprecated_with_replacement(self):
+        legacy_keys = (
+            "SCHEDULE_ENABLED",
+            "SCHEDULE_TIME",
+            "SCHEDULE_TIMES",
+            "SCHEDULE_RUN_IMMEDIATELY",
+        )
+        for key in legacy_keys:
+            field = get_field_definition(key)
+            self.assertTrue(field.get("deprecated"), f"{key} should be deprecated")
+            replacement = field.get("replacement") or ""
+            self.assertIn("scheduled-tasks", replacement.lower(), key)
+            self.assertIn("versioned", replacement.lower(), key)
+
 
 class TestLLMPromptCacheFieldsRegistered(unittest.TestCase):
     def test_prompt_cache_telemetry_default_enabled(self):
