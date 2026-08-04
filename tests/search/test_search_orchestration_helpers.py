@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import src.search_service as search_module
+from src.data import stock_mapping
 from src.search_service import SearchResponse, SearchResult, SearchService
 
 
@@ -406,3 +407,113 @@ def test_ranked_response_final_tiebreakers():
         best_stats=best,
         prefer_chinese=False,
     )
+
+
+def test_news_identity_and_normalization_defensive_edges(monkeypatch):
+    service = _service()
+    assert service._stock_code_identity_terms("") == []
+    assert service._stock_code_identity_terms("not/a/ticker") == ["not/a/ticker", "NOT/A/TICKER"]
+    assert service._company_identity_terms("") == []
+    assert service._contains_identity_term("", "Apple") is False
+    assert service._contains_identity_term("苹果镇与苹果发布财报", "苹果") is True
+    assert service._contains_any_low_quality_news_term("", ("download",)) is False
+    assert service._contains_any_low_quality_news_term("safe", ("", "download")) is False
+    assert service._source_resembles_hostname("https://news.example.com/story") is True
+
+    adult_spam = _result(
+        "外围 上门信息",
+        url="https://example.com/spam",
+        snippet="无关内容",
+    )
+    assert service._has_adult_service_spam_news_page_signal(adult_spam) is True
+
+    url_match = _result(
+        "Unrelated market update",
+        url="https://example.com/stocks/AAPL",
+        snippet="General market context",
+    )
+    scored = service._score_news_relevance(
+        url_match,
+        stock_code="AAPL",
+        stock_name="Apple Inc.",
+    )
+    assert any("链接命中股票代码" in reason for reason in scored.relevance_reasons)
+
+    snippet_match = _result(
+        "Quarterly update",
+        url="https://example.com/acme",
+        snippet="Acme reports earnings growth",
+    )
+    scored = service._score_news_relevance(
+        snippet_match,
+        stock_code="UNKNOWN",
+        stock_name="Acme Corporation",
+    )
+    assert any("摘要命中公司名" in reason for reason in scored.relevance_reasons)
+
+    assert service._normalize_news_publish_date("2 days ago") is not None
+    assert service._normalize_news_publish_date("04 Aug 2026 10:00:00") == date(2026, 8, 4)
+    assert service._normalize_news_publish_date("2026年99月99日") is None
+
+    broken_map = dict(stock_mapping.STOCK_ENGLISH_NAME_MAP)
+    broken_map["EXTRA"] = ("Extra Corp.",)
+    monkeypatch.setattr(stock_mapping, "STOCK_ENGLISH_NAME_MAP", broken_map)
+    with pytest.raises(AssertionError, match="extra=.*EXTRA"):
+        stock_mapping._assert_foreign_english_map_invariant()
+
+
+def test_stock_news_provider_exception_and_admission_fallback(monkeypatch):
+    monkeypatch.setattr(search_module, "record_provider_run_started", lambda **_kwargs: None)
+
+    raising = _service([_Provider("raising", [RuntimeError("provider failed")])])
+    monkeypatch.setattr(raising, "_record_news_search_run", lambda **_kwargs: None)
+    with pytest.raises(RuntimeError, match="provider failed"):
+        raising.search_stock_news("AAPL", "Apple")
+
+    source = _response(
+        results=[_result("Apple update", url="https://example.com/apple")]
+    )
+    filtered = _service([_Provider("filtered", [source])])
+    monkeypatch.setattr(filtered, "_filter_news_response", lambda response, **_kwargs: response)
+    monkeypatch.setattr(filtered, "_prioritize_news_language", lambda response, **_kwargs: (response, 0))
+    monkeypatch.setattr(filtered, "_rank_news_response", lambda response, **_kwargs: response)
+    monkeypatch.setattr(
+        filtered,
+        "_filter_ranked_news_for_context",
+        lambda response, **_kwargs: _response(
+            query=response.query,
+            provider=response.provider,
+            results=[],
+        ),
+    )
+    monkeypatch.setattr(filtered, "_record_news_search_run", lambda **_kwargs: None)
+    response = filtered.search_stock_news("AAPL", "Apple")
+    assert response.success is True
+    assert response.provider == "Filtered"
+
+
+def test_event_and_comprehensive_failure_boundaries(monkeypatch):
+    unavailable = _service([_Provider("off", [], available=False)])
+    event_response = unavailable.search_stock_events("600519", "贵州茅台")
+    assert event_response.success is False
+    assert "年报预告" in event_response.query
+
+    assert unavailable.search_comprehensive_intel(
+        "AAPL",
+        "Apple",
+        max_searches=1,
+    ) == {}
+
+    failed_provider = _Provider(
+        "failed",
+        [_response(success=False, error_message="stable failure")],
+    )
+    configured = _service([failed_provider])
+    monkeypatch.setattr(search_module.time, "sleep", lambda _seconds: None)
+    results = configured.search_comprehensive_intel(
+        "AAPL",
+        "Apple",
+        max_searches=1,
+    )
+    assert results["latest_news"].success is False
+    assert results["latest_news"].error_message == search_module._SEARCH_REQUEST_FAILED
