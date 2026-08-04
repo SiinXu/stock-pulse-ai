@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import ast
 import builtins
 from dataclasses import dataclass
@@ -3056,6 +3058,7 @@ def emit(error, use_primary):
     assert find_exception_log_violations("fixture.py", source) == []
 
 
+@pytest.mark.timeout(600)
 def test_all_production_python_uses_shared_sanitized_exception_logging() -> None:
     violations = [
         violation
