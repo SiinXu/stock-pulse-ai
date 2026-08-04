@@ -135,7 +135,7 @@ StockPulse 拥有一套完整的 Native Agent 实现:Single(`AgentExecutor`)、M
 - `docs/stockpulse-domain-decisions.md`
 - `docs/stockpulse-product-overview.md`
 - `docs/stockpulse-work-tracker.md`
-- `docs/architecture/ADR-001-agent-runtime.md`(`docs/architecture/` 目前仅含 `api_spec.json`)
+- `docs/adr/ADR-001-agent-runtime.md`(`docs/architecture/` 目前仅含 `api_spec.json`)
 
 处理决定(已与用户确认):如实记录为文档漂移/Evidence gap,并把"创建或迁入这些治理文档"列入 AR-PY-00 的阻断项。prompt 中"更新框架对比文档的 Vercel Harness 旧结论"与"更新 Work Tracker 旧 baseline 与 AR-07 描述"两条指令,在文档不存在的现实下转化为:**创建或迁入时即以 PydanticAI 为第一优先 Python POC、以 `e58d71f2` 后的最新主线为 baseline 建立正确结论**,不再产生需要修正的旧结论。
 
@@ -143,7 +143,7 @@ StockPulse 拥有一套完整的 Native Agent 实现:Single(`AgentExecutor`)、M
 
 | ID | 阻断项 | 状态 |
 | --- | --- | --- |
-| B1 | `docs/architecture/ADR-001-agent-runtime.md` 不存在,更未 `Accepted` | **已关闭**:ADR-001 于 2026-07-17 创建并获维护者 `Accepted` |
+| B1 | `docs/adr/ADR-001-agent-runtime.md` 不存在,更未 `Accepted` | **已关闭**:ADR-001 于 2026-07-17 创建并获维护者 `Accepted` |
 | B2 | 两个 degraded `success=true` 行为未获 ADR 裁决(第 3.4 节) | **已关闭**:维护者 2026-07-17 批准 ADR-001 D2(冻结为兼容契约) |
 | B3 | 本计划状态为 `Proposed`,未获维护者批准 | **已关闭**:维护者 2026-07-17 批准("按照本计划开始开发"),状态更新为 `Approved` |
 | B4 | 治理文档漂移(第 4.1 节) | AR-PY-00 内创建/迁入 |
@@ -246,12 +246,12 @@ Spike 必须验证:
 ### AR-PY-00:决策与基线收敛(docs-only)
 
 - 目标:
-  - 起草并送审 `docs/architecture/ADR-001-agent-runtime.md`(决策:Native 永久默认 + vendor-neutral Contract + PydanticAI 实验 Adapter;PydanticAI 为第一优先 Python POC)。
+  - 起草并送审 `docs/adr/ADR-001-agent-runtime.md`(决策:Native 永久默认 + vendor-neutral Contract + PydanticAI 实验 Adapter;PydanticAI 为第一优先 Python POC)。
   - 对两个 degraded `success=true` 行为(第 3.4 节)给出裁决建议并送审。
   - 创建或迁入第 4.1 节缺失的治理文档(framework comparison、work tracker 等),以最新主线为 baseline,不引入旧结论。
   - 记录 PydanticAI 版本、许可证、Python/Desktop/Docker 支持与 Evidence gap(以合入当日重新核对官方资料,更新第 16 章)。
 - 前置:本计划获批。
-- 预计文件:`docs/architecture/ADR-001-agent-runtime.md`(新)、`docs/stockpulse-agent-runtime-framework-comparison.md`(新建或迁入)、`docs/stockpulse-work-tracker.md`(新建或迁入)、本文档状态位更新。
+- 预计文件:`docs/adr/ADR-001-agent-runtime.md`(新)、`docs/stockpulse-agent-runtime-framework-comparison.md`(新建或迁入)、`docs/stockpulse-work-tracker.md`(新建或迁入)、本文档状态位更新。
 - 测试:`python scripts/check_ai_assets.py`、`git diff --check`、文档验证命令(第 10.3 节)。
 - 验收/退出条件:ADR 与两项 degraded 裁决获维护者批准。**未批准则停止,不进入任何编码阶段。**
 - 风险:裁决久拖导致后续阶段全部阻塞——按期升级给维护者,不得绕过。
@@ -364,7 +364,7 @@ Spike 必须验证:
 
 | 文件/区域 | 00 | 01 | 02 | 03 | 04 | 05 | 06 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `docs/architecture/ADR-001-agent-runtime.md` | 新 | - | - | - | - | 改(结论) | 改 |
+| `docs/adr/ADR-001-agent-runtime.md` | 新 | - | - | - | - | 改(结论) | 改 |
 | `docs/stockpulse-*`(治理文档) | 新/迁入 | - | - | - | - | - | 改 |
 | `src/agent/runtime/contract.py` 等 Contract | - | 新 | - | 改 | - | - | - |
 | `src/agent/runtime/native_adapter.py` | - | 新 | 改 | 改 | - | - | - |

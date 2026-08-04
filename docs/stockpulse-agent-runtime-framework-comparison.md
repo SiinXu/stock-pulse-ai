@@ -1,6 +1,6 @@
 # StockPulse Agent Runtime 框架对比
 
-- 状态:`Historical`（框架 POC 已结束；现行结论以 `docs/architecture/ADR-001-agent-runtime.md` 为准）
+- 状态:`Historical`（框架 POC 已结束；现行结论以 `docs/adr/ADR-001-agent-runtime.md` 为准）
 - 日期:2026-07-19（记录 Native Only 实施；候选资料仍以 2026-07-17 访问结果为历史快照）
 - 代码 baseline:`main@fa7a6ee1`
 - 外部资料访问日期:2026-07-17;信息可能过时,引用前须重新核对官方文档

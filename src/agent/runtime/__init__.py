@@ -4,7 +4,7 @@
 """Vendor-neutral agent runtime layer (AR-PY-01/AR-PY-02/AR-PY-03).
 
 This package is owned by StockPulse and must never import external agent
-framework types. See ``docs/architecture/ADR-001-agent-runtime.md``.
+framework types. See ``docs/adr/ADR-001-agent-runtime.md``.
 """
 
 from src.agent.runtime.contract import (

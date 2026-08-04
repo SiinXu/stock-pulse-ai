@@ -9,8 +9,6 @@ mechanics; runnable code remains authoritative when documentation drifts.
 
 - ADR numbers are repository-wide, three digits, monotonic, and never reused.
 - New files use `ADR-NNN-short-kebab-title.md` and live in `docs/adr/`.
-- `ADR-001` and `ADR-002` predate this directory. They remain at their stable
-  `docs/architecture/` paths and reserve those numbers globally.
 - Accepted records are not renumbered or rewritten to hide history. A material
   change uses a new ADR and reciprocal amendment or supersession links.
 - Use [the template](template.md) for new records.
@@ -58,8 +56,8 @@ unless they alter one of the boundaries above.
 
 | ADR | Status | Decision | Primary evidence |
 | --- | --- | --- | --- |
-| [ADR-001](../architecture/ADR-001-agent-runtime.md) | Accepted / Amended by ADR-002 | Native-only production Agent assembly behind a vendor-neutral runtime contract | Runtime decision history through 2026-07-19 |
-| [ADR-002](../architecture/ADR-002-pydanticai-runtime-reinstatement.md) | Accepted | Optional PydanticAI Single RUN test/evidence POC with no product selector or fallback | PR #60 and subsequent reconciliation |
+| [ADR-001](ADR-001-agent-runtime.md) | Accepted / Amended by ADR-002 | Native-only production Agent assembly behind a vendor-neutral runtime contract | Runtime decision history through 2026-07-19 |
+| [ADR-002](ADR-002-pydanticai-runtime-reinstatement.md) | Accepted | Optional PydanticAI Single RUN test/evidence POC with no product selector or fallback | PR #60 and subsequent reconciliation |
 | [ADR-003](ADR-003-application-services-composition-root.md) | Accepted (retrospective) | Lightweight process composition root with lazy compatibility accessors | [PR #83](https://github.com/SiinXu/stock-pulse-ai/pull/83) |
 | [ADR-004](ADR-004-process-local-task-execution-authority.md) | Accepted (retrospective) / Amended by ADR-008 | One process-local task execution lifecycle and status authority | [PR #90](https://github.com/SiinXu/stock-pulse-ai/pull/90), [PR #103](https://github.com/SiinXu/stock-pulse-ai/pull/103) |
 | [ADR-005](ADR-005-provider-fallback-and-circuit-control.md) | Accepted (retrospective) | Priority-based provider fallback with market-scoped health and circuit control | [PR #290](https://github.com/SiinXu/stock-pulse-ai/pull/290), compatible evolution in [PR #312](https://github.com/SiinXu/stock-pulse-ai/pull/312) |
