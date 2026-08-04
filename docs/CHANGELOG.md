@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
 - [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
+- [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
 
 ## [3.27.0] - 2026-08-04
 
