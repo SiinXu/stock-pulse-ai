@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { analysisApi } from '../api/analysis';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import type { HistoryListResponse } from '../types/analysis';
+import type { HistoryListResponse, MarketReviewRegion } from '../types/analysis';
 
 export type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -14,6 +14,7 @@ export type MarketReviewNotice = {
 
 type UseMarketReviewRunnerOptions = {
   notify: boolean;
+  regions?: readonly MarketReviewRegion[];
   refreshMarketReviewHistory: (silent?: boolean) => Promise<HistoryListResponse | null>;
   onPersistedReport: (recordId: number) => void;
   onFeedback?: () => void;
@@ -24,6 +25,7 @@ export const MARKET_REVIEW_POLL_INTERVAL_MS = 2_000;
 
 export function useMarketReviewRunner({
   notify,
+  regions,
   refreshMarketReviewHistory,
   onPersistedReport,
   onFeedback,
@@ -94,7 +96,13 @@ export function useMarketReviewRunner({
           setNotice({
             variant: 'warning',
             title: t('home.marketReviewInProgress'),
-            message: t('home.taskStatus', { status: status.status, progress }),
+            message: status.region
+              ? t('home.taskStatusWithRegion', {
+                status: status.status,
+                progress,
+                region: status.region,
+              })
+              : t('home.taskStatus', { status: status.status, progress }),
           });
           return true;
         }
@@ -169,12 +177,18 @@ export function useMarketReviewRunner({
     setError(null);
     onFeedbackRef.current?.();
     try {
-      const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
+      const result = await analysisApi.triggerMarketReview({
+        sendNotification: notify,
+        regions,
+      });
       if (!activeRef.current) return;
       setNotice({
         variant: 'success',
         title: t('home.marketReviewSubmitted'),
-        message: result.message,
+        message: t('home.marketReviewSubmittedWithRegion', {
+          message: result.message,
+          region: result.region,
+        }),
       });
       onFeedbackRef.current?.();
       if (result.taskId) void pollStatus(result.taskId);
@@ -186,7 +200,7 @@ export function useMarketReviewRunner({
     } finally {
       if (activeRef.current) setIsSubmitting(false);
     }
-  }, [notify, pollStatus, t]);
+  }, [notify, pollStatus, regions, t]);
 
   return {
     clear,

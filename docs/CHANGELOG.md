@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] On-demand report share images via `GET /api/v1/history/{id}/share-image` and Web one-click share
+- [Added] Web/API per-market market-review trigger with request-scoped `region`
+- [Fixed] Auth disable UI requires current admin password re-confirmation (backend already enforced)
+- [Tests] Short-credential CLI diagnostic redaction counterexamples from upstream ee3d3da1
+
+
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
