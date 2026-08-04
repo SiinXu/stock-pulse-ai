@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
+- [Added] On-demand report share images via `GET /api/v1/history/{id}/share-image` and Web one-click share
+- [Added] Web/API per-market market-review trigger with request-scoped `region`
+- [Fixed] Auth disable UI requires current admin password re-confirmation (backend already enforced)
+- [Tests] Short-credential CLI diagnostic redaction counterexamples from upstream ee3d3da1
+
+
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.

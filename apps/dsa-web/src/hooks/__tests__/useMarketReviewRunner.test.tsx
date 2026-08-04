@@ -57,6 +57,7 @@ describe('useMarketReviewRunner', () => {
   it('polls serially and selects only the matching persisted report', async () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: true,
       message: '大盘复盘任务已提交',
       taskId: 'market-task',
@@ -108,6 +109,7 @@ describe('useMarketReviewRunner', () => {
   it('reports completion without selecting raw task output when persistence is delayed', async () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: false,
       message: 'Accepted',
       taskId: 'market-task',
@@ -141,6 +143,7 @@ describe('useMarketReviewRunner', () => {
   it('surfaces a terminal task failure and stops polling', async () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: true,
       message: 'Accepted',
       taskId: 'market-task',
@@ -176,6 +179,7 @@ describe('useMarketReviewRunner', () => {
   it('reports a bounded timeout after the maximum polling attempts', async () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: false,
       message: 'Accepted',
       taskId: 'market-task',
@@ -237,12 +241,14 @@ describe('useMarketReviewRunner', () => {
     vi.mocked(analysisApi.triggerMarketReview)
       .mockResolvedValueOnce({
         status: 'accepted',
+        region: 'cn',
         sendNotification: true,
         message: 'Old accepted',
         taskId: 'old-task',
       })
       .mockResolvedValueOnce({
         status: 'accepted',
+        region: 'cn',
         sendNotification: true,
         message: 'New accepted',
         taskId: 'market-task',
@@ -285,6 +291,7 @@ describe('useMarketReviewRunner', () => {
   it('ignores an in-flight poll result after unmount', async () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
+      region: 'cn',
       sendNotification: true,
       message: 'Accepted',
       taskId: 'market-task',

@@ -75,6 +75,11 @@ export const AuthSettingsCard: React.FC = () => {
       }
     }
 
+    if (authEnabled && !desiredEnabled && !currentPassword.trim()) {
+      setError(t('settings.authDisableRequiredCurrentPassword'));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await authApi.updateSettings(
