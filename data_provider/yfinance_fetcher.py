@@ -142,6 +142,12 @@ class YfinanceFetcher(BaseFetcher):
             logger.debug(f"转换港股代码: {stock_code} -> {hk_code}.HK")
             return f"{hk_code}.HK"
 
+        # Bare Hong Kong codes use four or five digits. A-share and BSE codes
+        # are six digits, so this branch cannot shadow their market routing.
+        if code.isdigit() and 4 <= len(code) <= 5:
+            logger.debug(f"识别裸港股代码: {stock_code} -> {code}.HK")
+            return f"{code}.HK"
+
         # Case with suffix already included
         if '.SS' in code or '.SZ' in code or '.HK' in code or '.BJ' in code:
             return code
