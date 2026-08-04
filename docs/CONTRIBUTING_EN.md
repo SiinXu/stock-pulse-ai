@@ -114,7 +114,9 @@ After opening a PR, CI will automatically run the following PR checks:
 | `ai-governance` | Validates `AGENTS.md`, compatibility instructions, and repository collaboration assets | ✅ |
 | `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages | ✅ |
 | `python-minimum` | Runs the full backend gate on Python 3.10, the minimum supported runtime | ✅ |
+| `pydanticai-installed` | Installs optional PydanticAI dependencies and runs experimental runtime tests with skips rejected | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
+| `openapi-types-gate` | Regenerates the backend OpenAPI snapshot and Web TypeScript types and rejects checked-in artifact drift | ✅ |
 | `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` for Web or related API/config/service contract changes | ✅ (when triggered) |
 | `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
 | `pr-review` | Advisory `pull_request` review: static syntax/flake8 on changed files, PR-size advisory (~1000 lines excluding lockfiles/generated), same-repo AI review (requires `GEMINI_API_KEY` and/or `OPENAI_API_KEY` repository secrets), automatic labels, and a bot review comment. Fork PRs stay read-only (no secrets, no write jobs). AI review is non-blocking. | ❌ (advisory) |

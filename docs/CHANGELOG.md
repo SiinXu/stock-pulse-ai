@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
 - [Fixed] Routed Feishu Stream connections and reply clients through the configured international Lark API domain when `FEISHU_DOMAIN=lark`.
 - [Fixed] Cached and coalesced AkShare Hong Kong full-market realtime snapshots, including short failed-refresh caching and validation before reuse, while preserving the Sina fallback.
 - [Fixed] Kept Tencent direct daily K-lines as the final built-in A-share fallback while preserving configurable provider priority and failure failover.
