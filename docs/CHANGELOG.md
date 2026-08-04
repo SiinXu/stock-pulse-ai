@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Updated the pinned stale-item automation action to v11.0.0.
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Fixed] Resolved canonical English company aliases for mapped U.S./Hong Kong tickers so Chinese display names no longer suppress English news queries or relevance matches.
