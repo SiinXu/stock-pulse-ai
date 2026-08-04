@@ -54,7 +54,10 @@ Record each applicable check with its actual result and link:
 
 - `ai-governance`: pass / fail / not applicable, link:
 - `backend-gate`: pass / fail / not applicable, link:
+- `python-minimum`: pass / fail / not applicable, link:
+- `pydanticai-installed`: pass / fail / not applicable, link:
 - `docker-build`: pass / fail / not applicable, link:
+- `openapi-types-gate`: pass / fail / not applicable, link:
 - `web-gate`: pass / fail / not applicable, link:
 - Full-suite note:
 - Key output and conclusion:

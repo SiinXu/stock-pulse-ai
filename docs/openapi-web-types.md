@@ -95,6 +95,8 @@ When migrating another `apps/dsa-web/src/api/*.ts` module:
 ## CI drift gate
 
 Job name: **`openapi-types-gate`** (blocking, always runs after `ai-governance`).
+The active `main` ruleset requires this exact check-run context, so generated
+artifact drift cannot be bypassed by merging after unrelated checks pass.
 
 Steps:
 
