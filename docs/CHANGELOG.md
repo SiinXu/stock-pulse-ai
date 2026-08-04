@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
+- [Changed] Pilot runtime validation on the Web stocks API module so response shape mismatches surface through ParsedApiError.
 
 ## [3.27.0] - 2026-08-04
 
