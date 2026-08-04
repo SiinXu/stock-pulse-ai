@@ -434,6 +434,44 @@ test('main BrowserWindow keeps preload access sandboxed and isolated', (t) => {
   assert.match(options.webPreferences.preload, /preload\.js$/);
 });
 
+test('main BrowserWindow navigation guards keep navigation on its selected Web origin', (t) => {
+  const mainModule = loadMainModule(t);
+  const navigationHandlers = new Map();
+  mainModule.registerMainWindowNavigationGuards({
+    on: (eventName, handler) => navigationHandlers.set(eventName, handler),
+  }, () => 'http://127.0.0.1:8123/?desktop_version=3.21.0');
+
+  for (const eventName of ['will-navigate', 'will-redirect']) {
+    const handler = navigationHandlers.get(eventName);
+    assert.equal(typeof handler, 'function', eventName);
+
+    let prevented = false;
+    handler({
+      preventDefault: () => {
+        prevented = true;
+      },
+    }, 'http://127.0.0.1:8123/login?redirect=%2Fsettings');
+    assert.equal(prevented, false, `${eventName} same origin`);
+
+    for (const blockedUrl of [
+      'http://127.0.0.1:8124/',
+      'http://localhost:8123/',
+      'https://evil.example/',
+      'blob:http://127.0.0.1:8123/renderer-content',
+      'file:///tmp/escape.html',
+      'not-a-url',
+    ]) {
+      prevented = false;
+      handler({
+        preventDefault: () => {
+          prevented = true;
+        },
+      }, blockedUrl);
+      assert.equal(prevented, true, `${eventName} ${blockedUrl}`);
+    }
+  }
+});
+
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {
   const mainModule = loadMainModule(t);
   const assistantWebContents = {

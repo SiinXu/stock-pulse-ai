@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
 
 ## [3.27.0] - 2026-08-04
