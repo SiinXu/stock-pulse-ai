@@ -160,6 +160,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-strategy', 'ReportStrategy', 'components/report/ReportStrategy.tsx', ['default', 'empty']),
   entry('reports', 'report-structured-insights', 'ReportStructuredInsights', 'components/report/ReportStructuredInsights.tsx', ['default', 'empty']),
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
+  entry('reports', 'share-image-button', 'ShareImageButton', 'components/report/ShareImageButton.tsx', ['default', 'states']),
+  entry('reports', 'market-review-region-selector', 'MarketReviewRegionSelector', 'components/market-review/MarketReviewRegionSelector.tsx', ['interactive', 'states']),
   entry('reports', 'deep-research-panel', 'DeepResearchPanel', 'components/chat/DeepResearchPanel.tsx', ['interactive', 'empty', 'error']),
 
   entry('runFlow', 'run-flow-event-list', 'RunFlowEventList', 'components/run-flow/RunFlowEventList.tsx', ['default', 'empty']),
