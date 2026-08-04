@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from src.share_image import ShareImageBranding, build_share_image_html
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +99,25 @@ def _markdown_to_image_playwright(
         logger.error("Playwright image conversion failed: %s", stderr[:500])
         return None
     except Exception as exc:  # broad-exception: fallback_recorded - Renderer availability varies by host; share API returns 503.
-        logger.error("Playwright image conversion error: %s", exc)
+        log_safe_exception(
+            logger,
+            "Playwright image conversion error",
+            exc,
+            error_code="playwright_image_conversion_failed",
+            level=logging.ERROR,
+        )
         return None
     finally:
         try:
             shutil.rmtree(temp_dir)
         except Exception as exc:  # broad-exception: cleanup - Temporary share-image workdir cleanup is best-effort.
-            logger.debug("Failed to remove temp dir %s: %s", temp_dir, exc)
+            log_safe_exception(
+                logger,
+                "Playwright image temporary directory cleanup failed",
+                exc,
+                error_code="playwright_image_temp_cleanup_failed",
+                level=logging.DEBUG,
+            )
 
 
 def _markdown_to_image_m2f(
@@ -157,14 +170,26 @@ def _markdown_to_image_m2f(
         logger.warning("m2f conversion timed out (60s)")
         return None
     except Exception as e:  # broad-exception: fallback_recorded - Optional m2f CLI may fail for many host reasons; caller falls back.
-        logger.warning("markdown_to_image (m2f) failed: %s", e)
+        log_safe_exception(
+            logger,
+            "Markdown-to-file image conversion failed",
+            e,
+            error_code="markdown_to_file_conversion_failed",
+            level=logging.WARNING,
+        )
         return None
     finally:
         if temp_dir and os.path.isdir(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
             except OSError as e:
-                logger.debug("Failed to remove temp dir %s: %s", temp_dir, e)
+                log_safe_exception(
+                    logger,
+                    "Markdown image temporary directory cleanup failed",
+                    e,
+                    error_code="markdown_image_temp_cleanup_failed",
+                    level=logging.DEBUG,
+                )
 
 
 def _markdown_to_image_wkhtml(
@@ -200,12 +225,30 @@ def _markdown_to_image_wkhtml(
         return None
     except OSError as e:
         if "wkhtmltoimage" in str(e).lower() or "wkhtmltopdf" in str(e).lower():
-            logger.debug("wkhtmltopdf/wkhtmltoimage not found: %s", e)
+            log_safe_exception(
+            logger,
+            "wkhtmltoimage executable is unavailable",
+            e,
+            error_code="wkhtmltoimage_unavailable",
+            level=logging.DEBUG,
+        )
         else:
-            logger.warning("imgkit/wkhtmltoimage error: %s", e)
+            log_safe_exception(
+            logger,
+            "wkhtmltoimage conversion failed",
+            e,
+            error_code="wkhtmltoimage_conversion_failed",
+            level=logging.WARNING,
+        )
         return None
     except Exception as e:  # broad-exception: fallback_recorded - Optional imgkit/wkhtml path failure; caller falls back to text/503.
-        logger.warning("markdown_to_image conversion failed: %s", e)
+        log_safe_exception(
+            logger,
+            "Markdown image conversion failed",
+            e,
+            error_code="markdown_image_conversion_failed",
+            level=logging.WARNING,
+        )
         return None
 
 
@@ -247,8 +290,14 @@ def markdown_to_image(
         config = get_config()
         engine = getattr(config, "md2img_engine", "wkhtmltoimage")
         branding = _share_image_branding(config)
-    except Exception:  # broad-exception: fallback_recorded - Config load failure must not break optional image conversion.
-        logger.debug("Share-image config unavailable; using defaults", exc_info=True)
+    except Exception as exc:  # broad-exception: fallback_recorded - Config load failure must not break optional image conversion.
+        log_safe_exception(
+            logger,
+            "Share-image config unavailable; using defaults",
+            exc,
+            error_code="share_image_config_unavailable",
+            level=logging.DEBUG,
+        )
         engine = "wkhtmltoimage"
         branding = ShareImageBranding()
 
