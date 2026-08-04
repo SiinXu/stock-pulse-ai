@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -78,7 +79,7 @@ def test_server_module_bind_matrix(
 import sys
 import types
 
-sys.argv = ["uvicorn", "server:app", "--host", sys.argv[1]]
+sys.argv = [sys.argv[2], "server:app", "--host", sys.argv[1]]
 fake_api_app = types.ModuleType("api.app")
 fake_api_app.app = object()
 sys.modules["api.app"] = fake_api_app
@@ -86,7 +87,13 @@ import server
 """
 
     result = subprocess.run(
-        [sys.executable, "-c", probe, host],
+        [
+            sys.executable,
+            "-c",
+            probe,
+            host,
+            str(Path(sys.executable).with_name("uvicorn")),
+        ],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
@@ -117,7 +124,11 @@ import server
             False,
             0,
         ),
+        ({}, ["uvicorn-module", "server:app", "--host", "127.0.0.1"], False, 0),
         ({}, ["custom-launcher"], False, 1),
+        ({}, ["/opt/custom/server.py"], False, 1),
+        ({}, ["/opt/custom/uvicorn", "server:app"], False, 1),
+        ({}, ["/opt/custom/uvicorn/__main__.py", "server:app"], False, 1),
         ({}, ["custom-launcher"], True, 0),
     ],
 )
@@ -156,8 +167,16 @@ sys.modules["api.app"] = fake_api_app
 import server
 """
 
+    resolved_argv = list(argv)
+    if resolved_argv[0] == "uvicorn":
+        resolved_argv[0] = str(Path(sys.executable).with_name("uvicorn"))
+    elif resolved_argv[0] == "uvicorn-module":
+        uvicorn_spec = importlib.util.find_spec("uvicorn")
+        assert uvicorn_spec is not None and uvicorn_spec.origin is not None
+        resolved_argv[0] = str(Path(uvicorn_spec.origin).with_name("__main__.py"))
+
     result = subprocess.run(
-        [sys.executable, "-c", probe, json.dumps(argv)],
+        [sys.executable, "-c", probe, json.dumps(resolved_argv)],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,

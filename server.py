@@ -11,10 +11,12 @@ emergency override is explicitly enabled.
 """
 
 import argparse
+import importlib.util
 import logging
 import os
 from pathlib import Path
 import sys
+import sysconfig
 
 from src.application_services import ApplicationServices, set_application_services
 from src.config import setup_env, get_config
@@ -34,19 +36,42 @@ setup_logging(
 )
 
 
+def _resolved_existing_path(value: str) -> Path | None:
+    """Resolve a launcher path without trusting its filename alone."""
+    try:
+        return Path(value).expanduser().resolve(strict=True)
+    except OSError:
+        return None
+
+
 def _is_uvicorn_cli(argv: list[str]) -> bool:
-    """Return whether the current process is the supported Uvicorn CLI."""
-    executable = Path(argv[0]).name.lower() if argv else ""
-    if executable in {"uvicorn", "uvicorn.exe"}:
-        return True
-    return executable in {"__main__.py", "__main__.pyc"} and any(
-        part.lower() == "uvicorn" for part in Path(argv[0]).parts
-    )
+    """Return whether the launcher is the installed Uvicorn CLI entrypoint."""
+    if not argv or (launcher := _resolved_existing_path(argv[0])) is None:
+        return False
+
+    executable_name = launcher.name.lower()
+    if executable_name in {"uvicorn", "uvicorn.exe"}:
+        script_dirs = {
+            Path(sys.executable).resolve().parent,
+            Path(sysconfig.get_path("scripts")).resolve(),
+        }
+        return launcher in {
+            directory / executable_name
+            for directory in script_dirs
+        }
+
+    if executable_name not in {"__main__.py", "__main__.pyc"}:
+        return False
+    spec = importlib.util.find_spec("uvicorn")
+    if spec is None or spec.origin is None:
+        return False
+    package_entrypoint = Path(spec.origin).resolve().with_name(executable_name)
+    return launcher == package_entrypoint
 
 
 def _is_direct_server_launch(argv: list[str]) -> bool:
     """Return whether this module is being executed as the server script."""
-    return bool(argv) and Path(argv[0]).name.lower() in {"server.py", "server.pyw"}
+    return bool(argv) and _resolved_existing_path(argv[0]) == Path(__file__).resolve()
 
 
 def _uvicorn_env(name: str) -> str | None:
