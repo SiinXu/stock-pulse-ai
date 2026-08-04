@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "lock_file": "constraints.txt",
   "build_constraint_file": "build-constraints.txt",
   "resolver": {
@@ -14,6 +14,9 @@
       "3.14"
     ],
     "exclude_newer": "2026-07-27T04:06:13Z",
+    "exclude_newer_packages": {
+      "cryptography": "2026-07-31T14:25:11Z"
+    },
     "universal": true
   },
   "source_files": [
@@ -95,5 +98,5 @@
       ]
     }
   },
-  "lock_sha256": "c1502a5ce2e950e81f6f42b0464897e81f831da8bf45d715b0daf5f0ef8d3109"
+  "lock_sha256": "b7cd2c8b5f781ed876a7eaf866fb011635eab3429139528e1e7a388d89652550"
 }
