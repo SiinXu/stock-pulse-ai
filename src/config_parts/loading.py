@@ -900,6 +900,10 @@ class _ConfigLoadingMethods:
                 minimum=1,
             ),
             md2img_engine=cls._parse_md2img_engine(os.getenv('MD2IMG_ENGINE', 'wkhtmltoimage')),
+            share_image_xiaohongshu_url=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_URL') or '').strip() or None,
+            share_image_xiaohongshu_handle=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_HANDLE') or '').strip() or None,
+            share_image_xiaohongshu_id=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_ID') or '').strip() or None,
+            share_image_xiaohongshu_qr_path=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_QR_PATH') or '').strip() or None,
             prefetch_realtime_quotes=os.getenv('PREFETCH_REALTIME_QUOTES', 'true').lower() == 'true',
             database_path=os.getenv('DATABASE_PATH', './data/stock_analysis.db'),
             sqlite_wal_enabled=os.getenv('SQLITE_WAL_ENABLED', 'true').lower() == 'true',
@@ -1303,25 +1307,14 @@ class _ConfigLoadingMethods:
 
     @classmethod
     def _parse_market_review_region(cls, value: str) -> str:
-        """解析大盘复盘市场区域，非法值记录警告后回退为 cn"""
+        """Parse market-review region; invalid values fall back to cn."""
+        from src.utils.market_review_region import normalize_market_review_region_lenient
+
+        normalized = normalize_market_review_region_lenient(value)
+        if normalized is not None:
+            return normalized
+
         import logging
-        v = (value or 'cn').strip().lower()
-        supported_regions = ('cn', 'hk', 'us', 'jp', 'kr', 'both')
-        ordered_regions = ('cn', 'hk', 'us', 'jp', 'kr')
-
-        if v in supported_regions:
-            if v == 'both':
-                return ','.join(ordered_regions)
-            return v
-
-        if ',' in v:
-            requested = {item.strip() for item in v.split(',') if item.strip()}
-            normalized = [region for region in ordered_regions if region in requested]
-            if 'both' in requested:
-                normalized = list(ordered_regions)
-            if normalized:
-                return ','.join(normalized)
-
         logging.getLogger(__name__).warning(
             f"MARKET_REVIEW_REGION 配置值 '{value}' 无效，已回退为默认值 'cn'（合法值：cn / hk / us / jp / kr / both；支持逗号分隔有效值）"
         )
@@ -1344,13 +1337,13 @@ class _ConfigLoadingMethods:
     def _parse_md2img_engine(cls, value: str) -> str:
         """Parse MD2IMG_ENGINE, fallback to wkhtmltoimage for invalid values (Issue #455)."""
         v = (value or 'wkhtmltoimage').strip().lower()
-        if v in ('wkhtmltoimage', 'markdown-to-file'):
+        if v in ('wkhtmltoimage', 'markdown-to-file', 'playwright'):
             return v
         if v:
             import logging
             logging.getLogger(__name__).warning(
                 f"MD2IMG_ENGINE '{value}' invalid, fallback to 'wkhtmltoimage' "
-                "(valid: wkhtmltoimage | markdown-to-file)"
+                "(valid: wkhtmltoimage | markdown-to-file | playwright)"
             )
         return 'wkhtmltoimage'
 

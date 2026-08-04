@@ -346,7 +346,11 @@ class Config:
     # Markdown to image (Issue #289): Send unsupported Markdown channels as images
     markdown_to_image_channels: List[str] = field(default_factory=list)  # Comma-separated: telegram,wechat,custom,email
     markdown_to_image_max_chars: int = 15000  # Do not convert if exceeding this length to avoid oversized images
-    md2img_engine: str = "wkhtmltoimage"  # wkhtmltoimage | markdown-to-file (Issue #455, better emoji support)
+    md2img_engine: str = "wkhtmltoimage"  # wkhtmltoimage | markdown-to-file | playwright
+    share_image_xiaohongshu_url: Optional[str] = None
+    share_image_xiaohongshu_handle: Optional[str] = None
+    share_image_xiaohongshu_id: Optional[str] = None
+    share_image_xiaohongshu_qr_path: Optional[str] = None
 
     # Real-time quote prefetch (Issue #455): Set to false to disable, avoid full market pull from efinance/akshare_em
     prefetch_realtime_quotes: bool = True
