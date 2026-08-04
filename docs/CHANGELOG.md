@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Updated the pinned stale-item automation action to v11.0.0.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
