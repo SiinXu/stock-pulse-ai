@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
+- [Changed] Pilot runtime validation on the Web stocks API module so response shape mismatches surface through ParsedApiError.
 - [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
 - [Fixed] Rejected desktop update IPC requests that do not originate from the Electron main Web window.
 - [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
