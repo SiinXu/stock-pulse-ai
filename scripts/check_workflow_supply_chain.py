@@ -123,13 +123,14 @@ TRUST_CLASSIFIER_RUN_LINES = (
     "fi",
 )
 TRUSTED_REVIEW_JOB_IF_LINES = (
-    "false &&",
     "needs.security-check.outputs.safe_to_run == 'true' &&",
     "needs.security-check.outputs.is_fork != 'true' &&",
     "needs.security-check.outputs.is_default_branch == 'true' &&",
     "needs.auto-check.result == 'success' &&",
     "needs.auto-check.outputs.has_reviewable_changes == 'true'",
 )
+# Repository secrets may appear only under the AI review job (exact env allowlist).
+TRUSTED_REVIEW_SECRET_PATH = ("jobs", "ai-review")
 LABELER_JOB_IF_LINES = (
     "github.event_name == 'pull_request' &&",
     "needs.security-check.outputs.is_fork != 'true' &&",
@@ -144,8 +145,10 @@ COMMENT_JOB_IF_LINES = (
 )
 TRUSTED_REVIEW_ENV = {
     "GITHUB_BASE_REF": "${{ github.base_ref || github.event.repository.default_branch }}",
+    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
     "GEMINI_MODEL": "${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}",
     "GEMINI_MODEL_FALLBACK": "${{ vars.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash' }}",
+    "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
     "OPENAI_BASE_URL": "${{ vars.OPENAI_BASE_URL }}",
     "OPENAI_MODEL": "${{ vars.OPENAI_MODEL }}",
     "AI_REVIEW_STRICT": "${{ vars.AI_REVIEW_STRICT || 'false' }}",
@@ -153,6 +156,7 @@ TRUSTED_REVIEW_ENV = {
     "CI_HAS_PY_CHANGES": "${{ needs.auto-check.outputs.has_py_changes || 'false' }}",
     "CI_AUTO_CHECK_RESULT": "${{ needs.auto-check.result || '' }}",
 }
+TRUSTED_REVIEW_ALLOWED_SECRET_KEYS = frozenset({"GEMINI_API_KEY", "OPENAI_API_KEY"})
 
 # Every job permission is part of the reviewed contract, including read access.
 APPROVED_JOB_PERMISSIONS = frozenset(
@@ -575,12 +579,14 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
     errors.extend(
         _mapping_shape_errors(
             ai_review,
-            {"name", "runs-on", "needs", "if", "permissions", "steps"},
+            {"name", "runs-on", "continue-on-error", "needs", "if", "permissions", "steps"},
             f"{relative_path}: ai-review job",
         )
     )
     if _scalar_value(ai_review, "runs-on") != "ubuntu-latest":
         errors.append(f"{relative_path}: ai-review must use the reviewed ubuntu-latest runner")
+    if _scalar_value(ai_review, "continue-on-error") != "true":
+        errors.append(f"{relative_path}: ai-review must remain continue-on-error (non-blocking)")
     if _scalar_sequence(ai_review, "needs") != ("security-check", "auto-check"):
         errors.append(f"{relative_path}: ai-review must retain its exact prerequisite jobs")
     job_if = _scalar_value(ai_review, "if") or ""
@@ -588,7 +594,7 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
     if job_if_lines != TRUSTED_REVIEW_JOB_IF_LINES:
         errors.append(
             f"{relative_path}: ai-review must retain its exact fork, default-branch, "
-            "static-check, and disabled gate"
+            "and static-check gate"
         )
 
     steps_values = _mapping_values(ai_review, "steps")
@@ -714,21 +720,36 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
             _mapping_shape_errors(
                 review_step,
                 {"name", "id", "working-directory", "env", "run"},
-                f"{relative_path}: disabled AI review step",
+                f"{relative_path}: AI review step",
             )
         )
         if _scalar_value(review_step, "working-directory") != "pr-code":
             errors.append(f"{relative_path}: AI review must retain its analysis working directory")
-        if _scalar_mapping(review_step, "env") != TRUSTED_REVIEW_ENV:
+        review_env = _scalar_mapping(review_step, "env")
+        if review_env != TRUSTED_REVIEW_ENV:
             errors.append(f"{relative_path}: AI review must retain its exact reviewed environment")
+        elif review_env is not None:
+            secret_keys = {
+                key
+                for key, value in review_env.items()
+                if SECRET_EXPRESSION_RE.search(value)
+            }
+            if secret_keys != TRUSTED_REVIEW_ALLOWED_SECRET_KEYS:
+                errors.append(
+                    f"{relative_path}: AI review may reference only the reviewed LLM secret keys "
+                    f"{sorted(TRUSTED_REVIEW_ALLOWED_SECRET_KEYS)}"
+                )
         review_run = _scalar_value(review_step, "run") or ""
         review_lines = tuple(line.strip() for line in review_run.splitlines() if line.strip())
         if review_lines != TRUSTED_REVIEW_RUN_LINES:
             errors.append(
                 f"{relative_path}: AI review must execute the trusted-base script and isolate its output"
             )
-    if _contains_secret_outside(document, None):
-        errors.append(f"{relative_path}: PR Review must not reference repository secrets")
+    # Secrets are allowed only under the AI review job; every other job stays secret-free.
+    if _contains_secret_outside(document, TRUSTED_REVIEW_SECRET_PATH):
+        errors.append(
+            f"{relative_path}: repository secrets may appear only under the ai-review job"
+        )
     if _contains_mapping_key(document, "secrets"):
         errors.append(f"{relative_path}: PR Review must not forward repository secrets")
 
@@ -963,6 +984,7 @@ jobs:
   ai-review:
     name: AI review
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: [security-check, auto-check]
     if: |
 {trusted_if_lines}
@@ -1164,8 +1186,18 @@ jobs:
         "exact case-sensitive contract",
     )
     _expect_failure(
-        trusted_errors(trusted_review.replace("      false &&\n", "", 1)),
-        "disabled gate",
+        trusted_errors(trusted_review.replace("    continue-on-error: true\n", "", 1)),
+        "continue-on-error",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "needs.security-check.outputs.is_fork != 'true' &&\n",
+                "",
+                1,
+            )
+        ),
+        "static-check gate",
     )
     _expect_failure(
         trusted_errors(
@@ -1226,7 +1258,7 @@ jobs:
                 "      - name: Install trusted dependencies\n",
             )
         ),
-        "PR Review must not reference repository secrets",
+        "exact reviewed step order",
     )
     non_ai_permissions = trusted_permissions | frozenset(
         {(trusted_path, "auto-check", "contents", "read")}
@@ -1247,7 +1279,7 @@ jobs:
     )
     _expect_failure(
         trusted_errors(non_ai_secret, approved_permissions=non_ai_permissions),
-        "PR Review must not reference repository secrets",
+        "repository secrets may appear only under the ai-review job",
     )
     mixed_case_non_ai_secret = non_ai_secret.replace(
         "${{ secrets.OPENAI_API_KEY }}",
@@ -1256,7 +1288,7 @@ jobs:
     )
     _expect_failure(
         trusted_errors(mixed_case_non_ai_secret, approved_permissions=non_ai_permissions),
-        "PR Review must not reference repository secrets",
+        "repository secrets may appear only under the ai-review job",
     )
     inherited_permissions = trusted_permissions | frozenset(
         {(trusted_path, "inherited-secrets", "contents", "read")}
@@ -1311,7 +1343,7 @@ jobs:
     )
     _expect_failure(
         trusted_errors(non_ai_secret_alias, approved_permissions=non_ai_permissions),
-        "PR Review must not reference repository secrets",
+        "repository secrets may appear only under the ai-review job",
     )
     mixed_case_secret_alias = non_ai_secret_alias.replace(
         "${{ secrets.GEMINI_API_KEY }}",
@@ -1320,13 +1352,13 @@ jobs:
     )
     _expect_failure(
         trusted_errors(mixed_case_secret_alias, approved_permissions=non_ai_permissions),
-        "PR Review must not reference repository secrets",
+        "repository secrets may appear only under the ai-review job",
     )
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
-                "    runs-on: ubuntu-latest\n",
-                "    runs-on: ubuntu-latest\n"
+                "    continue-on-error: true\n",
+                "    continue-on-error: true\n"
                 "    env:\n"
                 "      TOKEN: ${{ secrets.REVIEW_TOKEN }}\n",
             )
@@ -1345,7 +1377,7 @@ jobs:
                 "      - name: Install trusted dependencies\n",
             )
         ),
-        "PR Review must not reference repository secrets",
+        "exact reviewed step order",
     )
     _expect_failure(
         trusted_errors(
@@ -1394,18 +1426,28 @@ jobs:
                 "          TOKEN: ${{ secrets.REVIEW_TOKEN }}\n",
             )
         ),
-        "PR Review must not reference repository secrets",
+        "review result upload step must declare exactly",
     )
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
-                "    runs-on: ubuntu-latest\n",
-                "    runs-on: ubuntu-latest\n"
+                "    continue-on-error: true\n",
+                "    continue-on-error: true\n"
                 "    env:\n"
                 "      PYTHONPATH: pr-code\n",
             )
         ),
         "ai-review job must declare exactly",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                f"          GEMINI_API_KEY: {TRUSTED_REVIEW_ENV['GEMINI_API_KEY']}\n",
+                "          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}\n"
+                "          EXTRA_KEY: ${{ secrets.REVIEW_TOKEN }}\n",
+            )
+        ),
+        "exact reviewed environment",
     )
     _expect_failure(
         trusted_errors(
@@ -1441,7 +1483,7 @@ jobs:
         trusted_errors(trusted_review.replace(f"id: {FETCH_REVIEW_BASE_ID}", f"id: {SETUP_REVIEW_PYTHON_ID}")),
         "exact reviewed step order",
     )
-    print("Workflow supply-chain self-tests passed (51 cases).")
+    print("Workflow supply-chain self-tests passed (52 cases).")
 
 
 def parse_args() -> argparse.Namespace:

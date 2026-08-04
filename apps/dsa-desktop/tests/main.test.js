@@ -424,6 +424,104 @@ test('floating assistant BrowserWindow is fixed, isolated, and hides instead of 
   assert.equal(hidden, true);
 });
 
+test('main BrowserWindow keeps preload access sandboxed and isolated', (t) => {
+  const mainModule = loadMainModule(t);
+  const options = mainModule.buildMainWindowOptions();
+
+  assert.equal(options.webPreferences.nodeIntegration, false);
+  assert.equal(options.webPreferences.contextIsolation, true);
+  assert.equal(options.webPreferences.sandbox, true);
+  assert.match(options.webPreferences.preload, /preload\.js$/);
+});
+
+test('main BrowserWindow navigation guards keep navigation on its selected Web origin', (t) => {
+  const mainModule = loadMainModule(t);
+  const navigationHandlers = new Map();
+  mainModule.registerMainWindowNavigationGuards({
+    on: (eventName, handler) => navigationHandlers.set(eventName, handler),
+  }, () => 'http://127.0.0.1:8123/?desktop_version=3.21.0');
+
+  for (const eventName of ['will-navigate', 'will-redirect']) {
+    const handler = navigationHandlers.get(eventName);
+    assert.equal(typeof handler, 'function', eventName);
+
+    let prevented = false;
+    handler({
+      preventDefault: () => {
+        prevented = true;
+      },
+    }, 'http://127.0.0.1:8123/login?redirect=%2Fsettings');
+    assert.equal(prevented, false, `${eventName} same origin`);
+
+    for (const blockedUrl of [
+      'http://127.0.0.1:8124/',
+      'http://localhost:8123/',
+      'https://evil.example/',
+      'blob:http://127.0.0.1:8123/renderer-content',
+      'file:///tmp/escape.html',
+      'not-a-url',
+    ]) {
+      prevented = false;
+      handler({
+        preventDefault: () => {
+          prevented = true;
+        },
+      }, blockedUrl);
+      assert.equal(prevented, true, `${eventName} ${blockedUrl}`);
+    }
+  }
+});
+
+test('main BrowserWindow opens only HTTP and HTTPS links outside the app', (t) => {
+  const mainModule = loadMainModule(t);
+  const openedUrls = [];
+  const openHandler = mainModule.createMainWindowOpenHandler((url) => {
+    openedUrls.push(url);
+  });
+
+  assert.deepEqual(openHandler({ url: 'https://docs.example/path?q=1' }), { action: 'deny' });
+  assert.deepEqual(openHandler({ url: 'http://news.example/article' }), { action: 'deny' });
+  assert.deepEqual(openedUrls, [
+    'https://docs.example/path?q=1',
+    'http://news.example/article',
+  ]);
+
+  for (const blockedUrl of [
+    'file:///tmp/secret.txt',
+    'smb://fileserver/private',
+    'javascript:alert(document.domain)',
+    'stockpulse://app/settings',
+    'custom-app://open/resource',
+  ]) {
+    assert.deepEqual(openHandler({ url: blockedUrl }), { action: 'deny' }, blockedUrl);
+  }
+  assert.equal(openedUrls.length, 2);
+});
+
+test('desktop update IPC rejects foreign renderers', async (t) => {
+  const mainModule = loadMainModule(t);
+  const mainWebContents = { send: () => undefined };
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    webContents: mainWebContents,
+  });
+  t.after(() => mainModule.__setMainWindowForTest(null));
+
+  for (const channel of [
+    'desktop:get-update-state',
+    'desktop:check-for-updates',
+    'desktop:install-downloaded-update',
+    'desktop:open-release-page',
+  ]) {
+    const handler = mainModule.__getIpcMainHandler(channel);
+    await assert.rejects(
+      async () => handler({ sender: { id: 'foreign-renderer' } }, 'https://evil.example'),
+      /Unauthorized desktop update IPC sender/,
+      channel
+    );
+  }
+});
+
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {
   const mainModule = loadMainModule(t);
   const assistantWebContents = {
@@ -1894,20 +1992,22 @@ test('auto download prompt falls back to error when install path fails', async (
   fs.writeFileSync(envFile, 'RUN_MODE=desktop\n');
   fs.writeFileSync(uninstallPath, '');
 
+  const mainWebContents = {
+    send: () => undefined,
+  };
   mainModule.__setMainWindowForTest({
     isDestroyed: () => false,
-    webContents: {
-      send: () => undefined,
-    },
+    webContents: mainWebContents,
   });
 
-  await mainModule.__getIpcMainHandler('desktop:check-for-updates')();
-  let state = await mainModule.__getIpcMainHandler('desktop:get-update-state')();
+  const mainSenderEvent = { sender: mainWebContents };
+  await mainModule.__getIpcMainHandler('desktop:check-for-updates')(mainSenderEvent);
+  let state = await mainModule.__getIpcMainHandler('desktop:get-update-state')(mainSenderEvent);
   for (let idx = 0; idx < 12 && state.status !== mainModule.UPDATE_STATUS.ERROR; idx += 1) {
     await new Promise((resolve) => {
       setTimeout(resolve, 30);
     });
-    state = await mainModule.__getIpcMainHandler('desktop:get-update-state')();
+    state = await mainModule.__getIpcMainHandler('desktop:get-update-state')(mainSenderEvent);
   }
 
   assert.equal(state.status, mainModule.UPDATE_STATUS.ERROR);
@@ -1977,14 +2077,17 @@ test('auto update backup copies AlphaSift hotspot detail directories recursively
   fs.writeFileSync(uninstallPath, '');
   fs.writeFileSync(detailFile, '{"topic":"AI算力"}\n', 'utf-8');
 
+  const mainWebContents = {
+    send: () => undefined,
+  };
   mainModule.__setMainWindowForTest({
     isDestroyed: () => false,
-    webContents: {
-      send: () => undefined,
-    },
+    webContents: mainWebContents,
   });
 
-  await mainModule.__getIpcMainHandler('desktop:check-for-updates')();
+  await mainModule.__getIpcMainHandler('desktop:check-for-updates')({
+    sender: mainWebContents,
+  });
   for (let idx = 0; idx < 12 && !quitAndInstallArgs; idx += 1) {
     await new Promise((resolve) => {
       setTimeout(resolve, 30);
@@ -2770,21 +2873,23 @@ test('createWindow startup routes a pending deep link after restore and backend 
   const loadedUrls = [];
   let startupError;
   let updateCheckRequested = false;
+  let mainWebContents = null;
   const originalResourcesPathDescriptor = Object.getOwnPropertyDescriptor(process, 'resourcesPath');
   const resourcesPath = path.join(tempRoot, 'resources');
   const backupRoot = path.join(userDataDir, '.dsa-desktop-update-backup');
   const manifestPath = path.join(backupRoot, 'runtime-state.json');
 
   function fakeBrowserWindow() {
+    mainWebContents = {
+      on: () => undefined,
+      setWindowOpenHandler: () => undefined,
+      send: () => undefined,
+    };
     return {
       isDestroyed: () => false,
       setBackgroundColor: () => undefined,
       once: () => undefined,
-      webContents: {
-        on: () => undefined,
-        setWindowOpenHandler: () => undefined,
-        send: () => undefined,
-      },
+      webContents: mainWebContents,
       loadFile: async (file) => {
         loadedFiles.push(file);
         return undefined;
@@ -2917,7 +3022,9 @@ test('createWindow startup routes a pending deep link after restore and backend 
   assert.equal(updateCheckRequested, true);
   assert.equal(startupError, undefined);
   assert.equal(fs.existsSync(backupRoot), false);
-  const updateState = await mainModule.__getIpcMainHandler('desktop:get-update-state')();
+  const updateState = await mainModule.__getIpcMainHandler('desktop:get-update-state')({
+    sender: mainWebContents,
+  });
   assert.notEqual(updateState.status, mainModule.UPDATE_STATUS.ERROR);
   assert.equal(updateState.updateMode, mainModule.UPDATE_MODE.AUTO);
 

@@ -91,33 +91,47 @@ because they are not present in the PyPI advisory database; all other skips fail
 
 `.github/requirements-review.txt` is the reviewed review-tool manifest. The
 read-only static job consumes the pull-request copy because it receives no
-secrets. The legacy `ai-review` job remains in the workflow only to preserve the
-existing job topology and is disabled by a literal `false` condition. The whole
-PR Review workflow is repository-secret-free, and the executable guard rejects
-every `${{ secrets.* }}` expression regardless of job, step, key casing, or YAML
-alias use. It also rejects every `secrets:` forwarding key, including
-`secrets: inherit` on local or reusable workflow jobs.
+secrets. The `ai-review` job is re-enabled for same-repository pull requests
+that target the default branch. It is non-blocking (`continue-on-error: true`)
+and still skips fork pull requests.
 
-This is required even for same-repository pull requests. A `pull_request`
-workflow from the proposed head executes before merge, so default-branch
-protection does not make its workflow definition or reviewed code
-base-controlled. A future privileged AI review must first move secret use to a
-base-controlled workflow or an approval-protected secret boundary; repository
-variables or branch protection alone must not re-enable this job.
+Repository secrets may appear only under the `ai-review` job, and only as the
+exact reviewed LLM keys `GEMINI_API_KEY` and `OPENAI_API_KEY` on the trusted
+review step environment. The executable guard rejects every other
+`${{ secrets.* }}` expression (any job, step, key casing, or YAML alias) and
+rejects every `secrets:` forwarding key, including `secrets: inherit` on local
+or reusable workflow jobs.
+
+Threat model for this `pull_request` design:
+
+- Fork workflows never receive repository secrets from GitHub, and the trust
+  classifier still skips AI review, labels, and comments for forks.
+- Same-repository collaborators can open a pull request whose head workflow
+  definition runs before merge. The residual risk is a write-access collaborator
+  editing the workflow to exfiltrate the two LLM secrets. Mitigations: secrets
+  only on the reviewed AI step env allowlist; trusted scripts and dependency
+  inputs are checked out from the PR base commit; static checks remain
+  secret-free; AI review cannot block merge.
+- A later hardening step may move privileged review to `pull_request_target`
+  with GitHub API-only diffs (no PR code checkout). That switch is intentionally
+  separate from this re-enable.
 
 A read-only classifier compares the PR base or dispatched ref with the default
 branch case-sensitively and also requires a branch ref, so a tag named after the
 default branch is untrusted. Write-capable label and comment jobs consume that
 exact output and do not run for another branch or tag. Base refs enter shell
 commands only through quoted environment variables. The workflow guard locks
-the literal AI disable, zero-secret contract, classifier, write-job gates, and
-the retained seven-step AI job shape, including Action identities, inputs,
-commands, runner, and step order. Extra local Actions, package installs, or
-execution settings fail closed.
+the AI same-repo/default-branch gate, secret allowlist, classifier, write-job
+gates, and the retained seven-step AI job shape, including Action identities,
+inputs, commands, runner, and step order. Extra local Actions, package installs,
+or execution settings fail closed.
 Before the trusted script runs, the job removes any pull-request-provided result
 node. A result is accepted only as a regular file, moved into the runner-owned
 temporary directory, and uploaded from that trusted path; an unavailable
 provider therefore cannot expose a pre-seeded pull-request artifact.
+
+The static job also emits a non-blocking PR-size advisory when changed lines
+(excluding lockfiles and common generated files) exceed about 1000 lines.
 
 ## GitHub Actions
 
@@ -171,12 +185,12 @@ contains every read-only job permission. Docker publish
 jobs do not request `id-token: write` because they authenticate with registry
 credentials and do not perform OIDC attestation.
 
-The PR Review workflow remains a `pull_request` workflow and contains no
-repository-secret references or forwarding keys. Fork and same-repository runs
-both keep the AI job disabled. Write-capable jobs require a same-repository
-head, a branch ref, and an exact, case-sensitive default-branch match. Pinning,
-permission declarations, base-ref handling, the literal disable, and the
-zero-secret contract must not weaken that isolation.
+The PR Review workflow remains a `pull_request` workflow. Fork runs stay
+read-only and secret-free. Same-repository runs targeting the default branch
+may use the two reviewed LLM secrets only inside `ai-review`. Write-capable jobs
+require a same-repository head, a branch ref, and an exact, case-sensitive
+default-branch match. Pinning, permission declarations, base-ref handling, the
+AI gate, and the secret allowlist must not weaken that isolation.
 
 ## Time-Bounded Exceptions
 
