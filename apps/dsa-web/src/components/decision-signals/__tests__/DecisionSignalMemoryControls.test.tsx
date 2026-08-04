@@ -83,8 +83,9 @@ describe('DecisionSignalMemoryControls', () => {
 
       renderControls();
 
-      expect(await screen.findByRole('switch', { name: '重点记忆' }))
-        .toHaveAttribute('aria-checked', String(memorable));
+      const memorableSwitch = screen.getByRole('switch', { name: '重点记忆' });
+      await waitFor(() => expect(memorableSwitch).toBeEnabled());
+      expect(memorableSwitch).toHaveAttribute('aria-checked', String(memorable));
       expect(screen.getByRole('switch', { name: '忽略' }))
         .toHaveAttribute('aria-checked', String(ignored));
       expect(screen.getAllByText(badge).length).toBeGreaterThan(0);
@@ -113,8 +114,10 @@ describe('DecisionSignalMemoryControls', () => {
       </UiLanguageProvider>,
     );
 
-    expect(await screen.findByRole('switch', { name: '忽略' }))
-      .toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: '忽略' }))
+        .toHaveAttribute('aria-checked', 'true');
+    });
 
     await act(async () => {
       resolveFirst(memoryFlags(7, true, false));
@@ -182,7 +185,8 @@ describe('DecisionSignalMemoryControls', () => {
 
     renderControls();
 
-    const memorableSwitch = await screen.findByRole('switch', { name: '重点记忆' });
+    const memorableSwitch = screen.getByRole('switch', { name: '重点记忆' });
+    await waitFor(() => expect(memorableSwitch).toBeEnabled());
     fireEvent.click(memorableSwitch);
 
     expect(await screen.findByText('决策记忆标记保存失败')).toBeInTheDocument();
