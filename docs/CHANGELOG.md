@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
 - [Added] Added read-only per-skill outcome statistics with independent horizon and engine-version buckets and a 30-evaluated-sample publication threshold.
 
+- [Tests] Patched the stock-index data boundary instead of `resolve_index_stock_code` so the report-code normalization matrix exercises the real resolver on every delivery path.
 - [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
 - [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
 - [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
