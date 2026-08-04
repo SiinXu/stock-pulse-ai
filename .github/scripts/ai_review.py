@@ -84,18 +84,52 @@ def get_changed_files():
     return output.split('\n') if output else []
 
 
-def get_pr_context():
-    """Read PR title/body from GitHub event payload when available."""
+def _event_payload():
+    """Read GitHub Actions event payload from ``GITHUB_EVENT_PATH``.
+
+    Returns an empty dict when the file is missing, unreadable, or contains
+    invalid JSON. Emits a warning that distinguishes failure modes so review
+    triage does not collapse into a silent empty title/body. The warning
+    records the exception type and source path only; it never prints payload
+    content.
+    """
     event_path = os.environ.get('GITHUB_EVENT_PATH')
-    if not event_path or not os.path.exists(event_path):
-        return '', ''
+    if not event_path:
+        return {}
+    if not os.path.exists(event_path):
+        print(
+            f"WARNING: GITHUB_EVENT_PATH file is missing: "
+            f"{_escape_non_ascii(event_path)}; event payload degraded to empty object"
+        )
+        return {}
     try:
         with open(event_path, 'r', encoding='utf-8') as f:
-            payload = json.load(f)
-        pr = payload.get('pull_request', {})
-        return (pr.get('title') or '').strip(), (pr.get('body') or '').strip()
-    except Exception:
-        return '', ''
+            return json.load(f)
+    except UnicodeDecodeError as exc:
+        print(
+            f"WARNING: event payload is not UTF-8 ({type(exc).__name__}): "
+            f"{_escape_non_ascii(event_path)}; degraded to empty object"
+        )
+        return {}
+    except OSError as exc:
+        print(
+            f"WARNING: event payload read failed ({type(exc).__name__}): "
+            f"{_escape_non_ascii(event_path)}; degraded to empty object"
+        )
+        return {}
+    except json.JSONDecodeError as exc:
+        print(
+            f"WARNING: event payload JSON parse failed ({type(exc).__name__}): "
+            f"{_escape_non_ascii(event_path)}; degraded to empty object"
+        )
+        return {}
+
+
+def get_pr_context():
+    """Read PR title/body from GitHub event payload when available."""
+    payload = _event_payload()
+    pr = payload.get('pull_request') or {}
+    return (pr.get('title') or '').strip(), (pr.get('body') or '').strip()
 
 
 def classify_files(files):
@@ -169,8 +203,10 @@ Changed files:
 2. Traceability: check for a linked issue through `Fixes` or `Refs`. A natural-language issue reference is acceptable and must not fail review only for formatting. Without an issue, require a motivation and acceptance criteria.
 3. Type: determine whether fix/feat/refactor/docs/chore/test/ci matches the actual change.
 4. Description completeness: check for background, complete scope, verification commands and results, compatibility risks, and an actionable rollback plan. Use the CI status above when evaluating verification: (a) when py_compile and Flake8 passed, the PR may cite CI without repeating local output; (b) `./scripts/ci_gate.sh` is not covered by this review workflow, so a missing result or skip reason for Python backend changes is a recommendation; (c) without CI results, do not assume CI passed and mark verification as "Unable to confirm."
-5. Merge readiness: return Ready or Not Ready and identify blockers.
-6. For user-visible changes, confirm the relevant documentation and `docs/CHANGELOG.md` are updated. Update `README.md` only when homepage-level information changed.
+5. Description vs diff consistency (critical for this single-maintainer repository): compare the PR title/body claims against the actual diff. Flag material contradictions, missing scope, inflated claims, or undocumented high-risk paths. This is the primary automated defense against AGENTS.md section 1.2 / 8.1 failure modes (PR body inconsistent with the real change).
+6. Merge readiness: return Ready or Not Ready and identify blockers.
+7. For user-visible changes, confirm the relevant documentation and `docs/CHANGELOG.md` are updated. Update `README.md` only when homepage-level information changed.
+8. Size philosophy: if the diff is very large, note whether the PR body explains why it cannot be split (AGENTS.md section 1.2). Size alone is a recommendation, not a blocker.
 
 ## Blocker Versus Recommendation Criteria
 Only the following may make the pull request Not Ready:
@@ -185,6 +221,7 @@ Treat the following as recommendations that do not affect merge readiness:
 - No `./scripts/ci_gate.sh` result or skip reason for a Python backend change
 - Nonessential wording or formatting concerns
 - Comment-language style or unrelated lockfile changes
+- Large PR size without a split rationale (advisory only)
 
 ## Required Review Output
 - Respond only in English.
@@ -194,6 +231,7 @@ Treat the following as recommendations that do not affect merge readiness:
   - Traceability: Pass/Fail with evidence
   - Type: recommended type
   - Description completeness: Complete/Incomplete with missing items
+  - Description vs diff consistency: Consistent/Inconsistent with specific mismatches
   - Risk level: Low/Medium/High with key risks
   - Required changes: at most five items, blockers only, ordered by priority
   - Recommendations: at most five items
@@ -307,7 +345,63 @@ def ai_review(diff_content, files, truncated):
     return None
 
 
+def _run_fixture_self_test():
+    """Exercise payload parsing and prompt construction without calling providers."""
+    fixture = os.environ.get(
+        'AI_REVIEW_FIXTURE',
+        os.path.join(os.path.dirname(__file__), 'fixtures', 'pr_event_sample.json'),
+    )
+    if not os.path.exists(fixture):
+        raise SystemExit(f"Fixture not found: {fixture}")
+
+    os.environ['GITHUB_EVENT_PATH'] = fixture
+    # Clear provider keys so this never spends tokens during self-test.
+    os.environ.pop('GEMINI_API_KEY', None)
+    os.environ.pop('OPENAI_API_KEY', None)
+
+    title, body = get_pr_context()
+    if not title:
+        raise SystemExit("Fixture self-test failed: empty PR title from payload")
+
+    sample_files = ['.github/workflows/pr-review.yml', 'docs/CHANGELOG.md']
+    sample_diff = (
+        "diff --git a/.github/workflows/pr-review.yml b/.github/workflows/pr-review.yml\n"
+        "--- a/.github/workflows/pr-review.yml\n"
+        "+++ b/.github/workflows/pr-review.yml\n"
+        "@@ -1 +1 @@\n"
+        "-# disabled\n"
+        "+# re-enabled AI review\n"
+    )
+    prompt = build_prompt(sample_diff, sample_files, False, title, body)
+    required_markers = (
+        "Description vs diff consistency",
+        "Respond only in English",
+        "Conclusion: Ready to Merge",
+        title,
+    )
+    missing = [marker for marker in required_markers if marker not in prompt]
+    if missing:
+        raise SystemExit(f"Fixture self-test failed: prompt missing {missing!r}")
+
+    # Payload failure modes must warn and degrade.
+    os.environ['GITHUB_EVENT_PATH'] = fixture + '.missing'
+    empty_title, empty_body = get_pr_context()
+    if empty_title or empty_body:
+        raise SystemExit("Fixture self-test failed: missing payload should degrade to empty")
+
+    print("ai_review fixture self-test passed")
+    print(f"  fixture: {fixture}")
+    print(f"  title: {_escape_non_ascii(title)}")
+    print(f"  body_chars: {len(body)}")
+    print(f"  prompt_chars: {len(prompt)}")
+    print("  provider calls: skipped (self-test)")
+
+
 def main():
+    if os.environ.get('AI_REVIEW_SELF_TEST', '').lower() in {'1', 'true', 'yes'}:
+        _run_fixture_self_test()
+        return
+
     diff, truncated = get_diff()
     files = get_changed_files()
 

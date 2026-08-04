@@ -1,5 +1,12 @@
-# Automated pull request review with syntax checks and advisory reporting.
-# The legacy AI job remains disabled until privileged work moves to base-controlled execution.
+# Automated pull request review with syntax checks and advisory AI reporting.
+#
+# Security model (pull_request, fork-safe):
+# - Fork PRs: read-only static checks only. Repository secrets and write jobs are skipped.
+# - Same-repo PRs targeting the default branch: static checks + AI review + labels/comments.
+# - AI review runs trusted scripts from the PR base commit only; the PR tree is analysis data.
+# - LLM secrets (GEMINI_API_KEY / OPENAI_API_KEY) are available only to the AI review step and
+#   only on same-repo runs (GitHub withholds repository secrets from fork pull_request workflows).
+# - AI review is auxiliary: continue-on-error so a provider outage never blocks the PR.
 
 name: PR Review
 
@@ -232,13 +239,73 @@ jobs:
           STATS=$(git diff --stat "origin/$BASE_REF...HEAD" 2>/dev/null | tail -1)
           echo "$STATS" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY
 
-  # ==================== Disabled legacy AI review ====================
+      - name: 📏 PR Size Advisory
+        id: size_advisory
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+          SIZE_ADVISORY_THRESHOLD: "1000"
+        run: |
+          escape_dynamic_text() {
+            perl -CSDA -pe 's/([^\x00-\x7F]|&)/sprintf("\\u{%X}", ord($1))/ge'
+          }
+          # Count changed lines excluding lockfiles and common generated artifacts.
+          # Advisory only: never fails the job.
+          EXCLUDE_REGEX='(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|poetry\.lock|Pipfile\.lock|composer\.lock|constraints\.txt|build-constraints\.txt|.*\.generated\.(ts|js|json)|openapi\.json|.*\.min\.(js|css))$'
+          TOTAL=0
+          while IFS=$'\t' read -r added deleted path; do
+            [ -z "$path" ] && continue
+            if printf '%s\n' "$path" | grep -Eq "$EXCLUDE_REGEX"; then
+              continue
+            fi
+            case "$added" in (*[!0-9]*) added=0 ;; esac
+            case "$deleted" in (*[!0-9]*) deleted=0 ;; esac
+            TOTAL=$((TOTAL + added + deleted))
+          done < <(git diff --numstat "origin/$BASE_REF...HEAD" 2>/dev/null || true)
+
+          echo "advisory_lines=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "## 📏 PR Size Advisory" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reviewable changed lines (excluding lockfiles/generated): **${TOTAL}** (threshold: ${SIZE_ADVISORY_THRESHOLD})" | escape_dynamic_text >> "$GITHUB_STEP_SUMMARY"
+          if [ "$TOTAL" -gt "$SIZE_ADVISORY_THRESHOLD" ]; then
+            echo "size_advisory=true" >> "$GITHUB_OUTPUT"
+            {
+              echo ""
+              echo "This pull request exceeds ~${SIZE_ADVISORY_THRESHOLD} changed lines after excluding lockfiles and generated files."
+              echo ""
+              echo "Per AGENTS.md section 1.2, large diffs that stack volume instead of converging a clear contract are discouraged. Please either:"
+              echo "1. Split into smaller, reviewable pull requests, or"
+              echo "2. Document in the PR body why this scope cannot be split (single atomic contract, mechanical rename, generated bulk with a thin real change, etc.)."
+              echo ""
+              echo "This notice is advisory only and does not block merge."
+            } >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "### 📏 PR Size Advisory"
+              echo ""
+              echo "This pull request changes **${TOTAL}** lines (excluding lockfiles and generated files), which exceeds the ~${SIZE_ADVISORY_THRESHOLD}-line advisory threshold."
+              echo ""
+              echo "Per AGENTS.md section 1.2, prefer splitting large work or explain in the PR body why the scope must stay together. This notice is advisory only and does not block merge."
+            } > "${RUNNER_TEMP}/size_advisory.txt"
+          else
+            echo "size_advisory=false" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Within the advisory size threshold." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: 📤 Upload Size Advisory Note
+        if: steps.size_advisory.outputs.size_advisory == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: size-advisory
+          path: ${{ runner.temp }}/size_advisory.txt
+          if-no-files-found: ignore
+
+  # ==================== AI review (same-repo, default-branch target only) ====================
   ai-review:
     name: 🤖 AI Code Review
     runs-on: ubuntu-latest
+    continue-on-error: true
     needs: [security-check, auto-check]
     if: |
-      false &&
       needs.security-check.outputs.safe_to_run == 'true' &&
       needs.security-check.outputs.is_fork != 'true' &&
       needs.security-check.outputs.is_default_branch == 'true' &&
@@ -296,8 +363,10 @@ jobs:
         working-directory: pr-code
         env:
           GITHUB_BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           GEMINI_MODEL_FALLBACK: ${{ vars.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           AI_REVIEW_STRICT: ${{ vars.AI_REVIEW_STRICT || 'false' }}
@@ -431,6 +500,13 @@ jobs:
         with:
           name: ai-review-result
           path: .
+
+      - name: 📥 Download Size Advisory Note
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: size-advisory
+          path: .
       
       - name: 💬 Publish Review Report
         env:
@@ -479,6 +555,17 @@ jobs:
               console.log('AI review artifact omitted because it contains an HTML character reference');
               aiReview = '';
             }
+
+            let sizeAdvisory = '';
+            try {
+              sizeAdvisory = fs.readFileSync('size_advisory.txt', 'utf8');
+            } catch (e) {
+              console.log('No size advisory note found');
+            }
+            if (containsNonEnglishLetter(sizeAdvisory) || containsCharacterReference(sizeAdvisory)) {
+              console.log('Size advisory omitted because it failed the English-only guard');
+              sizeAdvisory = '';
+            }
             
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -520,6 +607,14 @@ jobs:
             if (files.length > 20) {
               report += `\n... and ${files.length - 20} more files\n`;
             }
+
+            if (sizeAdvisory) {
+              report += `
+            ---
+
+            ${sizeAdvisory}
+            `;
+            }
             
             if (aiReview) {
               report += `
@@ -534,7 +629,7 @@ jobs:
             report += `
             ---
 
-            > 💡 **Reminder:** Make sure the code passes the relevant local tests and follows the repository standards.
+            > 💡 **Reminder:** Make sure the code passes the relevant local tests and follows the repository standards. Automated review is advisory and non-blocking.
             `;
             
             if (botComment) {

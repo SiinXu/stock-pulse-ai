@@ -115,6 +115,7 @@ docs: update the README deployment guide
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
 | web-gate | Web 或关联 API/配置/服务契约变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` | ✅（触发时） |
 | web-e2e | 同一关联路径触发；以隔离运行时启动真实后端、Vite 与本地 fake 模型端点并执行 `npm run test:smoke` | ✅（触发时） |
+| pr-review | 辅助 `pull_request` 审查：变更文件语法/flake8、约 1000 行规模提示（排除 lock/生成文件）、同仓 AI 审查（需仓库 Secrets `GEMINI_API_KEY` 和/或 `OPENAI_API_KEY`）、自动标签与机器人评论。Fork PR 只读（无 secrets、无写操作）。AI 审查不阻断合入。 | ❌（辅助项） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
 
 `web-e2e` 只使用专用 canary credential，并将单次运行限定在 `test-results/ci-secret-bearing/`。该 credential-bearing 运行关闭 screenshot、video 和 trace；仓库 `test:smoke` 入口拒绝 UI 模式和替代 Playwright config，global setup 在 Playwright 合并 CLI/project 配置后逐 project 再确认最终 trace 为 `off`。无论 E2E 成功或失败，CI 都先扫描原始运行目录中的文本、日志、JSON、HAR、原始二进制 canary，以及意外出现的 trace/ZIP 条目；扫描器仍按扩展名或文件签名拒绝无法可靠检查的 PNG/JPEG/WebM，不使用 OCR，也不回显匹配值。原始扫描成功后，专用 staging 脚本严格解析 `playwright-results.json`，递归保留 `service-logs/` 中的 UTF-8 `.log`/`.txt` 及目录结构，拒绝符号链接、非 allowlist 文件、伪装 archive 和媒体签名，并生成带大小与 SHA-256 的 `manifest.json`；CI 再扫描 staging 目录，只有两次扫描与 staging 全部成功才上传。原始目录、trace、媒体和 archive 不进入 artifact。
