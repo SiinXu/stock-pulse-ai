@@ -30,6 +30,7 @@ deterministic_checks() {
   python scripts/check_dependency_vulnerabilities.py --self-test
   python scripts/check_legacy_facade_imports.py --self-test
   python scripts/check_legacy_facade_imports.py
+  python scripts/check_coverage_floor.py --self-test
   echo "==> backend-gate: mypy type check (src/schemas only)"
   python -m mypy --config-file mypy.ini
   ./scripts/test.sh code
@@ -39,10 +40,32 @@ deterministic_checks() {
 offline_test_suite() {
   echo "==> backend-gate: offline test suite"
   local test_data_dir
+  local coverage_report
   local test_exit_code=0
   test_data_dir="$(mktemp -d)"
+  coverage_report="${test_data_dir}/coverage.json"
+  # Marker selection excludes network and wall-clock benchmarks. Benchmarks
+  # still collect under --strict-markers; run them manually with:
+  #   python -m pytest -m benchmark
+  # Per-test timeout + thread method: hard-fail hangs with an attributed
+  # traceback instead of burning the full job budget. faulthandler_timeout
+  # dumps every thread stack when a single test (including teardown) is silent
+  # for 300s, which is complementary post-mortem signal beyond pytest-timeout.
+  # Coverage is measured for src/api/data_provider/bot and enforced by the
+  # checked-in floor in scripts/coverage_floor_baseline.json.
   DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
-    python -m pytest -m "not network" || test_exit_code=$?
+    python -m pytest -m "not network and not benchmark" \
+      --timeout=120 --timeout-method=thread \
+      -o faulthandler_timeout=300 \
+      --cov=src --cov=api --cov=data_provider --cov=bot \
+      --cov-report=term \
+      --cov-report="json:${coverage_report}" \
+    || test_exit_code=$?
+  if [ "${test_exit_code}" -eq 0 ]; then
+    echo "==> backend-gate: coverage floor"
+    python scripts/check_coverage_floor.py --report "${coverage_report}" \
+      || test_exit_code=$?
+  fi
   rm -rf "${test_data_dir}"
   return "${test_exit_code}"
 }

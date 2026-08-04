@@ -34,6 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Complete the AGENTS.md CI verification matrix with `changes` and `pydanticai-installed`.
 - [Tests] Enforce Copilot/AGENTS Unreleased type token parity via `scripts/check_ai_assets.py`.
 
+- [Tests] Add per-test pytest-timeout (120s, thread method) and faulthandler_timeout=300 to the offline CI gate so hangs fail with attribution instead of burning the full job budget.
+- [Tests] Measure offline-suite line coverage for `src`/`api`/`data_provider`/`bot` and enforce a measured coverage floor via `scripts/check_coverage_floor.py`.
+- [Tests] Enable `--strict-markers`, register the `benchmark` marker, exclude wall-clock benchmark assertions from the default offline gate, and document manual benchmark runs.
+- [Chore] Add `pytest-timeout` and `pytest-cov` to `.github/requirements-ci.txt` and refresh the universal dependency lock.
+- [Docs] Document offline gate timeout, coverage floor, and marker semantics in `docs/testing-ci-gate.md` and Contributing.
+
+
+- [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
+
 ## [3.27.0] - 2026-08-04
 
 ### Release Highlights
