@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
 - [Added] Added read-only per-skill outcome statistics with independent horizon and engine-version buckets and a 30-evaluated-sample publication threshold.
 
+- [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
+- [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
+- [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
+- [Docs] Complete the AGENTS.md CI verification matrix with `changes` and `pydanticai-installed`.
+- [Tests] Enforce Copilot/AGENTS Unreleased type token parity via `scripts/check_ai_assets.py`.
+
 ## [3.27.0] - 2026-08-04
 
 ### Release Highlights
