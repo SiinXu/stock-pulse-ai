@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Changed] Migrated Phase-1 leaf service and bot importers from ADR-006 legacy facades to canonical packages and shrunk the facade-import allowlist.
 - [Docs] Consolidated ADR-001 and ADR-002 under docs/adr/ as the single ADR location, leaving docs/architecture/ for non-ADR material.
+- [Docs] Corrected a stale docs/architecture parenthetical in the historical PydanticAI development plan after ADR-001 moved under docs/adr/.
 - [Fixed] Made shared Web date fields picker-only while preserving required validation, optional-date clearing, and inherited disabled-fieldset locks, and improved Market Review history height fill, Backtest validation-mode contrast in dark mode, and adaptive Deep Research stock input layout.
 - [Fixed] Routed DingTalk-only aggregate reports through the canonical notification dispatch policy.
 - [Fixed] Kept Portfolio operation identities account/file scoped and prevented stale ledger, FX, and post-write projection races from blocking controls or showing out-of-scope data.
