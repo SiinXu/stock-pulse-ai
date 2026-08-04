@@ -3347,6 +3347,23 @@ async function runLocalModelOperation(operation) {
   }
 }
 
+function buildMainWindowOptions() {
+  return {
+    width: 1200,
+    height: 800,
+    minWidth: 960,
+    minHeight: 640,
+    backgroundColor: resolveWindowBackgroundColor(),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      additionalArguments: [`--dsa-desktop-version=${app.getVersion()}`],
+    },
+  };
+}
+
 ipcMain.handle('desktop:get-update-state', () => desktopUpdateState);
 ipcMain.handle('desktop:check-for-updates', () => performDesktopUpdateCheck({ manual: true }));
 ipcMain.handle('desktop:install-downloaded-update', () => installDownloadedUpdate());
@@ -3480,19 +3497,7 @@ async function createWindow(brandMigrationResult) {
 
   logStartup('createWindow started');
 
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 960,
-    minHeight: 640,
-    backgroundColor: resolveWindowBackgroundColor(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      additionalArguments: [`--dsa-desktop-version=${app.getVersion()}`],
-    },
-  });
+  mainWindow = new BrowserWindow(buildMainWindowOptions());
   logStartup('BrowserWindow created');
 
   if (typeof mainWindow.on === 'function') {
@@ -3813,6 +3818,7 @@ module.exports = {
   fetchLatestReleaseJson,
   findAvailablePort,
   buildMainPageUrl,
+  buildMainWindowOptions,
   buildDesktopAssistantRoute,
   buildDesktopAssistantState,
   buildDesktopDeepLinkTargetUrl,

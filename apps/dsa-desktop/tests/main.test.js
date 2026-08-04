@@ -424,6 +424,16 @@ test('floating assistant BrowserWindow is fixed, isolated, and hides instead of 
   assert.equal(hidden, true);
 });
 
+test('main BrowserWindow keeps preload access sandboxed and isolated', (t) => {
+  const mainModule = loadMainModule(t);
+  const options = mainModule.buildMainWindowOptions();
+
+  assert.equal(options.webPreferences.nodeIntegration, false);
+  assert.equal(options.webPreferences.contextIsolation, true);
+  assert.equal(options.webPreferences.sandbox, true);
+  assert.match(options.webPreferences.preload, /preload\.js$/);
+});
+
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {
   const mainModule = loadMainModule(t);
   const assistantWebContents = {
