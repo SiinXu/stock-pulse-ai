@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Made Longbridge volume-ratio history calls use keyword arguments so SDK versions with different positional `time` and `count` ordering remain compatible.
 
 - [Chore] Updated the pinned stale-item automation action to v11.0.0.
+- [Tests] Stub DsaEastMoneyHotspotProvider.hotspot_rows in AlphaSift status/hotspot API tests to prevent live EastMoney hangs under per-test timeout.
+
 - [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
 - [Added] On-demand report share images via `GET /api/v1/history/{id}/share-image` and Web one-click share
 - [Added] Web/API per-market market-review trigger with request-scoped `region`
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 
 - [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
+- [Tests] Keep AlphaSift hotspot FakeProvider offline by stubbing board-change probes that previously hung under the new per-test timeout.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
 - [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
 - [Changed] Pilot runtime validation on the Web stocks API module so response shape mismatches surface through ParsedApiError.
@@ -40,6 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
 - [Docs] Complete the AGENTS.md CI verification matrix with `changes` and `pydanticai-installed`.
 - [Tests] Enforce Copilot/AGENTS Unreleased type token parity via `scripts/check_ai_assets.py`.
+
+- [Tests] Add per-test pytest-timeout (120s, thread method) and faulthandler_timeout=300 to the offline CI gate so hangs fail with attribution instead of burning the full job budget.
+- [Tests] Measure offline-suite line coverage for `src`/`api`/`data_provider`/`bot` and enforce a measured coverage floor via `scripts/check_coverage_floor.py`.
+- [Tests] Enable `--strict-markers`, register the `benchmark` marker, exclude wall-clock benchmark assertions from the default offline gate, and document manual benchmark runs.
+- [Chore] Add `pytest-timeout` and `pytest-cov` to `.github/requirements-ci.txt` and refresh the universal dependency lock.
+- [Docs] Document offline gate timeout, coverage floor, and marker semantics in `docs/testing-ci-gate.md` and Contributing.
+
+
+- [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 
 ## [3.27.0] - 2026-08-04
 

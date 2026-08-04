@@ -1,7 +1,7 @@
 # StockPulse universal Python dependency constraints
 # Generated file; do not edit by hand.
 # Resolver: uv==0.11.31
-# Source-SHA256: 0db3ede39ba552a13f5c87107b797953fbf7e90a952e94902606f0344a9d6415
+# Source-SHA256: 75ec0f3aa420188704390c2c1d188a2294fd3c62e3c09522cdf5a5a40189e01a
 # Python-Minimum: 3.10
 # Exclude-Newer: 2026-07-27T04:06:13Z
 # Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z
@@ -30,6 +30,7 @@ cffi==2.1.0
 charset-normalizer==3.4.9
 click==8.4.2
 colorama==0.4.6 ; sys_platform == 'win32'
+coverage==7.15.2
 cryptography==50.0.0
 cssselect==1.4.0
 cuda-bindings==13.3.1 ; python_full_version < '3.15' and sys_platform == 'linux'
@@ -170,6 +171,8 @@ pyparsing==3.3.2
 pypinyin==0.55.0
 pytdx==1.72
 pytest==9.1.1
+pytest-cov==7.1.0
+pytest-timeout==2.4.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-multipart==0.0.32

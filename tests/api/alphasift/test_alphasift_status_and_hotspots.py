@@ -30,7 +30,37 @@ from tests.alphasift_api_test_support import (
 )
 
 
+
 class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
+    def setUp(self) -> None:
+        """Keep hotspot unit tests offline under the CI per-test timeout.
+
+        Refresh paths can call DsaEastMoneyHotspotProvider.hotspot_rows after a
+        mocked AlphaSift discover. Stub that entrypoint so offline tests never
+        open live EastMoney/akshare sockets under the 120s per-test timeout.
+        Tests that need real provider methods can still patch.object over this.
+        """
+        super().setUp()
+        self._offline_network_patches = [
+            patch.object(
+                alphasift_service.DsaEastMoneyHotspotProvider,
+                "hotspot_rows",
+                return_value=[],
+            ),
+            patch.object(
+                alphasift_service.DsaEastMoneyHotspotProvider,
+                "_enrich_constituent_quotes",
+                side_effect=lambda stocks: stocks,
+            ),
+        ]
+        for item in self._offline_network_patches:
+            item.start()
+
+    def tearDown(self) -> None:
+        for item in reversed(getattr(self, "_offline_network_patches", [])):
+            item.stop()
+        super().tearDown()
+
     def test_hotspot_cache_failure_logs_topic_metadata_without_private_text(self) -> None:
         private_topic = (
             "Board discussion about Northwind acquiring Contoso before announcement"
@@ -1425,6 +1455,13 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
             def _find_board_change(self, topic: str) -> Dict[str, Any]:
                 return {}
 
+            def _is_industry_hotspot(self, topic: str) -> bool:
+                # Keep this offline unit test free of live akshare board fetches.
+                return False
+
+            def _fetch_board_changes(self) -> Any:
+                return pd.DataFrame()
+
             def _build_hotspot_route(self, topic: str, summary: Dict[str, Any]) -> Any:
                 return [{"title": "fallback", "description": topic, "source": "test"}]
 
@@ -1539,6 +1576,12 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
             def _find_board_change(self, topic: str) -> Dict[str, Any]:
                 raise TimeoutError("board change timeout")
 
+            def _is_industry_hotspot(self, topic: str) -> bool:
+                return False
+
+            def _fetch_board_changes(self) -> Any:
+                return pd.DataFrame()
+
             def _fetch_ths_constituents(self, topic: str) -> Any:
                 return pd.DataFrame()
 
@@ -1578,6 +1621,10 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
 
             def stock_board_industry_name_em(self) -> Any:
                 return pd.DataFrame([{"name": "电池", "rank": 1}])
+
+            def _fetch_board_changes(self) -> Any:
+                # Avoid live akshare board-change probes during industry classification.
+                return pd.DataFrame()
 
             def _fetch_eastmoney_constituents(self, topic: str, *, source: str) -> Any:
                 self.constituent_sources.append(source)
