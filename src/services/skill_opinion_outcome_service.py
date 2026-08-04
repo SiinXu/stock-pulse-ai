@@ -183,7 +183,9 @@ class SkillOpinionOutcomeService:
         self,
         candidate: SkillOpinionOutcomeCandidate,
     ) -> SkillOpinionOutcomeEvaluation:
-        analysis_date = self._resolve_analysis_date(candidate.history)
+        analysis_date, analysis_date_failure = self._resolve_analysis_date(
+            candidate.history
+        )
         if not self._codes_equivalent(
             candidate.sample.stock_code,
             candidate.history.stock_code,
@@ -191,6 +193,12 @@ class SkillOpinionOutcomeService:
             return SkillOpinionOutcomeEvaluation(
                 eval_status="unable",
                 unable_reason="stock_code_mismatch",
+                analysis_date=analysis_date,
+            )
+        if analysis_date_failure is not None:
+            return SkillOpinionOutcomeEvaluation(
+                eval_status="unable",
+                unable_reason=analysis_date_failure,
                 analysis_date=analysis_date,
             )
         expected_start_date, failure_reason = self._resolve_expected_start_date(
@@ -276,7 +284,7 @@ class SkillOpinionOutcomeService:
     def _resolve_analysis_date(
         cls,
         history: AnalysisHistoryProjection,
-    ) -> Optional[date]:
+    ) -> Tuple[Optional[date], Optional[str]]:
         snapshot = cls._mapping(history.context_snapshot)
         enhanced = (
             snapshot.get("enhanced_context")
@@ -284,14 +292,15 @@ class SkillOpinionOutcomeService:
             else None
         )
         if isinstance(enhanced, Mapping):
-            parsed = cls._parse_date(enhanced.get("date"))
-            if parsed is not None:
-                return parsed
-        return (
-            history.created_at.date()
-            if isinstance(history.created_at, datetime)
-            else None
-        )
+            raw_date = enhanced.get("date")
+            if raw_date not in (None, ""):
+                parsed = cls._parse_date(raw_date)
+                if parsed is None:
+                    return None, "invalid_analysis_date"
+                return parsed, None
+        if isinstance(history.created_at, datetime):
+            return history.created_at.date(), None
+        return None, "missing_analysis_date"
 
     @staticmethod
     def _code_candidates(stock_code: Any) -> List[str]:

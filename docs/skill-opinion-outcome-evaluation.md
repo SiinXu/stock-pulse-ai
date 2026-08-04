@@ -66,6 +66,9 @@ valid ISO date, and cannot be later than the analysis date. The repository then
 requires an exact local daily bar for that date and keeps the start and all
 forward bars on one stored stock-code shape.
 
+An explicitly present but invalid analysis date is terminal `unable`; it is not
+silently replaced with the history creation date.
+
 `strong_buy` and `buy` are bullish; `strong_sell` and `sell` are bearish.
 Directional return must be strictly positive to count as a hit, so a zero
 return is a miss. `hold` becomes observational only after the complete window

@@ -361,6 +361,71 @@ def test_invalid_persisted_start_metadata_is_terminal_unable(
     )["processed_keys"] == 0
 
 
+def test_invalid_explicit_analysis_date_never_falls_back_to_created_at(
+    isolated_db,
+) -> None:
+    history_id = _add_history(
+        isolated_db,
+        context_snapshot=json.dumps(
+            {
+                "enhanced_context": {"date": "not-a-date"},
+                "market_phase_summary": {
+                    "phase": "postmarket",
+                    "market": "cn",
+                    "effective_daily_bar_date": "2024-01-02",
+                },
+            }
+        ),
+    )
+
+    item = SkillOpinionOutcomeService(
+        db_manager=isolated_db
+    ).run_outcomes(
+        analysis_history_id=history_id,
+        horizons=["1d"],
+    )["items"][0]
+
+    assert item["eval_status"] == "unable"
+    assert item["unable_reason"] == "invalid_analysis_date"
+    assert item["analysis_date"] is None
+
+
+def test_absent_analysis_date_falls_back_to_history_created_at(
+    isolated_db,
+) -> None:
+    history_id = _add_history(
+        isolated_db,
+        context_snapshot=json.dumps(
+            {
+                "market_phase_summary": {
+                    "phase": "postmarket",
+                    "market": "cn",
+                    "effective_daily_bar_date": "2024-01-02",
+                }
+            }
+        ),
+    )
+    _seed_bars(
+        isolated_db,
+        code="600519",
+        bars=[
+            (date(2024, 1, 2), 100.0),
+            (date(2024, 1, 3), 105.0),
+        ],
+    )
+
+    item = SkillOpinionOutcomeService(
+        db_manager=isolated_db
+    ).run_outcomes(
+        analysis_history_id=history_id,
+        horizons=["1d"],
+    )["items"][0]
+
+    assert item["eval_status"] == "evaluated"
+    assert item["analysis_date"] == "2024-01-02"
+    assert item["outcome"] == "hit"
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [
