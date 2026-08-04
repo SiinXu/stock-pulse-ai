@@ -141,4 +141,9 @@ def test_backend_gate_uses_an_isolated_temporary_database() -> None:
     assert 'test_data_dir="$(mktemp -d)"' in script
     assert 'DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite"' in script
     assert 'rm -rf "${test_data_dir}"' in script
-    assert 'python -m pytest -m "not network"' in script
+    assert 'python -m pytest -m "not network and not benchmark"' in script
+    assert "--timeout=120" in script
+    assert "--timeout-method=thread" in script
+    assert "faulthandler_timeout=300" in script
+    assert "--cov=src" in script
+    assert "check_coverage_floor.py" in script
