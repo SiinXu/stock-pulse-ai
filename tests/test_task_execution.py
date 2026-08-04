@@ -969,7 +969,9 @@ def test_shutdown_interrupts_tasks_exposes_error_and_closes_stream(task_queue) -
         task_queue.submit(make_command(lambda _context: None))
 
 
+@pytest.mark.benchmark
 def test_real_thread_pool_shutdown_returns_before_blocked_runner_exits(task_queue) -> None:
+    """Wall-clock: shutdown must return before a blocked runner exits (noisy CI)."""
     started = threading.Event()
     release = threading.Event()
     cancellation_observations = []

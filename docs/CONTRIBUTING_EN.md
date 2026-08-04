@@ -112,7 +112,7 @@ After opening a PR, CI will automatically run the following PR checks:
 | Check | Description | Required |
 |-------|-------------|:--------:|
 | `ai-governance` | Validates `AGENTS.md`, compatibility instructions, and repository collaboration assets | ✅ |
-| `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages | ✅ |
+| `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages (per-test timeout, coverage floor, strict markers) | ✅ |
 | `python-minimum` | Runs the full backend gate on Python 3.10, the minimum supported runtime | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
 | `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` for Web or related API/config/service contract changes | ✅ (when triggered) |
@@ -133,6 +133,10 @@ python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
 python -m pip check
 ./scripts/ci_gate.sh
+
+# Offline suite details: per-test timeout (120s), coverage floor, strict markers,
+# and how to run wall-clock @pytest.mark.benchmark tests manually:
+# see docs/testing-ci-gate.md
 
 # Frontend gate (only if you changed apps/dsa-web/)
 cd apps/dsa-web
