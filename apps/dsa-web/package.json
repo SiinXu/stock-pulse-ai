@@ -17,7 +17,8 @@
     "test:i18n": "npm run i18n:resources && npm run i18n:high-risk && vitest run src/locales/__tests__/localeConsistency.test.ts src/locales/__tests__/hardcodedUiStrings.test.ts",
     "test:e2e-security-preflight": "vitest run src/utils/__tests__/playwrightTracePolicy.test.ts src/utils/__tests__/playwrightTraceSourceGuard.test.ts",
     "test:smoke": "node e2e/run-playwright-tests.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:api-types": "openapi-typescript openapi.json -o src/types/api.generated.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
@@ -37,7 +38,8 @@
     "remark-gfm": "^4.0.1",
     "remove-markdown": "^0.6.3",
     "tailwind-merge": "^3.5.0",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "zod": "^4.0.17"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -60,7 +62,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "openapi-typescript": "^7.13.0"
   },
   "optionalDependencies": {
     "@loupe/dev-annotator": "file:../../../loupe/packages/dev-annotator"
