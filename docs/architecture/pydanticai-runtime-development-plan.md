@@ -135,7 +135,7 @@ StockPulse 拥有一套完整的 Native Agent 实现:Single(`AgentExecutor`)、M
 - `docs/stockpulse-domain-decisions.md`
 - `docs/stockpulse-product-overview.md`
 - `docs/stockpulse-work-tracker.md`
-- `docs/adr/ADR-001-agent-runtime.md`(`docs/architecture/` 目前仅含 `api_spec.json`)
+- `docs/adr/ADR-001-agent-runtime.md`
 
 处理决定(已与用户确认):如实记录为文档漂移/Evidence gap,并把"创建或迁入这些治理文档"列入 AR-PY-00 的阻断项。prompt 中"更新框架对比文档的 Vercel Harness 旧结论"与"更新 Work Tracker 旧 baseline 与 AR-07 描述"两条指令,在文档不存在的现实下转化为:**创建或迁入时即以 PydanticAI 为第一优先 Python POC、以 `e58d71f2` 后的最新主线为 baseline 建立正确结论**,不再产生需要修正的旧结论。
 
