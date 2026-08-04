@@ -121,6 +121,8 @@ docs: update the README deployment guide
 
 **本地运行检查：**
 
+类型检查目前为窄范围棘轮（仅 `src/schemas/`）。范围与扩展方式见 [Python Type Checking](type-checking.md)（英文专题文档；中英流程一致，暂不复制全文）。
+
 ```bash
 # backend gate（推荐）
 python -m pip install --upgrade --constraint constraints.txt pip

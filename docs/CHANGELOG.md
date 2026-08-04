@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Added a mypy type-checking ratchet for `src/schemas/` only (follow-imports=skip), wired into `ci_gate.sh` deterministic checks.
 - [Changed] Deprecated legacy `SCHEDULE_*` day-batch in favor of versioned scheduled tasks: registry markers, one-time startup deprecation log, Settings migration notice, and documented migration/removal criteria (behavior unchanged).
 - [Fixed] Upgraded the universal Python lock to `cryptography` 50.0.0 for CVE-2026-69247 while preserving the reviewed cutoff for unrelated dependencies.
 - [Docs] Consolidated ADR-001 and ADR-002 under docs/adr/ as the single ADR location, leaving docs/architecture/ for non-ADR material.

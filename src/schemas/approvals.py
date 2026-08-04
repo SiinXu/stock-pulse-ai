@@ -11,7 +11,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-APPROVAL_ACTION_RISK_CONTROL_BYPASS = "risk_control_bypass"
+APPROVAL_ACTION_RISK_CONTROL_BYPASS: Literal["risk_control_bypass"] = (
+    "risk_control_bypass"
+)
 LOCAL_ADMIN_OWNER = "local_admin"
 DEFAULT_APPROVAL_EXPIRES_IN_SECONDS = 300
 MIN_APPROVAL_EXPIRES_IN_SECONDS = 30
