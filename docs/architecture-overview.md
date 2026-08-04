@@ -331,9 +331,9 @@ The catalog and execution flow has these stages:
 
 The root `SKILL.md` documents an external integration and is likewise not the
 built-in product Skill catalog. The accepted runtime boundary remains Native
-production assembly under [ADR-001](architecture/ADR-001-agent-runtime.md), with
+production assembly under [ADR-001](adr/ADR-001-agent-runtime.md), with
 the isolated PydanticAI test/evidence scope governed by
-[ADR-002](architecture/ADR-002-pydanticai-runtime-reinstatement.md). This flow
+[ADR-002](adr/ADR-002-pydanticai-runtime-reinstatement.md). This flow
 does not expand the lightweight composition root in
 [ADR-003](adr/ADR-003-application-services-composition-root.md), replace the
 process-local task authority in
@@ -365,8 +365,8 @@ separately owned contract.
   do not establish a broker, worker lease, or distributed exactly-once model.
 - Agent production assembly is Native-only. PydanticAI is an optional Single RUN
   test/evidence POC with no config, environment, API, Web, Desktop, or Bot
-  selector and no runtime fallback. See [ADR-001](architecture/ADR-001-agent-runtime.md)
-  and [ADR-002](architecture/ADR-002-pydanticai-runtime-reinstatement.md).
+  selector and no runtime fallback. See [ADR-001](adr/ADR-001-agent-runtime.md)
+  and [ADR-002](adr/ADR-002-pydanticai-runtime-reinstatement.md).
 - The bounded Critic is an optional, default-off stage only in non-Chat Native
   Multi. It has no tools, cannot synthesize a strategy or decision, and can
   admit at most one isolated retry of an already-entered intelligence or

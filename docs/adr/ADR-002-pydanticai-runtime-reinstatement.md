@@ -2,7 +2,7 @@
 
 - 状态: `Accepted`（2026-07-19）
 - 决策者: Maintainer（SiinXu）
-- 修订对象: `docs/architecture/ADR-001-agent-runtime.md`（修订 D1；为本 ADR 的测试/证据 POC 有限覆盖 D5 的直接恢复禁令；D2/D3/D4 不变）
+- 修订对象: `docs/adr/ADR-001-agent-runtime.md`（修订 D1；为本 ADR 的测试/证据 POC 有限覆盖 D5 的直接恢复禁令；D2/D3/D4 不变）
 - 关联文档:
   - `docs/architecture/pydanticai-runtime-adoption-decision.md`（第 7 章记录本次改判）
   - `docs/stockpulse-work-tracker.md`（AR 工作追踪）
