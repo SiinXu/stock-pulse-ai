@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from sqlalchemy import and_, func, insert, or_, select, update
+from sqlalchemy import and_, case, func, insert, or_, select, update
 
 from src.repositories.skill_opinion_tables import (
     analysis_history_table,
@@ -21,6 +21,7 @@ from src.schemas.skill_opinion_outcome import (
     SkillOpinionOutcome,
     SkillOpinionOutcomeCandidate,
     SkillOpinionOutcomeEvaluation,
+    SkillOpinionPerformanceBucket,
     SkillOpinionSample,
     StockDailyBar,
     TERMINAL_SKILL_OUTCOME_STATUSES,
@@ -295,6 +296,88 @@ class SkillOpinionOutcomeRepository:
                 if best is None or score > best[0]:
                     best = score, window
         return best[1] if best is not None else None
+
+    def list_performance_buckets(
+        self,
+        *,
+        engine_version: str,
+        skill_id: Optional[str] = None,
+        skill_ids: Optional[Sequence[str]] = None,
+        horizons: Optional[Sequence[str]] = None,
+    ) -> List[SkillOpinionPerformanceBucket]:
+        """Aggregate persisted outcome facts without applying sample policy."""
+        status = skill_opinion_outcome_table.c.eval_status
+        outcome = skill_opinion_outcome_table.c.outcome
+        conditions = [
+            skill_opinion_outcome_table.c.engine_version == engine_version
+        ]
+        if skill_id is not None:
+            conditions.append(skill_opinion_sample_table.c.skill_id == skill_id)
+        if skill_ids is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.skill_id.in_(list(skill_ids))
+            )
+        if horizons is not None:
+            conditions.append(
+                skill_opinion_outcome_table.c.horizon.in_(list(horizons))
+            )
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(
+                    skill_opinion_sample_table.c.skill_id,
+                    skill_opinion_outcome_table.c.horizon,
+                    skill_opinion_outcome_table.c.engine_version,
+                    func.count(skill_opinion_outcome_table.c.id),
+                    func.sum(case((status == "pending", 1), else_=0)),
+                    func.sum(case((status == "evaluated", 1), else_=0)),
+                    func.sum(
+                        case((status == "observational", 1), else_=0)
+                    ),
+                    func.sum(case((status == "unable", 1), else_=0)),
+                    func.sum(case((outcome == "hit", 1), else_=0)),
+                    func.sum(case((outcome == "miss", 1), else_=0)),
+                    func.avg(
+                        case(
+                            (
+                                status == "evaluated",
+                                skill_opinion_outcome_table.c.directional_return_pct,
+                            ),
+                            else_=None,
+                        )
+                    ),
+                )
+                .select_from(
+                    skill_opinion_outcome_table.join(
+                        skill_opinion_sample_table,
+                        skill_opinion_sample_table.c.id
+                        == skill_opinion_outcome_table.c.skill_opinion_sample_id,
+                    )
+                )
+                .where(and_(*conditions))
+                .group_by(
+                    skill_opinion_sample_table.c.skill_id,
+                    skill_opinion_outcome_table.c.horizon,
+                    skill_opinion_outcome_table.c.engine_version,
+                )
+            ).all()
+        return [
+            SkillOpinionPerformanceBucket(
+                skill_id=str(row[0]),
+                horizon=str(row[1]),
+                engine_version=str(row[2]),
+                total=int(row[3] or 0),
+                pending=int(row[4] or 0),
+                evaluated=int(row[5] or 0),
+                observational=int(row[6] or 0),
+                unable=int(row[7] or 0),
+                hit=int(row[8] or 0),
+                miss=int(row[9] or 0),
+                avg_directional_return_pct=(
+                    float(row[10]) if row[10] is not None else None
+                ),
+            )
+            for row in rows
+        ]
 
     @classmethod
     def _candidate(

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
 - [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
 - [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
+- [Added] Added read-only per-skill outcome statistics with independent horizon and engine-version buckets and a 30-evaluated-sample publication threshold.
 
 ## [3.27.0] - 2026-08-04
 

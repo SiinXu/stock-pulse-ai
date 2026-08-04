@@ -13,6 +13,13 @@ to market data. It never fetches or refills prices, never reads the final Agent
 decision as a substitute for an individual skill opinion, and does not alter
 runtime aggregation weights.
 
+## Configuration
+
+V0 adds no configuration key. The new services have no automatic runtime hook,
+so existing analysis output and aggregation are unchanged. The default-off gate
+for Bayesian feedback belongs to the separately tracked weighting phase rather
+than a dormant or stubbed V0 setting.
+
 ## Upstream-to-StockPulse design mapping
 
 | Upstream responsibility | StockPulse adaptation | Reason |
@@ -24,8 +31,8 @@ runtime aggregation weights.
 | Outcome repository and service | New outcome repository and service modules | Outcome identity and terminal-state immutability remain unchanged. |
 | Performance statistics service | New read-only performance service | Each `skill_id + horizon + engine_version` bucket keeps its own sufficiency gate. |
 | Read-only API | No API in V0 | The inspected upstream commits expose services but no outcome API. A Web/API surface is tracked separately. |
-| Bayesian outcome weights (`831ada53`) | Deferred | Runtime integration requires existing Agent aggregator and config-registry changes outside this port's writable boundary. |
-| Decision-profile calibration (`aa68d45d`) | Deferred | The upstream change extends existing DecisionSignal repository/service/API contracts and Web UI, which are outside this V0 scope. |
+| Bayesian outcome weights (`831ada53`) | Deferred to [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) | Runtime integration requires existing Agent aggregator and config-registry changes outside this port's writable boundary. |
+| Decision-profile calibration (`aa68d45d`) | Deferred to [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) | The upstream change extends existing DecisionSignal repository/service/API contracts and Web UI, which are outside this V0 scope. |
 | Reassessment persistence (`487e49e5`) | Already present on `main` | StockPulse already supports `persist_status=created/existing/refreshed`; duplicating it would create a parallel contract. |
 
 ## Data model
@@ -65,8 +72,8 @@ return is a miss. `hold` becomes observational only after the complete window
 exists.
 
 Candidate scheduling is bounded by outcome keys rather than samples. Missing
-and pending keys are ordered by their last attempt time so retries rotate
-behind newer work instead of starving either group.
+and pending keys are ordered by their creation or last-attempt time. Retried
+pending keys therefore rotate behind other currently older candidate keys.
 
 ## Statistics contract
 
@@ -85,11 +92,15 @@ temporary pending rows do not dilute permanent metadata failures.
 - V0 materializes samples when the sample/outcome service is invoked; it does
   not add another side effect to the core history-save path.
 - Histories saved without a structured skill synthesis create no samples.
+- Structured syntheses with no valid individual opinions also create no samples;
+  later bounded scans may reconsider those histories.
 - Histories without an authoritative persisted effective daily-bar date are
   marked unable rather than guessed from an arbitrary local bar.
-- V0 has no Web UI and no new public API.
+- V0 has no Web UI and no new public API; the authenticated API/Web surface is
+  tracked in [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713).
 - Bayesian runtime weighting and decision-profile outcome calibration remain
-  default-neutral until their separately reviewed integration work lands.
+  default-neutral until [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714)
+  and [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) land.
 
 The migration is additive. Code rollback does not remove either table, so
 collected facts remain available if the feature is reintroduced.

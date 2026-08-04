@@ -137,6 +137,23 @@ class SkillOpinionOutcomeCandidate:
     existing_outcome: Optional[SkillOpinionOutcome]
 
 
+@dataclass(frozen=True)
+class SkillOpinionPerformanceBucket:
+    """Raw persisted counts for one skill, horizon, and engine version."""
+
+    skill_id: str
+    horizon: str
+    engine_version: str
+    total: int
+    pending: int
+    evaluated: int
+    observational: int
+    unable: int
+    hit: int
+    miss: int
+    avg_directional_return_pct: Optional[float]
+
+
 class SkillOpinionOutcomeEvaluator:
     """Evaluate one immutable canonical skill signal against local daily bars."""
 
