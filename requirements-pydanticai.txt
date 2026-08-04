@@ -1,7 +1,7 @@
 # Optional dependency for the experimental PydanticAI runtime adapter (AR-PY-04).
 #
 # NOT part of the default install: Native is the permanent default runtime and
-# has zero dependency on this file (see docs/architecture/ADR-001-agent-runtime.md).
+# has zero dependency on this file (see docs/adr/ADR-001-agent-runtime.md).
 # Install only to exercise the test/evidence PydanticAI POC path:
 #
 #   python -m pip install --upgrade --constraint constraints.txt pip
