@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "Autentikasi admin diaktifkan. Gunakan Ubah kata sandi di bawah ini untuk memperbaruinya.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Belum ada kata sandi yang ditetapkan. Tetapkan sandi admin awal sebelum mengaktifkan autentikasi.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Kata sandi admin sebelumnya dipertahankan. Masukkan untuk mengaktifkan kembali autentikasi dengan cepat.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Jika sesi login saat ini masih valid, Anda dapat langsung menonaktifkan otentikasi; Jika sesi tidak valid, masukkan kata sandi administrator saat ini.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Anda mungkin perlu memverifikasi identitas sebelum menonaktifkan autentikasi",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Menonaktifkan autentikasi selalu memerlukan kata sandi admin saat ini. Cookie sesi yang valid saja tidak cukup.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Masukkan kata sandi admin saat ini sebelum menonaktifkan",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Masukkan kata sandi lama untuk mengaktifkan kembali otentikasi",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Silakan masukkan kata sandi Anda saat ini",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Kata sandi baru diperlukan",
@@ -2635,6 +2635,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.title": "TickFlow Prioritas K-line Harian",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.usage": "Gunakan bilangan bulat. Angka yang lebih rendah dicoba lebih awal. Defaultnya adalah 2. Ini tidak berpengaruh kecuali TICKFLOW_API_KEY dikonfigurasi.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.valueNotes.0": "Pengaturan ini hanya memengaruhi rantai penggantian K-line/sumber data umum harian; Itu tidak mengontrol pesanan penyedia penawaran waktu nyata.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.examples.0": "https://tushare.example.com",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.impact.0": "Memengaruhi semua permintaan Tushare Pro; endpoint yang dikonfigurasi dapat menerima token dan isi permintaan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.notes.0": "Pastikan Anda memercayai operator endpoint sebelum menyimpan URL khusus.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.summary": "Secara opsional merutekan permintaan Tushare Pro melalui gateway atau mirror yang kompatibel.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.title": "URL API Tushare Pro",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.usage": "Biarkan kosong untuk memakai endpoint resmi. Masukkan URL HTTP atau HTTPS lengkap hanya jika endpoint khusus diperlukan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.valueNotes.0": "Host privat atau internal juga harus diizinkan dalam OUTBOUND_HTTP_ALLOWLIST.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.impact.0": "Memengaruhi akses ke beberapa data dasar saham A, daftar saham, dan data yang disempurnakan terkait.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.notes.0": "Jangan mengirimkan token ke repositori atau mencatat data secara publik.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.summary": "Token yang digunakan untuk Tushare Akses data profesional.",
@@ -3729,6 +3736,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.TICKFLOW_PRIORITY": "Prioritas K-line harian TickFlow",
   "utils.systemConfigI18n.fieldTitleMaps.TRADING_DAY_CHECK_ENABLED": "Aktifkan pemeriksaan hari perdagangan",
   "utils.systemConfigI18n.fieldTitleMaps.TRUST_X_FORWARDED_FOR": "Percayai X-Forwarded-For",
+  "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_HTTP_URL": "URL API Tushare Pro",
   "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_TOKEN": "Token Tushare",
   "utils.systemConfigI18n.fieldTitleMaps.VISION_MODEL": "Model visi",
   "utils.systemConfigI18n.fieldTitleMaps.WEBHOOK_VERIFY_SSL": "Verifikasi sertifikat SSL Webhook",
@@ -4321,4 +4329,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Pohon keputusan dapat berisi paling banyak {limit} node.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Sebuah kerangka kerja dapat berisi paling banyak {limit} aturan risiko.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Kerangka kerja dapat berisi paling banyak {limit} kriteria pelacakan.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata sandi admin saat ini sebelum menonaktifkan autentikasi",
 };

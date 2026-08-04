@@ -37,8 +37,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             self.skipTest("analysis endpoint helpers unavailable in this environment")
         task_queue = MagicMock()
         task_queue.submit_background_task.return_value = SimpleNamespace(task_id="market-task-1")
-        request = SimpleNamespace(send_notification=False)
-        config = SimpleNamespace(trading_day_check_enabled=False)
+        request = SimpleNamespace(send_notification=False, report_language=None, region=None)
+        config = SimpleNamespace(trading_day_check_enabled=False, market_review_region="cn", report_language="zh")
         lock_token = object()
 
         with patch.object(
@@ -66,7 +66,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         if trigger_market_review is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
 
-        request = SimpleNamespace(send_notification=True, report_language="en")
+        request = SimpleNamespace(send_notification=True, report_language="en", region=None)
         config = SimpleNamespace(trading_day_check_enabled=False, report_language="zh", market_review_region="cn")
         lock_token = object()
         task_payload: dict[str, object] = {}
@@ -105,7 +105,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         call_kwargs = run_market_review.call_args.kwargs
         self.assertEqual(call_kwargs["send_notification"], True)
-        self.assertIsNone(call_kwargs["override_region"])
+        self.assertEqual(call_kwargs["override_region"], "cn")
         self.assertEqual(call_kwargs["trigger_source"], "api")
         runtime_config = call_kwargs.get("config")
         self.assertIsNotNone(runtime_config)
@@ -166,8 +166,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             self.skipTest("analysis endpoint helpers unavailable in this environment")
 
         task_queue = MagicMock()
-        request = SimpleNamespace(send_notification=True)
-        config = SimpleNamespace(trading_day_check_enabled=False)
+        request = SimpleNamespace(send_notification=True, report_language=None, region=None)
+        config = SimpleNamespace(trading_day_check_enabled=False, market_review_region="cn")
 
         with patch.object(
             analysis_endpoint_module,
@@ -195,6 +195,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             config = SimpleNamespace(
                 trading_day_check_enabled=False,
+                market_review_region="cn",
+                report_language="zh",
                 database_path=str(Path(temp_dir) / "stock_analysis.db"),
             )
             lock_token = try_acquire_market_review_lock(config)
@@ -205,7 +207,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 with patch("api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
                     with self.assertRaises(Exception) as ctx:
                         trigger_market_review(
-                            request=SimpleNamespace(send_notification=True),
+                            request=SimpleNamespace(send_notification=True, report_language=None, region=None),
                             config=config,
                         )
             finally:
@@ -220,8 +222,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         task_queue = MagicMock()
         task_queue.submit_background_task.return_value = SimpleNamespace(task_id="market-task-manual")
-        request = SimpleNamespace(send_notification=True)
-        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="cn")
+        request = SimpleNamespace(send_notification=True, report_language=None, region=None)
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="cn", report_language="zh")
         lock_token = object()
 
         with patch(
@@ -277,7 +279,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         ), patch("src.core.market_review.run_market_review") as run_market_review:
             analysis_endpoint_module._run_market_review_background(
                 send_notification=False,
-                override_region="cn,us",
+                effective_region="cn,us",
                 lock_token=None,
                 config=config,
             )
@@ -349,12 +351,12 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         ), patch("src.core.market_review.run_market_review", return_value="report") as run_market_review:
             result = analysis_endpoint_module._run_market_review_background(
                 send_notification=False,
-                override_region="cn",
+                effective_region="cn",
                 lock_token=None,
                 config=market_review_config,
             )
 
-        self.assertEqual(result, {"result": "report"})
+        self.assertEqual(result, {"result": "report", "region": "cn"})
         run_market_review.assert_called_once_with(
             notifier=runtime_notifier,
             analyzer=runtime_analyzer,
@@ -820,7 +822,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "大盘复盘未返回可持久化报告"):
                 analysis_endpoint_module._run_market_review_background(
                     send_notification=False,
-                    override_region="cn",
+                    effective_region="cn",
                     lock_token=None,
                     config=SimpleNamespace(),
                 )
@@ -841,7 +843,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 analysis_endpoint_module._run_market_review_background(
                     send_notification=False,
-                    override_region="cn",
+                    effective_region="cn",
                     lock_token=lock_token,
                     config=SimpleNamespace(),
                 )
@@ -871,7 +873,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             task = queue.submit_background_task(
                 lambda: analysis_endpoint_module._run_market_review_background(
                     send_notification=False,
-                    override_region="cn",
+                    effective_region="cn",
                     lock_token=object(),
                     config=SimpleNamespace(),
                 ),

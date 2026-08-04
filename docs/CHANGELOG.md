@@ -8,7 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+
+- [Tests] Wait for decision-memory controls and legacy usage-route synchronization before asserting or interacting, eliminating full-suite timing races.
+- [Tests] Cover share-image parsing, merge, localization, safety, and branding contracts so the repository coverage floor remains enforceable after the upstream parity merge.
+- [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
+- [Fixed] Routed Feishu Stream connections and reply clients through the configured international Lark API domain when `FEISHU_DOMAIN=lark`.
+- [Fixed] Cached and coalesced AkShare Hong Kong full-market realtime snapshots, including short failed-refresh caching and validation before reuse, while preserving the Sina fallback.
+- [Fixed] Kept Tencent direct daily K-lines as the final built-in A-share fallback while preserving configurable provider priority and failure failover.
+- [Fixed] Aligned manager, AkShare, Longbridge, and Yahoo routing for bare four- and five-digit Hong Kong codes, including Yahoo's four-digit symbol normalization.
+- [Fixed] Made Longbridge volume-ratio history calls use keyword arguments so SDK versions with different positional `time` and `count` ordering remain compatible.
+
+- [Chore] Updated the pinned stale-item automation action to v11.0.0.
+- [Tests] Stub DsaEastMoneyHotspotProvider.hotspot_rows in AlphaSift status/hotspot API tests to prevent live EastMoney hangs under per-test timeout.
+
+- [Chore] Updated the pinned Docker registry login action to v4.6.0 across image publishing workflows.
+- [Added] On-demand report share images via `GET /api/v1/history/{id}/share-image` and Web one-click share
+- [Added] Web/API per-market market-review trigger with request-scoped `region`
+- [Fixed] Auth disable UI requires current admin password re-confirmation (backend already enforced)
+- [Tests] Short-credential CLI diagnostic redaction counterexamples from upstream ee3d3da1
+
+
+- [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
+- [Fixed] Resolved canonical English company aliases for mapped U.S./Hong Kong tickers so Chinese display names no longer suppress English news queries or relevance matches.
+- [Added] Exposed the existing `TUSHARE_HTTP_URL` custom endpoint through the configuration registry and Web Settings schema.
+- [Fixed] Made backtests resolve market-aware legacy stock identities and require an authoritative same-code daily-bar window, preventing missed JP/KR history and cross-alias price splicing.
+- [Tests] Keep AlphaSift hotspot FakeProvider offline by stubbing board-change probes that previously hung under the new per-test timeout.
 - [Chore] Scoped dependabot away from the generated Python lock and documented the reviewed lock-refresh path.
+- [Added] Generated web API types from the backend OpenAPI schema with a CI drift gate.
+- [Changed] Pilot runtime validation on the Web stocks API module so response shape mismatches surface through ParsedApiError.
+- [Fixed] Normalized and audited unsigned macOS desktop signatures before backend execution and DMG publication.
+- [Fixed] Rejected desktop update IPC requests that do not originate from the Electron main Web window.
+- [Fixed] Restricted Electron desktop external-link handoff to HTTP and HTTPS URLs.
+- [Fixed] Kept Electron desktop main-window navigation and redirects on the selected local Web origin.
+- [Fixed] Sandboxed the Electron desktop main window while preserving its isolated preload bridge.
+- [Added] Added immutable strategy-skill opinion samples and deterministic local-only forward outcome evaluation across 1d, 3d, 5d, and 10d horizons.
+- [Added] Added read-only per-skill outcome statistics with independent horizon and engine-version buckets and a 30-evaluated-sample publication threshold.
+
+- [Fixed] Made AI governance type parity reject undeclared changelog tokens and kept model examples provider-neutral.
+- [Tests] Patched the stock-index data boundary instead of `resolve_index_stock_code` so the report-code normalization matrix exercises the real resolver on every delivery path.
+- [Fixed] Align Copilot changelog type labels with the canonical English Unreleased types in AGENTS.md.
+- [Fixed] Document previously missing registry config keys in `.env.example` and guard registry→env coverage.
+- [Fixed] Repoint the issue template Documentation link to `README.md#quick-start`.
+- [Docs] Complete the AGENTS.md CI verification matrix with `changes` and `pydanticai-installed`.
+- [Tests] Enforce Copilot/AGENTS Unreleased type token parity via `scripts/check_ai_assets.py`.
+
+- [Tests] Add per-test pytest-timeout (120s, thread method) and faulthandler_timeout=300 to the offline CI gate so hangs fail with attribution instead of burning the full job budget.
+- [Tests] Measure offline-suite line coverage for `src`/`api`/`data_provider`/`bot` and enforce a measured coverage floor via `scripts/check_coverage_floor.py`.
+- [Tests] Enable `--strict-markers`, register the `benchmark` marker, exclude wall-clock benchmark assertions from the default offline gate, and document manual benchmark runs.
+- [Chore] Add `pytest-timeout` and `pytest-cov` to `.github/requirements-ci.txt` and refresh the universal dependency lock.
+- [Docs] Document offline gate timeout, coverage floor, and marker semantics in `docs/testing-ci-gate.md` and Contributing.
+
+
+- [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
 
 ## [4.0.0] - 2026-08-04
 

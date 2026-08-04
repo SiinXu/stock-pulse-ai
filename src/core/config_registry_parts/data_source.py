@@ -34,6 +34,41 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["secret_value"],
     },
+    "TUSHARE_HTTP_URL": {
+        "title": "Tushare Pro API URL",
+        "description": (
+            "Optional Tushare Pro endpoint for self-hosted nodes, proxies, or "
+            "internal mirrors. Leave empty to use http://api.tushare.pro. "
+            "Private hosts must also be allowed by OUTBOUND_HTTP_ALLOWLIST."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+        },
+        "display_order": 11,
+        "help_key": "settings.data_source.TUSHARE_HTTP_URL",
+        "examples": [
+            "TUSHARE_HTTP_URL=https://tushare.example.com",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+            {
+                "label": "出站 HTTP 安全策略",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md",
+            },
+        ],
+    },
     "TICKFLOW_API_KEY": {
         "title": "TickFlow API Key",
         "description": "API key for optional TickFlow A-share daily K-lines, realtime quotes, stock list/name lookup, and market review enhancement. Permission failures fail open to existing providers.",

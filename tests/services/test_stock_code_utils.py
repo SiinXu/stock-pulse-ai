@@ -11,6 +11,7 @@ from unittest.mock import patch
 from src.services.stock_code_utils import (
     is_code_like,
     normalize_code,
+    resolve_daily_stock_identity,
     resolve_index_stock_code_for_analysis,
 )
 
@@ -250,3 +251,30 @@ class TestResolveIndexStockCodeForAnalysis:
         with patch("src.data.stock_index_loader.resolve_index_stock_code", return_value=None):
             assert resolve_index_stock_code_for_analysis("005930") == "005930"
             assert resolve_index_stock_code_for_analysis("AAPL") == "AAPL"
+
+
+class TestResolveDailyStockIdentity:
+    def test_jp_suffix_includes_legacy_bare_candidate(self):
+        with patch(
+            "src.data.stock_index_loader.resolve_index_stock_code",
+            side_effect=lambda value: "7203.T" if value == "7203" else None,
+        ):
+            identity = resolve_daily_stock_identity("7203.T")
+
+        assert identity is not None
+        assert identity.market == "jp"
+        assert identity.normalized_code == "7203.T"
+        assert identity.refill_code == "7203.T"
+        assert "7203" in identity.code_candidates
+
+    def test_hk_identity_drops_legacy_bare_alias_owned_by_jp(self):
+        with patch(
+            "src.data.stock_index_loader.resolve_index_stock_code",
+            side_effect=lambda value: "8035.T" if value == "8035" else None,
+        ):
+            identity = resolve_daily_stock_identity("08035.HK")
+
+        assert identity is not None
+        assert identity.market == "hk"
+        assert "08035" in identity.code_candidates
+        assert "8035" not in identity.code_candidates

@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "관리자 인증이 활성화되어 있습니다. 아래의 비밀번호 변경을 사용해 업데이트하세요.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "아직 비밀번호는 설정되지 않았습니다. 인증을 활성화하기 전에 초기 관리자 비밀번호를 설정하세요.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "이전 관리자 비밀번호는 유지되었습니다. 입력하면 빠르게 인증을 재활성화할 수 있습니다.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "현재 로그인 세션이 유효하다면, 직접 인증을 비활성화할 수 있습니다; 세션이 유효하지 않은 경우, 현재 관리자 비밀번호를 입력해 주세요.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "인증을 종료하기 전에 신원 확인이 필요할 수 있습니다",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "인증 비활성화에는 항상 현재 관리자 비밀번호가 필요합니다. 유효한 세션 쿠키만으로는 부족합니다.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "이전 비밀번호를 입력해 인증을 재활성화합니다",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "현재 비밀번호를 입력해 주세요",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "새로운 비밀번호가 필요합니다",
@@ -2635,6 +2635,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.title": "TickFlow 일일 K-라인 우선순위",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.usage": "정수를 사용하세요. 더 낮은 숫자는 더 일찍 시도됩니다. 기본값은 2입니다. 이 방법은 효과가 없습니다. TICKFLOW_API_KEY 구성되어 있습니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.valueNotes.0": "이 설정은 일일 K-라인/일반 데이터 소스 백업 체인에만 영향을 미치며; 실시간 견적 제공자 주문을 통제하지 않습니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.examples.0": "https://tushare.example.com",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.impact.0": "모든 Tushare Pro 요청에 영향을 주며, 설정한 엔드포인트가 토큰과 요청 내용을 수신할 수 있습니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.notes.0": "사용자 지정 URL을 저장하기 전에 해당 엔드포인트 운영자를 신뢰할 수 있는지 확인하세요.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.summary": "Tushare Pro 요청을 호환 게이트웨이 또는 미러로 선택적으로 라우팅합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.title": "Tushare Pro API URL",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.usage": "공식 엔드포인트를 사용하려면 비워 두세요. 사용자 지정 엔드포인트가 필요할 때만 전체 HTTP 또는 HTTPS URL을 입력하세요.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.valueNotes.0": "비공개 또는 내부 호스트는 OUTBOUND_HTTP_ALLOWLIST에서도 허용해야 합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.impact.0": "일부 A-share 기본 데이터, 주식 목록 및 관련 향상된 데이터 접근에 영향을 미칩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.notes.0": "저장소에 토큰을 제출하거나 데이터를 공개적으로 기록하지 마세요.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.summary": "사용되는 토큰 Tushare 프로 데이터 접근.",
@@ -3729,6 +3736,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.TICKFLOW_PRIORITY": "TickFlow 일봉 우선순위",
   "utils.systemConfigI18n.fieldTitleMaps.TRADING_DAY_CHECK_ENABLED": "거래일 확인 활성화",
   "utils.systemConfigI18n.fieldTitleMaps.TRUST_X_FORWARDED_FOR": "X-Forwarded-For 신뢰",
+  "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_HTTP_URL": "Tushare Pro API URL",
   "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_TOKEN": "Tushare 토큰",
   "utils.systemConfigI18n.fieldTitleMaps.VISION_MODEL": "비전 모델",
   "utils.systemConfigI18n.fieldTitleMaps.WEBHOOK_VERIFY_SSL": "Webhook SSL 인증서 검증",
@@ -4321,4 +4329,34 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "의사결정 트리에는 최대 {limit}개의 노드가 포함될 수 있습니다.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "프레임워크에는 최대 {limit}개의 위험 규칙이 포함될 수 있습니다.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "프레임워크에는 최대 {limit} 추적 기준이 포함될 수 있습니다.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "전체 시장",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A주",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "제출 시 서버가 결정",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "이번 리뷰에 포함할 시장을 하나 이상 선택하세요.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "홍콩",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "일본",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "한국",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "이번 실행에만 적용되며 전역 설정은 변경되지 않습니다.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "시장 리뷰 지역 선택",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "서버 기본값",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "이번 리뷰 시장",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "미국",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; 실제 시장: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "작업 상태: {status} ({progress}); 실제 시장: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요",
+
 };

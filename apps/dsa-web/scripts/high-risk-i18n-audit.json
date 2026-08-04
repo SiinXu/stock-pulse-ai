@@ -294,19 +294,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 89,
-        "keySetSha256": "fe9b4c645201e2e6fb71bd91c8d68b2ff61c0ce284f4a2d4d878345bdac52d49",
+        "keyCount": 90,
+        "keySetSha256": "35cb705c0b7d9b0ee5a603c85407f9b7d62f0c2d2553094f137692982f3e4489",
         "bundleSha256": {
-          "zh": "3e11c5a20f9fb29fa6fd047f7d9b42765a555922912c407f5d3ac050a3de3100",
-          "zh-TW": "f35ff5e3704347b07ffa8eaf331fed9bdba61267d20a95e39a3297a1fae85d99",
-          "en": "73ec39cc17026c4d4b0a38d3b65d8e6eed12bef05e7d7003f9453358ee37ac15",
-          "ja": "419ef91f8c8c63847cb77cdb90785c5375113c4e53ffa90d980b37ee69d6d374",
-          "ko": "cb68c20831c85af04a8f0722f4cc0104bbd3ef192a2080ad468f46edc4b43075",
-          "de": "9af09a18fcd6c3a83dc39bd52b90a52327917ec34c5e43ea695daa5136dd705c",
-          "es": "30033f2a22f91f42d281cc50b2ce90c1cdba05229170bf640a945f70134c822a",
-          "ms": "ad99362517b7108fbd321d2905806f1bb930981e2fe19ef8fb0383e26fcf6ffa",
-          "fr": "b1c9a31904b0195a2bb0441dab01c04595db8fff6e6584b03f0bb7ba7d9216db",
-          "id": "96e3a70828338ddf02c521bc2f650a8b83659c6b72a62aa21829508b7219d7b3"
+          "zh": "a32bf28a81d37d750708013cd8136a0b5abe3d363eb97819386a3df75e03f005",
+          "zh-TW": "81ec8686a13ec6fa1483fcc7fc53f9bbbd5dc025f21b7eae5f5d51cc0cc7567e",
+          "en": "b170ead615c75da1f34972b8b1bdb118a0685d5ac35ca0338199ac04929aeb3d",
+          "ja": "14ee900e0c48f068825f644e92d41101665eafefaad82760e45939637772e96b",
+          "ko": "f0dbf80705d2b6ae06cdf4ec29b919d19176e8ed92152a051aa370fd8d0be42f",
+          "de": "1a87bda95d5bc8910582f777cbc2c5bfd7ce01172a4929c000b25350e14b6194",
+          "es": "9010c60beec540c5d0b28152ed0e034bba04d7dd3f38a9374d76ef02eedada73",
+          "ms": "ca1cab524a9e56a33cd45c552800a6cc80e4c1f4d15f61279cee85a0a3b94b63",
+          "fr": "aa51a1f879c7a1775a857f74b6282649691a59cbf02a876326d45e47679266ff",
+          "id": "fbb5c89ada9dd574d588014d27f50d7f3b8cc0e5b160e56093cf9ea8c4f3cec8"
         }
       }
     },
@@ -549,10 +549,10 @@
         "password_mismatch",
         "password_required",
         "portfolio_busy",
-      "portfolio_oversell",
-      "rate_limited",
-      "rollback_unavailable",
-      "scheduler_busy",
+        "portfolio_oversell",
+        "rate_limited",
+        "rollback_unavailable",
+        "scheduler_busy",
         "security_audit_auth_required",
         "security_audit_unavailable",
         "unauthorized",
@@ -693,15 +693,15 @@
           "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title",
           "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message"
         ],
-      "rate_limited": [
-        "api.error.STABLE_ERROR_TEXT.rate_limited.title",
-        "api.error.STABLE_ERROR_TEXT.rate_limited.message"
-      ],
-      "rollback_unavailable": [
-        "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",
-        "api.error.STABLE_ERROR_TEXT.rollback_unavailable.message"
-      ],
-      "scheduler_busy": [
+        "rate_limited": [
+          "api.error.STABLE_ERROR_TEXT.rate_limited.title",
+          "api.error.STABLE_ERROR_TEXT.rate_limited.message"
+        ],
+        "rollback_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.rollback_unavailable.message"
+        ],
+        "scheduler_busy": [
           "api.error.STABLE_ERROR_TEXT.scheduler_busy.title",
           "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"
         ],

@@ -52,7 +52,7 @@ describe('AuthSettingsCard', () => {
     expect(await screen.findByText('认证设置已更新')).toBeInTheDocument();
   });
 
-  it('allows disabling auth without current password when the session is still valid', async () => {
+  it('blocks disabling when current password is missing', async () => {
     useAuthMock.mockReturnValue({
       authEnabled: true,
       setupState: 'enabled',
@@ -66,8 +66,31 @@ describe('AuthSettingsCard', () => {
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: '关闭认证' }));
 
+    // Client-side validation must block API calls before password re-confirmation.
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(refreshStatus).not.toHaveBeenCalled();
+    expect(screen.getByText('认证设置失败')).toBeInTheDocument();
+  });
+
+  it('disables auth when current password is provided', async () => {
+    useAuthMock.mockReturnValue({
+      authEnabled: true,
+      setupState: 'enabled',
+      refreshStatus,
+    });
+    updateSettings.mockResolvedValue(undefined);
+    refreshStatus.mockResolvedValue(undefined);
+
+    render(<AuthSettingsCard />);
+
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(screen.getByLabelText('当前管理员密码'), {
+      target: { value: 'admin-secret' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '关闭认证' }));
+
     await waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith(false, undefined, undefined, undefined);
+      expect(updateSettings).toHaveBeenCalledWith(false, undefined, undefined, 'admin-secret');
     });
     expect(refreshStatus).toHaveBeenCalled();
     expect(await screen.findByText('认证已关闭')).toBeInTheDocument();

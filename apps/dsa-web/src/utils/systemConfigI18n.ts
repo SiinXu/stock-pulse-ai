@@ -51,6 +51,7 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
 const fieldTitleMapZh = {
   STOCK_LIST: '自选股列表',
   TUSHARE_TOKEN: 'Tushare Token',
+  TUSHARE_HTTP_URL: 'Tushare Pro API 地址',
   BOCHA_API_KEYS: 'Bocha API Keys',
   TAVILY_API_KEYS: 'Tavily API Keys',
   ANSPIRE_API_KEYS: 'Anspire API Keys',
@@ -245,6 +246,7 @@ type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
 const fieldTitleMapEn = {
   STOCK_LIST: 'Stock List',
   TUSHARE_TOKEN: 'Tushare Token',
+  TUSHARE_HTTP_URL: 'Tushare Pro API URL',
   BOCHA_API_KEYS: 'Bocha API Keys',
   TAVILY_API_KEYS: 'Tavily API Keys',
   ANSPIRE_API_KEYS: 'Anspire API Keys',
@@ -439,6 +441,7 @@ const fieldTitleMaps: Record<UiLanguage, Record<string, string>> = createUiLangu
 const fieldDescriptionMap: Record<string, string> = {
   STOCK_LIST: '推荐使用英文逗号分隔股票代码；中文逗号、顿号、分号、空格和换行会在保存后规范为英文逗号。',
   TUSHARE_TOKEN: '用于接入 Tushare Pro 数据服务的凭据。',
+  TUSHARE_HTTP_URL: '可选的 Tushare Pro 接入地址；留空使用官方端点，私有地址还需加入出站 HTTP 允许列表。',
   BOCHA_API_KEYS: '用于新闻检索的 Bocha 密钥，支持逗号分隔多个（最高优先级）。',
   TAVILY_API_KEYS: '用于新闻检索的 Tavily 密钥，支持逗号分隔多个。',
   ANSPIRE_API_KEYS: 'Anspire Open 密钥，支持逗号分隔多个；默认同时用于大模型网关和新闻检索。',

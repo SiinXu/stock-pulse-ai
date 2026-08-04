@@ -146,6 +146,39 @@ class TestDingTalkGroupWebhookFieldsRegistered(unittest.TestCase):
         self.assertTrue(set(self._DINGTALK_GROUP_KEYS).issubset(field_keys))
 
 
+class TestTushareHttpUrlRegistered(unittest.TestCase):
+    """The optional Tushare endpoint must be explicit and Web-editable."""
+
+    def test_field_contract_is_optional_non_sensitive_url(self):
+        field = get_field_definition("TUSHARE_HTTP_URL")
+
+        self.assertEqual(field["category"], "data_source")
+        self.assertEqual(field["ui_control"], "text")
+        self.assertFalse(field["is_sensitive"])
+        self.assertFalse(field["is_required"])
+        self.assertIsNone(field["default_value"])
+        self.assertEqual(field["validation"]["item_type"], "url")
+        self.assertEqual(
+            field["validation"]["allowed_schemes"],
+            ["http", "https"],
+        )
+        self.assertNotEqual(field["display_order"], 9000)
+        self.assertNotIn("TUSHARE_HTTP_URL", WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_schema_response_includes_tushare_http_url(self):
+        schema = build_schema_response()
+        data_source = next(
+            category
+            for category in schema["categories"]
+            if category["category"] == "data_source"
+        )
+
+        self.assertIn(
+            "TUSHARE_HTTP_URL",
+            {field["key"] for field in data_source["fields"]},
+        )
+
+
 class TestAstrBotFieldsRegistered(unittest.TestCase):
     """AstrBot config keys must be explicitly registered for settings UI."""
 
@@ -600,10 +633,15 @@ class TestIssue1512SettingsFields(unittest.TestCase):
 
 
 class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
-    """Active .env.example keys must be registered or intentionally hidden."""
+    """Keep .env.example and the config registry aligned in both directions."""
 
     _ENV_EXAMPLE = Path(__file__).resolve().parents[1] / ".env.example"
     _ACTIVE_ENV_ASSIGNMENT_RE = re.compile(r"^([A-Z][A-Z0-9_]*)=")
+    # Documented KEY= lines count whether active or commented (leading '#').
+    _DOCUMENTED_ENV_ASSIGNMENT_RE = re.compile(r"^\s*#?\s*([A-Z][A-Z0-9_]*)=")
+    # Registered keys intentionally omitted from .env.example (none today).
+    # Add a short comment when introducing a permanent exemption.
+    _ENV_EXAMPLE_INTENTIONALLY_HIDDEN_KEYS: frozenset[str] = frozenset()
 
     def test_active_env_example_keys_are_registered_or_hidden_from_web_ui(self) -> None:
         active_keys = {
@@ -617,6 +655,25 @@ class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
         self.assertEqual(
             sorted(active_keys - registered_keys - WEB_SETTINGS_HIDDEN_FROM_UI),
             [],
+        )
+
+    def test_registered_keys_are_documented_in_env_example(self) -> None:
+        """Every registry key must appear as KEY= (active or commented) unless allowlisted."""
+        documented_keys = {
+            match.group(1)
+            for line in self._ENV_EXAMPLE.read_text(encoding="utf-8").splitlines()
+            for match in [self._DOCUMENTED_ENV_ASSIGNMENT_RE.match(line)]
+            if match
+        }
+        registered_keys = set(get_registered_field_keys())
+        missing = sorted(
+            registered_keys - documented_keys - self._ENV_EXAMPLE_INTENTIONALLY_HIDDEN_KEYS
+        )
+        self.assertEqual(
+            missing,
+            [],
+            "Registered config keys missing from .env.example "
+            f"(add KEY= docs or list in _ENV_EXAMPLE_INTENTIONALLY_HIDDEN_KEYS): {missing}",
         )
 
 

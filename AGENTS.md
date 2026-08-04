@@ -157,10 +157,13 @@ The current repository CI mainly contains:
 
 | Check | Source | Description | Blocking? |
 | --- | --- | --- | --- |
+| `changes` | `.github/workflows/ci.yml` | Path-filter job that sets the `frontend` output used to decide whether `web-gate` / `web-e2e` run | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
 | `backend-gate` | `.github/workflows/ci.yml` | Executes `./scripts/ci_gate.sh` | Yes |
 | `python-minimum` | `.github/workflows/ci.yml` | Installs the locked CI dependencies and executes `./scripts/ci_gate.sh` on Python 3.10 | Yes |
+| `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
+| `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
 | `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test`, and `npm run build` during frontend changes | Yes (triggered) |
 | `web-e2e` | `.github/workflows/ci.yml` | For frontend changes, starts a real backend, Vite, and local fake model endpoint with an isolated temporary `ENV_FILE`, then runs `npm run test:smoke` (Playwright) | Yes (when triggered) |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |

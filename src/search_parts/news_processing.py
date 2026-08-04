@@ -447,7 +447,29 @@ class _NewsProcessingMethods:
                         add_reason(f"链接命中股票代码 {term}")
                         break
 
+        company_identity_terms: List[str] = []
+        seen_company_identity_terms: set[str] = set()
+        english_alias_identity_terms: set[str] = set()
+
+        from src.data.stock_mapping import foreign_stock_english_aliases
+
         for term in cls._company_identity_terms(stock_name):
+            normalized_term = term.casefold()
+            if normalized_term not in seen_company_identity_terms:
+                seen_company_identity_terms.add(normalized_term)
+                company_identity_terms.append(term)
+
+        for alias in foreign_stock_english_aliases(stock_code, stock_name):
+            for term in cls._company_identity_terms(alias):
+                normalized_term = term.casefold()
+                english_alias_identity_terms.add(normalized_term)
+                if normalized_term not in seen_company_identity_terms:
+                    seen_company_identity_terms.add(normalized_term)
+                    company_identity_terms.append(term)
+
+        for term in company_identity_terms:
+            normalized_term = term.casefold()
+            is_english_alias = normalized_term in english_alias_identity_terms
             ambiguous_en = (
                 not cls._contains_chinese_text(term)
                 and term.lower() in cls._AMBIGUOUS_EN_COMPANY_NAMES
@@ -461,7 +483,8 @@ class _NewsProcessingMethods:
                     has_ambiguous_company_signal = True
                 else:
                     has_unambiguous_company_signal = True
-                add_reason(f"标题命中公司名 {term}")
+                identity_label = "公司英文别名" if is_english_alias else "公司名"
+                add_reason(f"标题命中{identity_label} {term}")
                 break
             if cls._contains_identity_term(snippet, term):
                 score += snippet_score
@@ -470,7 +493,8 @@ class _NewsProcessingMethods:
                     has_ambiguous_company_signal = True
                 else:
                     has_unambiguous_company_signal = True
-                add_reason(f"摘要命中公司名 {term}")
+                identity_label = "公司英文别名" if is_english_alias else "公司名"
+                add_reason(f"摘要命中{identity_label} {term}")
                 break
 
         has_company_event = cls._contains_any_news_term(full_text, cls._COMPANY_EVENT_TERMS)

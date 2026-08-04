@@ -40,6 +40,9 @@ from src.migrations.versions.v202607240003_investment_framework_schema import (
 from src.migrations.versions.v202607250001_approval_gate_schema import (
     MIGRATION as APPROVAL_GATE_SCHEMA_MIGRATION,
 )
+from src.migrations.versions.v202608040001_skill_opinion_outcome_schema import (
+    MIGRATION as SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -55,6 +58,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         SCHEDULED_TASK_SCHEMA_MIGRATION,
         INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
         APPROVAL_GATE_SCHEMA_MIGRATION,
+        SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
     )
 )
 

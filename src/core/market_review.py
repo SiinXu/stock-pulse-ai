@@ -165,20 +165,10 @@ def _get_market_review_market_heading(language: Any, market: str) -> str:
 
 def _resolve_market_review_regions(raw_region: Optional[str]) -> list[str]:
     """Normalize MARKET_REVIEW_REGION into an ordered, non-empty region list."""
+    from src.utils.market_review_region import normalize_market_review_region_lenient
 
-    region = str(raw_region or 'cn').strip().lower()
-    if region == 'both':
-        return list(_MARKET_REVIEW_REGION_ORDER)
-    if ',' in region:
-        requested = {
-            item.strip().lower()
-            for item in region.split(',')
-            if item.strip().lower() in _VALID_MARKET_REVIEW_REGIONS
-        }
-        return [market for market in _MARKET_REVIEW_REGION_ORDER if market in requested] or ['cn']
-    if region in _VALID_MARKET_REVIEW_REGIONS:
-        return [region]
-    return ['cn']
+    normalized = normalize_market_review_region_lenient(raw_region) or "cn"
+    return normalized.split(",")
 
 
 def run_market_review(

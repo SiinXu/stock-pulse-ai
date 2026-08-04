@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "Admin-Authentifizierung ist aktiviert. Verwenden Sie unten das Passwort ändern, um es zu aktualisieren.",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "Es wurde noch kein Passwort festgelegt. Setze ein initiales Admin-Passwort, bevor du die Authentifizierung aktivierst.",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "Das vorherige Admin-Passwort wurde behalten. Geben Sie sie ein, um die Authentifizierung schnell wieder zu aktivieren.",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Wenn die aktuelle Anmeldesitzung noch gültig ist, können Sie die Authentifizierung direkt deaktivieren; Wenn die Sitzung ungültig ist, geben Sie bitte das aktuelle Administrator-Passwort ein.",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Möglicherweise müssen Sie Ihre Identität bestätigen, bevor Sie die Authentifizierung deaktivieren.",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "Zum Deaktivieren der Authentifizierung ist immer das aktuelle Admin-Passwort erforderlich. Ein gültiges Sitzungs-Cookie allein reicht nicht aus.",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "Geben Sie vor dem Deaktivieren das aktuelle Admin-Passwort ein",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "Geben Sie das alte Passwort ein, um die Authentifizierung wieder zu aktivieren",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "Bitte geben Sie Ihr aktuelles Passwort ein",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "Ein neues Passwort ist erforderlich",
@@ -2635,6 +2635,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.title": "TickFlow Tägliche K-Line-Priorität",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.usage": "Verwenden Sie eine ganze Zahl. Niedrigere Zahlen werden früher ausprobiert. Die Standardeinstellung ist 2. Dies hat keine Auswirkung, es sei denn, TICKFLOW_API_KEY konfiguriert ist.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.valueNotes.0": "Diese Einstellung betrifft nur die tägliche K-Line/allgemeine Datenquellen-Fallback-Kette; Es kontrolliert keine Echtzeit-Angebotsreihenfolge.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.examples.0": "https://tushare.example.com",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.impact.0": "Betrifft alle Tushare-Pro-Anfragen; der konfigurierte Endpunkt kann Token und Anfrageinhalte empfangen.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.notes.0": "Prüfen Sie vor dem Speichern einer benutzerdefinierten URL, ob Sie dem Betreiber des Endpunkts vertrauen.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.summary": "Leitet Tushare-Pro-Anfragen optional über ein kompatibles Gateway oder einen Spiegelserver.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.title": "Tushare Pro API-URL",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.usage": "Leer lassen, um den offiziellen Endpunkt zu verwenden. Geben Sie nur bei Bedarf eine vollständige HTTP- oder HTTPS-URL ein.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.valueNotes.0": "Private oder interne Hosts müssen auch in OUTBOUND_HTTP_ALLOWLIST zugelassen sein.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.impact.0": "Betrifft den Zugriff auf einige Grunddaten, Aktienlisten und verwandte erweiterte Daten.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.notes.0": "Reichen Sie keine Token an das Repository ein und protokollieren Sie die Daten nicht öffentlich.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.summary": "Token verwendet für Tushare Pro Datenzugriff.",
@@ -3729,6 +3736,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.TICKFLOW_PRIORITY": "Priorität der täglichen TickFlow-K-Linien",
   "utils.systemConfigI18n.fieldTitleMaps.TRADING_DAY_CHECK_ENABLED": "Handelstagsprüfung",
   "utils.systemConfigI18n.fieldTitleMaps.TRUST_X_FORWARDED_FOR": "X-Forwarded-For vertrauen",
+  "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_HTTP_URL": "Tushare Pro API-URL",
   "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_TOKEN": "Tushare-Token",
   "utils.systemConfigI18n.fieldTitleMaps.VISION_MODEL": "Bildanalysemodell",
   "utils.systemConfigI18n.fieldTitleMaps.WEBHOOK_VERIFY_SSL": "Webhook-SSL-Prüfung",
@@ -4321,4 +4329,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Ein Entscheidungsbaum kann höchstens {limit} Knoten enthalten.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Ein Framework kann höchstens {limit} Risikoregeln enthalten.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Ein Framework kann höchstens {limit} Trackingkriterien enthalten.",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Geben Sie vor dem Deaktivieren der Authentifizierung das aktuelle Admin-Passwort ein",
 };

@@ -112,11 +112,14 @@ After opening a PR, CI will automatically run the following PR checks:
 | Check | Description | Required |
 |-------|-------------|:--------:|
 | `ai-governance` | Validates `AGENTS.md`, compatibility instructions, and repository collaboration assets | ✅ |
-| `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages | ✅ |
+| `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages (per-test timeout, coverage floor, strict markers) | ✅ |
 | `python-minimum` | Runs the full backend gate on Python 3.10, the minimum supported runtime | ✅ |
+| `pydanticai-installed` | Installs optional PydanticAI dependencies and runs experimental runtime tests with skips rejected | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
+| `openapi-types-gate` | Regenerates the backend OpenAPI snapshot and Web TypeScript types and rejects checked-in artifact drift | ✅ |
 | `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` for Web or related API/config/service contract changes | ✅ (when triggered) |
 | `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
+| `pr-review` | Advisory `pull_request` review: static syntax/flake8 on changed files, PR-size advisory (~1000 lines excluding lockfiles/generated), same-repo AI review (requires `GEMINI_API_KEY` and/or `OPENAI_API_KEY` repository secrets), automatic labels, and a bot review comment. Fork PRs stay read-only (no secrets, no write jobs). AI review is non-blocking. | ❌ (advisory) |
 
 `web-e2e` uses dedicated canary credentials only and scopes each CI run to `test-results/ci-secret-bearing/`. That credential-bearing run disables screenshots, videos, and traces. The repository `test:smoke` entry point rejects UI mode and alternate Playwright configs, while global setup checks every project after Playwright merges CLI and project configuration and requires the final trace value to remain `off`. Whether E2E passes or fails, CI first scans the raw run directory for text, logs, JSON, HAR, raw binary canary bytes, and unexpected trace/ZIP entries. It still rejects uninspectable PNG/JPEG/WebM by extension or signature, does not use OCR, and never echoes matched values. After the raw scan succeeds, a dedicated staging script strictly parses `playwright-results.json`, recursively preserves UTF-8 `.log`/`.txt` files and their directory structure under `service-logs/`, rejects symlinks, non-allowlisted files, disguised archives, and media signatures, and emits a size/SHA-256 `manifest.json`. CI scans that staging directory again and uploads only when both scans and staging succeed. Raw output, traces, media, and archives never enter the artifact.
 
@@ -132,6 +135,10 @@ python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
 python -m pip check
 ./scripts/ci_gate.sh
+
+# Offline suite details: per-test timeout (120s), coverage floor, strict markers,
+# and how to run wall-clock @pytest.mark.benchmark tests manually:
+# see docs/testing-ci-gate.md
 
 # Frontend gate (only if you changed apps/dsa-web/)
 cd apps/dsa-web

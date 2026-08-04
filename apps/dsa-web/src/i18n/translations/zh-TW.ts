@@ -911,8 +911,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.authHelperEnabled": "管理員認證已啟用。如需更新密碼，請使用下方的“修改密碼”功能。",
   "i18n.uiText.UI_TEXT.settings.authHelperNoPassword": "系統尚未設定密碼。啟用認證前請先設定初始管理員密碼，設定後請妥善保管。",
   "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained": "系統已保留之前設定的管理員密碼。輸入當前密碼即可快速重新啟用認證。",
-  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "若當前登入會話仍有效，可直接關閉認證；若會話已失效，請輸入當前管理員密碼。",
-  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "關閉認證前可能需要驗證身份",
+  "i18n.uiText.UI_TEXT.settings.authHelperTurnOff": "關閉認證必須再次輸入目前管理員密碼。有效工作階段 cookie 不足以關閉認證。",
+  "i18n.uiText.UI_TEXT.settings.authPasswordHintOff": "關閉認證前請輸入目前管理員密碼",
   "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained": "輸入舊密碼以重新啟用認證",
   "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder": "請輸入當前密碼",
   "i18n.uiText.UI_TEXT.settings.authRequiredPassword": "設定新密碼是必填項",
@@ -2635,6 +2635,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.title": "TickFlow 日 K 優先順序",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.usage": "填寫整數；數字越小越早嘗試，預設 2。未配置 TICKFLOW_API_KEY 時該優先順序不會生效。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_PRIORITY.valueNotes.0": "該設定只影響日 K 等通用資料來源回退鏈，不控制實時行情源順序。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.examples.0": "https://tushare.example.com",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.impact.0": "影響所有 Tushare Pro 請求，設定的端點可能接收 token 和請求內容。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.notes.0": "儲存自訂網址前，請確認你信任該端點營運方。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.summary": "可選擇將 Tushare Pro 請求路由到相容閘道或鏡像。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.title": "Tushare Pro API 網址",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.usage": "留空使用官方端點；僅在需要自訂端點時填寫完整的 HTTP 或 HTTPS 網址。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_HTTP_URL.valueNotes.0": "私有或內部主機也必須加入 OUTBOUND_HTTP_ALLOWLIST。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.impact.0": "影響部分 A 股基礎資料、股票列表和相關增強資料獲取。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.notes.0": "不要把 token 提交到倉庫或公開日誌。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TUSHARE_TOKEN.summary": "用於訪問 Tushare Pro 資料介面。",
@@ -3729,6 +3736,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.TICKFLOW_PRIORITY": "TickFlow 日 K 優先順序",
   "utils.systemConfigI18n.fieldTitleMaps.TRADING_DAY_CHECK_ENABLED": "啟用交易日檢查",
   "utils.systemConfigI18n.fieldTitleMaps.TRUST_X_FORWARDED_FOR": "信任 X-Forwarded-For",
+  "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_HTTP_URL": "Tushare Pro API 網址",
   "utils.systemConfigI18n.fieldTitleMaps.TUSHARE_TOKEN": "Tushare Token",
   "utils.systemConfigI18n.fieldTitleMaps.VISION_MODEL": "視覺模型",
   "utils.systemConfigI18n.fieldTitleMaps.WEBHOOK_VERIFY_SSL": "驗證 Webhook SSL 憑證",
@@ -4321,4 +4329,34 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "決策樹最多可以包含 {limit} 個節點。",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "框架最多可以包含 {limit} 條風險規則。",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "框架最多可以包含 {limit} 追蹤條件。",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "全部市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A 股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "由伺服器在提交時決定",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "選擇本次復盤覆蓋的市場，可單選或多選。",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "港股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "日股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "韓股",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "僅影響本次觸發，不會修改全域配置。",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "選擇大盤復盤市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "伺服器預設",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "本次復盤市場",
+
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "美股",
+
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}；實際市場：{region}",
+
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "任務狀態：{status}（{progress}）；實際市場：{region}",
+
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "關閉認證前請輸入目前管理員密碼",
+
 };

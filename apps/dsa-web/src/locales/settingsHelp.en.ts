@@ -253,6 +253,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects some A-share base data, stock lists, and enrichment data.'],
     notes: ['Do not commit the token or print it in public logs.'],
   },
+  'settings.data_source.TUSHARE_HTTP_URL': {
+    title: 'Tushare Pro API URL',
+    summary: 'Optionally routes Tushare Pro requests through a compatible gateway or mirror.',
+    usage: 'Leave empty to use the official endpoint. Enter a complete HTTP or HTTPS URL only when a custom endpoint is required.',
+    valueNotes: ['Private or internal hosts must also be permitted by OUTBOUND_HTTP_ALLOWLIST.'],
+    impact: ['Affects every Tushare Pro request and may expose the token and request payload to the configured endpoint.'],
+    notes: ['Verify that you trust the endpoint operator before saving a custom URL.'],
+    examples: ['https://tushare.example.com'],
+  },
   'settings.data_source.TICKFLOW_API_KEY': {
     title: 'TickFlow API Key',
     summary: 'Enables optional TickFlow A-share daily K-lines, realtime quotes, stock list/name lookup, and market-review data.',

@@ -22,18 +22,17 @@ class _ServiceStateMethods:
 
     @staticmethod
     def _is_foreign_stock(stock_code: str) -> bool:
-        """判断是否为港股或美股"""
-        code = stock_code.strip()
+        """Return whether a ticker is a supported U.S. or Hong Kong shape."""
+        from src.data.stock_mapping import canonicalize_foreign_stock_code
+
+        code = canonicalize_foreign_stock_code(stock_code)
+        if not code:
+            return False
         # U.S. stocks: 1-5 uppercase letters, may contain periods (e.g., BRK.B)
         if SearchService._US_STOCK_RE.match(code):
             return True
-        # Hong Kong stocks: With hk prefix or 5-digit numbers only
-        lower = code.lower()
-        if lower.startswith('hk'):
-            return True
-        if code.isdigit() and len(code) == 5:
-            return True
-        return False
+        # HK prefix/suffix forms are canonicalized to five digits above.
+        return code.isdigit() and len(code) == 5
 
     @classmethod
     def _contains_chinese_text(cls, value: Optional[str]) -> bool:
@@ -43,7 +42,9 @@ class _ServiceStateMethods:
     @classmethod
     def _is_us_stock(cls, stock_code: str) -> bool:
         """判断是否为美股/美股指数代码。"""
-        code = (stock_code or "").strip().upper()
+        from src.data.stock_mapping import canonicalize_foreign_stock_code
+
+        code = canonicalize_foreign_stock_code(stock_code)
         return bool(cls._US_STOCK_RE.match(code) or is_us_index_code(code))
 
     @classmethod
@@ -62,6 +63,13 @@ class _ServiceStateMethods:
         """
         if any(cls._contains_chinese_text(keyword) for keyword in (focus_keywords or [])):
             return True
+        from src.data.stock_mapping import foreign_stock_english_aliases
+
+        if (
+            cls._is_foreign_stock(stock_code)
+            and foreign_stock_english_aliases(stock_code, stock_name)
+        ):
+            return False
         if cls._contains_chinese_text(stock_name):
             return True
         # Positive A-stock identification: 6-digit numeric codes (e.g. 600519)

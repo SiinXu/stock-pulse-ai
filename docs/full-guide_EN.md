@@ -158,7 +158,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) token | Optional |
-| `TUSHARE_HTTP_URL` | Tushare Pro API endpoint (default `http://api.tushare.pro`) for self-hosted nodes, proxies, or internal mirrors. Leaving it empty keeps default behavior; private/internal hosts must also be added to `OUTBOUND_HTTP_ALLOWLIST`, see [docs/security-outbound-policy.md](./security-outbound-policy.md). | Optional |
+| `TUSHARE_HTTP_URL` | Tushare Pro API endpoint (default `http://api.tushare.pro`), configurable in Web Settings or `.env`, for self-hosted nodes, proxies, or internal mirrors. Leaving it empty keeps default behavior; private/internal hosts must also be added to `OUTBOUND_HTTP_ALLOWLIST`, see [docs/security-outbound-policy.md](./security-outbound-policy.md). | Optional |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key for optional A-share daily K-lines, realtime quotes, stock list/name lookup, and CN market review enhancement; permission or entitlement failures fall back to existing providers | Optional |
 
 > **GitHub Actions:** The bundled `00-daily-analysis.yml` maps `TUSHARE_TOKEN`, `TICKFLOW_API_KEY` / `TICKFLOW_*`, and the documented `LONGBRIDGE_*` variables into the job environment. Store `TICKFLOW_API_KEY` in **Secrets**; non-sensitive TickFlow priority, adjustment, and batch switches can live in **Variables** or **Secrets**. Longbridge OAuth still requires a client id plus `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` for headless Actions runs, while the legacy `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` triplet remains supported.
@@ -326,6 +326,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 
 > Behavior note: Search and social sentiment are optional enhancement services. If either service fails to initialize, the system logs a warning and degrades gracefully by skipping that stage without blocking the core analysis flow.
 
+> Foreign-stock English news: mapped U.S./Hong Kong forms such as `AAPL.US`, `HK00700`, and `00700.HK` are canonicalized before search. Even when the display name is Chinese, news, event/comprehensive-intelligence queries, and relevance scoring use the shared English company aliases. Unmapped tickers retain the existing fallback behavior.
+
 ### Data Source Configuration
 
 | Variable | Description | Default | Required |
@@ -334,6 +336,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `TUSHARE_HTTP_URL` | Tushare Pro API endpoint for self-hosted nodes, proxies, or internal mirrors. Empty keeps the official default and behavior unchanged; private/internal hosts must also be added to `OUTBOUND_HTTP_ALLOWLIST`. | `http://api.tushare.pro` | Optional |
 | `TICKFLOW_API_KEY` | TickFlow API key; enables optional A-share daily K-lines, realtime quotes, stock list/name lookup, and CN market review enhancement. Permission failures fall back to existing providers. | - | Optional |
 | `TICKFLOW_PRIORITY` | TickFlow daily K-line provider priority; lower values are tried earlier. No effect unless `TICKFLOW_API_KEY` is configured. Does not affect realtime quotes, which are ordered by `REALTIME_SOURCE_PRIORITY`. | `2` | Optional |
+| `TENCENT_PRIORITY` | Tencent direct A-share daily K-line provider priority; lower values are tried earlier. Defaults to `5` as the final fallback after the other built-in A-share daily providers. Does not affect realtime quotes. | `5` | Optional |
 | `TICKFLOW_KLINE_ADJUST` | TickFlow daily K-line adjustment mode: `none`, `forward`, `backward`, `forward_additive`, or `backward_additive`. | `none` | Optional |
 | `TICKFLOW_BATCH_DAILY_ENABLED` | Enable TickFlow batch daily K-line prefetch when the current plan supports it; permission failures are negative-cached and fall back to per-stock providers. | `true` | Optional |
 | `TICKFLOW_BATCH_SIZE` | Maximum symbols per TickFlow batch request for daily K-lines and realtime quotes. | `100` | Optional |
@@ -1383,6 +1386,8 @@ The backtesting module automatically validates historical AI analysis records ag
 3. Infers expected direction from the operation advice and compares against actual movement
 4. Evaluates stop-loss/take-profit hit conditions and simulates execution returns
 5. Aggregates into overall and per-stock performance metrics
+
+The backtest start date first uses `market_phase_summary.effective_daily_bar_date` from the historical snapshot; older snapshots use the trading calendar only when their market and phase are trustworthy. The start bar and forward window must come from one market identity and one stored code shape, so prices are never spliced across aliases. A missing authoritative start or usable window is reported as insufficient data instead of falling back to an arbitrary stale bar.
 
 ### Operation Advice Mapping
 

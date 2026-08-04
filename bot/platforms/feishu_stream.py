@@ -23,6 +23,7 @@ https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/server-side-sdk/python--sd
 
 import json
 import logging
+import os
 import threading
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -33,6 +34,9 @@ import time
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+FEISHU_DOMAIN = "https://open.feishu.cn"
+LARK_DOMAIN = "https://open.larksuite.com"
 
 # Attempt to import Feishu SDK
 try:
@@ -45,7 +49,13 @@ try:
         CreateMessageRequest,
         CreateMessageRequestBody,
     )
+    from lark_oapi.core.const import (
+        FEISHU_DOMAIN as SDK_FEISHU_DOMAIN,
+        LARK_DOMAIN as SDK_LARK_DOMAIN,
+    )
 
+    FEISHU_DOMAIN = SDK_FEISHU_DOMAIN
+    LARK_DOMAIN = SDK_LARK_DOMAIN
     FEISHU_SDK_AVAILABLE = True
 except ImportError:
     FEISHU_SDK_AVAILABLE = False
@@ -59,6 +69,33 @@ from src.formatters import format_feishu_markdown, chunk_content_by_max_bytes
 from src.config import get_config
 
 
+def _resolve_feishu_domain(domain: Optional[str]) -> str:
+    """Resolve a configured Feishu/Lark region to an SDK API domain."""
+    raw_domain = str(domain or "feishu").strip().lower()
+    if raw_domain in ("feishu", FEISHU_DOMAIN.lower()):
+        return FEISHU_DOMAIN
+    if raw_domain in ("lark", LARK_DOMAIN.lower()):
+        return LARK_DOMAIN
+
+    logger.warning(
+        "[Feishu Stream] Invalid FEISHU_DOMAIN=%s; falling back to feishu",
+        raw_domain,
+    )
+    return FEISHU_DOMAIN
+
+
+def _configured_feishu_domain(config: object, override: Optional[str]) -> str:
+    """Read the region override from the caller or the documented env key."""
+    if override is not None:
+        return _resolve_feishu_domain(override)
+
+    configured_domain = os.getenv(
+        "FEISHU_DOMAIN",
+        getattr(config, "feishu_domain", "feishu"),
+    )
+    return _resolve_feishu_domain(configured_domain)
+
+
 class FeishuReplyClient:
     """
     飞书消息回复客户端
@@ -66,23 +103,32 @@ class FeishuReplyClient:
     使用飞书 API 发送回复消息。
     """
 
-    def __init__(self, app_id: str, app_secret: str):
+    def __init__(
+            self,
+            app_id: str,
+            app_secret: str,
+            domain: Optional[str] = None
+    ):
         """
         Args:
             app_id: 飞书应用 ID
             app_secret: 飞书应用密钥
+            domain: Feishu API region (feishu/lark) or SDK API domain
         """
         if not FEISHU_SDK_AVAILABLE:
             raise ImportError("lark-oapi SDK 未安装")
 
+        config = get_config()
+        self._domain = _configured_feishu_domain(config, domain)
+
         self._client = lark.Client.builder() \
             .app_id(app_id) \
             .app_secret(app_secret) \
+            .domain(self._domain) \
             .log_level(lark.LogLevel.WARNING) \
             .build()
 
         # Get the maximum byte size of the configuration.
-        config = get_config()
         self._max_bytes = getattr(config, 'feishu_max_bytes', 20000)
 
     def _send_interactive_card(self, content: str, message_id: Optional[str] = None,
@@ -573,12 +619,14 @@ class FeishuStreamClient:
     def __init__(
             self,
             app_id: Optional[str] = None,
-            app_secret: Optional[str] = None
+            app_secret: Optional[str] = None,
+            domain: Optional[str] = None
     ):
         """
         Args:
             app_id: 应用 ID（不传则从配置读取）
             app_secret: 应用密钥（不传则从配置读取）
+            domain: Feishu API region (feishu/lark) or SDK API domain
         """
         if not FEISHU_SDK_AVAILABLE:
             raise ImportError(
@@ -591,6 +639,7 @@ class FeishuStreamClient:
 
         self._app_id = app_id or getattr(config, 'feishu_app_id', None)
         self._app_secret = app_secret or getattr(config, 'feishu_app_secret', None)
+        self._domain = _configured_feishu_domain(config, domain)
 
         if not self._app_id or not self._app_secret:
             raise ValueError(
@@ -616,7 +665,11 @@ class FeishuStreamClient:
     def _create_event_handler(self) -> 'lark.EventDispatcherHandler':
         """创建事件分发处理器"""
         # Create a reply client
-        self._reply_client = FeishuReplyClient(self._app_id, self._app_secret)
+        self._reply_client = FeishuReplyClient(
+            self._app_id,
+            self._app_secret,
+            domain=self._domain,
+        )
 
         # Create message processor
         handler = FeishuStreamHandler(
@@ -660,6 +713,7 @@ class FeishuStreamClient:
             app_id=self._app_id,
             app_secret=self._app_secret,
             event_handler=event_handler,
+            domain=self._domain,
             log_level=lark.LogLevel.WARNING,
             auto_reconnect=True
         )

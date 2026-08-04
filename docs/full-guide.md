@@ -166,7 +166,7 @@ stock-pulse-ai/
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
-| `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`）；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
+| `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`），可通过 Web 设置或 `.env` 配置；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | 可选 |
 | `LONGBRIDGE_OAUTH_CLIENT_ID` | [Longbridge OpenAPI](https://open.longbridge.com/) OAuth client_id；留空且无 Legacy Access Token 时会兼容使用 `LONGBRIDGE_APP_KEY` | 可选 |
 | `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | OAuth token 缓存文件的 base64 内容，供 GitHub Actions / Docker 等 headless 环境恢复 SDK token 缓存 | 可选 |
@@ -371,6 +371,8 @@ stock-pulse-ai/
 
 > 行为说明：搜索服务与社交舆情服务为可选增强链路。任一服务初始化失败时，系统会记录 warning 并降级为跳过该服务，仅影响对应环节，不会阻塞技术面主链路和主任务流。
 
+> 外股英文资讯：对已收录的美股/港股，`AAPL.US` / `HK00700` / `00700.HK` 等形式会先归一到标准 ticker。即使展示名为“苹果”或“腾讯控股”，新闻查询、事件/多维情报查询与相关度评分仍会使用统一英文别名；未收录的 ticker 保持原有降级行为。
+
 ### 新闻检索可解释排序（Issue #1356）
 
 `search_stock_news` 对每条候选新闻会计算「可解释相关度」并落地为 3 类标签：
@@ -398,6 +400,7 @@ stock-pulse-ai/
 | `TUSHARE_HTTP_URL` | Tushare Pro 接口地址；用于自建节点、代理或内网镜像。留空使用默认官方端点，行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`。 | `http://api.tushare.pro` | 可选 |
 | `TICKFLOW_API_KEY` | TickFlow API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | - | 可选 |
 | `TICKFLOW_PRIORITY` | TickFlow 日 K 数据源优先级；数字越小越早尝试，默认 `2`；未配置 API Key 时不启用；不影响实时行情，实时行情顺序由 `REALTIME_SOURCE_PRIORITY` 控制。 | `2` | 可选 |
+| `TENCENT_PRIORITY` | 腾讯直连 A 股日 K 数据源优先级；数字越小越早尝试，默认 `5`，作为其他内置 A 股日 K 数据源之后的最终兜底；不影响实时行情。 | `5` | 可选 |
 | `TICKFLOW_KLINE_ADJUST` | TickFlow 日 K 复权模式：`none`、`forward`、`backward`、`forward_additive`、`backward_additive`。 | `none` | 可选 |
 | `TICKFLOW_BATCH_DAILY_ENABLED` | 是否启用 TickFlow 批量日 K 预取；权限不足会短期缓存失败状态，并继续走常规回退。 | `true` | 可选 |
 | `TICKFLOW_BATCH_SIZE` | TickFlow 日 K 与实时行情批量请求的单批最大标的数。 | `100` | 可选 |
@@ -1533,6 +1536,8 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 3. 根据操作建议推断预期方向，与实际走势对比
 4. 评估止盈/止损命中情况，模拟执行收益
 5. 汇总为整体和单股两个维度的表现指标
+
+回测起始日优先使用历史快照中的 `market_phase_summary.effective_daily_bar_date`；旧快照仅在市场与阶段信息可信时通过交易日历解析。起始 K 线与后续窗口必须来自同一个市场身份和同一种已存代码形态，不会再把一个别名的起始价与另一个别名的后续 K 线拼接。缺少权威起始日或完整窗口时，结果会标记为数据不足，而不会回退到任意旧 K 线。
 
 ### 操作建议映射
 
