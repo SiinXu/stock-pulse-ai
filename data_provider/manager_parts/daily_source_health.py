@@ -33,8 +33,18 @@ import pandas as pd
 
 from src.utils.sanitize import sanitize_diagnostic_text
 
+from ..realtime_types import CircuitBreaker
+from ..symbol_normalization import _market_tag, normalize_stock_code
+
 if TYPE_CHECKING:
     from data_provider.base import BaseFetcher, DataProvider
+
+# Facade-only symbols cannot be imported from ``data_provider.base`` while that
+# module is still assembling this part (circular import). Declare anchors so
+# flake8 F821 is clean; rebound methods resolve the real objects from the
+# ``data_provider.base`` global namespace.
+CircuitOpenError = None  # type: ignore[assignment,misc]
+record_provider_run = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger("data_provider.base")
 
