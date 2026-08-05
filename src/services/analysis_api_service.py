@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         TaskListResponse,
         TaskStatus,
     )
+    from api.v1.schemas.history import AnalysisReport
     from api.v1.schemas.run_flow import RunFlowSnapshot
 
 
