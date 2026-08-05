@@ -1262,7 +1262,7 @@ export interface paths {
         };
         /**
          * Generate a history report share image
-         * @description Build a deterministic PNG share image from the historical report Markdown and any persisted structured payload.
+         * @description Build a deterministic PNG share image from the historical report Markdown and any persisted structured payload. Content longer than SHARE_IMAGE_MAX_CHARS returns 413 share_image_content_too_large instead of a false renderer-unavailable 503.
          */
         get: operations["get_history_share_image_api_v1_history__record_id__share_image_get"];
         put?: never;
@@ -13534,6 +13534,15 @@ export interface operations {
             };
             /** @description Report not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Report content exceeds SHARE_IMAGE_MAX_CHARS */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
