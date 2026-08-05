@@ -32,7 +32,7 @@ const MODEL_PACK_PARAMETER_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const MODEL_PACK_REQUIRED_ROLES = Object.freeze(['gguf', 'modelfile', 'license']);
 const MODEL_PACK_ALLOWED_INSTRUCTIONS = new Set(['FROM', 'PARAMETER', 'TEMPLATE', 'SYSTEM']);
 const MODEL_PACK_REPEATABLE_PARAMETERS = new Set(['stop']);
-const MODEL_PACK_MAX_PORTABLE_INTEGER = Number.MAX_SAFE_INTEGER;
+const _MODEL_PACK_MAX_PORTABLE_INTEGER = Number.MAX_SAFE_INTEGER;
 const MODEL_PACK_PARAMETER_TYPES = Object.freeze({
   num_ctx: 'integer',
   num_batch: 'integer',
