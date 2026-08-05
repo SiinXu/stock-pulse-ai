@@ -66,7 +66,10 @@ def _http_repository_error(
     event: str,
     context: Optional[Mapping[str, Any]] = None,
 ) -> HTTPException:
-    """Map repository infrastructure failures to HTTP 500 (never 404)."""
+    """Map repository infrastructure failures to HTTP 500 (never 404).
+
+    Missing rows remain 404; only RepositoryError maps here.
+    """
     log_safe_exception(
         logger,
         event,
