@@ -490,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 112,
-        "keySetSha256": "9c5aaa83de0be8bf73efc381737a8a98a065ee76ccca4ede4b5f6b5abdbb7df2",
+        "keyCount": 116,
+        "keySetSha256": "06d6c0b579fa4515499816be335181df2b362ec7ed4b29f7da93a67ea3c4c75e",
         "bundleSha256": {
-          "zh": "43e9423a1f4ea484be19cff264b32131b29b567fb88908a2b58cc8b9eb6e818e",
-          "zh-TW": "6af27f6ed0167fc546e02f5f6c951bb7d68920f807deef47477d2f369477d318",
-          "en": "726d3bf75b0f7148ca07b1d3566ba9cbc1cec5c4c5b84338e30c9e385aa3e8ff",
-          "ja": "d023f1da4463548c9db8cd6cd1175e12ee7e0187b4666611ddc843bd73891838",
-          "ko": "d8f3158a506982f8fc035606ab9dc32c59ca513c8dc4fdb6de9f07f96c2eb69d",
-          "de": "ab91c373da25920ec9e582a53be9a2ac8cea9caec80b0e211068b95607080b38",
-          "es": "27a1d7f2e5fdf051aae32b0d774478207d283484994b7efc5bce5bcd1a072330",
-          "ms": "49fdd04fdc3429d8c6396f58a0ad83ceac86e21cb682eee3b0d8626c35f9186a",
-          "fr": "8848a8f0a98a702f901168d8b9f5367a51d3e680da5d9f19e0c85206b0a82df4",
-          "id": "ead26ae12983275c433e79830b817bad6d41fdbee5c17035b2fcf68d20287cc1"
+          "zh": "335a9cd7f98bbe6e7d82db40b1f81620ef150ff28d80e795650a5d89833c37e1",
+          "zh-TW": "ec6ba81aa02a1ee29eaa742062da6eb5d2e6dddbb5e48de358c98cfcdd24d5b8",
+          "en": "da6ae181100d2c0337104e648ad1b82a496069fbe7c2fceb62072986df588246",
+          "ja": "cc550886fc8a1525c15331c1200722b5951e7711f843e52a5f21804e03012995",
+          "ko": "b26a33732b301cb685e6bb923632a38a9bf0979942db60f48ab4532d2988e5d0",
+          "de": "c406f2ab0c775416730b93d542813396dfcfdaa26d0e285b0b0e9a5674912cda",
+          "es": "39f3837e97a021c60ba9fe6ecef96e6997436a0320dc590e837c6739b1bc3ce1",
+          "ms": "11f6835440464acec59d544bb490a379b7dcff7a41e86ebd049c6e5bf10c2ca4",
+          "fr": "f13b9dea78b4f6e2c2bd1abb6f1756ba96024113d5e49fc7c6c48f946ea08337",
+          "id": "dfcd52492fb0d242779c92c27d12df7da3ee7b34507c458347626b62706b49fd"
         }
       }
     },
@@ -652,6 +652,8 @@
         "scheduler_busy",
         "security_audit_auth_required",
         "security_audit_unavailable",
+        "share_image_content_too_large",
+        "share_image_unavailable",
         "unauthorized",
         "unsupported_alert_type",
         "validation_error",
@@ -754,6 +756,10 @@
           "api.error.STABLE_ERROR_TEXT.invalid_password.title",
           "api.error.STABLE_ERROR_TEXT.invalid_password.message"
         ],
+        "llm_not_configured": [
+          "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
+          "api.error.STABLE_ERROR_TEXT.llm_not_configured.message"
+        ],
         "no_channels": [
           "api.error.STABLE_ERROR_TEXT.no_channels.title",
           "api.error.STABLE_ERROR_TEXT.no_channels.message"
@@ -810,6 +816,14 @@
           "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
           "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message"
         ],
+        "share_image_content_too_large": [
+          "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title",
+          "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message"
+        ],
+        "share_image_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message"
+        ],
         "unauthorized": [
           "api.error.STABLE_ERROR_TEXT.unauthorized.title",
           "api.error.STABLE_ERROR_TEXT.unauthorized.message"
@@ -825,10 +839,6 @@
         "validation_failed": [
           "api.error.STABLE_ERROR_TEXT.validation_failed.title",
           "api.error.STABLE_ERROR_TEXT.validation_failed.message"
-        ],
-        "llm_not_configured": [
-          "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
-          "api.error.STABLE_ERROR_TEXT.llm_not_configured.message"
         ]
       }
     },

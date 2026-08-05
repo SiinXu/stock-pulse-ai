@@ -29,6 +29,7 @@ from api.v1.schemas.history import (
     StockBarItem,
     StockBarResponse,
 )
+from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.run_flow import RunFlowSnapshot
 from src.config import get_config
@@ -52,6 +53,10 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Dedicated share-image input bound. Keeps the IM notification cap
+# (MARKDOWN_TO_IMAGE_MAX_CHARS=15000) unchanged while allowing full history reports.
+_DEFAULT_SHARE_IMAGE_MAX_CHARS = 100_000
 
 
 def _history_share_image_payload(result: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
@@ -697,13 +702,19 @@ def get_history_news(
     responses={
         200: {"description": "PNG share image", "content": {"image/png": {}}},
         404: {"description": "Report not found", "model": ErrorResponse},
+        413: {
+            "description": "Report content exceeds SHARE_IMAGE_MAX_CHARS",
+            "model": ErrorResponse,
+        },
         500: {"description": "Report generation failed", "model": ErrorResponse},
         503: {"description": "Image renderer unavailable", "model": ErrorResponse},
     },
     summary="Generate a history report share image",
     description=(
         "Build a deterministic PNG share image from the historical report Markdown "
-        "and any persisted structured payload."
+        "and any persisted structured payload. Content longer than "
+        "SHARE_IMAGE_MAX_CHARS returns 413 share_image_content_too_large instead of "
+        "a false renderer-unavailable 503."
     ),
 )
 def get_history_share_image(
@@ -749,9 +760,33 @@ def get_history_share_image(
         )
 
     config = get_config()
+    share_image_max_chars = int(
+        getattr(config, "share_image_max_chars", _DEFAULT_SHARE_IMAGE_MAX_CHARS)
+        or _DEFAULT_SHARE_IMAGE_MAX_CHARS
+    )
+    if share_image_max_chars < 1:
+        share_image_max_chars = _DEFAULT_SHARE_IMAGE_MAX_CHARS
+
+    actual_chars = len(markdown_content)
+    if actual_chars > share_image_max_chars:
+        raise api_error(
+            413,
+            "share_image_content_too_large",
+            (
+                f"报告内容过长，无法生成分享图片"
+                f"（{actual_chars} 字符，上限 {share_image_max_chars}）。"
+                "可在设置中提高 SHARE_IMAGE_MAX_CHARS，或缩短报告后再试。"
+            ),
+            params={
+                "limit": share_image_max_chars,
+                "actual": actual_chars,
+            },
+        )
+
     image_bytes = markdown_to_image(
         markdown_content,
-        max_chars=getattr(config, "markdown_to_image_max_chars", 15000),
+        # Pass the share-image bound so md2img does not re-apply the smaller IM cap.
+        max_chars=share_image_max_chars,
         structured_payload=_history_share_image_payload(result),
     )
     if image_bytes is None:

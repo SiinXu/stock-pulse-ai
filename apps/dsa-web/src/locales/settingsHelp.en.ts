@@ -1149,6 +1149,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['No current effect.'],
     notes: ['A future version will aggregate the day\'s notifications into a single digest push.'],
   },
+  'settings.notification.SHARE_IMAGE_MAX_CHARS': {
+    title: 'Share Image Max Characters',
+    summary: 'Maximum Markdown length accepted by the history share-image API.',
+    usage: 'Controls GET /api/v1/history/{id}/share-image only. Reports longer than this limit return HTTP 413 share_image_content_too_large with limit/actual params.',
+    valueNotes: [
+      'Default 100000 covers verbose detailed reports and multi-region market reviews.',
+      'Independent of MARKDOWN_TO_IMAGE_MAX_CHARS (IM notification images stay at 15000).',
+    ],
+    impact: ['Affects Web one-click share image generation for history reports.'],
+    notes: ['Raise this value only when you intentionally allow larger Markdown input for rendering.'],
+  },
   // ------------------------------------------------------------------
   // System runtime
   // ------------------------------------------------------------------

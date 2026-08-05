@@ -182,9 +182,15 @@ def add_error_handlers(app) -> None:
                 if isinstance(exc.detail, dict)
                 else None
             )
-            security_audit_unavailable = (
+            # Operator-actionable 503 codes that must reach clients with install guidance.
+            public_service_unavailable_codes = {
+                "security_audit_unavailable",
+                "share_image_unavailable",
+            }
+            public_service_unavailable = (
                 exc.status_code == 503
-                and detail_error == "security_audit_unavailable"
+                and isinstance(detail_error, str)
+                and detail_error in public_service_unavailable_codes
             )
             safe_log_exception = HTTPException(
                 status_code=exc.status_code,
@@ -195,8 +201,8 @@ def add_error_handlers(app) -> None:
                 "HTTP exception returned a server error",
                 safe_log_exception,
                 error_code=(
-                    "security_audit_unavailable"
-                    if security_audit_unavailable
+                    detail_error
+                    if public_service_unavailable
                     else "internal_error"
                 ),
                 trace_id=trace_id,
@@ -204,10 +210,11 @@ def add_error_handlers(app) -> None:
                 path=_normalized_request_path(request),
                 context={"status_code": exc.status_code},
             )
-            if security_audit_unavailable:
-                content = error_body(
-                    "security_audit_unavailable",
-                    "Security audit storage is unavailable",
+            if public_service_unavailable:
+                content = normalize_error_body(
+                    exc.detail,
+                    default_error=detail_error or "http_error",
+                    default_message="Service unavailable",
                     trace_id=trace_id,
                 )
             else:
