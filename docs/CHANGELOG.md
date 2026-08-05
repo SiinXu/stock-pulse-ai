@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Extracted the largest Settings sections into dedicated cards and added a page-size lint guard.
+- [Chore] Moved stock-list splitting to a leaf utility, removing the config-to-services import edge.
+- [Added] Added a shrink-only import-cycle ratchet to the deterministic CI gate.
 - [Chore] Split the share-image renderer into a package with parsing, model, formatting, and render modules, preserving all import paths.
 
 - [Tests] Ran the API suite against the real Starlette test client in a dedicated CI job behind a default-off flag.
 - [Chore] Extended CI path filters to the backend code the e2e stack boots and added a push-to-main run.
+- [Chore] Injected notification dispatch dependencies through explicit ports and guarded the notification_sender legacy facades in the import ratchet.
 - [Fixed] First-run analysis without an LLM now returns stable `llm_not_configured` (HTTP 422 sync / task `message_code`) and Home setup banners localize readiness check keys; invalid market-review `region` errors include the allowed set.
 - [Fixed] Honored explicit loopback `--host`/`--uds` under unrecognized HTTP launchers (custom uvicorn shims, `uv run`, gunicorn-style argv) while keeping fail-closed behavior and clearer errors when the bind cannot be verified as local.
 - [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.

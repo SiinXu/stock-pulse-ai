@@ -197,7 +197,21 @@ python -m pip check
 ./scripts/ci_gate.sh
 ```
 
-Phases: `syntax` → `flake8` → `deterministic` (includes `check_coverage_floor.py --self-test`) → `offline-tests` (timeout + coverage + floor).
+Phases: `syntax` → `flake8` → `deterministic` (includes `check_coverage_floor.py --self-test`, `check_import_layers.py` self-test + live check, and peer AST ratchets) → `offline-tests` (timeout + coverage + floor).
+
+## Import-cycle ratchet
+
+The deterministic phase also runs:
+
+```bash
+python scripts/check_import_layers.py --self-test
+python scripts/check_import_layers.py
+```
+
+This shrink-only guard fails when a **new** bidirectional package import pair
+appears (module-level edges only). See [import-cycle ratchet](import-cycle-ratchet.md)
+and [ADR-010](adr/ADR-010-import-cycle-ratchet.md) for package identity, failure
+messages, and the legitimate shrink / intentional-growth paths.
 
 ## Related CI packaging
 

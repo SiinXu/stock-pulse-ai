@@ -3,20 +3,11 @@
 
 from __future__ import annotations
 
-import re
 from typing import Iterable, List, Optional
 
-_STOCK_LIST_SEPARATOR_RE = re.compile(r"[\s,;\uFF0C\u3001\uFF1B]+")
+from src.utils.stock_list import split_stock_list
+
 SUPPORTED_PORTFOLIO_SOURCES = ("futu",)
-
-
-def split_stock_list(value: str) -> List[str]:
-    """Split STOCK_LIST values on common copy/paste separators."""
-    return [
-        item.strip()
-        for item in _STOCK_LIST_SEPARATOR_RE.split(value or "")
-        if item.strip()
-    ]
 
 
 def serialize_stock_list(value: str) -> str:
