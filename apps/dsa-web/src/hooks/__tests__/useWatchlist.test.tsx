@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWatchlist } from '../useWatchlist';
+import { createDeferred } from '../../test-utils';
 
 const {
   mockGetWatchlist,
@@ -19,16 +20,6 @@ vi.mock('../../api/systemConfig', () => ({
     removeFromWatchlist: mockRemoveFromWatchlist,
   },
 }));
-
-function deferredPromise<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, reject, resolve };
-}
 
 describe('useWatchlist', () => {
   beforeEach(() => {
@@ -55,8 +46,8 @@ describe('useWatchlist', () => {
   });
 
   it('keeps the newest watchlist result when an older refresh resolves last', async () => {
-    const older = deferredPromise<string[]>();
-    const newer = deferredPromise<string[]>();
+    const older = createDeferred<string[]>();
+    const newer = createDeferred<string[]>();
     mockGetWatchlist
       .mockReturnValueOnce(older.promise)
       .mockReturnValueOnce(newer.promise);
@@ -80,8 +71,8 @@ describe('useWatchlist', () => {
   });
 
   it('ignores an older watchlist error after a newer refresh succeeds', async () => {
-    const older = deferredPromise<string[]>();
-    const newer = deferredPromise<string[]>();
+    const older = createDeferred<string[]>();
+    const newer = createDeferred<string[]>();
     mockGetWatchlist
       .mockReturnValueOnce(older.promise)
       .mockReturnValueOnce(newer.promise);
@@ -105,8 +96,8 @@ describe('useWatchlist', () => {
   });
 
   it('keeps the newest watchlist error when an older refresh succeeds later', async () => {
-    const older = deferredPromise<string[]>();
-    const newer = deferredPromise<string[]>();
+    const older = createDeferred<string[]>();
+    const newer = createDeferred<string[]>();
     mockGetWatchlist
       .mockReturnValueOnce(older.promise)
       .mockReturnValueOnce(newer.promise);

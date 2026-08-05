@@ -60,6 +60,36 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_FEATURES_ACKNOWLEDGED_OFF": {
+        "title": "Acknowledge Agent Features Off",
+        "description": (
+            "Confirm that Q&A Agent features are not needed. Settles the Agent model "
+            "readiness check for CLI-only setups. Automatically superseded when a "
+            "tool-capable API model becomes available for Agent."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 3,
+        "help_key": "settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF",
+        "examples": [
+            "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+            "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+        ],
+        "docs": [
+            {
+                "label": "LLM 配置指南",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/LLM_CONFIG_GUIDE.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MAX_STEPS": {
         "title": "Agent Max Steps",
         "description": f"Maximum reasoning-step limit for Agent mode. At the default ({AGENT_MAX_STEPS_DEFAULT}), each sub-agent keeps its own preset. When raised above {AGENT_MAX_STEPS_DEFAULT}, all sub-agents adopt this value. When lowered below a sub-agent's preset, that sub-agent is capped at this value.",

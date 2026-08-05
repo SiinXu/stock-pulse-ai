@@ -13,19 +13,11 @@ import {
   buildSignalCenterHref,
 } from '../../routing/routes';
 import PortfolioPage from '../PortfolioPage';
+import { createDeferred, chooseOption } from '../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  fireEvent.click(trigger);
-  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
 }
 
 function chooseVisibleDate(label: string): string {
@@ -304,16 +296,6 @@ function makeDecisionSignal(overrides: Partial<DecisionSignalItem> = {}): Decisi
   };
 }
 
-function deferredPromise<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
 async function waitForPortfolioLoad() {
   await waitFor(() => {
     expect(screen.getByRole('button', { name: /^(刷新数据|Refresh data)$/ })).toBeEnabled();
@@ -490,7 +472,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('drops a late snapshot response after switching account scope', async () => {
-    const accountOneSnapshot = deferredPromise<ReturnType<typeof makeSnapshot>>();
+    const accountOneSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
     getAccounts.mockResolvedValueOnce(makeAccounts([
       { id: 1, name: 'Main' },
       { id: 2, name: 'Alt' },
@@ -808,7 +790,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('refreshes FX for a single selected account and only reloads snapshot/risk', async () => {
-    const selectedAccountRisk = deferredPromise<ReturnType<typeof makeRisk>>();
+    const selectedAccountRisk = createDeferred<ReturnType<typeof makeRisk>>();
     getSnapshot
       .mockResolvedValueOnce(makeSnapshot({ fxStale: true }))
       .mockResolvedValueOnce(makeSnapshot({ accountId: 1, fxStale: true }))
@@ -1021,7 +1003,7 @@ describe('PortfolioPage FX refresh', () => {
       { id: 1, name: 'Main' },
       { id: 2, name: 'Alt' },
     ]));
-    const accountTwoSnapshot = deferredPromise<ReturnType<typeof makeSnapshot>>();
+    const accountTwoSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
     getSnapshot
       .mockResolvedValueOnce(makeSnapshot({
         accountCount: 2,
@@ -1087,7 +1069,7 @@ describe('PortfolioPage FX refresh', () => {
           { symbol: '600519', market: 'cn', currency: 'CNY', quantity: 1, avgCost: 1500, totalCost: 1500, lastPrice: 1600, marketValueBase: 1600, unrealizedPnlBase: 100, unrealizedPnlPct: 6.67, valuationCurrency: 'CNY', priceSource: 'history_close', priceDate: '2026-06-17', priceStale: false, priceAvailable: true },
         ],
       }));
-    const oldSignals = deferredPromise<{
+    const oldSignals = createDeferred<{
       items: DecisionSignalItem[];
       total: number;
       page: number;
@@ -1416,7 +1398,7 @@ describe('PortfolioPage FX refresh', () => {
       return makeSnapshot({ accountId: accountId ?? 1, fxStale: true, accountCount: accountId ? 1 : 2 });
     });
 
-    const pendingRefresh = deferredPromise<{
+    const pendingRefresh = createDeferred<{
       asOf: string;
       accountCount: number;
       pairCount: number;
@@ -1466,7 +1448,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('drops late FX refresh results after switching cost method', async () => {
-    const pendingRefresh = deferredPromise<{
+    const pendingRefresh = createDeferred<{
       asOf: string;
       accountCount: number;
       pairCount: number;
@@ -1513,7 +1495,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('deactivates the selected account from the account toolbar and reloads accounts', async () => {
-    const selectedAccountRisk = deferredPromise<ReturnType<typeof makeRisk>>();
+    const selectedAccountRisk = createDeferred<ReturnType<typeof makeRisk>>();
     getAccounts
       .mockResolvedValueOnce(makeAccounts([{ id: 1, name: 'Main' }, { id: 2, name: 'Alt' }]))
       .mockResolvedValueOnce(makeAccounts([{ id: 2, name: 'Alt' }]));
@@ -1854,7 +1836,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('refreshes the active account scope when a pending mutation commits after navigation', async () => {
-    const pendingTrade = deferredPromise<{ id: number }>();
+    const pendingTrade = createDeferred<{ id: number }>();
     getAccounts.mockResolvedValueOnce(makeAccounts([
       { id: 1, name: 'Main' },
       { id: 2, name: 'Alt' },
@@ -1897,7 +1879,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('locks trade fields and close behavior while a mutation is pending', async () => {
-    const pendingTrade = deferredPromise<{ id: number }>();
+    const pendingTrade = createDeferred<{ id: number }>();
     createTrade.mockReturnValueOnce(pendingTrade.promise);
     renderPortfolioPage();
     await waitForInitialLoad();

@@ -1,19 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
+import { createDeferred, chooseOption } from '../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  fireEvent.click(trigger);
-  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
 }
 
 const {
@@ -82,14 +74,6 @@ const rule = {
   createdAt: '2026-05-18T09:00:00',
   updatedAt: '2026-05-18T09:30:00',
 };
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve;
-  });
-  return { promise, resolve };
-}
 
 beforeEach(() => {
   vi.clearAllMocks();
