@@ -318,15 +318,10 @@ describe('scheduledTasksApi', () => {
   it('rejects create responses missing required OpenAPI fields via ParsedApiError', async () => {
     post.mockResolvedValueOnce({
       data: {
-        compatibility: 'supported',
-        id: 'task-broken',
-        // missing max_attempts, payload, schedule, etc.
-        schema_version: 1,
+        // missing id / compatibility / timestamps — not a valid definition summary
         name: 'broken',
         task_type: 'stock_analysis',
         enabled: true,
-        created_at: '2026-07-26T12:00:00Z',
-        updated_at: '2026-07-26T12:00:00Z',
       },
     });
 

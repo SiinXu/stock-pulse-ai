@@ -82,6 +82,7 @@ describe('structured report insight API contract', () => {
         data: {
           task_id: 'task-report-contract',
           status: 'completed',
+          message_code: 'task.status',
           progress: 100,
           result: {
             query_id: 'report-contract',

@@ -22,6 +22,8 @@ test.describe('Shell global actions', () => {
           status: 'accepted',
           send_notification: true,
           message: 'Market review accepted',
+          region: 'cn',
+          message_code: 'task.market_review.queued',
         }),
       });
     });

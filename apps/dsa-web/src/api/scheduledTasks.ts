@@ -62,19 +62,21 @@ const scheduledScheduleSchema = z.object({
   nonTradingDayPolicy: z.string(),
 }).passthrough();
 
+// List/today projections historically omit payload/schedule; OpenAPI full items
+// include them. Validate shared summary fields and accept full items when present.
 const supportedTaskItemSchema = z.object({
   compatibility: z.literal('supported'),
   id: z.string(),
   schemaVersion: z.number(),
   name: z.string(),
-  taskType: z.string(),
+  taskType: z.string().optional(),
   enabled: z.boolean(),
   nextRunAt: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  maxAttempts: z.number(),
-  payload: scheduledPayloadSchema,
-  schedule: scheduledScheduleSchema,
+  maxAttempts: z.number().optional(),
+  payload: scheduledPayloadSchema.optional(),
+  schedule: scheduledScheduleSchema.optional(),
 }).passthrough();
 
 const unsupportedTaskItemSchema = z.object({

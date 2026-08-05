@@ -1165,9 +1165,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       ],
     }));
     await page.route('**/api/v1/agent/chat/sessions/url-session', (route) => fulfillJson(route, {
+      session_id: 'url-session',
       messages: [{ id: 'url-message', role: 'assistant', content: 'URL session restored' }],
     }));
     await page.route('**/api/v1/agent/chat/sessions/stale-local', (route) => fulfillJson(route, {
+      session_id: 'stale-local',
       messages: [{ id: 'stale-message', role: 'assistant', content: 'stale local message' }],
     }));
     await login(page);
@@ -2193,6 +2195,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         message: 'accepted',
         task_id: submissions === 1 ? 'old-review-task' : 'new-review-task',
         send_notification: false,
+        region: 'cn',
+        message_code: 'task.market_review.queued',
       }, 202);
     });
     await page.route('**/api/v1/analysis/status/old-review-task', async (route) => {
@@ -2530,7 +2534,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.route('**/api/v1/agent/chat/sessions?**', (route) => fulfillJson(route, {
       sessions: [{ session_id: 'overlay-session', title: 'Overlay Session', message_count: 1, created_at: '2026-07-15T10:00:00Z', last_active: '2026-07-15T10:00:00Z' }],
     }));
-    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, { messages: [] }));
+    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, { session_id: 'overlay-session', messages: [] }));
     await login(page);
     await page.goto('/chat?session=overlay-session');
     const historyButton = page.getByRole('button', { name: '历史对话' }).first();

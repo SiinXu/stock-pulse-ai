@@ -172,7 +172,7 @@ const runFlowSnapshotSchema = z.object({
   stockCode: z.string(),
   status: z.string(),
   generatedAt: z.string(),
-  schemaVersion: z.string(),
+  schemaVersion: z.string().optional(),
   summary: runFlowSummarySchema,
   stockName: z.string().nullable().optional(),
   traceId: z.string().nullable().optional(),
