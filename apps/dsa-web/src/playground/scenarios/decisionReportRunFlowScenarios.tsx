@@ -12,6 +12,12 @@ import {
 import { DecisionSignalMemoryControls } from '../../components/decision-signals/DecisionSignalMemoryControls';
 import { DecisionSignalOutcomeExplorer } from '../../components/decision-signals/DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals/DecisionSignalOutcomeRunPanel';
+import { DecisionSignalOutcomeStatsCard } from '../../components/decision-signals/DecisionSignalOutcomeStatsCard';
+import { DecisionSignalProfileCalibration } from '../../components/decision-signals/DecisionSignalProfileCalibration';
+import type {
+  DecisionSignalOutcomeStatsResponse,
+  DecisionSignalProfileCalibration as DecisionSignalProfileCalibrationData,
+} from '../../types/decisionSignals';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
   type ManualSignalDraft,
@@ -194,6 +200,142 @@ const DecisionSignalCreateDrawerStory = () => {
 };
 
 const DecisionSignalOutcomeRunPanelStory = () => <DecisionSignalOutcomeRunPanel onCompleted={() => undefined} />;
+
+const fixtureProfileCalibration: DecisionSignalProfileCalibrationData = {
+  minimumCompletedSampleSize: 30,
+  breakdowns: {
+    decisionProfile: [
+      {
+        dimensions: { decisionProfile: 'balanced' },
+        total: 36,
+        completed: 36,
+        unable: 0,
+        hit: 20,
+        miss: 12,
+        neutral: 4,
+        sampleSufficient: true,
+        hitRatePct: 62.5,
+        avgStockReturnPct: 1.2,
+        missRatePct: 37.5,
+        unableRatePct: 0,
+        maxAdverseExcursionPct: 4.5,
+      },
+      {
+        dimensions: { decisionProfile: 'conservative' },
+        total: 12,
+        completed: 12,
+        unable: 0,
+        hit: 6,
+        miss: 6,
+        neutral: 0,
+        sampleSufficient: false,
+        hitRatePct: null,
+        avgStockReturnPct: null,
+        missRatePct: null,
+        unableRatePct: null,
+        maxAdverseExcursionPct: null,
+      },
+    ],
+    decisionProfileAction: [],
+    decisionProfileHorizon: [
+      {
+        dimensions: { decisionProfile: 'balanced', horizon: '3d' },
+        total: 30,
+        completed: 30,
+        unable: 0,
+        hit: 18,
+        miss: 12,
+        neutral: 0,
+        sampleSufficient: true,
+        hitRatePct: 60,
+        avgStockReturnPct: 0.8,
+        missRatePct: 40,
+        unableRatePct: 0,
+        maxAdverseExcursionPct: 3.1,
+      },
+    ],
+    decisionProfileMarketPhase: [],
+    decisionProfileDataQualityLevel: [],
+    profileSource: [],
+  },
+};
+
+const fixtureOutcomeStats: DecisionSignalOutcomeStatsResponse = {
+  engineVersion: 'decision-signal-v1',
+  statuses: ['active'],
+  total: 48,
+  completed: 48,
+  unable: 0,
+  hit: 26,
+  miss: 18,
+  neutral: 4,
+  hitRatePct: 59.09,
+  avgStockReturnPct: 0.9,
+  unableReasons: {},
+  breakdowns: {},
+  profileCalibration: fixtureProfileCalibration,
+};
+
+const DecisionSignalOutcomeStatsCardStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'loading') {
+    return (
+      <DecisionSignalOutcomeStatsCard
+        outcomeStats={null}
+        statsLoading
+        statsError={null}
+        onRetryStats={() => undefined}
+        onRunCompleted={() => undefined}
+      />
+    );
+  }
+  if (scenario === 'empty') {
+    return (
+      <DecisionSignalOutcomeStatsCard
+        outcomeStats={{ ...fixtureOutcomeStats, total: 0, completed: 0, hit: 0, miss: 0, neutral: 0, profileCalibration: undefined }}
+        statsLoading={false}
+        statsError={null}
+        onRetryStats={() => undefined}
+        onRunCompleted={() => undefined}
+      />
+    );
+  }
+  return (
+    <DecisionSignalOutcomeStatsCard
+      outcomeStats={fixtureOutcomeStats}
+      statsLoading={false}
+      statsError={null}
+      onRetryStats={() => undefined}
+      onRunCompleted={() => undefined}
+    />
+  );
+};
+
+const DecisionSignalProfileCalibrationStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'insufficient') {
+    return (
+      <DecisionSignalProfileCalibration
+        calibration={{
+          ...fixtureProfileCalibration,
+          breakdowns: {
+            ...fixtureProfileCalibration.breakdowns,
+            decisionProfile: fixtureProfileCalibration.breakdowns.decisionProfile.map((bucket) => ({
+              ...bucket,
+              sampleSufficient: false,
+              hitRatePct: null,
+              avgStockReturnPct: null,
+              missRatePct: null,
+              unableRatePct: null,
+              maxAdverseExcursionPct: null,
+            })),
+          },
+        }}
+      />
+    );
+  }
+  return <DecisionSignalProfileCalibration calibration={fixtureProfileCalibration} />;
+};
 
 const DeepResearchPanelStory = () => {
   const { scenario, profile } = usePlaygroundScenario();
@@ -455,6 +597,8 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'decision-signal-timeline': DecisionSignalTimelineStory,
   'decision-signal-create-drawer': DecisionSignalCreateDrawerStory,
   'decision-signal-outcome-run-panel': DecisionSignalOutcomeRunPanelStory,
+  'decision-signal-outcome-stats-card': DecisionSignalOutcomeStatsCardStory,
+  'decision-signal-profile-calibration': DecisionSignalProfileCalibrationStory,
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,

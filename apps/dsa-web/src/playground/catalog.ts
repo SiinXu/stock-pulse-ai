@@ -144,6 +144,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('signals', 'decision-signal-timeline', 'DecisionSignalTimeline', 'components/decision-signals/DecisionSignalTimeline.tsx', ['default', 'loading', 'empty', 'error']),
   entry('signals', 'decision-signal-create-drawer', 'DecisionSignalCreateDrawer', 'components/decision-signals/DecisionSignalCreateDrawer.tsx', ['interactive', 'states']),
   entry('signals', 'decision-signal-outcome-run-panel', 'DecisionSignalOutcomeRunPanel', 'components/decision-signals/DecisionSignalOutcomeRunPanel.tsx', ['interactive', 'empty', 'error']),
+  entry('signals', 'decision-signal-outcome-stats-card', 'DecisionSignalOutcomeStatsCard', 'components/decision-signals/DecisionSignalOutcomeStatsCard.tsx', ['default', 'empty', 'loading']),
+  entry('signals', 'decision-signal-profile-calibration', 'DecisionSignalProfileCalibration', 'components/decision-signals/DecisionSignalProfileCalibration.tsx', ['default', 'insufficient']),
 
   entry('reports', 'analysis-context-summary', 'AnalysisContextSummary', 'components/report/AnalysisContextSummary.tsx', ['default', 'empty']),
   entry('reports', 'market-review-report-view', 'MarketReviewReportView', 'components/report/MarketReviewReportView.tsx', ['default', 'loading', 'error']),
