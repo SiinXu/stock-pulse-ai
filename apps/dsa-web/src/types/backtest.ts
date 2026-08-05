@@ -25,7 +25,8 @@ export interface BacktestRunResponse {
   completed: number;
   insufficient: number;
   errors: number;
-  appliedEvalWindowDays?: number;
+  /** OpenAPI: required and nullable. */
+  appliedEvalWindowDays: number | null;
   message?: string | null;
   diagnostics?: Record<string, unknown>;
 }
@@ -96,17 +97,18 @@ export interface PerformanceMetrics {
   lossCount: number;
   neutralCount: number;
 
-  directionAccuracyPct?: number;
-  winRatePct?: number;
-  neutralRatePct?: number;
-  avgStockReturnPct?: number;
-  avgSimulatedReturnPct?: number;
+  directionAccuracyPct?: number | null;
+  winRatePct?: number | null;
+  neutralRatePct?: number | null;
+  avgStockReturnPct?: number | null;
+  avgSimulatedReturnPct?: number | null;
 
-  stopLossTriggerRate?: number;
-  takeProfitTriggerRate?: number;
-  ambiguousRate?: number;
-  avgDaysToFirstHit?: number;
+  stopLossTriggerRate?: number | null;
+  takeProfitTriggerRate?: number | null;
+  ambiguousRate?: number | null;
+  avgDaysToFirstHit?: number | null;
 
-  adviceBreakdown: Record<string, unknown>;
-  diagnostics: Record<string, unknown>;
+  /** OpenAPI: optional. */
+  adviceBreakdown?: Record<string, unknown>;
+  diagnostics?: Record<string, unknown>;
 }

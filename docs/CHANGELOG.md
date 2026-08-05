@@ -17,10 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Applied Content-Security-Policy and related security headers (nosniff, frame deny, referrer) on FastAPI responses as defense-in-depth for the served web app.
 - [Chore] Extracted NotificationConfig and ShareImageConfig domain sub-objects behind the flat Config facade (phase 1; attribute access unchanged).
+- [Changed] Migrated portfolio, backtest, decisionSignals, and scorecard Web API modules to OpenAPI-generated types with Zod boundary validation (money-math numeric-string mismatches fail closed).
 - [Tests] Expand Playwright e2e coverage for share-image success/503 UI, per-market market-review region selection, and auth-disable current-password re-confirmation.
 - [Chore] Extended the mypy ratchet to `api/v1/schemas` (kept `follow_imports=skip`; documented next-package order).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
+- [Chore] Upgraded the Electron desktop stack (Electron 43.3.0, electron-builder 26.15.7, electron-updater 6.8.9, tar override 7.5.22) and added ESLint flat config with // @ts-check for main.js.
 
+- [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
