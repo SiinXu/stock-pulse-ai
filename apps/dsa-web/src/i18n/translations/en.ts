@@ -104,6 +104,10 @@ export const UI_TRANSLATION_KEYS = [
   "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.title",
   "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message",
   "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title",
   "api.error.STABLE_ERROR_TEXT.unauthorized.message",
   "api.error.STABLE_ERROR_TEXT.unauthorized.title",
   "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message",
@@ -4461,6 +4465,10 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.title": "Security audit requires administrator authentication",
   "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message": "Security audit records cannot be read or written. Retry later, or check the database and migration state.",
   "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title": "Security audit storage is unavailable",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "This report has {actual} characters, which exceeds the share-image limit of {limit}. Raise SHARE_IMAGE_MAX_CHARS in Settings, or shorten the report and try again.",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "Report is too long to generate a share image",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "Install and enable the image renderer. For Playwright: cd apps/dsa-web && npm ci && npx playwright install chromium.",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title": "Share image renderer unavailable",
   "api.error.STABLE_ERROR_TEXT.unauthorized.message": "Your session has expired. Sign in again.",
   "api.error.STABLE_ERROR_TEXT.unauthorized.title": "Sign-in required",
   "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message": "Choose a supported alert condition.",
@@ -8708,5 +8716,5 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "Preparing {candidate_count} candidates",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Screening in progress",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Screening task queued",
-  "utils.taskMessage.TASK_STATUS_UPDATED": "Task status updated"
+  "utils.taskMessage.TASK_STATUS_UPDATED": "Task status updated",
 };

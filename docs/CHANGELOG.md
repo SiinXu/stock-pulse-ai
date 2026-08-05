@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Marked the HK cold-lookup barrier test as `@pytest.mark.benchmark` so it leaves the blocking offline gate and runs in the scheduled benchmark workflow.
 - [Fixed] Registered `TENCENT_PRIORITY` in the config registry and read it via the Config object (env fallback preserved) so Web settings changes apply to the Tencent daily fetcher.
 - [Docs] Documented coverage-floor anti-lowering semantics, legitimate floor-lowering path, package-scope assertions, and the scheduled benchmark runner in `docs/testing-ci-gate.md`.
+- [Fixed] Share-image API returns HTTP 413 `share_image_content_too_large` when report Markdown exceeds `SHARE_IMAGE_MAX_CHARS` (default 100000), instead of a false 503 renderer-unavailable; Web shows the localized ParsedApiError, uses a 90s per-request timeout, and downloads via a DOM-attached anchor.
 - [Tests] Wait for decision-memory controls and legacy usage-route synchronization before asserting or interacting, eliminating full-suite timing races.
 - [Tests] Cover share-image parsing, merge, localization, safety, and branding contracts so the repository coverage floor remains enforceable after the upstream parity merge.
 - [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
