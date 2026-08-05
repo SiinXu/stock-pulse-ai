@@ -51,6 +51,8 @@ sequenceDiagram
 7. Watch **Running tasks**.
 8. Open History when complete.
 
+Ticker-suffix examples, manual full-code submission guidance, and the phase scope are available from the help tooltips beside their field labels. Hover or focus the help icons to read them without expanding the launch grid.
+
 The Launch & batch view separates stock and Skill, mode and notification, and
 batch actions into three groups. Confirm them from top to bottom before
 submitting so a single-stock run is not confused with an imported batch.

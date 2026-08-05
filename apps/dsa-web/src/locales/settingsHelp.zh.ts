@@ -938,6 +938,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 分析的最大等待时间。'],
     notes: ['超时不影响其他股票的分析流程。'],
   },
+  'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
+    title: '技能观点样本记录',
+    summary: '将个体技能观点写入离线后验评估存储。',
+    usage: '仅在需要通过 /api/v1/skill-outcomes 做离线后验时开启；默认关闭不影响分析与聚合权重。',
+    valueNotes: [
+      '默认关闭；开关不影响运行时聚合权重。',
+      '开启后：在已绑定 history id 时于聚合后落库，并在分析历史保存后从报告物化样本。',
+    ],
+    impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
+    notes: ['记录失败仅记日志，不会让分析失败。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',

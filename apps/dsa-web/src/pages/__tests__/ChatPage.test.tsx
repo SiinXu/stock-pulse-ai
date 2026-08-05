@@ -273,8 +273,16 @@ describe('ChatPage', () => {
     expect(await screen.findByTestId('chat-workspace')).toBeInTheDocument();
     expect(screen.getByTestId('chat-session-list-scroll')).toBeInTheDocument();
     expect(screen.getByTestId('chat-message-scroll')).toBeInTheDocument();
-    expect(screen.getByTestId('chat-session-rail')).toHaveClass('hidden', 'xl:flex');
-    expect(screen.getByTestId('chat-session-rail')).not.toHaveClass('md:flex');
+    const sessionRail = screen.getByTestId('chat-session-rail');
+    expect(sessionRail).toHaveClass('hidden', 'xl:flex');
+    expect(sessionRail).not.toHaveClass(
+      'md:flex',
+      'rounded-3xl',
+      'border',
+      'border-subtle',
+      'bg-card/82',
+      'shadow-soft-card',
+    );
     expect(screen.getByTestId('chat-session-trigger')).toHaveClass('xl:hidden');
     expect(screen.getByTestId('chat-session-trigger')).not.toHaveClass('md:hidden');
     expect(mockLoadInitialSession).toHaveBeenCalled();
@@ -427,6 +435,8 @@ describe('ChatPage', () => {
 
     expect(compressionToggle).toHaveClass('h-11', 'w-11');
     expect(screen.getByTestId('context-compression-switch-visual')).toHaveClass('h-6', 'w-10');
+    expect(screen.getByTestId('context-compression-settings')).toHaveClass('py-1');
+    expect(screen.getByTestId('context-compression-settings')).not.toHaveClass('py-2');
     expect(compressionToggle).not.toBeChecked();
 
     fireEvent.click(compressionToggle);

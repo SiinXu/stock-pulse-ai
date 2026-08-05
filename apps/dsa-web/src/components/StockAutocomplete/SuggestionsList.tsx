@@ -21,6 +21,7 @@ export interface SuggestionsListProps {
   onMouseEnter: (index: number) => void;
   /** Custom style (for Portal fixed positioning) */
   style?: CSSProperties;
+  density?: 'default' | 'compact';
 }
 
 export function SuggestionsList({
@@ -29,6 +30,7 @@ export function SuggestionsList({
   onSelect,
   onMouseEnter,
   style,
+  density = 'default',
 }: SuggestionsListProps) {
   if (suggestions.length === 0) {
     return null;
@@ -38,6 +40,7 @@ export function SuggestionsList({
     <ul
       id="suggestions-list"
       data-dialog-popup="true"
+      data-suggestion-density={density}
       className="max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b shadow-xl"
       style={getOverlayStyle('popover', {
         ...style,
@@ -52,21 +55,22 @@ export function SuggestionsList({
           role="option"
           aria-selected={index === highlightedIndex}
           className={cn(
-            'px-4 py-2 cursor-pointer flex items-center justify-between',
+            'cursor-pointer flex items-center justify-between',
+            density === 'compact' ? 'gap-2 px-2.5 py-1.5 text-xs' : 'px-4 py-2',
             'hover:bg-muted',
             index === highlightedIndex && 'bg-muted',
           )}
           onClick={() => onSelect(suggestion)}
           onMouseEnter={() => onMouseEnter(index)}
         >
-          <div className="flex items-center gap-3">
+          <div className={cn('flex min-w-0 items-center', density === 'compact' ? 'gap-2' : 'gap-3')}>
             <MarketBadge market={suggestion.market} />
 
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-primary-text">
+            <div className="flex min-w-0 flex-col">
+              <span className={cn('truncate font-medium text-primary-text', density === 'compact' ? 'text-xs' : 'text-sm')}>
                 {suggestion.nameZh}
               </span>
-              <span className="text-sm text-secondary-text">
+              <span className={cn('truncate text-secondary-text', density === 'compact' ? 'text-xs' : 'text-sm')}>
                 {suggestion.displayCode}
               </span>
             </div>

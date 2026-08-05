@@ -48,7 +48,9 @@ describe('SystemConfigRollbackCard', () => {
     );
 
     expect(screen.getByText('当前配置版本：v3')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '回滚配置' }));
+    const rollbackButton = screen.getByRole('button', { name: '回滚配置' });
+    expect(rollbackButton).toHaveAttribute('data-variant', 'danger-subtle');
+    fireEvent.click(rollbackButton);
     expect(screen.getByRole('dialog', { name: '确认回滚系统配置？' })).toHaveTextContent('v3');
     fireEvent.click(screen.getByRole('button', { name: '确认回滚' }));
 

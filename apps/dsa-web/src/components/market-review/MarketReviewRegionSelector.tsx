@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Globe2, RotateCcw } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { Checkbox } from '../common';
 import {
   formatMarketReviewRegionSelection,
   MARKET_REVIEW_REGION_ORDER,
@@ -161,40 +162,35 @@ export const MarketReviewRegionSelector: React.FC<MarketReviewRegionSelectorProp
               <Check className={cn('h-4 w-4', value === undefined ? 'opacity-100' : 'opacity-0')} aria-hidden="true" />
             </button>
 
-            <button
-              type="button"
+            <Checkbox
               disabled={disabled}
-              aria-pressed={value !== undefined && displayedRegions.length === MARKET_REVIEW_REGION_ORDER.length}
-              onClick={() => onChange([...MARKET_REVIEW_REGION_ORDER])}
-              className="flex min-h-10 w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
-            >
-              <span className="flex h-4 w-4 items-center justify-center rounded border border-primary/60 bg-primary/10">
-                <Check
-                  className={cn('h-3 w-3 text-primary', displayedRegions.length === MARKET_REVIEW_REGION_ORDER.length ? 'opacity-100' : 'opacity-0')}
-                  aria-hidden="true"
-                />
-              </span>
-              <span className="font-medium">{t('home.marketRegionAll')}</span>
-            </button>
+              checked={value !== undefined && displayedRegions.length === MARKET_REVIEW_REGION_ORDER.length}
+              onChange={() => onChange([...MARKET_REVIEW_REGION_ORDER])}
+              containerClassName="group min-h-10 w-full rounded-xl px-2.5 py-2 transition-colors hover:bg-hover"
+              label={(
+                <span className="font-normal text-secondary-text group-hover:text-foreground">
+                  {t('home.marketRegionAll')}
+                </span>
+              )}
+            />
 
             <div className="grid grid-cols-1 gap-1 pt-1 sm:grid-cols-2">
               {MARKET_REVIEW_REGION_ORDER.map((region) => {
                 const checked = displayedRegions.includes(region);
                 return (
-                  <label
+                  <Checkbox
                     key={region}
-                    className="flex min-h-10 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2 text-sm text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-                  >
-                    <input
-                      type="checkbox"
-                      disabled={disabled}
-                      checked={checked}
-                      onChange={() => toggleRegion(region)}
-                      className="h-4 w-4 rounded border-border accent-primary"
-                    />
-                    <span>{regionLabels[region]}</span>
-                    <span className="ml-auto text-xs uppercase text-muted-text">{region}</span>
-                  </label>
+                    disabled={disabled}
+                    checked={checked}
+                    onChange={() => toggleRegion(region)}
+                    containerClassName="group min-h-10 w-full rounded-xl px-2.5 py-2 transition-colors hover:bg-hover"
+                    label={(
+                      <span className="flex min-w-0 flex-1 items-center gap-3 font-normal text-secondary-text group-hover:text-foreground">
+                        <span>{regionLabels[region]}</span>
+                        <span className="ml-auto text-xs uppercase text-muted-text">{region}</span>
+                      </span>
+                    )}
+                  />
                 );
               })}
             </div>

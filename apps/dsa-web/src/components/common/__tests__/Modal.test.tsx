@@ -55,6 +55,26 @@ describe('Modal escape behavior', () => {
     );
   });
 
+  it('supports opt-in borderless dialog chrome without changing the default', () => {
+    render(
+      <UiLanguageProvider>
+        <Modal
+          isOpen
+          showBorder={false}
+          showHeaderDivider={false}
+          onClose={() => undefined}
+          title="Borderless dialog"
+        >
+          <p>Borderless content</p>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Borderless dialog' });
+    expect(dialog).not.toHaveClass('border', 'border-border');
+    expect(dialog.querySelector('[data-overlay-slot="header"]')).not.toHaveClass('border-b', 'border-border');
+  });
+
   it('blocks backdrop, Escape, and close-button dismissal while closing is disabled', () => {
     const onClose = vi.fn();
     const onPageEscape = vi.fn();

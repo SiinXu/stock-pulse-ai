@@ -34,20 +34,24 @@ If you only want history, open the clean URL `/research/market` without `action=
 
 ## What you will see
 
-1. **Trigger review** control — submits one market-level job.  
-2. **Feedback area** — submitting / running / done / failed / timeout.  
-3. **Review history** — previous market diaries; multi-select delete may be available.  
-4. **Report pane** — summary and body for the selected history row.  
-5. Optional **run flow** — stage breakdown for debugging.
+1. **Market selector** — use checkboxes for one or more markets, or restore the server default.
+2. **Trigger review** — submit a market-level task.
+3. **Feedback area** — submitting / running / done / failed / timeout.
+4. **Review history** — previous market diaries; multi-select delete may be available.
+5. **Report pane** — summary and body for the selected history row.
+6. Optional **run flow** — stage breakdown for debugging.
+
+In narrower content areas, review history and the report pane stack vertically. The history rail and report use two columns only on wide screens so empty states are not squeezed into an awkward narrow column.
 
 ### Recommended after-close steps
 
 1. Open Market review.  
-2. Trigger review (label as in UI).  
-3. Wait for completion; on failure read model / network / data-source errors.  
-4. Open the newest history row.  
-5. Read in order: indices → breadth → sectors → risks / data quality.  
-6. Pick at most 1–2 themes and open [03 Analysis workbench](03-analysis-workbench_EN.md) for individual codes.
+2. Select markets as needed; keep at least one market or use the server default.
+3. Trigger review (label as in UI).
+4. Wait for completion; on failure read model / network / data-source errors.
+5. Open the newest history row.
+6. Read in order: indices → breadth → sectors → risks / data quality.
+7. Pick at most 1–2 themes and open [03 Analysis workbench](03-analysis-workbench_EN.md) for individual codes.
 
 ## Common report blocks
 

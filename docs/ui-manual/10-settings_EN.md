@@ -63,6 +63,8 @@ Save control is often on the top or bottom toolbar—scroll once on narrow scree
 6. Optionally set **Agent** model (can match primary at first).  
 7. **Save** → **Test connection**.
 
+The provider picker uses a rounded search field. Success, empty, and error states from **Fetch models** appear below the action instead of squeezing it; manual model entry remains available after a failure.
+
 ### Local models
 
 Browse catalog, pull/register, activate. Desktop may prefer bundled Ollama. Respect delete protections on catalog models.
@@ -130,9 +132,11 @@ English menus + Chinese reports is valid.
 
 When enabled, a **long-running** Web/API/Desktop process must stay up. You may see next-run times and “run once” actions. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
 
+In a narrow Settings content column, legacy day-batch configuration and runtime status stay stacked; they become side by side only when the content area has enough room.
+
 ### Config backup
 
-Export a saved snapshot before desktop reinstall; import reloads keys and may warn about unsaved drafts. **Roll back to the last good configuration** submits the current config version behind a danger confirmation and reloads atomically. A version conflict is never auto-retried: explicitly load the latest config first. Fields actually restored by the server synchronize to their rolled-back values; other unsaved drafts and the signed-in session remain intact.
+Export a saved snapshot before desktop reinstall; import reloads keys and may warn about unsaved drafts. **Roll back to the last good configuration** uses the destructive treatment, submits the current config version behind a danger confirmation, and reloads atomically. A version conflict is never auto-retried: explicitly load the latest config first. Fields actually restored by the server synchronize to their rolled-back values; other unsaved drafts and the signed-in session remain intact.
 
 ## Use cases
 
