@@ -381,7 +381,7 @@ EXPECTED_CLASS_STATIC_ATTRIBUTES = (
     "_runtime_scheduler",
     "_runtime_config_transaction",
 )
-EXPECTED_METHOD_METADATA_SHA256 = '1b963e531964e74c80775db832fc2497f41c9d9059f955c6a354f5da0d0681b4'
+EXPECTED_METHOD_METADATA_SHA256 = '195751fd8dc203cce1e1414e0c0d053d235f0860c3e96bb575b158733b5ba788'
 
 
 def _descriptor_function(descriptor):
