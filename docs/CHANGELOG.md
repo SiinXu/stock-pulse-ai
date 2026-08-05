@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Ported upstream explicit-suffix stock-list analysis-target parsing (`parse_analysis_target` / IndexRegistry) with reject contract for invalid exchange suffixes.
+
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
