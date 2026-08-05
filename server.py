@@ -119,13 +119,21 @@ def _parse_server_bind(argv: list[str] | None = None) -> argparse.Namespace:
         )
         options.bind_authoritative = True
     else:
-        # Import-based servers can bind sockets without exposing their Config
-        # to the ASGI module. Treat that unprovable locality like an inherited FD.
-        options.host = None
-        options.port = None
-        options.uds = None
-        options.fd = None
-        options.bind_authoritative = False
+        # Unrecognized launchers (user-local uvicorn shims, `uv run`, gunicorn
+        # workers, supervisor wrappers, etc.). Keep explicit CLI bind options so
+        # loopback targets remain provable; never invent defaults from the
+        # environment, and treat missing / FD-ambiguous binds as unprovable.
+        if options.fd is not None:
+            # An inherited FD cannot be proven local even when --host is loopback.
+            options.bind_authoritative = False
+        elif options.host is not None or options.uds is not None:
+            options.bind_authoritative = True
+        else:
+            options.host = None
+            options.port = None
+            options.uds = None
+            options.fd = None
+            options.bind_authoritative = False
     return options
 
 

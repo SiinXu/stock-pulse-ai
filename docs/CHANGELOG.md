@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] Honored explicit loopback `--host`/`--uds` under unrecognized HTTP launchers (custom uvicorn shims, `uv run`, gunicorn-style argv) while keeping fail-closed behavior and clearer errors when the bind cannot be verified as local.
 - [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.
 - [Tests] Wait for decision-memory controls and legacy usage-route synchronization before asserting or interacting, eliminating full-suite timing races.
 - [Tests] Cover share-image parsing, merge, localization, safety, and branding contracts so the repository coverage floor remains enforceable after the upstream parity merge.
