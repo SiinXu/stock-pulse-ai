@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
+- [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
 - [Chore] Extracted the largest Settings sections into dedicated cards and added a page-size lint guard.
 - [Chore] Moved stock-list splitting to a leaf utility, removing the config-to-services import edge.
 - [Added] Added a shrink-only import-cycle ratchet to the deterministic CI gate.
