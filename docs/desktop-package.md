@@ -11,6 +11,11 @@
 - Python 后端首次初始化 `DatabaseManager` 时同步完成有序数据库 migration，Electron 不复制 Schema 升级逻辑；通用 `/api/health` 不是数据库 readiness probe
 - Windows 便携/安装模式下，用户配置文件 `.env`、数据库和持久化日线 provider cache 放在 exe 同级运行时目录；macOS 打包版使用 Electron 用户数据目录保存这些运行时数据
 - 桌面端会自动从本机 `8000-8100` 选择可用端口，并把实际选择的端口同步给内置后端；桌面端不依赖 `.env` 里的 `WEBUI_PORT` 来决定窗口连接地址，避免用户改端口后 Electron 仍等待旧端口导致启动超时
+- 报告正文等 Markdown 中的外部 `http`/`https` 链接：主窗口导航守卫会拦截离开私有本地 Web origin 的顶层导航，并把合法外链转发到系统默认浏览器（与 `target="_blank"` 的窗口打开路径一致）。`file:`、`blob:`、`javascript:` 等非 http(s) 方案仍只拦截、不外开
+
+### 报告分享图（Web only）
+
+报告页的「生成分享图」按钮（`ShareImageButton`）在检测到桌面运行时（`window.dsaDesktop`）时会直接隐藏，不提供等价入口。原因是分享图路径依赖浏览器侧的图片生成与系统分享/下载能力，当前桌面壳尚未接入对应 IPC 或系统分享通道；功能仍仅在纯 Web 部署中可用。后续若要在桌面端开放，需要单独设计主进程能力与回退策略，不属于启动/导航守卫链路。
 
 ## 本地开发
 
