@@ -15,9 +15,11 @@ import {
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, IconButton, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, IconButton, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
 import { Pressable } from '../components/common/Pressable';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
+import { ChatEmptyMessages } from '../components/chat/ChatEmptyMessages';
+import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -225,6 +227,7 @@ const ChatPage: React.FC = () => {
   const [contextCompressionConfigVersion, setContextCompressionConfigVersion] = useState('');
   const [contextCompressionMaskToken, setContextCompressionMaskToken] = useState('******');
   const [contextCompressionError, setContextCompressionError] = useState<string | null>(null);
+  const agentUnavailable = useAgentSetupAvailability();
   const [copiedMessages, setCopiedMessages] = useState<Set<string>>(new Set());
   const { copyText } = useClipboard();
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
@@ -593,6 +596,7 @@ const ChatPage: React.FC = () => {
       active = false;
     };
   }, [t]);
+
 
   const updateContextCompressionEnabled = useCallback(
     async (nextEnabled: boolean) => {
@@ -1354,43 +1358,17 @@ const ChatPage: React.FC = () => {
             testId="chat-message-scroll"
           >
             {messages.length === 0 && !loading ? (
-              <div className="flex h-full items-center justify-center">
-                <EmptyState
-                  title={t('chat.emptyTitle')}
-                  description={t('chat.emptyDescription')}
-                  className="max-w-2xl"
-                  icon={(
-                    <svg
-                      className="h-8 w-8"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                      />
-                    </svg>
-                  )}
-                  action={(
-                    <div className="flex max-w-lg flex-wrap justify-center gap-2">
-                      {quickQuestions.map((q, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => handleQuickQuestion(q)}
-                          disabled={isSkillsLoading || loading || sessionLoading}
-                          className="quick-question-btn"
-                        >
-                          {q.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                />
-              </div>
+              <ChatEmptyMessages
+                agentUnavailable={agentUnavailable}
+                agentUnavailableTitle={t('chat.agentUnavailableTitle')}
+                agentUnavailableDescription={t('chat.agentUnavailableDescription')}
+                agentUnavailableAction={t('chat.agentUnavailableAction')}
+                emptyTitle={t('chat.emptyTitle')}
+                emptyDescription={t('chat.emptyDescription')}
+                quickQuestions={quickQuestions}
+                onQuickQuestion={handleQuickQuestion}
+                quickQuestionsDisabled={isSkillsLoading || loading || sessionLoading}
+              />
             ) : (
               messages.map((msg) => {
                 const skillLabel = getMessageSkillLabel(msg);
