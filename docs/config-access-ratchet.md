@@ -93,6 +93,7 @@ an injection seam:
 | `src/services/history_service.py` | Optional `config` constructor arg; default via `get_application_services().config` |
 | `src/services/portfolio_risk_service.py` | Existing optional `config` arg; default via composition root |
 | `src/services/alert_worker.py` | Existing `config_provider` callable; default provider uses composition root |
+| `api/v1/endpoints/system_config.py` (`get_kronos_status`) | Composition-root config for status probe (converted when landing after main introduced the site) |
 
 Further conversions are incremental follow-ups under issue #625; each PR should
 shrink the baseline without changing config semantics.
