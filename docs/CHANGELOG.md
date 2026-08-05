@@ -2645,3 +2645,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 [1.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/4df277e109c38604e31e2184fcff36f561f8ffa5
 [1.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/5d5c095be55ff8cc2b0ed219ea35a9135536de38
 [1.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v1.0.0
+
