@@ -355,7 +355,9 @@ vi.mock('../../components/settings', async () => {
     onConfigurationChanged?: () => void | Promise<void>;
   }) => (
     <div data-testid="local-models-with-kronos">
-      <button type="button" onClick={() => void onConfigurationChanged?.()}>refresh local models</button>
+      <div data-testid="local-models-panel">
+        <button type="button" onClick={() => void onConfigurationChanged?.()}>refresh local models</button>
+      </div>
     </div>
   ),
   ModelFallbackEditor: (await import('../../components/settings/ModelFallbackEditor')).ModelFallbackEditor,
