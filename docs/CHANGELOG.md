@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extended the mypy ratchet to `api/v1/schemas` (kept `follow_imports=skip`; documented next-package order).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 
+- [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
+- [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
