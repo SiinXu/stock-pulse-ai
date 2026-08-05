@@ -262,7 +262,7 @@ OPENAI_MODEL=deepseek-v4-flash
 
 Kronos 是**可选**的本地 K 线预测 Agent Tool（不是聊天模型），默认关闭且不安装 torch。
 
-1. 安装可选依赖：`pip install … -r requirements-kronos.txt`（见 [Kronos 本地模型](kronos-local-model.md)）
+1. 安装可选依赖：`python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt`（见 [Kronos 本地模型](kronos-local-model.md)）
 2. 显式下载权重（会先打印大约体积）：`python scripts/download_kronos_weights.py --size mini --weights-dir <dir> --yes`
 3. 在 **设置 → AI 与模型 → 本地模型** 配置 `KRONOS_ENABLED` / `KRONOS_MODEL_SIZE` / `KRONOS_WEIGHTS_DIR`，或写入 `.env`
 4. **重启**进程；用同一页的 Kronos 状态面板核对依赖与权重

@@ -96,7 +96,7 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 | 状态 reason | 含义 | 下一步 |
 | --- | --- | --- |
 | `disabled` | 未启用 | 装依赖 → 下载权重 → 配置目录 → 启用 → 重启 |
-| `dependencies_missing` | 可选包缺失 | `pip install -r requirements-kronos.txt`（见上文） |
+| `dependencies_missing` | 可选包缺失 | 上文完整 `python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt` |
 | `weights_dir_*` / `weights_incomplete` / `weights_invalid` | 权重路径或文件问题 | `scripts/download_kronos_weights.py` 或修复目录 |
 | `ready` | 本地门禁通过 | 若工具未注册则重启；再走 Agent 路径 |
 | `packaged_desktop_unsupported` | 预构建桌面 | 改用源码环境 |

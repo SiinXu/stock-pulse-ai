@@ -176,6 +176,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'data-providers-panel', 'DataProvidersPanel', 'components/settings/DataProvidersPanel.tsx', ['interactive', 'empty']),
   entry('settings', 'first-run-wizard', 'FirstRunWizard', 'components/settings/FirstRunWizard.tsx', ['interactive', 'error']),
   entry('settings', 'generation-backend-status-panel', 'GenerationBackendStatusPanel', 'components/settings/GenerationBackendStatusPanel.tsx', ['default', 'loading', 'error']),
+  entry('settings', 'kronos-status-panel', 'KronosStatusPanel', 'components/settings/KronosStatusPanel.tsx', ['default', 'loading', 'error']),
   entry('settings', 'intelligent-import', 'IntelligentImport', 'components/settings/IntelligentImport.tsx', ['interactive', 'error']),
   entry('settings', 'intelligence-sources-panel', 'IntelligenceSourcesPanel', 'components/settings/IntelligenceSourcesPanel.tsx', ['default', 'loading', 'empty', 'error']),
   entry('settings', 'investment-framework-settings-card', 'InvestmentFrameworkSettingsCard', 'components/settings/InvestmentFrameworkSettingsCard.tsx', ['default', 'empty', 'error']),

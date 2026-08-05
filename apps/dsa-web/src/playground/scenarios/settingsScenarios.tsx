@@ -7,6 +7,7 @@ import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
 import { FirstRunWizard } from '../../components/settings/FirstRunWizard';
 import { GenerationBackendStatusPanel } from '../../components/settings/GenerationBackendStatusPanel';
+import { KronosStatusPanel } from '../../components/settings/KronosStatusPanel';
 import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
 import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
@@ -188,6 +189,8 @@ const GenerationBackendStatusPanelStory = () => {
     />
   );
 };
+
+const KronosStatusPanelStory = () => <KronosStatusPanel />;
 
 const IntelligentImportStory = () => {
   const [value, setValue] = useState('600519,AAPL');
@@ -466,6 +469,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'data-providers-panel': DataProvidersPanelStory,
   'first-run-wizard': FirstRunWizardStory,
   'generation-backend-status-panel': GenerationBackendStatusPanelStory,
+  'kronos-status-panel': KronosStatusPanelStory,
   'intelligent-import': IntelligentImportStory,
   'investment-framework-settings-card': InvestmentFrameworkSettingsCard,
   'intelligence-sources-panel': IntelligenceSourcesPanel,

@@ -94,7 +94,7 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 | `reason` | Meaning | Next step |
 | --- | --- | --- |
 | `disabled` | Tool off | Install deps → download weights → set dir → enable → restart |
-| `dependencies_missing` | Optional packages missing | `pip install -r requirements-kronos.txt` (command above) |
+| `dependencies_missing` | Optional packages missing | Full command above: `python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt` |
 | `weights_dir_*` / `weights_incomplete` / `weights_invalid` | Path or artifact issues | `scripts/download_kronos_weights.py` or fix directories |
 | `ready` | Local gates pass | Restart if the tool is not registered yet; then use Agent |
 | `packaged_desktop_unsupported` | Prebuilt desktop | Use a source install |

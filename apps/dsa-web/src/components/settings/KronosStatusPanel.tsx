@@ -73,7 +73,7 @@ export const KronosStatusPanel: React.FC<KronosStatusPanelProps> = ({
         <Button
           type="button"
           variant="secondary"
-          size="sm"
+          size="default"
           disabled={disabled || isLoading}
           onClick={() => {
             void refresh();
