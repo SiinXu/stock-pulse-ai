@@ -24,6 +24,7 @@ from api.v1.schemas.system_config import (
     GenerationBackendStatusPreviewRequest,
     GenerationBackendStatusResponse,
     ImportSystemConfigRequest,
+    KronosStatusResponse,
     LocalModelCatalogResponse,
     LLMProviderCatalogResponse,
     RollbackSystemConfigRequest,
@@ -345,6 +346,45 @@ def get_generation_backend_status(
             detail={
                 "error": "internal_error",
                 "message": "Failed to load generation backend status",
+            },
+        )
+
+
+@router.get(
+    "/config/kronos/status",
+    response_model=KronosStatusResponse,
+    responses={
+        200: {"description": "Kronos local-model status loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get Kronos local model status",
+    description=(
+        "Read a side-effect-free Kronos readiness diagnostic: optional dependency "
+        "import probes, weights directory presence, enabled flag, and one actionable "
+        "next step. Never downloads weights and does not import torch at module level."
+    ),
+    operation_id="getKronosStatus",
+)
+def get_kronos_status() -> KronosStatusResponse:
+    """Return Kronos install/config readiness without writing config or downloading."""
+    try:
+        from src.config import get_config
+        from src.services.kronos_forecast_service import build_kronos_status_report
+
+        payload = build_kronos_status_report(get_config()).to_dict()
+        return KronosStatusResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - map Kronos status probe failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Kronos status load failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load Kronos status",
             },
         )
 

@@ -29,10 +29,18 @@ const NOTIFICATIONS_TARGET: SectionViewTarget = { section: 'notifications', view
 const CONVERSATION_TARGET: SectionViewTarget = { section: 'conversation', view: 'context' };
 const AGENT_TARGET: SectionViewTarget = { section: 'agent_behavior', view: 'execution' };
 const ADVANCED_TARGET: SectionViewTarget = { section: 'advanced', view: 'diagnostics' };
+const LOCAL_MODELS_TARGET: SectionViewTarget = { section: 'ai_models', view: 'local_models' };
 const SYSTEM_RUNTIME_TARGET: SectionViewTarget = { section: 'system_security', view: 'runtime' };
 const SYSTEM_GENERAL_TARGET: SectionViewTarget = { section: 'system_security', view: 'general' };
 const SYSTEM_SERVICE_TARGET: SectionViewTarget = { section: 'system_security', view: 'service' };
 const SYSTEM_SECURITY_TARGET: SectionViewTarget = { section: 'system_security', view: 'security' };
+
+/** Optional local Kronos finance model keys live under Local Models. */
+export const KRONOS_SETTING_KEYS = new Set<string>([
+  'KRONOS_ENABLED',
+  'KRONOS_MODEL_SIZE',
+  'KRONOS_WEIGHTS_DIR',
+]);
 
 // Scheduler keys render inside the dedicated SchedulerSettingsCard on the
 // Scheduling tab (they are hidden from the generic field panel), so placement
@@ -72,6 +80,10 @@ export function placementForKey(category: string, key: string): SectionViewTarge
 
   if (ADVANCED_KEYS.has(upper)) {
     return ADVANCED_TARGET;
+  }
+
+  if (KRONOS_SETTING_KEYS.has(upper)) {
+    return LOCAL_MODELS_TARGET;
   }
 
   if (category === 'notification') {

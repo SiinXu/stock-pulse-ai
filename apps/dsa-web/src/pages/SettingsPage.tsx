@@ -25,7 +25,7 @@ import {
   ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
-  LocalModelsPanel,
+  LocalModelsWithKronos,
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
@@ -123,7 +123,6 @@ import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS } from '../locales/s
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 import TokenUsagePage from '../components/usage/TokenUsagePage';
-
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
 const CHANNEL_ROUTING_FIELD_KEYS = new Set([
@@ -131,7 +130,6 @@ const CHANNEL_ROUTING_FIELD_KEYS = new Set([
   'NOTIFICATION_ALERT_CHANNELS',
   'NOTIFICATION_SYSTEM_ERROR_CHANNELS',
 ]);
-
 const LOCAL_MODEL_CONFIG_KEYS = [
   'GENERATION_BACKEND',
   'LLM_CONFIG_MODE',
@@ -144,8 +142,6 @@ const LOCAL_MODEL_CONFIG_KEYS = [
   'LITELLM_MODEL',
   'AGENT_LITELLM_MODEL',
 ];
-
-
 function parseSetupStockList(value: unknown) {
   return parseStockListValue(String(value ?? ''));
 }
@@ -592,7 +588,6 @@ const SettingsPage: React.FC = () => {
       window.clearTimeout(timer);
     };
   }, [clearToast, isToastPaused, toast]);
-
 
   const rawActiveItems = itemsByCategory[activeCategory] || [];
   const firstSetupStockCode = parseSetupStockList(getConfigItem(itemsByCategory.base || [], 'STOCK_LIST')?.value)[0] || '';
@@ -1259,7 +1254,6 @@ const SettingsPage: React.FC = () => {
     [allValuesByKey],
   );
 
-
   const handleRunSetupSmoke = async () => {
     setSetupSmokeError(null);
     setSetupSmokeSuccess('');
@@ -1729,12 +1723,18 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {isAiLocalModels ? (
-              <LocalModelsPanel
+              <LocalModelsWithKronos
                 language={uiLanguage}
                 onConfigurationChanged={async () => {
                   await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
                   applyPostSaveEffects();
                 }}
+                kronosItems={itemsByCategory.ai_model || []}
+                allValuesByKey={allValuesByKey}
+                issueByKey={issueByKey}
+                disabled={isSaving || isLoading}
+                onKronosChange={setDraftValue}
+                readOnlyDiagnostic={(item) => readOnlyDiagnosticForItem(item, 'ai_model')}
               />
             ) : null}
             {isAiTaskRouting ? (
