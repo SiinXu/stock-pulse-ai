@@ -9,5 +9,6 @@ API 中间件模块初始化
 """
 
 from api.middlewares.error_handler import ErrorHandlerMiddleware
+from api.middlewares.security_headers import SecurityHeadersMiddleware
 
-__all__ = ["ErrorHandlerMiddleware"]
+__all__ = ["ErrorHandlerMiddleware", "SecurityHeadersMiddleware"]

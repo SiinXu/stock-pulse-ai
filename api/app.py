@@ -6,7 +6,7 @@ FastAPI 应用工厂模块
 
 职责：
 1. 创建和配置 FastAPI 应用实例
-2. 配置 CORS 中间件
+2. 配置 CORS 与 security-headers 中间件
 3. 注册路由和异常处理器
 4. 托管前端静态文件（生产模式）
 
@@ -195,6 +195,7 @@ from api.deps import (
 from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
 from api.middlewares.model_pack_upload import ModelPackUploadLimitMiddleware
+from api.middlewares.security_headers import add_security_headers_middleware
 from api.v1.schemas.common import HealthResponse
 from src.auth import is_auth_enabled
 from src.data.stock_index_loader import find_existing_stock_index_path
@@ -433,6 +434,8 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     )
 
     add_auth_middleware(app)
+    # Outermost so CSP/nosniff/frame/referrer headers apply to auth 401s and errors too.
+    add_security_headers_middleware(app)
     
     # ============================================================
     # Register route

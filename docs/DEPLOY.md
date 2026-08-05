@@ -49,6 +49,17 @@ python main.py --serve-only
 
 完整清单与条款见 [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries)。
 
+### 浏览器安全响应头（CSP）
+
+FastAPI 会在产品路由上附加纵深防御响应头：
+
+- `Content-Security-Policy` — 默认同源；允许构建后 SPA 主题引导脚本与 React 内联样式所需的 inline script/style；允许 CSS 背景与分享/导出下载所需的 `data:` / `blob:` 图片；禁止 `object-src`、base 劫持与嵌入（`frame-ancestors 'none'`）。
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-Frame-Options: DENY`
+
+`/docs` 与 `/redoc` 仅省略 CSP，以便 CDN 托管的 OpenAPI UI 加载；其余安全头仍会下发。建议在反向代理终止 TLS，且不要无意剥离上述响应头。完整说明见 [安全基线 · 浏览器响应头](security-baseline.md#browser-response-headers-csp)。
+
 ---
 
 ## 🐳 方案一：Docker Compose 部署（推荐）
