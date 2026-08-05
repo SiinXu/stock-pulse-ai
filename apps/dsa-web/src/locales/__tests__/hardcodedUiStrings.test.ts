@@ -115,7 +115,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'Literal diagnostic filename users must locate on disk.',
   },
   {
-    file: 'pages/StockScreeningPage.tsx',
+    file: 'components/screening/ScreeningResultsSection.tsx',
     text: 'LLM',
     context: 'jsx-text',
     purpose: 'Established technical acronym in a result-column heading.',
