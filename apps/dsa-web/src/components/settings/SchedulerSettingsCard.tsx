@@ -236,7 +236,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             }
           />
         ) : null}
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 xl:items-start">
+        <div className="grid grid-cols-1 gap-3 2xl:grid-cols-2 2xl:items-start">
           <Surface level="interactive" className="space-y-4 px-4 py-4">
             <div className="flex min-h-11 items-center justify-between gap-3">
               <div>

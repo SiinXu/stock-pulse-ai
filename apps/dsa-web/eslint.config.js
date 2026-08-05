@@ -16,10 +16,10 @@ const pageLineBaselines = {
   'src/pages/PortfolioPage.tsx': 2291,
   'src/pages/SettingsPage.tsx': 2030,
   'src/pages/ChatPage.tsx': 1770,
-  'src/pages/StockScreeningPage.tsx': 1696,
-  'src/pages/ResearchAnalysisWorkbenchPage.tsx': 1372,
-  'src/pages/BacktestPage.tsx': 997,
-  'src/pages/HomePage.tsx': 825,
+  'src/pages/StockScreeningPage.tsx': 1699,
+  'src/pages/ResearchAnalysisWorkbenchPage.tsx': 1406,
+  'src/pages/BacktestPage.tsx': 1015,
+  'src/pages/HomePage.tsx': 833,
 }
 
 const pageBaselineOverrides = Object.entries(pageLineBaselines).map(([file, max]) => ({

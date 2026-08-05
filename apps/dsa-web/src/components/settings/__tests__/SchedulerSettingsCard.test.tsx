@@ -85,7 +85,8 @@ describe('SchedulerSettingsCard legacy migration notice', () => {
     );
 
     const card = await screen.findByTestId('scheduler-settings-card');
-    expect(card.querySelector(':scope > div.grid')).toHaveClass('xl:grid-cols-2', 'xl:items-start');
+    expect(card.querySelector(':scope > div.grid')).toHaveClass('2xl:grid-cols-2', '2xl:items-start');
+    expect(card.querySelector(':scope > div.grid')).not.toHaveClass('xl:grid-cols-2', 'xl:items-start');
     expect(card.querySelector('dl')).toHaveClass('sm:grid-cols-3');
     expect(screen.getByText('Legacy day-batch schedule')).toBeInTheDocument();
     expect(screen.getByTestId('scheduler-legacy-track-note')).toBeInTheDocument();

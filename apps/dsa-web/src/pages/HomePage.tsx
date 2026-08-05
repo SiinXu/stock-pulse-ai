@@ -9,6 +9,7 @@ import {
   CalendarClock,
   ChevronDown,
   ClipboardCheck,
+  History,
   PlayCircle,
   RefreshCw,
   ShieldAlert,
@@ -515,16 +516,6 @@ const HomePage: React.FC = () => {
           contentClassName="flex flex-col gap-3"
           actions={<ClipboardCheck className="h-5 w-5 text-warning" aria-hidden="true" />}
         >
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="default"
-              onClick={() => navigate(approvalsHref)}
-            >
-              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-              {t('home.reviewApprovals')}
-            </Button>
-          </div>
           {isLoading ? (
             <StatePanel state="loading" title={t('common.loading')} size="compact" />
           ) : !availability.reassessments ? (
@@ -566,6 +557,16 @@ const HomePage: React.FC = () => {
               )}
             />
           )}
+          <div className="order-last flex justify-center">
+            <Button
+              variant="secondary"
+              size="default"
+              onClick={() => navigate(approvalsHref)}
+            >
+              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+              {t('home.reviewApprovals')}
+            </Button>
+          </div>
         </Section>
 
         <Section
@@ -599,9 +600,9 @@ const HomePage: React.FC = () => {
                   </dd>
                 </div>
               </dl>
-              <Button variant="secondary" size="default" onClick={() => navigate(signalCenterHref)}>
+              <Button className="mx-auto" variant="secondary" size="default" onClick={() => navigate(signalCenterHref)}>
                 {t('decisionSignals.viewAll')}
-                <ArrowRight aria-hidden="true" />
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </div>
           )}
@@ -689,6 +690,7 @@ const HomePage: React.FC = () => {
             title={t('home.recentAnalyses')}
             level="interactive"
             padding="md"
+            actions={<History className="h-5 w-5 text-primary" aria-hidden="true" />}
           >
             {isLoading ? (
               <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
@@ -736,86 +738,92 @@ const HomePage: React.FC = () => {
             )}
           </Section>
 
-          <Section
-            title={t('home.scheduledTasksToday')}
-            description={t('home.scheduledTasksTodayDescription')}
-            level="section"
-            padding="md"
-            actions={(
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
+          <div className="[&>section>header]:rounded-lg [&>section>header]:border [&>section>header]:border-border [&>section>header]:p-3">
+            <Section
+              title={t('home.scheduledTasksToday')}
+              description={t('home.scheduledTasksTodayDescription')}
+              level="section"
+              padding="md"
+              actions={(
+                <>
+                  {isLoading || !availability.scheduledTasks || data.scheduledTasks.length > 0 ? (
+                    <Button
+                      variant="secondary"
+                      size="compact"
+                      onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
+                    >
+                      {t('home.manageScheduledTasks')}
+                    </Button>
+                  ) : null}
+                  <CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />
+                </>
+              )}
+            >
+              {isLoading ? (
+                <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
+              ) : !availability.scheduledTasks ? (
+                <StatePanel
+                  state="partial"
+                  title={t('home.partialDataTitle')}
+                  description={t('home.partialDataMessage')}
+                  action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
                   size="compact"
-                  onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
+                  titleAs="p"
+                />
+              ) : data.scheduledTasks.length > 0 ? (
+                <div
+                  role="region"
+                  aria-label={t('home.scheduledTasksListLabel')}
+                  tabIndex={0}
+                  className="max-h-72 overflow-y-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  data-testid="today-scheduled-tasks"
                 >
-                  {t('home.manageScheduledTasks')}
-                </Button>
-                <CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />
-              </div>
-            )}
-          >
-            {isLoading ? (
-              <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
-            ) : !availability.scheduledTasks ? (
-              <StatePanel
-                state="partial"
-                title={t('home.partialDataTitle')}
-                description={t('home.partialDataMessage')}
-                action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
-                size="compact"
-                titleAs="p"
-              />
-            ) : data.scheduledTasks.length > 0 ? (
-              <div
-                role="region"
-                aria-label={t('home.scheduledTasksListLabel')}
-                tabIndex={0}
-                className="max-h-72 overflow-y-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                data-testid="today-scheduled-tasks"
-              >
-                <ul className="divide-y divide-border/70">
-                  {data.scheduledTasks.map((item) => {
-                    const status = getScheduledTaskStatusPresentation(item.status, t);
-                    return (
-                      <li
-                        key={`${item.task.id}-${item.scheduledFor}`}
-                        className="flex min-h-12 items-center justify-between gap-3 py-2"
+                  <ul className="divide-y divide-border/70">
+                    {data.scheduledTasks.map((item) => {
+                      const status = getScheduledTaskStatusPresentation(item.status, t);
+                      return (
+                        <li
+                          key={`${item.task.id}-${item.scheduledFor}`}
+                          className="flex min-h-12 items-center justify-between gap-3 py-2"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-foreground">
+                              {item.task.name}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-secondary-text">
+                              {getScheduledTaskTypeLabel(item.task.taskType, t)}
+                              {' · '}
+                              {formatDateTime(item.scheduledFor, language)}
+                            </span>
+                          </span>
+                          <Badge variant={status.variant} className="shrink-0">
+                            {status.label}
+                          </Badge>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border">
+                  <EmptyState
+                    compact
+                    title={t('home.noScheduledTasksTodayTitle')}
+                    description={t('home.noScheduledTasksTodayDescription')}
+                    action={(
+                      <Button
+                        variant="secondary"
+                        size="default"
+                        onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
                       >
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-foreground">
-                            {item.task.name}
-                          </span>
-                          <span className="mt-0.5 block truncate text-xs text-secondary-text">
-                            {getScheduledTaskTypeLabel(item.task.taskType, t)}
-                            {' · '}
-                            {formatDateTime(item.scheduledFor, language)}
-                          </span>
-                        </span>
-                        <Badge variant={status.variant} className="shrink-0">
-                          {status.label}
-                        </Badge>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                title={t('home.noScheduledTasksTodayTitle')}
-                description={t('home.noScheduledTasksTodayDescription')}
-                action={(
-                  <Button
-                    variant="secondary"
-                    size="default"
-                    onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
-                  >
-                    {t('home.manageScheduledTasks')}
-                  </Button>
-                )}
-              />
-            )}
-          </Section>
+                        {t('home.manageScheduledTasks')}
+                      </Button>
+                    )}
+                  />
+                </div>
+              )}
+            </Section>
+          </div>
         </div>
       </section>
     </WorkspacePage>

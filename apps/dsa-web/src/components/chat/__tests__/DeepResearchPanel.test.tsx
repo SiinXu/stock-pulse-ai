@@ -54,13 +54,20 @@ describe('DeepResearchPanel', () => {
       'placeholder',
       'Optional, e.g. 600519, HK00700, AAPL',
     );
-    expect(stockInput.parentElement?.parentElement).toHaveClass(
+    expect(screen.getByTestId('deep-research-stock-field')).toHaveClass(
       'w-full',
       'sm:min-w-0',
       'sm:flex-1',
     );
-    expect(stockInput.parentElement?.parentElement).not.toHaveClass('sm:w-64');
+    expect(screen.getByTestId('deep-research-stock-field')).not.toHaveClass('sm:w-64');
+    expect(screen.getByTestId('deep-research-stock-field').parentElement).toHaveClass('sm:items-center');
+    expect(screen.getByTestId('deep-research-stock-field').parentElement).not.toHaveClass('sm:items-end');
     expect(screen.queryByText('Optional, e.g. 600519, HK00700, AAPL')).not.toBeInTheDocument();
+    expect(stockInput.parentElement?.parentElement).toHaveClass('[&>div>p]:sr-only');
+
+    fireEvent.mouseEnter(screen.getByTestId('deep-research-stock-help'));
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Japan 7203\.T/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/If no suggestion appears/);
   });
 
   it('keeps the empty hint lightweight and the research configuration at the bottom', () => {

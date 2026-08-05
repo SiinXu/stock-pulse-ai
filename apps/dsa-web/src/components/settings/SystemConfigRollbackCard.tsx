@@ -89,7 +89,7 @@ const SystemConfigRollbackCard: React.FC<SystemConfigRollbackCardProps> = ({
         </div>
         <Button
           type="button"
-          variant="danger"
+          variant="danger-subtle"
           size="default"
           disabled={disabled || !configVersion || isRollingBack || isReloading}
           isLoading={isRollingBack}

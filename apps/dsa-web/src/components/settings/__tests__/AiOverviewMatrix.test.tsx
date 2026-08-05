@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AiOverviewMatrix } from '../AiOverviewMatrix';
 
 describe('AiOverviewMatrix', () => {
-  it('keeps the task-routing action on a 44px touch target', () => {
+  it('keeps the task-routing action visually compact with an expanded hit area', () => {
     const onEditRouting = vi.fn();
 
     render(
@@ -17,7 +17,8 @@ describe('AiOverviewMatrix', () => {
     );
 
     const editButton = screen.getByRole('button', { name: 'Edit task routing' });
-    expect(editButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(editButton).toHaveClass('h-8', 'min-h-8', 'min-w-8', 'before:-inset-1.5');
+    expect(editButton).not.toHaveClass('min-h-11', 'min-w-11');
     fireEvent.click(editButton);
     expect(onEditRouting).toHaveBeenCalledTimes(1);
   });

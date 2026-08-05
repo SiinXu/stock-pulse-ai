@@ -42,7 +42,7 @@ UI may show casual samples. Prefer research-oriented phrasing:
 
 | Control | Role | Tip |
 | --- | --- | --- |
-| History list | Past sessions | Delete noise regularly |
+| History list | Past sessions; outside the main content frame on wide screens | Delete noise regularly |
 | New chat | Clean context | Use when changing topic |
 | Input + send | Ask | Avoid double-submit while generating |
 | Stop | Interrupt generation | Partial text may remain |
@@ -51,10 +51,10 @@ UI may show casual samples. Prefer research-oriented phrasing:
 | Notify | Push to a channel | Needs a working channel in Settings |
 | Watchlist add/remove | Sync watchlist | Same list as Settings |
 | Strategy expand | Choose a Skill | Beginners can skip |
-| Deep-research stock field | Scope a research question to a symbol | Supports code/name suggestions |
+| Deep-research stock field | Scope a research question to a symbol | Supports code/name suggestions; suffix and manual-entry guidance is in the adjacent help tooltip |
 | Generate analysis | Heavier path | Costs more; use deliberately |
 | Thinking / reasoning pane | Intermediate traces | Reference only |
-| Context compression | Save tokens on long chats | Check unsaved state after edits |
+| Context compression | Save tokens on long chats | Compact control row; check unsaved state after edits |
 
 ## Strategy / Skill — should you pick one?
 
