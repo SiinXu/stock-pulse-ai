@@ -3388,13 +3388,21 @@ function isAllowedMainWindowNavigation(targetUrl, allowedPageUrl) {
 
 function registerMainWindowNavigationGuards(
   webContents,
-  getAllowedPageUrl = () => desktopMainPageUrl
+  getAllowedPageUrl = () => desktopMainPageUrl,
+  openExternal = shell.openExternal
 ) {
   const guardNavigation = (event, targetUrl) => {
     if (isAllowedMainWindowNavigation(targetUrl, getAllowedPageUrl())) {
       return;
     }
+    // Keep the renderer on the private local origin. For top-level clicks on
+    // real http(s) report/markdown links (no target=_blank), forward to the
+    // system browser — same protocol filter as setWindowOpenHandler.
     event.preventDefault();
+    const externalUrl = sanitizeExternalWebUrl(targetUrl);
+    if (externalUrl) {
+      void openExternal(externalUrl);
+    }
   };
   webContents.on('will-navigate', guardNavigation);
   webContents.on('will-redirect', guardNavigation);
