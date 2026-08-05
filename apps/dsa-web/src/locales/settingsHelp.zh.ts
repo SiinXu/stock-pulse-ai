@@ -1203,6 +1203,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['当前无实际影响。'],
     notes: ['未来版本启用后会聚合当日通知为一条摘要推送。'],
   },
+  'settings.notification.SHARE_IMAGE_MAX_CHARS': {
+    title: '分享图片最大字符数',
+    summary: '历史报告分享图接口允许的 Markdown 最大长度。',
+    usage: '仅作用于 GET /api/v1/history/{id}/share-image。超过该上限时返回 HTTP 413 share_image_content_too_large，并在 params 中提供 limit/actual。',
+    valueNotes: [
+      '默认 100000，覆盖较长的详细报告与多市场复盘。',
+      '与 MARKDOWN_TO_IMAGE_MAX_CHARS（IM 通知转图默认 15000）相互独立。',
+    ],
+    impact: ['影响 Web 一键生成历史报告分享图。'],
+    notes: ['仅在确实需要允许更大 Markdown 输入时再提高该值。'],
+  },
   // ------------------------------------------------------------------
   // System runtime
   // ------------------------------------------------------------------

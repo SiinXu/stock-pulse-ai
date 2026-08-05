@@ -350,6 +350,10 @@ class Config:
     markdown_to_image_channels: List[str] = field(default_factory=list)  # Comma-separated: telegram,wechat,custom,email
     markdown_to_image_max_chars: int = 15000  # Do not convert if exceeding this length to avoid oversized images
     md2img_engine: str = "wkhtmltoimage"  # wkhtmltoimage | markdown-to-file | playwright
+    # Web/API history share-image bound (independent of the IM notification cap above).
+    # 100000 covers verbose detailed reports and multi-region market reviews (~20k-60k
+    # typical) with headroom, without treating normal full reports as renderer failures.
+    share_image_max_chars: int = 100000
     share_image_xiaohongshu_url: Optional[str] = None
     share_image_xiaohongshu_handle: Optional[str] = None
     share_image_xiaohongshu_id: Optional[str] = None

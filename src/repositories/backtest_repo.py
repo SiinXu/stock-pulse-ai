@@ -68,10 +68,14 @@ class BacktestRepository:
             query = select(AnalysisHistory).where(and_(*conditions))
 
             if not force:
+                # Only successfully evaluated rows permanently skip re-runs.
+                # insufficient_data / error / pending rows are re-attempted so a
+                # one-time data gap cannot poison the candidate set forever.
                 existing_ids = select(BacktestResult.analysis_history_id).where(
                     and_(
                         BacktestResult.eval_window_days == eval_window_days,
                         BacktestResult.engine_version == engine_version,
+                        BacktestResult.eval_status == "completed",
                     )
                 )
                 query = query.where(AnalysisHistory.id.not_in(existing_ids))

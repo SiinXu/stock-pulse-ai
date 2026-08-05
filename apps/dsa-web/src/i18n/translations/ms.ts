@@ -50,6 +50,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift tidak tersedia",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "Analisis belum selesai; sila semak konfigurasi dan cuba lagi.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "Analisis gagal",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "Respons API gagal pengesahan ({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "Pengesahan respons gagal",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "Laporan ini mempunyai {actual} aksara dan melebihi had imej kongsi {limit}. Tingkatkan SHARE_IMAGE_MAX_CHARS dalam Tetapan, atau pendekkan laporan lalu cuba lagi.",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "Laporan terlalu panjang untuk menjana imej kongsi",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "Semak sama ada alat penukaran imej telah dipasang dan tersedia. Untuk Playwright: cd apps/dsa-web && npm ci && npx playwright install chromium.",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title": "Perender imej kongsi tidak tersedia",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "Log masuk kata laluan tidak didayakan untuk perkhidmatan ini.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "Log masuk kata laluan tidak didayakan",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "Konfigurasi pelayan berubah. Muat semula dan gunakan perubahan anda sekali lagi.",
@@ -3690,6 +3696,14 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_ALERT_CHANNELS": "Saluran Pemberitahuan Amaran",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_COOLDOWN_SECONDS": "Tempoh Jeda Pemberitahuan (Saat)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DAILY_DIGEST_ENABLED": "Ringkasan Harian Pemberitahuan Didayakan (Dikhaskan)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.impact.0": "Mempengaruhi penjanaan imej kongsi laporan sejarah di Web.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.notes.0": "Naikkan nilai ini hanya jika anda sengaja membenarkan input Markdown yang lebih besar.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.summary": "Panjang Markdown maksimum yang diterima API imej kongsi sejarah.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.title": "Aksara maksimum imej kongsi",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.usage": "Hanya untuk GET /api/v1/history/{id}/share-image. Melebihi had mengembalikan HTTP 413 share_image_content_too_large dengan limit/actual dalam params.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.0": "Lalai 100000 merangkumi laporan terperinci dan semakan berbilang pasaran.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.1": "Bebas daripada MARKDOWN_TO_IMAGE_MAX_CHARS (imej pemberitahuan IM kekal 15000).",
+  "utils.systemConfigI18n.fieldTitleMaps.SHARE_IMAGE_MAX_CHARS": "Aksara maksimum imej kongsi",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DEDUP_TTL_SECONDS": "TTL Penyahduplikasian Pemberitahuan (Saat)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_MIN_SEVERITY": "Tahap Keterukan Minimum Pemberitahuan",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_QUIET_HOURS": "Waktu Senyap Pemberitahuan",
@@ -4343,33 +4357,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Pepohon keputusan boleh mengandungi paling banyak {limit} nod.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Rangka kerja boleh mengandungi paling banyak {limit} peraturan risiko.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Rangka kerja boleh mengandungi paling banyak {limit} kriteria penjejakan.",
-  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "Semua pasaran",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "Saham A",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Ditentukan oleh pelayan semasa dihantar",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Pilih satu atau lebih pasaran untuk semakan ini.",
 
   "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Jepun",
 
   "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Hanya diguna pakai untuk pelaksanaan ini dan tidak mengubah tetapan global.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Pilih pasaran semakan pasaran",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Lalai pelayan",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Pasaran untuk semakan ini",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "AS",
 
-  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; pasaran berkesan: {region}",
 
-  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Status tugas: {status} ({progress}); pasaran berkesan: {region}",
 
   "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata laluan admin semasa sebelum menyahdayakan pengesahan"
 };

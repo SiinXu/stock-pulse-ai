@@ -230,10 +230,35 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '分析失败', message: '分析未能完成，请检查配置后重试。' },
     en: { title: 'Analysis failed', message: 'The analysis could not finish. Check the configuration and try again.' },
   }),
+  api_response_validation_failed: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.api_response_validation_failed", {
+    category: 'unknown',
+    zh: { title: '响应校验失败', message: '接口响应未通过校验（{label}）。{issues}' },
+    en: { title: 'Response validation failed', message: 'API response failed validation ({label}). {issues}' },
+  }),
   llm_not_configured: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.llm_not_configured", {
     category: 'llm_not_configured',
     zh: { title: '尚未配置 LLM 模型', message: '请在设置中配置主要模型、模型连接或 API Key。' },
     en: { title: 'No LLM model is configured', message: 'Configure a primary model, connection, or API key in Settings, then try again.' },
+  }),
+  share_image_content_too_large: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.share_image_content_too_large", {
+    zh: {
+      title: '报告内容过长，无法生成分享图片',
+      message: '当前报告有 {actual} 个字符，超过分享图片上限 {limit}。可在设置中提高 SHARE_IMAGE_MAX_CHARS，或缩短报告后再试。',
+    },
+    en: {
+      title: 'Report is too long to generate a share image',
+      message: 'This report has {actual} characters, which exceeds the share-image limit of {limit}. Raise SHARE_IMAGE_MAX_CHARS in Settings, or shorten the report and try again.',
+    },
+  }),
+  share_image_unavailable: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.share_image_unavailable", {
+    zh: {
+      title: '分享图片引擎不可用',
+      message: '请检查转图工具是否已安装并可用。Playwright 引擎需要：cd apps/dsa-web && npm ci && npx playwright install chromium。',
+    },
+    en: {
+      title: 'Share image renderer unavailable',
+      message: 'Install and enable the image renderer. For Playwright: cd apps/dsa-web && npm ci && npx playwright install chromium.',
+    },
   }),
 };
 

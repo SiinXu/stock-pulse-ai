@@ -30,6 +30,17 @@ class _FakeStockRepository:
         self.selected_start_dates[code] = start.date
         return start
 
+    def get_nearest_daily_on_or_before(self, *, code, target_date, min_date):
+        """Exact-only fake: no prior-session fallback unless the bar date matches."""
+        start = self.starts.get(code)
+        if start is None or start.date > target_date or start.date < min_date:
+            return None
+        if start.date != target_date:
+            # Keep the original contract tests focused on exact-date eligibility.
+            return None
+        self.selected_start_dates[code] = start.date
+        return start
+
     def get_forward_bars(self, *, code, analysis_date, eval_window_days):
         assert self.selected_start_dates[code] == analysis_date
         return list(self.forwards.get(code, ()))[:eval_window_days]
@@ -76,6 +87,62 @@ def test_candidates_without_exact_start_return_none() -> None:
             "first": [_bar(date(2024, 1, 8), 55.0)],
             "second": [_bar(date(2024, 1, 8), 65.0)],
         },
+    )
+
+    assert window is None
+
+
+def test_prior_session_bar_within_lookback_is_used_when_exact_missing() -> None:
+    """Suspended stocks: exact expected date missing, prior bar within bound is OK."""
+
+    class _LookbackRepo:
+        def __init__(self):
+            self.selected_start_dates = {}
+
+        def get_daily_on_date(self, *, code, target_date):
+            return None
+
+        def get_nearest_daily_on_or_before(self, *, code, target_date, min_date):
+            assert code == "first"
+            assert target_date == date(2024, 1, 5)
+            assert min_date <= date(2024, 1, 4)
+            bar = _bar(date(2024, 1, 4), 99.0)
+            self.selected_start_dates[code] = bar.date
+            return bar
+
+        def get_forward_bars(self, *, code, analysis_date, eval_window_days):
+            assert analysis_date == date(2024, 1, 4)
+            return [_bar(date(2024, 1, 8), 101.0)][:eval_window_days]
+
+    window = resolve_stock_daily_window(
+        stock_repo=_LookbackRepo(),
+        code_candidates=("first",),
+        expected_start_date=date(2024, 1, 5),
+        eval_window_days=1,
+    )
+
+    assert window is not None
+    assert window.code == "first"
+    assert window.start_bar.date == date(2024, 1, 4)
+    assert window.used_prior_session_start is True
+
+
+def test_prior_session_bar_beyond_lookback_still_returns_none() -> None:
+    class _StaleRepo:
+        def get_daily_on_date(self, *, code, target_date):
+            return None
+
+        def get_nearest_daily_on_or_before(self, *, code, target_date, min_date):
+            return None
+
+        def get_forward_bars(self, *, code, analysis_date, eval_window_days):
+            raise AssertionError("forward bars should not be fetched without a start bar")
+
+    window = resolve_stock_daily_window(
+        stock_repo=_StaleRepo(),
+        code_candidates=("first",),
+        expected_start_date=date(2024, 1, 5),
+        eval_window_days=1,
     )
 
     assert window is None

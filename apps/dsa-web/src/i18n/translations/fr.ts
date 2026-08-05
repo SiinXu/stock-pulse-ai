@@ -50,6 +50,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift est indisponible",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "L’analyse n’a pas été terminée ; veuillez vérifier la configuration et réessayer.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "Échec de l’analyse",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "La réponse API a échoué la validation ({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "Échec de la validation de la réponse",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "Ce rapport contient {actual} caractères et dépasse la limite d’image de partage de {limit}. Augmentez SHARE_IMAGE_MAX_CHARS dans les paramètres, ou raccourcissez le rapport puis réessayez.",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "Rapport trop long pour générer une image de partage",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "Vérifiez que l’outil de conversion d’image est installé et disponible. Pour Playwright : cd apps/dsa-web && npm ci && npx playwright install chromium.",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title": "Moteur d’image de partage indisponible",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "La connexion par mot de passe n’est pas activée pour ce service.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "Connexion par mot de passe non activée",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "La configuration du serveur a changé. Rafraîchissez et appliquez à nouveau vos modifications.",
@@ -3690,6 +3696,14 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_ALERT_CHANNELS": "Canaux de notification des alertes",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_COOLDOWN_SECONDS": "Temps d’attente entre notifications (secondes)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DAILY_DIGEST_ENABLED": "Récapitulatif quotidien des notifications activé (réservé)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.impact.0": "Affecte la génération d’images de partage d’historique dans le Web.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.notes.0": "N’augmentez cette valeur que si vous autorisez volontairement un Markdown plus long.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.summary": "Longueur Markdown maximale acceptée par l’API d’image de partage d’historique.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.title": "Nombre maximal de caractères d’image de partage",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.usage": "S’applique uniquement à GET /api/v1/history/{id}/share-image. Au-delà de la limite, renvoie HTTP 413 share_image_content_too_large avec limit/actual dans params.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.0": "La valeur par défaut 100000 couvre les rapports détaillés et les revues multi-marchés.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.1": "Indépendant de MARKDOWN_TO_IMAGE_MAX_CHARS (images de notification IM restent à 15000).",
+  "utils.systemConfigI18n.fieldTitleMaps.SHARE_IMAGE_MAX_CHARS": "Nombre maximal de caractères d’image de partage",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DEDUP_TTL_SECONDS": "TTL de déduplication des notifications (secondes)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_MIN_SEVERITY": "Gravité minimale des notifications",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_QUIET_HOURS": "Plages silencieuses des notifications",
@@ -4343,33 +4357,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Un arbre de décision peut contenir au plus {limit} nœuds.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Un cadre peut contenir au plus {limit} règles de risque.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Un cadre peut contenir au plus {limit} critères de suivi.",
-  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "Tous les marchés",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "Actions A",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Déterminé par le serveur lors de la soumission",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choisissez un ou plusieurs marchés pour cet examen.",
 
   "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japon",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Corée",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "S'applique uniquement à cette exécution et ne modifie pas les paramètres globaux.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Sélectionner les marchés de l'examen",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Défaut serveur",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Marchés de cet examen",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "États-Unis",
 
-  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message} ; marché effectif : {region}",
 
-  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Statut de la tâche : {status} ({progress}) ; marché effectif : {region}",
 
   "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Saisissez le mot de passe administrateur actuel avant de désactiver l’authentification"
 };

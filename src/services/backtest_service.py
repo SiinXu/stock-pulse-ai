@@ -143,10 +143,13 @@ class BacktestService:
                     if daily_identity is not None
                     else []
                 )
-                expected_start_date = self._resolve_expected_start_date(
+                market_for_window = (
+                    daily_identity.market if daily_identity is not None else None
+                )
+                expected_start_date, resolution_notes = self._resolve_expected_start_date(
                     analysis=analysis,
                     analysis_date=analysis_date,
-                    market=daily_identity.market if daily_identity is not None else None,
+                    market=market_for_window,
                     stock_code=(
                         daily_identity.normalized_code
                         if daily_identity is not None
@@ -160,6 +163,7 @@ class BacktestService:
                         code_candidates=daily_code_candidates,
                         expected_start_date=expected_start_date,
                         eval_window_days=eval_window_days,
+                        market=market_for_window,
                     )
 
                 if (
@@ -180,6 +184,7 @@ class BacktestService:
                         code_candidates=daily_code_candidates,
                         expected_start_date=expected_start_date,
                         eval_window_days=eval_window_days,
+                        market=market_for_window,
                     )
 
                 if daily_window is None:
@@ -194,9 +199,20 @@ class BacktestService:
                             eval_status="insufficient_data",
                             evaluated_at=datetime.now(),
                             operation_advice=analysis.operation_advice,
+                            resolution_notes=resolution_notes or None,
                         )
                     )
                     continue
+
+                notes = [
+                    note
+                    for note in (resolution_notes or "").split(",")
+                    if note
+                ]
+                if getattr(daily_window, "used_prior_session_start", False):
+                    if "prior_session_start" not in notes:
+                        notes.append("prior_session_start")
+                resolution_notes_value = ",".join(notes) or None
 
                 evaluation = BacktestEngine.evaluate_single(
                     operation_advice=analysis.operation_advice,
@@ -246,6 +262,7 @@ class BacktestService:
                         simulated_exit_price=evaluation.get("simulated_exit_price"),
                         simulated_exit_reason=evaluation.get("simulated_exit_reason"),
                         simulated_return_pct=evaluation.get("simulated_return_pct"),
+                        resolution_notes=resolution_notes_value,
                     )
                 )
 
@@ -276,7 +293,10 @@ class BacktestService:
 
         saved = 0
         if results_to_save:
-            saved = self.repo.save_results_batch(results_to_save, replace_existing=force)
+            # Always replace the batch keys: candidates exclude completed rows,
+            # so this only overwrites missing / insufficient_data / error rows
+            # (and force re-runs). Avoids unique-constraint failures on re-eval.
+            saved = self.repo.save_results_batch(results_to_save, replace_existing=True)
 
         if saved:
             self._recompute_summaries(
@@ -876,7 +896,14 @@ class BacktestService:
         analysis_date: date,
         market: Optional[str],
         stock_code: Optional[str],
-    ) -> Optional[date]:
+    ) -> Tuple[Optional[date], str]:
+        """Resolve the expected start bar date and optional resolution markers.
+
+        When ``market_phase_summary`` is missing or cannot be rebuilt (legacy
+        pre-phase rows), fall back to the analysis-date-based expected start
+        (pre-#727 semantic) and mark ``legacy_analysis_date`` instead of
+        permanently poisoning the row as ``insufficient_data``.
+        """
         phase_summary = extract_market_phase_summary(analysis.context_snapshot)
         snapshot_market = (
             str(phase_summary.get("market") or "").strip().lower()
@@ -884,7 +911,9 @@ class BacktestService:
             else ""
         )
         if not market:
-            return None
+            # Cannot assert market identity; still allow analysis-date fallback
+            # so legacy rows are not permanently skipped when bars exist.
+            return analysis_date, "legacy_analysis_date"
         if snapshot_market != market:
             phase_summary = rebuild_market_phase_summary_for_stock_code(
                 stock_code,
@@ -896,7 +925,7 @@ class BacktestService:
                 else ""
             )
             if snapshot_market != market:
-                return None
+                return analysis_date, "legacy_analysis_date"
 
         effective_date_value = (
             phase_summary.get("effective_daily_bar_date")
@@ -910,15 +939,22 @@ class BacktestService:
                     "%Y-%m-%d",
                 ).date()
             except (TypeError, ValueError):
-                return None
-            return effective_date if effective_date <= analysis_date else None
+                return analysis_date, "legacy_analysis_date"
+            if effective_date <= analysis_date:
+                return effective_date, ""
+            return analysis_date, "legacy_analysis_date"
 
         phase = phase_summary.get("phase") if isinstance(phase_summary, dict) else None
-        return resolve_historical_daily_bar_date(
+        resolved = resolve_historical_daily_bar_date(
             market,
             analysis_date,
             phase,
         )
+        if resolved is not None:
+            return resolved, ""
+        # Phase missing/unknown, calendar failure, or unprovable session:
+        # degrade gracefully to analysis-date start (pre-#727).
+        return analysis_date, "legacy_analysis_date"
 
     def _try_fill_daily_data(self, *, code: str, analysis_date: date, eval_window_days: int) -> None:
         refill_code = str(code or "").strip()
@@ -1088,6 +1124,7 @@ class BacktestService:
             "simulated_exit_price": row.simulated_exit_price,
             "simulated_exit_reason": row.simulated_exit_reason,
             "simulated_return_pct": row.simulated_return_pct,
+            "resolution_notes": getattr(row, "resolution_notes", None),
         }
 
     @staticmethod

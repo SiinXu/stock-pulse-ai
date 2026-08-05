@@ -71,3 +71,6 @@ npm run test:smoke
 `i18n:high-risk` 会从真实源字典和十语言 bundle 提取交易动作、风险、认证、Credential、错误和免责声明文案，核对已纳入审计的 TypeScript 内部 code / 稳定显示 key 清单，锁定逐类、逐语言快照，并用数量与 SHA-256 摘要分别保护稳定 key decision 与逐 locale 修订层。`--verify-baseline` 还会用 TypeScript AST 解析记录的 main bundle，逐项确认 `before` 值来自当前分支 merge-base，并要求实际修订集合与 decision 完全相等。审计文档中 “Deferred to UIUX” 的组件内原始 code fallback 不在该保证内。快照与自动化通过不代表母语金融签核。
 
 `test:i18n` 会先执行资源校验与高风险语义守卫，再检查全部十种界面语言的稳定 key、空翻译、NFC、插值参数、零宽字符/生成标记、重复 key，并扫描生产 TSX 中中英文用户可见的 JSX 文本/表达式、模板字符串、`aria-label`、`aria-description`、`alt`、`placeholder`、`title`、`label`、`message`、`description`、通知/错误 setter、toast 和 document title。扫描器会解析本地 `const` 的直接或间接引用（包括别名与嵌套解构）、对象属性、对象 spread 与 JSX spread，避免硬编码文案通过中间变量绕过检查；动态值和可变绑定不会被当作静态文案。允许项必须按具体文件、字符串、语境和用途精确登记，并保持仍被实际使用；禁止整目录或整文件忽略。Playwright 场景应使用独立、可读的 test 名称和关键断言，不得用循环或注释编号代替语义覆盖。
+
+
+`test:i18n` 还会运行 shrink-only 的 identical-to-English 棘轮（`src/i18n/__tests__/identicalToEnglishGuard.test.ts`）：遍历每个非英语 bundle，若某 key 的值与英文逐字节相同且未列入 `src/i18n/__tests__/identicalToEnglish.baseline.json` 则失败。已修复的相同项必须从 baseline 中删除（仅允许缩小）。专有名词、代码、品牌等有意保留的英文，仅可在 PR 中说明理由后加入 baseline。

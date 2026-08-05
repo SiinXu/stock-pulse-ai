@@ -966,6 +966,245 @@ class BacktestServiceTestCase(unittest.TestCase):
             self.assertIsNone(result.start_price)
             self.assertIsNone(result.end_close)
 
+    def test_run_backtest_legacy_snapshot_without_phase_falls_back_to_analysis_date(self) -> None:
+        """Legacy pre-phase snapshots must not permanently poison as insufficient_data."""
+        with self.db.get_session() as session:
+            session.add(
+                AnalysisHistory(
+                    query_id="q_legacy_no_phase",
+                    code="600519",
+                    name="贵州茅台",
+                    report_type="simple",
+                    sentiment_score=60,
+                    operation_advice="买入",
+                    trend_prediction="看多",
+                    analysis_summary="legacy snapshot without market_phase_summary",
+                    stop_loss=None,
+                    take_profit=None,
+                    created_at=datetime(2024, 2, 15, 0, 0, 0),
+                    # Pre-#727 fixture shape: analysis date only, no phase summary.
+                    context_snapshot='{"enhanced_context": {"date": "2024-02-15"}}',
+                )
+            )
+            session.add(
+                StockDaily(
+                    code="600519",
+                    date=date(2024, 2, 15),
+                    open=100.0,
+                    high=100.0,
+                    low=100.0,
+                    close=100.0,
+                )
+            )
+            session.add(
+                StockDaily(
+                    code="600519",
+                    date=date(2024, 2, 16),
+                    high=106.0,
+                    low=99.0,
+                    close=105.0,
+                )
+            )
+            session.commit()
+
+        service = BacktestService(self.db)
+        with patch.object(service, "_try_fill_daily_data"):
+            stats = service.run_backtest(
+                code="600519",
+                force=False,
+                eval_window_days=1,
+                min_age_days=0,
+                analysis_date_from=date(2024, 2, 15),
+                analysis_date_to=date(2024, 2, 15),
+                limit=10,
+            )
+
+        self.assertEqual(stats["processed"], 1)
+        self.assertEqual(stats["saved"], 1)
+        self.assertEqual(stats["completed"], 1)
+        self.assertEqual(stats["insufficient"], 0)
+
+        with self.db.get_session() as session:
+            result = (
+                session.query(BacktestResult)
+                .filter(BacktestResult.code == "600519")
+                .order_by(BacktestResult.id.desc())
+                .first()
+            )
+            self.assertIsNotNone(result)
+            self.assertEqual(result.eval_status, "completed")
+            self.assertEqual(result.analysis_date, date(2024, 2, 15))
+            self.assertEqual(result.start_price, 100.0)
+            self.assertEqual(result.end_close, 105.0)
+            notes = getattr(result, "resolution_notes", None) or ""
+            self.assertIn("legacy_analysis_date", notes)
+
+    def test_run_backtest_suspended_stock_uses_prior_session_bar_within_lookback(self) -> None:
+        """Suspended/halted stocks missing the exact start bar should use a bounded prior bar."""
+        with self.db.get_session() as session:
+            session.add(
+                AnalysisHistory(
+                    query_id="q_suspended_start",
+                    code="600519",
+                    name="贵州茅台",
+                    report_type="simple",
+                    sentiment_score=60,
+                    operation_advice="买入",
+                    trend_prediction="看多",
+                    analysis_summary="suspended on expected start date",
+                    stop_loss=None,
+                    take_profit=None,
+                    created_at=datetime(2024, 2, 15, 0, 0, 0),
+                    context_snapshot=_phase_snapshot(
+                        date(2024, 2, 15),
+                        phase="postmarket",
+                        effective_date=date(2024, 2, 15),
+                    ),
+                )
+            )
+            # No bar on 2024-02-15 (halted); prior session bar exists within lookback.
+            session.add(
+                StockDaily(
+                    code="600519",
+                    date=date(2024, 2, 14),
+                    open=98.0,
+                    high=99.0,
+                    low=97.0,
+                    close=98.5,
+                )
+            )
+            session.add(
+                StockDaily(
+                    code="600519",
+                    date=date(2024, 2, 16),
+                    high=104.0,
+                    low=98.0,
+                    close=103.0,
+                )
+            )
+            session.commit()
+
+        service = BacktestService(self.db)
+        with patch.object(service, "_try_fill_daily_data"):
+            stats = service.run_backtest(
+                code="600519",
+                force=False,
+                eval_window_days=1,
+                min_age_days=0,
+                analysis_date_from=date(2024, 2, 15),
+                analysis_date_to=date(2024, 2, 15),
+                limit=10,
+            )
+
+        self.assertEqual(stats["processed"], 1)
+        self.assertEqual(stats["saved"], 1)
+        self.assertEqual(stats["completed"], 1)
+        self.assertEqual(stats["insufficient"], 0)
+
+        with self.db.get_session() as session:
+            result = (
+                session.query(BacktestResult)
+                .filter(BacktestResult.code == "600519")
+                .order_by(BacktestResult.id.desc())
+                .first()
+            )
+            self.assertIsNotNone(result)
+            self.assertEqual(result.eval_status, "completed")
+            self.assertEqual(result.start_price, 98.5)
+            self.assertEqual(result.end_close, 103.0)
+            notes = getattr(result, "resolution_notes", None) or ""
+            self.assertIn("prior_session_start", notes)
+
+    def test_second_run_reevaluates_previously_insufficient_data_rows(self) -> None:
+        """insufficient_data rows must not permanently poison the candidate set."""
+        with self.db.get_session() as session:
+            session.add(
+                AnalysisHistory(
+                    query_id="q_poison_then_heal",
+                    code="000001",
+                    name="平安银行",
+                    report_type="simple",
+                    sentiment_score=55,
+                    operation_advice="买入",
+                    trend_prediction="看多",
+                    analysis_summary="first insufficient then healed",
+                    stop_loss=None,
+                    take_profit=None,
+                    created_at=datetime(2024, 3, 1, 0, 0, 0),
+                    context_snapshot=_phase_snapshot(
+                        date(2024, 3, 1),
+                        phase="postmarket",
+                        effective_date=date(2024, 3, 1),
+                    ),
+                )
+            )
+            session.commit()
+
+        service = BacktestService(self.db)
+        with patch.object(service, "_try_fill_daily_data"):
+            first = service.run_backtest(
+                code="000001",
+                force=False,
+                eval_window_days=1,
+                min_age_days=0,
+                analysis_date_from=date(2024, 3, 1),
+                analysis_date_to=date(2024, 3, 1),
+                limit=10,
+            )
+
+        self.assertEqual(first["processed"], 1)
+        self.assertEqual(first["insufficient"], 1)
+        self.assertEqual(first["completed"], 0)
+
+        with self.db.get_session() as session:
+            poisoned = session.query(BacktestResult).filter(BacktestResult.code == "000001").one()
+            self.assertEqual(poisoned.eval_status, "insufficient_data")
+            history_id = poisoned.analysis_history_id
+            session.add(
+                StockDaily(
+                    code="000001",
+                    date=date(2024, 3, 1),
+                    open=10.0,
+                    high=10.0,
+                    low=10.0,
+                    close=10.0,
+                )
+            )
+            session.add(
+                StockDaily(
+                    code="000001",
+                    date=date(2024, 3, 4),
+                    high=11.0,
+                    low=9.5,
+                    close=10.8,
+                )
+            )
+            session.commit()
+
+        with patch.object(service, "_try_fill_daily_data"):
+            second = service.run_backtest(
+                code="000001",
+                force=False,
+                eval_window_days=1,
+                min_age_days=0,
+                analysis_date_from=date(2024, 3, 1),
+                analysis_date_to=date(2024, 3, 1),
+                limit=10,
+            )
+
+        self.assertEqual(second["processed"], 1)
+        self.assertEqual(second["saved"], 1)
+        self.assertEqual(second["completed"], 1)
+        self.assertEqual(second["insufficient"], 0)
+
+        with self.db.get_session() as session:
+            rows = session.query(BacktestResult).filter(BacktestResult.code == "000001").all()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0].analysis_history_id, history_id)
+            self.assertEqual(rows[0].eval_status, "completed")
+            self.assertEqual(rows[0].start_price, 10.0)
+            self.assertEqual(rows[0].end_close, 10.8)
+
     def test_run_backtest_supports_us_suffix_code_shape_when_run_with_suffix(self) -> None:
         self._seed_analysis(
             query_id="q_aapl",

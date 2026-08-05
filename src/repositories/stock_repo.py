@@ -190,6 +190,35 @@ class StockRepository:
             ).scalar_one_or_none()
             return row
 
+    def get_nearest_daily_on_or_before(
+        self,
+        *,
+        code: str,
+        target_date: date,
+        min_date: date,
+    ) -> Optional[StockDaily]:
+        """Return the latest bar on or before target_date, not earlier than min_date.
+
+        Used for suspended/halted stocks and local bar gaps so start-bar
+        resolution stays bounded instead of walking unbounded history.
+        """
+        if min_date > target_date:
+            return None
+        with self.db.get_session() as session:
+            row = session.execute(
+                select(StockDaily)
+                .where(
+                    and_(
+                        StockDaily.code == code,
+                        StockDaily.date <= target_date,
+                        StockDaily.date >= min_date,
+                    )
+                )
+                .order_by(desc(StockDaily.date))
+                .limit(1)
+            ).scalar_one_or_none()
+            return row
+
     def get_forward_bars(self, *, code: str, analysis_date: date, eval_window_days: int) -> List[StockDaily]:
         """Return forward daily bars after analysis_date, up to eval_window_days."""
         with self.db.get_session() as session:

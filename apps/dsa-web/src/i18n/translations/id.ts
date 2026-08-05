@@ -50,6 +50,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift tidak tersedia",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "Analisis belum selesai; silakan periksa konfigurasi dan coba lagi.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "Analisis gagal",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "Respons API gagal validasi ({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "Validasi respons gagal",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "Laporan ini memiliki {actual} karakter dan melebihi batas gambar berbagi {limit}. Naikkan SHARE_IMAGE_MAX_CHARS di Pengaturan, atau persingkat laporan lalu coba lagi.",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "Laporan terlalu panjang untuk membuat gambar berbagi",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "Periksa apakah alat konversi gambar sudah terpasang dan tersedia. Untuk Playwright: cd apps/dsa-web && npm ci && npx playwright install chromium.",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title": "Perender gambar berbagi tidak tersedia",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "Login kata sandi tidak diaktifkan untuk layanan ini.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "Login kata sandi tidak diaktifkan",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "Konfigurasi server berubah. Segarkan dan terapkan perubahan Anda lagi.",
@@ -3690,6 +3696,14 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_ALERT_CHANNELS": "Kanal notifikasi peringatan",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_COOLDOWN_SECONDS": "Masa tunggu notifikasi (detik)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DAILY_DIGEST_ENABLED": "Aktifkan ringkasan notifikasi harian (cadangan)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.impact.0": "Mempengaruhi pembuatan gambar berbagi laporan riwayat di Web.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.notes.0": "Naikkan nilai ini hanya jika Anda sengaja mengizinkan input Markdown yang lebih besar.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.summary": "Panjang Markdown maksimum yang diterima API gambar berbagi riwayat.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.title": "Karakter maksimum gambar berbagi",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.usage": "Hanya berlaku untuk GET /api/v1/history/{id}/share-image. Melebihi batas mengembalikan HTTP 413 share_image_content_too_large dengan limit/actual di params.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.0": "Default 100000 mencakup laporan terperinci dan tinjauan multi-pasar.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.1": "Terpisah dari MARKDOWN_TO_IMAGE_MAX_CHARS (gambar notifikasi IM tetap 15000).",
+  "utils.systemConfigI18n.fieldTitleMaps.SHARE_IMAGE_MAX_CHARS": "Karakter maksimum gambar berbagi",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DEDUP_TTL_SECONDS": "TTL deduplikasi notifikasi (detik)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_MIN_SEVERITY": "Tingkat keparahan minimum notifikasi",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_QUIET_HOURS": "Jam hening notifikasi",
@@ -4343,33 +4357,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Pohon keputusan dapat berisi paling banyak {limit} node.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Sebuah kerangka kerja dapat berisi paling banyak {limit} aturan risiko.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Kerangka kerja dapat berisi paling banyak {limit} kriteria pelacakan.",
-  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "Semua pasar",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "Saham A",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Ditentukan server saat dikirim",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Pilih satu atau lebih pasar untuk ulasan ini.",
 
   "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Jepang",
 
   "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Hanya berlaku untuk eksekusi ini dan tidak mengubah pengaturan global.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Pilih pasar untuk ulasan pasar",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Default server",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Pasar untuk ulasan ini",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "AS",
 
-  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; pasar efektif: {region}",
 
-  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Status tugas: {status} ({progress}); pasar efektif: {region}",
 
   "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata sandi admin saat ini sebelum menonaktifkan autentikasi"
 };

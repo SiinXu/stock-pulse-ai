@@ -73,6 +73,13 @@ class BacktestResultItem(BaseModel):
     simulated_exit_price: Optional[float] = None
     simulated_exit_reason: Optional[str] = None
     simulated_return_pct: Optional[float] = None
+    resolution_notes: Optional[str] = Field(
+        None,
+        description=(
+            "Optional comma-separated start-resolution markers such as "
+            "legacy_analysis_date or prior_session_start"
+        ),
+    )
 
 
 class BacktestResultsResponse(BaseModel):
