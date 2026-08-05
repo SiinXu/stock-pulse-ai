@@ -194,13 +194,14 @@ describe('SidebarNav', () => {
 
     await screen.findByRole('link', { name: '发现' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 9)).toEqual([
+    expect(hrefs.slice(0, 10)).toEqual([
       APP_ROUTE_PATHS.home,
       APP_ROUTE_PATHS.research,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchDiscover,
       APP_ROUTE_PATHS.researchAnalysis,
       APP_ROUTE_PATHS.researchBacktest,
+      APP_ROUTE_PATHS.researchSkillOutcomes,
       APP_ROUTE_PATHS.portfolio,
       APP_ROUTE_PATHS.agent,
       APP_ROUTE_PATHS.settings,
