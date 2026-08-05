@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift를 사용할 수 없습니다",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "분석이 완료되지 않았으니, 구성을 확인하고 다시 시도해 주세요.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "분석 실패",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "API 응답 검증에 실패했습니다({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "응답 검증 실패",
   "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "이 보고서는 {actual}자이며 공유 이미지 한도 {limit}자를 초과합니다. 설정에서 SHARE_IMAGE_MAX_CHARS를 높이거나 보고서를 줄인 뒤 다시 시도하세요.",
   "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "보고서가 너무 길어 공유 이미지를 만들 수 없습니다",
   "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "이미지 변환 도구가 설치되어 사용 가능한지 확인하세요. Playwright 엔진: cd apps/dsa-web && npm ci && npx playwright install chromium.",

@@ -10,11 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
+- [Chore] Split the share-image renderer into a package with parsing, model, formatting, and render modules, preserving all import paths.
+
 - [Tests] Ran the API suite against the real Starlette test client in a dedicated CI job behind a default-off flag.
 - [Chore] Extended CI path filters to the backend code the e2e stack boots and added a push-to-main run.
+- [Chore] Injected notification dispatch dependencies through explicit ports and guarded the notification_sender legacy facades in the import ratchet.
 - [Fixed] First-run analysis without an LLM now returns stable `llm_not_configured` (HTTP 422 sync / task `message_code`) and Home setup banners localize readiness check keys; invalid market-review `region` errors include the allowed set.
 - [Fixed] Honored explicit loopback `--host`/`--uds` under unrecognized HTTP launchers (custom uvicorn shims, `uv run`, gunicorn-style argv) while keeping fail-closed behavior and clearer errors when the bind cannot be verified as local.
 - [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.
+- [Fixed] Closed Web i18n leaks for market-review region copy (real fr/de/es/id/ms translations, localized region labels instead of raw tokens, stocks response-validation error catalog, optional history data alignment) and added a shrink-only identical-to-English translation ratchet.
 - [Fixed] Stopped backtests from permanently poisoning legacy pre-phase snapshots and suspended-stock rows as `insufficient_data`, re-attempting non-completed results and marking `legacy_analysis_date` / `prior_session_start` resolution notes when degraded.
 - [Changed] `GET /api/v1/backtest/performance/{code}` returns the canonical bare stock code in the summary payload (for example `AAPL` not `AAPL.US`).
 

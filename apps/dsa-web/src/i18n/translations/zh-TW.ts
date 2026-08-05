@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift 無法使用",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "分析未能完成，請檢查配置後重試。",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "分析失敗",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "介面回應未通過校驗（{label}）。{issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "回應校驗失敗",
   "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "目前報告有 {actual} 個字元，超過分享圖片上限 {limit}。可在設定中提高 SHARE_IMAGE_MAX_CHARS，或縮短報告後再試。",
   "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "報告內容過長，無法產生分享圖片",
   "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "請檢查轉圖工具是否已安裝並可用。Playwright 引擎需要：cd apps/dsa-web && npm ci && npx playwright install chromium。",

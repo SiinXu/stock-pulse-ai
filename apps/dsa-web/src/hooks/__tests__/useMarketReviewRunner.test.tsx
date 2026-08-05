@@ -67,6 +67,7 @@ describe('useMarketReviewRunner', () => {
         taskId: 'market-task',
         status: 'processing',
         progress: 60,
+        region: 'cn,hk,us',
       })
       .mockResolvedValueOnce({
         taskId: 'market-task',
@@ -89,6 +90,10 @@ describe('useMarketReviewRunner', () => {
     expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     expect(analysisApi.getStatus).toHaveBeenCalledTimes(1);
     expect(result.current.notice?.title).toBe('大盘复盘进行中');
+    expect(result.current.notice?.message).toContain('A 股');
+    expect(result.current.notice?.message).toContain('港股');
+    expect(result.current.notice?.message).toContain('美股');
+    expect(result.current.notice?.message).not.toMatch(/\bcn,hk,us\b/);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(MARKET_REVIEW_POLL_INTERVAL_MS);
@@ -209,6 +214,31 @@ describe('useMarketReviewRunner', () => {
       message: '任务长时间未返回最终结果，请在任务列表/历史中查看。',
     });
     expect(result.current.error).toBeNull();
+  });
+
+  it('localizes multi-region tokens on submit notice instead of raw enum codes', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      region: 'cn,hk,us,jp,kr',
+      sendNotification: false,
+      message: '已接受',
+      // Omit taskId so polling does not overwrite the submit notice.
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: false,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+    });
+
+    expect(result.current.notice?.title).toBe('大盘复盘已提交');
+    expect(result.current.notice?.message).toContain('已接受');
+    expect(result.current.notice?.message).toContain('A 股');
+    expect(result.current.notice?.message).not.toContain('cn,hk,us,jp,kr');
+    expect(analysisApi.getStatus).not.toHaveBeenCalled();
   });
 
   it('surfaces a trigger failure without starting status polling', async () => {

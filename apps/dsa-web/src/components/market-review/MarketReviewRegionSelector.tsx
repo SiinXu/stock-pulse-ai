@@ -4,7 +4,9 @@ import { Check, ChevronDown, Globe2, RotateCcw } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import {
+  formatMarketReviewRegionSelection,
   MARKET_REVIEW_REGION_ORDER,
+  MARKET_REVIEW_REGION_UI_TEXT_KEYS,
   type MarketReviewRegion,
 } from '../../utils/marketReviewRegion';
 
@@ -19,7 +21,7 @@ export const MarketReviewRegionSelector: React.FC<MarketReviewRegionSelectorProp
   disabled = false,
   onChange,
 }) => {
-  const { t } = useUiLanguage();
+  const { t, language } = useUiLanguage();
   const [open, setOpen] = useState(false);
   const menuOpen = open && !disabled;
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -29,19 +31,20 @@ export const MarketReviewRegionSelector: React.FC<MarketReviewRegionSelectorProp
   const displayedRegions = value ?? [];
 
   const regionLabels: Record<MarketReviewRegion, string> = {
-    cn: t('home.marketRegionCn'),
-    hk: t('home.marketRegionHk'),
-    us: t('home.marketRegionUs'),
-    jp: t('home.marketRegionJp'),
-    kr: t('home.marketRegionKr'),
+    cn: t(MARKET_REVIEW_REGION_UI_TEXT_KEYS.cn),
+    hk: t(MARKET_REVIEW_REGION_UI_TEXT_KEYS.hk),
+    us: t(MARKET_REVIEW_REGION_UI_TEXT_KEYS.us),
+    jp: t(MARKET_REVIEW_REGION_UI_TEXT_KEYS.jp),
+    kr: t(MARKET_REVIEW_REGION_UI_TEXT_KEYS.kr),
   };
 
-  const formatRegions = (regions: MarketReviewRegion[]) => (
-    regions.map((region) => regionLabels[region]).join(' + ')
-  );
   const triggerLabel = value === undefined
     ? t('home.marketRegionServerDefault')
-    : formatRegions([...displayedRegions]);
+    : formatMarketReviewRegionSelection(
+      [...displayedRegions],
+      (region) => regionLabels[region],
+      language,
+    );
 
   const close = useCallback((restoreFocus = false) => {
     setOpen(false);

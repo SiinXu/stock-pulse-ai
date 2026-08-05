@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift を利用できません",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "解析は完了していません。設定を確認して再度お試しください。",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "分析失敗",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "API 応答の検証に失敗しました（{label}）。{issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "応答検証に失敗しました",
   "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "このレポートは {actual} 文字で、共有画像の上限 {limit} を超えています。設定で SHARE_IMAGE_MAX_CHARS を上げるか、レポートを短くしてから再試行してください。",
   "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "レポートが長すぎて共有画像を生成できません",
   "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "画像変換ツールがインストールされ利用可能か確認してください。Playwright エンジンの場合: cd apps/dsa-web && npm ci && npx playwright install chromium。",

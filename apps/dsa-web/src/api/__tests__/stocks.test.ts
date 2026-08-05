@@ -86,8 +86,22 @@ describe('stocksApi.getDailyHistory', () => {
       const parsed = getParsedApiError(error);
       expect(parsed.code).toBe('api_response_validation_failed');
       expect(parsed.message).toContain('StockHistoryResponse');
+      expect(parsed.params).toMatchObject({ label: 'StockHistoryResponse' });
       return true;
     });
+  });
+
+  it('accepts contract-valid history payloads that omit optional data and defaults to []', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        stock_code: '600519',
+        period: 'daily',
+      },
+    });
+    const history = await stocksApi.getDailyHistory('600519');
+    expect(history.stockCode).toBe('600519');
+    expect(history.period).toBe('daily');
+    expect(history.data).toEqual([]);
   });
 
   it('rejects history payloads missing required candle fields via ParsedApiError', async () => {
@@ -100,7 +114,9 @@ describe('stocksApi.getDailyHistory', () => {
     });
     await expect(stocksApi.getDailyHistory('600519')).rejects.toSatisfy((error: unknown) => {
       expect(isApiRequestError(error)).toBe(true);
-      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.title).toBe('响应校验失败');
       return true;
     });
   });
