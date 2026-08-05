@@ -32,7 +32,7 @@ from .base import (
     normalize_stock_code,
     _is_hk_market,
 )
-from .retry_policy import (
+from data_provider.retry_policy import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     DEFAULT_RETRYABLE_EXCEPTIONS,
     call_with_timeout,

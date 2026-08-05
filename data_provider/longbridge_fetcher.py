@@ -38,7 +38,7 @@ from src.security.outbound_policy import validate_outbound_url
 
 from .base import BaseFetcher, STANDARD_COLUMNS
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource, safe_float
-from .retry_policy import (
+from data_provider.retry_policy import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     call_with_timeout,
     provider_retry,
