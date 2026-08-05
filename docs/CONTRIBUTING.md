@@ -133,6 +133,10 @@ python -m pip install --build-constraint build-constraints.txt -r .github/requir
 python -m pip check
 ./scripts/ci_gate.sh
 
+# 离线门禁细节：单测超时（120s）、覆盖率下限、严格 marker，
+# 以及如何手动跑带 wall-clock 的 @pytest.mark.benchmark：
+# 见 docs/testing-ci-gate.md
+
 # 前端 gate（如修改了 apps/dsa-web）
 cd apps/dsa-web
 npm ci

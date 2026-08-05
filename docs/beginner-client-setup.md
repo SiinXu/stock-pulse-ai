@@ -16,22 +16,28 @@ English: [beginner-client-setup_EN.md](beginner-client-setup_EN.md). 装好后�
 
 ## 1. 下载客户端
 
-打开发布页：
+**只从本仓库发布页下载：**
 
 <https://github.com/SiinXu/stock-pulse-ai/releases>
 
-只有发布页中存在带 `Assets`（附件）的正式版本时，客户端安装包才可下载。如果页面为空或最新版本没有对应附件，说明 StockPulse 尚未发布可下载客户端；请先按 [README](../README.md) 使用源码 / WebUI 方式运行，不要从上游或第三方下载并冒充 StockPulse 的安装包。
+当前（截至本仓库已发布标签）带桌面安装包的最新正式版是 **`v3.29.0`**。Changelog 中的 `4.0.0` 等源码版本号**不等于**已有同名桌面安装包；若最新源码标签没有 `Assets` 里的 `.exe` / `.zip` / `.dmg`，请下载带附件的最近一次 Desktop 发布，或按 [桌面打包说明](desktop-package.md) 本地构建，或先用 [README](../README.md) 的源码 / WebUI 方式运行。
 
-在页面下方 `Assets`（附件）里下载：
+**不要**从上游 `daily_stock_analysis` 仓库、应用商店镜像或第三方网盘下载并冒充本项目的安装包，即便文件名看起来相似。
 
-| 电脑 | 下载哪个 |
+在发布页下方 `Assets`（附件）里，按自己的系统选：
+
+| 电脑 | 当前已发布命名（例：`v3.29.0`） |
 | --- | --- |
-| Windows | `stockpulse-windows-installer-<版本号>.exe` |
-| Windows 不想安装 | `stockpulse-windows-noinstall-<版本号>.zip` |
-| macOS Apple 芯片 | `stockpulse-macos-arm64-<版本号>.dmg` |
-| macOS Intel 芯片 | `stockpulse-macos-x64-<版本号>.dmg` |
+| Windows 安装包 | `daily-stock-analysis-windows-installer-v3.29.0.exe` |
+| Windows 免安装 | `daily-stock-analysis-windows-noinstall-v3.29.0.zip` |
+| macOS Apple 芯片 | `daily-stock-analysis-macos-arm64-v3.29.0.dmg` |
+| macOS Intel 芯片 | `daily-stock-analysis-macos-x64-v3.29.0.dmg` |
 
-不用下载 `latest.yml`、`*.blockmap`，它们不是客户端安装包。
+说明：
+
+- 已发布桌面包仍使用历史前缀 `daily-stock-analysis-...`（可用 `gh release view v3.29.0` 核对附件名）。
+- 本仓库当前打包链路（`apps/dsa-desktop/package.json` 与 `.github/workflows/desktop-release.yml`）会为**后续** Desktop 发布生成 `stockpulse-windows-installer-<tag>.exe`、`stockpulse-windows-noinstall-<tag>.zip`、`stockpulse-macos-arm64-<tag>.dmg`、`stockpulse-macos-x64-<tag>.dmg`。打开 `Assets` 时以实际文件名为准，两种前缀都只认本仓库发布页。
+- 不要下载 `latest.yml`、`*.blockmap`，它们不是安装包。
 
 不知道 Mac 是哪种芯片：点击左上角苹果图标 -> 关于本机，看到 M1/M2/M3/M4 就选 `arm64`，看到 Intel 就选 `x64`。
 

@@ -53,6 +53,26 @@ This document compiles common issues encountered by users and their solutions.
 
 ---
 
+### Q3b: Why is my Hong Kong stock not analyzed / has no quotes?
+
+**Symptom**: Watchlist entries such as `hk00700`, `00700`, or `00700.HK` fail analysis, show empty prices, or logs look like “HK unsupported” / data-query errors.
+
+**Cause and provider chain (summary)**:
+
+1. Hong Kong is a first-class market, but quotes depend on multi-provider fallback—not “any token guarantees HK daily bars.”
+2. **Daily bars** try HK-capable providers in numeric-priority order: configured and initialized **Tushare** (preferred) → **AkShare** → **YFinance** → optional **Longbridge** (see [Data source stability](data-source-stability_EN.md)).
+3. **Realtime quotes**: configured and available Longbridge is preferred; otherwise YFinance / AkShare (and other market-capable routes) remain fallbacks.
+4. **Known gotcha**: if `TUSHARE_TOKEN` is set but the account **lacks Hong Kong daily-bar API permission**, Tushare is tried first and fails; the symptom can look like “HK not supported” (documented in the Chinese [full guide](full-guide.md) data-source notes and [market support · HK](market-support.md#港股-hong-kong)). Fix by upgrading Tushare HK daily permission, **temporarily removing** `TUSHARE_TOKEN` so AkShare / YFinance can run, or configuring working `LONGBRIDGE_*` credentials for supported HK/US paths.
+
+**Solution**:
+
+1. Use a code form the market detector treats as HK (for example `hk00700`, `00700.HK`, `00700`); do not confuse bare A-share six-digit codes.
+2. Read which provider failed and which fallback ran; compare with [Data source stability · Hong Kong](data-source-stability_EN.md).
+3. If `TUSHARE_TOKEN` is set, confirm HK daily permission in [Tushare Pro](https://tushare.pro/); without permission, do not rely on that token for HK.
+4. Free sources may rate-limit; try `MAX_WORKERS=1` or retry later. Capability boundaries: [Market support](market-support.md#港股-hong-kong) (Chinese doc; no separate EN twin yet).
+
+---
+
 ### Q4: Data fetch rate-limited or returning empty?
 
 **Symptom**: Log shows `Circuit breaker triggered` or data returns `None`
