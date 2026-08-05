@@ -46,6 +46,7 @@ describe('application navigation descriptor', () => {
       ['research-discover', APP_ROUTE_PATHS.researchDiscover],
       ['research-analysis', APP_ROUTE_PATHS.researchAnalysis],
       ['research-backtest', APP_ROUTE_PATHS.researchBacktest],
+      ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes],
     ]);
   });
 

@@ -57,7 +57,7 @@ set of outcome keys (`limit` counts keys, not samples).
 | Shared backtest start/window resolver | Outcome-owned exact-start resolver over persisted `market_phase_summary.effective_daily_bar_date` and local `stock_daily` rows | The port must not modify the sibling-owned backtest service/repository and must not guess an earlier bar or fetch network data. |
 | Outcome repository and service | New outcome repository and service modules | Outcome identity and terminal-state immutability remain unchanged. |
 | Performance statistics service | New read-only performance service | Each `skill_id + horizon + engine_version` bucket keeps its own sufficiency gate. |
-| Read-only API | Authenticated `/api/v1/skill-outcomes` (stats, samples, outcomes, explicit run) | Tracked by [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713). Web UI remains follow-up. |
+| Read-only API + Web surface | Authenticated `/api/v1/skill-outcomes` (stats, samples, outcomes, explicit run) plus Research page `/research/skill-outcomes` | API merged via [#756](https://github.com/SiinXu/stock-pulse-ai/pull/756); Web surface closes the remaining half of [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713). |
 | Bayesian outcome weights (`831ada53`) | Deferred to [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) | Runtime integration requires existing Agent aggregator and config-registry changes outside this port's writable boundary. |
 | Decision-profile calibration (`aa68d45d`) | Implemented under [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) on DecisionSignal stats (`decision_profile_calibration_service` + optional `profile_calibration` behind `DECISION_PROFILE_CALIBRATION_ENABLED`) | See [decision-signals.md](decision-signals.md); this skill-opinion plane remains independent. |
 | Reassessment persistence (`487e49e5`) | Already present on `main` | StockPulse already supports `persist_status=created/existing/refreshed`; duplicating it would create a parallel contract. |
@@ -127,8 +127,9 @@ temporary pending rows do not dilute permanent metadata failures.
   later bounded scans may reconsider those histories.
 - Histories without an authoritative persisted effective daily-bar date are
   marked unable rather than guessed from an arbitrary local bar.
-- V0 ships the authenticated API; the Web surface for buckets/thresholds remains
-  open under [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713).
+- V0 ships the authenticated API and the Research Web surface for buckets,
+  thresholds, pending/unable counts, and explicit offline evaluation under
+  `/research/skill-outcomes` ([#713](https://github.com/SiinXu/stock-pulse-ai/issues/713)).
 - Bayesian runtime weighting remains default-neutral until
   [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) lands.
 - Decision-profile outcome calibration lives on the DecisionSignal stats surface
