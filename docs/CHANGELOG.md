@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Disclose CLI backend generation-only limits in the first-run wizard and settings, and add `AGENT_FEATURES_ACKNOWLEDGED_OFF` so CLI-only users can settle the Agent readiness check without needing an API model.
+- [Fixed] Admin-configured loopback Ollama (`LLM_OLLAMA_BASE_URL` on 127.0.0.0/8, ::1, or localhost) is reachable without hand-editing `OUTBOUND_HTTP_ALLOWLIST`; non-loopback targets and redirect escapes stay fail-closed.
+
 - [Chore] Moved stock-list splitting to a leaf utility, removing the config-to-services import edge.
 - [Added] Added a shrink-only import-cycle ratchet to the deterministic CI gate.
 - [Chore] Split the share-image renderer into a package with parsing, model, formatting, and render modules, preserving all import paths.

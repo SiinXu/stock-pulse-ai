@@ -4385,6 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "任務狀態：{status}（{progress}）；實際市場：{region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "關閉認證前請輸入目前管理員密碼"
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "關閉認證前請輸入目前管理員密碼",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "CLI 後端僅涵蓋報告生成；問股 Agent 需要支援工具呼叫的 API 模型（否則不可用）。",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "前往設定",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "CLI 後端僅涵蓋報告生成。問股 Agent 需要支援工具呼叫的 API 模型。請在設定中新增模型連線，或確認暫不使用 Agent。",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "問股 Agent 目前不可用",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "CLI 後端僅涵蓋報告生成；問股 Agent 需要支援工具呼叫的 API 模型（否則不可用）。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "使 llm_agent 就緒檢查收斂，不阻斷首次配置完成。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "Agent 不可用時，問股頁顯示引導至設定的空狀態。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "需要問股 Agent 時，請優先新增 API 模型連線。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "CLI 與 Agent 能力邊界請見 LLM 配置指南。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "確認目前不需要問股 Agent，以便 CLI-only 場景下 Agent 就緒檢查可以收斂。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "確認暫不使用 Agent 功能",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "當你使用本機 CLI 後端做報告生成且暫不需要問股 Agent 時開啟。準備好配置支援工具呼叫的 API 模型後再關閉。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "預設關閉：在配置 API 模型或確認暫不使用 Agent 之前，Agent 模型就緒檢查仍會提示需要處理。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "一旦 Agent 已有可用的工具呼叫 API 模型，該確認會被自動覆蓋，不再阻止 Agent 就緒。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "CLI 後端仍只支援生成；此開關不會讓 CLI 具備 Agent 工具呼叫能力。",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "我暫時不需要問股 Agent（可稍後在設定中變更）",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "CLI 後端僅涵蓋報告生成；問股 Agent 需要支援工具呼叫的 API 模型（否則不可用）。",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

@@ -498,3 +498,41 @@ def test_eastmoney_patch_matches_only_owned_hosts(url: str) -> None:
 )
 def test_eastmoney_patch_rejects_domain_substring_confusion(url: str) -> None:
     assert _is_eastmoney_request_url(url) is False
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:11434/",
+        "http://[::1]:11434/",
+        "http://localhost:11434/",
+    ],
+)
+def test_admin_loopback_exemption_allows_pure_loopback_targets(url: str) -> None:
+    target = validate_outbound_url(url, resolve_dns=False, allow_admin_loopback=True)
+    assert target.allowlisted is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://192.168.1.50:11434/",
+        "http://10.0.0.5:11434/",
+        "http://printer.local:11434/",
+    ],
+)
+def test_admin_loopback_exemption_does_not_open_private_or_mdns_hosts(url: str) -> None:
+    with pytest.raises(OutboundPolicyError):
+        validate_outbound_url(url, resolve_dns=False, allow_admin_loopback=True)
+
+
+def test_admin_loopback_redirect_escape_to_private_lan_is_blocked() -> None:
+    first = _response(
+        302,
+        location="http://10.0.0.5:9000/steal",
+        url="http://127.0.0.1:11434/start",
+    )
+    with patch("src.security.outbound_policy.requests.get", return_value=first) as request_get:
+        with pytest.raises(OutboundPolicyError, match="private_ip_blocked"):
+            safe_get("http://127.0.0.1:11434/start", allow_admin_loopback=True)
+    assert request_get.call_count == 1
+

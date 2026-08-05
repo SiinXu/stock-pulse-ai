@@ -4385,6 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "작업 상태: {status} ({progress}); 실제 시장: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요"
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "설정으로 이동",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가). 설정으로 이동.",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "Q&A Agent를 사용할 수 없음",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "Agent 기능 사용 안 함 확인",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "당분간 Q&A Agent가 필요하지 않습니다(나중에 설정에서 변경 가능)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "당분간 Q&A Agent가 필요하지 않습니다(나중에 설정에서 변경 가능)",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "CLI 백엔드는 보고서 생성만 담당합니다. Q&A Agent에는 도구 호출이 가능한 API 모델이 필요합니다(없으면 사용 불가).",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

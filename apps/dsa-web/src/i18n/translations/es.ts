@@ -4385,5 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Estado de la tarea: {status} ({progress}); mercado efectivo: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Introduzca la contraseña de administrador actual antes de desactivar la autenticación"
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Introduzca la contraseña de administrador actual antes de desactivar la autenticación",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "Abrir ajustes",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible). Abrir ajustes.",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "El Agent de preguntas y respuestas no está disponible",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "Confirmar funciones de Agent desactivadas",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "No necesito el Agent de preguntas y respuestas por ahora (puede cambiarlo después en Ajustes)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "No necesito el Agent de preguntas y respuestas por ahora (puede cambiarlo después en Ajustes)",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "Los backends CLI solo cubren la generación de informes; el Agent de preguntas y respuestas necesita un modelo API con herramientas (o no estará disponible).",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

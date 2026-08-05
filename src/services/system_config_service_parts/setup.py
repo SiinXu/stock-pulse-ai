@@ -274,6 +274,30 @@ class _SystemConfigSetupMethods:
         effective_map: Dict[str, str],
         primary_check: Dict[str, Any],
     ) -> Dict[str, Any]:
+        check = self._resolve_setup_agent_llm_check(effective_map, primary_check)
+        if (
+            check["status"] == "needs_action"
+            and parse_env_bool(
+                effective_map.get("AGENT_FEATURES_ACKNOWLEDGED_OFF"),
+                default=False,
+            )
+        ):
+            return self._setup_check(
+                "llm_agent",
+                "Agent 模型",
+                "agent",
+                True,
+                "optional",
+                "已确认暂不使用问股 Agent。CLI 后端仅覆盖报告生成；问股 Agent 需要支持工具调用的 API 模型。",
+                "需要启用 Agent 时，请关闭「确认暂不使用 Agent 功能」，并配置 API 模型连接。",
+            )
+        return check
+
+    def _resolve_setup_agent_llm_check(
+        self,
+        effective_map: Dict[str, str],
+        primary_check: Dict[str, Any],
+    ) -> Dict[str, Any]:
         generation_backend = normalize_backend_id(
             effective_map.get("GENERATION_BACKEND"),
             default=LITELLM_BACKEND_ID,

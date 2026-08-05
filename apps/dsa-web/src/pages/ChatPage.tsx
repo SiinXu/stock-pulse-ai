@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -44,7 +44,7 @@ import type { UiTextKey } from '../i18n/uiText';
 import { formatUiDateTime, getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
-import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
+import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
@@ -225,6 +225,7 @@ const ChatPage: React.FC = () => {
   const [contextCompressionConfigVersion, setContextCompressionConfigVersion] = useState('');
   const [contextCompressionMaskToken, setContextCompressionMaskToken] = useState('******');
   const [contextCompressionError, setContextCompressionError] = useState<string | null>(null);
+  const [agentUnavailable, setAgentUnavailable] = useState(false);
   const [copiedMessages, setCopiedMessages] = useState<Set<string>>(new Set());
   const { copyText } = useClipboard();
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
@@ -593,6 +594,20 @@ const ChatPage: React.FC = () => {
       active = false;
     };
   }, [t]);
+
+  useEffect(() => {
+    let active = true;
+    void systemConfigApi.getSetupStatus()
+      .then((status) => {
+        if (!active) return;
+        const agentCheck = status.checks.find((check) => check.key === 'llm_agent');
+        setAgentUnavailable(
+          agentCheck?.status === 'needs_action' || agentCheck?.status === 'optional',
+        );
+      })
+      .catch(() => { if (active) setAgentUnavailable(false); });
+    return () => { active = false; };
+  }, []);
 
   const updateContextCompressionEnabled = useCallback(
     async (nextEnabled: boolean) => {
@@ -1356,9 +1371,10 @@ const ChatPage: React.FC = () => {
             {messages.length === 0 && !loading ? (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
-                  title={t('chat.emptyTitle')}
-                  description={t('chat.emptyDescription')}
+                  title={agentUnavailable ? t('chat.agentUnavailableTitle') : t('chat.emptyTitle')}
+                  description={agentUnavailable ? t('chat.agentUnavailableDescription') : t('chat.emptyDescription')}
                   className="max-w-2xl"
+                  data-testid={agentUnavailable ? 'chat-agent-unavailable' : undefined}
                   icon={(
                     <svg
                       className="h-8 w-8"
@@ -1374,7 +1390,14 @@ const ChatPage: React.FC = () => {
                       />
                     </svg>
                   )}
-                  action={(
+                  action={agentUnavailable ? (
+                    <Link
+                      to={APP_ROUTE_PATHS.settings}
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--settings-border)] bg-[var(--nav-active-bg)] px-4 py-2 text-sm font-medium text-foreground"
+                    >
+                      {t('chat.agentUnavailableAction')}
+                    </Link>
+                  ) : (
                     <div className="flex max-w-lg flex-wrap justify-center gap-2">
                       {quickQuestions.map((q, i) => (
                         <button

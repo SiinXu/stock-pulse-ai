@@ -161,6 +161,7 @@ const AGENT_GROUPS: CategoryFieldGroup[] = [
     titleKey: 'settings.agentGroupMode',
     keys: [
       'AGENT_GENERATION_BACKEND',
+      'AGENT_FEATURES_ACKNOWLEDGED_OFF',
       'AGENT_MODE',
       'AGENT_ARCH',
       'AGENT_MAX_STEPS',

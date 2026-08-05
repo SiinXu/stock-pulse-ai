@@ -4385,5 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Status tugas: {status} ({progress}); pasaran berkesan: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata laluan admin semasa sebelum menyahdayakan pengesahan"
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata laluan admin semasa sebelum menyahdayakan pengesahan",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "Buka Tetapan",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia). Buka Tetapan.",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "Agent soal jawab tidak tersedia",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "Sahkan ciri Agent dimatikan",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "Saya tidak memerlukan Agent soal jawab buat masa ini (boleh diubah kemudian dalam Tetapan)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "Saya tidak memerlukan Agent soal jawab buat masa ini (boleh diubah kemudian dalam Tetapan)",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "Backend CLI hanya meliputi penjanaan laporan; Agent soal jawab memerlukan model API yang menyokong alatan (atau tidak tersedia).",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

@@ -4385,5 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Statut de la tâche : {status} ({progress}) ; marché effectif : {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Saisissez le mot de passe administrateur actuel avant de désactiver l’authentification"
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Saisissez le mot de passe administrateur actuel avant de désactiver l’authentification",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "Ouvrir les paramètres",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible). Ouvrir les paramètres.",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "L’Agent Q&R est indisponible",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "Confirmer les fonctions Agent désactivées",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "Je n’ai pas besoin de l’Agent Q&R pour l’instant (modifiable plus tard dans les paramètres)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "Je n’ai pas besoin de l’Agent Q&R pour l’instant (modifiable plus tard dans les paramètres)",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "Les backends CLI ne couvrent que la génération de rapports ; l’Agent Q&R nécessite un modèle API compatible outils (sinon indisponible).",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

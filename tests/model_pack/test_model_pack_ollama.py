@@ -313,16 +313,35 @@ def test_http_executor_translates_unreachable_ollama_without_exposing_traceback(
     assert "private path" not in error.value.user_message
 
 
-def test_http_executor_requires_private_target_allowlisting(tmp_path: Path) -> None:
+def test_http_executor_allows_admin_loopback_without_allowlist(tmp_path: Path) -> None:
     pack_path = _write_pack(tmp_path / "pack")
+    seen_kwargs: list[dict] = []
+
+    def fake_request(_method: str, _url: str, **kwargs):
+        seen_kwargs.append(kwargs)
+        raise requests.ConnectionError("connection refused")
+
     executor = OllamaHttpModelPackExecutor(
         base_url_provider=lambda: "http://127.0.0.1:11434",
+        requester=fake_request,
         allowlist_provider=lambda: (),
     )
-
     with inspect_model_pack(pack_path) as inspected:
         with pytest.raises(ModelPackError) as error:
             executor.create(inspected)
+    assert error.value.code == "ollama_unavailable"
+    assert seen_kwargs[0].get("allow_admin_loopback") is True
 
+
+def test_http_executor_requires_non_loopback_private_allowlisting(tmp_path: Path) -> None:
+    pack_path = _write_pack(tmp_path / "pack")
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://192.168.1.50:11434",
+        allowlist_provider=lambda: (),
+    )
+    with inspect_model_pack(pack_path) as inspected:
+        with pytest.raises(ModelPackError) as error:
+            executor.create(inspected)
     assert error.value.code == "ollama_access_blocked"
     assert "OUTBOUND_HTTP_ALLOWLIST" in error.value.user_message
+    assert "Loopback" in error.value.user_message

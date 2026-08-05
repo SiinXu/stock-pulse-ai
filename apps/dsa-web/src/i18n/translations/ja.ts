@@ -4385,6 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "タスク状態：{status}（{progress}）；対象市場：{region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "認証を無効にする前に現在の管理者パスワードを入力してください"
-
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "認証を無効にする前に現在の管理者パスワードを入力してください",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "CLI バックエンドはレポート生成のみを担当します。Q&A Agent にはツール対応の API モデルが必要です（未設定時は利用不可）。",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "設定を開く",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "CLI バックエンドはレポート生成のみです。Q&A Agent にはツール対応の API モデルが必要です。設定でモデル接続を追加するか、Agent を当面不要と確認してください。",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "Q&A Agent は現在利用できません",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "CLI バックエンドはレポート生成のみを担当します。Q&A Agent にはツール対応の API モデルが必要です（未設定時は利用不可）。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "初回セットアップ完了を妨げずに llm_agent チェックを収束させます。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "Agent が利用不可のとき、チャットは設定へのリンク付き空状態を表示します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "Q&A Agent が必要な場合は、まず API モデル接続を追加してください。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "CLI と Agent の能力境界は LLM 設定ガイドを参照してください。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "Q&A Agent が不要であることを確認し、CLI のみの構成で Agent 準備チェックを収束させます。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "Agent 機能を当面オフと確認",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "レポート生成にローカル CLI を使い、当面 Q&A Agent が不要なときに有効にします。ツール対応 API モデルを設定する準備ができたらオフにしてください。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "既定はオフです。API モデルが使えるか Agent オフを確認するまで、Agent モデルの準備チェックは要対応のままです。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "ツール対応 API モデルが Agent で利用可能になると、この確認は自動的に上書きされ、Agent 準備を妨げません。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "CLI バックエンドは生成専用のままです。このスイッチで CLI が Agent 対応になることはありません。",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "当面 Q&A Agent は不要です（後から設定で変更できます）",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "CLI バックエンドはレポート生成のみを担当します。Q&A Agent にはツール対応の API モデルが必要です（未設定時は利用不可）。",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

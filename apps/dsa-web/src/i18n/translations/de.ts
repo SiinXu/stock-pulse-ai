@@ -4385,5 +4385,25 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Aufgabenstatus: {status} ({progress}); effektiver Markt: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Geben Sie vor dem Deaktivieren der Authentifizierung das aktuelle Admin-Passwort ein"
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Geben Sie vor dem Deaktivieren der Authentifizierung das aktuelle Admin-Passwort ein",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableAction": "Einstellungen öffnen",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableDescription": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar). Einstellungen öffnen.",
+  "i18n.uiText.UI_TEXT.chat.agentUnavailableTitle": "Q&A-Agent ist nicht verfügbar",
+  "i18n.uiText.UI_TEXT.settings.cliAgentCapabilityNote": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.0": "AGENT_FEATURES_ACKNOWLEDGED_OFF=false",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.examples.1": "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.0": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.impact.1": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.0": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.notes.1": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.summary": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.title": "Agent-Funktionen als deaktiviert bestätigen",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.usage": "Ich brauche den Q&A-Agent vorerst nicht (später in den Einstellungen änderbar)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.0": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.1": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "Ich brauche den Q&A-Agent vorerst nicht (später in den Einstellungen änderbar)",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "CLI-Backends decken nur die Berichtserstellung ab; der Q&A-Agent benötigt ein API-Modell mit Tool-Unterstützung (sonst nicht verfügbar).",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
 };

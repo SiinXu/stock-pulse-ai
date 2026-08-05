@@ -4,7 +4,14 @@ import type React from 'react';
 import { getUiListSeparator } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
 import { DataTable, type DataTableColumn } from '../common';
-import { resolveAiTaskMatrix, type AiTaskRow, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
+import {
+  CLI_AGENT_CAPABILITY_NOTE,
+  isGenerationOnlyBackend,
+  resolveAiTaskMatrix,
+  type AiTaskRow,
+  type AiTaskStatus,
+  type UiLang,
+} from './aiTaskMatrix';
 import { SETTINGS_MISC_TEXT, SETTINGS_OVERVIEW_STATUS } from '../../locales/settingsMisc';
 
 interface AiOverviewMatrixProps {
@@ -35,6 +42,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: Record<UiLang, string>) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
+  const showCliCapabilityNote = isGenerationOnlyBackend((getValue('GENERATION_BACKEND') || 'litellm').trim());
   const columns: readonly DataTableColumn<AiTaskRow>[] = [
     {
       id: 'task',
@@ -114,6 +122,12 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
           </button>
         ) : null}
       </div>
+
+      {showCliCapabilityNote ? (
+        <p className="rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
+          {CLI_AGENT_CAPABILITY_NOTE[language]}
+        </p>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-[var(--settings-border)]">
         <DataTable
