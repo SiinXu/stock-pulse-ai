@@ -58,6 +58,7 @@ This is the entry point for project documentation. The README covers the project
 | --- | --- |
 | [UI User Manual](ui-manual/README_EN.md) | Module-by-module Web/desktop operations and daily workflows; see [TRANSLATION.md](ui-manual/TRANSLATION.md) |
 | [Bot Commands (EN)](bot-command_EN.md) | Bot commands, webhooks, platform integration, and callback behavior |
+| [Kronos Local Finance Model](kronos-local-model_EN.md) | Install optional deps, explicit weight download, Web settings and status diagnostics, desktop limitations ([Chinese](kronos-local-model.md)) |
 | [Kronos K-line Forecasting Agent Tool](kronos-agent-tool.md) | Optional local model setup, registration gates, output contract, limitations, verification, and rollback |
 | [Community Intelligence Agent Tool](community-intel-tool.md) | Default-off Phase A stock-scoped evidence contract, public citation boundary, deterministic degradation, and verification |
 | [Agent Soul Contract](agent-soul.md) | Version/hash rules, Single/Multi/Chat assembly, Soul/Persona/Skill precedence, run metadata, and rollback |

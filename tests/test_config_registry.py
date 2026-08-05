@@ -1092,6 +1092,7 @@ class TestUiPlacement(unittest.TestCase):
             "model_access",
             "task_routing",
             "developer_diagnostics",
+            "local_models",
             "hidden_legacy",
         }
         ai_fields = next(
@@ -1216,7 +1217,13 @@ class TestUiPlacement(unittest.TestCase):
         for field in ai_model["fields"]:
             self.assertIn(
                 field.get("ui_placement"),
-                {"model_access", "task_routing", "developer_diagnostics", "hidden_legacy"},
+                {
+                    "model_access",
+                    "task_routing",
+                    "developer_diagnostics",
+                    "local_models",
+                    "hidden_legacy",
+                },
                 f"{field['key']} has no ui_placement",
             )
 

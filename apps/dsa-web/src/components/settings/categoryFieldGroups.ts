@@ -95,6 +95,15 @@ const AI_MODEL_GROUPS: CategoryFieldGroup[] = [
       'LLM_USAGE_HMAC_KEY_VERSION',
     ],
   },
+  {
+    id: 'kronos',
+    titleKey: 'settings.aiGroupKronos',
+    keys: [
+      'KRONOS_ENABLED',
+      'KRONOS_MODEL_SIZE',
+      'KRONOS_WEIGHTS_DIR',
+    ],
+  },
 ];
 
 const SYSTEM_GROUPS: CategoryFieldGroup[] = [
