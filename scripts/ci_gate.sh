@@ -54,9 +54,6 @@ offline_test_suite() {
   local test_data_dir
   local coverage_report
   local test_exit_code=0
-  # Keep in lockstep with scripts/coverage_floor_baseline.json packages.
-  # Order is exact-match enforced below; do not reorder without updating the baseline.
-  local cov_packages=(src api data_provider bot)
   test_data_dir="$(mktemp -d)"
   coverage_report="${test_data_dir}/coverage.json"
   # Marker selection excludes network and wall-clock benchmarks. Benchmarks
@@ -69,18 +66,15 @@ offline_test_suite() {
   # for 300s, which is complementary post-mortem signal beyond pytest-timeout.
   # Coverage is measured for src/api/data_provider/bot and enforced by the
   # checked-in floor in scripts/coverage_floor_baseline.json.
+  # Keep --cov= flags in lockstep with baseline.packages (order-sensitive).
   echo "==> backend-gate: assert --cov packages match coverage floor baseline"
   python scripts/check_coverage_floor.py --assert-cov-flags \
-    --cov "${cov_packages[0]}" \
-    --cov "${cov_packages[1]}" \
-    --cov "${cov_packages[2]}" \
-    --cov "${cov_packages[3]}"
+    --cov src --cov api --cov data_provider --cov bot
   DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
     python -m pytest -m "not network and not benchmark" \
       --timeout=120 --timeout-method=thread \
       -o faulthandler_timeout=300 \
-      --cov="${cov_packages[0]}" --cov="${cov_packages[1]}" \
-      --cov="${cov_packages[2]}" --cov="${cov_packages[3]}" \
+      --cov=src --cov=api --cov=data_provider --cov=bot \
       --cov-report=term \
       --cov-report="json:${coverage_report}" \
     || test_exit_code=$?
