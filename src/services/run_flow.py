@@ -114,6 +114,15 @@ def build_task_run_flow_snapshot(
             "analysis_phase": getattr(task, "analysis_phase", None),
         },
     )
+    task_error = getattr(task, "error", None)
+    task_message_code = getattr(task, "message_code", None)
+    queue_message = getattr(task, "message", None) or _task_status_message(flow_status)
+    # Prefer stable public codes on failed nodes so first-run guidance can map
+    # without scraping generic Chinese labels.
+    if flow_status == "failed" and task_message_code == "llm_not_configured":
+        queue_message = "llm_not_configured"
+    elif flow_status == "failed" and task_error == "llm_not_configured":
+        queue_message = "llm_not_configured"
     _put_node(
         nodes,
         "task_queue",
@@ -124,10 +133,11 @@ def build_task_run_flow_snapshot(
         started_at=created_at,
         ended_at=completed_at,
         duration_ms=_elapsed_ms(getattr(task, "created_at", None), getattr(task, "completed_at", None)),
-        message=getattr(task, "message", None) or _task_status_message(flow_status),
+        message=queue_message,
         metadata={
             "progress": getattr(task, "progress", None),
-            "error": getattr(task, "error", None),
+            "error": task_error,
+            "message_code": task_message_code,
         },
     )
     _append_edge(edges, "request", "task_queue", "control", flow_status, label="提交")
@@ -901,6 +911,10 @@ def _append_task_events(events: List[Dict[str, Any]], task: Any, flow_status: st
             message=getattr(task, "message", None) or "任务执行中",
         )
     if flow_status == "failed":
+        failed_message = getattr(task, "error", None) or getattr(task, "message", None)
+        failed_code = getattr(task, "message_code", None)
+        if failed_code == "llm_not_configured" or failed_message == "llm_not_configured":
+            failed_message = "llm_not_configured"
         _append_event(
             events,
             "task_failed",
@@ -908,7 +922,8 @@ def _append_task_events(events: List[Dict[str, Any]], task: Any, flow_status: st
             timestamp=_datetime_to_iso(getattr(task, "completed_at", None)),
             severity="danger",
             title="任务失败",
-            message=getattr(task, "error", None) or getattr(task, "message", None),
+            message=failed_message,
+            metadata={"message_code": failed_code, "error": getattr(task, "error", None)},
         )
     elif flow_status in {"cancel_requested", "cancelled"}:
         _append_event(

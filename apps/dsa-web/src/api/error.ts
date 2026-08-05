@@ -230,6 +230,11 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '分析失败', message: '分析未能完成，请检查配置后重试。' },
     en: { title: 'Analysis failed', message: 'The analysis could not finish. Check the configuration and try again.' },
   }),
+  llm_not_configured: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.llm_not_configured", {
+    category: 'llm_not_configured',
+    zh: { title: '尚未配置 LLM 模型', message: '请在设置中配置主要模型、模型连接或 API Key。' },
+    en: { title: 'No LLM model is configured', message: 'Configure a primary model, connection, or API key in Settings, then try again.' },
+  }),
 };
 
 const EN_ERROR_TEXT: Record<ApiErrorCategory, { title: string; message: string }> = {

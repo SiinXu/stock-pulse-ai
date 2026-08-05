@@ -26,6 +26,34 @@ describe('stable API error contract', () => {
     expect(english.traceId).toBe('trace-1');
   });
 
+  it('renders the llm_not_configured first-run remedy copy from the stable catalog', () => {
+    const parsed = parseApiError({
+      response: {
+        status: 422,
+        data: {
+          error: 'llm_not_configured',
+          message: 'LLM API Key 未配置',
+          params: { stock_code: '600519' },
+          details: null,
+          trace_id: 'trace-llm',
+        },
+      },
+    });
+
+    expect(parsed.code).toBe('llm_not_configured');
+    expect(parsed.category).toBe('llm_not_configured');
+    expect(parsed.status).toBe(422);
+
+    const english = getParsedApiError(parsed, 'en');
+    expect(english.title).toBe('No LLM model is configured');
+    expect(english.message).toMatch(/Settings/i);
+    expect(english.message).not.toContain('LLM API Key 未配置');
+
+    const chinese = getParsedApiError(parsed, 'zh');
+    expect(chinese.title).toBe('尚未配置 LLM 模型');
+    expect(chinese.message).toMatch(/设置|API Key/);
+  });
+
   it('uses localized generic copy for unknown codes while preserving details', () => {
     const parsed = getParsedApiError({
       response: {

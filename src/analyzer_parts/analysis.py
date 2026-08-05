@@ -188,6 +188,7 @@ class GeminiAnalyzer:
                     zh='LLM API Key 未配置',
                     ko='LLM API 키가 설정되지 않았습니다',
                 ),
+                error_code="llm_not_configured",
                 model_used=None,
                 report_language=report_language,
             )

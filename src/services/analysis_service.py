@@ -40,6 +40,34 @@ from src.utils.sanitize import (
 
 logger = logging.getLogger(__name__)
 
+# Stable public code for the known "no usable LLM configured" first-run failure.
+LLM_NOT_CONFIGURED_ERROR_CODE = "llm_not_configured"
+
+_LLM_NOT_CONFIGURED_MARKERS = (
+    "llm api key is not configured",
+    "llm api key 未配置",
+    "llm api 키가 설정되지 않았습니다",
+    "no api key is configured",
+    "未配置 api key",
+    "ai analysis will be unavailable",
+    "no llm configured",
+    "no effective primary model configured",
+    "litellm_model not configured",
+)
+
+
+def is_llm_not_configured_error(
+    error_code: Optional[str] = None,
+    error_message: Optional[str] = None,
+) -> bool:
+    """Return True only for the known missing-LLM configuration condition."""
+    if str(error_code or "").strip() == LLM_NOT_CONFIGURED_ERROR_CODE:
+        return True
+    text = str(error_message or "").strip().lower()
+    if not text:
+        return False
+    return any(marker in text for marker in _LLM_NOT_CONFIGURED_MARKERS)
+
 
 class AnalysisService:
     """
@@ -52,6 +80,7 @@ class AnalysisService:
         """初始化分析服务"""
         self.repo = AnalysisRepository()
         self.last_error: Optional[str] = None
+        self.last_error_code: Optional[str] = None
     
     def analyze_stock(
         self,
@@ -94,6 +123,7 @@ class AnalysisService:
         """
         try:
             self.last_error = None
+            self.last_error_code = None
             # Import analysis related modules
             from src.config import get_config
             from src.core.pipeline import StockAnalysisPipeline
@@ -154,10 +184,16 @@ class AnalysisService:
                 return None
 
             if not getattr(result, "success", True):
+                raw_error = getattr(result, "error_message", None)
+                raw_code = getattr(result, "error_code", None)
                 self.last_error = sanitize_diagnostic_text(
-                    getattr(result, "error_message", None),
+                    raw_error,
                     max_length=300,
                 ) or f"分析股票 {stock_code} 失败"
+                if is_llm_not_configured_error(raw_code, raw_error or self.last_error):
+                    self.last_error_code = LLM_NOT_CONFIGURED_ERROR_CODE
+                elif isinstance(raw_code, str) and raw_code.strip():
+                    self.last_error_code = raw_code.strip()
                 logger.warning(f"分析股票 {stock_code} 未成功完成: {self.last_error}")
                 return None
             
@@ -167,6 +203,8 @@ class AnalysisService:
         except Exception as exc:
             # broad-exception: fallback_recorded - analysis fail-safe contract; records a sanitized last_error and safe log, then returns None for any pipeline failure.
             self.last_error = sanitize_exception_chain(exc)
+            if is_llm_not_configured_error(error_message=self.last_error):
+                self.last_error_code = LLM_NOT_CONFIGURED_ERROR_CODE
             log_safe_exception(
                 logger,
                 "Stock analysis failed",

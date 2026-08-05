@@ -130,6 +130,15 @@ def _dedupe_stock_code_key(stock_code: str) -> str:
 _STABLE_TASK_ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 
 
+class KnownTaskFailure(Exception):
+    """Command failure that already carries a stable public error code."""
+
+    def __init__(self, error_code: str, message: str) -> None:
+        super().__init__(message)
+        self.error_code = str(error_code or "").strip() or "task_failed"
+        self.message = str(message or "").strip() or self.error_code
+
+
 def public_task_error(task: Any, default_error_code: str = "task_failed") -> Optional[str]:
     """Project a failed task to a stable public error code."""
     status = getattr(task, "status", None)
@@ -148,7 +157,10 @@ def public_task_message(task: Any, default_failed_message: str = "任务执行�
     status_value = status.value if isinstance(status, Enum) else str(status or "")
     if status_value != TaskStatus.FAILED.value:
         return getattr(task, "message", None)
-    if getattr(task, "message_code", None) == "task.analysis.failed":
+    message_code = getattr(task, "message_code", None)
+    if message_code == "llm_not_configured":
+        return "No LLM model is configured"
+    if message_code == "task.analysis.failed":
         return "分析失败"
     return default_failed_message
 
@@ -1731,7 +1743,17 @@ class AnalysisTaskQueue:
             task.result = None
             task.result_ref = None
             task.error = task.failure_error_code
-            if task.kind == "stock_analysis":
+            if task.failure_error_code == "llm_not_configured":
+                # Known first-run configuration gap: surface the stable code on
+                # message_code/error so polling, history, and run-flow can map UI copy.
+                task.message = "No LLM model is configured"
+                task.message_code = "llm_not_configured"
+                task.message_params = (
+                    {"stock_code": task.stock_code}
+                    if task.kind == "stock_analysis"
+                    else {}
+                )
+            elif task.kind == "stock_analysis":
                 task.message = "分析失败"
                 task.message_code = "task.analysis.failed"
                 task.message_params = {"stock_code": task.stock_code}
@@ -1798,7 +1820,18 @@ class AnalysisTaskQueue:
             request_context=request_context,
         )
         if result is None:
-            raise RuntimeError(service.last_error or "分析返回空结果")
+            error_message = service.last_error or "分析返回空结果"
+            from src.services.analysis_service import (
+                LLM_NOT_CONFIGURED_ERROR_CODE,
+                is_llm_not_configured_error,
+            )
+
+            if is_llm_not_configured_error(service.last_error_code, error_message):
+                raise KnownTaskFailure(
+                    LLM_NOT_CONFIGURED_ERROR_CODE,
+                    error_message,
+                )
+            raise RuntimeError(error_message)
         return result
 
     def _execute_command(self, task_id: str) -> Optional[Any]:
@@ -1866,17 +1899,24 @@ class AnalysisTaskQueue:
                 exc,
                 redaction_values=redaction_values,
             )
+            known_failure_code = (
+                exc.error_code
+                if isinstance(exc, KnownTaskFailure) and exc.error_code
+                else None
+            )
             log_safe_exception(
                 logger,
                 "Task command failed",
                 exc,
-                error_code="task_command_failed",
+                error_code=known_failure_code or "task_command_failed",
                 context={"task_id": task_id, "stock_code": stock_code},
                 exception_redaction_values=redaction_values,
             )
             with self._data_lock:
                 current = self._tasks.get(task_id)
                 if current is not None:
+                    if known_failure_code:
+                        current.failure_error_code = known_failure_code
                     self._terminalize_locked(
                         current,
                         TaskStatus.FAILED,

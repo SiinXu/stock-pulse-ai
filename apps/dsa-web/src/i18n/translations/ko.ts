@@ -76,6 +76,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.invalid_params.title": "요청 매개변수는 유효하지 않습니다",
   "api.error.STABLE_ERROR_TEXT.invalid_password.message": "비밀번호를 확인한 후 다시 시도해 보세요.",
   "api.error.STABLE_ERROR_TEXT.invalid_password.title": "비밀번호 검증 실패",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.message": "설정에서 기본 모델, 연결 또는 API 키를 구성한 후 다시 시도하세요.",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.title": "LLM 모델이 구성되지 않았습니다",
   "api.error.STABLE_ERROR_TEXT.no_channels.message": "먼저 설정에서 알림 채널을 설정하세요.",
   "api.error.STABLE_ERROR_TEXT.no_channels.title": "알림 채널이 설정되어 있지 않습니다",
   "api.error.STABLE_ERROR_TEXT.not_changeable.message": "이 비밀번호 출처는 웹 앱에서 변경을 지원하지 않습니다.",
@@ -213,6 +215,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.thinking": "AI가 생각하고 있어...",
   "i18n.uiText.UI_TEXT.chat.thinkingProcess": "이유",
   "i18n.uiText.UI_TEXT.chat.thinkingStep": "{step} 단계: 추론",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_agent": "Agent 모델",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_primary": "기본 모델",
+  "i18n.uiText.UI_TEXT.home.setupCheck.notification": "알림 채널",
+  "i18n.uiText.UI_TEXT.home.setupCheck.stock_list": "관심 종목",
+  "i18n.uiText.UI_TEXT.home.setupCheck.storage": "데이터베이스 / 로컬 저장소",
   "i18n.uiText.UI_TEXT.research.cancel": "취소",
   "i18n.uiText.UI_TEXT.research.chatMode": "채팅",
   "i18n.uiText.UI_TEXT.research.description": "하나의 질문에 대해 심층 리서치를 실행합니다: 분해·검색·종합하여 결론과 하위 질문 참조를 제공합니다. 동기식으로 실행되며 취소할 수 있고 결과는 세션별로 유지됩니다.",
@@ -4357,6 +4364,6 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "작업 상태: {status} ({progress}); 실제 시장: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요",
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "인증을 끄기 전에 현재 관리자 비밀번호를 입력하세요"
 
 };
