@@ -6,6 +6,7 @@ import { DECISION_REPORT_RUN_FLOW_SCENARIOS } from './decisionReportRunFlowScena
 import { LAYOUT_DASHBOARD_SCENARIOS } from './layoutDashboardScenarios';
 import { SETTINGS_SCENARIOS } from './settingsScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
+import { SCREENING_SCENARIOS } from './screeningScenarios';
 
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
@@ -14,6 +15,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...DECISION_REPORT_RUN_FLOW_SCENARIOS,
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
+  ...SCREENING_SCENARIOS,
 };
 
 export function getPlaygroundRenderer(componentId: string): PlaygroundScenarioRenderer | undefined {
