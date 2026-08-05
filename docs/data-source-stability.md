@@ -32,7 +32,7 @@ ADR-006 拆分后，规范化 / 路由辅助 / 共享类型的文件归属见 [D
 | AlphaSift 选股快照 | Tushare、Sina、Efinance、AkShare EM、EastMoney Datacenter | 有 `TUSHARE_TOKEN` 时自动把 `tushare` 放入快照优先级；否则使用免费源链路 | AlphaSift 维护 source health；DSA 状态接口透出 snapshot/daily health |
 | AlphaSift 日线补特征 | DSA `DataFetcherManager` | AlphaSift 调用 DSA provider context，优先复用 DSA 日线与缓存链路 | DSA 链路失败后才回到 AlphaSift 原始日线源 |
 | AlphaSift 热点题材 | DSA EastMoney provider、AlphaSift hotspot、last-good cache | 未指定 provider 时默认使用 DSA EastMoney provider | 实时失败时回退热点缓存；无缓存时返回稳定空态和可读错误 |
-| 港股 | Tushare、AkShare、YFinance、Longbridge | 日线按 numeric priority；配置且初始化成功的 Tushare 为 `-1`，Longbridge 默认 `5`。实时行情配置 Longbridge 后优先 Longbridge | 日线继续尝试下一个 HK-capable provider；实时行情回退 AkShare |
+| 港股 | Tushare、AkShare、YFinance、Longbridge | 日线按 numeric priority；配置且初始化成功的 Tushare 为 `-1`，Longbridge 默认 `5`。实时行情配置 Longbridge 后优先 Longbridge | 日线继续尝试下一个 HK-capable provider；实时行情回退 AkShare。AkShare 港股东财全市场快照：刷新失败时不销毁仍在 success TTL 内的可用快照；仅在完全没有可用快照时写入约 30s 的 failure 负缓存，再回退新浪（字段更少） |
 | 美股 | Longbridge、Finnhub、AlphaVantage、YFinance | 个股配置 Longbridge 后使用 `Longbridge -> Finnhub -> AlphaVantage -> YFinance`，否则使用 `Finnhub -> AlphaVantage -> YFinance`；指数固定 `YFinance -> Finnhub` | named route 忽略 numeric priority；全部失败后才使用符合窗口的 stale 日线缓存 |
 
 ## 总体链路图
