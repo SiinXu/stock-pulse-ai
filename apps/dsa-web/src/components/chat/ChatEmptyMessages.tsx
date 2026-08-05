@@ -4,7 +4,7 @@ import type React from 'react';
 import { EmptyState } from '../common';
 import { AgentUnavailableEmptyState } from './AgentUnavailableEmptyState';
 
-type QuickQuestion = { label: string };
+type QuickQuestion = { label: string; skill: string };
 
 type ChatEmptyMessagesProps = {
   agentUnavailable: boolean;
@@ -18,7 +18,7 @@ type ChatEmptyMessagesProps = {
   quickQuestionsDisabled: boolean;
 };
 
-export const ChatEmptyMessages: React.FC<ChatEmptyMessagesProps> = ({
+const ChatEmptyMessages: React.FC<ChatEmptyMessagesProps> = ({
   agentUnavailable,
   agentUnavailableTitle,
   agentUnavailableDescription,
@@ -70,3 +70,5 @@ export const ChatEmptyMessages: React.FC<ChatEmptyMessagesProps> = ({
     )}
   </div>
 );
+
+export { ChatEmptyMessages };

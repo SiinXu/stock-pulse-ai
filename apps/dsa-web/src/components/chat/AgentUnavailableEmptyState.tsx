@@ -12,7 +12,7 @@ type AgentUnavailableEmptyStateProps = {
 };
 
 /** Informative empty state when Q&A Agent is unavailable (e.g. CLI-only). */
-export const AgentUnavailableEmptyState: React.FC<AgentUnavailableEmptyStateProps> = ({
+const AgentUnavailableEmptyState: React.FC<AgentUnavailableEmptyStateProps> = ({
   title,
   description,
   actionLabel,
@@ -32,3 +32,5 @@ export const AgentUnavailableEmptyState: React.FC<AgentUnavailableEmptyStateProp
     )}
   />
 );
+
+export { AgentUnavailableEmptyState };
