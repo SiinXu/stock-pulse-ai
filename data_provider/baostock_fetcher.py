@@ -21,14 +21,8 @@ from datetime import datetime
 from typing import Optional, Generator
 
 import pandas as pd
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
 
-from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
+from src.utils.sanitize import log_safe_exception
 
 from .base import (
     BaseFetcher,
@@ -37,6 +31,12 @@ from .base import (
     is_bse_code,
     normalize_stock_code,
     _is_hk_market,
+)
+from .retry_policy import (
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    DEFAULT_RETRYABLE_EXCEPTIONS,
+    call_with_timeout,
+    provider_retry,
 )
 import os
 
@@ -76,9 +76,20 @@ class BaostockFetcher(BaseFetcher):
     name = "BaostockFetcher"
     priority = int(os.getenv("BAOSTOCK_PRIORITY", "3"))
     
-    def __init__(self):
-        """初始化 BaostockFetcher"""
+    def __init__(self, request_timeout_seconds: Optional[float] = None):
+        """初始化 BaostockFetcher
+
+        Args:
+            request_timeout_seconds: Explicit request deadline for library calls
+                that lack a native timeout. Defaults to the shared provider
+                request-timeout contract.
+        """
         self._bs_module = None
+        self._request_timeout_seconds = (
+            DEFAULT_REQUEST_TIMEOUT_SECONDS
+            if request_timeout_seconds is None
+            else float(request_timeout_seconds)
+        )
     
     def _get_baostock(self):
         """
@@ -188,16 +199,10 @@ class BaostockFetcher(BaseFetcher):
             logger.warning(f"无法确定股票 {code} 的市场，默认使用深市")
             return f"sz.{code}"
     
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=safe_before_sleep_log(
-            logger,
-            logging.WARNING,
-            event="Baostock daily data retry scheduled",
-            error_code="baostock_daily_data_retry",
-        ),
+    @provider_retry(
+        target_logger=logger,
+        event="Baostock daily data retry scheduled",
+        error_code="baostock_daily_data_retry",
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -209,7 +214,7 @@ class BaostockFetcher(BaseFetcher):
         1. 检查是否为美股（不支持）
         2. 使用上下文管理器管理连接
         3. 转换股票代码格式
-        4. 调用 API 查询数据
+        4. 调用 API 查询数据 (bounded by request timeout)
         5. 将结果转换为 DataFrame
         """
         # U.S. stocks are not supported, Throw an exception to allow DataFetcherManager Switch to another data source
@@ -230,9 +235,9 @@ class BaostockFetcher(BaseFetcher):
         bs_code = self._convert_stock_code(stock_code)
         
         logger.debug(f"调用 Baostock query_history_k_data_plus({bs_code}, {start_date}, {end_date})")
-        
-        with self._baostock_session() as bs:
-            try:
+
+        def _query() -> pd.DataFrame:
+            with self._baostock_session() as bs:
                 # Query daily data
                 # adjustflag: 1-backward-adjusted, 2-forward-adjusted, 3-unadjusted
                 rs = bs.query_history_k_data_plus(
@@ -243,26 +248,33 @@ class BaostockFetcher(BaseFetcher):
                     frequency="d",  # Daily line
                     adjustflag="2"  # forward-adjusted.
                 )
-                
+
                 if rs.error_code != '0':
                     raise DataFetchError(f"Baostock 查询失败: {rs.error_msg}")
-                
+
                 # Convert to DataFrame
                 data_list = []
                 while rs.next():
                     data_list.append(rs.get_row_data())
-                
+
                 if not data_list:
                     raise DataFetchError(f"Baostock 未查询到 {stock_code} 的数据")
-                
-                df = pd.DataFrame(data_list, columns=rs.fields)
-                
-                return df
-                
-            except Exception as e:
-                if isinstance(e, DataFetchError):
-                    raise
-                raise DataFetchError(f"Baostock 获取数据失败: {e}") from e
+
+                return pd.DataFrame(data_list, columns=rs.fields)
+
+        try:
+            return call_with_timeout(
+                _query,
+                timeout=self._request_timeout_seconds,
+                call_name="baostock.query_history_k_data_plus",
+            )
+        except DEFAULT_RETRYABLE_EXCEPTIONS:
+            # Preserve retryable exceptions for provider_retry; do not wrap.
+            raise
+        except DataFetchError:
+            raise
+        except Exception as e:
+            raise DataFetchError(f"Baostock 获取数据失败: {e}") from e
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """
