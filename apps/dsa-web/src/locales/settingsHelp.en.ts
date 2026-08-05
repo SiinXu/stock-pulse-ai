@@ -1226,6 +1226,46 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the market overview section in analysis reports.'],
     notes: ['Market review depends on the availability of index data sources for the selected markets.'],
   },
+  'settings.ai_model.KRONOS_ENABLED': {
+    title: 'Enable Kronos Local Forecast',
+    summary: 'Opt-in local Kronos K-line forecasting Agent Tool (not an LLM chat model).',
+    usage: 'Install requirements-kronos.txt, download weights with scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, then enable and restart. Use the Kronos status panel on Local Models to verify.',
+    valueNotes: [
+      'Default is false; analysis continues without Kronos when disabled or not ready.',
+      'A process restart is required after enabling so the built-in plugin can register the tool.',
+      'Prebuilt desktop packages do not support Kronos.',
+    ],
+    impact: ['When ready, exposes forecast_kline_with_kronos to the Technical Agent / Agent tool registry.'],
+    notes: ['Never auto-downloads weights from the Web UI. See docs/kronos-local-model.md.'],
+    docs: [
+      {
+        label: 'Kronos local model guide',
+        href: 'https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/kronos-local-model.md',
+      },
+    ],
+  },
+  'settings.ai_model.KRONOS_MODEL_SIZE': {
+    title: 'Kronos Model Size',
+    summary: 'Selects the official mini, small, or base model/tokenizer pair.',
+    usage: 'Prefer mini for first install (~40 MB with tokenizer). Larger sizes need more RAM and CPU/GPU.',
+    valueNotes: [
+      'mini uses Kronos-Tokenizer-2k; small/base share Kronos-Tokenizer-base.',
+      'Approximate downloads: mini ~40 MB, small ~150 MB, base ~500 MB.',
+    ],
+    impact: ['Determines which local directories under KRONOS_WEIGHTS_DIR must be present.'],
+    notes: ['Changing size after download requires matching weights and a restart.'],
+  },
+  'settings.ai_model.KRONOS_WEIGHTS_DIR': {
+    title: 'Kronos Weights Directory',
+    summary: 'Absolute local root that contains the selected model and tokenizer folders.',
+    usage: 'Point to a directory prepared with scripts/download_kronos_weights.py or a manual official HF snapshot copy.',
+    valueNotes: [
+      'Must be a local filesystem path (not a URL).',
+      'StockPulse loads weights with local_files_only=True and never downloads from analysis.',
+    ],
+    impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
+    notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
+  },
 };
 
 export default settingsHelpEnUS;

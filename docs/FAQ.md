@@ -258,6 +258,20 @@ OPENAI_MODEL=deepseek-v4-flash
 
 ---
 
+### Q12b2: 如何安装并配置 Kronos 本地金融预测模型？
+
+Kronos 是**可选**的本地 K 线预测 Agent Tool（不是聊天模型），默认关闭且不安装 torch。
+
+1. 安装可选依赖：`pip install … -r requirements-kronos.txt`（见 [Kronos 本地模型](kronos-local-model.md)）
+2. 显式下载权重（会先打印大约体积）：`python scripts/download_kronos_weights.py --size mini --weights-dir <dir> --yes`
+3. 在 **设置 → AI 与模型 → 本地模型** 配置 `KRONOS_ENABLED` / `KRONOS_MODEL_SIZE` / `KRONOS_WEIGHTS_DIR`，或写入 `.env`
+4. **重启**进程；用同一页的 Kronos 状态面板核对依赖与权重
+5. **预构建桌面端不支持** Kronos；请在源码环境使用
+
+完整说明：[kronos-local-model.md](kronos-local-model.md)、工具契约 [kronos-agent-tool.md](kronos-agent-tool.md)。
+
+---
+
 ### Q12c: 运行时报 `OllamaException / APIConnectionError`（All LLM models failed）怎么办？
 
 **症状**：日志出现 `litellm.APIConnectionError: OllamaException` 或 `Analysis failed: All LLM models failed (tried 1 model(s))`。

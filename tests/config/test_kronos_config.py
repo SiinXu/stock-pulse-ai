@@ -9,12 +9,17 @@ from src.config import Config
 from src.core.config_registry import WEB_SETTINGS_HIDDEN_FROM_UI
 
 
-def test_kronos_configuration_remains_environment_only() -> None:
-    assert {
-        "KRONOS_ENABLED",
-        "KRONOS_MODEL_SIZE",
-        "KRONOS_WEIGHTS_DIR",
-    } <= WEB_SETTINGS_HIDDEN_FROM_UI
+def test_kronos_configuration_is_visible_in_web_settings_registry() -> None:
+    """Productized Kronos settings are no longer hidden from the Web UI."""
+    from src.core.config_registry import get_field_definition, get_registered_field_keys
+
+    registered = set(get_registered_field_keys())
+    for key in ("KRONOS_ENABLED", "KRONOS_MODEL_SIZE", "KRONOS_WEIGHTS_DIR"):
+        assert key not in WEB_SETTINGS_HIDDEN_FROM_UI
+        assert key in registered
+        field = get_field_definition(key)
+        assert field["category"] == "ai_model"
+        assert field.get("help_key")
 
 
 @patch("src.config.setup_env")

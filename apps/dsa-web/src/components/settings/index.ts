@@ -23,4 +23,5 @@ export * from './ModelMultiSelect';
 export * from './AuthSettingsCard';
 export * from './InvestmentFrameworkSettingsCard';
 export * from './GenerationBackendStatusPanel';
+export * from './KronosStatusPanel';
 export * from './LocalModelsPanel';

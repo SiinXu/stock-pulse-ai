@@ -9,8 +9,10 @@ import json
 import logging
 import math
 import re
+import sys
 import threading
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, Protocol, Sequence
@@ -204,6 +206,25 @@ KRONOS_MODEL_SPECS = MappingProxyType(
     }
 )
 
+# Approximate download sizes for operator planning (model + matching tokenizer).
+# Exact bytes vary by HF revision; the download helper prints these before opt-in.
+KRONOS_DOWNLOAD_SIZE_HINTS = MappingProxyType(
+    {
+        "mini": "~40 MB (Kronos-mini + Kronos-Tokenizer-2k)",
+        "small": "~150 MB (Kronos-small + Kronos-Tokenizer-base)",
+        "base": "~500 MB (Kronos-base + Kronos-Tokenizer-base)",
+    }
+)
+
+KRONOS_INSTALL_COMMAND = (
+    "python -m pip install --constraint constraints.txt "
+    "--build-constraint build-constraints.txt -r requirements-kronos.txt"
+)
+KRONOS_DOWNLOAD_COMMAND = (
+    "python scripts/download_kronos_weights.py --size {size} --weights-dir <dir>"
+)
+KRONOS_DOCS_PATH = "docs/kronos-local-model.md"
+
 
 @dataclass(frozen=True)
 class KronosAvailability:
@@ -215,6 +236,63 @@ class KronosAvailability:
     spec: KronosModelSpec | None = None
     model_dir: Path | None = None
     tokenizer_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class KronosDependencyStatus:
+    """Import probe result for one optional Kronos dependency."""
+
+    name: str
+    available: bool
+
+
+@dataclass(frozen=True)
+class KronosStatusReport:
+    """Operator-facing status matrix for Settings diagnostics."""
+
+    enabled: bool
+    model_size: str
+    weights_dir_configured: str | None
+    weights_dir_resolved: str | None
+    ready: bool
+    reason: str
+    message: str
+    next_step: str
+    dependencies_installed: bool
+    dependencies: tuple[KronosDependencyStatus, ...]
+    weights_present: bool
+    weights_total_bytes: int | None
+    weights_modified_at: str | None
+    model_dir: str | None
+    tokenizer_dir: str | None
+    packaged_desktop: bool
+    install_supported: bool
+    download_size_hint: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "model_size": self.model_size,
+            "weights_dir_configured": self.weights_dir_configured,
+            "weights_dir_resolved": self.weights_dir_resolved,
+            "ready": self.ready,
+            "reason": self.reason,
+            "message": self.message,
+            "next_step": self.next_step,
+            "dependencies_installed": self.dependencies_installed,
+            "dependencies": [
+                {"name": item.name, "available": item.available}
+                for item in self.dependencies
+            ],
+            "weights_present": self.weights_present,
+            "weights_total_bytes": self.weights_total_bytes,
+            "weights_modified_at": self.weights_modified_at,
+            "model_dir": self.model_dir,
+            "tokenizer_dir": self.tokenizer_dir,
+            "packaged_desktop": self.packaged_desktop,
+            "install_supported": self.install_supported,
+            "download_size_hint": self.download_size_hint,
+        }
 
 
 class KronosForecastError(RuntimeError):
@@ -361,7 +439,8 @@ def assess_kronos_availability(
             reason="disabled",
             message=(
                 "Kronos agent tool is disabled. Set KRONOS_ENABLED=true only "
-                "after installing requirements-kronos.txt and placing local weights."
+                "after installing requirements-kronos.txt and placing local "
+                f"weights (see {KRONOS_DOCS_PATH})."
             ),
         )
 
@@ -394,7 +473,8 @@ def assess_kronos_availability(
             reason="dependencies_missing",
             message=(
                 "Kronos dependencies are missing: "
-                f"{', '.join(missing_dependencies)}. Install requirements-kronos.txt."
+                f"{', '.join(missing_dependencies)}. Install requirements-kronos.txt "
+                f"with: {KRONOS_INSTALL_COMMAND}"
             ),
             spec=spec,
         )
@@ -406,7 +486,8 @@ def assess_kronos_availability(
             reason="weights_dir_unconfigured",
             message=(
                 "Kronos weights are not configured. Set KRONOS_WEIGHTS_DIR to "
-                "a local directory containing the selected model and tokenizer."
+                "a local directory containing the selected model and tokenizer, "
+                f"or run: {KRONOS_DOWNLOAD_COMMAND.format(size=size)}"
             ),
             spec=spec,
         )
@@ -414,7 +495,10 @@ def assess_kronos_availability(
         return KronosAvailability(
             ready=False,
             reason="weights_dir_invalid",
-            message="KRONOS_WEIGHTS_DIR must be a local filesystem directory.",
+            message=(
+                "KRONOS_WEIGHTS_DIR must be a local filesystem directory. "
+                f"See {KRONOS_DOCS_PATH}."
+            ),
             spec=spec,
         )
 
@@ -427,8 +511,9 @@ def assess_kronos_availability(
             reason="weights_dir_missing",
             message=(
                 "The configured Kronos weights directory does not exist. "
-                "Download the official Hugging Face artifacts elsewhere or "
-                "place them manually, then restart StockPulse."
+                "Download the official Hugging Face artifacts with "
+                f"{KRONOS_DOWNLOAD_COMMAND.format(size=size)} "
+                "or place them manually, then restart StockPulse."
             ),
             spec=spec,
             model_dir=model_dir,
@@ -447,7 +532,8 @@ def assess_kronos_availability(
             reason="weights_incomplete",
             message=(
                 "Kronos local weights are incomplete. Missing: "
-                f"{', '.join(missing_artifacts)}. No automatic download was attempted."
+                f"{', '.join(missing_artifacts)}. No automatic download was attempted. "
+                f"Run: {KRONOS_DOWNLOAD_COMMAND.format(size=size)}"
             ),
             spec=spec,
             model_dir=model_dir,
@@ -470,7 +556,8 @@ def assess_kronos_availability(
             message=(
                 "Kronos local artifacts do not match the selected official "
                 f"model/tokenizer contract: {', '.join(invalid_artifacts)}. "
-                "No automatic download was attempted."
+                "No automatic download was attempted. Replace both directories "
+                f"with official artifacts ({KRONOS_DOWNLOAD_COMMAND.format(size=size)})."
             ),
             spec=spec,
             model_dir=model_dir,
@@ -480,10 +567,209 @@ def assess_kronos_availability(
     return KronosAvailability(
         ready=True,
         reason="ready",
-        message="Kronos local model and tokenizer are ready.",
+        message=(
+            "Kronos local model and tokenizer are ready. Restart StockPulse if "
+            "you just enabled KRONOS_ENABLED so the Agent Tool can register."
+        ),
         spec=spec,
         model_dir=model_dir,
         tokenizer_dir=tokenizer_dir,
+    )
+
+
+def is_packaged_desktop_runtime() -> bool:
+    """Return True when the backend is a frozen PyInstaller desktop bundle."""
+
+    return bool(getattr(sys, "frozen", False)) or hasattr(sys, "_MEIPASS")
+
+
+def _next_step_for_reason(
+    reason: str,
+    *,
+    size: str,
+    packaged_desktop: bool,
+) -> str:
+    if packaged_desktop:
+        return (
+            "Prebuilt desktop packages do not include PyTorch or Kronos weights. "
+            f"Run Kronos from a source install on a supported platform; see {KRONOS_DOCS_PATH}."
+        )
+    if reason == "disabled":
+        return (
+            f"Install optional deps ({KRONOS_INSTALL_COMMAND}), download weights "
+            f"({KRONOS_DOWNLOAD_COMMAND.format(size=size or KRONOS_MODEL_SIZE_DEFAULT)}), "
+            "set KRONOS_WEIGHTS_DIR, enable KRONOS_ENABLED, then restart."
+        )
+    if reason == "dependencies_missing":
+        return f"Install optional dependencies: {KRONOS_INSTALL_COMMAND}"
+    if reason == "model_size_invalid":
+        return (
+            "Set KRONOS_MODEL_SIZE to one of: "
+            f"{', '.join(sorted(KRONOS_MODEL_SIZES))}."
+        )
+    if reason in {
+        "weights_dir_unconfigured",
+        "weights_dir_missing",
+        "weights_incomplete",
+        "weights_invalid",
+        "weights_dir_invalid",
+    }:
+        return (
+            f"Download or fix local weights: "
+            f"{KRONOS_DOWNLOAD_COMMAND.format(size=size or KRONOS_MODEL_SIZE_DEFAULT)} "
+            f"(size estimate: {KRONOS_DOWNLOAD_SIZE_HINTS.get(size or KRONOS_MODEL_SIZE_DEFAULT, 'see docs')})."
+        )
+    if reason == "ready":
+        return (
+            "Restart StockPulse if the tool is not yet registered, then use the "
+            "Technical Agent / Agent path that exposes forecast_kline_with_kronos."
+        )
+    return f"See {KRONOS_DOCS_PATH} for the install → download → configure → verify path."
+
+
+def _directory_total_bytes_and_mtime(
+    *directories: Path,
+) -> tuple[int | None, str | None]:
+    total = 0
+    newest: float | None = None
+    found = False
+    for directory in directories:
+        if not directory.is_dir():
+            continue
+        for path in directory.rglob("*"):
+            if not path.is_file():
+                continue
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            found = True
+            total += int(stat.st_size)
+            newest = stat.st_mtime if newest is None else max(newest, stat.st_mtime)
+    if not found:
+        return None, None
+    modified_at = None
+    if newest is not None:
+        modified_at = datetime.fromtimestamp(newest, tz=timezone.utc).isoformat()
+    return total, modified_at
+
+
+def build_kronos_status_report(
+    config: Any,
+    *,
+    dependency_probe: Callable[[str], bool] = _dependency_available,
+    packaged_desktop: bool | None = None,
+) -> KronosStatusReport:
+    """Build a Settings-facing status report without network or torch imports."""
+
+    enabled = getattr(config, "kronos_enabled", False) is True
+    size = str(
+        getattr(config, "kronos_model_size", KRONOS_MODEL_SIZE_DEFAULT) or ""
+    ).strip().lower() or KRONOS_MODEL_SIZE_DEFAULT
+    raw_weights_dir = str(getattr(config, "kronos_weights_dir", "") or "").strip() or None
+    availability = assess_kronos_availability(
+        config,
+        dependency_probe=dependency_probe,
+    )
+    dependencies: list[KronosDependencyStatus] = []
+    for module_name in _OPTIONAL_DEPENDENCIES:
+        try:
+            available = dependency_probe(module_name)
+        except Exception:  # broad-exception: fallback_recorded - Status panel reports probe failures as missing deps.
+            logger.debug(
+                "Kronos status dependency probe failed module=%s",
+                module_name,
+            )
+            available = False
+        dependencies.append(
+            KronosDependencyStatus(name=module_name, available=bool(available))
+        )
+    dependencies_installed = all(item.available for item in dependencies)
+
+    weights_dir_resolved: str | None = None
+    model_dir_str: str | None = None
+    tokenizer_dir_str: str | None = None
+    weights_total_bytes: int | None = None
+    weights_modified_at: str | None = None
+    if availability.model_dir is not None:
+        model_dir_str = str(availability.model_dir)
+    if availability.tokenizer_dir is not None:
+        tokenizer_dir_str = str(availability.tokenizer_dir)
+    if raw_weights_dir and "\x00" not in raw_weights_dir and "://" not in raw_weights_dir:
+        resolved = Path(raw_weights_dir).expanduser()
+        weights_dir_resolved = str(resolved)
+        spec = KRONOS_MODEL_SPECS.get(size)
+        model_path = availability.model_dir
+        tokenizer_path = availability.tokenizer_dir
+        if model_path is None and spec is not None:
+            model_path = resolved / spec.model_directory
+        if tokenizer_path is None and spec is not None:
+            tokenizer_path = resolved / spec.tokenizer_directory
+        if model_path is not None and tokenizer_path is not None:
+            weights_total_bytes, weights_modified_at = _directory_total_bytes_and_mtime(
+                model_path,
+                tokenizer_path,
+            )
+            if model_dir_str is None:
+                model_dir_str = str(model_path)
+            if tokenizer_dir_str is None:
+                tokenizer_dir_str = str(tokenizer_path)
+
+    is_packaged = (
+        is_packaged_desktop_runtime() if packaged_desktop is None else packaged_desktop
+    )
+    if availability.reason == "ready":
+        weights_present = True
+    elif availability.reason in {
+        "weights_dir_unconfigured",
+        "weights_dir_missing",
+        "weights_incomplete",
+        "weights_invalid",
+        "weights_dir_invalid",
+    }:
+        weights_present = False
+    else:
+        # Gates that short-circuit before full weight validation still report
+        # whether the expected local directories appear non-empty on disk.
+        weights_present = bool(
+            weights_total_bytes is not None and weights_total_bytes > 0
+        )
+
+    next_step = _next_step_for_reason(
+        availability.reason,
+        size=size,
+        packaged_desktop=is_packaged,
+    )
+    message = availability.message
+    if is_packaged and availability.reason != "disabled":
+        message = (
+            f"{availability.message} Packaged desktop builds do not support "
+            f"Kronos; use a source install ({KRONOS_DOCS_PATH})."
+        )
+
+    return KronosStatusReport(
+        enabled=enabled,
+        model_size=size,
+        weights_dir_configured=raw_weights_dir,
+        weights_dir_resolved=weights_dir_resolved,
+        ready=availability.ready and not is_packaged,
+        reason=(
+            "packaged_desktop_unsupported"
+            if is_packaged and availability.ready
+            else availability.reason
+        ),
+        message=message,
+        next_step=next_step,
+        dependencies_installed=dependencies_installed,
+        dependencies=tuple(dependencies),
+        weights_present=weights_present,
+        weights_total_bytes=weights_total_bytes,
+        weights_modified_at=weights_modified_at,
+        model_dir=model_dir_str,
+        tokenizer_dir=tokenizer_dir_str,
+        packaged_desktop=is_packaged,
+        install_supported=not is_packaged,
+        download_size_hint=KRONOS_DOWNLOAD_SIZE_HINTS.get(size),
     )
 
 

@@ -349,6 +349,7 @@ vi.mock('../../components/settings', async () => {
       {items.map((item) => `${item.key}=${item.value}`).join('|')}
     </div>
   ),
+  KronosStatusPanel: () => <div data-testid="kronos-status-panel">Kronos status panel</div>,
   ModelFallbackEditor: (await import('../../components/settings/ModelFallbackEditor')).ModelFallbackEditor,
   LLMConfigModeBanner: ({ onMigrated }: { onMigrated?: () => void }) => (
     <div data-testid="llm-config-mode-banner">

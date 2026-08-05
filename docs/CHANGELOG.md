@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extracted the largest Settings sections into dedicated cards and added a page-size lint guard.
 - [Chore] Moved stock-list splitting to a leaf utility, removing the config-to-services import edge.
 - [Added] Added a shrink-only import-cycle ratchet to the deterministic CI gate.
+- [Added] Exposed Kronos local-model settings with a status panel, install documentation, and a weights download helper.
+
 - [Chore] Split the share-image renderer into a package with parsing, model, formatting, and render modules, preserving all import paths.
 
 - [Tests] Ran the API suite against the real Starlette test client in a dedicated CI job behind a default-off flag.

@@ -256,6 +256,20 @@ Supported model services:
 
 ---
 
+### Q12b2: How do I install and configure the Kronos local finance model?
+
+Kronos is an **optional** local K-line forecasting Agent Tool (not a chat model). It is off by default and does not install torch.
+
+1. Install optional deps: `pip install … -r requirements-kronos.txt` (see [Kronos local model](kronos-local-model_EN.md))
+2. Download weights explicitly (size is printed first): `python scripts/download_kronos_weights.py --size mini --weights-dir <dir> --yes`
+3. Configure `KRONOS_ENABLED` / `KRONOS_MODEL_SIZE` / `KRONOS_WEIGHTS_DIR` under **Settings → AI & Models → Local Models**, or in `.env`
+4. **Restart** the process; use the Kronos status panel on the same page to verify deps and weights
+5. **Prebuilt desktop packages do not support** Kronos; use a source install
+
+Full guide: [kronos-local-model_EN.md](kronos-local-model_EN.md), tool contract [kronos-agent-tool.md](kronos-agent-tool.md).
+
+---
+
 ### Q12c: Getting `OllamaException / APIConnectionError` (All LLM models failed)?
 
 **Symptom**: Log shows `litellm.APIConnectionError: OllamaException` or `Analysis failed: All LLM models failed (tried 1 model(s))`.

@@ -343,6 +343,40 @@ class GenerationBackendStatusResponse(BaseModel):
     backends: List[GenerationBackendStatus] = Field(default_factory=list)
 
 
+class KronosDependencyStatus(BaseModel):
+    """Import probe result for one optional Kronos dependency."""
+
+    name: str
+    available: bool
+
+
+class KronosStatusResponse(BaseModel):
+    """Read-only Kronos local-model status for Settings diagnostics.
+
+    Never downloads weights or imports torch at module import time; dependency
+    probes use importlib per package name.
+    """
+
+    enabled: bool
+    model_size: str
+    weights_dir_configured: Optional[str] = None
+    weights_dir_resolved: Optional[str] = None
+    ready: bool
+    reason: str
+    message: str
+    next_step: str
+    dependencies_installed: bool
+    dependencies: List[KronosDependencyStatus] = Field(default_factory=list)
+    weights_present: bool
+    weights_total_bytes: Optional[int] = None
+    weights_modified_at: Optional[str] = None
+    model_dir: Optional[str] = None
+    tokenizer_dir: Optional[str] = None
+    packaged_desktop: bool = False
+    install_supported: bool = True
+    download_size_hint: Optional[str] = None
+
+
 class ExportSystemConfigResponse(BaseModel):
     """Export payload for raw `.env` backups."""
 

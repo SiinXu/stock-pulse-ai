@@ -175,6 +175,32 @@ export interface GenerationBackendStatusResponse {
   backends: GenerationBackendStatus[];
 }
 
+export interface KronosDependencyStatus {
+  name: string;
+  available: boolean;
+}
+
+export interface KronosStatusResponse {
+  enabled: boolean;
+  modelSize: string;
+  weightsDirConfigured?: string | null;
+  weightsDirResolved?: string | null;
+  ready: boolean;
+  reason: string;
+  message: string;
+  nextStep: string;
+  dependenciesInstalled: boolean;
+  dependencies: KronosDependencyStatus[];
+  weightsPresent: boolean;
+  weightsTotalBytes?: number | null;
+  weightsModifiedAt?: string | null;
+  modelDir?: string | null;
+  tokenizerDir?: string | null;
+  packagedDesktop: boolean;
+  installSupported: boolean;
+  downloadSizeHint?: string | null;
+}
+
 export type LLMConfigMode = 'auto' | 'channels' | 'yaml' | 'legacy';
 export type LLMConfigModeSource = 'yaml' | 'channels' | 'legacy';
 

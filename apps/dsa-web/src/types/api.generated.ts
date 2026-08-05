@@ -2413,6 +2413,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/config/kronos/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Kronos local model status
+         * @description Read a side-effect-free Kronos readiness diagnostic: optional dependency import probes, weights directory presence, enabled flag, and one actionable next step. Never downloads weights and does not import torch at module level.
+         */
+        get: operations["getKronosStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/config/llm/available-models": {
         parameters: {
             query?: never;
@@ -6012,6 +6032,67 @@ export interface components {
              * @description 成交量
              */
             volume?: number | null;
+        };
+        /**
+         * KronosDependencyStatus
+         * @description Import probe result for one optional Kronos dependency.
+         */
+        KronosDependencyStatus: {
+            /** Available */
+            available: boolean;
+            /** Name */
+            name: string;
+        };
+        /**
+         * KronosStatusResponse
+         * @description Read-only Kronos local-model status for Settings diagnostics.
+         *
+         *     Never downloads weights or imports torch at module import time; dependency
+         *     probes use importlib per package name.
+         */
+        KronosStatusResponse: {
+            /** Dependencies */
+            dependencies?: components["schemas"]["KronosDependencyStatus"][];
+            /** Dependencies Installed */
+            dependencies_installed: boolean;
+            /** Download Size Hint */
+            download_size_hint?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Install Supported
+             * @default true
+             */
+            install_supported: boolean;
+            /** Message */
+            message: string;
+            /** Model Dir */
+            model_dir?: string | null;
+            /** Model Size */
+            model_size: string;
+            /** Next Step */
+            next_step: string;
+            /**
+             * Packaged Desktop
+             * @default false
+             */
+            packaged_desktop: boolean;
+            /** Ready */
+            ready: boolean;
+            /** Reason */
+            reason: string;
+            /** Tokenizer Dir */
+            tokenizer_dir?: string | null;
+            /** Weights Dir Configured */
+            weights_dir_configured?: string | null;
+            /** Weights Dir Resolved */
+            weights_dir_resolved?: string | null;
+            /** Weights Modified At */
+            weights_modified_at?: string | null;
+            /** Weights Present */
+            weights_present: boolean;
+            /** Weights Total Bytes */
+            weights_total_bytes?: number | null;
         };
         /**
          * LLMCapabilityCheckResult
@@ -17107,6 +17188,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getKronosStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kronos local-model status loaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KronosStatusResponse"];
                 };
             };
             /** @description Internal server error */
