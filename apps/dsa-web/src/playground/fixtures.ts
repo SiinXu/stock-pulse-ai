@@ -360,6 +360,7 @@ export const fixtureDecisionSignal: DecisionSignalItem = {
   createdAt: FIXTURE_TIMESTAMP,
   updatedAt: FIXTURE_TIMESTAMP,
   metadata: { fixture: true },
+  // OpenAPI-required presentation for playground mocks.
   presentation: {
     action: 'watch',
     label: 'Watch',
