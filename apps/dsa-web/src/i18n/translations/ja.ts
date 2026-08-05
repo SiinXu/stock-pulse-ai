@@ -4405,5 +4405,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "CLI バックエンドは生成専用のままです。このスイッチで CLI が Agent 対応になることはありません。",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "当面 Q&A Agent は不要です（後から設定で変更できます）",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "CLI バックエンドはレポート生成のみを担当します。Q&A Agent にはツール対応の API モデルが必要です（未設定時は利用不可）。",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 機能を当面オフと確認",
 };

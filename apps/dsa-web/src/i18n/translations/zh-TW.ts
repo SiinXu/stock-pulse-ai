@@ -4405,5 +4405,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF.valueNotes.2": "CLI 後端仍只支援生成；此開關不會讓 CLI 具備 Agent 工具呼叫能力。",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.acknowledgeAgentOff": "我暫時不需要問股 Agent（可稍後在設定中變更）",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.cliCapabilityNote": "CLI 後端僅涵蓋報告生成；問股 Agent 需要支援工具呼叫的 API 模型（否則不可用）。",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Acknowledge Agent Features Off",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "確認暫不使用 Agent 功能",
 };
