@@ -47,6 +47,24 @@ const BACKEND_LABELS: Record<string, BilingualLabel> = {
   opencode_cli: createUiLanguageRecord("components.settings.aiTaskMatrix.BACKEND_LABELS.opencode_cli", { zh: 'OpenCode CLI（本地）', en: 'OpenCode CLI (local)' }),
 };
 
+export const GENERATION_ONLY_BACKEND_IDS = new Set([
+  'codex_cli',
+  'claude_code_cli',
+  'opencode_cli',
+]);
+
+export function isGenerationOnlyBackend(backendId: string): boolean {
+  return GENERATION_ONLY_BACKEND_IDS.has((backendId || '').trim().toLowerCase());
+}
+
+export const CLI_AGENT_CAPABILITY_NOTE = createUiLanguageRecord(
+  'components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE',
+  {
+    zh: 'CLI 后端仅覆盖报告生成；问股 Agent 需要支持工具调用的 API 模型（否则不可用）。',
+    en: 'CLI backends cover report generation only; the Q&A Agent requires a tool-capable API model (or will be unavailable).',
+  },
+);
+
 const NOT_CONFIGURED_LABEL = createUiLanguageRecord('components.settings.aiTaskMatrix.NOT_CONFIGURED_LABEL', {
   zh: '未配置',
   en: 'Not configured',
@@ -87,14 +105,9 @@ export function resolveAiTaskMatrix(
   const visionModel = get('VISION_MODEL').trim();
   const fallbackModels = splitModels(get('LITELLM_FALLBACK_MODELS'));
   const label = backendLabel(backendId);
-  // Local CLI backends run without a channel model, so their route set is not
-  // meaningful — treat a selected CLI backend as active on its own.
-  const isCliBackend = backendId !== 'litellm' && backendId.length > 0;
+  const isCliBackend = isGenerationOnlyBackend(backendId);
 
-  const resolveStatus = (model: string): AiTaskStatus => {
-    if (isCliBackend) {
-      return 'active';
-    }
+  const resolveApiModelStatus = (model: string): AiTaskStatus => {
     if (model.length === 0) {
       return 'unconfigured';
     }
@@ -104,6 +117,13 @@ export function resolveAiTaskMatrix(
     return 'active';
   };
 
+  const resolveStatus = (taskId: string, model: string): AiTaskStatus => {
+    if (isCliBackend && (taskId === 'report' || taskId === 'market_review')) {
+      return 'active';
+    }
+    return resolveApiModelStatus(model);
+  };
+
   const row = (
     id: string,
     labelText: BilingualLabel,
@@ -111,7 +131,7 @@ export function resolveAiTaskMatrix(
     inherited: boolean,
     fallbacks: string[],
   ): AiTaskRow => {
-    const status = resolveStatus(model);
+    const status = resolveStatus(id, model);
     return {
       id,
       label: labelText,
