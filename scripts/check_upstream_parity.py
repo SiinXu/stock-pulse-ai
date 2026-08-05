@@ -560,12 +560,15 @@ def run_self_tests() -> None:
         upstream = tmp_path / "upstream.git"
         local = tmp_path / "local"
         upstream.mkdir()
-        _run_git(["init", "--bare"], cwd=upstream)
+        # Bare repo HEAD must be main so clones check out main even when the
+        # runner's init.defaultBranch is master.
+        bare = _run_git(["init", "--bare", "-b", "main"], cwd=upstream, check=False)
+        if bare.returncode != 0:
+            _run_git(["init", "--bare"], cwd=upstream)
+            _run_git(["symbolic-ref", "HEAD", "refs/heads/main"], cwd=upstream)
 
         seed = tmp_path / "seed"
         seed.mkdir()
-        # Prefer init -b main so the first commit already lives on main even when
-        # the runner default branch is master (or unset). Fall back for older git.
         init = _run_git(["init", "-b", "main"], cwd=seed, check=False)
         if init.returncode != 0:
             _run_git(["init"], cwd=seed)
@@ -573,24 +576,25 @@ def run_self_tests() -> None:
         _write(seed / "shared" / "core.py", "v1\n")
         _write(seed / "examples" / "demo.py", "demo\n")
         fork_sha = _commit(seed, "initial shared baseline")
-        # Ensure the first commit is on main before push (covers init without -b).
         _run_git(["branch", "-M", "main"], cwd=seed)
         _run_git(["remote", "add", "origin", str(upstream)], cwd=seed)
-        _run_git(["push", "-u", "origin", "main"], cwd=seed)
+        _run_git(["push", "-u", "origin", "HEAD:main"], cwd=seed)
 
         work_up = tmp_path / "work-up"
         _run_git(["clone", str(upstream), str(work_up)], cwd=tmp_path)
         _git_identity(work_up)
+        _run_git(["checkout", "-B", "main"], cwd=work_up)
         _write(work_up / "shared" / "core.py", "v2-upstream\n")
         attention_sha = _commit(work_up, "fix shared core behavior")
         _write(work_up / "examples" / "demo.py", "demo-upstream\n")
         info_sha = _commit(work_up, "docs examples only")
         _write(work_up / "shared" / "util.py", "util\n")
         ported_upstream_sha = _commit(work_up, "fix shared util")
-        _run_git(["push", "origin", "main"], cwd=work_up)
+        _run_git(["push", "origin", "HEAD:main"], cwd=work_up)
 
         _run_git(["clone", str(upstream), str(local)], cwd=tmp_path)
         _git_identity(local)
+        _run_git(["checkout", "-B", "main"], cwd=local)
         _run_git(["reset", "--hard", fork_sha], cwd=local)
         _write(local / "shared" / "util.py", "util-ported\n")
         short = ported_upstream_sha[:8]
