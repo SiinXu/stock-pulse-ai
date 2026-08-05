@@ -700,6 +700,124 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {"multi_value": True, "delimiter": ","},
         "display_order": 7,
     },
+    # ------------------------------------------------------------------
+    # AI Model – Optional local Kronos finance forecast model
+    # ------------------------------------------------------------------
+    "KRONOS_ENABLED": {
+        "title": "Enable Kronos Local Forecast",
+        "description": (
+            "Opt-in local Kronos K-line forecasting Agent Tool. Requires optional "
+            "dependencies (requirements-kronos.txt), local weights under "
+            "KRONOS_WEIGHTS_DIR, and a process restart after enabling so the tool "
+            "can register. Not available in the prebuilt desktop package. "
+            "See docs/kronos-local-model.md."
+        ),
+        "category": "ai_model",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 90,
+        "help_key": "settings.ai_model.KRONOS_ENABLED",
+        "examples": [
+            "KRONOS_ENABLED=false",
+            "KRONOS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Kronos local model guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/kronos-local-model.md",
+            },
+            {
+                "label": "Kronos agent tool contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/kronos-agent-tool.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "KRONOS_MODEL_SIZE": {
+        "title": "Kronos Model Size",
+        "description": (
+            "Official Kronos size to load: mini (~40 MB with tokenizer), "
+            "small (~150 MB), or base (~500 MB). Larger sizes use more RAM and CPU/GPU. "
+            "Download weights explicitly with scripts/download_kronos_weights.py; "
+            "the Web UI never downloads multi-gigabyte artifacts."
+        ),
+        "category": "ai_model",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "mini",
+        "options": [
+            {"label": "Mini (recommended first install)", "value": "mini"},
+            {"label": "Small", "value": "small"},
+            {"label": "Base", "value": "base"},
+        ],
+        "validation": {"enum": ["mini", "small", "base"]},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 91,
+        "help_key": "settings.ai_model.KRONOS_MODEL_SIZE",
+        "examples": [
+            "KRONOS_MODEL_SIZE=mini",
+            "KRONOS_MODEL_SIZE=small",
+            "KRONOS_MODEL_SIZE=base",
+        ],
+        "docs": [
+            {
+                "label": "Kronos local model guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/kronos-local-model.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "KRONOS_WEIGHTS_DIR": {
+        "title": "Kronos Weights Directory",
+        "description": (
+            "Absolute local directory that contains the selected model and matching "
+            "tokenizer folders (for example Kronos-mini/ and Kronos-Tokenizer-2k/). "
+            "Use scripts/download_kronos_weights.py to download after reviewing size. "
+            "StockPulse never auto-downloads weights from the Web UI."
+        ),
+        "category": "ai_model",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "placeholder": "/absolute/path/to/kronos-weights",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 92,
+        "help_key": "settings.ai_model.KRONOS_WEIGHTS_DIR",
+        "examples": [
+            "KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights",
+        ],
+        "docs": [
+            {
+                "label": "Kronos local model guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/kronos-local-model.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
 }
 
 AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {

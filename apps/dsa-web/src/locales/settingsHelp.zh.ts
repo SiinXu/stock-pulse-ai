@@ -1280,6 +1280,46 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响分析报告中大盘概览部分的内容和视觉呈现。'],
     notes: ['大盘分析依赖对应市场的指数数据源可用性。'],
   },
+  'settings.ai_model.KRONOS_ENABLED': {
+    title: '启用 Kronos 本地预测',
+    summary: '可选的本地 Kronos K 线预测 Agent Tool（不是聊天 LLM）。',
+    usage: '先安装 requirements-kronos.txt，用 scripts/download_kronos_weights.py 下载权重并设置 KRONOS_WEIGHTS_DIR，再启用并重启。可在「本地模型」页的 Kronos 状态面板核对就绪条件。',
+    valueNotes: [
+      '默认关闭；未就绪时不影响主分析流程。',
+      '启用后需要重启进程，内置插件才会注册工具。',
+      '预构建桌面端不支持 Kronos。',
+    ],
+    impact: ['就绪后向技术 Agent / Agent 工具注册表暴露 forecast_kline_with_kronos。'],
+    notes: ['网页不会自动下载权重。详见 docs/kronos-local-model.md。'],
+    docs: [
+      {
+        label: 'Kronos 本地模型指南',
+        href: 'https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/kronos-local-model.md',
+      },
+    ],
+  },
+  'settings.ai_model.KRONOS_MODEL_SIZE': {
+    title: 'Kronos 模型规格',
+    summary: '选择官方 mini / small / base 模型与对应 tokenizer。',
+    usage: '首次建议 mini（连 tokenizer 约 40MB）。更大规格需要更多内存与算力。',
+    valueNotes: [
+      'mini 使用 Kronos-Tokenizer-2k；small/base 共用 Kronos-Tokenizer-base。',
+      '大约下载量：mini ~40MB，small ~150MB，base ~500MB。',
+    ],
+    impact: ['决定 KRONOS_WEIGHTS_DIR 下需要存在哪些子目录。'],
+    notes: ['更换规格后需配套权重并重启。'],
+  },
+  'settings.ai_model.KRONOS_WEIGHTS_DIR': {
+    title: 'Kronos 权重目录',
+    summary: '包含所选模型与 tokenizer 子目录的本地绝对路径根目录。',
+    usage: '使用 scripts/download_kronos_weights.py 准备，或手动拷贝官方 Hugging Face 产物。',
+    valueNotes: [
+      '必须是本地文件系统路径，不能是 URL。',
+      '加载时强制 local_files_only=True，分析流程不会联网下载。',
+    ],
+    impact: ['决定 Kronos Agent Tool 能否注册并做本地推理。'],
+    notes: ['示例：/absolute/path/to/kronos-weights，内含 Kronos-mini/ 与 Kronos-Tokenizer-2k/。'],
+  },
 };
 
 export default settingsHelpZhCN;
