@@ -68,9 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Document Hong Kong provider chain, Tushare HK-permission gotcha, and FAQ/market-support entry points.
 - [Fixed] Localize legacy no-dashboard buy-reason and risk-warning labels in `report_markdown.j2` via report-language keys.
 
-## [4.0.0] - 2026-08-04
+- [Chore] Restart the StockPulse independent version line at 0.1.0 (rename the 4.0.0 release block and desktop package version; annotated tag remains a maintainer action).
 
-> **Version policy:** StockPulse is an independent fork and has diverged from upstream's 3.x numbering. Upstream `v3.27.0` and later releases are unrelated to this fork's 4.x release line.
+## [0.1.0] - 2026-08-04
+
+> **Version policy:** StockPulse restarts its independent product version line at `0.x` (pre-1.0 semver: the public surface may still change). The `1.x`–`3.x` history below is preserved as-is (upstream-era plus fork-era). Upstream `v3.27+` / `v4.x` releases are unrelated to this line.
 
 ### Release Highlights
 
@@ -2524,7 +2526,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ---
 
 [Unreleased]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.3...HEAD
-[4.0.0]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.3...HEAD
+[0.1.0]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.3...HEAD
 [3.26.3]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.2...v3.26.3
 [3.26.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.25.0...v3.26.0
 [3.25.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.1...v3.25.0

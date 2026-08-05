@@ -440,7 +440,7 @@ test('main BrowserWindow navigation guards keep navigation on its selected Web o
   const openedUrls = [];
   mainModule.registerMainWindowNavigationGuards({
     on: (eventName, handler) => navigationHandlers.set(eventName, handler),
-  }, () => 'http://127.0.0.1:8123/?desktop_version=3.21.0', (url) => {
+  }, () => 'http://127.0.0.1:8123/?desktop_version=0.1.0', (url) => {
     openedUrls.push(url);
   });
 
@@ -619,7 +619,7 @@ test('desktop assistant IPC rejects other renderers and routes validated stock a
   mainModule.__setAssistantWindowForTest(assistantWindowRef);
   mainModule.__setMainWindowForTest(mainWindowRef);
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
 
@@ -677,7 +677,7 @@ test('desktop assistant stays visible when a validated shortcut cannot navigate'
     },
   });
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
 
@@ -721,7 +721,7 @@ test('desktop assistant preserves navigation failure when readiness drops during
     }),
   });
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
 
@@ -784,7 +784,7 @@ test('desktop assistant observes failure when queued behind an active OS navigat
     }),
   });
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
 
@@ -843,7 +843,7 @@ test('desktop assistant stays visible when a queued route remains pending after 
     }),
   });
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
 
@@ -887,7 +887,7 @@ test('older deep-link flush cleanup cannot deregister a newer flush generation',
     }),
   });
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
     pendingRoute: '/stocks/MSFT',
   });
@@ -896,7 +896,7 @@ test('older deep-link flush cleanup cannot deregister a newer flush generation',
   assert.equal(navigationAttempts.length, 1);
 
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=456',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=456',
     ready: true,
     pendingRoute: '/alerts',
   });
@@ -990,7 +990,7 @@ test('desktop tray opens the unified local model Settings panel', async (t) => {
     },
   });
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
   menuTemplate.find((item) => item.label === 'Local Models…').click();
@@ -1111,7 +1111,7 @@ test('desktop deep-link parser rejects external, ambiguous, and smuggled routes'
 test('desktop deep links stay on the selected private Web origin', (t) => {
   const mainModule = loadMainModule(t);
   const targetUrl = new URL(mainModule.buildDesktopDeepLinkTargetUrl(
-    'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     '/portfolio?account=7&desktop_version=spoofed&keep=yes'
   ));
 
@@ -1119,11 +1119,11 @@ test('desktop deep links stay on the selected private Web origin', (t) => {
   assert.equal(targetUrl.pathname, '/portfolio');
   assert.equal(targetUrl.searchParams.get('account'), '7');
   assert.equal(targetUrl.searchParams.get('keep'), 'yes');
-  assert.equal(targetUrl.searchParams.get('desktop_version'), '3.21.0');
+  assert.equal(targetUrl.searchParams.get('desktop_version'), '0.1.0');
   assert.equal(targetUrl.searchParams.get('cache_bust'), '123');
   assert.throws(
     () => mainModule.buildDesktopDeepLinkTargetUrl(
-      'http://127.0.0.1:8123/?desktop_version=3.21.0',
+      'http://127.0.0.1:8123/?desktop_version=0.1.0',
       'https://evil.example/settings'
     ),
     /private Web origin/
@@ -1177,7 +1177,7 @@ test('second-instance deep links restore and focus before routing', async (t) =>
   };
   mainModule.__setMainWindowForTest(fakeWindow);
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
   });
 
@@ -1189,7 +1189,7 @@ test('second-instance deep links restore and focus before routing', async (t) =>
   const loadedUrl = new URL(lifecycle[3].slice('load:'.length));
   assert.equal(loadedUrl.pathname, '/portfolio');
   assert.equal(loadedUrl.searchParams.get('account'), '7');
-  assert.equal(loadedUrl.searchParams.get('desktop_version'), '3.21.0');
+  assert.equal(loadedUrl.searchParams.get('desktop_version'), '0.1.0');
 
   const loadCount = lifecycle.filter((entry) => entry.startsWith('load:')).length;
   assert.equal(await mainModule.handleDesktopSecondInstance(
@@ -1223,7 +1223,7 @@ test('macOS open-url deep links wait for the private Web origin to become ready'
   assert.equal(pendingRoute, '/stocks/AAPL?period=weekly');
 
   mainModule.__setDesktopDeepLinkStateForTest({
-    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0&cache_bust=123',
     ready: true,
     pendingRoute,
   });
@@ -2599,7 +2599,7 @@ test('StockPulse upgrade restores a legacy updater backup and recognizes both un
     platform: 'win32',
     app: {
       isPackaged: true,
-      getVersion: () => '3.21.0',
+      getVersion: () => '0.1.0',
       getPath: (name) => {
         if (name === 'exe') {
           return path.join(appDir, 'StockPulse.exe');
