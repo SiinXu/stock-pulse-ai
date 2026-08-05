@@ -866,6 +866,7 @@ describe('StockScreeningPage', () => {
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     const dialog = openScreeningConfiguration();
+    expect(dialog).not.toHaveClass('border', 'border-border');
     const marketField = within(dialog).getByLabelText('市场').parentElement?.parentElement;
     const strategyField = within(dialog).getByLabelText('策略参数').parentElement?.parentElement;
     const resultCountField = within(dialog).getByLabelText('返回数量').parentElement?.parentElement;

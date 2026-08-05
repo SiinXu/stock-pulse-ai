@@ -744,6 +744,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               options={providerOptions}
               placeholder={text.providerPlaceholder}
               searchPlaceholder={text.providerSearch}
+              searchInputRadius="lg"
               disabled={disabled}
             />
           ) : null}
@@ -781,6 +782,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 options={providerOptions}
                 placeholder={text.providerPlaceholder}
                 searchPlaceholder={text.providerSearch}
+                searchInputRadius="lg"
                 disabled={
                   catalogUnavailable
                   || providers.length === 0
@@ -1044,33 +1046,33 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             ) : null}
             {supportsDiscovery ? (
               <>
-                <div className="flex items-center gap-2">
-                  <Button
-                    id={discoverButtonId}
-                    type="button"
-                    variant="secondary"
-                    size="default"
-                    className="text-xs shadow-none"
-                    disabled={
-                      discovery?.status === 'loading'
-                      || !discoveryEnabledByContract
-                      || fieldIsReadOnly('models')
-                    }
-                    onClick={() => void handleDiscover()}
-                  >
-                    {discovery?.status === 'loading' ? text.gettingModels : text.getModels}
-                  </Button>
-                  <span className={`text-xs ${
+                <Button
+                  id={discoverButtonId}
+                  type="button"
+                  variant="secondary"
+                  size="default"
+                  className="text-xs shadow-none"
+                  disabled={
+                    discovery?.status === 'loading'
+                    || !discoveryEnabledByContract
+                    || fieldIsReadOnly('models')
+                  }
+                  onClick={() => void handleDiscover()}
+                >
+                  {discovery?.status === 'loading' ? text.gettingModels : text.getModels}
+                </Button>
+                <p
+                  role={discovery?.status === 'error' ? 'alert' : 'status'}
+                  className={`text-xs ${
                     discovery?.status === 'success'
                       ? 'text-success'
                       : discovery?.status === 'error'
                         ? 'text-danger'
                         : 'text-muted-text'
                   }`}
-                  >
-                    {discovery?.text || text.discoveryDescription}
-                  </span>
-                </div>
+                >
+                  {discovery?.text || text.discoveryDescription}
+                </p>
                 {discovery?.hint ? <p className="text-xs text-secondary-text">{discovery.hint}</p> : null}
               </>
             ) : (

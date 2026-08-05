@@ -570,6 +570,34 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     ));
   });
 
+  it('top-aligns launch controls and presents stock and phase guidance as tooltips', async () => {
+    renderWorkbench();
+
+    const stockInput = await screen.findByRole('combobox', { name: '股票搜索' });
+    const launchGrid = stockInput.closest('.grid');
+    expect(launchGrid).toHaveClass('lg:items-start');
+    expect(launchGrid).not.toHaveClass('lg:items-end');
+    expect(stockInput.parentElement?.parentElement).toHaveClass('[&>div>p]:sr-only');
+    expect(document.getElementById('analysis-workbench-phase-hint')).not.toBeInTheDocument();
+
+    const stockHelp = screen.getByTestId('analysis-stock-search-help');
+    const phaseHelp = screen.getByTestId('analysis-phase-help');
+    const stockLabel = screen.getByText('股票搜索', { selector: 'label' });
+    const strategyLabel = screen.getByText('策略', { selector: 'label' });
+    const phaseLabel = screen.getByText('分析阶段', { selector: 'label' });
+    expect(stockLabel.parentElement).toHaveClass('h-5');
+    expect(strategyLabel.parentElement).toHaveClass('[&>label]:h-5');
+    expect(phaseLabel.parentElement).toHaveClass('h-5');
+    expect(phaseLabel.parentElement).toContainElement(phaseHelp);
+
+    fireEvent.mouseEnter(stockHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/日股示例 7203\.T/);
+    fireEvent.mouseLeave(stockHelp);
+
+    fireEvent.mouseEnter(phaseHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/自动模式按市场时段推断/);
+  });
+
   it('consumes stock context once and allows a different symbol to be submitted', async () => {
     renderWorkbench(buildAnalysisWorkbenchHref({ stock: 'AAPL' }));
     const stockInput = document.querySelector<HTMLInputElement>('#analysis-workbench-stock-search')!;
