@@ -53,6 +53,31 @@ npm run dev
 
 首次运行时会自动从 `.env.example` 复制生成 `.env`。
 
+## 依赖与工具链（Desktop）
+
+当前桌面壳固定依赖（见 `apps/dsa-desktop/package.json`）：
+
+- Electron `43.3.0`（开发依赖，但作为打包运行时随应用分发）
+- electron-builder `26.15.7`（打包）
+- electron-updater `6.8.9`（自动更新）
+- `app-builder-lib` 的 `tar` override `7.5.22`（构建链审计修复，保留与 archive 路径的兼容性探测）
+
+本地校验：
+
+```bash
+cd apps/dsa-desktop
+npm install
+npm run lint
+npm test
+# optional diagnostic: incomplete JSDoc types currently report under // @ts-check
+npm run typecheck
+```
+
+`npm run lint` 使用 ESLint flat config（`eslint.config.js`），覆盖 main/preload/renderer/scripts/tests。`main.js` 启用 `// @ts-check` 供编辑器与 `npm run typecheck` 诊断使用；现有 JSDoc 缺口属于类型标注不完整，不在本升级中做语义改写。
+
+从 Electron 31 / electron-builder 24 升级时需注意：自动更新与 NSIS/DMG 打包语义、沙箱与 contextIsolation 默认值，以及 builder 26 的 archive API（options object）。Windows 协议注册仍依赖 `installer.nsh`，不依赖 builder 的 protocols 字段。
+
+
 ## 桌面深链协议
 
 桌面安装包注册 `stockpulse` 自定义协议。规范形式是
@@ -77,7 +102,7 @@ Electron 会保留已接受链接的路径和查询参数，并把它们映射�
 
 冷启动时，Windows/Linux 从初始 argv 提取链接；macOS 通过 `open-url` 接收链接。若后端尚未通过健康检查，链接会排队到私有 Web origin 就绪后再作为首个产品页面加载。应用已运行时，Windows/Linux 的第二实例 argv 仍走同一验证入口，并先恢复、显示和聚焦主窗口；macOS `open-url` 使用同一排队与路由逻辑。没有协议 URL 的第二实例继续只聚焦现有窗口。
 
-`apps/dsa-desktop/package.json` 的 electron-builder `protocols` 声明负责生成 macOS bundle 的 `CFBundleURLTypes`。electron-builder 24 不会用该字段生成 Windows 协议注册；Windows NSIS 安装器因此通过 `installer.nsh` 在当前用户的 `Software\Classes\stockpulse` 写入带引号的 exe 与 `%1` 命令，并只在该命令仍指向当前安装目录时随卸载清理。运行时同时调用 `app.setAsDefaultProtocolClient('stockpulse')` 作为开发态和注册修复入口。Electron 开发态会把当前入口脚本作为协议启动参数；操作系统级注册和最终安装行为仍应以打包产物为准。
+`apps/dsa-desktop/package.json` 的 electron-builder `protocols` 声明负责生成 macOS bundle 的 `CFBundleURLTypes`。electron-builder 24–26 不会用该字段生成 Windows 协议注册；Windows NSIS 安装器因此通过 `installer.nsh` 在当前用户的 `Software\Classes\stockpulse` 写入带引号的 exe 与 `%1` 命令，并只在该命令仍指向当前安装目录时随卸载清理。运行时同时调用 `app.setAsDefaultProtocolClient('stockpulse')` 作为开发态和注册修复入口。Electron 开发态会把当前入口脚本作为协议启动参数；操作系统级注册和最终安装行为仍应以打包产物为准。
 
 macOS 安装包可用以下命令验证冷启动和已运行实例：
 

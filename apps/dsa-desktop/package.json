@@ -9,19 +9,26 @@
     "prebuild": "npm run prepare:ollama",
     "build": "electron-builder",
     "build:electron": "electron-builder",
+    "lint": "eslint .",
+    "typecheck": "tsc -p jsconfig.json --noEmit",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
-    "electron-updater": "^6.8.3",
+    "electron-updater": "6.8.9",
     "yauzl": "^3.4.0"
   },
   "devDependencies": {
-    "electron": "^31.4.0",
-    "electron-builder": "^24.13.3"
+    "@eslint/js": "9.39.2",
+    "@types/node": "22.15.30",
+    "electron": "43.3.0",
+    "electron-builder": "26.15.7",
+    "eslint": "9.39.2",
+    "globals": "16.4.0",
+    "typescript": "5.9.3"
   },
   "overrides": {
     "app-builder-lib": {
-      "tar": "7.5.19"
+      "tar": "7.5.22"
     }
   },
   "build": {
