@@ -349,7 +349,15 @@ vi.mock('../../components/settings', async () => {
       {items.map((item) => `${item.key}=${item.value}`).join('|')}
     </div>
   ),
-  KronosStatusPanel: () => <div data-testid="kronos-status-panel">Kronos status panel</div>,
+  LocalModelsWithKronos: ({
+    onConfigurationChanged,
+  }: {
+    onConfigurationChanged?: () => void | Promise<void>;
+  }) => (
+    <div data-testid="local-models-with-kronos">
+      <button type="button" onClick={() => void onConfigurationChanged?.()}>refresh local models</button>
+    </div>
+  ),
   ModelFallbackEditor: (await import('../../components/settings/ModelFallbackEditor')).ModelFallbackEditor,
   LLMConfigModeBanner: ({ onMigrated }: { onMigrated?: () => void }) => (
     <div data-testid="llm-config-mode-banner">

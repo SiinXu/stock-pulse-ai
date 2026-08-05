@@ -25,8 +25,7 @@ import {
   ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
-  KronosStatusPanel,
-  LocalModelsPanel,
+  LocalModelsWithKronos,
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
@@ -89,7 +88,7 @@ import {
   type SettingsSectionId,
 } from '../components/settings/settingsInformationArchitecture';
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
-import { keyBelongsToSection, placementForKey, KRONOS_SETTING_KEYS, SCHEDULER_SETTING_KEYS } from '../components/settings/settingsFieldPlacement';
+import { keyBelongsToSection, placementForKey, SCHEDULER_SETTING_KEYS } from '../components/settings/settingsFieldPlacement';
 import {
   type SettingsGroupSaveState,
   type SettingsSaveStatus,
@@ -1730,50 +1729,19 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {isAiLocalModels ? (
-              <>
-                <LocalModelsPanel
-                  language={uiLanguage}
-                  onConfigurationChanged={async () => {
-                    await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
-                    applyPostSaveEffects();
-                  }}
-                />
-                <KronosStatusPanel disabled={isSaving || isLoading} />
-                {(() => {
-                  const kronosItems = (itemsByCategory.ai_model || [])
-                    .filter((item) => KRONOS_SETTING_KEYS.has(item.key.toUpperCase()))
-                    .filter((item) => isFieldVisibleByContract(item.schema?.contract, allValuesByKey))
-                    .sort((a, b) => (a.schema?.displayOrder ?? 0) - (b.schema?.displayOrder ?? 0));
-                  if (kronosItems.length === 0) {
-                    return null;
-                  }
-                  return (
-                    <SettingsSectionCard
-                      title={t('settings.kronosFieldsTitle')}
-                      description={t('settings.kronosFieldsDescription')}
-                    >
-                      <form
-                        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-                        onSubmit={(event) => event.preventDefault()}
-                      >
-                        {kronosItems.map((item) => (
-                          <SettingsField
-                            key={item.key}
-                            item={item}
-                            value={item.value}
-                            disabled={isSaving}
-                            onChange={setDraftValue}
-                            issues={issueByKey[item.key] || []}
-                            requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                            dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                            readOnlyDiagnostic={readOnlyDiagnosticForItem(item, 'ai_model')}
-                          />
-                        ))}
-                      </form>
-                    </SettingsSectionCard>
-                  );
-                })()}
-              </>
+              <LocalModelsWithKronos
+                language={uiLanguage}
+                onConfigurationChanged={async () => {
+                  await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
+                  applyPostSaveEffects();
+                }}
+                kronosItems={itemsByCategory.ai_model || []}
+                allValuesByKey={allValuesByKey}
+                issueByKey={issueByKey}
+                disabled={isSaving || isLoading}
+                onKronosChange={setDraftValue}
+                readOnlyDiagnostic={(item) => readOnlyDiagnosticForItem(item, 'ai_model')}
+              />
             ) : null}
             {isAiTaskRouting ? (
               <AiTaskRoutingCard
