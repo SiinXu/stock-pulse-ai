@@ -12,26 +12,20 @@ from data_provider.tencent_fetcher import TencentFetcher, _to_tencent_symbol
 
 
 def test_tencent_priority_defaults_to_final_fallback_and_allows_override() -> None:
+    # Env path: Config without tencent_priority falls through to TENCENT_PRIORITY.
+    bare_config = SimpleNamespace()
     with patch.dict("os.environ", {"TENCENT_PRIORITY": "5"}, clear=False):
-        with patch(
-            "src.config.get_config",
-            side_effect=RuntimeError("config unavailable"),
-        ):
+        with patch("src.config.get_config", return_value=bare_config):
             assert TencentFetcher().priority == 5
     with patch.dict("os.environ", {"TENCENT_PRIORITY": "2"}, clear=False):
-        with patch(
-            "src.config.get_config",
-            side_effect=RuntimeError("config unavailable"),
-        ):
+        with patch("src.config.get_config", return_value=bare_config):
             assert TencentFetcher().priority == 2
 
 
 def test_invalid_tencent_priority_falls_back_to_final_position() -> None:
+    bare_config = SimpleNamespace()
     with patch.dict("os.environ", {"TENCENT_PRIORITY": "invalid"}, clear=False):
-        with patch(
-            "src.config.get_config",
-            side_effect=RuntimeError("config unavailable"),
-        ):
+        with patch("src.config.get_config", return_value=bare_config):
             assert TencentFetcher().priority == 5
 
 

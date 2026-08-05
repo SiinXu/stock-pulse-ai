@@ -119,19 +119,15 @@ def _read_tencent_priority() -> int:
 
     Prefers ``Config.tencent_priority`` (registry-backed Web settings path)
     when present, matching peer fetchers that read priority via the Config
-    object. Falls back to ``TENCENT_PRIORITY`` env / default 5. Invalid values
-    log a warning and return 5 so Tencent stays the final A-share fallback.
+    object (for example ``getattr(config, "tickflow_priority", ...)``). Falls
+    back to ``TENCENT_PRIORITY`` env / default 5. Invalid values log a warning
+    and return 5 so Tencent stays the final A-share fallback.
     """
 
-    raw_value: Any = None
-    try:
-        from src.config import get_config
+    from src.config import get_config
 
-        config = get_config()
-        raw_value = getattr(config, "tencent_priority", None)
-    except Exception:  # pragma: no cover - config bootstrap edge cases
-        raw_value = None
-
+    config = get_config()
+    raw_value: Any = getattr(config, "tencent_priority", None)
     if raw_value is None:
         raw_value = os.getenv("TENCENT_PRIORITY", "5")
 
