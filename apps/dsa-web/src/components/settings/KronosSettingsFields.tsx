@@ -62,7 +62,7 @@ export const KronosSettingsFields: React.FC<KronosSettingsFieldsProps> = ({
             issues={issueByKey[item.key] || []}
             requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
             dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-            readOnlyDiagnostic={readOnlyDiagnostic?.(item)}
+            readOnlyDiagnostic={readOnlyDiagnostic?.(item) ?? undefined}
           />
         ))}
       </form>

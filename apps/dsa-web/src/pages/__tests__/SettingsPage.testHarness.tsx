@@ -356,7 +356,9 @@ vi.mock('../../components/settings', async () => {
   }) => (
     <div data-testid="local-models-with-kronos">
       <div data-testid="local-models-panel">
-        <button type="button" onClick={() => void onConfigurationChanged?.()}>refresh local models</button>
+        <button type="button" onClick={() => void onConfigurationChanged?.()}>
+          simulate local model config
+        </button>
       </div>
     </div>
   ),
