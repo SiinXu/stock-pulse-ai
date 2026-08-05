@@ -2,7 +2,6 @@ import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
-  BarChart3,
   FileText,
   PlusCircle,
   RefreshCw,
@@ -36,7 +35,6 @@ import {
   ResponsiveFilterPanel,
   Select,
   SelectionChip,
-  StatCard,
   Surface,
   TabPanel,
   Tabs,
@@ -46,10 +44,9 @@ import {
   DecisionSignalCard,
   DecisionSignalDetails,
 } from '../components/decision-signals/DecisionSignalDisplay';
-import { DecisionSignalProfileCalibration } from '../components/decision-signals/DecisionSignalProfileCalibration';
 import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
-import { DecisionSignalOutcomeRunPanel } from '../components/decision-signals/DecisionSignalOutcomeRunPanel';
+import { DecisionSignalOutcomeStatsCard } from '../components/decision-signals/DecisionSignalOutcomeStatsCard';
 import { DecisionSignalMemoryControls } from '../components/decision-signals/DecisionSignalMemoryControls';
 import { DecisionSignalOutcomeExplorer } from '../components/decision-signals/DecisionSignalOutcomeExplorer';
 import {
@@ -550,16 +547,6 @@ function draftMatchesStockContext(draft: string, context: StockContext | null): 
   if (!normalizedDraft) return false;
   return normalizedDraft === context.code.trim().toUpperCase()
     || normalizedDraft === String(context.displayCode ?? '').trim().toUpperCase();
-}
-
-function formatStatNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '-';
-  return Number(value).toFixed(2).replace(/\.?0+$/, '');
-}
-
-function formatStatPercent(value: number | null | undefined): string {
-  const formatted = formatStatNumber(value);
-  return formatted === '-' ? formatted : `${formatted}%`;
 }
 
 async function runWithRequestSlot<T>(
@@ -2373,65 +2360,16 @@ const DecisionSignalsPage: React.FC = () => {
           value={SIGNAL_CENTER_TAB_VALUES.review}
           activeValue={signalCenterTab}
         >
-          <Card
-            title={t('decisionSignals.statsTitle')}
-            subtitle={t('decisionSignals.statsDescription')}
-            padding="md"
-            headerRight={<Badge variant="default" size="sm">{t('decisionSignals.scopeGlobal')}</Badge>}
-          >
-            <p className="mb-3 text-sm text-secondary-text">{t('decisionSignals.statsGlobalScope')}</p>
-            {statsError ? (
-              <ApiErrorAlert
-                error={{ ...statsError, title: t('decisionSignals.statsErrorTitle') }}
-                actionLabel={t('common.retry')}
-                onAction={() => void loadOutcomeStats()}
-              />
-            ) : statsLoading ? (
-              <Loading />
-            ) : outcomeStats && outcomeStats.total > 0 ? (
-              <div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  <StatCard label={t('decisionSignals.statsTotal')} value={outcomeStats.total} />
-                  <StatCard
-                    tone="success"
-                    label={t('decisionSignals.statsHitRate')}
-                    value={<span className="text-success">{formatStatPercent(outcomeStats.hitRatePct)}</span>}
-                  />
-                  <StatCard
-                    tone="success"
-                    label={t('decisionSignals.outcome.hit')}
-                    value={<span className="text-success">{outcomeStats.hit}</span>}
-                  />
-                  <StatCard
-                    tone="danger"
-                    label={t('decisionSignals.outcome.miss')}
-                    value={<span className="text-danger">{outcomeStats.miss}</span>}
-                  />
-                  <StatCard
-                    tone="warning"
-                    label={t('decisionSignals.outcome.unable')}
-                    value={<span className="text-warning">{outcomeStats.unable}</span>}
-                  />
-                </div>
-                {outcomeStats.profileCalibration ? (
-                  <DecisionSignalProfileCalibration calibration={outcomeStats.profileCalibration} />
-                ) : null}
-              </div>
-            ) : (
-              <EmptyState
-                compact
-                title={t('decisionSignals.noReviewedStatsTitle')}
-                description={t('decisionSignals.noReviewedStatsDescription')}
-                icon={<BarChart3 className="h-6 w-6" />}
-              />
-            )}
-            <DecisionSignalOutcomeRunPanel
-              onCompleted={() => {
-                void loadOutcomeStats();
-                setOutcomeExplorerRefreshKey((current) => current + 1);
-              }}
-            />
-          </Card>
+          <DecisionSignalOutcomeStatsCard
+            outcomeStats={outcomeStats}
+            statsLoading={statsLoading}
+            statsError={statsError}
+            onRetryStats={() => void loadOutcomeStats()}
+            onRunCompleted={() => {
+              void loadOutcomeStats();
+              setOutcomeExplorerRefreshKey((current) => current + 1);
+            }}
+          />
           {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.review ? (
             <DecisionSignalOutcomeExplorer
               refreshKey={outcomeExplorerRefreshKey}
