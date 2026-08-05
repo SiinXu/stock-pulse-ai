@@ -39,7 +39,7 @@ from src.notification_contracts import (
     is_feishu_app_bot_configured,
     is_feishu_static_configured,
 )
-from src.services.stock_list_parser import split_stock_list
+from src.utils.stock_list import split_stock_list
 from src.utils.sanitize import log_safe_exception
 from src.llm.backend_registry import (
     AUTO_AGENT_BACKEND_ID,

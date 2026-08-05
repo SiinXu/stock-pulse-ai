@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Moved stock-list splitting to a leaf utility, removing the config-to-services import edge.
+- [Added] Added a shrink-only import-cycle ratchet to the deterministic CI gate.
 - [Chore] Split the share-image renderer into a package with parsing, model, formatting, and render modules, preserving all import paths.
 
 - [Tests] Ran the API suite against the real Starlette test client in a dedicated CI job behind a default-off flag.

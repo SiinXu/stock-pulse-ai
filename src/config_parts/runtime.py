@@ -11,7 +11,7 @@ from src.llm.backend_registry import (
     GENERATION_ONLY_BACKEND_IDS,
 )
 from src.llm.hermes import route_deployment_origins
-from src.services.stock_list_parser import split_stock_list
+from src.utils.stock_list import split_stock_list
 
 
 class _ConfigRuntimeMethods:
