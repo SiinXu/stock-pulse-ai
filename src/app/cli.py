@@ -123,7 +123,7 @@ class CliRunSummaryCapture:
         for target, name, original in reversed(self._restore):
             try:
                 setattr(target, name, original)
-            except Exception:  # broad-exception: fail-open restore
+            except Exception:  # broad-exception: fallback_recorded - fail-open restore of notifier wrappers
                 pass
         self._restore.clear()
 
@@ -145,7 +145,7 @@ def _channel_display_name(channel: Any) -> str:
 
         if isinstance(channel, NotificationChannel):
             return ChannelDetector.get_channel_name(channel)
-    except Exception:  # broad-exception: fail-open display
+    except Exception:  # broad-exception: fallback_recorded - fail-open channel display name
         pass
     if hasattr(channel, "value"):
         return str(channel.value)
@@ -187,7 +187,7 @@ def build_notification_summary_lines(
         if callable(get_available):
             try:
                 channels = tuple(get_available() or ())
-            except Exception:  # broad-exception: fail-open channel list
+            except Exception:  # broad-exception: fallback_recorded - fail-open available channel list
                 channels = ()
 
     if skip_reason is not None:
@@ -262,7 +262,7 @@ def analyzer_has_no_usable_llm(analyzer: Any) -> bool:
         return True
     try:
         return not bool(is_available())
-    except Exception:  # broad-exception: fail-open treat as unavailable
+    except Exception:  # broad-exception: fallback_recorded - fail-open treat analyzer as unavailable
         return True
 
 

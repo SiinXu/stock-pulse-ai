@@ -660,7 +660,7 @@ def run_full_analysis(
                             )
                             if pipeline.db.has_today_data(code, target_date):
                                 ok_count += 1
-                        except Exception:  # broad-exception: fail-open per-stock dry-run count
+                        except Exception:  # broad-exception: fallback_recorded - fail-open per-stock dry-run count
                             pass
                     failed_count = max(0, len(attempted_codes) - int(ok_count or 0))
                 else:
@@ -693,7 +693,7 @@ def run_full_analysis(
         finally:
             try:
                 summary_capture.restore()
-            except Exception:  # broad-exception: fail-open restore
+            except Exception:  # broad-exception: fallback_recorded - fail-open restore of notifier wrappers
                 pass
 
         return True
