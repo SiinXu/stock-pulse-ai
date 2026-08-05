@@ -7,7 +7,9 @@ import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
 import { FirstRunWizard } from '../../components/settings/FirstRunWizard';
 import { GenerationBackendStatusPanel } from '../../components/settings/GenerationBackendStatusPanel';
+import { KronosSettingsFields } from '../../components/settings/KronosSettingsFields';
 import { KronosStatusPanel } from '../../components/settings/KronosStatusPanel';
+import { LocalModelsWithKronos } from '../../components/settings/LocalModelsWithKronos';
 import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
 import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
@@ -191,6 +193,25 @@ const GenerationBackendStatusPanelStory = () => {
 };
 
 const KronosStatusPanelStory = () => <KronosStatusPanel />;
+
+const KronosSettingsFieldsStory = () => (
+  <KronosSettingsFields
+    items={[]}
+    allValuesByKey={{}}
+    issueByKey={{}}
+    onChange={() => undefined}
+  />
+);
+
+const LocalModelsWithKronosStory = () => (
+  <LocalModelsWithKronos
+    language="en"
+    kronosItems={[]}
+    allValuesByKey={{}}
+    issueByKey={{}}
+    onKronosChange={() => undefined}
+  />
+);
 
 const IntelligentImportStory = () => {
   const [value, setValue] = useState('600519,AAPL');
@@ -470,6 +491,8 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'first-run-wizard': FirstRunWizardStory,
   'generation-backend-status-panel': GenerationBackendStatusPanelStory,
   'kronos-status-panel': KronosStatusPanelStory,
+  'kronos-settings-fields': KronosSettingsFieldsStory,
+  'local-models-with-kronos': LocalModelsWithKronosStory,
   'intelligent-import': IntelligentImportStory,
   'investment-framework-settings-card': InvestmentFrameworkSettingsCard,
   'intelligence-sources-panel': IntelligenceSourcesPanel,
