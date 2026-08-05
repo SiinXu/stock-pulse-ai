@@ -2,13 +2,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../analysis';
-import { getParsedApiError } from '../error';
+import { getParsedApiError, isApiRequestError } from '../error';
 
-const { post } = vi.hoisted(() => ({ post: vi.fn() }));
+const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
 
 vi.mock('../index', () => ({
-  default: { post },
+  default: {
+    post,
+    get,
+    defaults: { baseURL: '' },
+  },
+  locallyRecoverableResourceConfig: () => ({}),
 }));
+
+function taskAcceptedWire(overrides: Record<string, unknown> = {}) {
+  return {
+    task_id: 'task-auto',
+    status: 'pending',
+    message_code: 'task.queued',
+    analysis_phase: 'auto',
+    ...overrides,
+  };
+}
 
 describe('analysisApi phase request mapping', () => {
   beforeEach(() => {
@@ -18,7 +33,7 @@ describe('analysisApi phase request mapping', () => {
   it('preserves the automatic phase payload when no override is selected', async () => {
     post.mockResolvedValue({
       status: 202,
-      data: { task_id: 'task-auto', status: 'pending', analysis_phase: 'auto' },
+      data: taskAcceptedWire(),
     });
 
     await analysisApi.analyzeAsync({ stockCode: 'AAPL' });
@@ -45,7 +60,11 @@ describe('analysisApi phase request mapping', () => {
   it('maps an explicit phase exactly for a batch request', async () => {
     post.mockResolvedValue({
       status: 202,
-      data: { accepted: [], duplicates: [] },
+      data: {
+        message: 'submitted',
+        accepted: [],
+        duplicates: [],
+      },
     });
 
     await analysisApi.analyzeAsync({
@@ -176,5 +195,147 @@ describe('analysisApi conflict handling', () => {
       details: { lock: 'held' },
       traceId: 'trace-market-review',
     });
+  });
+});
+
+describe('analysisApi response validation', () => {
+  beforeEach(() => {
+    post.mockReset();
+    get.mockReset();
+  });
+
+  it('camelCases async accept payloads and preserves extra keys (pass-through)', async () => {
+    post.mockResolvedValue({
+      status: 202,
+      data: {
+        ...taskAcceptedWire({ unexpected_server_field: 'keep-me' }),
+      },
+    });
+
+    const result = await analysisApi.analyzeAsync({ stockCode: 'AAPL' });
+    expect(result).toEqual({
+      taskId: 'task-auto',
+      status: 'pending',
+      messageCode: 'task.queued',
+      analysisPhase: 'auto',
+      unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces analyzeAsync shape mismatches through ParsedApiError', async () => {
+    post.mockResolvedValue({
+      status: 202,
+      data: {
+        // missing task_id / message for both accepted shapes
+        status: 'pending',
+      },
+    });
+
+    await expect(analysisApi.analyzeAsync({ stockCode: 'AAPL' })).rejects.toSatisfy(
+      (error: unknown) => {
+        expect(isApiRequestError(error)).toBe(true);
+        const parsed = getParsedApiError(error);
+        expect(parsed.code).toBe('api_response_validation_failed');
+        expect(parsed.message).toContain('AnalyzeAsyncResponse');
+        return true;
+      },
+    );
+  });
+
+  it('validates market-review accepted payloads and rejects missing required fields', async () => {
+    post.mockResolvedValueOnce({
+      status: 202,
+      data: {
+        status: 'accepted',
+        message: 'queued',
+        message_code: 'task.market_review.queued',
+        send_notification: true,
+        region: 'cn',
+        unexpected_flag: true,
+      },
+    });
+
+    const accepted = await analysisApi.triggerMarketReview();
+    expect(accepted).toEqual({
+      status: 'accepted',
+      message: 'queued',
+      messageCode: 'task.market_review.queued',
+      sendNotification: true,
+      region: 'cn',
+      unexpectedFlag: true,
+    });
+
+    post.mockResolvedValueOnce({
+      status: 202,
+      data: {
+        status: 'accepted',
+        message: 'queued',
+        // message_code / send_notification / region missing
+      },
+    });
+
+    await expect(analysisApi.triggerMarketReview()).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'MarketReviewAccepted' });
+      return true;
+    });
+  });
+
+  it('validates task status and list responses', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        task_id: 't1',
+        status: 'processing',
+        message_code: 'task.status',
+        progress: 40,
+        unexpected_nested: { keep: true },
+      },
+    });
+
+    const status = await analysisApi.getStatus('t1');
+    expect(status).toEqual({
+      taskId: 't1',
+      status: 'processing',
+      messageCode: 'task.status',
+      progress: 40,
+      unexpectedNested: { keep: true },
+    });
+
+    get.mockResolvedValueOnce({
+      data: {
+        // task_id missing
+        status: 'processing',
+        message_code: 'task.status',
+      },
+    });
+
+    await expect(analysisApi.getStatus('t1')).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'TaskStatus' });
+      return true;
+    });
+
+    get.mockResolvedValueOnce({
+      data: {
+        total: 1,
+        pending: 0,
+        processing: 1,
+        tasks: [{
+          task_id: 't1',
+          stock_code: 'AAPL',
+          status: 'processing',
+          progress: 10,
+          report_type: 'detailed',
+          created_at: '2026-01-01T00:00:00Z',
+          message_code: 'task.status',
+          analysis_phase: 'auto',
+        }],
+      },
+    });
+
+    const list = await analysisApi.getTasks();
+    expect(list.tasks[0].stockCode).toBe('AAPL');
   });
 });

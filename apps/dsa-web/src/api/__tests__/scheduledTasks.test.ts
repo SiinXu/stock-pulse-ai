@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../scheduledTasks';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, post } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -9,6 +10,51 @@ const { get, post } = vi.hoisted(() => ({
 vi.mock('../index', () => ({
   default: { get, post },
 }));
+
+/** OpenAPI ScheduledTaskItem required fields (snake_case wire shape). */
+function supportedTaskWire(overrides: Record<string, unknown> = {}) {
+  return {
+    compatibility: 'supported',
+    id: 'task-1',
+    schema_version: 1,
+    name: 'Daily AAPL',
+    task_type: 'stock_analysis',
+    enabled: true,
+    next_run_at: '2026-07-26T15:00:00Z',
+    created_at: '2026-07-24T20:00:00Z',
+    updated_at: '2026-07-24T20:00:00Z',
+    max_attempts: 1,
+    payload: { stock_code: 'AAPL', report_type: 'brief', notify: true },
+    schedule: {
+      kind: 'daily',
+      time: '16:30',
+      timezone: 'America/New_York',
+      calendar_market: 'us',
+      non_trading_day_policy: 'skip',
+    },
+    ...overrides,
+  };
+}
+
+function runWire(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'run-1',
+    task_id: 'task-risk',
+    scheduled_for: '2026-07-26T13:30:00Z',
+    status: 'succeeded',
+    attempt_count: 1,
+    dispatch_failure_count: 0,
+    execution_task_ids: ['analysis-1'],
+    result_refs: [],
+    error_code: null,
+    next_attempt_at: null,
+    started_at: '2026-07-26T13:30:01Z',
+    finished_at: '2026-07-26T13:31:00Z',
+    created_at: '2026-07-26T13:30:00Z',
+    updated_at: '2026-07-26T13:31:00Z',
+    ...overrides,
+  };
+}
 
 describe('scheduledTasksApi', () => {
   beforeEach(() => {
@@ -24,17 +70,13 @@ describe('scheduledTasksApi', () => {
         generated_at: '2026-07-25T19:00:00Z',
         total: 1,
         items: [{
-          task: {
-            compatibility: 'supported',
+          task: supportedTaskWire({
             id: 'task-1',
             schema_version: 2,
             name: 'AAPL risk check',
             task_type: 'risk_check',
-            enabled: true,
             next_run_at: '2026-07-25T10:00:00Z',
-            created_at: '2026-07-24T20:00:00Z',
-            updated_at: '2026-07-24T20:00:00Z',
-          },
+          }),
           scheduled_for: '2026-07-25T10:00:00Z',
           status: 'scheduled',
           run: null,
@@ -58,48 +100,67 @@ describe('scheduledTasksApi', () => {
     });
   });
 
+  it('preserves extra keys on valid list payloads (byte-identical toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        total: 1,
+        unexpected_server_field: 'keep-me',
+        items: [supportedTaskWire({ unexpected_item_field: 'also-keep' })],
+      },
+    });
+
+    const listed = await scheduledTasksApi.list({ limit: 50 });
+    expect(listed).toEqual({
+      total: 1,
+      unexpectedServerField: 'keep-me',
+      items: [
+        expect.objectContaining({
+          id: 'task-1',
+          unexpectedItemField: 'also-keep',
+          maxAttempts: 1,
+          payload: { stockCode: 'AAPL', reportType: 'brief', notify: true },
+        }),
+      ],
+    });
+  });
+
+  it('surfaces list shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        // total missing — required by ScheduledTaskListResponse
+        items: [],
+      },
+    });
+
+    await expect(scheduledTasksApi.list()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('ScheduledTaskListResponse');
+      return true;
+    });
+  });
+
   it('lists definitions and posts enable/disable mutations', async () => {
     get.mockResolvedValueOnce({
       data: {
         total: 1,
-        items: [{
-          compatibility: 'supported',
-          id: 'task-1',
-          schema_version: 1,
-          name: 'Daily AAPL',
-          task_type: 'stock_analysis',
-          enabled: false,
-          next_run_at: null,
-          created_at: '2026-07-24T20:00:00Z',
-          updated_at: '2026-07-24T20:00:00Z',
-        }],
+        items: [supportedTaskWire({ enabled: false, next_run_at: null })],
       },
     });
     post.mockResolvedValueOnce({
-      data: {
-        compatibility: 'supported',
-        id: 'task-1',
-        schema_version: 1,
-        name: 'Daily AAPL',
-        task_type: 'stock_analysis',
+      data: supportedTaskWire({
         enabled: true,
         next_run_at: '2026-07-26T15:00:00Z',
-        created_at: '2026-07-24T20:00:00Z',
         updated_at: '2026-07-26T10:00:00Z',
-      },
+      }),
     });
     post.mockResolvedValueOnce({
-      data: {
-        compatibility: 'supported',
-        id: 'task-1',
-        schema_version: 1,
-        name: 'Daily AAPL',
-        task_type: 'stock_analysis',
+      data: supportedTaskWire({
         enabled: false,
         next_run_at: null,
-        created_at: '2026-07-24T20:00:00Z',
         updated_at: '2026-07-26T11:00:00Z',
-      },
+      }),
     });
 
     const listed = await scheduledTasksApi.list({ limit: 50 });
@@ -119,17 +180,13 @@ describe('scheduledTasksApi', () => {
 
   it('creates a stock-analysis definition with snake_case payload fields', async () => {
     post.mockResolvedValueOnce({
-      data: {
-        compatibility: 'supported',
+      data: supportedTaskWire({
         id: 'task-new',
-        schema_version: 1,
         name: 'US close analysis',
-        task_type: 'stock_analysis',
-        enabled: true,
         next_run_at: '2026-07-27T20:30:00Z',
         created_at: '2026-07-26T12:00:00Z',
         updated_at: '2026-07-26T12:00:00Z',
-      },
+      }),
     });
 
     const created = await scheduledTasksApi.create({
@@ -177,68 +234,36 @@ describe('scheduledTasksApi', () => {
 
   it('creates a research definition without report_type and loads status/runs', async () => {
     post.mockResolvedValueOnce({
-      data: {
-        compatibility: 'supported',
+      data: supportedTaskWire({
         id: 'task-risk',
         schema_version: 2,
         name: 'AAPL downside review',
         task_type: 'risk_check',
-        enabled: true,
         next_run_at: '2026-07-27T13:30:00Z',
         created_at: '2026-07-26T12:00:00Z',
         updated_at: '2026-07-26T12:00:00Z',
-      },
+        payload: { stock_code: 'AAPL', notify: true },
+      }),
     });
     get.mockResolvedValueOnce({
       data: {
-        task: {
-          compatibility: 'supported',
+        task: supportedTaskWire({
           id: 'task-risk',
           schema_version: 2,
           name: 'AAPL downside review',
           task_type: 'risk_check',
-          enabled: true,
           next_run_at: '2026-07-27T13:30:00Z',
           created_at: '2026-07-26T12:00:00Z',
           updated_at: '2026-07-26T12:00:00Z',
-        },
-        latest_run: {
-          id: 'run-1',
-          task_id: 'task-risk',
-          scheduled_for: '2026-07-26T13:30:00Z',
-          status: 'succeeded',
-          attempt_count: 1,
-          dispatch_failure_count: 0,
-          execution_task_ids: ['analysis-1'],
-          result_refs: [],
-          error_code: null,
-          next_attempt_at: null,
-          started_at: '2026-07-26T13:30:01Z',
-          finished_at: '2026-07-26T13:31:00Z',
-          created_at: '2026-07-26T13:30:00Z',
-          updated_at: '2026-07-26T13:31:00Z',
-        },
+          payload: { stock_code: 'AAPL', notify: true },
+        }),
+        latest_run: runWire(),
       },
     });
     get.mockResolvedValueOnce({
       data: {
         total: 1,
-        items: [{
-          id: 'run-1',
-          task_id: 'task-risk',
-          scheduled_for: '2026-07-26T13:30:00Z',
-          status: 'succeeded',
-          attempt_count: 1,
-          dispatch_failure_count: 0,
-          execution_task_ids: ['analysis-1'],
-          result_refs: [],
-          error_code: null,
-          next_attempt_at: null,
-          started_at: '2026-07-26T13:30:01Z',
-          finished_at: '2026-07-26T13:31:00Z',
-          created_at: '2026-07-26T13:30:00Z',
-          updated_at: '2026-07-26T13:31:00Z',
-        }],
+        items: [runWire()],
       },
     });
 
@@ -288,5 +313,42 @@ describe('scheduledTasksApi', () => {
     });
     expect(runs.total).toBe(1);
     expect(runs.items[0].status).toBe('succeeded');
+  });
+
+  it('rejects create responses missing required OpenAPI fields via ParsedApiError', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        compatibility: 'supported',
+        id: 'task-broken',
+        // missing max_attempts, payload, schedule, etc.
+        schema_version: 1,
+        name: 'broken',
+        task_type: 'stock_analysis',
+        enabled: true,
+        created_at: '2026-07-26T12:00:00Z',
+        updated_at: '2026-07-26T12:00:00Z',
+      },
+    });
+
+    await expect(
+      scheduledTasksApi.create({
+        schemaVersion: 1,
+        name: 'broken',
+        taskType: 'stock_analysis',
+        schedule: {
+          kind: 'daily',
+          time: '09:30',
+          timezone: 'UTC',
+          calendarMarket: 'us',
+          nonTradingDayPolicy: 'skip',
+        },
+        payload: { stockCode: 'AAPL' },
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'ScheduledTaskItem' });
+      return true;
+    });
   });
 });
