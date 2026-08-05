@@ -1100,7 +1100,7 @@ class _PipelineMethods:
             is_skill_opinion_recording_enabled,
         )
 
-        if not is_skill_opinion_recording_enabled(self.config):
+        if not is_skill_opinion_recording_enabled(getattr(self, "config", None)):
             return
         if not valid_skill_opinions:
             return
