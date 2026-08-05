@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
@@ -17,7 +17,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, FileInput, Modal, PageHeader, SearchableSelect, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import {
   AuthSettingsCard,
@@ -28,10 +28,7 @@ import {
   LocalModelsPanel,
   LLMChannelEditor,
   LLMConfigModeBanner,
-  NotificationChannelsPanel,
-  DataProvidersPanel,
   NotificationTestPanel,
-  isNotificationChannelKey,
   NOTIFICATION_FIELD_GROUP_ORDER,
   getNotificationFieldGroupId,
   getNotificationFieldOrder,
@@ -51,15 +48,35 @@ import {
   FirstRunWizard,
   type WizardDraftItem,
   type WizardCompleteResult,
-  ModelFallbackEditor,
   type ModelReferenceReplacement,
 } from '../components/settings';
-import SystemConfigRollbackCard from '../components/settings/SystemConfigRollbackCard';
 import { parseModelAccessFieldKey, type ModelAccessFieldFocusRequest } from '../utils/modelAccessFieldKey';
-import { getProviderDisplayLabel } from '../components/settings/llmConnectionContract';
 import { connectionItemsRespectSchema } from '../components/settings/settingsConnectionUpdateContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
-import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
+import SystemAboutCard from '../components/settings/SystemAboutCard';
+import ConfigBackupCard from '../components/settings/ConfigBackupCard';
+import AlphaSiftSettingsCard from '../components/settings/AlphaSiftSettingsCard';
+import {
+  AiOverviewCard,
+  AiTaskRoutingCard,
+  AiReliabilityCard,
+} from '../components/settings/AiModelsViewCards';
+import {
+  TASK_MODEL_KEYS,
+  buildModelSelectorOptions,
+  buildAvailableModelRefSet,
+  buildAvailableModelsByRoute,
+  resolveConfiguredModelRef as resolveConfiguredModelRefValue,
+  formatConfiguredModel as formatConfiguredModelValue,
+} from '../components/settings/aiModelsViewModel';
+import { getDesktopRuntimeApi } from '../components/settings/desktopUpdateModel';
+import {
+  getUnsafeAiPlacement,
+  mergeGenerationBackendDraftItems,
+  isPromptCacheAdvancedSetting,
+} from '../components/settings/settingsGenerationDraftModel';
+import SettingsConflictPanel from '../components/settings/SettingsConflictPanel';
+import SettingsActiveConfigPanel from '../components/settings/SettingsActiveConfigPanel';
 import {
   SETTINGS_SECTIONS,
   getDefaultView,
@@ -87,10 +104,8 @@ import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
 import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
-import { WEB_BUILD_INFO } from '../utils/constants';
-import { decodeModelRef } from '../utils/modelRef';
 import { parseStockListValue } from '../utils/stockList';
-import { getCategoryDescription, getCategoryTitle, getFieldTitleZh } from '../utils/systemConfigI18n';
+import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
 import {
   hasUnknownConfigContractCondition,
   isFieldVisibleByContract,
@@ -104,22 +119,10 @@ import type {
   SystemConfigItem,
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
-import { formatUiText, type UiTextKey } from '../i18n/uiText';
-import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
+import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS } from '../locales/settingsPage';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 import TokenUsagePage from '../components/usage/TokenUsagePage';
-
-type DesktopWindow = Window & {
-  dsaDesktop?: {
-    version?: unknown;
-    getUpdateState?: () => Promise<RawDesktopUpdateState>;
-    checkForUpdates?: () => Promise<RawDesktopUpdateState>;
-    installDownloadedUpdate?: () => Promise<boolean>;
-    openReleasePage?: (releaseUrl?: string) => Promise<boolean>;
-    onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
-  };
-};
 
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
@@ -142,286 +145,18 @@ const LOCAL_MODEL_CONFIG_KEYS = [
   'AGENT_LITELLM_MODEL',
 ];
 
-type DesktopUpdateState = {
-  status?: string;
-  updateMode?: string;
-  currentVersion?: string;
-  latestVersion?: string;
-  releaseUrl?: string;
-  checkedAt?: string;
-  publishedAt?: string;
-  message?: string;
-  releaseName?: string;
-  tagName?: string;
-  downloadPercent?: number | null;
-  downloadedBytes?: number | null;
-  totalBytes?: number | null;
-};
-
-type RawDesktopUpdateState = {
-  status?: unknown;
-  updateMode?: unknown;
-  currentVersion?: unknown;
-  latestVersion?: unknown;
-  releaseUrl?: unknown;
-  checkedAt?: unknown;
-  publishedAt?: unknown;
-  message?: unknown;
-  releaseName?: unknown;
-  tagName?: unknown;
-  downloadPercent?: unknown;
-  downloadedBytes?: unknown;
-  totalBytes?: unknown;
-};
-
-type DesktopUpdateNotice = {
-  title: string;
-  message: string;
-  variant: 'error' | 'success' | 'warning';
-  actionLabel?: string;
-  actionKind?: 'release' | 'install';
-};
-
-const LLM_CHANNEL_EDITOR_RUNTIME_KEYS = new Set([
-  'LITELLM_MODEL',
-  'LITELLM_FALLBACK_MODELS',
-  'AGENT_LITELLM_MODEL',
-  'VISION_MODEL',
-  'LLM_TEMPERATURE',
-]);
-const KNOWN_AI_UI_PLACEMENTS = new Set([
-  'model_access',
-  'task_routing',
-  'developer_diagnostics',
-  'hidden_legacy',
-]);
-
-function getUnsafeAiPlacement(
-  item: SystemConfigItem,
-  categoryHint?: string,
-): 'missing' | 'unknown' | null {
-  if ((item.schema?.category ?? categoryHint) !== 'ai_model') {
-    return null;
-  }
-  const placement = item.schema?.uiPlacement;
-  if (!placement) {
-    return 'missing';
-  }
-  return KNOWN_AI_UI_PLACEMENTS.has(String(placement)) ? null : 'unknown';
-}
-const GENERATION_BACKEND_STATUS_KEYS = new Set([
-  'GENERATION_BACKEND',
-  'GENERATION_FALLBACK_BACKEND',
-  'GENERATION_BACKEND_TIMEOUT_SECONDS',
-  'GENERATION_BACKEND_MAX_OUTPUT_BYTES',
-  'GENERATION_BACKEND_MAX_CONCURRENCY',
-  'LOCAL_CLI_BACKEND_MAX_CONCURRENCY',
-  'OPENCODE_CLI_MODEL',
-  'LITELLM_CONFIG',
-  'LITELLM_MODEL',
-  'LITELLM_FALLBACK_MODELS',
-]);
-const LLM_CHANNEL_STATUS_KEY_PATTERN = /^LLM_[A-Z0-9_]+_(PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$/;
-
-function isLlmChannelEditorDraftKey(key: string): boolean {
-  const normalized = key.trim().toUpperCase();
-  return normalized.startsWith('LLM_') || LLM_CHANNEL_EDITOR_RUNTIME_KEYS.has(normalized);
-}
-
-function isGenerationBackendStatusDraftKey(key: string): boolean {
-  const normalized = key.trim().toUpperCase();
-  return (
-    GENERATION_BACKEND_STATUS_KEYS.has(normalized)
-    || normalized === 'LLM_CHANNELS'
-    || LLM_CHANNEL_STATUS_KEY_PATTERN.test(normalized)
-  );
-}
-
-function mergeGenerationBackendDraftItems(
-  outerItems: SystemConfigUpdateItem[],
-  llmChannelItems: SystemConfigUpdateItem[],
-): SystemConfigUpdateItem[] {
-  const merged = new Map<string, SystemConfigUpdateItem>();
-  for (const item of outerItems) {
-    const normalizedKey = item.key.trim().toUpperCase();
-    if (isGenerationBackendStatusDraftKey(normalizedKey)) {
-      merged.set(normalizedKey, item);
-    }
-  }
-  for (const item of llmChannelItems) {
-    const normalizedKey = item.key.trim().toUpperCase();
-    if (isLlmChannelEditorDraftKey(normalizedKey) && isGenerationBackendStatusDraftKey(normalizedKey)) {
-      merged.set(normalizedKey, item);
-    }
-  }
-  return Array.from(merged.values());
-}
-
-const PROMPT_CACHE_ADVANCED_SETTING_KEYS = new Set([
-  'LLM_PROMPT_CACHE_TELEMETRY_ENABLED',
-  'LLM_PROMPT_CACHE_HINTS_ENABLED',
-  'LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL',
-]);
-
-function isPromptCacheAdvancedSetting(item: { key: string }) {
-  return PROMPT_CACHE_ADVANCED_SETTING_KEYS.has(item.key);
-}
-
-function trimDesktopRuntimeString(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeDesktopRuntimeNumber(value: unknown) {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-  const numberValue = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(numberValue) ? numberValue : null;
-}
-
-function getDesktopRuntimeApi() {
-  if (typeof window === 'undefined') {
-    return undefined;
-  }
-
-  return (window as DesktopWindow).dsaDesktop;
-}
-
-function getDesktopAppVersion() {
-  return trimDesktopRuntimeString(getDesktopRuntimeApi()?.version);
-}
-
-function normalizeDesktopUpdateState(state: RawDesktopUpdateState | null | undefined) {
-  if (!state || typeof state !== 'object') {
-    return null;
-  }
-
-  return {
-    status: trimDesktopRuntimeString(state.status) || 'idle',
-    updateMode: trimDesktopRuntimeString(state.updateMode) || 'manual',
-    currentVersion: trimDesktopRuntimeString(state.currentVersion),
-    latestVersion: trimDesktopRuntimeString(state.latestVersion),
-    releaseUrl: trimDesktopRuntimeString(state.releaseUrl),
-    checkedAt: trimDesktopRuntimeString(state.checkedAt),
-    publishedAt: trimDesktopRuntimeString(state.publishedAt),
-    message: trimDesktopRuntimeString(state.message),
-    releaseName: trimDesktopRuntimeString(state.releaseName),
-    tagName: trimDesktopRuntimeString(state.tagName),
-    downloadPercent: normalizeDesktopRuntimeNumber(state.downloadPercent),
-    downloadedBytes: normalizeDesktopRuntimeNumber(state.downloadedBytes),
-    totalBytes: normalizeDesktopRuntimeNumber(state.totalBytes),
-  };
-}
-
-function getDesktopUpdateNotice(
-  state: DesktopUpdateState | null,
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
-): DesktopUpdateNotice | null {
-  if (!state) {
-    return null;
-  }
-
-  if (state.status === 'update-available') {
-    const latestLabel = state.latestVersion || state.tagName || t('settings.desktopLatest');
-    const currentLabel = state.currentVersion || getDesktopAppVersion() || WEB_BUILD_INFO.version;
-    return {
-      title: t('settings.desktopUpdateAvailable'),
-      message: t('settings.desktopUpdateMessage', {
-        current: currentLabel,
-        latest: latestLabel,
-        message: state.message || t('settings.desktopUpdateReleaseMessage'),
-      }),
-      variant: 'warning' as const,
-      actionLabel: state.updateMode === 'auto' ? undefined : t('settings.desktopDownload'),
-      actionKind: state.updateMode === 'auto' ? undefined : 'release',
-    };
-  }
-
-  if (state.status === 'downloading') {
-    const percentText = typeof state.downloadPercent === 'number' ? `（${state.downloadPercent}%）` : '';
-    return {
-      title: t('settings.desktopDownloading'),
-      message: state.message || t('settings.desktopUpdateDownloadingMessage', { percent: percentText }),
-      variant: 'warning' as const,
-    };
-  }
-
-  if (state.status === 'update-downloaded') {
-    return {
-      title: t('settings.desktopDownloaded'),
-      message: state.message || t('settings.desktopUpdateDownloadedMessage'),
-      variant: 'success' as const,
-      actionLabel: t('settings.desktopInstall'),
-      actionKind: 'install',
-    };
-  }
-
-  if (state.status === 'installing') {
-    return {
-      title: t('settings.desktopInstalling'),
-      message: state.message || t('settings.desktopUpdateInstallingMessage'),
-      variant: 'warning' as const,
-    };
-  }
-
-  if (state.status === 'up-to-date') {
-    return {
-      title: t('settings.desktopUpToDate'),
-      message: state.message || t('settings.desktopUpToDateMessage'),
-      variant: 'success' as const,
-    };
-  }
-
-  if (state.status === 'checking') {
-    return {
-      title: t('settings.desktopChecking'),
-      message: state.message || t('settings.desktopUpdateCheckingMessage'),
-      variant: 'warning' as const,
-    };
-  }
-
-  if (state.status === 'error') {
-    return {
-      title: t('settings.desktopCheckError'),
-      message: state.message || t('settings.desktopUpdateErrorMessage'),
-      variant: 'error' as const,
-      actionLabel: state.updateMode === 'auto' && state.releaseUrl ? t('settings.desktopDownload') : undefined,
-      actionKind: state.updateMode === 'auto' && state.releaseUrl ? 'release' : undefined,
-    };
-  }
-
-  return null;
-}
-
-function formatEnvBackupFilename(isDesktopRuntime: boolean) {
-  const now = new Date();
-  const pad = (value: number) => value.toString().padStart(2, '0');
-  const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
-  const time = `${pad(now.getHours())}${pad(now.getMinutes())}`;
-  return `${isDesktopRuntime ? 'dsa-desktop-env' : 'dsa-env'}_${date}_${time}.env`;
-}
 
 function parseSetupStockList(value: unknown) {
   return parseStockListValue(String(value ?? ''));
 }
 
 const SettingsPage: React.FC = () => {
-  const { authEnabled, passwordChangeable } = useAuth();
+  const { passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
   const navigate = useNavigate();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
-  const [envBackupActionError, setEnvBackupActionError] = useState<ParsedApiError | null>(null);
-  const [envBackupActionSuccess, setEnvBackupActionSuccess] = useState<string>('');
-  const [alphaSiftActionError, setAlphaSiftActionError] = useState<ParsedApiError | null>(null);
-  const [alphaSiftActionSuccess, setAlphaSiftActionSuccess] = useState<string>('');
-  const [isExportingEnv, setIsExportingEnv] = useState(false);
-  const [isImportingEnv, setIsImportingEnv] = useState(false);
-  const [isUpdatingAlphaSift, setIsUpdatingAlphaSift] = useState(false);
-  const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateState | null>(null);
-  const [isCheckingDesktopUpdate, setIsCheckingDesktopUpdate] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
@@ -457,16 +192,9 @@ const SettingsPage: React.FC = () => {
   const [llmChannelResetSignal, setLlmChannelResetSignal] = useState(0);
   // Bumped by the page-level primary action to open the add-connection dialog.
   const [llmChannelAddSignal, setLlmChannelAddSignal] = useState(0);
-  const envBackupImportRef = useRef<HTMLInputElement | null>(null);
   const setupStatusRequestIdRef = useRef(0);
   const onboardingWizardOpenedRef = useRef(false);
-  const desktopRuntimeApi = getDesktopRuntimeApi();
-  const isDesktopRuntime = Boolean(desktopRuntimeApi);
-  const canCheckDesktopUpdate = Boolean(
-    desktopRuntimeApi?.getUpdateState && desktopRuntimeApi?.checkForUpdates && desktopRuntimeApi?.openReleasePage
-  );
-  const desktopAppVersion = getDesktopAppVersion();
-  const shouldShowDesktopVersionCard = Boolean(desktopAppVersion);
+  const isDesktopRuntime = Boolean(getDesktopRuntimeApi());
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Seed the active tab from the URL once so deep links / refresh restore it.
@@ -865,49 +593,6 @@ const SettingsPage: React.FC = () => {
     };
   }, [clearToast, isToastPaused, toast]);
 
-  useEffect(() => {
-    if (!canCheckDesktopUpdate) {
-      setDesktopUpdateState(null);
-      setIsCheckingDesktopUpdate(false);
-      return;
-    }
-
-    let active = true;
-
-    const syncDesktopUpdateState = async () => {
-      try {
-        const state = await desktopRuntimeApi?.getUpdateState?.();
-        if (active) {
-          setDesktopUpdateState(normalizeDesktopUpdateState(state));
-        }
-      } catch (error: unknown) {
-        if (!active) {
-          return;
-        }
-        setDesktopUpdateState({
-          status: 'error',
-          message: error instanceof Error ? error.message : t('settings.desktopUpdateErrorMessage'),
-        });
-      }
-    };
-
-    void syncDesktopUpdateState();
-
-    const unsubscribe = desktopRuntimeApi?.onUpdateStateChange?.((state) => {
-      if (!active) {
-        return;
-      }
-      setDesktopUpdateState(normalizeDesktopUpdateState(state));
-      setIsCheckingDesktopUpdate(false);
-    });
-
-    return () => {
-      active = false;
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
-  }, [canCheckDesktopUpdate, desktopRuntimeApi, t]);
 
   const rawActiveItems = itemsByCategory[activeCategory] || [];
   const firstSetupStockCode = parseSetupStockList(getConfigItem(itemsByCategory.base || [], 'STOCK_LIST')?.value)[0] || '';
@@ -1156,69 +841,34 @@ const SettingsPage: React.FC = () => {
   );
   const fallbackRoutingItem = configItemByKey.get('LITELLM_FALLBACK_MODELS');
   const hasSafeFallbackPlacement = fallbackRoutingItem?.schema?.uiPlacement === 'task_routing';
-  // Config keys whose value is a single model route (rendered via the selector).
-  const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
   const configuredTaskRoutes = useMemo(
     () => taskRoutingItems
       .filter((item) => TASK_MODEL_KEYS.has(item.key) && item.value.trim())
       .map((item) => ({ key: item.key, value: item.value.trim() })),
-    [TASK_MODEL_KEYS, taskRoutingItems],
+    [taskRoutingItems],
   );
   // Per-task model fields render a model selector fed by the authoritative
   // available-model catalog (grouped by connection), so users pick a display
   // name and never hand-type a provider/model route.
   const modelSelectorOptions = useMemo<SearchableSelectOption[]>(
-    () => availableModels.map((entry) => {
-      const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
-      const catalogProvider = providerCatalog.find((provider) => provider.id === entry.providerId);
-      const providerLabel = catalogProvider
-        ? getProviderDisplayLabel(catalogProvider, uiLanguage)
-        : entry.providerLabel ?? entry.provider;
-      return {
-        value: entry.modelRef || entry.route,
-        label: entry.display,
-        sublabel: [providerLabel, connectionLabel]
-          .filter((part): part is string => Boolean(part))
-          .join(' · ') || undefined,
-        group: connectionLabel ?? providerLabel ?? undefined,
-        keywords: [entry.route, entry.modelRef, entry.providerId, connectionLabel]
-          .filter((part): part is string => Boolean(part)),
-      };
-    }),
+    () => buildModelSelectorOptions(availableModels, providerCatalog, uiLanguage),
     [availableModels, providerCatalog, uiLanguage],
   );
   // Authoritative routable route set for AI Overview Active/Unavailable status.
   const availableModelRefSet = useMemo(
-    () => new Set(availableModels.map((entry) => entry.modelRef || entry.route)),
+    () => buildAvailableModelRefSet(availableModels),
     [availableModels],
   );
-  const availableModelsByRoute = useMemo(() => {
-    const byRoute = new Map<string, typeof availableModels>();
-    for (const entry of availableModels) {
-      const entries = byRoute.get(entry.route) ?? [];
-      entries.push(entry);
-      byRoute.set(entry.route, entries);
-    }
-    return byRoute;
-  }, [availableModels]);
-  const resolveConfiguredModelRef = useCallback((value: string): string => {
-    const normalized = value.trim();
-    if (!normalized || availableModelRefSet.has(normalized)) {
-      return normalized;
-    }
-    const matches = availableModelsByRoute.get(normalized) ?? [];
-    return matches.length === 1 ? (matches[0].modelRef || matches[0].route) : normalized;
-  }, [availableModelRefSet, availableModelsByRoute]);
-  const formatConfiguredModel = useCallback((value: string): string => {
-    const resolved = resolveConfiguredModelRef(value);
-    const entry = availableModels.find((model) => (model.modelRef || model.route) === resolved);
-    if (!entry) {
-      const decoded = decodeModelRef(value);
-      return decoded ? `${decoded.runtimeRoute} · ${decoded.connectionId}` : value.trim();
-    }
-    const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
-    return connectionLabel ? `${entry.display} · ${connectionLabel}` : entry.display;
-  }, [availableModels, resolveConfiguredModelRef]);
+  const availableModelsByRoute = useMemo(
+    () => buildAvailableModelsByRoute(availableModels),
+    [availableModels],
+  );
+  const resolveConfiguredModelRef = useCallback((value: string): string => (
+    resolveConfiguredModelRefValue(value, availableModelRefSet, availableModelsByRoute)
+  ), [availableModelRefSet, availableModelsByRoute]);
+  const formatConfiguredModel = useCallback((value: string): string => (
+    formatConfiguredModelValue(value, availableModels, resolveConfiguredModelRef)
+  ), [availableModels, resolveConfiguredModelRef]);
   // Task -> route references, used by the model-access manager to show which
   // tasks use each connection and to protect referenced connections on delete.
   const taskModelRefs = useMemo(() => {
@@ -1353,136 +1003,6 @@ const SettingsPage: React.FC = () => {
     isDataProvidersSub ||
     subFilteredItems.length > 0 ||
     activeSubPromptCacheItems.length > 0;
-  const isEnvBackupAllowed = isDesktopRuntime || authEnabled;
-  const envBackupActionDisabled = isLoading || isSaving || isExportingEnv || isImportingEnv || !isEnvBackupAllowed;
-
-  const downloadEnvBackup = async () => {
-    setEnvBackupActionError(null);
-    setEnvBackupActionSuccess('');
-    setIsExportingEnv(true);
-    try {
-      const payload = await systemConfigApi.exportEnv();
-      const blob = new Blob([payload.content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = formatEnvBackupFilename(isDesktopRuntime);
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
-      setEnvBackupActionSuccess(t('settings.envExported'));
-    } catch (error: unknown) {
-      setEnvBackupActionError(getParsedApiError(error));
-    } finally {
-      setIsExportingEnv(false);
-    }
-  };
-
-  const beginEnvBackupImport = () => {
-    setEnvBackupActionError(null);
-    setEnvBackupActionSuccess('');
-    if (hasDirty) {
-      setShowImportConfirm(true);
-      return;
-    }
-    envBackupImportRef.current?.click();
-  };
-
-  const handleEnvBackupImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    setShowImportConfirm(false);
-    if (!file) {
-      return;
-    }
-
-    setEnvBackupActionError(null);
-    setEnvBackupActionSuccess('');
-    setIsImportingEnv(true);
-    try {
-      const content = await file.text();
-      const importResult = await systemConfigApi.importEnv({
-        configVersion,
-        content,
-        reloadNow: true,
-      });
-      const reloaded = await load();
-      if (!reloaded) {
-        setEnvBackupActionError(createParsedApiError({
-          title: t('settings.envImportedRefreshFailedTitle'),
-          message: t('settings.envImportedRefreshFailedMessage'),
-          rawMessage: t('settings.envImportedRefreshFailedRaw'),
-          category: 'http_error',
-        }));
-        return;
-      }
-      if (importResult.updatedKeys.some((key) => SCHEDULER_SETTING_KEYS.has(key))) {
-        setSchedulerStatusRefreshToken((current) => current + 1);
-      }
-      notifySystemConfigChanged();
-      void refreshSetupStatus();
-      setEnvBackupActionSuccess(t('settings.envImported'));
-    } catch (error: unknown) {
-      setEnvBackupActionError(getParsedApiError(error));
-    } finally {
-      setIsImportingEnv(false);
-    }
-  };
-
-  const handleDesktopUpdateCheck = async () => {
-    if (!desktopRuntimeApi?.checkForUpdates) {
-      return;
-    }
-
-    setIsCheckingDesktopUpdate(true);
-    setDesktopUpdateState((current) => ({
-      ...(current || {}),
-      status: 'checking',
-      message: t('settings.desktopUpdateCheckingMessage'),
-    }));
-
-    try {
-      const state = await desktopRuntimeApi.checkForUpdates();
-      setDesktopUpdateState(normalizeDesktopUpdateState(state));
-    } catch (error: unknown) {
-      setDesktopUpdateState({
-        status: 'error',
-        message: error instanceof Error ? error.message : t('settings.desktopUpdateErrorMessage'),
-      });
-    } finally {
-      setIsCheckingDesktopUpdate(false);
-    }
-  };
-
-  const updateAlphaSiftEnabled = async (nextEnabled: boolean) => {
-    setAlphaSiftActionError(null);
-    setAlphaSiftActionSuccess('');
-    setIsUpdatingAlphaSift(true);
-    try {
-      if (nextEnabled) {
-        await alphasiftApi.enable();
-        await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-        setAlphaSiftActionSuccess(t('settings.enabledAlphaSiftSuccess'));
-        return;
-      }
-
-      await systemConfigApi.update({
-        configVersion,
-        maskToken,
-        reloadNow: true,
-        items: [{ key: 'ALPHASIFT_ENABLED', value: 'false' }],
-      });
-      notifyAlphaSiftConfigChanged();
-      await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-      setAlphaSiftActionSuccess(t('settings.disabledAlphaSiftSuccess'));
-    } catch (error: unknown) {
-      setAlphaSiftActionError(getParsedApiError(error));
-      await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-    } finally {
-      setIsUpdatingAlphaSift(false);
-    }
-  };
 
   const persistConfigGroup = useCallback(async (
     group: string,
@@ -1508,25 +1028,20 @@ const SettingsPage: React.FC = () => {
       return result;
     }
 
-    setAlphaSiftActionError(null);
-    setAlphaSiftActionSuccess('');
     try {
       const isAlphaSiftEnabled = changedAlphaSiftItem.value.trim().toLowerCase() === 'true';
       if (isAlphaSiftEnabled) {
         await alphasiftApi.enable();
         await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-        setAlphaSiftActionSuccess(t('settings.enabledAlphaSiftSuccess'));
         return result;
       }
 
       notifyAlphaSiftConfigChanged();
-      setAlphaSiftActionSuccess(t('settings.disabledAlphaSiftSuccess'));
-    } catch (error: unknown) {
-      setAlphaSiftActionError(getParsedApiError(error));
+    } catch {
       await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
     }
     return result;
-  }, [applyPostSaveEffects, refreshAfterExternalSave, save, t]);
+  }, [applyPostSaveEffects, refreshAfterExternalSave, save]);
 
   const runGroupAutosave = useCallback(async (group: string) => {
     if (autosaveInFlightRef.current) {
@@ -1744,39 +1259,6 @@ const SettingsPage: React.FC = () => {
     [allValuesByKey],
   );
 
-  const openDesktopReleasePage = async () => {
-    if (!desktopRuntimeApi?.openReleasePage) {
-      return;
-    }
-
-    await desktopRuntimeApi.openReleasePage(desktopUpdateState?.releaseUrl);
-  };
-
-  const installDesktopUpdate = async () => {
-    if (!desktopRuntimeApi?.installDownloadedUpdate) {
-      setDesktopUpdateState((current) => ({
-        ...(current || {}),
-        status: 'error',
-        message: t('settings.desktopManualUnsupported'),
-      }));
-      return;
-    }
-
-    try {
-      setDesktopUpdateState((current) => ({
-        ...(current || {}),
-        status: 'installing',
-        message: t('settings.desktopUpdateInstallingMessage'),
-      }));
-      await desktopRuntimeApi.installDownloadedUpdate();
-    } catch (error: unknown) {
-      setDesktopUpdateState((current) => ({
-        ...(current || {}),
-        status: 'error',
-        message: error instanceof Error ? error.message : t('settings.desktopManualUnsupported'),
-      }));
-    }
-  };
 
   const handleRunSetupSmoke = async () => {
     setSetupSmokeError(null);
@@ -1826,7 +1308,6 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const desktopUpdateNotice = getDesktopUpdateNotice(desktopUpdateState, t);
   const shouldGuardActiveConfigPanel = activeCategory === 'notification' || activeCategory === 'agent';
   const activeConfigPanelErrorTitle = activeCategory === 'agent' ? t('settings.agentSettings') : t('settings.notificationSettings');
   const settingsPanelDiagnosticHint = isDesktopRuntime
@@ -1872,145 +1353,44 @@ const SettingsPage: React.FC = () => {
     && !isTopLevelAdvanced
     && !(isAlertsSection && activeView === 'events')
     && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
-  const activeConfigPanelContent = (
-    <>
-      {isNotificationChannelsSub ? (
-        <NotificationChannelsPanel
-          items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
-          configuredChannels={configuredNotificationChannels}
-          disabled={isSaving}
-          onChange={setDraftValue}
-          issueByKey={issueByKey}
-        />
-      ) : isDataProvidersSub ? (
-        <DataProvidersPanel
-          items={subFilteredItems}
-          disabled={isSaving}
-          onChange={setDraftValue}
-          issueByKey={issueByKey}
-          configuredOverrides={{ alphasift: alphasiftEnabled }}
-        />
-      ) : activeFieldGroupOrder ? (
-        <div className="space-y-4">
-          {activeFieldGroupOrder.map((group) => {
-            const groupItems = subFilteredItems
-              .filter((item) => fieldGroupIdOf(item.key) === group.id)
-              .sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key));
-            if (!groupItems.length) {
-              return null;
-            }
-            const showChannelRoutingEmptyBanner = hasConfiguredNotificationChannelStatus
-              && configuredRoutingValues.size === 0
-              && groupItems.some((item) => CHANNEL_ROUTING_FIELD_KEYS.has(item.key));
-            return (
-              <div key={group.id} className="space-y-2">
-                <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
-                {showChannelRoutingEmptyBanner ? channelRoutingEmptyBanner : null}
-                <form
-                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
-                  onSubmit={(event) => event.preventDefault()}
-                >
-                  {groupItems.map((item) => (
-                    <SettingsField
-                      key={item.key}
-                      item={item}
-                      value={item.value}
-                      disabled={isSaving}
-                      onChange={setDraftValue}
-                      issues={issueByKey[item.key] || []}
-                      requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                      readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
-                      enumOptionFilter={
-                        CHANNEL_ROUTING_FIELD_KEYS.has(item.key) && hasConfiguredNotificationChannelStatus
-                          ? channelRoutingOptionFilter
-                          : undefined
-                      }
-                      enumEmptyState={
-                        CHANNEL_ROUTING_FIELD_KEYS.has(item.key) && hasConfiguredNotificationChannelStatus
-                          ? channelRoutingEmptyState
-                          : undefined
-                      }
-                    />
-                  ))}
-                </form>
-              </div>
-            );
-          })}
-        </div>
-      ) : subFilteredItems.length ? (
-        <form
-          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
-          onSubmit={(event) => event.preventDefault()}
-        >
-          {subFilteredItems.map((item) => (
-            <SettingsField
-              key={item.key}
-              item={item}
-              value={item.value}
-              disabled={isSaving}
-              onChange={setDraftValue}
-              issues={issueByKey[item.key] || []}
-              requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-              dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-              readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
-            />
-          ))}
-        </form>
-      ) : null}
-      {activeSubPromptCacheItems.length ? (
-        <details className="group/prompt-cache overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-semibold text-foreground">
-                {t('settings.promptCacheAdvancedTitle')}
-              </p>
-              <p className="text-xs leading-5 text-muted-text">
-                {t('settings.promptCacheAdvancedDescription')}
-              </p>
-            </div>
-            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/prompt-cache:rotate-180" aria-hidden="true" />
-          </summary>
-          <form
-            className="border-t border-[var(--settings-border-soft)]"
-            onSubmit={(event) => event.preventDefault()}
-          >
-            {activeSubPromptCacheItems.map((item) => (
-              <SettingsField
-                key={item.key}
-                item={item}
-                value={item.value}
-                disabled={isSaving}
-                onChange={setDraftValue}
-                issues={issueByKey[item.key] || []}
-                requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
-              />
-            ))}
-          </form>
-        </details>
-      ) : null}
-    </>
-  );
-  const activeConfigPanel = shouldRenderFieldPanel ? (
-    <SettingsSectionCard
-      key={`${activeSection}:${activeView}`}
-      title={activeConfigPanelTitle}
-      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
-    >
-      {activeConfigPanelContent}
-    </SettingsSectionCard>
-  ) : activeSection === 'overview'
+  const showActiveConfigEmptyState = !(
+    activeSection === 'overview'
     || activeSection === 'ai_models'
     || activeSection === 'advanced'
     || isInvestmentFrameworkView
     || activeCategory === 'system'
     || (isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0)
-    || (activeCategory === 'data_source' && activeSubCategory !== 'providers') ? null : (
-    <EmptyState
-      title={t('settings.currentCategoryEmptyTitle')}
-      description={t('settings.currentCategoryEmptyDescription')}
+    || (activeCategory === 'data_source' && activeSubCategory !== 'providers')
+  );
+  const activeConfigPanel = (
+    <SettingsActiveConfigPanel
+      panelKey={`${activeSection}:${activeView}`}
+      title={activeConfigPanelTitle}
+      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
+      shouldRender={shouldRenderFieldPanel}
+      showEmptyState={showActiveConfigEmptyState}
+      isNotificationChannelsSub={isNotificationChannelsSub}
+      isDataProvidersSub={isDataProvidersSub}
+      visibleActiveItems={visibleActiveItems}
+      subFilteredItems={subFilteredItems}
+      activeSubPromptCacheItems={activeSubPromptCacheItems}
+      activeFieldGroupOrder={activeFieldGroupOrder}
+      fieldGroupIdOf={fieldGroupIdOf}
+      fieldGroupOrderOf={fieldGroupOrderOf}
+      configuredNotificationChannels={configuredNotificationChannels}
+      hasConfiguredNotificationChannelStatus={hasConfiguredNotificationChannelStatus}
+      configuredRoutingValues={configuredRoutingValues}
+      channelRoutingFieldKeys={CHANNEL_ROUTING_FIELD_KEYS}
+      channelRoutingEmptyBanner={channelRoutingEmptyBanner}
+      channelRoutingEmptyState={channelRoutingEmptyState}
+      channelRoutingOptionFilter={channelRoutingOptionFilter}
+      isSaving={isSaving}
+      issueByKey={issueByKey}
+      allValuesByKey={allValuesByKey}
+      alphasiftEnabled={alphasiftEnabled}
+      setDraftValue={setDraftValue}
+      readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
+      activeCategory={activeCategory}
     />
   );
   const activeSaveGroup = activeCategory;
@@ -2091,90 +1471,11 @@ const SettingsPage: React.FC = () => {
         ) : null}
 
         {conflictState ? (
-          <section
-            className="mt-3 space-y-3 rounded-xl border border-warning/40 bg-warning/5 p-4"
-            aria-labelledby="settings-conflict-title"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <h2 id="settings-conflict-title" className="text-sm font-semibold text-foreground">
-                  {settingsText.conflictTitle}
-                </h2>
-                <p className="text-xs leading-5 text-secondary-text">
-                  {settingsText.conflictDescription}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="compact"
-                  onClick={() => resolveAllSettingsConflicts('server')}
-                >
-                  {settingsText.useAllServer}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="compact"
-                  onClick={() => resolveAllSettingsConflicts('local')}
-                >
-                  {settingsText.keepAllLocal}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {conflictState.fields.map((field) => (
-                <div key={field.key} className="rounded-lg border border-[var(--settings-border)] bg-background/70 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {resolveSettingsFieldTitle({
-                          itemKey: field.key,
-                          fallbackTitle: field.title || field.key,
-                          language: uiLanguage,
-                        })}
-                      </p>
-                      <p className="text-xs text-muted-text">{field.key}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="compact"
-                        onClick={() => resolveSettingsConflict(field.key, 'server')}
-                      >
-                        {settingsText.useServer}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        size="compact"
-                        onClick={() => resolveSettingsConflict(field.key, 'local')}
-                      >
-                        {settingsText.keepLocal}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
-                      <p className="text-xs font-medium text-muted-text">{settingsText.serverValue}</p>
-                      <p className="mt-1 break-all text-xs text-secondary-text">
-                        {field.isSensitive ? settingsText.hiddenServerValue : field.server || settingsText.emptyValue}
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
-                      <p className="text-xs font-medium text-muted-text">{settingsText.localValue}</p>
-                      <p className="mt-1 break-all text-xs text-secondary-text">
-                        {field.isSensitive ? settingsText.hiddenLocalValue : field.local || settingsText.emptyValue}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <SettingsConflictPanel
+            fields={conflictState.fields}
+            onResolveField={resolveSettingsConflict}
+            onResolveAll={resolveAllSettingsConflicts}
+          />
         ) : null}
       </div>
 
@@ -2296,53 +1597,16 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {shouldShowAlphaSiftSettings ? (
-              <SettingsSectionCard
-                title={t('settings.alphaSift')}
-                description={t('settings.alphaSiftDescription')}
-              >
-                <Surface level="interactive" className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {alphasiftEnabled ? t('settings.alphaSiftEnabled') : t('settings.alphaSiftDisabled')}
-                    </p>
-                    <p className="mt-1 text-xs leading-6 text-muted-text">
-                      {t('settings.alphaSiftSummary')}
-                    </p>
-                    <p className="mt-2 text-xs leading-6 text-amber-700 dark:text-amber-300">
-                      {t('settings.alphaSiftRisk')}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => selectSectionView('data_sources', 'providers')}
-                    >
-                      {t('settings.viewConfigItems')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={alphasiftEnabled ? 'secondary' : 'primary'}
-                      onClick={() => void updateAlphaSiftEnabled(!alphasiftEnabled)}
-                      disabled={isSaving || isLoading || isUpdatingAlphaSift}
-                      isLoading={isUpdatingAlphaSift}
-                      loadingText={alphasiftEnabled ? t('settings.disablingAlphaSift') : t('settings.enablingAlphaSift')}
-                    >
-                      {alphasiftEnabled ? t('settings.disableAlphaSift') : t('settings.enableAlphaSift')}
-                    </Button>
-                  </div>
-                </Surface>
-                {alphaSiftActionError ? (
-                  <div className="mt-3">
-                    <ApiErrorAlert error={alphaSiftActionError} />
-                  </div>
-                ) : null}
-                {!alphaSiftActionError && alphaSiftActionSuccess ? (
-                  <div className="mt-3">
-                    <SettingsAlert title={t('settings.actionSuccess')} message={alphaSiftActionSuccess} variant="success" />
-                  </div>
-                ) : null}
-              </SettingsSectionCard>
+              <AlphaSiftSettingsCard
+                enabled={alphasiftEnabled}
+                configVersion={configVersion}
+                maskToken={maskToken}
+                disabled={isSaving || isLoading}
+                onViewConfigItems={() => selectSectionView('data_sources', 'providers')}
+                onAfterChange={async () => {
+                  await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
+                }}
+              />
             ) : null}
             {activeCategory === 'system' && activeView === 'security' ? (
               <>
@@ -2391,167 +1655,22 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {activeCategory === 'system' && activeView === 'about' ? (
-              <SettingsSectionCard
-                title={t('settings.versionInfo')}
-                description={t('settings.versionInfoDescription')}
-                contentBordered
-              >
-                <div
-                  className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
-                >
-                  <Surface level="interactive" className="px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
-                      {t('settings.versionWebui')}
-                    </p>
-                    <p className="mt-2 break-all font-mono text-sm text-foreground">
-                      {WEB_BUILD_INFO.version}
-                    </p>
-                  </Surface>
-                  <Surface level="interactive" className="px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
-                      {t('settings.versionBuildId')}
-                    </p>
-                    <p className="mt-2 break-all font-mono text-sm text-foreground">
-                      {WEB_BUILD_INFO.buildId}
-                    </p>
-                  </Surface>
-                  <Surface level="interactive" className="px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
-                      {t('settings.versionBuildTime')}
-                    </p>
-                    <p className="mt-2 break-all font-mono text-sm text-foreground">
-                      {WEB_BUILD_INFO.buildTime}
-                    </p>
-                  </Surface>
-                  {shouldShowDesktopVersionCard ? (
-                    <Surface level="interactive" className="px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
-                        {t('settings.versionDesktop')}
-                      </p>
-                      <p className="mt-2 break-all font-mono text-sm text-foreground">
-                        {desktopAppVersion}
-                      </p>
-                    </Surface>
-                  ) : null}
-                </div>
-                <p className="text-xs leading-6 text-muted-text">
-                  {t('settings.updateBuildDescription')}
-                </p>
-                {canCheckDesktopUpdate ? (
-                  <Surface level="interactive" className="mt-4 space-y-3 px-4 py-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{t('settings.desktopUpdate')}</p>
-                        <p className="text-xs leading-6 text-muted-text">
-                          {t('settings.desktopUpdateDescription')}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => void handleDesktopUpdateCheck()}
-                        disabled={isCheckingDesktopUpdate}
-                        isLoading={isCheckingDesktopUpdate}
-                        loadingText={t('settings.checkingDesktopUpdate')}
-                      >
-                        {t('settings.checkDesktopUpdate')}
-                      </Button>
-                    </div>
-                    {desktopUpdateNotice ? (
-                      <SettingsAlert
-                        title={desktopUpdateNotice.title}
-                        message={desktopUpdateNotice.message}
-                        variant={desktopUpdateNotice.variant}
-                        actionLabel={desktopUpdateNotice.actionLabel}
-                        onAction={desktopUpdateNotice.actionLabel ? () => {
-                          if (desktopUpdateNotice.actionKind === 'install') {
-                            void installDesktopUpdate();
-                            return;
-                          }
-                          void openDesktopReleasePage();
-                        } : undefined}
-                      />
-                    ) : (
-                      <p className="text-xs leading-6 text-muted-text">
-                        {t('settings.desktopCurrentNoStatus')}
-                      </p>
-                    )}
-                  </Surface>
-                ) : null}
-                {WEB_BUILD_INFO.isFallbackVersion ? (
-                  <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
-                    {t('settings.fallbackVersionWarning')}
-                  </p>
-                ) : null}
-              </SettingsSectionCard>
+              <SystemAboutCard />
             ) : null}
             {isTopLevelAdvanced && activeView === 'backup' ? (
-              <SettingsSectionCard
-                title={t('settings.configBackup')}
-                description={t('settings.configBackupDescription')}
-              >
-                <Surface level="interactive" className="space-y-4 p-4">
-                  {!isEnvBackupAllowed ? (
-                    <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
-                      {t('settings.disabledAuthBackupWarning')}
-                    </p>
-                  ) : null}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void downloadEnvBackup()}
-                      disabled={envBackupActionDisabled}
-                      isLoading={isExportingEnv}
-                      loadingText={t('settings.exportingEnv')}
-                    >
-                      {t('settings.exportEnv')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={beginEnvBackupImport}
-                      disabled={envBackupActionDisabled}
-                      isLoading={isImportingEnv}
-                      loadingText={t('settings.importingEnv')}
-                    >
-                      {t('settings.importEnv')}
-                    </Button>
-                    <FileInput
-                      ref={envBackupImportRef}
-                      accept=".env,.txt"
-                      onChange={(event) => {
-                        void handleEnvBackupImportFile(event);
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs leading-6 text-muted-text">
-                    {t('settings.envExportNote')}
-                  </p>
-                  <p className="text-xs leading-6 text-muted-text">
-                    {t('settings.envDockerNote')}
-                  </p>
-                  {envBackupActionError ? (
-                    <ApiErrorAlert
-                      error={envBackupActionError}
-                      actionLabel={envBackupActionError.status === 409 ? t('settings.reload') : undefined}
-                      onAction={envBackupActionError.status === 409 ? () => void load() : undefined}
-                    />
-                  ) : null}
-                  {!envBackupActionError && envBackupActionSuccess ? (
-                    <SettingsAlert title={t('settings.actionSuccess')} message={envBackupActionSuccess} variant="success" />
-                  ) : null}
-                </Surface>
-                <SystemConfigRollbackCard
-                  configVersion={configVersion}
-                  disabled={isSaving || isLoading || isImportingEnv || isExportingEnv}
-                  onRolledBack={async (result) => {
-                    await refreshAfterExternalSave(result.updatedKeys);
-                    applyPostSaveEffects();
-                  }}
-                  onReloadLatest={() => refreshAfterExternalSave([])}
-                />
-              </SettingsSectionCard>
+              <ConfigBackupCard
+                configVersion={configVersion}
+                hasDirty={hasDirty}
+                disabled={isSaving || isLoading}
+                load={load}
+                onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((current) => current + 1)}
+                onRefreshSetupStatus={() => { void refreshSetupStatus(); }}
+                onRolledBack={async (result) => {
+                  await refreshAfterExternalSave(result.updatedKeys);
+                  applyPostSaveEffects();
+                }}
+                onReloadLatest={() => refreshAfterExternalSave([])}
+              />
             ) : null}
             {activeCategory === 'base' ? (
               <>
@@ -2599,33 +1718,15 @@ const SettingsPage: React.FC = () => {
               </>
             ) : null}
             {isAiOverview ? (
-              <SettingsSectionCard
-                title={t('settings.llmAccess')}
-                description={t('settings.llmAccessDescription')}
-                contentBordered
-              >
-                {availableModelsError ? (
-                  <SettingsAlert
-                    variant="error"
-                    title={settingsText.modelCatalogFailed}
-                    message={settingsText.modelCatalogOverviewError}
-                    actionLabel={settingsText.reload}
-                    onAction={() => reloadAvailableModels()}
-                  />
-                ) : availableModelsLoading ? (
-                  <p className="text-xs text-secondary-text">
-                    {settingsText.loadingModels}
-                  </p>
-                ) : (
-                  <AiOverviewMatrix
-                    getValue={(key) => allValuesByKey[key.toUpperCase()] ?? ''}
-                    language={uiLanguage}
-                    onEditRouting={() => selectSectionView('ai_models', 'task_routing')}
-                    availableRoutes={availableModelRefSet}
-                    formatModel={formatConfiguredModel}
-                  />
-                )}
-              </SettingsSectionCard>
+              <AiOverviewCard
+                allValuesByKey={allValuesByKey}
+                availableRoutes={availableModelRefSet}
+                availableModelsError={availableModelsError}
+                availableModelsLoading={availableModelsLoading}
+                formatModel={formatConfiguredModel}
+                onEditRouting={() => selectSectionView('ai_models', 'task_routing')}
+                onReloadModels={() => reloadAvailableModels()}
+              />
             ) : null}
             {isAiLocalModels ? (
               <LocalModelsPanel
@@ -2637,165 +1738,40 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {isAiTaskRouting ? (
-              <SettingsSectionCard
-                title={settingsText.taskRouting}
-                description={settingsText.taskRoutingDescription}
-              >
-                {availableModelsError ? (
-                  <SettingsAlert
-                    variant="error"
-                    title={settingsText.modelCatalogFailed}
-                    message={settingsText.modelCatalogRoutingError}
-                    actionLabel={settingsText.reload}
-                    onAction={() => reloadAvailableModels()}
-                  />
-                ) : availableModelsLoading && availableModels.length === 0 ? (
-                  <p className="mb-3 text-xs text-secondary-text">{settingsText.loadingModels}</p>
-                ) : availableModels.length === 0 ? (
-                  <div className="mb-3 rounded-lg border border-dashed border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-5 text-center">
-                    <p className="text-sm font-medium text-foreground">
-                      {settingsText.noModels}
-                    </p>
-                    <p className="mt-1 text-sm text-secondary-text">
-                      {(allValuesByKey.LLM_CHANNELS || '').trim()
-                        ? settingsText.connectedWithoutModels
-                        : settingsText.connectFirst}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="default"
-                      className="mt-3"
-                      onClick={goToModelAccessFromTaskRouting}
-                    >
-                      {settingsText.goModelAccess}
-                    </Button>
-                    {configuredTaskRoutes.length > 0 ? (
-                      <div className="mt-4 space-y-1 text-left text-xs text-warning">
-                        {configuredTaskRoutes.map((route) => (
-                          <p key={route.key}>
-                            {formatUiText(settingsText.staleValue, {
-                              value: formatConfiguredModel(route.value),
-                            })}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                {!availableModelsError && !availableModelsLoading && availableModels.length > 0 ? (
-                  <>
-                    {taskRoutingItems.length > 0 ? (
-                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-                    {taskRoutingItems.map((item) => (
-                      TASK_MODEL_KEYS.has(item.key) ? (
-                        <div key={item.key} className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_260px] md:items-center md:gap-6">
-                          <label htmlFor={`setting-${item.key}`} className="text-sm text-foreground">
-                            {SETTINGS_TASK_ROUTE_LABELS[uiLanguage][item.key] ?? getFieldTitleZh(item.key, item.key)}
-                          </label>
-                          <div className="min-w-0">
-                            <SearchableSelect
-                              id={`setting-${item.key}`}
-                              value={resolveConfiguredModelRef(item.value)}
-                              onChange={(next) => setDraftValue(item.key, next)}
-                              options={modelSelectorOptions}
-                              disabled={isSaving || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                              ariaLabel={SETTINGS_TASK_ROUTE_LABELS[uiLanguage][item.key] ?? getFieldTitleZh(item.key, item.key)}
-                              placeholder={item.key === 'LITELLM_MODEL'
-                                ? settingsText.selectModel
-                                : settingsText.inheritReportModel}
-                              error={(issueByKey[item.key] || []).some((issue) => issue.severity === 'error')}
-                              ariaDescribedBy={(issueByKey[item.key] || [])
-                                .map((issue) => `setting-${item.key}-issue-${issue.code}`)
-                                .join(' ') || undefined}
-                              emptyText={settingsText.noModelOptions}
-                              searchPlaceholder={settingsText.searchModels}
-                              staleValueText={formatConfiguredModel(item.value)}
-                              staleValueLabel={formatUiText(settingsText.staleValue, {
-                                value: formatConfiguredModel(item.value),
-                              })}
-                              clearable={item.key !== 'LITELLM_MODEL'}
-                            />
-                            {(issueByKey[item.key] || []).map((issue) => (
-                              <p
-                                id={`setting-${item.key}-issue-${issue.code}`}
-                                key={`${issue.key}-${issue.code}`}
-                                className="mt-1 text-xs text-danger"
-                              >
-                                {issue.message}
-                              </p>
-                            ))}
-                            {readOnlyDiagnosticForItem(item, 'ai_model') ? (
-                              <p className="mt-1 text-xs text-warning">
-                                {readOnlyDiagnosticForItem(item, 'ai_model')}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : (
-                        <SettingsField
-                          key={item.key}
-                          item={item}
-                          value={item.value}
-                          disabled={isSaving}
-                          onChange={setDraftValue}
-                          issues={issueByKey[item.key] || []}
-                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                          readOnlyDiagnostic={readOnlyDiagnosticForItem(item, 'ai_model')}
-                        />
-                      )
-                    ))}
-                  </div>
-                    ) : (
-                  <p className="text-xs text-muted-text">
-                    {settingsText.noRoutingFields}
-                  </p>
-                    )}
-                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-text">
-                  <span>{settingsText.fallbackOrderLabel}</span>
-                  <span className="font-medium text-foreground">
-                    {allValuesByKey.LITELLM_FALLBACK_MODELS
-                      ? allValuesByKey.LITELLM_FALLBACK_MODELS
-                        .split(',')
-                        .map((entry) => formatConfiguredModel(entry.trim()))
-                        .join(getUiListSeparator(uiLanguage))
-                      : settingsText.noneSet}
-                  </span>
-                  {hasSafeFallbackPlacement ? (
-                    <button
-                      type="button"
-                      className="settings-accent-text inline-flex min-h-11 min-w-11 items-center underline-offset-2 hover:underline"
-                      onClick={() => selectSectionView('ai_models', 'reliability')}
-                    >
-                      {settingsText.editReliability}
-                    </button>
-                  ) : null}
-                    </div>
-                  </>
-                ) : null}
-              </SettingsSectionCard>
+              <AiTaskRoutingCard
+                taskRoutingItems={taskRoutingItems}
+                fallbackModelsValue={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                issueByKey={issueByKey}
+                allValuesByKey={allValuesByKey}
+                modelSelectorOptions={modelSelectorOptions}
+                availableModels={availableModels}
+                availableModelsError={availableModelsError}
+                availableModelsLoading={availableModelsLoading}
+                configuredTaskRoutes={configuredTaskRoutes}
+                hasSafeFallbackPlacement={hasSafeFallbackPlacement}
+                isSaving={isSaving}
+                setDraftValue={setDraftValue}
+                resolveConfiguredModelRef={resolveConfiguredModelRef}
+                formatConfiguredModel={formatConfiguredModel}
+                readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
+                onGoToModelAccess={goToModelAccessFromTaskRouting}
+                onEditReliability={() => selectSectionView('ai_models', 'reliability')}
+                onReloadModels={() => reloadAvailableModels()}
+              />
             ) : null}
             {isAiReliability ? (
-              <SettingsSectionCard
-                title={settingsText.fallbackTitle}
-                description={settingsText.fallbackDescription}
-              >
-                {hasSafeFallbackPlacement ? (
-                  <ModelFallbackEditor
-                    value={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
-                    onChange={(next) => setDraftValue('LITELLM_FALLBACK_MODELS', next)}
-                    options={modelSelectorOptions}
-                    primaryRoute={resolveConfiguredModelRef(allValuesByKey.LITELLM_MODEL || '')}
-                    resolveConfiguredModelRef={resolveConfiguredModelRef}
-                    language={uiLanguage}
-                    disabled={isSaving || !isFieldEnabledByContract(fallbackRoutingItem?.schema?.contract, allValuesByKey)}
-                  />
-                ) : null}
-                {(issueByKey.LITELLM_FALLBACK_MODELS || []).map((issue) => (
-                  <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
-                ))}
-              </SettingsSectionCard>
+              <AiReliabilityCard
+                fallbackValue={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                fallbackIssues={issueByKey.LITELLM_FALLBACK_MODELS || []}
+                fallbackItem={fallbackRoutingItem}
+                hasSafeFallbackPlacement={hasSafeFallbackPlacement}
+                modelSelectorOptions={modelSelectorOptions}
+                primaryRoute={resolveConfiguredModelRef(allValuesByKey.LITELLM_MODEL || '')}
+                allValuesByKey={allValuesByKey}
+                isSaving={isSaving}
+                setDraftValue={setDraftValue}
+                resolveConfiguredModelRef={resolveConfiguredModelRef}
+              />
             ) : null}
             {isTopLevelAdvanced && activeView === 'raw_config' ? (
               <>
@@ -2989,20 +1965,6 @@ const SettingsPage: React.FC = () => {
           </div>
         </ToastViewport>
       ) : null}
-      <ConfirmDialog
-        isOpen={showImportConfirm}
-        title={t('settings.importConfirmTitle')}
-        message={t('settings.importConfirmMessage')}
-        confirmText={t('settings.importConfirmContinue')}
-        cancelText={t('common.cancel')}
-        onConfirm={() => {
-          setShowImportConfirm(false);
-          envBackupImportRef.current?.click();
-        }}
-        onCancel={() => {
-          setShowImportConfirm(false);
-        }}
-      />
       <ConfirmDialog
         isOpen={showResetConfirm}
         title={t('settings.resetConfirmTitle')}
