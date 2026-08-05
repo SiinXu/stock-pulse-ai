@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Split the share-image renderer into a package with parsing, model, formatting, and render modules, preserving all import paths.
+
 - [Tests] Ran the API suite against the real Starlette test client in a dedicated CI job behind a default-off flag.
 - [Chore] Extended CI path filters to the backend code the e2e stack boots and added a push-to-main run.
 - [Fixed] First-run analysis without an LLM now returns stable `llm_not_configured` (HTTP 422 sync / task `message_code`) and Home setup banners localize readiness check keys; invalid market-review `region` errors include the allowed set.
