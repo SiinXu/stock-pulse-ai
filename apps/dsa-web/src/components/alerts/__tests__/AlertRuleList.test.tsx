@@ -2,24 +2,13 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertRuleList } from '../AlertRuleList';
+import { chooseOption, openListbox } from '../../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
 
-function openListbox(trigger: HTMLElement) {
-  fireEvent.click(trigger);
-  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  const listbox = openListbox(trigger);
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
-}
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { AlertRuleItem } from '../../../types/alerts';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';

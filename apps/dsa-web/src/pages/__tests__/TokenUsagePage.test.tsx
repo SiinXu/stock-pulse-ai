@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import TokenUsagePage from '../TokenUsagePage';
+import { createDeferred } from '../../test-utils';
 
 const { get } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -74,16 +75,6 @@ function makeDashboardResponse(overrides: Partial<typeof dashboardResponse> = {}
     ...dashboardResponse,
     ...overrides,
   };
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, resolve, reject };
 }
 
 function LocationProbe() {
