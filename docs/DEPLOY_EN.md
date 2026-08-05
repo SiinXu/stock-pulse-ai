@@ -49,6 +49,17 @@ For gunicorn, systemd, or other import-based workers without uvicorn-style `--ho
 
 Full checklist: [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries).
 
+### Browser security headers (CSP)
+
+The FastAPI app attaches defense-in-depth response headers on product routes:
+
+- `Content-Security-Policy` — same-origin default; allows inline script/style required by the built SPA theme bootstrap and React inline styles; allows `data:` / `blob:` images for CSS backgrounds and share/export downloads; denies `object-src`, base hijack, and framing (`frame-ancestors 'none'`).
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-Frame-Options: DENY`
+
+`/docs` and `/redoc` omit CSP only so the CDN-hosted OpenAPI UIs can load; the other headers still apply. Prefer TLS at the reverse proxy and do not strip these headers. Full rationale: [Security baseline — browser response headers](security-baseline.md#browser-response-headers-csp).
+
 ---
 
 ## Option 1: Docker Compose Deployment (Recommended)
