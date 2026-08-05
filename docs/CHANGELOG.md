@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Applied Content-Security-Policy and related security headers (nosniff, frame deny, referrer) on FastAPI responses as defense-in-depth for the served web app.
+- [Changed] Modularized the web API error catalog into parse/categorize/catalog/format modules with import-path parity and actionable remediation for high-impact codes.
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.

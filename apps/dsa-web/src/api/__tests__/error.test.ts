@@ -227,3 +227,58 @@ describe('stable API error contract', () => {
   });
 
 });
+
+describe('actionable error remediation', () => {
+  it('resolves settings deep links for top user-impact codes', async () => {
+    const { resolveErrorRemediation, parseApiError, getParsedApiError } = await import('../error');
+
+    const llm = getParsedApiError(parseApiError({
+      response: {
+        status: 422,
+        data: { error: 'llm_not_configured', message: 'diag', params: {} },
+      },
+    }), 'en');
+    const remediation = resolveErrorRemediation(llm, 'en');
+    expect(remediation?.actionLabel).toMatch(/model settings/i);
+    expect(remediation?.href).toContain('/settings');
+    expect(remediation?.href).toContain('section=ai_models');
+    expect(remediation?.hint).toMatch(/Model Access/i);
+  });
+
+  it('falls back to category remediation when code is absent', async () => {
+    const { resolveErrorRemediation, createParsedApiError } = await import('../error');
+    const error = createParsedApiError({
+      title: 'local',
+      message: 'down',
+      category: 'local_connection_failed',
+    });
+    const remediation = resolveErrorRemediation(error, 'en');
+    expect(remediation?.actionLabel).toMatch(/local service/i);
+    expect(remediation?.href).toBeUndefined();
+    expect(remediation?.hint).toMatch(/Web service/i);
+  });
+
+  it('keeps export surface including resolveErrorRemediation', async () => {
+    const mod = await import('../error');
+    const required = [
+      'parseApiError',
+      'getParsedApiError',
+      'createParsedApiError',
+      'createApiError',
+      'attachParsedApiError',
+      'localizeParsedApiError',
+      'formatParsedApiError',
+      'toApiErrorMessage',
+      'extractErrorPayloadText',
+      'isParsedApiError',
+      'isApiRequestError',
+      'isAxiosApiError',
+      'isLocalConnectionFailure',
+      'isPermanentlyUnavailableResourceError',
+      'resolveErrorRemediation',
+    ] as const;
+    for (const name of required) {
+      expect(mod[name], name).toBeTypeOf('function');
+    }
+  });
+});

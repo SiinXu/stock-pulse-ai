@@ -76,19 +76,19 @@
       }
     },
     "error": {
-      "keyCount": 112,
-      "keySetSha256": "9c5aaa83de0be8bf73efc381737a8a98a065ee76ccca4ede4b5f6b5abdbb7df2",
+      "keyCount": 158,
+      "keySetSha256": "4b1b9989e8ace31c2f176e767d9851923d2ee134c2e10e181d32894f30cc9074",
       "bundleSha256": {
-        "zh": "43e9423a1f4ea484be19cff264b32131b29b567fb88908a2b58cc8b9eb6e818e",
-        "zh-TW": "6af27f6ed0167fc546e02f5f6c951bb7d68920f807deef47477d2f369477d318",
-        "en": "726d3bf75b0f7148ca07b1d3566ba9cbc1cec5c4c5b84338e30c9e385aa3e8ff",
-        "ja": "d023f1da4463548c9db8cd6cd1175e12ee7e0187b4666611ddc843bd73891838",
-        "ko": "d8f3158a506982f8fc035606ab9dc32c59ca513c8dc4fdb6de9f07f96c2eb69d",
-        "de": "ab91c373da25920ec9e582a53be9a2ac8cea9caec80b0e211068b95607080b38",
-        "es": "27a1d7f2e5fdf051aae32b0d774478207d283484994b7efc5bce5bcd1a072330",
-        "ms": "49fdd04fdc3429d8c6396f58a0ad83ceac86e21cb682eee3b0d8626c35f9186a",
-        "fr": "8848a8f0a98a702f901168d8b9f5367a51d3e680da5d9f19e0c85206b0a82df4",
-        "id": "ead26ae12983275c433e79830b817bad6d41fdbee5c17035b2fcf68d20287cc1"
+        "zh": "553a9bb7e4d820a70462909a45d75123b8704e0956fa90aa9530c6c7551d064f",
+        "zh-TW": "7215dbe1c46c5353f8103587a57f13f0608ea62e521896bd20cd3b5a3c8e8275",
+        "en": "acd88080184b88090d97ab25cbaaa2e1a3423ac3066dbc7f9bdf41a64ca38277",
+        "ja": "906fe0b2a055e21db58081a1fdd1ad0de1cd453731d0f178a5b0372514ad34af",
+        "ko": "58c28d831239d59081a56a107fd736f0117f9b02f0bc1bd6d845ca516e44b056",
+        "de": "70a56480d0b13fbeb06a05e7f90919ba18bb3050d61c63440faf0de70c78de0d",
+        "es": "355ef3b88c397fc1bac166b55e3b81bfe9dc678ec158f43b74ba91cf1d9b8576",
+        "ms": "7da2f5799a01e5e59fe073aaa975a14bb19735cbe7d618cefb08cc9ac96dddac",
+        "fr": "3918e699e342b8adfbaaab10eb11da113641627a4780b3717ec07511d4750b76",
+        "id": "042fee18effc59e90d8fcfd58ff47205e382c24e1ee88243713ef45f7c733571"
       }
     },
     "disclaimer": {
@@ -490,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 118,
-        "keySetSha256": "302c4ff2373465d61926b228e42ed7e72b8336105570206b69aaa97e636a041f",
+        "keyCount": 158,
+        "keySetSha256": "4b1b9989e8ace31c2f176e767d9851923d2ee134c2e10e181d32894f30cc9074",
         "bundleSha256": {
-          "zh": "4e3c9fe2a793cf22c71b9962872608b621d2cc9c299c97acd72be223347e46f1",
-          "zh-TW": "102ce5dc0c690515102646677a903ead4b0f30e4f39a7377fb5ff527623438ff",
-          "en": "f41a32aaaf042ed39135c3dee462a3d8c1b3b3b71d6fb06dba5938de7ce4cbf8",
-          "ja": "2264b5da3deb7670bea74230266a08d094e48439555bb1c53c375eec7ce10b3a",
-          "ko": "3965c847437268800a4d3e7b1cef9b1b258a9e3fe5b3825552469f668df3d234",
-          "de": "5b151ba5a81824c4939e48f92d6ed99d05aff1f3b9285c3a43b5ca3e7983bc8d",
-          "es": "8e2b878e3bf61172a26eaeb6eeb794737969ed511cb467967fa8f5882c693869",
-          "ms": "782c965279f2c20ece72fade66d139fcc9edc7ba124287ef4981edbf77d56875",
-          "fr": "4d5e45d89c6a5b168d37f72a9c4c1927e579164e8f5f1d6896e27181a6979d49",
-          "id": "c10e851a226bc1c41a0cab3b626f2500925c7ec382ce23ad1a251e3ff48981a2"
+          "zh": "553a9bb7e4d820a70462909a45d75123b8704e0956fa90aa9530c6c7551d064f",
+          "zh-TW": "7215dbe1c46c5353f8103587a57f13f0608ea62e521896bd20cd3b5a3c8e8275",
+          "en": "acd88080184b88090d97ab25cbaaa2e1a3423ac3066dbc7f9bdf41a64ca38277",
+          "ja": "906fe0b2a055e21db58081a1fdd1ad0de1cd453731d0f178a5b0372514ad34af",
+          "ko": "58c28d831239d59081a56a107fd736f0117f9b02f0bc1bd6d845ca516e44b056",
+          "de": "70a56480d0b13fbeb06a05e7f90919ba18bb3050d61c63440faf0de70c78de0d",
+          "es": "355ef3b88c397fc1bac166b55e3b81bfe9dc678ec158f43b74ba91cf1d9b8576",
+          "ms": "7da2f5799a01e5e59fe073aaa975a14bb19735cbe7d618cefb08cc9ac96dddac",
+          "fr": "3918e699e342b8adfbaaab10eb11da113641627a4780b3717ec07511d4750b76",
+          "id": "042fee18effc59e90d8fcfd58ff47205e382c24e1ee88243713ef45f7c733571"
         }
       }
     },
@@ -610,7 +610,7 @@
     },
     {
       "id": "stable_api_error",
-      "contractSource": "apps/dsa-web/src/api/error.ts STABLE_ERROR_TEXT",
+      "contractSource": "apps/dsa-web/src/api/error/catalog.ts STABLE_ERROR_TEXT",
       "translationCodePattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.([^.]+)\\.(?:title|message)$",
       "internalCodes": [
         "agent_chat_failed",

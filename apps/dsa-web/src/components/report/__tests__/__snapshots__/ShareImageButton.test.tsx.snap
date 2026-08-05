@@ -29,6 +29,11 @@ exports[`ShareImageButton > shows localized 413 share_image_content_too_large gu
           <p>
             当前报告有 120000 个字符，超过分享图片上限 100000。可在设置中提高 SHARE_IMAGE_MAX_CHARS，或缩短报告后再试。
           </p>
+          <p
+            class="mt-2 text-sm leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-90"
+          >
+            可在「报告 → 输出」提高 SHARE_IMAGE_MAX_CHARS，或缩短报告内容。
+          </p>
         </div>
       </div>
       <div
@@ -126,6 +131,11 @@ exports[`ShareImageButton > shows timeout guidance when share-image generation t
         >
           <p>
             服务端访问外部依赖时超时，请稍后重试，或检查当前网络与代理设置。
+          </p>
+          <p
+            class="mt-2 text-sm leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-90"
+          >
+            上游服务响应超时。可稍后重试，或检查网络与代理设置。
           </p>
         </div>
       </div>
