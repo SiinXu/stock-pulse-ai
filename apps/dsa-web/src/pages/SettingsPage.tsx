@@ -2300,7 +2300,7 @@ const SettingsPage: React.FC = () => {
                 title={t('settings.alphaSift')}
                 description={t('settings.alphaSiftDescription')}
               >
-                <Surface level="interactive" className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <Surface level="interactive" className="flex flex-col gap-4 px-4 py-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
                       {alphasiftEnabled ? t('settings.alphaSiftEnabled') : t('settings.alphaSiftDisabled')}

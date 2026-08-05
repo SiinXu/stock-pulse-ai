@@ -1529,6 +1529,9 @@ const StockScreeningPage: React.FC = () => {
         title={text.parameters}
         description={selectedStrategyDisplay?.description || text.strategyDescription}
         closeDisabled={loading}
+        showBorder={false}
+        showHeaderDivider={false}
+        showFooterDivider={false}
         footer={(
           <>
             <Button

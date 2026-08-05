@@ -1728,6 +1728,8 @@ describe('LLMChannelEditor', () => {
     const dialog = openAddAfterRender();
     const trigger = within(dialog).getByLabelText('选择模型服务商');
     fireEvent.click(trigger);
+    expect(screen.getByRole('combobox', { name: '搜索选项: 选择模型服务商' }))
+      .toHaveClass('rounded-lg');
     const listbox = screen.getByRole('listbox');
     expect(within(listbox).getByRole('option', { name: /OpenAI 官方.*云端模型服务/ })).toBeInTheDocument();
     expect(within(listbox).getByRole('option', { name: /自定义兼容服务.*自定义模型服务/ })).toBeInTheDocument();
@@ -2099,7 +2101,13 @@ describe('LLMChannelEditor', () => {
     });
     const dialog = editConnectionAfterRender();
     fireEvent.click(within(dialog).getByRole('button', { name: '获取模型' }));
-    expect(await within(dialog).findByText(/模型发现 · 鉴权失败/)).toBeInTheDocument();
+    const discoveryError = await within(dialog).findByText(/模型发现 · 鉴权失败/);
+    expect(discoveryError).toHaveAttribute('role', 'alert');
+    expect(discoveryError.tagName).toBe('P');
+    expect(discoveryError.parentElement).not.toHaveClass('flex', 'items-center');
+    expect(discoveryError.previousElementSibling).toBe(
+      within(dialog).getByRole('button', { name: '获取模型' }),
+    );
     expect(within(dialog).getByRole('button', { name: /手动添加模型/ })).toBeInTheDocument();
   });
 

@@ -22,6 +22,9 @@ export interface ModalProps {
   size?: ModalSize;
   closeDisabled?: boolean;
   closeLabel?: string;
+  showBorder?: boolean;
+  showHeaderDivider?: boolean;
+  showFooterDivider?: boolean;
 }
 
 const MODAL_SIZE_STYLES: Record<ModalSize, string> = {
@@ -42,6 +45,9 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'default',
   closeDisabled = false,
   closeLabel,
+  showBorder = true,
+  showHeaderDivider = true,
+  showFooterDivider = true,
 }) => {
   const { t } = useUiLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -79,15 +85,19 @@ export const Modal: React.FC<ModalProps> = ({
         data-overlay-dialog="true"
         data-modal-size={size}
         className={cn(
-          'flex max-h-[85dvh] min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-2xl focus:outline-none',
-          'max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0',
+          'flex max-h-[85dvh] min-h-0 w-full flex-col overflow-hidden rounded-xl bg-elevated shadow-2xl focus:outline-none',
+          'max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none',
+          showBorder && 'border border-border max-sm:border-x-0 max-sm:border-b-0',
           MODAL_SIZE_STYLES[size],
         )}
         onClick={(event) => event.stopPropagation()}
       >
         <header
           data-overlay-slot="header"
-          className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4"
+          className={cn(
+            'flex shrink-0 items-start justify-between gap-4 px-5 py-4',
+            showHeaderDivider && 'border-b border-border',
+          )}
         >
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-foreground">{title}</h2>
@@ -112,7 +122,10 @@ export const Modal: React.FC<ModalProps> = ({
         {footer ? (
           <footer
             data-overlay-slot="footer"
-            className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-elevated px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+            className={cn(
+              'flex shrink-0 flex-wrap items-center justify-end gap-2 bg-elevated px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]',
+              showFooterDivider && 'border-t border-border',
+            )}
           >
             {footer}
           </footer>

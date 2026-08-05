@@ -313,7 +313,7 @@ const MarketReviewPage: React.FC = () => {
         ) : null}
       </div>
 
-      <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <div className="mt-4 grid min-h-0 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <HistoryList
           className={
             marketReviewHistoryHasMore

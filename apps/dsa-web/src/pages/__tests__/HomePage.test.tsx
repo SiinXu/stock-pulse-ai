@@ -195,7 +195,13 @@ describe('HomePage attention hub', () => {
     const todos = within(core).getByRole('region', { name: 'To-dos' });
     const signalSummary = within(core).getByRole('region', { name: 'Signal summary' });
     const approvals = within(core).getByRole('button', { name: 'Review human approvals' });
-    expect(approvals.parentElement).toHaveClass('flex', 'justify-end');
+    expect(approvals.parentElement).toHaveClass(
+      'order-last',
+      'justify-center',
+    );
+    expect(approvals).toHaveAttribute('data-variant', 'secondary');
+    expect(approvals.parentElement).not.toHaveClass('w-full', '[&>button]:w-full');
+    expect(approvals.parentElement).not.toHaveClass('border-t', 'border-border/70');
     expect(todos).toHaveClass('rounded-xl', 'border', 'border-border');
     expect(todos.querySelector(':scope > div.mt-4')).toHaveClass('flex', 'flex-col', 'gap-3');
     expect(signalSummary).toHaveClass('rounded-xl', 'border', 'border-border');
@@ -265,7 +271,18 @@ describe('HomePage attention hub', () => {
     expect(recentAnalyses).toHaveClass('border', 'border-border');
     expect(within(morningReport).getByText('Market review')).toBeInTheDocument();
     expect(within(recentAnalyses).getByText('Apple')).toBeInTheDocument();
+    expect(recentAnalyses.querySelector(':scope > header .lucide-history')).toBeInTheDocument();
     const scheduled = screen.getByRole('region', { name: 'Versioned scheduled tasks today' });
+    expect(scheduled.parentElement).toHaveClass(
+      '[&>section>header]:rounded-lg',
+      '[&>section>header]:border',
+      '[&>section>header]:border-border',
+      '[&>section>header]:p-3',
+    );
+    expect(scheduled.parentElement).not.toHaveClass(
+      '[&>section>header]:!flex-col',
+      '[&>section>header]:!items-stretch',
+    );
     expect(within(scheduled).getByText('AAPL downside review')).toBeInTheDocument();
     expect(within(scheduled).getByText('Risk check', { exact: false })).toBeInTheDocument();
     expect(within(scheduled).getByText('Waiting to retry')).toBeInTheDocument();
@@ -275,7 +292,18 @@ describe('HomePage attention hub', () => {
     expect(taskList).toHaveAttribute('tabindex', '0');
     expect(within(taskList).getByRole('list')).toBeInTheDocument();
     expect(within(taskList).getAllByRole('listitem')).toHaveLength(1);
-    expect(within(scheduled).getByRole('button', { name: 'Manage schedules' })).toBeInTheDocument();
+    const manageSchedules = within(scheduled).getByRole('button', { name: 'Manage schedules' });
+    expect(scheduled.querySelector(':scope > header')).toContainElement(manageSchedules);
+
+    const viewAllSignals = within(screen.getByRole('region', { name: 'Signal summary' }))
+      .getByRole('button', { name: 'View all' });
+    expect(viewAllSignals).toHaveClass('mx-auto');
+    expect(viewAllSignals.querySelector('svg')).toHaveClass('h-3.5', 'w-3.5');
+
+    const reviewApprovals = screen.getByRole('button', { name: 'Review human approvals' });
+    expect(reviewApprovals).toHaveAttribute('data-variant', 'secondary');
+    expect(reviewApprovals.parentElement).toHaveClass('justify-center');
+    expect(reviewApprovals.parentElement).not.toHaveClass('w-full', '[&>button]:w-full');
 
     for (const reportType of ['market_review', 'simple', 'detailed', 'full', 'brief']) {
       expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({ reportType }));
@@ -283,6 +311,28 @@ describe('HomePage attention hub', () => {
     expect(scheduledTasksApi.getToday).toHaveBeenCalledWith({
       timezone: expect.any(String),
     });
+  });
+
+  it('frames the empty scheduled-task state without changing the shared empty-state component', async () => {
+    window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, '1');
+    vi.mocked(scheduledTasksApi.getToday).mockResolvedValue({
+      date: '2026-07-25',
+      timezone: 'UTC',
+      generatedAt: '2026-07-25T12:00:00Z',
+      items: [],
+      total: 0,
+    });
+
+    renderHome();
+
+    const scheduled = await screen.findByRole('region', { name: 'Versioned scheduled tasks today' });
+    const emptyState = within(scheduled)
+      .getByText('No versioned scheduled tasks today')
+      .closest('[data-state-panel="empty"]');
+    expect(emptyState?.parentElement).toHaveClass('rounded-lg', 'border', 'border-border');
+    expect(emptyState).toContainElement(
+      within(scheduled).getByRole('button', { name: 'Manage schedules' }),
+    );
   });
 
   it('isolates an unavailable scheduled-task projection from other Home data', async () => {

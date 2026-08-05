@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Globe2, RotateCcw } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { Checkbox } from '../common';
 import {
   formatMarketReviewRegionSelection,
   MARKET_REVIEW_REGION_ORDER,
@@ -181,20 +182,19 @@ export const MarketReviewRegionSelector: React.FC<MarketReviewRegionSelectorProp
               {MARKET_REVIEW_REGION_ORDER.map((region) => {
                 const checked = displayedRegions.includes(region);
                 return (
-                  <label
+                  <Checkbox
                     key={region}
-                    className="flex min-h-10 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2 text-sm text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-                  >
-                    <input
-                      type="checkbox"
-                      disabled={disabled}
-                      checked={checked}
-                      onChange={() => toggleRegion(region)}
-                      className="h-4 w-4 rounded border-border accent-primary"
-                    />
-                    <span>{regionLabels[region]}</span>
-                    <span className="ml-auto text-xs uppercase text-muted-text">{region}</span>
-                  </label>
+                    disabled={disabled}
+                    checked={checked}
+                    onChange={() => toggleRegion(region)}
+                    containerClassName="group min-h-10 w-full rounded-xl px-2.5 py-2 transition-colors hover:bg-hover"
+                    label={(
+                      <span className="flex min-w-0 flex-1 items-center gap-3 font-normal text-secondary-text group-hover:text-foreground">
+                        <span>{regionLabels[region]}</span>
+                        <span className="ml-auto text-xs uppercase text-muted-text">{region}</span>
+                      </span>
+                    )}
+                  />
                 );
               })}
             </div>

@@ -1153,7 +1153,7 @@ const ChatPage: React.FC = () => {
       <div
         ref={desktopSessionRailRef}
         tabIndex={-1}
-        className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-subtle bg-card/82 shadow-soft-card xl:flex"
+        className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden xl:flex"
         data-testid="chat-session-rail"
       >
         {sidebarContent}
@@ -1594,7 +1594,7 @@ const ChatPage: React.FC = () => {
                   message={t('chat.followUpLoadingMessage')}
                 />
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-2">
+              <div data-testid="context-compression-settings" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-1">
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-foreground">{t('chat.contextCompression')}</span>
                   <span className="ml-2 text-xs text-muted-text">{t('chat.contextCompressionDescription')}</span>

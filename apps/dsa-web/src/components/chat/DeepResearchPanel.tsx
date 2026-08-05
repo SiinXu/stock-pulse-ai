@@ -2,12 +2,13 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Search, StopCircle } from 'lucide-react';
+import { CircleHelp, Search, StopCircle } from 'lucide-react';
 import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Button, Field, InlineAlert, StatePanel, Surface, Textarea } from '../common';
+import { ApiErrorAlert, Button, InlineAlert, StatePanel, Surface, Textarea, Tooltip } from '../common';
 import { StockAutocomplete } from '../StockAutocomplete';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
 import {
   DEEP_RESEARCH_SESSION_STORAGE_PREFIX,
   readSessionItemWithLegacyLocal,
@@ -69,7 +70,7 @@ interface DeepResearchPanelProps {
 }
 
 export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId }) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   // The panel is remounted per session (keyed by sessionId in the parent), so
   // this reads the persisted run once on mount.
   const initialRun = useMemo(() => loadRun(sessionId), [sessionId]);
@@ -186,23 +187,47 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
           rows={3}
           disabled={running}
         />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} className="w-full sm:min-w-0 sm:flex-1">
-            <StockAutocomplete
-              id="deep-research-stock"
-              value={stockCode}
-              onChange={setStockCode}
-              onSubmit={(code, _name, source, metadata) => {
-                setStockCode(metadata?.displayCode ?? code);
-                if (source !== 'autocomplete') {
-                  formRef.current?.requestSubmit();
-                }
-              }}
-              disabled={running}
-              placeholder={t('research.stockCodeHint')}
-              ariaLabel={t('research.stockCodeLabel')}
-            />
-          </Field>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div data-testid="deep-research-stock-field" className="w-full sm:min-w-0 sm:flex-1">
+            <div className="mb-1.5 flex items-center gap-1">
+              <label htmlFor="deep-research-stock" className="text-xs font-medium text-secondary-text">
+                {t('research.stockCodeLabel')}
+              </label>
+              <Tooltip
+                content={(
+                  <span className="space-y-1">
+                    <span className="block">{STOCK_SEARCH_TEXT[language].suffixExamples}</span>
+                    <span className="block">{STOCK_SEARCH_TEXT[language].manualEntryHint}</span>
+                  </span>
+                )}
+              >
+                <button
+                  type="button"
+                  data-testid="deep-research-stock-help"
+                  aria-label={`${t('research.stockCodeLabel')} · ${t('common.details')}`}
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </Tooltip>
+            </div>
+            <div className="[&>div>p]:sr-only">
+              <StockAutocomplete
+                id="deep-research-stock"
+                value={stockCode}
+                onChange={setStockCode}
+                onSubmit={(code, _name, source, metadata) => {
+                  setStockCode(metadata?.displayCode ?? code);
+                  if (source !== 'autocomplete') {
+                    formRef.current?.requestSubmit();
+                  }
+                }}
+                disabled={running}
+                placeholder={t('research.stockCodeHint')}
+                ariaLabel={t('research.stockCodeLabel')}
+              />
+            </div>
+          </div>
           {running ? (
             <Button type="button" variant="secondary" size="comfortable" onClick={handleCancel}>
               <StopCircle className="h-4 w-4" aria-hidden="true" />

@@ -29,7 +29,12 @@ describe('MarketReviewRegionSelector', () => {
     expect(screen.getByRole('button', { name: '选择大盘复盘市场' })).not.toHaveTextContent('A 股');
     fireEvent.click(screen.getByRole('button', { name: '选择大盘复盘市场' }));
     expect(screen.getByText('由服务器在提交时决定')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /A 股/ })).not.toBeChecked();
+    const cnCheckbox = screen.getByRole('checkbox', { name: /A 股/ });
+    expect(cnCheckbox).not.toBeChecked();
+    expect(cnCheckbox).toHaveClass('shared-checkbox-input');
+    expect(cnCheckbox.parentElement).toContainElement(
+      cnCheckbox.parentElement?.querySelector('.shared-checkbox-control') as HTMLElement,
+    );
     expect(screen.getByRole('checkbox', { name: /美股/ })).not.toBeChecked();
 
     fireEvent.click(screen.getByRole('checkbox', { name: /日股/ }));

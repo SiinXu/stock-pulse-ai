@@ -10,6 +10,27 @@ import {
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import BacktestPage from '../BacktestPage';
 
+vi.mock('../../hooks/useStockIndex', () => ({
+  useStockIndex: () => ({
+    index: [{
+      canonicalCode: '600519.SH',
+      displayCode: '600519',
+      nameZh: '贵州茅台',
+      pinyinFull: 'guizhoumaotai',
+      pinyinAbbr: 'gzmt',
+      aliases: ['茅台'],
+      market: 'CN',
+      assetType: 'stock',
+      active: true,
+      popularity: 100,
+    }],
+    loading: false,
+    error: null,
+    fallback: false,
+    loaded: true,
+  }),
+}));
+
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
@@ -156,8 +177,8 @@ describe('BacktestPage', () => {
     const startDateInput = screen.getByLabelText('分析开始日期');
     const endDateInput = screen.getByLabelText('分析结束日期');
 
-    expect(filterInput).toHaveAttribute('data-control', 'input');
-    expect(filterInput).toHaveAttribute('data-size', 'default');
+    expect(filterInput).toHaveAttribute('role', 'combobox');
+    expect(filterInput).toHaveAttribute('aria-autocomplete', 'none');
     expect(windowInput).toHaveAttribute('data-control', 'input');
     expect(windowInput).toHaveAttribute('data-size', 'default');
     expect(screen.getByRole('button', { name: '筛选' })).toHaveAttribute('data-size', 'primary');
@@ -304,8 +325,8 @@ describe('BacktestPage', () => {
     mockGetResults.mockReturnValueOnce(delayedResults);
     renderEnglishPage();
 
-    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)'))
-      .toHaveAttribute('data-size', 'default');
+    expect(await screen.findByRole('combobox', { name: 'Filter by stock code (leave empty for all)' }))
+      .toHaveAttribute('aria-autocomplete', 'none');
     expect(screen.getByRole('radio', { name: 'Evaluation window' })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
@@ -699,8 +720,32 @@ describe('BacktestPage', () => {
 
     expect(mockRun).not.toHaveBeenCalled();
     expect(windowInput).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('评估窗口必须是 1 到 120 之间的整数')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('评估窗口必须是 1 到 120 之间的整数');
+    expect(screen.getByRole('alert')).toHaveClass('sr-only');
+    expect(screen.queryByTestId('backtest-eval-window-error-help')).not.toBeInTheDocument();
+    expect(windowInput.parentElement?.querySelector('.absolute.inset-y-0.right-0')).not.toBeInTheDocument();
     expect(windowInput).toHaveFocus();
+  });
+
+  it('uses compact fuzzy stock recommendations and filters with the canonical code', async () => {
+    renderPage();
+
+    const filterInput = await screen.findByRole('combobox', { name: '按股票代码筛选（留空表示全部）' });
+    expect(screen.getByTestId('backtest-stock-filter')).toHaveClass('w-64');
+    expect(screen.getByTestId('backtest-stock-filter')).toHaveClass('[&>div>p]:sr-only');
+    expect(filterInput).toHaveClass('h-8', 'min-h-8', 'sm:h-8', 'sm:min-h-8');
+
+    fireEvent.change(filterInput, { target: { value: '茅台' } });
+    const suggestions = await screen.findByRole('listbox');
+    expect(suggestions).toHaveAttribute('data-suggestion-density', 'compact');
+    const suggestion = within(suggestions).getByRole('option');
+    expect(suggestion).toHaveClass('px-2.5', 'py-1.5', 'text-xs');
+    fireEvent.click(within(suggestions).getByText('贵州茅台'));
+
+    await waitFor(() => expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+      code: '600519.SH',
+    })));
+    expect(filterInput).toHaveValue('600519');
   });
 
   it('switches to next-day validation with the 1D shortcut', async () => {
@@ -709,10 +754,14 @@ describe('BacktestPage', () => {
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('radio', { name: '1 日验证' });
     expect(screen.getByRole('radiogroup', { name: '评估窗口' })).toHaveClass(
+      '[&_.segmented-control-tab]:font-medium',
       'dark:!bg-foreground/10',
       'dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground',
       'dark:[&_.segmented-control-tab[aria-checked=true]]:text-background',
       'dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70',
+    );
+    expect(screen.getByRole('button', { name: '筛选' }).parentElement).toHaveClass(
+      'w-full',
     );
     expect(oneDayButton).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: '强制重跑' })).toHaveAttribute('aria-checked', 'false');
@@ -771,6 +820,39 @@ describe('BacktestPage', () => {
       evalWindowDays: 10,
     })));
     expect(screen.getByPlaceholderText('10')).toHaveValue(10);
+  });
+
+  it('explains that Filter refreshes results without running a backtest', async () => {
+    renderPage();
+    const filterButton = await screen.findByRole('button', { name: '筛选' });
+
+    fireEvent.mouseEnter(filterButton.parentElement as HTMLElement);
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('仅筛选下方结果，不会重跑回测');
+    expect(mockRun).not.toHaveBeenCalled();
+  });
+
+  it('keeps expandable run-error diagnostics within the responsive alert width', async () => {
+    mockRun.mockRejectedValueOnce({
+      title: '股票代码无效',
+      message: '请输入有效的股票代码。',
+      rawMessage: '非法股票代码格式: 11\ntrace_id: test-trace',
+      category: 'http_error',
+    });
+    renderPage();
+    const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
+    fireEvent.change(filterInput, { target: { value: '11' } });
+    fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
+
+    const runError = await screen.findByTestId('backtest-run-error');
+    expect(runError).toHaveClass(
+      '[&_details]:w-full',
+      '[&_details]:max-w-full',
+      '[&_pre]:max-w-full',
+      '[&_pre]:overflow-x-auto',
+    );
+    expect(within(runError).getByText('查看详情')).toBeInTheDocument();
+    expect(within(runError).getByText(/trace_id: test-trace/)).toBeInTheDocument();
   });
 
   it('restores applied filters and pagination from the URL', async () => {
