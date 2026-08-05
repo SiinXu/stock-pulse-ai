@@ -345,3 +345,4 @@ def test_http_executor_requires_non_loopback_private_allowlisting(tmp_path: Path
     assert error.value.code == "ollama_access_blocked"
     assert "OUTBOUND_HTTP_ALLOWLIST" in error.value.user_message
     assert "Loopback" in error.value.user_message
+# retrigger-ci
