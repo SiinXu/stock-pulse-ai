@@ -64,7 +64,9 @@ def test_unverified_bind_error_lists_remedies() -> None:
             allow_insecure_public_bind=False,
         )
     message = str(exc_info.value)
-    assert "launcher was not recognized" in message
+    assert "bind target could not be verified as local" in message
+    assert "unrecognized launcher" in message
+    assert "inherited file descriptor" in message
     assert "ADMIN_AUTH_ENABLED" in message
     assert "ALLOW_INSECURE_PUBLIC_BIND=true" in message
 
