@@ -18,27 +18,57 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+from typing import TYPE_CHECKING
+
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
-from api.v1.errors import api_error, error_body
-from api.v1.schemas.analysis import (
-    AnalyzeRequest,
-    AnalysisResultResponse,
-    TaskAccepted,
-    BatchTaskAcceptedResponse,
-    BatchTaskAcceptedItem,
-    BatchDuplicateTaskItem,
-    TaskStatus,
-    TaskInfo,
-    TaskListResponse,
-    DuplicateTaskErrorResponse,
-    MarketReviewRequest,
-    MarketReviewAccepted,
-)
-from api.v1.schemas.history import AnalysisReport
-from api.v1.schemas.run_flow import RunFlowSnapshot
 from data_provider.base import canonical_stock_code, normalize_stock_code
+
+if TYPE_CHECKING:
+    from api.v1.schemas.analysis import (
+        AnalyzeRequest,
+        AnalysisResultResponse,
+        MarketReviewAccepted,
+        MarketReviewRequest,
+        TaskListResponse,
+        TaskStatus,
+    )
+    from api.v1.schemas.run_flow import RunFlowSnapshot
+
+
+def api_error(*args, **kwargs):
+    """Lazy transport error helper — avoids module-level api import edge."""
+    from api.v1.errors import api_error as _api_error
+
+    return _api_error(*args, **kwargs)
+
+
+def error_body(*args, **kwargs):
+    from api.v1.errors import error_body as _error_body
+
+    return _error_body(*args, **kwargs)
+
+
+class _Lazy:
+    """Resolve HTTP schemas only when first used (method-local import edge)."""
+
+    def __getattr__(self, name: str):
+        if name == "AnalysisReport":
+            from api.v1.schemas.history import AnalysisReport as value
+            object.__setattr__(self, name, value)
+            return value
+        if name == "RunFlowSnapshot":
+            from api.v1.schemas.run_flow import RunFlowSnapshot as value
+            object.__setattr__(self, name, value)
+            return value
+        from api.v1.schemas import analysis as analysis_schemas
+        value = getattr(analysis_schemas, name)
+        object.__setattr__(self, name, value)
+        return value
+
+
+_S = _Lazy()
 from src.config import Config
 from src.core.market_review_lock import (
     MarketReviewExecutionLock as _MarketReviewExecutionLock,
@@ -505,7 +535,7 @@ class AnalysisApiService:
             )
 
         accepted = [
-            BatchTaskAcceptedItem(
+            _S.BatchTaskAcceptedItem(
                 task_id=task.task_id,
                 trace_id=self.get_task_trace_id(task),
                 stock_code=task.stock_code,
@@ -518,7 +548,7 @@ class AnalysisApiService:
             for task in accepted_tasks
         ]
         duplicates = [
-            BatchDuplicateTaskItem(
+            _S.BatchDuplicateTaskItem(
                 stock_code=dup.stock_code,
                 existing_task_id=dup.existing_task_id,
                 message=str(dup),
@@ -529,7 +559,7 @@ class AnalysisApiService:
         # Single stock and rejected: maintain 409 compatibility
         if len(stock_codes) == 1 and duplicates:
             dup = duplicates[0]
-            error_response = DuplicateTaskErrorResponse(
+            error_response = _S.DuplicateTaskErrorResponse(
                 error="duplicate_task",
                 message=dup.message,
                 stock_code=dup.stock_code,
@@ -549,7 +579,7 @@ class AnalysisApiService:
     
         # Single stock successful: maintain original response format compatibility
         if len(stock_codes) == 1 and accepted:
-            task_accepted = TaskAccepted(
+            task_accepted = _S.TaskAccepted(
                 task_id=accepted[0].task_id,
                 trace_id=accepted[0].trace_id,
                 status="pending",
@@ -564,7 +594,7 @@ class AnalysisApiService:
             )
     
         # Batch: Return aggregated results
-        batch_response = BatchTaskAcceptedResponse(
+        batch_response = _S.BatchTaskAcceptedResponse(
             accepted=accepted,
             duplicates=duplicates,
             message=f"已提交 {len(accepted)} 个任务，{len(duplicates)} 个重复跳过",
@@ -635,7 +665,7 @@ class AnalysisApiService:
                 fallback_raw_result_payload=raw_result_snapshot or result,
             )
 
-            return AnalysisResultResponse(
+            return _S.AnalysisResultResponse(
                 query_id=query_id,
                 trace_id=result.get("trace_id") or query_id,
                 stock_code=result.get("stock_code", stock_code),
@@ -664,7 +694,7 @@ class AnalysisApiService:
             config: Config,
         ) -> MarketReviewAccepted:
         """Trigger market review from Web/API without blocking the request."""
-        request = request or MarketReviewRequest()
+        request = request or _S.MarketReviewRequest()
 
         runtime_config = self.with_request_report_language(config, request.report_language)
         # Validate region at the endpoint so the allowed set is preserved in the
@@ -720,7 +750,7 @@ class AnalysisApiService:
             self.release_market_review_lock(lock_token)
             raise
 
-        return MarketReviewAccepted(
+        return _S.MarketReviewAccepted(
             status="accepted",
             message="大盘复盘任务已提交，完成后会保存报告并按配置推送通知",
             message_code="task.market_review.queued",
@@ -761,7 +791,7 @@ class AnalysisApiService:
     
         # Convert to Schema
         task_infos = [
-            TaskInfo(
+            _S.TaskInfo(
                 task_id=t.task_id,
                 trace_id=self.get_task_trace_id(t),
                 stock_code=t.stock_code,
@@ -785,7 +815,7 @@ class AnalysisApiService:
             for t in all_tasks
         ]
     
-        return TaskListResponse(
+        return _S.TaskListResponse(
             total=stats["total"],
             pending=stats["pending"],
             processing=stats["processing"],
@@ -1006,7 +1036,7 @@ class AnalysisApiService:
                 display_stock_code=self.display_stock_code_from_index,
             )
 
-        return AnalysisResultResponse.model_validate(payload)
+        return _S.AnalysisResultResponse.model_validate(payload)
 
     def get_analysis_status(self, task_id: str) -> TaskStatus:
         """
@@ -1053,7 +1083,7 @@ class AnalysisApiService:
                             context={"task_id": task.task_id},
                         )
 
-            return TaskStatus(
+            return _S.TaskStatus(
                 task_id=task.task_id,
                 trace_id=self.get_task_trace_id(task),
                 status=task.status.value,
@@ -1105,7 +1135,7 @@ class AnalysisApiService:
                     if not market_review_report and record.news_content:
                         market_review_report = record.news_content
 
-                    return TaskStatus(
+                    return _S.TaskStatus(
                         task_id=task_id,
                         trace_id=task_id,
                         status="completed",
@@ -1129,7 +1159,7 @@ class AnalysisApiService:
                     code=record.code,
                 )
 
-                report_dict = AnalysisReport.model_validate(
+                report_dict = _S.AnalysisReport.model_validate(
                     project_persisted_analysis_report(
                         record,
                         query_id=task_id,
@@ -1146,12 +1176,12 @@ class AnalysisApiService:
                 report_meta = report_dict["meta"]
                 display_stock_code = report_meta["stock_code"]
                 stock_name = report_meta["stock_name"]
-                return TaskStatus(
+                return _S.TaskStatus(
                     task_id=task_id,
                     trace_id=task_id,
                     status="completed",
                     progress=100,
-                    result=AnalysisResultResponse(
+                    result=_S.AnalysisResultResponse(
                         query_id=task_id,
                         trace_id=task_id,
                         stock_code=display_stock_code,
@@ -1247,7 +1277,7 @@ class AnalysisApiService:
                 "zh",
             )
 
-        return AnalysisReport.model_validate(
+        return _S.AnalysisReport.model_validate(
             project_analysis_report(
                 report_data,
                 query_id=query_id,
