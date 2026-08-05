@@ -4,57 +4,42 @@
 股票分析接口
 ===================================
 
-职责：
-1. 提供 POST /api/v1/analysis/analyze 触发分析接口
-2. 提供 GET /api/v1/analysis/status/{task_id} 查询任务状态接口
-3. 提供 GET /api/v1/analysis/tasks 获取任务列表接口
-4. 提供 GET /api/v1/analysis/tasks/stream SSE 实时推送接口
+HTTP layer: auth/deps, DTO validation, status codes, SSE framing, and projection
+into response models. Use-case orchestration lives in
+``src.services.analysis_api_service.AnalysisApiService``.
 
-特性：
-- 异步任务队列：分析任务异步执行，不阻塞请求
-- 防重复提交：相同股票代码正在分析时返回 409
-- SSE 实时推送：任务状态变化实时通知前端
+Private helpers remain importable here as thin facades so existing API tests that
+patch or call ``api.v1.endpoints.analysis.*`` keep working without wire changes.
 """
 
+from __future__ import annotations
+
 import asyncio
-import copy
-import json
 import logging
-import re
-import uuid
-from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Any, Dict, Optional, Union
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, Depends, Query, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.deps import (
     get_config_dep,
     require_security_audit_service,
 )
-from api.v1.errors import api_error, error_body
 from api.v1.schemas.analysis import (
     AnalyzeRequest,
     AnalysisResultResponse,
     TaskAccepted,
     BatchTaskAcceptedResponse,
-    BatchTaskAcceptedItem,
-    BatchDuplicateTaskItem,
     TaskStatus,
-    TaskInfo,
     TaskListResponse,
     DuplicateTaskErrorResponse,
     MarketReviewRequest,
     MarketReviewAccepted,
 )
 from api.v1.schemas.common import ErrorResponse
-from api.v1.schemas.history import (
-    AnalysisReport,
-)
 from api.v1.schemas.run_flow import RunFlowSnapshot
-from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.data.stock_index_loader import resolve_index_stock_code
 from src.config import Config
 from src.core.market_review_lock import (
@@ -66,56 +51,45 @@ from src.core.market_review_lock import (
 from src.core.market_review_runtime import (
     build_market_review_runtime as _runtime_build_market_review_runtime,
 )
-from src.services.stock_code_utils import is_code_like, resolve_index_stock_code_for_analysis
-from src.report_language import normalize_report_language
-from src.services._analysis_report_projection import (
-    normalize_fallback_analysis_report,
-    prepare_analysis_report_for_enrichment,
-    project_analysis_report,
-    project_persisted_analysis_report,
-)
+from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.services.name_to_code_resolver import resolve_name_to_code
-from src.utils.market_review_region import (
-    MARKET_REVIEW_REGION_VALID_INPUTS,
-    normalize_market_review_region_lenient,
-    normalize_market_review_region_strict,
-)
-from src.services.task_queue import (
-    get_task_queue,
-    DuplicateTaskError,
-    public_task_error,
-    public_task_message,
-)
+from src.services.task_queue import get_task_queue
 from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
-from src.services.run_diagnostics import build_run_diagnostic_summary
-from src.services.run_flow import build_task_run_flow_snapshot
-from src.services.security_audit_service import (
-    SecurityAuditRecorder,
-    SecurityAuditService,
-    SecurityAuditUnavailable,
-    require_security_audit_recorder,
-)
-from src.utils.data_processing import (
-    parse_json_field,
-)
-from src.utils.sanitize import log_safe_exception
+from src.services.security_audit_service import SecurityAuditRecorder
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_SUPPORTED_FREE_TEXT_RE = re.compile(r"^[A-Za-z0-9.*\-+\u3400-\u9fff\s]+$")
+
+def _analysis_api_service_cls():
+    """Lazy import to avoid api.v1 package init <-> service circular load."""
+    from src.services.analysis_api_service import AnalysisApiService
+
+    return AnalysisApiService
+
+
+def _analysis_api_service():
+    """Build a service bound to this module's collaborators (patch seams)."""
+    return _analysis_api_service_cls()(
+        get_task_queue=get_task_queue,
+        resolve_name_to_code=resolve_name_to_code,
+        resolve_index_stock_code=resolve_index_stock_code,
+        resolve_index_stock_code_for_analysis=resolve_index_stock_code_for_analysis,
+        load_sync_fundamental_sources=_load_sync_fundamental_sources,
+        build_analysis_report=_build_analysis_report,
+        run_market_review_background=_run_market_review_background,
+        load_history_run_flow_by_query_id=_load_history_run_flow_by_query_id,
+        get_config_instance=Config.get_instance,
+        get_config_dep=get_config_dep,
+        try_acquire_market_review_lock=_try_acquire_market_review_lock,
+        release_market_review_lock=_release_market_review_lock,
+        build_market_review_runtime=_build_market_review_runtime,
+    )
 
 
 def _require_analysis_audit_service(value: object) -> SecurityAuditRecorder:
-    try:
-        return require_security_audit_recorder(value)
-    except SecurityAuditUnavailable:
-        raise api_error(
-            503,
-            "security_audit_unavailable",
-            "Security audit storage is unavailable",
-        ) from None
+    return _analysis_api_service_cls().require_analysis_audit_service(value)
 
 
 def _record_analysis_submission_audit(
@@ -128,52 +102,27 @@ def _record_analysis_submission_audit(
     reason_code: str = "attempt_started",
     metadata: dict[str, Any] | None = None,
 ) -> None:
-    common = dict(
-        event_type="analysis.submit",
-        actor_type="api_client",
-        actor_id="analysis_submitter",
-        execution_id=correlation_id,
-        action="analysis.submit",
-        target_type="stock",
-        target_id=stock_code,
+    return _analysis_api_service_cls().record_analysis_submission_audit(
+        service,
+        phase=phase,
         correlation_id=correlation_id,
-        metadata=metadata or {},
+        stock_code=stock_code,
+        outcome=outcome,
+        reason_code=reason_code,
+        metadata=metadata,
     )
-    try:
-        if phase == "attempt":
-            service.record_attempt(**common)
-        else:
-            service.record_completion(
-                **common,
-                outcome=outcome,
-                reason_code=reason_code,
-            )
-    except SecurityAuditUnavailable:
-        raise api_error(
-            503,
-            "security_audit_unavailable",
-            "Security audit storage is unavailable",
-        )
 
 
 def _get_task_trace_id(task: Any) -> Optional[str]:
-    trace_id = getattr(task, "trace_id", None)
-    if isinstance(trace_id, str) and trace_id.strip():
-        return trace_id
-    task_id = getattr(task, "task_id", None)
-    if isinstance(task_id, str) and task_id.strip():
-        return task_id
-    return None
+    return _analysis_api_service_cls().get_task_trace_id(task)
 
 
 def _get_task_message_code(task: Any, default: str = "task.status") -> str:
-    value = getattr(task, "message_code", None)
-    return value if isinstance(value, str) and value.strip() else default
+    return _analysis_api_service_cls().get_task_message_code(task, default)
 
 
 def _get_task_message_params(task: Any, **fallback: Any) -> Dict[str, Any]:
-    value = getattr(task, "message_params", None)
-    return dict(value) if isinstance(value, dict) else fallback
+    return _analysis_api_service_cls().get_task_message_params(task, **fallback)
 
 
 def _market_review_lock_path(config: Config) -> Path:
@@ -185,14 +134,7 @@ def _build_market_review_runtime(config: Config) -> tuple[Any, Any, Any]:
 
 
 def _with_request_report_language(config: Config, report_language: Optional[str]) -> Config:
-    """Return a request-scoped config copy when the caller overrides report language."""
-    normalized = normalize_report_language(report_language, default="")
-    if not normalized:
-        return config
-
-    scoped_config = copy.copy(config)
-    scoped_config.report_language = normalized
-    return scoped_config
+    return _analysis_api_service_cls().with_request_report_language(config, report_language)
 
 
 def _run_market_review_background(
@@ -202,104 +144,147 @@ def _run_market_review_background(
     config: Optional[Config] = None,
     query_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Run market review after the API response has been accepted."""
-    from src.core.market_review import run_market_review
-
-    runtime_config = config or get_config_dep()
-    try:
-        notifier, analyzer, search_service = _build_market_review_runtime(runtime_config)
-        review_kwargs = {
-            "notifier": notifier,
-            "analyzer": analyzer,
-            "search_service": search_service,
-            "config": runtime_config,
-            "send_notification": send_notification,
-            "override_region": effective_region,
-            "return_structured": True,
-            "trigger_source": "api",
-        }
-        if query_id:
-            review_kwargs["query_id"] = query_id
-        logger.info(
-            "[MarketReview] component=market_review action=background_start "
-            "trigger_source=api task_id=%s region=%s",
-            query_id or "-",
-            effective_region,
-        )
-        report = run_market_review(**review_kwargs)
-        if not report:
-            raise RuntimeError("大盘复盘未返回可持久化报告")
-        if hasattr(report, "report"):
-            return {
-                "result": report.report,
-                "market_review_payload": getattr(report, "market_review_payload", None),
-                "region": effective_region,
-            }
-        return {"result": report, "region": effective_region}
-    finally:
-        _release_market_review_lock(lock_token)
+    return _analysis_api_service_cls()(
+        get_task_queue=get_task_queue,
+        get_config_dep=get_config_dep,
+        try_acquire_market_review_lock=_try_acquire_market_review_lock,
+        release_market_review_lock=_release_market_review_lock,
+        build_market_review_runtime=_build_market_review_runtime,
+    ).run_market_review_background(
+        send_notification,
+        effective_region,
+        lock_token=lock_token,
+        config=config,
+        query_id=query_id,
+    )
 
 
 def _coalesce_text(*values: Any) -> Optional[str]:
-    for value in values:
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            return text
-    return None
+    return _analysis_api_service_cls().coalesce_text(*values)
 
 
-def _invalid_analysis_input_error() -> HTTPException:
-    return api_error(400, "validation_error", "请输入有效的股票代码或股票名称")
+def _invalid_analysis_input_error():
+    return _analysis_api_service_cls().invalid_analysis_input_error()
 
 
 def _is_obviously_invalid_analysis_input(text: str) -> bool:
-    """Reject mixed alphanumeric noise and unsupported symbols early."""
-    if not text or is_code_like(text):
-        return False
-
-    if not _SUPPORTED_FREE_TEXT_RE.fullmatch(text):
-        return True
-
-    has_letters = any(ch.isalpha() and ch.isascii() for ch in text)
-    has_digits = any(ch.isdigit() for ch in text)
-    return has_letters and has_digits
+    return _analysis_api_service_cls().is_obviously_invalid_analysis_input(text)
 
 
 def _resolve_and_normalize_input(raw_value: str) -> str:
-    """
-    Resolve and normalize a stock input for analysis requests.
-
-    Code-like values keep the existing canonical path.
-    Non-code inputs must resolve to a known stock code. Obvious garbage
-    input is rejected before expensive resolver and task-queue work.
-    """
-    text = (raw_value or "").strip()
-    if not text:
-        return ""
-
-    if is_code_like(text):
-        return resolve_index_stock_code_for_analysis(text)
-
-    if text.isdigit() and len(text) == 4:
-        resolved_index_code = resolve_index_stock_code_for_analysis(text)
-        if resolved_index_code != canonical_stock_code(text):
-            return resolved_index_code
-
-    if _is_obviously_invalid_analysis_input(text):
-        raise _invalid_analysis_input_error()
-
-    resolved = resolve_name_to_code(text)
-    if resolved:
-        return canonical_stock_code(resolved)
-
-    raise _invalid_analysis_input_error()
+    return _analysis_api_service().resolve_and_normalize_input(raw_value)
 
 
-# ============================================================
-# POST /analyze - triggers stock analysis
-# ============================================================
+def _handle_async_analysis_batch(
+    stock_codes: list,
+    request: AnalyzeRequest,
+    *,
+    security_audit: SecurityAuditRecorder,
+) -> JSONResponse:
+    return _analysis_api_service().handle_async_analysis_batch(
+        stock_codes,
+        request,
+        security_audit=security_audit,
+    )
+
+
+def _handle_sync_analysis(
+    stock_code: str,
+    request: AnalyzeRequest,
+) -> AnalysisResultResponse:
+    return _analysis_api_service().handle_sync_analysis(stock_code, request)
+
+
+def _format_sse_event(event_type: str, data: Dict[str, Any]) -> str:
+    from src.services.analysis_api_service import format_sse_event
+
+    return format_sse_event(event_type, data)
+
+
+def _load_history_run_flow_by_query_id(
+    query_id: str,
+    *,
+    code: Optional[str] = None,
+    report_type: Optional[str] = None,
+    fail_open: bool = False,
+) -> Optional[RunFlowSnapshot]:
+    return _analysis_api_service_cls()(
+        get_task_queue=get_task_queue,
+        resolve_index_stock_code=resolve_index_stock_code,
+    ).load_history_run_flow_by_query_id(
+        query_id,
+        code=code,
+        report_type=report_type,
+        fail_open=fail_open,
+    )
+
+
+def _safe_task_flow_text(value: Any, *, max_length: int) -> Optional[str]:
+    return _analysis_api_service_cls().safe_task_flow_text(value, max_length=max_length)
+
+
+def _history_report_type_for_task_flow(value: Any) -> Optional[str]:
+    return _analysis_api_service_cls().history_report_type_for_task_flow(value)
+
+
+def _datetime_to_iso(value: Any) -> Optional[str]:
+    return _analysis_api_service_cls().datetime_to_iso(value)
+
+
+def _extract_report_created_at(payload: Dict[str, Any]) -> Optional[str]:
+    return _analysis_api_service().extract_report_created_at(payload)
+
+
+def _display_stock_code_from_index(stock_code: Any) -> str:
+    return _analysis_api_service().display_stock_code_from_index(stock_code)
+
+
+def _prepare_report_for_task_enrichment(
+    report_data: Dict[str, Any],
+    created_at: Optional[str],
+) -> Dict[str, Any]:
+    return _analysis_api_service_cls().prepare_report_for_task_enrichment(
+        report_data, created_at
+    )
+
+
+def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
+    return _analysis_api_service().build_task_analysis_result(task)
+
+
+def _load_sync_fundamental_sources(
+    query_id: str,
+    stock_code: str,
+):
+    return _analysis_api_service_cls()(
+        get_task_queue=get_task_queue,
+        resolve_index_stock_code=resolve_index_stock_code,
+    ).load_sync_fundamental_sources(query_id, stock_code)
+
+
+def _build_analysis_report(
+    report_data: Dict[str, Any],
+    query_id: str,
+    stock_code: str,
+    stock_name: Optional[str] = None,
+    context_snapshot: Optional[Any] = None,
+    fallback_fundamental_payload: Optional[Dict[str, Any]] = None,
+    fallback_raw_result_payload: Optional[Any] = None,
+):
+    return _analysis_api_service_cls()(
+        get_task_queue=get_task_queue,
+        resolve_index_stock_code=resolve_index_stock_code,
+        get_config_instance=Config.get_instance,
+    ).build_analysis_report(
+        report_data,
+        query_id,
+        stock_code,
+        stock_name,
+        context_snapshot=context_snapshot,
+        fallback_fundamental_payload=fallback_fundamental_payload,
+        fallback_raw_result_payload=fallback_raw_result_payload,
+    )
+
 
 @router.post(
     "/analyze",
@@ -323,344 +308,13 @@ def trigger_analysis(
         config: Config = Depends(get_config_dep),
         security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> Union[AnalysisResultResponse, JSONResponse]:
-    """
-    触发股票分析
-    
-    启动 AI 智能分析任务，支持单只或多只股票批量分析
-    
-    流程：
-    1. 校验请求参数
-    2. 异步模式：检查重复 -> 提交任务队列 -> 返回 202
-    3. 同步模式：直接执行分析 -> 返回 200
-    
-    Args:
-        request: 分析请求参数
-        config: 配置依赖
-        
-    Returns:
-        AnalysisResultResponse: 分析结果（同步模式）
-        TaskAccepted | BatchTaskAcceptedResponse: 任务已接受（异步模式，返回 202）
-        
-    Raises:
-        HTTPException: 400 - 请求参数错误
-        HTTPException: 409 - 股票正在分析中
-        HTTPException: 500 - 分析失败
-    """
-    # Validate request parameters
-    stock_codes = []
-    if request.stock_code:
-        stock_codes.append(request.stock_code)
-    if request.stock_codes:
-        stock_codes.extend(request.stock_codes)
-
-    if not stock_codes:
-        raise api_error(400, "validation_error", "必须提供 stock_code 或 stock_codes 参数")
-
-    # Normalize and de-duplicate inputs while preserving compatibility.
-    resolved = [_resolve_and_normalize_input(c) for c in stock_codes]
-    
-    seen = set()
-    unique_codes = []
-    for code in resolved:
-        if not code:
-            continue
-        # Use normalize_stock_code to ensure '600519' and '600519.SH' are merged
-        norm = normalize_stock_code(code)
-        if norm not in seen:
-            seen.add(norm)
-            unique_codes.append(code)
-    
-    stock_codes = unique_codes
-
-    # Limit the number of stocks in a single request to prevent DoS
-    MAX_BATCH_SIZE = 50
-    if len(stock_codes) > MAX_BATCH_SIZE:
-        raise api_error(400, "validation_error", f"单次分析请求最多支持 {MAX_BATCH_SIZE} 只股票")
-
-    if not stock_codes:
-        raise api_error(400, "validation_error", "股票代码不能为空或仅包含空白字符")
-
-    # Sync mode only supports single-stock analysis.
-    if not request.async_mode:
-        if len(stock_codes) > 1:
-            raise api_error(
-                400,
-                "validation_error",
-                "同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析",
-            )
-        return _handle_sync_analysis(stock_codes[0], request)
-
-    # Async mode submits one task per stock.
-    return _handle_async_analysis_batch(
-        stock_codes,
+    """Trigger stock analysis (sync or async)."""
+    return _analysis_api_service().trigger_analysis(
         request,
-        security_audit=_require_analysis_audit_service(security_audit),
+        config=config,
+        security_audit=security_audit,
     )
 
-
-def _handle_async_analysis_batch(
-    stock_codes: list,
-    request: AnalyzeRequest,
-    *,
-    security_audit: SecurityAuditRecorder,
-) -> JSONResponse:
-    """
-    Handle asynchronous analysis requests, including batch submission.
-    """
-    task_queue = get_task_queue()
-    
-    # Preserve metadata for single-stock requests. For batch requests,
-    # only carry through metadata that semantically applies to the whole
-    # batch, such as import/image source tracking.
-    is_single = len(stock_codes) == 1
-    preserve_batch_metadata = request.selection_source in {"import", "image"}
-
-    stock_name = request.stock_name if is_single else None
-    original_query = request.original_query if (is_single or preserve_batch_metadata) else None
-    selection_source = request.selection_source if (is_single or preserve_batch_metadata) else None
-    notify = getattr(request, "notify", True)
-    skills = getattr(request, "skills", None)
-    analysis_phase = request.analysis_phase
-    report_language = normalize_report_language(getattr(request, "report_language", None), default="")
-    use_memory = getattr(request, "use_memory", None)
-
-    submit_kwargs = dict(
-        stock_codes=stock_codes,
-        stock_name=stock_name,
-        original_query=original_query,
-        selection_source=selection_source,
-        report_type=request.report_type,
-        analysis_phase=analysis_phase,
-        force_refresh=request.force_refresh,
-        notify=notify,
-    )
-    if report_language:
-        submit_kwargs["report_language"] = report_language
-    if skills is not None:
-        submit_kwargs["skills"] = skills
-    if use_memory is not None:
-        submit_kwargs["use_memory"] = use_memory
-
-    correlations = {
-        stock_code: SecurityAuditService.new_correlation_id()
-        for stock_code in stock_codes
-    }
-    audit_metadata = {
-        "report_type": request.report_type,
-        "analysis_phase": analysis_phase,
-        "batch_size": len(stock_codes),
-    }
-    for stock_code in stock_codes:
-        _record_analysis_submission_audit(
-            security_audit,
-            phase="attempt",
-            correlation_id=correlations[stock_code],
-            stock_code=stock_code,
-            metadata=audit_metadata,
-        )
-
-    try:
-        accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
-    except Exception:
-        for stock_code in stock_codes:
-            _record_analysis_submission_audit(
-                security_audit,
-                phase="completion",
-                correlation_id=correlations[stock_code],
-                stock_code=stock_code,
-                outcome="failure",
-                reason_code="task_submission_failed",
-                metadata=audit_metadata,
-            )
-        raise
-
-    accepted_codes = {
-        normalize_stock_code(task.stock_code)
-        for task in accepted_tasks
-    }
-    duplicate_codes = {
-        normalize_stock_code(duplicate.stock_code)
-        for duplicate in duplicate_errors
-    }
-    for stock_code in stock_codes:
-        normalized_stock_code = normalize_stock_code(stock_code)
-        if normalized_stock_code in accepted_codes:
-            outcome = "accepted"
-            reason_code = "task_accepted"
-        elif normalized_stock_code in duplicate_codes:
-            outcome = "rejected"
-            reason_code = "duplicate_task"
-        else:
-            outcome = "failure"
-            reason_code = "submission_not_resolved"
-        _record_analysis_submission_audit(
-            security_audit,
-            phase="completion",
-            correlation_id=correlations[stock_code],
-            stock_code=stock_code,
-            outcome=outcome,
-            reason_code=reason_code,
-            metadata=audit_metadata,
-        )
-
-    accepted = [
-        BatchTaskAcceptedItem(
-            task_id=task.task_id,
-            trace_id=_get_task_trace_id(task),
-            stock_code=task.stock_code,
-            status="pending",
-            message=f"分析任务已加入队列: {task.stock_code}",
-            message_code=_get_task_message_code(task, "task.queued"),
-            message_params=_get_task_message_params(task, stock_code=task.stock_code),
-            analysis_phase=task.analysis_phase,
-        )
-        for task in accepted_tasks
-    ]
-    duplicates = [
-        BatchDuplicateTaskItem(
-            stock_code=dup.stock_code,
-            existing_task_id=dup.existing_task_id,
-            message=str(dup),
-        )
-        for dup in duplicate_errors
-    ]
-    
-    # Single stock and rejected: maintain 409 compatibility
-    if len(stock_codes) == 1 and duplicates:
-        dup = duplicates[0]
-        error_response = DuplicateTaskErrorResponse(
-            error="duplicate_task",
-            message=dup.message,
-            stock_code=dup.stock_code,
-            existing_task_id=dup.existing_task_id,
-        )
-        return JSONResponse(
-            status_code=409,
-            content=error_body(
-                error_response.error,
-                error_response.message,
-                params={
-                    "stock_code": error_response.stock_code,
-                    "existing_task_id": error_response.existing_task_id,
-                },
-            ),
-        )
-    
-    # Single stock successful: maintain original response format compatibility
-    if len(stock_codes) == 1 and accepted:
-        task_accepted = TaskAccepted(
-            task_id=accepted[0].task_id,
-            trace_id=accepted[0].trace_id,
-            status="pending",
-            message=accepted[0].message,
-            message_code=_get_task_message_code(accepted[0], "task.queued"),
-            message_params=_get_task_message_params(accepted[0], stock_code=accepted[0].stock_code),
-            analysis_phase=accepted[0].analysis_phase,
-        )
-        return JSONResponse(
-            status_code=202,
-            content=task_accepted.model_dump()
-        )
-    
-    # Batch: Return aggregated results
-    batch_response = BatchTaskAcceptedResponse(
-        accepted=accepted,
-        duplicates=duplicates,
-        message=f"已提交 {len(accepted)} 个任务，{len(duplicates)} 个重复跳过",
-    )
-    return JSONResponse(
-        status_code=202,
-        content=batch_response.model_dump()
-    )
-
-
-def _handle_sync_analysis(
-    stock_code: str,
-    request: AnalyzeRequest
-) -> AnalysisResultResponse:
-    """
-    处理同步分析请求
-    
-    直接执行分析，等待完成后返回结果
-    """
-    import uuid
-    from src.services.analysis_service import (
-        AnalysisService,
-        LLM_NOT_CONFIGURED_ERROR_CODE,
-        is_llm_not_configured_error,
-    )
-    
-    query_id = uuid.uuid4().hex
-    
-    try:
-        service = AnalysisService()
-        result = service.analyze_stock(
-            stock_code=stock_code,
-            report_type=request.report_type,
-            force_refresh=request.force_refresh,
-            query_id=query_id,
-            send_notification=getattr(request, "notify", True),
-            skills=getattr(request, "skills", None),
-            analysis_phase=request.analysis_phase,
-            report_language=getattr(request, "report_language", None),
-            use_memory=getattr(request, "use_memory", None),
-        )
-
-        if result is None:
-            error_message = service.last_error or f"分析股票 {stock_code} 失败"
-            # Known first-run configuration gap: map only this condition to a
-            # stable 422 so clients can show setup guidance instead of a generic 500.
-            if is_llm_not_configured_error(service.last_error_code, error_message):
-                raise api_error(
-                    422,
-                    LLM_NOT_CONFIGURED_ERROR_CODE,
-                    "No LLM model is configured",
-                    params={"stock_code": stock_code},
-                )
-            raise api_error(500, "analysis_failed", error_message)
-
-        # Build report structure
-        report_data = result.get("report", {})
-        context_snapshot, fundamental_snapshot, raw_result_snapshot = _load_sync_fundamental_sources(
-            query_id=query_id,
-            stock_code=result.get("stock_code", stock_code),
-        )
-        report = _build_analysis_report(
-            report_data,
-            query_id,
-            stock_code,
-            result.get("stock_name"),
-            context_snapshot=context_snapshot,
-            fallback_fundamental_payload=fundamental_snapshot,
-            fallback_raw_result_payload=raw_result_snapshot or result,
-        )
-
-        return AnalysisResultResponse(
-            query_id=query_id,
-            trace_id=result.get("trace_id") or query_id,
-            stock_code=result.get("stock_code", stock_code),
-            stock_name=result.get("stock_name"),
-            report=report.model_dump() if report else None,
-            diagnostic_summary=result.get("diagnostic_summary"),
-            created_at=datetime.now().isoformat()
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        log_safe_exception(
-            logger,
-            "Stock analysis failed",
-            e,
-            error_code="internal_error",
-            context={"stock_code": stock_code},
-        )
-        raise api_error(500, "internal_error", f"分析过程发生错误: {str(e)}")
-
-
-# ============================================================
-# POST /market-review - trigger market review
-# ============================================================
 
 @router.post(
     "/market-review",
@@ -679,77 +333,8 @@ def trigger_market_review(
     config: Config = Depends(get_config_dep),
 ) -> MarketReviewAccepted:
     """Trigger market review from Web/API without blocking the request."""
-    request = request or MarketReviewRequest()
+    return _analysis_api_service().trigger_market_review(request, config=config)
 
-    runtime_config = _with_request_report_language(config, request.report_language)
-    # Validate region at the endpoint so the allowed set is preserved in the
-    # public error envelope (Pydantic ctx-backed messages are redacted globally).
-    if request.region is not None:
-        try:
-            effective_region = normalize_market_review_region_strict(request.region)
-        except ValueError as exc:
-            raise api_error(
-                422,
-                "validation_error",
-                str(exc),
-                params={
-                    "field": "region",
-                    "allowed": list(MARKET_REVIEW_REGION_VALID_INPUTS),
-                },
-            ) from exc
-    else:
-        effective_region = (
-            normalize_market_review_region_lenient(runtime_config.market_review_region)
-            or "cn"
-        )
-
-    lock_token = _try_acquire_market_review_lock(runtime_config)
-    if lock_token is None:
-        raise api_error(409, "duplicate_market_review", "大盘复盘正在执行中，请稍后再试")
-
-    try:
-        task_id = uuid.uuid4().hex
-        logger.info(
-            "[MarketReview] component=market_review action=submit trigger_source=api "
-            "task_id=%s region=%s send_notification=%s",
-            task_id,
-            effective_region,
-            request.send_notification,
-        )
-        task = get_task_queue().submit_background_task(
-            lambda: _run_market_review_background(
-                request.send_notification,
-                effective_region=effective_region,
-                lock_token=lock_token,
-                config=runtime_config,
-                query_id=task_id,
-            ),
-            stock_code="market_review",
-            stock_name="大盘复盘",
-            message="大盘复盘任务已提交",
-            task_id=task_id,
-            failure_error_code="analysis_failed",
-            region=effective_region,
-        )
-    except Exception:
-        _release_market_review_lock(lock_token)
-        raise
-
-    return MarketReviewAccepted(
-        status="accepted",
-        message="大盘复盘任务已提交，完成后会保存报告并按配置推送通知",
-        message_code="task.market_review.queued",
-        message_params={},
-        send_notification=request.send_notification,
-        region=effective_region,
-        task_id=task.task_id,
-        trace_id=_get_task_trace_id(task),
-    )
-
-
-# ============================================================
-# GET /tasks - Get the list of tasks
-# ============================================================
 
 @router.get(
     "/tasks",
@@ -770,66 +355,9 @@ def get_task_list(
     ),
     limit: int = Query(20, description="返回数量限制", ge=1, le=100),
 ) -> TaskListResponse:
-    """
-    获取分析任务列表
-    
-    Args:
-        status: 状态筛选（可选）
-        limit: 返回数量限制
-        
-    Returns:
-        TaskListResponse: 任务列表响应
-    """
-    task_queue = get_task_queue()
-    
-    # Get all tasks
-    all_tasks = task_queue.list_all_tasks(limit=limit)
-    
-    # Status filter
-    if status:
-        status_list = [s.strip().lower() for s in status.split(",")]
-        all_tasks = [t for t in all_tasks if t.status.value in status_list]
-    
-    # Statistical information
-    stats = task_queue.get_task_stats()
-    
-    # Convert to Schema
-    task_infos = [
-        TaskInfo(
-            task_id=t.task_id,
-            trace_id=_get_task_trace_id(t),
-            stock_code=t.stock_code,
-            stock_name=t.stock_name,
-            status=t.status.value,
-            progress=t.progress,
-            message=public_task_message(t),
-            message_code=_get_task_message_code(t),
-            message_params=_get_task_message_params(t),
-            report_type=t.report_type,
-            created_at=t.created_at.isoformat(),
-            started_at=t.started_at.isoformat() if t.started_at else None,
-            completed_at=t.completed_at.isoformat() if t.completed_at else None,
-            error=public_task_error(t, default_error_code="analysis_failed"),
-            original_query=t.original_query,
-            selection_source=t.selection_source,
-            analysis_phase=t.analysis_phase,
-            skills=getattr(t, "skills", None),
-            region=getattr(t, "region", None),
-        )
-        for t in all_tasks
-    ]
-    
-    return TaskListResponse(
-        total=stats["total"],
-        pending=stats["pending"],
-        processing=stats["processing"],
-        tasks=task_infos,
-    )
+    """Get the analysis task list."""
+    return _analysis_api_service().get_task_list(status=status, limit=limit)
 
-
-# ============================================================
-# GET /tasks/stream - SSE real-time push
-# ============================================================
 
 @router.get(
     "/tasks/stream",
@@ -840,21 +368,7 @@ def get_task_list(
     description="通过 Server-Sent Events 实时推送任务状态变化"
 )
 async def task_stream():
-    """
-    SSE 任务状态流
-    
-    事件类型：
-    - connected: 连接成功
-    - task_created: 新任务创建
-    - task_started: 任务开始执行
-    - task_progress: 任务阶段进度更新
-    - task_completed: 任务完成
-    - task_failed: 任务失败
-    - heartbeat: 心跳（每 30 秒）
-    
-    Returns:
-        StreamingResponse: SSE 事件流
-    """
+    """SSE task status stream (transport adapter over the process-local queue)."""
     async def event_generator():
         task_queue = get_task_queue()
         stream = task_queue.subscribe_all()
@@ -886,61 +400,16 @@ async def task_stream():
             raise
         finally:
             await stream.aclose()
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable Nginx caching
+            "X-Accel-Buffering": "no",
         }
     )
-
-
-def _format_sse_event(event_type: str, data: Dict[str, Any]) -> str:
-    """
-    格式化 SSE 事件
-    
-    Args:
-        event_type: 事件类型
-        data: 事件数据
-        
-    Returns:
-        SSE 格式字符串
-    """
-    return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
-def _load_history_run_flow_by_query_id(
-    query_id: str,
-    *,
-    code: Optional[str] = None,
-    report_type: Optional[str] = None,
-    fail_open: bool = False,
-) -> Optional[RunFlowSnapshot]:
-    try:
-        from src.storage import DatabaseManager
-        from src.services.history_service import HistoryService
-
-        service = HistoryService(DatabaseManager.get_instance())
-        return service.resolve_and_get_run_flow(
-            query_id,
-            code=code,
-            report_type=report_type,
-        )
-    except Exception as e:
-        if fail_open:
-            log_safe_exception(
-                logger,
-                "History run-flow load failed; falling back to task skeleton",
-                e,
-                error_code="history_run_flow_load_failed",
-                level=logging.DEBUG,
-                context={"query_id": query_id},
-            )
-            return None
-        raise
 
 
 @router.get(
@@ -955,200 +424,9 @@ def _load_history_run_flow_by_query_id(
     description="根据 task_id 查询任务数据流/信息流快照；活跃任务缺少诊断时返回骨架流。",
 )
 def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
-    """
-    查询分析任务运行流。
+    """Query an analysis task run-flow snapshot."""
+    return _analysis_api_service().get_task_run_flow(task_id)
 
-    Active tasks are served from the in-memory task queue. Completed tasks try
-    to hydrate from persisted history diagnostics using the same task_id/query_id.
-    """
-    task_queue = get_task_queue()
-    task = task_queue.get_task(task_id)
-
-    if task:
-        if task.status == TaskStatusEnum.COMPLETED:
-            task_report_type = _history_report_type_for_task_flow(
-                getattr(task, "report_type", None)
-            )
-            task_stock_code = _safe_task_flow_text(getattr(task, "stock_code", None), max_length=32)
-            if task_report_type == "market_review":
-                task_stock_code = "MARKET"
-            history_snapshot = _load_history_run_flow_by_query_id(
-                task_id,
-                code=task_stock_code,
-                report_type=task_report_type,
-                fail_open=True,
-            )
-            if history_snapshot is not None:
-                return history_snapshot
-        return build_task_run_flow_snapshot(task)
-
-    try:
-        history_snapshot = _load_history_run_flow_by_query_id(task_id)
-        if history_snapshot is not None:
-            return history_snapshot
-    except Exception as e:
-        log_safe_exception(
-            logger,
-            "Task run-flow query failed",
-            e,
-            error_code="internal_error",
-            context={"task_id": task_id},
-        )
-        raise api_error(500, "internal_error", f"查询任务运行流失败: {str(e)}")
-
-    raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
-
-
-def _safe_task_flow_text(value: Any, *, max_length: int) -> Optional[str]:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    return text[:max_length]
-
-
-def _history_report_type_for_task_flow(value: Any) -> Optional[str]:
-    text = _safe_task_flow_text(value, max_length=64)
-    if text is None:
-        return None
-    normalized = text.lower().strip().replace("-", "_")
-    aliases = {
-        "detailed": "full",
-        "simple": "simple",
-        "full": "full",
-        "brief": "brief",
-        "market": "market_review",
-        "market_review": "market_review",
-    }
-    return aliases.get(normalized, normalized)
-
-
-def _datetime_to_iso(value: Any) -> Optional[str]:
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, str) and value.strip():
-        return value
-    return None
-
-
-def _extract_report_created_at(payload: Dict[str, Any]) -> Optional[str]:
-    report = payload.get("report")
-    if not isinstance(report, dict):
-        return None
-
-    meta = report.get("meta")
-    if not isinstance(meta, dict):
-        return None
-
-    return _datetime_to_iso(meta.get("created_at"))
-
-
-def _display_stock_code_from_index(stock_code: Any) -> str:
-    code = str(stock_code or "").strip()
-    if not code:
-        return code
-    return resolve_index_stock_code(code) or code
-
-
-def _prepare_report_for_task_enrichment(
-    report_data: Dict[str, Any],
-    created_at: Optional[str],
-) -> Dict[str, Any]:
-    return prepare_analysis_report_for_enrichment(report_data, created_at)
-
-
-def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
-    """
-    Normalize an in-memory completed task result to the public API contract.
-
-    Older AnalysisService payloads contain stock_code/stock_name/report only.
-    The status endpoint owns the task metadata, so it can supply the missing
-    response fields without waiting for the database fallback path.
-    """
-    payload = dict(task.result)
-    if not payload.get("query_id"):
-        payload["query_id"] = task.task_id
-    if not payload.get("trace_id"):
-        payload["trace_id"] = _get_task_trace_id(task) or task.task_id
-    if not payload.get("stock_code"):
-        payload["stock_code"] = task.stock_code
-    display_stock_code = _display_stock_code_from_index(payload.get("stock_code"))
-    if display_stock_code:
-        payload["stock_code"] = display_stock_code
-
-    if not payload.get("stock_name") and getattr(task, "stock_name", None):
-        payload["stock_name"] = task.stock_name
-
-    if not payload.get("created_at"):
-        payload["created_at"] = (
-            _extract_report_created_at(payload)
-            or _datetime_to_iso(getattr(task, "created_at", None))
-            or _datetime_to_iso(getattr(task, "completed_at", None))
-            or datetime.now().isoformat()
-        )
-
-    report_data = payload.get("report")
-    stock_code = payload.get("stock_code")
-    query_id = payload.get("query_id")
-    report_enriched = False
-
-    if isinstance(report_data, dict) and stock_code and query_id:
-        context_snapshot, fundamental_snapshot, raw_result_snapshot = _load_sync_fundamental_sources(
-            query_id=query_id,
-            stock_code=stock_code,
-        )
-        report_task_details = report_data.get("details")
-        report_task_raw_result = (
-            report_task_details.get("raw_result")
-            if isinstance(report_task_details, dict)
-            else None
-        )
-        should_rebuild_report = (
-            context_snapshot is not None
-            or fundamental_snapshot is not None
-            or raw_result_snapshot is not None
-            or report_task_raw_result is not None
-        )
-        if should_rebuild_report:
-            try:
-                report = _build_analysis_report(
-                    _prepare_report_for_task_enrichment(
-                        report_data,
-                        payload.get("created_at"),
-                    ),
-                    query_id,
-                    stock_code,
-                    payload.get("stock_name") or getattr(task, "stock_name", None),
-                    context_snapshot=context_snapshot,
-                    fallback_fundamental_payload=fundamental_snapshot,
-                    fallback_raw_result_payload=raw_result_snapshot or payload,
-                )
-                payload["report"] = report.model_dump()
-                report_enriched = True
-            except Exception as e:
-                log_safe_exception(
-                    logger,
-                    "In-memory task report enrichment failed (fail-open)",
-                    e,
-                    error_code="task_report_enrichment_failed",
-                    level=logging.DEBUG,
-                    context={"task_id": getattr(task, "task_id", None)},
-                )
-
-    if not report_enriched and isinstance(report_data, dict):
-        payload["report"] = normalize_fallback_analysis_report(
-            report_data,
-            stock_code=payload.get("stock_code") or getattr(task, "stock_code", None),
-            display_stock_code=_display_stock_code_from_index,
-        )
-
-    return AnalysisResultResponse.model_validate(payload)
-
-
-# ============================================================
-# GET /status/{task_id} - Query the status of a single task
-# ============================================================
 
 @router.get(
     "/status/{task_id}",
@@ -1161,261 +439,5 @@ def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
     description="根据 task_id 查询单个任务的状态"
 )
 def get_analysis_status(task_id: str) -> TaskStatus:
-    """
-    查询分析任务状态
-    
-    优先从任务队列查询，如果不存在则从数据库查询历史记录
-    
-    Args:
-        task_id: 任务 ID
-        
-    Returns:
-        TaskStatus: 任务状态信息
-        
-    Raises:
-        HTTPException: 404 - 任务不存在
-    """
-    # 1. Query from task queue first
-    task_queue = get_task_queue()
-    task = task_queue.get_task(task_id)
-    
-    if task:
-        result: Optional[AnalysisResultResponse] = None
-        market_review_report = None
-        market_review_payload = None
-
-        if task.status == TaskStatusEnum.COMPLETED and isinstance(task.result, dict):
-            if task.stock_code == "market_review":
-                report_text = task.result.get("result")
-                if isinstance(report_text, str) and report_text.strip():
-                    market_review_report = report_text
-                payload = task.result.get("market_review_payload")
-                if isinstance(payload, dict):
-                    market_review_payload = payload
-            else:
-                try:
-                    result = _build_task_analysis_result(task)
-                except Exception as exc:
-                    log_safe_exception(
-                        logger,
-                        "Task result parsing failed; returning an empty result",
-                        exc,
-                        error_code="task_result_parse_failed",
-                        level=logging.WARNING,
-                        context={"task_id": task.task_id},
-                    )
-
-        return TaskStatus(
-            task_id=task.task_id,
-            trace_id=_get_task_trace_id(task),
-            status=task.status.value,
-            progress=task.progress,
-            message=public_task_message(task),
-            message_code=_get_task_message_code(task),
-            message_params=_get_task_message_params(task),
-            result=result,
-            market_review_report=market_review_report,
-            market_review_payload=market_review_payload,
-            region=getattr(task, "region", None),
-            error=public_task_error(task, default_error_code="analysis_failed"),
-            stock_name=task.stock_name,
-            original_query=task.original_query,
-            selection_source=task.selection_source,
-            analysis_phase=task.analysis_phase,
-            skills=getattr(task, "skills", None),
-        )
-    
-    # 2. Query completed records from database.
-    try:
-        from src.storage import DatabaseManager
-        db = DatabaseManager.get_instance()
-        records = db.get_analysis_history(query_id=task_id, limit=1)
-
-        if records:
-            record = records[0]
-            raw_result = parse_json_field(record.raw_result)
-            if getattr(record, "report_type", None) == "market_review":
-                market_review_report = None
-                context_snapshot = parse_json_field(getattr(record, "context_snapshot", None))
-                market_review_payload = None
-                region = None
-                if isinstance(context_snapshot, dict):
-                    raw_region = context_snapshot.get("market_review_region")
-                    if isinstance(raw_region, str) and raw_region.strip():
-                        region = raw_region.strip()
-                    payload = context_snapshot.get("market_review_payload")
-                    if isinstance(payload, dict):
-                        market_review_payload = payload
-                        if region is None:
-                            payload_region = payload.get("region")
-                            if isinstance(payload_region, str) and payload_region.strip():
-                                region = payload_region.strip()
-                if isinstance(raw_result, dict):
-                    report_text = raw_result.get("raw_response") or raw_result.get("market_review_report")
-                    if isinstance(report_text, str) and report_text.strip():
-                        market_review_report = report_text
-                if not market_review_report and record.news_content:
-                    market_review_report = record.news_content
-
-                return TaskStatus(
-                    task_id=task_id,
-                    trace_id=task_id,
-                    status="completed",
-                    progress=100,
-                    result=None,
-                    market_review_report=market_review_report,
-                    market_review_payload=market_review_payload,
-                    region=region,
-                    error=None,
-                    stock_name=record.name,
-                )
-
-            skills = None
-            context_snapshot = parse_json_field(getattr(record, 'context_snapshot', None))
-            if context_snapshot and isinstance(context_snapshot, dict):
-                raw_skills = context_snapshot.get("skills")
-                if isinstance(raw_skills, list):
-                    skills = [str(skill) for skill in raw_skills]
-            fallback_fundamental = db.get_latest_fundamental_snapshot(
-                query_id=task_id,
-                code=record.code,
-            )
-
-            report_dict = AnalysisReport.model_validate(
-                project_persisted_analysis_report(
-                    record,
-                    query_id=task_id,
-                    context_snapshot=context_snapshot,
-                    raw_result=raw_result,
-                    fallback_fundamental_payload=fallback_fundamental,
-                    display_stock_code=_display_stock_code_from_index,
-                    log_context={
-                        "task_id": task_id,
-                        "path": "get_analysis_status",
-                    },
-                )
-            ).model_dump()
-            report_meta = report_dict["meta"]
-            display_stock_code = report_meta["stock_code"]
-            stock_name = report_meta["stock_name"]
-            return TaskStatus(
-                task_id=task_id,
-                trace_id=task_id,
-                status="completed",
-                progress=100,
-                result=AnalysisResultResponse(
-                    query_id=task_id,
-                    trace_id=task_id,
-                    stock_code=display_stock_code,
-                    stock_name=stock_name,
-                    report=report_dict,
-                    diagnostic_summary=build_run_diagnostic_summary(
-                        context_snapshot=context_snapshot,
-                        raw_result=raw_result,
-                        report_saved=True,
-                        query_id=task_id,
-                        stock_code=display_stock_code,
-                    ),
-                    created_at=record.created_at.isoformat() if record.created_at else datetime.now().isoformat()
-                ),
-                error=None,
-                skills=skills,
-            )
-
-    except Exception as e:
-        log_safe_exception(
-            logger,
-            "Task status query failed",
-            e,
-            error_code="internal_error",
-            context={"task_id": task_id},
-        )
-        raise api_error(500, "internal_error", f"查询任务状态失败: {str(e)}")
-
-    # 3. Task does not exist
-    raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
-
-
-# ============================================================
-# Helper function
-# ============================================================
-
-def _load_sync_fundamental_sources(
-    query_id: str,
-    stock_code: str,
-) -> tuple[Optional[Any], Optional[Dict[str, Any]], Optional[Any]]:
-    """
-    Load report enrichment payloads for sync analyze response.
-    """
-    try:
-        from src.storage import DatabaseManager
-
-        db = DatabaseManager.get_instance()
-        records = db.get_analysis_history(query_id=query_id, code=stock_code, limit=1)
-        context_snapshot = None
-        raw_result_snapshot = None
-        if records:
-            latest_record = records[0]
-            context_snapshot = parse_json_field(getattr(latest_record, "context_snapshot", None))
-            raw_result_snapshot = parse_json_field(getattr(latest_record, "raw_result", None))
-
-        fallback_fundamental = db.get_latest_fundamental_snapshot(
-            query_id=query_id,
-            code=stock_code,
-        )
-        return context_snapshot, fallback_fundamental, raw_result_snapshot
-    except Exception as e:
-        log_safe_exception(
-            logger,
-            "Synchronous fundamental source load failed (fail-open)",
-            e,
-            error_code="fundamental_source_load_failed",
-            level=logging.DEBUG,
-            context={"query_id": query_id, "stock_code": stock_code},
-        )
-        return None, None, None
-
-
-def _build_analysis_report(
-    report_data: Dict[str, Any],
-    query_id: str,
-    stock_code: str,
-    stock_name: Optional[str] = None,
-    context_snapshot: Optional[Any] = None,
-    fallback_fundamental_payload: Optional[Dict[str, Any]] = None,
-    fallback_raw_result_payload: Optional[Any] = None,
-) -> AnalysisReport:
-    """Compatibility facade for callers and patch seams outside the endpoint."""
-
-    report_meta = report_data.get("meta")
-    explicit_report_language = (
-        report_meta.get("report_language")
-        if isinstance(report_meta, Mapping)
-        else None
-    ) or (
-        context_snapshot.get("report_language")
-        if isinstance(context_snapshot, Mapping)
-        else None
-    )
-    default_report_language = None
-    if not explicit_report_language:
-        default_report_language = getattr(
-            Config.get_instance(),
-            "report_language",
-            "zh",
-        )
-
-    return AnalysisReport.model_validate(
-        project_analysis_report(
-            report_data,
-            query_id=query_id,
-            stock_code=stock_code,
-            stock_name=stock_name,
-            context_snapshot=context_snapshot,
-            fallback_fundamental_payload=fallback_fundamental_payload,
-            fallback_raw_result_payload=fallback_raw_result_payload,
-            default_report_language=default_report_language,
-            display_stock_code=_display_stock_code_from_index,
-            log_context={"path": "_build_analysis_report"},
-        )
-    )
+    """Query analysis task status from the queue, then history."""
+    return _analysis_api_service().get_analysis_status(task_id)
