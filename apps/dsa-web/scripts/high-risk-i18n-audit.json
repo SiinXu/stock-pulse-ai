@@ -490,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 112,
-        "keySetSha256": "9c5aaa83de0be8bf73efc381737a8a98a065ee76ccca4ede4b5f6b5abdbb7df2",
+        "keyCount": 118,
+        "keySetSha256": "302c4ff2373465d61926b228e42ed7e72b8336105570206b69aaa97e636a041f",
         "bundleSha256": {
-          "zh": "43e9423a1f4ea484be19cff264b32131b29b567fb88908a2b58cc8b9eb6e818e",
-          "zh-TW": "6af27f6ed0167fc546e02f5f6c951bb7d68920f807deef47477d2f369477d318",
-          "en": "726d3bf75b0f7148ca07b1d3566ba9cbc1cec5c4c5b84338e30c9e385aa3e8ff",
-          "ja": "d023f1da4463548c9db8cd6cd1175e12ee7e0187b4666611ddc843bd73891838",
-          "ko": "d8f3158a506982f8fc035606ab9dc32c59ca513c8dc4fdb6de9f07f96c2eb69d",
-          "de": "ab91c373da25920ec9e582a53be9a2ac8cea9caec80b0e211068b95607080b38",
-          "es": "27a1d7f2e5fdf051aae32b0d774478207d283484994b7efc5bce5bcd1a072330",
-          "ms": "49fdd04fdc3429d8c6396f58a0ad83ceac86e21cb682eee3b0d8626c35f9186a",
-          "fr": "8848a8f0a98a702f901168d8b9f5367a51d3e680da5d9f19e0c85206b0a82df4",
-          "id": "ead26ae12983275c433e79830b817bad6d41fdbee5c17035b2fcf68d20287cc1"
+          "zh": "4e3c9fe2a793cf22c71b9962872608b621d2cc9c299c97acd72be223347e46f1",
+          "zh-TW": "102ce5dc0c690515102646677a903ead4b0f30e4f39a7377fb5ff527623438ff",
+          "en": "f41a32aaaf042ed39135c3dee462a3d8c1b3b3b71d6fb06dba5938de7ce4cbf8",
+          "ja": "2264b5da3deb7670bea74230266a08d094e48439555bb1c53c375eec7ce10b3a",
+          "ko": "3965c847437268800a4d3e7b1cef9b1b258a9e3fe5b3825552469f668df3d234",
+          "de": "5b151ba5a81824c4939e48f92d6ed99d05aff1f3b9285c3a43b5ca3e7983bc8d",
+          "es": "8e2b878e3bf61172a26eaeb6eeb794737969ed511cb467967fa8f5882c693869",
+          "ms": "782c965279f2c20ece72fade66d139fcc9edc7ba124287ef4981edbf77d56875",
+          "fr": "4d5e45d89c6a5b168d37f72a9c4c1927e579164e8f5f1d6896e27181a6979d49",
+          "id": "c10e851a226bc1c41a0cab3b626f2500925c7ec382ce23ad1a251e3ff48981a2"
         }
       }
     },
@@ -623,6 +623,7 @@
         "alphasift_screen_task_not_found",
         "alphasift_unavailable",
         "analysis_failed",
+        "api_response_validation_failed",
         "approval_auth_required",
         "auth_disabled",
         "config_conflict",
@@ -652,6 +653,8 @@
         "scheduler_busy",
         "security_audit_auth_required",
         "security_audit_unavailable",
+        "share_image_content_too_large",
+        "share_image_unavailable",
         "unauthorized",
         "unsupported_alert_type",
         "validation_error",
@@ -697,6 +700,10 @@
         "analysis_failed": [
           "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
           "api.error.STABLE_ERROR_TEXT.analysis_failed.message"
+        ],
+        "api_response_validation_failed": [
+          "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title",
+          "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message"
         ],
         "approval_auth_required": [
           "api.error.STABLE_ERROR_TEXT.approval_auth_required.title",
@@ -754,6 +761,10 @@
           "api.error.STABLE_ERROR_TEXT.invalid_password.title",
           "api.error.STABLE_ERROR_TEXT.invalid_password.message"
         ],
+        "llm_not_configured": [
+          "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
+          "api.error.STABLE_ERROR_TEXT.llm_not_configured.message"
+        ],
         "no_channels": [
           "api.error.STABLE_ERROR_TEXT.no_channels.title",
           "api.error.STABLE_ERROR_TEXT.no_channels.message"
@@ -810,6 +821,14 @@
           "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
           "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message"
         ],
+        "share_image_content_too_large": [
+          "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title",
+          "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message"
+        ],
+        "share_image_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message"
+        ],
         "unauthorized": [
           "api.error.STABLE_ERROR_TEXT.unauthorized.title",
           "api.error.STABLE_ERROR_TEXT.unauthorized.message"
@@ -825,10 +844,6 @@
         "validation_failed": [
           "api.error.STABLE_ERROR_TEXT.validation_failed.title",
           "api.error.STABLE_ERROR_TEXT.validation_failed.message"
-        ],
-        "llm_not_configured": [
-          "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
-          "api.error.STABLE_ERROR_TEXT.llm_not_configured.message"
         ]
       }
     },

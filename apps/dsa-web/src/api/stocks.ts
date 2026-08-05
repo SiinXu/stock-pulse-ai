@@ -62,11 +62,12 @@ const stockHistoryCandleSchema = z.object({
   changePercent: z.number().nullable().optional(),
 }).passthrough();
 
+// OpenAPI StockHistoryResponse.required = ["stock_code","period"]; data is optional.
 const stockHistoryResponseSchema = z.object({
   stockCode: z.string(),
   stockName: z.string().nullable().optional(),
   period: z.string(),
-  data: z.array(stockHistoryCandleSchema),
+  data: z.array(stockHistoryCandleSchema).optional(),
 }).passthrough();
 
 function parseCamelCasePayload<T>(
@@ -81,13 +82,18 @@ function parseCamelCasePayload<T>(
       .slice(0, 5)
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ');
+    if (import.meta.env.DEV) {
+      console.error(`[stocks] response validation failed (${label})`, result.error.issues);
+    }
     throw createApiError(
       createParsedApiError({
+        // Title/message are localized via STABLE_ERROR_TEXT[code] + params.
         title: '响应校验失败',
-        message: `API response failed validation (${label}). ${issueSummary}`,
+        message: `接口响应未通过校验（${label}）。${issueSummary}`,
         rawMessage: result.error.message,
         category: 'unknown',
         code: 'api_response_validation_failed',
+        params: { label, issues: issueSummary },
         details: result.error.issues,
       }),
     );
@@ -124,11 +130,16 @@ export const stocksApi = {
       `/api/v1/stocks/${toStockCodePath(stockCode)}/history`,
       { params: { period: 'daily', days } },
     );
-    return parseCamelCasePayload<StockHistoryResponse>(
+    const history = parseCamelCasePayload<StockHistoryResponse>(
       response.data,
       stockHistoryResponseSchema,
       'StockHistoryResponse',
     );
+    // OpenAPI marks data optional; consumers always expect an array.
+    if (!Array.isArray(history.data)) {
+      return { ...history, data: [] };
+    }
+    return history;
   },
 
   async extractFromImage(file: File): Promise<ExtractFromImageResponse> {

@@ -50,6 +50,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift ist nicht verfügbar",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "Die Analyse wurde nicht abgeschlossen; bitte überprüfen Sie die Konfiguration und versuchen Sie es erneut.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "Analyse fehlschlug",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "API-Antwort hat die Validierung nicht bestanden ({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "Antwortvalidierung fehlgeschlagen",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message": "Dieser Bericht hat {actual} Zeichen und überschreitet das Share-Image-Limit von {limit}. Erhöhen Sie SHARE_IMAGE_MAX_CHARS in den Einstellungen oder kürzen Sie den Bericht und versuchen Sie es erneut.",
+  "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title": "Bericht ist zu lang für ein Share-Image",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message": "Prüfen Sie, ob das Bild-Rendering-Tool installiert und verfügbar ist. Für Playwright: cd apps/dsa-web && npm ci && npx playwright install chromium.",
+  "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title": "Share-Image-Renderer nicht verfügbar",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "Der Passwort-Login ist für diesen Dienst nicht aktiviert.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "Passwort-Login nicht aktiviert",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "Die Serverkonfiguration hat sich geändert. Aktualisieren Sie und wenden Sie Ihre Änderungen erneut an.",
@@ -3690,6 +3696,14 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_ALERT_CHANNELS": "Benachrichtigungskanäle für Alarme",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_COOLDOWN_SECONDS": "Abklingzeit für Benachrichtigungen (Sekunden)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DAILY_DIGEST_ENABLED": "Tägliche Benachrichtigungsübersicht aktiviert (reserviert)",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.impact.0": "Betrifft die Ein-Klick-Share-Image-Erzeugung im Web.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.notes.0": "Erhöhen Sie den Wert nur, wenn Sie bewusst größere Markdown-Eingaben erlauben.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.summary": "Maximale Markdown-Länge für die History-Share-Image-API.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.title": "Maximale Zeichenanzahl für Share-Images",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.usage": "Gilt nur für GET /api/v1/history/{id}/share-image. Längere Berichte liefern HTTP 413 share_image_content_too_large mit limit/actual in params.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.0": "Standard 100000 deckt ausführliche Berichte und Multi-Markt-Reviews ab.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.valueNotes.1": "Unabhängig von MARKDOWN_TO_IMAGE_MAX_CHARS (IM-Benachrichtigungsbilder bleiben bei 15000).",
+  "utils.systemConfigI18n.fieldTitleMaps.SHARE_IMAGE_MAX_CHARS": "Maximale Zeichenanzahl für Share-Images",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DEDUP_TTL_SECONDS": "Deduplizierungs-TTL für Benachrichtigungen (Sekunden)",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_MIN_SEVERITY": "Mindestschweregrad für Benachrichtigungen",
   "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_QUIET_HOURS": "Ruhezeiten für Benachrichtigungen",
@@ -4343,33 +4357,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Ein Entscheidungsbaum kann höchstens {limit} Knoten enthalten.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Ein Framework kann höchstens {limit} Risikoregeln enthalten.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Ein Framework kann höchstens {limit} Trackingkriterien enthalten.",
-  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "Alle Märkte",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-Aktien",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Wird beim Absenden vom Server festgelegt",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Wählen Sie einen oder mehrere Märkte für diese Marktüberprüfung.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
+  "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hongkong",
 
   "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
 
   "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Gilt nur für diesen Lauf und ändert keine globalen Einstellungen.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Märkte für die Marktüberprüfung wählen",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Serverstandard",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Märkte für diese Überprüfung",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "USA",
 
-  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effektiver Markt: {region}",
 
-  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Aufgabenstatus: {status} ({progress}); effektiver Markt: {region}",
 
   "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Geben Sie vor dem Deaktivieren der Authentifizierung das aktuelle Admin-Passwort ein"
 };

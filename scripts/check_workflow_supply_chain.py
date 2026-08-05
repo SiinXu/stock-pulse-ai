@@ -173,6 +173,7 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/ci.yml", "openapi-types-gate", "contents", "read"),
         (".github/workflows/ci.yml", "web-gate", "contents", "read"),
         (".github/workflows/ci.yml", "web-e2e", "contents", "read"),
+        (".github/workflows/ci.yml", "api-real-client", "contents", "read"),
         (".github/workflows/create-release.yml", "release", "contents", "write"),
         (".github/workflows/desktop-release.yml", "build-windows", "contents", "read"),
         (".github/workflows/desktop-release.yml", "build-macos", "contents", "read"),
