@@ -139,12 +139,20 @@ class SystemConfigApiTestCase(unittest.TestCase):
             security_audit=self.security_audit,
         )
 
+    def _export_system_config(self, **kwargs):
+        kwargs.setdefault("security_audit", self.security_audit)
+        return system_config.export_system_config(**kwargs)
+
+    def _import_system_config(self, **kwargs):
+        kwargs.setdefault("security_audit", self.security_audit)
+        return system_config.import_system_config(**kwargs)
+
     def _build_client_app(self) -> FastAPI:
         app = FastAPI()
 
         @app.get("/api/v1/system/config/export")
         async def export_config(request: Request):
-            return system_config.export_system_config(request=request, service=self.service)
+            return system_config.export_system_config(request=request, service=self.service, security_audit=self.security_audit)
 
         add_error_handlers(app)
         add_auth_middleware(app)
@@ -1031,7 +1039,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.service = SystemConfigService(manager=self.manager)
         Config.reset_instance()
 
-        payload = system_config.export_system_config(
+        payload = self._export_system_config(
             request=self._build_request(),
             service=self.service,
         ).model_dump()
@@ -1045,7 +1053,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
     def test_import_system_config_merges_updates(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
-        payload = system_config.import_system_config(
+        payload = self._import_system_config(
             request_obj=self._build_request(),
             request=ImportSystemConfigRequest(
                 config_version=current["config_version"],
@@ -1065,7 +1073,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
         with self.assertRaises(HTTPException) as context:
-            system_config.import_system_config(
+            self._import_system_config(
                 request_obj=self._build_request(),
                 request=ImportSystemConfigRequest(
                     config_version=current["config_version"],
@@ -1086,7 +1094,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
     def test_import_system_config_allows_unchanged_admin_auth_setting(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
-        payload = system_config.import_system_config(
+        payload = self._import_system_config(
             request_obj=self._build_request(),
             request=ImportSystemConfigRequest(
                 config_version=current["config_version"],
@@ -1103,7 +1111,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
     def test_import_export_system_config_preserves_generation_backend_keys(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
-        payload = system_config.import_system_config(
+        payload = self._import_system_config(
             request_obj=self._build_request(),
             request=ImportSystemConfigRequest(
                 config_version=current["config_version"],
@@ -1117,7 +1125,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             ),
             service=self.service,
         ).model_dump()
-        export_payload = system_config.export_system_config(
+        export_payload = self._export_system_config(
             request=self._build_request(),
             service=self.service,
         ).model_dump()
@@ -1130,7 +1138,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_import_system_config_returns_conflict_when_version_is_stale(self) -> None:
         with self.assertRaises(HTTPException) as context:
-            system_config.import_system_config(
+            self._import_system_config(
                 request_obj=self._build_request(),
                 request=ImportSystemConfigRequest(
                     config_version="stale-version",
@@ -1147,7 +1155,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
         with self.assertRaises(HTTPException) as context:
-            system_config.import_system_config(
+            self._import_system_config(
                 request_obj=self._build_request(),
                 request=ImportSystemConfigRequest(
                     config_version=current["config_version"],
@@ -1164,7 +1172,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
         with self.assertRaises(HTTPException) as context:
-            system_config.import_system_config(
+            self._import_system_config(
                 request_obj=self._build_request(),
                 request=ImportSystemConfigRequest(
                     config_version=current["config_version"],
@@ -1181,11 +1189,11 @@ class SystemConfigApiTestCase(unittest.TestCase):
         with patch.dict(os.environ, {"DSA_DESKTOP_MODE": "false"}, clear=False):
             current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
-            export_payload = system_config.export_system_config(
+            export_payload = self._export_system_config(
                 request=self._build_request(),
                 service=self.service,
             ).model_dump()
-            import_payload = system_config.import_system_config(
+            import_payload = self._import_system_config(
                 request_obj=self._build_request(),
                 request=ImportSystemConfigRequest(
                     config_version=current["config_version"],
@@ -1225,7 +1233,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
             with self.assertRaises(HTTPException) as export_ctx:
-                system_config.export_system_config(
+                self._export_system_config(
                     request=self._build_request(),
                     service=self.service,
                 )
@@ -1233,7 +1241,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             self.assertEqual(export_ctx.exception.detail["error"], "env_backup_access_denied")
 
             with self.assertRaises(HTTPException) as import_ctx:
-                system_config.import_system_config(
+                self._import_system_config(
                     request_obj=self._build_request(),
                     request=ImportSystemConfigRequest(
                         config_version=current["config_version"],
@@ -1254,12 +1262,12 @@ class SystemConfigApiTestCase(unittest.TestCase):
             invalid_request = self._build_request({system_config.COOKIE_NAME: "invalid-session"})
 
             with self.assertRaises(HTTPException) as export_ctx:
-                system_config.export_system_config(request=invalid_request, service=self.service)
+                self._export_system_config(request=invalid_request, service=self.service)
             self.assertEqual(export_ctx.exception.status_code, 401)
             self.assertEqual(export_ctx.exception.detail["error"], "env_backup_access_denied")
 
             with self.assertRaises(HTTPException) as import_ctx:
-                system_config.import_system_config(
+                self._import_system_config(
                     request_obj=invalid_request,
                     request=ImportSystemConfigRequest(
                         config_version=current["config_version"],
@@ -1295,7 +1303,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             Config.reset_instance()
 
             with self.assertRaises(HTTPException) as export_ctx:
-                system_config.export_system_config(
+                self._export_system_config(
                     request=self._build_request(),
                     service=self.service,
                 )
@@ -1308,7 +1316,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         with patch.object(self.service, "export_env", side_effect=PermissionError("read denied")):
             with self.assertRaises(HTTPException) as export_ctx:
-                system_config.export_system_config(
+                self._export_system_config(
                     request=self._build_request(),
                     service=self.service,
                 )
@@ -1318,7 +1326,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         with patch.object(self.service, "import_env", side_effect=PermissionError("write denied")):
             with self.assertRaises(HTTPException) as import_ctx:
-                system_config.import_system_config(
+                self._import_system_config(
                     request_obj=self._build_request(),
                     request=ImportSystemConfigRequest(
                         config_version=current["config_version"],
