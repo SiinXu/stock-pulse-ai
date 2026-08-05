@@ -990,7 +990,12 @@ def export_system_config(
             reason_code="config_export_failed",
             metadata=audit_metadata,
         )
-        _log_config_exception("System configuration export failed", exc)
+        log_safe_exception(
+            logger,
+            "System configuration export failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={
