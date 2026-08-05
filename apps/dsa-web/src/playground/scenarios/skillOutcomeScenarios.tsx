@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+/* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
 import type { PlaygroundScenarioRenderer } from '../types';
 import {
   SkillOutcomePerformanceTable,
