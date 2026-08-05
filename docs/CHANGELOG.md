@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
