@@ -1,4 +1,6 @@
+import axios from 'axios';
 import apiClient, { locallyRecoverableResourceConfig } from './index';
+import { createApiError, getParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type {
   HistoryListResponse,
@@ -11,6 +13,41 @@ import type {
   StockBarResponse,
 } from '../types/analysis';
 import type { RunFlowSnapshot } from '../types/runFlow';
+
+// Cold Playwright / wkhtml renders of full history reports routinely exceed the
+// global 30s axios default; keep that default and only stretch this endpoint.
+export const SHARE_IMAGE_REQUEST_TIMEOUT_MS = 90_000;
+
+async function rethrowShareImageBlobError(error: unknown): Promise<never> {
+  if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+    const contentType = String(error.response.headers?.['content-type'] ?? '');
+    const looksJson = contentType.includes('json') || contentType.includes('text');
+    if (looksJson || error.response.status >= 400) {
+      try {
+        const text = await error.response.data.text();
+        const data = text ? JSON.parse(text) as unknown : undefined;
+        const hydrated = {
+          ...error,
+          response: {
+            ...error.response,
+            data,
+          },
+        };
+        throw createApiError(getParsedApiError(hydrated), {
+          response: hydrated.response,
+          code: error.code,
+          cause: error,
+        });
+      } catch (parseOrApiError) {
+        if (parseOrApiError instanceof Error && parseOrApiError.name === 'ApiRequestError') {
+          throw parseOrApiError;
+        }
+        // Fall through when the body is not JSON.
+      }
+    }
+  }
+  throw error;
+}
 
 // ============ API Interface ============
 
@@ -85,11 +122,23 @@ export const historyApi = {
     return response.data.content;
   },
 
+  /**
+   * Generate a share PNG for a history record.
+   * Uses a longer per-request timeout than the global 30s default because cold
+   * Playwright/wkhtml renders of full reports commonly exceed that bound.
+   */
   getShareImage: async (recordId: number): Promise<Blob> => {
-    const response = await apiClient.get<Blob>(`/api/v1/history/${recordId}/share-image`, {
-      responseType: 'blob',
-    });
-    return response.data;
+    try {
+      const response = await apiClient.get<Blob>(`/api/v1/history/${recordId}/share-image`, {
+        responseType: 'blob',
+        timeout: SHARE_IMAGE_REQUEST_TIMEOUT_MS,
+      });
+      return response.data;
+    } catch (error) {
+      // responseType: 'blob' makes error bodies Blobs; rehydrate JSON so ParsedApiError
+      // can surface share_image_* codes and install/length guidance.
+      throw await rethrowShareImageBlobError(error);
+    }
   },
 
   /**

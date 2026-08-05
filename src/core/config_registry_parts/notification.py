@@ -1418,4 +1418,35 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["reserved_flag"],
     },
+    "SHARE_IMAGE_MAX_CHARS": {
+        "title": "Share Image Max Characters",
+        "description": (
+            "Maximum Markdown length accepted by GET /api/v1/history/{id}/share-image. "
+            "Reports over this limit return HTTP 413 share_image_content_too_large. "
+            "Independent of MARKDOWN_TO_IMAGE_MAX_CHARS (IM notification images). "
+            "Default 100000 covers verbose detailed reports and multi-region market reviews."
+        ),
+        "category": "notification",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "100000",
+        "options": [],
+        "validation": {"minimum": 1},
+        "display_order": 71,
+        "help_key": "settings.notification.SHARE_IMAGE_MAX_CHARS",
+        "examples": [
+            "SHARE_IMAGE_MAX_CHARS=100000",
+            "SHARE_IMAGE_MAX_CHARS=150000",
+        ],
+        "docs": [
+            {
+                "label": "分享图片说明",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/share-images.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 }

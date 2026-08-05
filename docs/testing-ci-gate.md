@@ -152,6 +152,42 @@ Current benchmark-marked wall-clock cases:
 
 `pytest-xdist` is **not** enabled in the gate by default. Global monkeypatches in `tests/conftest.py` (asyncio/anyio/TestClient rebinding) are process-global and may not be safe under multi-process collection. Re-evaluate with two clean `pytest -n auto -m "not network and not benchmark"` runs before enabling in `ci_gate.sh`.
 
+## Threadless TestClient vs real Starlette client
+
+The offline gate (and the default local suite) rebind FastAPI/Starlette `TestClient` to a process-local **threadless** client, plus related asyncio/anyio wake-up patches, so sandboxed CI runners do not hang on AnyIO cross-thread portals.
+
+| Env var | Default | Behavior |
+| --- | --- | --- |
+| `STOCKPULSE_TEST_THREADLESS` | `1` (unset = on) | Use the threadless client and asyncio/anyio sandbox patches |
+| `STOCKPULSE_TEST_THREADLESS=0` | — | Leave the real `starlette.testclient.TestClient` untouched |
+
+Falsy values: `0`, `false`, `no`, `off`, empty string.
+
+Local real-client run (same selection as the non-required `api-real-client` CI job):
+
+```bash
+STOCKPULSE_TEST_THREADLESS=0 \
+  DATABASE_PATH=/tmp/stockpulse-real-client.sqlite \
+  python -m pytest tests/api -m "not network and not benchmark"
+```
+
+The `api-real-client` job in `.github/workflows/ci.yml` is **not** a required branch-ruleset check. It always runs on PR and push-to-main (after `ai-governance`) so real-client regressions surface without blocking merges while the inventory stabilizes.
+
+## CI path filters (`web-gate` vs `web-e2e`)
+
+The `changes` job in `.github/workflows/ci.yml` emits two independent filters:
+
+| Output | Consumed by | Paths (summary) |
+| --- | --- | --- |
+| `frontend` | `web-gate` (lint / i18n / unit / build) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
+| `web_e2e` | `web-e2e` (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
+
+Pure backend changes under `src/**` / `data_provider/**` / `bot/**` therefore re-run the e2e stack that boots the real app, without paying for frontend lint/unit/build. Pure frontend changes still run both jobs.
+
+## Push-to-main CI
+
+`ci.yml` triggers on `pull_request` **and** `push` to `main`. Concurrency group is `ci-${{ github.event.pull_request.number || github.ref }}` with `cancel-in-progress: true`, so a merge burst cancels the superseded `ci-refs/heads/main` run and keeps only the newest main revision.
+
 ## Local full gate
 
 ```bash

@@ -189,4 +189,41 @@ describe('stable API error contract', () => {
     expect(parsed.traceId).toBe('trace-legacy-service');
     expect(parsed.rawMessage).toContain('Legacy task conflict');
   });
+
+  it('localizes share_image_content_too_large with limit and actual params', () => {
+    const parsed = getParsedApiError({
+      response: {
+        status: 413,
+        data: {
+          error: 'share_image_content_too_large',
+          message: 'report too long diagnostic',
+          params: { limit: 100000, actual: 120500 },
+        },
+      },
+    }, 'en');
+
+    expect(parsed.code).toBe('share_image_content_too_large');
+    expect(parsed.title).toMatch(/too long/i);
+    expect(parsed.message).toContain('120500');
+    expect(parsed.message).toContain('100000');
+    expect(parsed.rawMessage).toContain('report too long diagnostic');
+  });
+
+  it('localizes share_image_unavailable install guidance', () => {
+    const parsed = getParsedApiError({
+      response: {
+        status: 503,
+        data: {
+          error: 'share_image_unavailable',
+          message: 'playwright missing diagnostic',
+          params: {},
+        },
+      },
+    }, 'en');
+
+    expect(parsed.code).toBe('share_image_unavailable');
+    expect(parsed.title).toMatch(/renderer unavailable/i);
+    expect(parsed.message.toLowerCase()).toContain('playwright');
+  });
+
 });
