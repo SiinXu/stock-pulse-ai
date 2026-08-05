@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../history';
-// ci-retrigger: keep history contract tests green under Zod boundary
 import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, delete: del } = vi.hoisted(() => ({
