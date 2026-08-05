@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
+- [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
