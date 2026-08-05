@@ -22,6 +22,31 @@ StockPulse 是**单管理员 / 本地优先**产品，不是多租户 SaaS：
 - 非本机 HTTP 监听在关闭认证时默认**拒绝启动**；`ALLOW_INSECURE_PUBLIC_BIND=true` 仅紧急逃生。
 - 可选 **HITL 风控绕过审批**默认关闭；仅在已开管理员认证且有人能在有效期内决策时启用。提案超时与 Agent pipeline 截止是两套时钟，见 [人工审批安全门禁](human-approvals.md)。
 
+#### HTTP 启动器绑定守卫
+
+导入 `server:app` 时，StockPulse 会检查进程 argv，判断监听目标是否仅限本机：
+
+| 启动器 | 绑定参数 | 认证关闭 | 结果 |
+| --- | --- | --- | --- |
+| 已解析的 `uvicorn` CLI 或 `python server.py` | 默认 / loopback / Unix socket | 允许 | 启动 |
+| 任意启动器（含自定义 `uvicorn` 路径、`uv run`、supervisor） | 显式 loopback `--host` / `--uds`，且无 `--fd` | 允许 | 启动——显式 loopback 与启动器路径无关，均视为可证明 |
+| 任意启动器 | 显式非本机 host（`0.0.0.0`、公网 IP、`*`） | 拒绝 | 错误说明绑定不是仅本机 |
+| 无法识别的启动器 / 无 uvicorn 风格绑定参数的 gunicorn worker，或任意 `--fd` | （无 / FD） | 拒绝 | 错误说明启动器未识别、无法验证绑定为本机 |
+| 上表任一拒绝行 | — | `ADMIN_AUTH_ENABLED=true` 时允许 | 启动 |
+| 上表任一拒绝行 | — | `ALLOW_INSECURE_PUBLIC_BIND=true` | 启动并写入持久安全警告（仅紧急） |
+
+推荐的本机启动方式：
+
+```bash
+uvicorn server:app --host 127.0.0.1 --port 8000
+python server.py
+python main.py --serve-only
+# 自定义/shim 启动器在显式写出 loopback 时同样可用：
+/path/to/custom/uvicorn server:app --host 127.0.0.1 --port 8000
+```
+
+使用 gunicorn、systemd 或其他基于 import 的 worker，且 argv 上没有 uvicorn 风格的 `--host`/`--uds` 时，请开启管理员认证、改用可识别的本机启动器，或接受文档中的紧急覆盖开关。
+
 完整清单与条款见 [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries)。
 
 ---

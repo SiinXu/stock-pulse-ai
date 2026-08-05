@@ -43,13 +43,30 @@ def test_unix_socket_is_allowed_when_auth_is_disabled() -> None:
 
 
 def test_inherited_socket_is_denied_when_locality_cannot_be_proven() -> None:
-    with pytest.raises(InsecurePublicBindError):
+    with pytest.raises(
+        InsecurePublicBindError,
+        match="bind target could not be verified as local",
+    ):
         enforce_http_bind_security(
             "127.0.0.1",
             inherited_socket=True,
             auth_enabled=False,
             allow_insecure_public_bind=False,
         )
+
+
+def test_unverified_bind_error_lists_remedies() -> None:
+    with pytest.raises(InsecurePublicBindError) as exc_info:
+        enforce_http_bind_security(
+            None,
+            inherited_socket=True,
+            auth_enabled=False,
+            allow_insecure_public_bind=False,
+        )
+    message = str(exc_info.value)
+    assert "launcher was not recognized" in message
+    assert "ADMIN_AUTH_ENABLED" in message
+    assert "ALLOW_INSECURE_PUBLIC_BIND=true" in message
 
 
 def test_auth_enabled_preserves_non_local_bind_behavior() -> None:
