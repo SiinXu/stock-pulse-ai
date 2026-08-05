@@ -110,7 +110,11 @@ python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt
 python -m pip check
 
-cp .env.example .env   # add model + optional data/news keys
+cp .env.example .env
+# Minimal first-run (same three lines as the top of .env.example):
+# STOCK_LIST=600519,hk00700,AAPL
+# ANSPIRE_API_KEYS=          # or GEMINI_API_KEY / AIHUBMIX_KEY / DEEPSEEK_API_KEY
+# # SERPAPI_API_KEYS=        # optional news search if not using Anspire for search
 python main.py         # one-shot analysis
 ```
 
