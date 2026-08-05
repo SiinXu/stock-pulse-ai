@@ -76,6 +76,7 @@ EXPECTED_PIPELINE_METHODS = (
     "_aggregate_skill_opinions",
     "_aggregate_strategy_opinions",
     "_run_strategy_engine",
+    "_maybe_record_skill_opinion_samples",
     "_apply_partition_fallback",
     "_collect_strategy_synthesis",
     "_prepare_decision_context",
@@ -107,7 +108,7 @@ EXPECTED_DASHBOARD_METHODS = (
 EXPECTED_AST_HASHES = {
     "_ExecutionMethods": "353d048051f1e3c3459a836a41481d45d35c0b3c064c06f459670209414c28e6",
     "_ChatMethods": "4f81da4531630de72155a485e53bd2f9f47b6d26dc282ba49bc8d098ce9712f2",
-    "_PipelineMethods": "c8a18b64686d20f29922f1b0d8eb2d37fd1ef43d3e002b66e8f4559039ab39f9",
+    "_PipelineMethods": "81a49c6e565dfa4fb33519639a79eba433333d83f57c2868f9e9bb3b8d69b518",
     "_DashboardMethods": "ec6082c24dbd1c11d983af00bd950d877d5ca1741216c6341160124e9b61a603",
 }
 
