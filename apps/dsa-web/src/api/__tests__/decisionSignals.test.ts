@@ -3,6 +3,7 @@ import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
 } from '../decisionSignals';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, post, patch, put } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -173,6 +174,10 @@ describe('decisionSignalsApi', () => {
           action: 'watch',
           plan_quality: 'unknown',
           status: 'active',
+          presentation: {
+            action: 'watch',
+            label: 'watch',
+          },
           metadata: null,
         },
         created: true,
@@ -211,6 +216,10 @@ describe('decisionSignalsApi', () => {
             action: 'hold',
             plan_quality: 'minimal',
             status: 'active',
+            presentation: {
+              action: 'watch',
+              label: 'watch',
+            },
           },
         ],
         total: 1,
@@ -348,6 +357,10 @@ describe('decisionSignalsApi', () => {
           action: 'watch',
           plan_quality: 'partial',
           status: 'active',
+          presentation: {
+            action: 'buy',
+            label: 'buy',
+          },
           metadata: {
             decision_profile: 'aggressive',
             guardrail_result: { raw_action: 'buy', final_action: 'watch', passed: true },
@@ -413,7 +426,7 @@ describe('decisionSignalsApi', () => {
     expect(getDecisionSignalReassessBlockedError({ response: { data: { error: 'other' } } })).toBeNull();
   });
 
-  it('rejects malformed list responses instead of treating missing items as empty', async () => {
+  it('defaults omitted list items to [] per OpenAPI optional items field', async () => {
     get.mockResolvedValueOnce({
       data: {
         total: 0,
@@ -422,9 +435,79 @@ describe('decisionSignalsApi', () => {
       },
     });
 
-    await expect(decisionSignalsApi.list()).rejects.toThrow(
-      'DecisionSignal list response items must be an array',
-    );
+    const response = await decisionSignalsApi.list();
+    expect(response.items).toEqual([]);
+    expect(response.total).toBe(0);
+  });
+
+  it('rejects non-array list items via ParsedApiError (malformed payload)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        total: 0,
+        page: 1,
+        page_size: 20,
+        items: null,
+      },
+    });
+
+    await expect(decisionSignalsApi.list()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('DecisionSignalListResponse');
+      return true;
+    });
+  });
+
+  it('rejects numeric-string money fields on DecisionSignalItem (contract is number)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        id: 99,
+        stock_code: '600519',
+        market: 'cn',
+        source_type: 'manual',
+        trigger_source: 'web',
+        action: 'buy',
+        plan_quality: 'complete',
+        status: 'active',
+        presentation: { action: 'buy', label: '买入' },
+        entry_low: '1680',
+        stop_loss: '1600',
+        target_price: '1850',
+      },
+    });
+
+    await expect(decisionSignalsApi.get(99)).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('DecisionSignalItem');
+      return true;
+    });
+  });
+
+  it('preserves extra keys on valid DecisionSignalItem pass-through', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        id: 100,
+        stock_code: 'AAPL',
+        market: 'us',
+        source_type: 'manual',
+        trigger_source: 'web',
+        action: 'hold',
+        plan_quality: 'minimal',
+        status: 'active',
+        presentation: { action: 'hold', label: '持有' },
+        unexpected_server_field: 'keep-me',
+      },
+    });
+
+    const item = await decisionSignalsApi.get(100);
+    expect(item).toEqual(expect.objectContaining({
+      id: 100,
+      stockCode: 'AAPL',
+      unexpectedServerField: 'keep-me',
+    }));
   });
 
   it('gets latest signals with a backend-supported stock code path', async () => {
@@ -463,6 +546,10 @@ describe('decisionSignalsApi', () => {
         action: 'reduce',
         plan_quality: 'partial',
         status: 'active',
+        presentation: {
+          action: 'reduce',
+          label: 'reduce',
+        },
       },
     });
     patch.mockResolvedValueOnce({
@@ -475,6 +562,7 @@ describe('decisionSignalsApi', () => {
         action: 'reduce',
         plan_quality: 'partial',
         status: 'closed',
+        presentation: { action: 'reduce', label: 'reduce' },
         metadata: { closed_by: 'tester' },
       },
     });
