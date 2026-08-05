@@ -89,9 +89,14 @@ _realtime_cache: Dict[str, Any] = {
     # validated snapshot across per-symbol requests.
     'hk': {
         'data': None,
+        # Timestamp of the last *successful* full-market snapshot.
         'timestamp': 0,
         'ttl': 1200,
         'failure_ttl': 30,
+        # Timestamp of the last failed refresh. Kept separate from ``timestamp``
+        # so a short negative-cache window never rewrites a still-usable
+        # snapshot's success age (and never forces Sina while EM data is fresh).
+        'failure_at': 0,
         'last_result': None,
         'lock': threading.Lock(),
     },
@@ -1617,37 +1622,49 @@ class AkshareFetcher(BaseFetcher):
             current_time = time.time()
             cache_data = hk_cache['data']
             cache_age = current_time - hk_cache['timestamp']
+
+            # Prefer a still-fresh Eastmoney snapshot over any failure marker.
+            # A failed refresh must not hide previously-good data that is still
+            # inside its own success TTL.
+            if cache_data is not None and cache_age < hk_cache['ttl']:
+                logger.debug(
+                    "Akshare Eastmoney HK realtime cache hit: age=%ds ttl=%ss",
+                    int(cache_age),
+                    hk_cache['ttl'],
+                )
+                try:
+                    return True, build_em_quote(cache_data)
+                except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics precede the preserved Sina fallback.
+                    log_safe_exception(
+                        logger,
+                        "Akshare Eastmoney HK realtime cache parse failed; trying Sina fallback",
+                        exc,
+                        error_code="akshare_hk_eastmoney_cache_parse_failed",
+                        level=logging.WARNING,
+                        context={"symbol": stock_code},
+                    )
+                    return True, None
+
+            # Short negative cache only when there is no usable snapshot.
+            failure_at = float(hk_cache.get('failure_at') or 0)
+            if failure_at <= 0 and hk_cache.get('last_result') == 'failure':
+                # Backward-compatible: older process state used ``timestamp`` as
+                # the failure clock after clearing ``data``.
+                failure_at = float(hk_cache.get('timestamp') or 0)
+            failure_age = current_time - failure_at if failure_at > 0 else None
             if (
                 hk_cache.get('last_result') == 'failure'
-                and cache_age < hk_cache.get('failure_ttl', 0)
+                and failure_age is not None
+                and failure_age < hk_cache.get('failure_ttl', 0)
             ):
                 logger.debug(
                     "Akshare Eastmoney HK realtime negative cache hit: age=%ds ttl=%ss",
-                    int(cache_age),
+                    int(failure_age),
                     hk_cache.get('failure_ttl', 0),
                 )
                 return True, None
 
-            if cache_data is None or cache_age >= hk_cache['ttl']:
-                return False, None
-
-            logger.debug(
-                "Akshare Eastmoney HK realtime cache hit: age=%ds ttl=%ss",
-                int(cache_age),
-                hk_cache['ttl'],
-            )
-            try:
-                return True, build_em_quote(cache_data)
-            except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics precede the preserved Sina fallback.
-                log_safe_exception(
-                    logger,
-                    "Akshare Eastmoney HK realtime cache parse failed; trying Sina fallback",
-                    exc,
-                    error_code="akshare_hk_eastmoney_cache_parse_failed",
-                    level=logging.WARNING,
-                    context={"symbol": stock_code},
-                )
-                return True, None
+            return False, None
 
         cache_hit, quote = read_cached_em_quote()
         if quote is not None:
@@ -1682,6 +1699,7 @@ class AkshareFetcher(BaseFetcher):
 
                         hk_cache['data'] = df
                         hk_cache['timestamp'] = time.time()
+                        hk_cache['failure_at'] = 0
                         hk_cache['last_result'] = 'success'
                         logger.info(
                             "Cached Akshare Eastmoney HK realtime snapshot: records=%d elapsed=%.2fs ttl=%ss",
@@ -1695,9 +1713,34 @@ class AkshareFetcher(BaseFetcher):
                         if quote is not None:
                             return quote
                     except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics and circuit state preserve the Sina fallback.
-                        hk_cache['data'] = None
-                        hk_cache['timestamp'] = time.time()
-                        hk_cache['last_result'] = 'failure'
+                        # Never destroy a still-usable snapshot on refresh
+                        # failure (network or validation). Keep serving it until
+                        # its own success TTL expires; apply the short failure
+                        # TTL only when there is no usable Eastmoney snapshot.
+                        now = time.time()
+                        existing = hk_cache.get('data')
+                        success_ts = float(hk_cache.get('timestamp') or 0)
+                        still_usable = (
+                            existing is not None
+                            and (now - success_ts) < float(hk_cache.get('ttl') or 0)
+                        )
+                        if still_usable:
+                            logger.warning(
+                                "Akshare Eastmoney HK realtime refresh failed; "
+                                "preserving still-usable snapshot (age=%ds ttl=%ss)",
+                                int(now - success_ts),
+                                hk_cache.get('ttl', 0),
+                            )
+                        else:
+                            # Do not clear previously-good (possibly expired)
+                            # DataFrames: only mark the negative-cache window.
+                            # When there was never a snapshot, stamp timestamp so
+                            # older readers that only inspect timestamp still see
+                            # a recent failure clock.
+                            if existing is None:
+                                hk_cache['timestamp'] = now
+                            hk_cache['failure_at'] = now
+                            hk_cache['last_result'] = 'failure'
                         log_safe_exception(
                             logger,
                             "Akshare Eastmoney HK realtime quote failed; trying Sina fallback",
