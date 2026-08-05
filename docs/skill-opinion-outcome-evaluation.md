@@ -135,3 +135,4 @@ temporary pending rows do not dilute permanent metadata failures.
 
 The migration is additive. Code rollback does not remove either table, so
 collected facts remain available if the feature is reintroduced.
+
