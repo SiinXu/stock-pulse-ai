@@ -809,16 +809,18 @@ class AnalysisApiService:
                 code=code,
                 report_type=report_type,
             )
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - History run-flow hydration is optional; log diagnostics then either fall back or re-raise.
+            log_safe_exception(
+                logger,
+                "History run-flow load failed; falling back to task skeleton"
+                if fail_open
+                else "History run-flow load failed",
+                e,
+                error_code="history_run_flow_load_failed",
+                level=logging.DEBUG,
+                context={"query_id": query_id},
+            )
             if fail_open:
-                log_safe_exception(
-                    logger,
-                    "History run-flow load failed; falling back to task skeleton",
-                    e,
-                    error_code="history_run_flow_load_failed",
-                    level=logging.DEBUG,
-                    context={"query_id": query_id},
-                )
                 return None
             raise
 
@@ -987,7 +989,7 @@ class AnalysisApiService:
                     )
                     payload["report"] = report.model_dump()
                     report_enriched = True
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Report enrichment is best-effort; keep the raw task result and log diagnostics.
                     log_safe_exception(
                         logger,
                         "In-memory task report enrichment failed (fail-open)",
@@ -1041,7 +1043,7 @@ class AnalysisApiService:
                 else:
                     try:
                         result = self.build_task_analysis_result(task)
-                    except Exception as exc:
+                    except Exception as exc:  # broad-exception: fallback_recorded - Status path must still return task metadata when result projection fails.
                         log_safe_exception(
                             logger,
                             "Task result parsing failed; returning an empty result",
@@ -1205,7 +1207,7 @@ class AnalysisApiService:
                 code=stock_code,
             )
             return context_snapshot, fallback_fundamental, raw_result_snapshot
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Fundamental enrichment is optional; continue without snapshots after logging.
             log_safe_exception(
                 logger,
                 "Synchronous fundamental source load failed (fail-open)",
