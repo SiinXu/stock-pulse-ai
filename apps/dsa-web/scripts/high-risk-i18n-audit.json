@@ -490,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 116,
-        "keySetSha256": "06d6c0b579fa4515499816be335181df2b362ec7ed4b29f7da93a67ea3c4c75e",
+        "keyCount": 118,
+        "keySetSha256": "302c4ff2373465d61926b228e42ed7e72b8336105570206b69aaa97e636a041f",
         "bundleSha256": {
-          "zh": "335a9cd7f98bbe6e7d82db40b1f81620ef150ff28d80e795650a5d89833c37e1",
-          "zh-TW": "ec6ba81aa02a1ee29eaa742062da6eb5d2e6dddbb5e48de358c98cfcdd24d5b8",
-          "en": "da6ae181100d2c0337104e648ad1b82a496069fbe7c2fceb62072986df588246",
-          "ja": "cc550886fc8a1525c15331c1200722b5951e7711f843e52a5f21804e03012995",
-          "ko": "b26a33732b301cb685e6bb923632a38a9bf0979942db60f48ab4532d2988e5d0",
-          "de": "c406f2ab0c775416730b93d542813396dfcfdaa26d0e285b0b0e9a5674912cda",
-          "es": "39f3837e97a021c60ba9fe6ecef96e6997436a0320dc590e837c6739b1bc3ce1",
-          "ms": "11f6835440464acec59d544bb490a379b7dcff7a41e86ebd049c6e5bf10c2ca4",
-          "fr": "f13b9dea78b4f6e2c2bd1abb6f1756ba96024113d5e49fc7c6c48f946ea08337",
-          "id": "dfcd52492fb0d242779c92c27d12df7da3ee7b34507c458347626b62706b49fd"
+          "zh": "4e3c9fe2a793cf22c71b9962872608b621d2cc9c299c97acd72be223347e46f1",
+          "zh-TW": "102ce5dc0c690515102646677a903ead4b0f30e4f39a7377fb5ff527623438ff",
+          "en": "f41a32aaaf042ed39135c3dee462a3d8c1b3b3b71d6fb06dba5938de7ce4cbf8",
+          "ja": "2264b5da3deb7670bea74230266a08d094e48439555bb1c53c375eec7ce10b3a",
+          "ko": "3965c847437268800a4d3e7b1cef9b1b258a9e3fe5b3825552469f668df3d234",
+          "de": "5b151ba5a81824c4939e48f92d6ed99d05aff1f3b9285c3a43b5ca3e7983bc8d",
+          "es": "8e2b878e3bf61172a26eaeb6eeb794737969ed511cb467967fa8f5882c693869",
+          "ms": "782c965279f2c20ece72fade66d139fcc9edc7ba124287ef4981edbf77d56875",
+          "fr": "4d5e45d89c6a5b168d37f72a9c4c1927e579164e8f5f1d6896e27181a6979d49",
+          "id": "c10e851a226bc1c41a0cab3b626f2500925c7ec382ce23ad1a251e3ff48981a2"
         }
       }
     },
@@ -623,6 +623,7 @@
         "alphasift_screen_task_not_found",
         "alphasift_unavailable",
         "analysis_failed",
+        "api_response_validation_failed",
         "approval_auth_required",
         "auth_disabled",
         "config_conflict",
@@ -699,6 +700,10 @@
         "analysis_failed": [
           "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
           "api.error.STABLE_ERROR_TEXT.analysis_failed.message"
+        ],
+        "api_response_validation_failed": [
+          "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title",
+          "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message"
         ],
         "approval_auth_required": [
           "api.error.STABLE_ERROR_TEXT.approval_auth_required.title",
