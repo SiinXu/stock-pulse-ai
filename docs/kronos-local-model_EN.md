@@ -121,3 +121,4 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 - [Kronos Agent Tool contract](kronos-agent-tool.md)
 - [FAQ](FAQ.md) / [FAQ (EN)](FAQ_EN.md)
 - [Local Model Catalog (Ollama, etc.)](local-model-catalog.md)
+
