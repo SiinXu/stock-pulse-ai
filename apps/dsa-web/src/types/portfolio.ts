@@ -14,7 +14,8 @@ export interface PortfolioAccountItem {
   market: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
   baseCurrency: string;
   isActive: boolean;
-  accountType: PortfolioAccountType;
+  /** OpenAPI: server default "real"; not always in required[]. */
+  accountType?: PortfolioAccountType;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -361,7 +362,8 @@ export interface PortfolioImportBrokerListResponse {
 export interface PortfolioFxRefreshResponse {
   asOf: string;
   accountCount: number;
-  refreshEnabled?: boolean;
+  /** OpenAPI: required. */
+  refreshEnabled: boolean;
   disabledReason?: string | null;
   pairCount: number;
   updatedCount: number;
