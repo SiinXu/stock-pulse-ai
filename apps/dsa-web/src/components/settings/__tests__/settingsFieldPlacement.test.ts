@@ -70,6 +70,12 @@ describe('placementForKey', () => {
     // (not the tuning limits) stays with the AI section too.
     expect(placementForKey('ai_model', 'LITELLM_MODEL').section).toBe('ai_models');
     expect(placementForKey('ai_model', 'GENERATION_BACKEND').section).toBe('ai_models');
+    expect(placementForKey('ai_model', 'KRONOS_ENABLED')).toEqual({
+      section: 'ai_models',
+      view: 'local_models',
+    });
+    expect(placementForKey('ai_model', 'KRONOS_MODEL_SIZE').view).toBe('local_models');
+    expect(placementForKey('ai_model', 'KRONOS_WEIGHTS_DIR').view).toBe('local_models');
   });
 
   it('splits system keys across the System & Security views', () => {
