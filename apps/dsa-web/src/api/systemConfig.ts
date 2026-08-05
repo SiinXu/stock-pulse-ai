@@ -10,6 +10,7 @@ import type {
   GenerationBackendStatusPreviewRequest,
   GenerationBackendStatusResponse,
   ImportSystemConfigRequest,
+  KronosStatusResponse,
   RollbackSystemConfigRequest,
   LegacyChannelsMigrationPreview,
   LlmProviderCatalogResponse,
@@ -205,6 +206,13 @@ export const systemConfigApi = {
       '/api/v1/system/config/generation-backends/status',
     );
     return toCamelCase<GenerationBackendStatusResponse>(response.data);
+  },
+
+  async getKronosStatus(): Promise<KronosStatusResponse> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      '/api/v1/system/config/kronos/status',
+    );
+    return toCamelCase<KronosStatusResponse>(response.data);
   },
 
   async getLlmConfigModeStatus(): Promise<LLMConfigModeStatus> {

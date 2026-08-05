@@ -72,7 +72,8 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 4. Leave `PLUGINS_DIR` empty unless every package is reviewed and trusted.
 5. Review outbound policy for user-influenced URLs: [Outbound HTTP security policy](security-outbound-policy.md).
 6. Confirm CORS and cookie `Secure` / `SameSite` settings match your real browser origins.
-7. Assume a single shared admin: anyone with the password or a stolen session cookie is the administrator.
+7. Confirm browser security headers (CSP, nosniff, frame deny, referrer) are present on the FastAPI origin; reverse proxies may tighten further but should not strip them unintentionally. See [Browser response headers (CSP)](#browser-response-headers-csp).
+8. Assume a single shared admin: anyone with the password or a stolen session cookie is the administrator.
 
 ### 5. Related documents
 
@@ -81,6 +82,7 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 | Full baseline requirements and gaps | This file (sections below) |
 | Plugin trust and extension points | [Plugin extension contract](plugin-extension-contract.md) |
 | Outbound SSRF / egress defaults | [Outbound HTTP security policy](security-outbound-policy.md) |
+| Browser response headers (CSP) | [Browser response headers](#browser-response-headers-csp) |
 | Durable audit Phase 1 | [Security audit](security-audit.md) |
 | Sensitive log/export redaction | [Sensitive-data redaction](security-sensitive-data-redaction.md) |
 | Deploy bind notes | [DEPLOY.md](DEPLOY.md), [DEPLOY_EN.md](DEPLOY_EN.md) |
@@ -129,6 +131,38 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 | `AUTH-06` | SHOULD | Login attempts and other abuse-sensitive endpoints should use bounded rate limits whose client identity is derived only from a documented trusted-proxy topology. |
 
 Current anchors: [`api/middlewares/auth.py`](../api/middlewares/auth.py), [`api/v1/endpoints/auth.py`](../api/v1/endpoints/auth.py), the startup bind policy in [`src/security/http_bind.py`](../src/security/http_bind.py), and [PR #292](https://github.com/SiinXu/stock-pulse-ai/pull/292). The current implementation uses an opt-in single-administrator session, signed expiring cookies, file-backed password hashes and session secrets, login throttling, session-secret rotation, current-password verification before disabling authentication, and fail-closed startup for unauthenticated non-local HTTP binds. The emergency public-bind override is explicit and emits a security warning. This is not a multi-user identity or authorization system.
+
+<a id="browser-response-headers-csp"></a>
+### Browser response headers (CSP)
+
+| ID | Level | Requirement |
+| --- | --- | --- |
+| `WEB-01` | MUST | When the FastAPI process serves the Web UI or API to a browser, responses MUST include defense-in-depth headers: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and clickjacking protection (`frame-ancestors 'none'` and/or `X-Frame-Options: DENY`). |
+| `WEB-02` | MUST | CSP allowances MUST be derived from the actual production SPA (Vite assets, inline theme bootstrap, React inline styles, same-origin API/SSE, `blob:` download URLs, `data:` CSS/image URIs). Remote script/style hosts and `unsafe-eval` MUST NOT be allowed for the product UI. |
+| `WEB-03` | SHOULD | Interactive OpenAPI UIs (`/docs`, `/redoc`) that load CDN assets may omit CSP only; other security headers SHOULD still apply. Prefer not exposing `/docs` on untrusted networks without an edge policy. |
+
+Current anchors: [`api/middlewares/security_headers.py`](../api/middlewares/security_headers.py) (registered from [`api/app.py`](../api/app.py)). The shipped policy is:
+
+```text
+default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';
+object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+```
+
+Allowance rationale (product UI):
+
+| Directive | Why present |
+| --- | --- |
+| `script-src 'self' 'unsafe-inline'` | Vite `/assets/*.js` modules; `apps/dsa-web/index.html` inline theme FOUC bootstrap |
+| `style-src 'self' 'unsafe-inline'` | Vite `/assets/*.css`; React `style={{...}}` props; not-built guide HTML inline CSS |
+| `img-src 'self' data: blob:` | Same-origin assets; CSS `data:image/svg+xml` backgrounds; share/export `blob:` object URLs |
+| `connect-src 'self'` | Same-origin REST + SSE (`EventSource` task stream, agent stream); production defaults to empty `VITE_API_URL` |
+| `object-src 'none'` / `base-uri 'none'` / `frame-ancestors 'none'` | Deny plugins, base-tag hijack, and framing |
+| `form-action 'self'` | Login and forms stay on the deployment origin |
+
+Desktop note: the Electron assistant window keeps its own HTML meta CSP in `apps/dsa-desktop/renderer/assistant.html`. The desktop shell that loads the FastAPI-served SPA receives the API security headers when it uses the HTTP origin; this middleware does not change desktop packaging files.
+
+This is defense-in-depth only. Markdown surfaces still rely on `react-markdown` defaults as the primary XSS control; CSP reduces impact of residual script/style injection and remote asset loads.
 
 ### Input and capability boundaries
 
@@ -245,6 +279,7 @@ These completed tracks are implementation evidence, not open gaps. Residual risk
 | Central sensitive-data redaction expansion | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) (completed) |
 | Dependency and workflow supply-chain hardening | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) (completed) |
 | Constrained AlphaSift repair installation | `SUPPLY-01` | [#359](https://github.com/SiinXu/stock-pulse-ai/issues/359) (completed by [#531](https://github.com/SiinXu/stock-pulse-ai/pull/531)) |
+| FastAPI browser security headers (CSP, nosniff, frame deny, referrer) | `WEB-01` through `WEB-03` | [`api/middlewares/security_headers.py`](../api/middlewares/security_headers.py) |
 
 ## Review Cadence
 

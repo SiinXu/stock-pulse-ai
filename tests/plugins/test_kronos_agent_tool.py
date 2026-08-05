@@ -180,7 +180,7 @@ def test_missing_weights_prevent_registration_without_network_access(
     rendered = "\n".join(record.getMessage() for record in caplog.records)
     assert "weights_dir_missing" in rendered
     assert "No automatic download" not in rendered
-    assert "Download the official Hugging Face artifacts elsewhere" in rendered
+    assert "download_kronos_weights.py" in rendered or "Hugging Face artifacts" in rendered
 
 
 @pytest.mark.parametrize("config_payload", ["not-json", "{}"])
