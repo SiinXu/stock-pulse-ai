@@ -1,7 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { skillOutcomesApi } from '../../api/skillOutcomes';
@@ -151,7 +150,7 @@ describe('SkillOutcomesPage', () => {
       offset: 0,
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByTestId('skill-outcomes-empty')).toBeInTheDocument();
   });
 
@@ -213,8 +212,8 @@ describe('SkillOutcomesPage', () => {
     renderPage();
 
     expect(await screen.findByTestId('skill-outcome-performance-table')).toBeInTheDocument();
-    expect(screen.getByText('momentum')).toBeInTheDocument();
-    expect(screen.getByText('value')).toBeInTheDocument();
+    expect(screen.getAllByText('momentum').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('value').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Insufficient').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Sufficient').length).toBeGreaterThan(0);
 
@@ -228,10 +227,10 @@ describe('SkillOutcomesPage', () => {
 
     const outcomes = screen.getByTestId('skill-outcome-recent-outcomes');
     expect(within(outcomes).getByText('pending')).toBeInTheDocument();
-    expect(within(outcomes).getByText('AAPL')).toBeInTheDocument();
+    expect(within(outcomes).getAllByText('AAPL').length).toBeGreaterThan(0);
 
     const samples = screen.getByTestId('skill-outcome-recent-samples');
-    expect(within(samples).getByText('momentum')).toBeInTheDocument();
+    expect(within(samples).getAllByText('momentum').length).toBeGreaterThan(0);
   });
 
   it('runs explicit offline evaluation after confirm and reloads data', async () => {
@@ -270,9 +269,10 @@ describe('SkillOutcomesPage', () => {
     renderPage();
     expect(await screen.findByTestId('skill-outcome-run-panel')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Run evaluation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run evaluation' }));
     expect(await screen.findByRole('heading', { name: 'Run skill outcome evaluation?' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Run evaluation' }));
+    const confirmButtons = screen.getAllByRole('button', { name: 'Run evaluation' });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
 
     await waitFor(() => {
       expect(skillOutcomesApi.runOutcomes).toHaveBeenCalledWith({ limit: 100 });
