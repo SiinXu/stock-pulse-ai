@@ -6,7 +6,7 @@
 
 HTTP layer: auth/deps, DTO validation, status codes, SSE framing, and projection
 into response models. Use-case orchestration lives in
-``src.services.analysis_api_service.AnalysisApiService``.
+``api.v1.services.analysis_api_service.AnalysisApiService``.
 
 Private helpers remain importable here as thin facades so existing API tests that
 patch or call ``api.v1.endpoints.analysis.*`` keep working without wire changes.
@@ -64,7 +64,7 @@ router = APIRouter()
 
 def _analysis_api_service_cls():
     """Lazy import to avoid api.v1 package init <-> service circular load."""
-    from src.services.analysis_api_service import AnalysisApiService
+    from api.v1.services.analysis_api_service import AnalysisApiService
 
     return AnalysisApiService
 
@@ -196,7 +196,7 @@ def _handle_sync_analysis(
 
 
 def _format_sse_event(event_type: str, data: Dict[str, Any]) -> str:
-    from src.services.analysis_api_service import format_sse_event
+    from api.v1.services.analysis_api_service import format_sse_event
 
     return format_sse_event(event_type, data)
 
