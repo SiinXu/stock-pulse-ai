@@ -564,12 +564,17 @@ def run_self_tests() -> None:
 
         seed = tmp_path / "seed"
         seed.mkdir()
-        _run_git(["init"], cwd=seed)
+        # Prefer init -b main so the first commit already lives on main even when
+        # the runner default branch is master (or unset). Fall back for older git.
+        init = _run_git(["init", "-b", "main"], cwd=seed, check=False)
+        if init.returncode != 0:
+            _run_git(["init"], cwd=seed)
         _git_identity(seed)
-        _run_git(["branch", "-M", "main"], cwd=seed)
         _write(seed / "shared" / "core.py", "v1\n")
         _write(seed / "examples" / "demo.py", "demo\n")
         fork_sha = _commit(seed, "initial shared baseline")
+        # Ensure the first commit is on main before push (covers init without -b).
+        _run_git(["branch", "-M", "main"], cwd=seed)
         _run_git(["remote", "add", "origin", str(upstream)], cwd=seed)
         _run_git(["push", "-u", "origin", "main"], cwd=seed)
 
