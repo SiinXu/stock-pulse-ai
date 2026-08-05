@@ -209,9 +209,22 @@ def test_config_default_factory_metadata_is_stable():
     assert schedule_factory.__module__ == "src.config"
     assert schedule_factory.__qualname__ == "Config.<lambda>"
     assert schedule_factory.__globals__ is config_module.__dict__
-    assert schedule_factory in tuple(
-        cell.cell_contents for cell in Config.__init__.__closure__ or ()
+
+    # Domain flat-kwargs wrapper may sit above the dataclass-generated __init__;
+    # walk __wrapped__ so factory cells remain discoverable after composition.
+    init_targets = []
+    current = Config.__init__
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        init_targets.append(current)
+        current = getattr(current, "__wrapped__", None)
+    factory_cells = tuple(
+        cell.cell_contents
+        for init_target in init_targets
+        for cell in (init_target.__closure__ or ())
     )
+    assert schedule_factory in factory_cells
     assert schedule_factory() == ["18:00"]
 
 
