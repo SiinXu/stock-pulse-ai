@@ -153,7 +153,6 @@ def configure_dispatch_ports(ports: Optional[DispatchPorts] = None) -> DispatchP
 def get_dispatch_ports() -> DispatchPorts:
     """Return configured ports, building the default composition when unset."""
 
-    global _PORTS
     if _PORTS is None:
         configure_dispatch_ports()
     assert _PORTS is not None
