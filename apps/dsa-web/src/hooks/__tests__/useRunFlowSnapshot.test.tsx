@@ -5,6 +5,7 @@ import { historyApi } from '../../api/history';
 import type { RunFlowSnapshot } from '../../types/runFlow';
 import type { UseTaskStreamOptions } from '../useTaskStream';
 import { useRunFlowSnapshot } from '../useRunFlowSnapshot';
+import { createDeferred } from '../../test-utils';
 
 vi.mock('../../api/analysis', () => ({
   analysisApi: {
@@ -71,16 +72,6 @@ const snapshot: RunFlowSnapshot = {
     },
   ],
 };
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, resolve, reject };
-}
 
 describe('useRunFlowSnapshot', () => {
   beforeEach(() => {

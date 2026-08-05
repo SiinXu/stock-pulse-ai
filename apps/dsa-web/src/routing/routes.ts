@@ -16,6 +16,7 @@ export const APP_ROUTE_PATHS = {
   researchMarket: '/research/market',
   researchDiscover: '/research/discover',
   researchBacktest: '/research/backtest',
+  researchSkillOutcomes: '/research/skill-outcomes',
   settings: '/settings',
 } as const;
 

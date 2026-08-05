@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DecisionSignalCreateDrawer } from '../DecisionSignalCreateDrawer';
@@ -9,6 +9,7 @@ import type {
   DecisionSignalItem,
   DecisionSignalMutationResponse,
 } from '../../../types/decisionSignals';
+import { chooseOption } from '../../../test-utils';
 
 vi.mock('../../../api/decisionSignals', () => ({
   decisionSignalsApi: { create: vi.fn() },
@@ -52,21 +53,10 @@ function Harness({ onCreated = vi.fn() }: { onCreated?: (result: DecisionSignalM
   );
 }
 
-function chooseOption(triggerId: string, value: string) {
-  const trigger = document.getElementById(triggerId)!;
-  fireEvent.click(trigger);
-  const listboxId = trigger.getAttribute('aria-controls')!;
-  const listbox = document.getElementById(listboxId)!;
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
-}
-
 function fillRequired(stockCode = '600519') {
   fireEvent.change(screen.getByLabelText('Stock code'), { target: { value: stockCode } });
-  chooseOption('manual-signal-market', 'cn');
-  chooseOption('manual-signal-action', 'buy');
+  chooseOption(document.getElementById('manual-signal-market')!, 'cn');
+  chooseOption(document.getElementById('manual-signal-action')!, 'buy');
 }
 
 function submit() {

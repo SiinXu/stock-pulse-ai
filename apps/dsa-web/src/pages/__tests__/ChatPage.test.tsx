@@ -10,16 +10,7 @@ import { extractStockCodeFromMessage, extractStockCodesFromMessage } from '../..
 import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
+import { createDeferred } from '../../test-utils';
 
 async function getReadySendButton(): Promise<HTMLButtonElement> {
   await act(async () => {

@@ -10,6 +10,7 @@ import {
 import { SCREEN_TASK_SESSION_STORAGE_KEY } from '../../utils/sessionPersistence';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import StockScreeningPage from '../StockScreeningPage';
+import { createDeferred } from '../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -115,16 +116,6 @@ const mockStrategiesResponse = {
   ],
   strategyCount: 1,
 };
-
-function createDeferred<T>() {
-  let resolve: (value: T) => void = () => {};
-  let reject: (reason?: unknown) => void = () => {};
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
-}
 
 const openScreeningConfiguration = () => {
   fireEvent.click(screen.getByRole('button', { name: '参数设置' }));

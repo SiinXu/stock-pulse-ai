@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type {
@@ -10,6 +10,7 @@ import type {
 } from '../../../types/decisionSignals';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { DecisionSignalOutcomeExplorer } from '../DecisionSignalOutcomeExplorer';
+import { chooseOption } from '../../../test-utils';
 
 const { listOutcomes } = vi.hoisted(() => ({
   listOutcomes: vi.fn(),
@@ -41,15 +42,6 @@ function response(
   page = 1,
 ): DecisionSignalOutcomeListResponse {
   return { items, total, page, pageSize: 20 };
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  fireEvent.click(trigger);
-  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
 }
 
 function renderExplorer(onOpenSignal = vi.fn()) {
