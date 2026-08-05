@@ -437,39 +437,111 @@ test('main BrowserWindow keeps preload access sandboxed and isolated', (t) => {
 test('main BrowserWindow navigation guards keep navigation on its selected Web origin', (t) => {
   const mainModule = loadMainModule(t);
   const navigationHandlers = new Map();
+  const openedUrls = [];
   mainModule.registerMainWindowNavigationGuards({
     on: (eventName, handler) => navigationHandlers.set(eventName, handler),
-  }, () => 'http://127.0.0.1:8123/?desktop_version=0.1.0');
+  }, () => 'http://127.0.0.1:8123/?desktop_version=0.1.0', (url) => {
+    openedUrls.push(url);
+  });
+
+  assert.deepEqual(
+    [...navigationHandlers.keys()].sort(),
+    ['will-navigate', 'will-redirect'],
+    'guard registers only will-navigate/will-redirect (not download channels)',
+  );
 
   for (const eventName of ['will-navigate', 'will-redirect']) {
     const handler = navigationHandlers.get(eventName);
     assert.equal(typeof handler, 'function', eventName);
 
     let prevented = false;
+    openedUrls.length = 0;
     handler({
       preventDefault: () => {
         prevented = true;
       },
     }, 'http://127.0.0.1:8123/login?redirect=%2Fsettings');
     assert.equal(prevented, false, `${eventName} same origin`);
+    assert.deepEqual(openedUrls, [], `${eventName} same origin must not openExternal`);
 
-    for (const blockedUrl of [
+    // External http(s) top-level navigations (e.g. report markdown <a href>
+    // without target=_blank), including other local ports/hosts, must be
+    // prevented AND handed to the system browser with the exact sanitized URL.
+    for (const externalUrl of [
+      'https://news.example/article?id=1',
+      'http://docs.example/path',
       'http://127.0.0.1:8124/',
       'http://localhost:8123/',
       'https://evil.example/',
+    ]) {
+      prevented = false;
+      openedUrls.length = 0;
+      handler({
+        preventDefault: () => {
+          prevented = true;
+        },
+      }, externalUrl);
+      assert.equal(prevented, true, `${eventName} ${externalUrl} prevented`);
+      assert.deepEqual(openedUrls, [externalUrl], `${eventName} ${externalUrl} openExternal`);
+    }
+
+    // Non-http(s) schemes stay blocked with no system-browser fallback.
+    for (const blockedUrl of [
       'blob:http://127.0.0.1:8123/renderer-content',
       'file:///tmp/escape.html',
+      'javascript:alert(1)',
       'not-a-url',
     ]) {
       prevented = false;
+      openedUrls.length = 0;
       handler({
         preventDefault: () => {
           prevented = true;
         },
       }, blockedUrl);
       assert.equal(prevented, true, `${eventName} ${blockedUrl}`);
+      assert.deepEqual(openedUrls, [], `${eventName} ${blockedUrl} must not openExternal`);
     }
   }
+});
+
+test('main navigation guard leaves a[download]+blob flows outside will-navigate', (t) => {
+  // Chromium/Electron does not fire will-navigate for <a download href="blob:...">
+  // clicks used by Settings .env backup and chat export. The guard only listens to
+  // will-navigate/will-redirect, so those downloads never reach guardNavigation.
+  // This test locks the registration surface and the blob: no-openExternal policy
+  // if a bare blob: navigation ever did hit the guard (e.g. without download attr).
+  const mainModule = loadMainModule(t);
+  const registeredEvents = [];
+  let willNavigateHandler = null;
+  const openedUrls = [];
+  mainModule.registerMainWindowNavigationGuards({
+    on: (eventName, handler) => {
+      registeredEvents.push(eventName);
+      if (eventName === 'will-navigate') {
+        willNavigateHandler = handler;
+      }
+    },
+  }, () => 'http://127.0.0.1:8123/', (url) => {
+    openedUrls.push(url);
+  });
+
+  assert.deepEqual([...registeredEvents].sort(), ['will-navigate', 'will-redirect']);
+  assert.equal(
+    registeredEvents.includes('will-download'),
+    false,
+    'guard must not register will-download (downloads use Chromium download path)',
+  );
+  assert.equal(typeof willNavigateHandler, 'function');
+
+  let prevented = false;
+  willNavigateHandler({
+    preventDefault: () => {
+      prevented = true;
+    },
+  }, 'blob:http://127.0.0.1:8123/export-content');
+  assert.equal(prevented, true);
+  assert.deepEqual(openedUrls, []);
 });
 
 test('main BrowserWindow opens only HTTP and HTTPS links outside the app', (t) => {

@@ -53,6 +53,26 @@
 
 ---
 
+### Q3b: 为什么我的港股没有被分析 / 查不到行情？
+
+**现象**：自选股里写了 `hk00700`、`00700`、`00700.HK` 等港股代码，分析失败、价格为空，或日志提示港股不支持 / 数据查询错误。
+
+**原因与数据链路（摘要）**：
+
+1. 港股是一等市场，但行情依赖多源回退，不是「填了任意 Token 就一定有港股日线」。
+2. **日线**按 HK 能力过滤后的 numeric priority 尝试：已配置且初始化成功的 **Tushare**（优先）→ **AkShare** → **YFinance** → 可选 **Longbridge**（见 [数据源稳定性](data-source-stability.md)）。
+3. **实时行情**：配置且可用的 Longbridge 优先，否则回退 YFinance / AkShare 等市场能力源。
+4. **已知坑**：若配置了 `TUSHARE_TOKEN` 但该账号**没有港股日线接口权限**，Tushare 会优先失败；表现可能与「不支持港股」类似（见 [完整指南](full-guide.md) 数据源说明）。此时应：升级 Tushare 港股权限，或**暂时去掉** `TUSHARE_TOKEN` 让链路走 AkShare / YFinance，或配置可用的 `LONGBRIDGE_*` 增强港美股实时/相关路径。
+
+**解决方案**：
+
+1. 确认代码格式可被识别为港股（如 `hk00700`、`00700.HK`、`00700`）；与 A 股六位码区分清楚。
+2. 检查日志里失败的 provider 与 fallback 顺序，对照 [数据源稳定性 · 港股](data-source-stability.md)。
+3. 有 `TUSHARE_TOKEN` 时先在 [Tushare Pro](https://tushare.pro/) 确认是否开通港股日线；无权限则勿强依赖该 Token 做港股。
+4. 免费源可能限流；可减少并发（`MAX_WORKERS=1`）或错峰重试。市场能力边界见 [市场支持](market-support.md#港股-hong-kong)。
+
+---
+
 ### Q4: 数据获取被限流或返回为空？
 
 **现象**：日志显示 `熔断器触发` 或数据返回 `None`，或出现 `RemoteDisconnected`、`push2his.eastmoney.com` 连接被关闭等

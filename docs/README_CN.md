@@ -199,7 +199,11 @@ python -m pip install --build-constraint build-constraints.txt -r requirements.t
 python -m pip check
 
 # 配置环境变量
-cp .env.example .env && vim .env
+cp .env.example .env
+# 最小首跑配置（与 .env.example 顶部三行一致）：
+# STOCK_LIST=600519,hk00700,AAPL
+# ANSPIRE_API_KEYS=          # 或 GEMINI_API_KEY / AIHUBMIX_KEY / DEEPSEEK_API_KEY
+# # SERPAPI_API_KEYS=        # 未用 Anspire 做搜索时可选用
 
 # 运行分析
 python main.py

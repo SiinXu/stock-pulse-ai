@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.
 - [Tests] Wait for decision-memory controls and legacy usage-route synchronization before asserting or interacting, eliminating full-suite timing races.
 - [Tests] Cover share-image parsing, merge, localization, safety, and branding contracts so the repository coverage floor remains enforceable after the upstream parity merge.
 - [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.
@@ -58,8 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Add `pytest-timeout` and `pytest-cov` to `.github/requirements-ci.txt` and refresh the universal dependency lock.
 - [Docs] Document offline gate timeout, coverage floor, and marker semantics in `docs/testing-ci-gate.md` and Contributing.
 
-
-- [Chore] Re-enabled automated PR review with fork-safe execution and a PR-size advisory.
+- [Docs] Align beginner desktop download names with published `daily-stock-analysis-*` assets and the `stockpulse-*` packaging pipeline.
+- [Docs] Surface a three-line minimal first-run config at the top of `.env.example` and in README Option B.
+- [Docs] Document Hong Kong provider chain, Tushare HK-permission gotcha, and FAQ/market-support entry points.
+- [Fixed] Localize legacy no-dashboard buy-reason and risk-warning labels in `report_markdown.j2` via report-language keys.
 
 - [Chore] Restart the StockPulse independent version line at 0.1.0 (rename the 4.0.0 release block and desktop package version; annotated tag remains a maintainer action).
 
