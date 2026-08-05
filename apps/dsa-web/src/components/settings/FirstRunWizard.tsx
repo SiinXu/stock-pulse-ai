@@ -4,6 +4,7 @@ import type React from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  Checkbox,
   CredentialInput,
   InlineAlert,
   Input,
@@ -45,6 +46,7 @@ import { decodeModelRef, encodeModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 import { LocalModelsPanel } from './LocalModelsPanel';
+import { CLI_AGENT_CAPABILITY_NOTE } from './aiTaskMatrix';
 
 export interface WizardDraftItem {
   key: string;
@@ -162,6 +164,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [fallbackModels, setFallbackModels] = useState(initialFallbackModels);
   const [visionModel, setVisionModel] = useState(initialVisionModel);
   const [cliBackend, setCliBackend] = useState('');
+  const [acknowledgeAgentOff, setAcknowledgeAgentOff] = useState(false);
   const [localModelReady, setLocalModelReady] = useState('');
   // Discovery results are candidates only: the user confirms which ones to
   // enable via the multi-select — never auto-selected wholesale.
@@ -621,7 +624,11 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       return [];
     }
     if (mode === 'cli') {
-      return [{ key: 'GENERATION_BACKEND', value: cliBackend }];
+      const items: WizardDraftItem[] = [{ key: 'GENERATION_BACKEND', value: cliBackend }];
+      if (acknowledgeAgentOff) {
+        items.push({ key: 'AGENT_FEATURES_ACKNOWLEDGED_OFF', value: 'true' });
+      }
+      return items;
     }
     if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return [];
@@ -949,17 +956,30 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         ) : null}
 
         {step === 'connection' && mode === 'cli' ? (
-          <div className="space-y-2">
-            <label htmlFor="wizard-cli" className="block text-sm text-foreground">
-              {text.chooseCli}
-            </label>
-            <Select
-              id="wizard-cli"
-              value={cliBackend}
-              onChange={setCliBackend}
-              options={CLI_BACKENDS}
-              placeholder={text.select}
-              className={SETTINGS_CONTROL_WIDTH_CLASS}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label htmlFor="wizard-cli" className="block text-sm text-foreground">
+                {text.chooseCli}
+              </label>
+              <Select
+                id="wizard-cli"
+                value={cliBackend}
+                onChange={setCliBackend}
+                options={CLI_BACKENDS}
+                placeholder={text.select}
+                className={SETTINGS_CONTROL_WIDTH_CLASS}
+              />
+            </div>
+            <InlineAlert
+              variant="info"
+              data-testid="wizard-cli-capability-note"
+              message={CLI_AGENT_CAPABILITY_NOTE[language] || text.cliCapabilityNote}
+            />
+            <Checkbox
+              id="wizard-ack-agent-off"
+              checked={acknowledgeAgentOff}
+              onChange={(event) => setAcknowledgeAgentOff(event.target.checked)}
+              label={text.acknowledgeAgentOff}
             />
           </div>
         ) : null}
@@ -1158,6 +1178,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 ? formatUiText(text.localReviewDescription, { model: localModelReady })
                 : text.reviewDescription}
             />
+            {mode === 'cli' ? (
+              <InlineAlert
+                variant="info"
+                data-testid="wizard-cli-capability-note-review"
+                message={CLI_AGENT_CAPABILITY_NOTE[language] || text.cliCapabilityNote}
+              />
+            ) : null}
             {/* User-facing summary only — no internal keys such as LLM_CHANNELS. */}
             <dl className="space-y-1.5 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm">
               <div className="flex justify-between gap-3">

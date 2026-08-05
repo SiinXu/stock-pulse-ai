@@ -61,6 +61,11 @@ const BackendStatusRow: React.FC<{ title: string; status: GenerationBackendStatu
               ? t('settings.generationBackendLocalCliDescription')
               : t('settings.generationBackendLiteLLMDescription')}
           </p>
+          {status.backendType === 'local_cli' && !status.supportsTools ? (
+            <p className="mt-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
+              {t('settings.cliAgentCapabilityNote')}
+            </p>
+          ) : null}
           {status.lastErrorMessage ? (
             <p className="mt-2 text-xs leading-5 text-warning">
               {status.lastErrorCode ? `${status.lastErrorCode}: ` : ''}
