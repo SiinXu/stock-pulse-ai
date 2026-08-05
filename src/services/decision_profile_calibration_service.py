@@ -75,7 +75,7 @@ def is_decision_profile_calibration_enabled(config: Any = None) -> bool:
             from src.config import Config
 
             config = Config.get_instance()
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - gate stays off if config unavailable
             log_safe_exception(
                 logger,
                 "Failed to load config for decision profile calibration gate",
