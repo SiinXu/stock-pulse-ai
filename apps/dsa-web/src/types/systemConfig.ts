@@ -69,6 +69,7 @@ export type SystemConfigUIPlacement =
   | 'model_access'
   | 'task_routing'
   | 'developer_diagnostics'
+  | 'local_models'
   | 'hidden_legacy';
 
 export interface SystemConfigFieldSchema {

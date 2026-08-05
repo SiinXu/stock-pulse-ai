@@ -136,6 +136,7 @@ def _extract_option_values(options: List[Any]) -> List[str]:
 #   - model_access: edited exclusively by the model-access connection manager
 #   - task_routing: task model selectors (report / agent / vision) and routing
 #   - developer_diagnostics: advanced diagnostics, collapsed by default
+#   - local_models: optional local finance model keys (Kronos), dedicated panel
 #   - hidden_legacy: legacy provider keys kept for back-compat; readable through
 #     the API but never rendered as a generic editable settings field
 #   - None: regular field, rendered by its category page as usual
@@ -159,6 +160,12 @@ _UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({
     "OPENCODE_CLI_MODEL",
 })
 _UI_PLACEMENT_DIAGNOSTICS_PREFIXES = ("LLM_PROMPT_CACHE_", "LLM_USAGE_HMAC_")
+
+_UI_PLACEMENT_LOCAL_MODELS_KEYS = frozenset({
+    "KRONOS_ENABLED",
+    "KRONOS_MODEL_SIZE",
+    "KRONOS_WEIGHTS_DIR",
+})
 
 _UI_PLACEMENT_HIDDEN_LEGACY_KEYS = frozenset({
     "AIHUBMIX_KEY",
@@ -188,6 +195,8 @@ def derive_ui_placement(key: str) -> Optional[str]:
         _UI_PLACEMENT_DIAGNOSTICS_PREFIXES
     ):
         return "developer_diagnostics"
+    if key_upper in _UI_PLACEMENT_LOCAL_MODELS_KEYS:
+        return "local_models"
     if key_upper in _UI_PLACEMENT_HIDDEN_LEGACY_KEYS or key_upper.startswith(
         _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES
     ):
