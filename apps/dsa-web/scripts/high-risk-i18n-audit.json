@@ -490,6 +490,7 @@
         }
       ],
       "snapshot": {
+<<<<<<< HEAD
         "keyCount": 114,
         "keySetSha256": "fb03e962cdcbe7e6bf2d2f23ec859dfbad5e5691d073659e4cd765142d450d74",
         "bundleSha256": {
@@ -503,6 +504,21 @@
           "ms": "725d9a0980992a43b4119e709c1bfdceff53a83d605552b4d749e5b191665409",
           "fr": "3c8e1cfdb5b5466a53636265d2325d0fd56c2d916ed21165973fa5916d008b91",
           "id": "58c0127b9d0594c527b9e83cdcb9f3d696921be52e9b974965d6852522c1eb1a"
+=======
+        "keyCount": 116,
+        "keySetSha256": "06d6c0b579fa4515499816be335181df2b362ec7ed4b29f7da93a67ea3c4c75e",
+        "bundleSha256": {
+          "zh": "335a9cd7f98bbe6e7d82db40b1f81620ef150ff28d80e795650a5d89833c37e1",
+          "zh-TW": "ec6ba81aa02a1ee29eaa742062da6eb5d2e6dddbb5e48de358c98cfcdd24d5b8",
+          "en": "da6ae181100d2c0337104e648ad1b82a496069fbe7c2fceb62072986df588246",
+          "ja": "cc550886fc8a1525c15331c1200722b5951e7711f843e52a5f21804e03012995",
+          "ko": "b26a33732b301cb685e6bb923632a38a9bf0979942db60f48ab4532d2988e5d0",
+          "de": "c406f2ab0c775416730b93d542813396dfcfdaa26d0e285b0b0e9a5674912cda",
+          "es": "39f3837e97a021c60ba9fe6ecef96e6997436a0320dc590e837c6739b1bc3ce1",
+          "ms": "11f6835440464acec59d544bb490a379b7dcff7a41e86ebd049c6e5bf10c2ca4",
+          "fr": "f13b9dea78b4f6e2c2bd1abb6f1756ba96024113d5e49fc7c6c48f946ea08337",
+          "id": "dfcd52492fb0d242779c92c27d12df7da3ee7b34507c458347626b62706b49fd"
+>>>>>>> origin/main
         }
       }
     },
@@ -653,6 +669,8 @@
         "scheduler_busy",
         "security_audit_auth_required",
         "security_audit_unavailable",
+        "share_image_content_too_large",
+        "share_image_unavailable",
         "unauthorized",
         "unsupported_alert_type",
         "validation_error",
@@ -818,6 +836,14 @@
         "security_audit_unavailable": [
           "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
           "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message"
+        ],
+        "share_image_content_too_large": [
+          "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title",
+          "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message"
+        ],
+        "share_image_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message"
         ],
         "unauthorized": [
           "api.error.STABLE_ERROR_TEXT.unauthorized.title",

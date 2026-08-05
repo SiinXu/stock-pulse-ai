@@ -20,7 +20,14 @@
   -> wkhtmltoimage / markdown-to-file / Playwright 输出 PNG
 ```
 
-`MARKDOWN_TO_IMAGE_CHANNELS`、`MD2IMG_ENGINE`、`MARKDOWN_TO_IMAGE_MAX_CHARS` 继续控制哪些通知渠道转图、使用哪个引擎以及最大输入长度。转换失败时仍回退为文本通知。
+`MARKDOWN_TO_IMAGE_CHANNELS`、`MD2IMG_ENGINE`、`MARKDOWN_TO_IMAGE_MAX_CHARS` 继续控制哪些通知渠道转图、使用哪个引擎以及 IM 通知图片的最大输入长度。转换失败时仍回退为文本通知。
+
+Web/API 历史报告一键分享使用独立上限 `SHARE_IMAGE_MAX_CHARS`（默认 `100000`），不再复用 IM 的 `15000` 上限。默认值按完整 `detailed` 报告与多市场复盘的常见体量（约 2 万–6 万字符）留出余量；超过该上限时接口返回 **HTTP 413**，稳定错误码 `share_image_content_too_large`，并在 `params` 中提供 `limit` / `actual`。真正缺少转图引擎或渲染失败仍返回 **503** `share_image_unavailable`（含安装指引），与内容过长区分。
+
+```dotenv
+# Independent of MARKDOWN_TO_IMAGE_MAX_CHARS (IM notifications stay at 15000)
+SHARE_IMAGE_MAX_CHARS=100000
+```
 
 ## 转图引擎能力矩阵
 
@@ -47,11 +54,13 @@ SHARE_IMAGE_XIAOHONGSHU_QR_PATH=assets/my-xiaohongshu-qr.png
 
 ## Web 一键分享
 
-浏览器版历史个股报告、市场复盘和完整报告抽屉右上角都会显示“分享”按钮。页面加载报告时会先调用 `GET /api/v1/history/{record_id}/share-image` 预生成并缓存 PNG，准备完成后按钮才可点击，因此 `navigator.share()` 能在点击的瞬时用户激活窗口内同步发起。支持文件分享的浏览器会打开系统分享面板；其他浏览器会直接下载 PNG。如果浏览器已声明支持文件分享、但系统分享面板实际打开失败，除用户主动取消外也会自动回退下载已经生成的 PNG。
+浏览器版历史个股报告、市场复盘和完整报告抽屉右上角都会显示“分享”按钮。首次点击时请求 `GET /api/v1/history/{record_id}/share-image` 生成并缓存 PNG；支持文件分享的浏览器在第二次点击时于用户激活窗口内调用 `navigator.share()`，其他浏览器直接下载 PNG。如果浏览器已声明支持文件分享、但系统分享面板实际打开失败，除用户主动取消外也会自动回退下载已经生成的 PNG。
+
+失败态会展示后端稳定错误码的本地化文案（例如 `share_image_unavailable` 的引擎安装指引，或 `share_image_content_too_large` 的长度上限），而不是只显示无上下文的“重试”。浏览器对该接口使用约 90 秒的独立请求超时，避免冷启动 Playwright 渲染被全局 30 秒超时误判。
 
 Electron 桌面运行时默认不展示该按钮。当前 Windows/macOS 打包版不会随包分发 `wkhtmltoimage`、`markdown-to-file` 或 Playwright/Chromium renderer，避免桌面用户在页面加载时就命中 `share_image_unavailable` 失败态。
 
-Web 手工生成不受 `MARKDOWN_TO_IMAGE_CHANNELS` 限制，但服务端仍需配置可用的 `MD2IMG_ENGINE`。使用 Playwright 时先执行：
+Web 手工生成不受 `MARKDOWN_TO_IMAGE_CHANNELS` 限制，但服务端仍需配置可用的 `MD2IMG_ENGINE`，并遵守 `SHARE_IMAGE_MAX_CHARS`。使用 Playwright 时先执行：
 
 ```bash
 cd apps/dsa-web

@@ -95,7 +95,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "InvestmentFrameworkVersionRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "d8a0488c52fad2733cfaa5bd4b845e0b2c6562b61d86e12bf616687fa07945a3"
+    "f537207730c1e2aabb02112b4d64a4d5e3ea6b4f859d2a32979b24cc470f5569"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
