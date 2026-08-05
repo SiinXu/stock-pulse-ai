@@ -273,7 +273,14 @@ class BaostockFetcher(BaseFetcher):
             raise
         except DataFetchError:
             raise
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Map library failures to DataFetchError for manager fallback.
+            log_safe_exception(
+                logger,
+                "Baostock raw data fetch failed",
+                e,
+                error_code="baostock_raw_data_fetch_failed",
+                level=logging.DEBUG,
+            )
             raise DataFetchError(f"Baostock 获取数据失败: {e}") from e
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
@@ -428,5 +435,12 @@ if __name__ == "__main__":
         name = fetcher.get_stock_name('600519')
         print(f"股票名称: {name}")
         
-    except Exception as e:
+    except Exception as e:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        log_safe_exception(
+            logger,
+            "Baostock manual smoke failed",
+            e,
+            error_code="baostock_manual_smoke_failed",
+            level=logging.ERROR,
+        )
         print(f"获取失败: {e}")

@@ -236,7 +236,7 @@ class PytdxFetcher(BaseFetcher):
                         self._current_host_idx = host_idx
                         logger.debug(f"Pytdx 连接成功: {host}:{port}")
                         break
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Try next host after connection failure.
                     log_safe_exception(
                         logger,
                         "Pytdx server connection failed",
@@ -408,7 +408,14 @@ class PytdxFetcher(BaseFetcher):
             raise
         except DataFetchError:
             raise
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Map library failures to DataFetchError for manager fallback.
+            log_safe_exception(
+                logger,
+                "Pytdx raw data fetch failed",
+                e,
+                error_code="pytdx_raw_data_fetch_failed",
+                level=logging.DEBUG,
+            )
             raise DataFetchError(f"Pytdx 获取数据失败: {e}") from e
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
@@ -565,5 +572,12 @@ if __name__ == "__main__":
         quote = fetcher.get_realtime_quote('600519')
         print(f"实时行情: {quote}")
         
-    except Exception as e:
+    except Exception as e:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        log_safe_exception(
+            logger,
+            "Pytdx manual smoke failed",
+            e,
+            error_code="pytdx_manual_smoke_failed",
+            level=logging.ERROR,
+        )
         print(f"获取失败: {e}")
