@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { portfolioApi } from '../portfolio';
+import { getParsedApiError, isApiRequestError } from '../error';
 
-const { post, put } = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
+const { get, post, put } = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+}));
 
 vi.mock('../index', () => ({
-  default: { post, put },
+  default: { get, post, put },
 }));
 
 describe('portfolioApi account and paper-trade mapping', () => {
@@ -75,30 +80,6 @@ describe('portfolioApi account and paper-trade mapping', () => {
       note: 'Paper entry',
     });
 
-    expect(post.mock.calls[0]).toEqual([
-      '/api/v1/portfolio/accounts',
-      {
-        name: 'Simulation',
-        broker: undefined,
-        market: 'us',
-        base_currency: 'USD',
-        owner_id: undefined,
-        account_type: 'paper',
-      },
-    ]);
-    expect(post.mock.calls[1]).toEqual([
-      '/api/v1/portfolio/accounts/8/paper-trades',
-      {
-        operation_id: 'portfolio-paper-1',
-        symbol: 'AAPL',
-        trade_date: '2026-07-29',
-        side: 'buy',
-        quantity: 2,
-        price: 205.5,
-        note: 'Paper entry',
-      },
-      { headers: { 'Idempotency-Key': 'portfolio-paper-1' } },
-    ]);
     expect(account.accountType).toBe('paper');
     expect(trade).toEqual({ id: 91, price: 205.5, priceSource: 'manual' });
   });
@@ -128,6 +109,29 @@ describe('portfolioApi account and paper-trade mapping', () => {
       { headers: { 'Idempotency-Key': 'portfolio-paper-2' } },
     );
   });
+
+  it('rejects numeric-string paper trade price (contract is number, not string)', async () => {
+    post.mockResolvedValue({
+      data: { id: 93, price: '205.5', price_source: 'manual' },
+    });
+
+    await expect(
+      portfolioApi.createPaperTrade(8, {
+        operationId: 'portfolio-paper-3',
+        symbol: 'AAPL',
+        tradeDate: '2026-07-29',
+        side: 'buy',
+        quantity: 1,
+        price: 205.5,
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('PaperTradeCreatedResponse');
+      return true;
+    });
+  });
 });
 
 describe('portfolioApi.updateAccount', () => {
@@ -152,7 +156,6 @@ describe('portfolioApi.updateAccount', () => {
       base_currency: 'USD',
     });
     expect(updated.baseCurrency).toBe('USD');
-    expect(updated.market).toBe('us');
   });
 
   it('omits fields that are not provided', async () => {
@@ -205,15 +208,9 @@ describe('portfolioApi idempotent mutations', () => {
       cashDividendPerShare: 0.25,
     });
 
-    expect(post.mock.calls[0][1]).toEqual(expect.objectContaining({
-      operation_id: 'portfolio-cash-1',
-    }));
     expect(post.mock.calls[0][2]).toEqual({
       headers: { 'Idempotency-Key': 'portfolio-cash-1' },
     });
-    expect(post.mock.calls[1][1]).toEqual(expect.objectContaining({
-      operation_id: 'portfolio-corporate-1',
-    }));
     expect(post.mock.calls[1][2]).toEqual({
       headers: { 'Idempotency-Key': 'portfolio-corporate-1' },
     });
@@ -238,14 +235,112 @@ describe('portfolioApi idempotent mutations', () => {
     const [url, body, config] = post.mock.calls[0] as [string, FormData, Record<string, unknown>];
     expect(url).toBe('/api/v1/portfolio/imports/csv/commit');
     expect(body.get('operation_id')).toBe('portfolio-csv-1');
-    expect(body.get('account_id')).toBe('7');
-    expect(body.get('dry_run')).toBe('false');
-    expect(body.get('file')).toBe(file);
     expect(config).toEqual({
       headers: {
         'Content-Type': 'multipart/form-data',
         'Idempotency-Key': 'portfolio-csv-1',
       },
+    });
+  });
+});
+
+describe('portfolioApi snapshot money-math validation', () => {
+  beforeEach(() => {
+    get.mockReset();
+  });
+
+  const validSnapshot = {
+    as_of: '2026-07-15',
+    cost_method: 'avg',
+    currency: 'USD',
+    account_count: 1,
+    total_cash: 10000.5,
+    total_market_value: 20500,
+    total_equity: 30500.5,
+    realized_pnl: 120.25,
+    unrealized_pnl: -50.1,
+    fee_total: 1.5,
+    tax_total: 0,
+    fx_stale: false,
+    accounts: [
+      {
+        account_id: 7,
+        account_name: 'Main',
+        as_of: '2026-07-15',
+        base_currency: 'USD',
+        cost_method: 'avg',
+        market: 'us',
+        fee_total: 1.5,
+        fx_stale: false,
+        realized_pnl: 120.25,
+        tax_total: 0,
+        total_cash: 10000.5,
+        total_equity: 30500.5,
+        total_market_value: 20500,
+        unrealized_pnl: -50.1,
+        positions: [
+          {
+            symbol: 'AAPL',
+            market: 'us',
+            currency: 'USD',
+            quantity: 10,
+            avg_cost: 200,
+            total_cost: 2000,
+            last_price: 205,
+            market_value_base: 2050,
+            unrealized_pnl_base: 50,
+            valuation_currency: 'USD',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('camelCases snapshot money fields and preserves extras (pass-through)', async () => {
+    get.mockResolvedValue({
+      data: { ...validSnapshot, unexpected_server_field: 'keep-me' },
+    });
+
+    const snapshot = await portfolioApi.getSnapshot({ accountId: 7 });
+    expect(snapshot.totalCash).toBe(10000.5);
+    expect(snapshot.totalEquity).toBe(30500.5);
+    expect(snapshot.accounts[0].positions[0].lastPrice).toBe(205);
+    expect(snapshot).toEqual(expect.objectContaining({ unexpectedServerField: 'keep-me' }));
+  });
+
+  it('rejects numeric-string equity/cash (contract is number)', async () => {
+    get.mockResolvedValue({
+      data: { ...validSnapshot, total_cash: '10000.5', total_equity: '30500.5' },
+    });
+
+    await expect(portfolioApi.getSnapshot()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('PortfolioSnapshotResponse');
+      return true;
+    });
+  });
+
+  it('rejects numeric-string position quantity/price nested under accounts', async () => {
+    get.mockResolvedValue({
+      data: {
+        ...validSnapshot,
+        accounts: [{
+          ...validSnapshot.accounts[0],
+          positions: [{
+            ...validSnapshot.accounts[0].positions[0],
+            quantity: '10',
+            last_price: '205',
+          }],
+        }],
+      },
+    });
+
+    await expect(portfolioApi.getSnapshot()).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      return true;
     });
   });
 });

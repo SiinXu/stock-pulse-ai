@@ -635,6 +635,13 @@ function signalItem(id: number, code: string, marker: string) {
     plan_quality: 'complete',
     status: 'active',
     created_at: '2026-07-15T12:00:00Z',
+    // OpenAPI DecisionSignalItem.required includes presentation.
+    presentation: {
+      action: 'watch',
+      label: marker,
+      confidence: 0.8,
+      summary: `${marker} signal`,
+    },
   };
 }
 
@@ -2242,7 +2249,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.route('**/api/v1/decision-signals/**', async (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith('/outcomes/stats')) {
-        await fulfillJson(route, { total: 0, hit: 0, miss: 0, unable: 0, hit_rate_pct: 0, unable_reasons: {}, breakdowns: {} });
+        await fulfillJson(route, { engine_version: 'e2e', total: 0, completed: 0, unable: 0, hit: 0, miss: 0, neutral: 0, hit_rate_pct: 0, unable_reasons: {}, breakdowns: {} });
         return;
       }
       if (url.pathname.endsWith('/latest/OLD')) {

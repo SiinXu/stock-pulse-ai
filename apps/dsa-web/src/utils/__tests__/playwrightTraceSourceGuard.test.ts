@@ -45,7 +45,7 @@ function configWithProjectOverride(override: string): string {
 
 describe('Playwright credential-bearing trace source guard', () => {
   // Full-tree scan is intentionally heavier; give CI runners headroom beyond the 5s default.
-  it('accepts the current production E2E sources without false positives', () => {
+  it('accepts the current production E2E sources without false positives', { timeout: 30_000 }, () => {
     const sources = readSourceTree('.');
     const e2eEntries = Object.keys(sources).filter((filename) => filename.startsWith('./e2e/'));
     const violations = findPlaywrightTraceSourceGraphViolations(
@@ -54,7 +54,7 @@ describe('Playwright credential-bearing trace source guard', () => {
     );
 
     expect(violations).toEqual([]);
-  }, 20_000);
+  });
 
   it('allows only a literal trace-off option and ignores comments and string content', () => {
     const source = `
