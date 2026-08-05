@@ -4,23 +4,11 @@ import type { ReactNode } from 'react';
 import { useUiLanguage, UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { NotificationTestPanel } from '../NotificationTestPanel';
+import { chooseOption, openListbox } from '../../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
-}
-
-function openListbox(trigger: HTMLElement) {
-  fireEvent.click(trigger);
-  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  const listbox = openListbox(trigger);
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
 }
 
 const testNotificationChannel = vi.hoisted(() => vi.fn());

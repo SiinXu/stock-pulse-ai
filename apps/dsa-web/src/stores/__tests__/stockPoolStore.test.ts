@@ -11,6 +11,7 @@ import type {
 } from '../../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../../utils/format';
 import { useStockPoolStore } from '../stockPoolStore';
+import { createDeferred } from '../../test-utils';
 
 vi.mock('../../api/history', () => ({
   historyApi: {
@@ -107,16 +108,6 @@ function createTaskListResponse(
     processing,
     tasks,
   };
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
 }
 
 describe('stockPoolStore', () => {

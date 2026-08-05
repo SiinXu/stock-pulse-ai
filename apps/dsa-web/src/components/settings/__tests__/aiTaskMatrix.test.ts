@@ -84,11 +84,26 @@ describe('resolveAiTaskMatrix', () => {
       expect(report.active).toBe(false);
     });
 
-    it('treats a selected local CLI backend as active without a route set', () => {
+    it('treats report tasks as active for local CLI without a route set', () => {
       const rows = resolveAiTaskMatrix(accessor({ GENERATION_BACKEND: 'codex_cli' }), {
         availableRoutes: new Set<string>(),
       });
-      expect(rows.every((row) => row.status === 'active')).toBe(true);
+      // Report/market-review run on CLI; Agent/vision still need an API model route.
+      expect(rows.find((row) => row.id === 'report')!.status).toBe('active');
+      expect(rows.find((row) => row.id === 'market_review')!.status).toBe('active');
+      expect(rows.find((row) => row.id === 'agent')!.status).toBe('unconfigured');
+      expect(rows.find((row) => row.id === 'vision')!.status).toBe('unconfigured');
+    });
+
+    it('marks Agent active for CLI when an API model is available', () => {
+      const rows = resolveAiTaskMatrix(
+        accessor({
+          GENERATION_BACKEND: 'codex_cli',
+          AGENT_LITELLM_MODEL: 'openai/gpt-4o',
+        }),
+        { availableRoutes: new Set(['openai/gpt-4o']) },
+      );
+      expect(rows.find((row) => row.id === 'agent')!.status).toBe('active');
     });
 
     it('falls back to non-empty status when no route set is provided', () => {
