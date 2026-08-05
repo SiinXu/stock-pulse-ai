@@ -368,6 +368,18 @@ def run_full_analysis(
             daily_market_context_enabled=should_use_daily_market_context,
             daily_market_context_allow_generate=should_use_daily_market_context,
         )
+        # End-of-run CLI summary capture lives here: this is where stock results,
+        # local report saves, and notification dispatch already aggregate.
+        from src.app.cli import (
+            CliRunSummary,
+            CliRunSummaryCapture,
+            analyzer_has_no_usable_llm,
+            build_notification_summary_lines,
+            emit_cli_run_summary,
+        )
+
+        summary_capture = CliRunSummaryCapture()
+        summary_capture.install(pipeline.notifier)
         if should_use_daily_market_context:
             # Prompt-side context can reuse historical summaries, while full-merge
             # content must avoid silently reusing unrelated historical reports.
@@ -630,6 +642,59 @@ def run_full_analysis(
                 error_code="main_automated_backtest_failed",
                 level=logging.WARNING,
             )
+
+        # Compact human-facing end-of-run summary (CLI analysis paths).
+        try:
+            dry_run = bool(getattr(args, "dry_run", False))
+            attempted_codes = list(stock_codes or [])
+            ok_count = None
+            failed_count = None
+            if attempted_codes:
+                if dry_run:
+                    ok_count = 0
+                    for code in attempted_codes:
+                        try:
+                            target_date = pipeline._resolve_resume_target_date(
+                                code,
+                                current_time=analysis_reference_time,
+                            )
+                            if pipeline.db.has_today_data(code, target_date):
+                                ok_count += 1
+                        except Exception:  # broad-exception: cleanup - Best-effort per-stock dry-run success count
+                            pass
+                    failed_count = max(0, len(attempted_codes) - int(ok_count or 0))
+                else:
+                    ok_count = len(results or [])
+                    failed_count = max(0, len(attempted_codes) - ok_count)
+
+            emit_cli_run_summary(
+                CliRunSummary(
+                    ok_count=ok_count,
+                    failed_count=failed_count,
+                    report_paths=list(dict.fromkeys(summary_capture.report_paths)),
+                    notifications=build_notification_summary_lines(
+                        capture=summary_capture,
+                        notifier=pipeline.notifier,
+                        dry_run=dry_run,
+                        no_notify=bool(getattr(args, "no_notify", False)),
+                    ),
+                    dry_run=dry_run,
+                    no_llm=analyzer_has_no_usable_llm(getattr(pipeline, "analyzer", None)),
+                )
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - summary must not fail the run
+            log_safe_exception(
+                logger,
+                "CLI run summary emission failed",
+                exc,
+                error_code="main_cli_run_summary_failed",
+                level=logging.WARNING,
+            )
+        finally:
+            try:
+                summary_capture.restore()
+            except Exception:  # broad-exception: cleanup - Best-effort restore of temporary notifier wrappers
+                pass
 
         return True
 
