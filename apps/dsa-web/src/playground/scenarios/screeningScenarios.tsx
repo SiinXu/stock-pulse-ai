@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
 import { useState } from 'react';
 import { MiniSparkline } from '../../components/screening/MiniSparkline';
 import { ScreenAlertMessage } from '../../components/screening/ScreenAlertMessage';
