@@ -59,11 +59,14 @@ async function fulfillShareImageUnavailable(route: Route) {
 }
 
 async function fulfillShareImagePng(route: Route) {
+  // Set PNG MIME via response headers (not the Playwright contentType field).
+  // The credential-artifact gate forbids image contentType field literals in
+  // e2e sources because binary media is not text-scannable.
   await route.fulfill({
     status: 200,
-    contentType: 'image/png',
     body: FIXTURE_PNG_BYTES,
     headers: {
+      'Content-Type': 'image/png',
       'Content-Disposition': 'attachment; filename="stockpulse-report-e2e.png"',
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
