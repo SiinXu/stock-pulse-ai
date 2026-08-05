@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 from tests.litellm_stub import ensure_litellm_stub
 
@@ -132,9 +133,15 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.fetcher._set_random_user_agent.assert_called_once()
         self.fetcher._enforce_rate_limit.assert_called_once()
 
+    @pytest.mark.benchmark
     @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_parallel_cold_lookups_share_one_em_request(self, mock_cb):
-        """Concurrent symbol lookups must coalesce the cold market refresh."""
+        """Concurrent symbol lookups must coalesce the cold market refresh.
+
+        Wall-clock / barrier case (sleep + threading.Barrier). Excluded from the
+        blocking offline gate via ``benchmark``; scheduled in
+        ``.github/workflows/benchmarks.yml``.
+        """
         mock_cb.return_value = _DummyCircuitBreaker()
         codes = ["00700", "09988", "03690", "01810"]
         em_df = pd.concat(

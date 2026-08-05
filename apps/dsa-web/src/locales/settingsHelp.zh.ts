@@ -302,6 +302,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 A 股日 K 获取的数据源尝试顺序；实时行情仍由 REALTIME_SOURCE_PRIORITY 单独决定。'],
     notes: ['如果希望优先使用 TickFlow 日 K，可以适当调低该值；如果希望实时行情优先使用 TickFlow，请在 REALTIME_SOURCE_PRIORITY 中显式加入 tickflow。'],
   },
+  'settings.data_source.TENCENT_PRIORITY': {
+    title: '腾讯日 K 优先级',
+    summary: '控制腾讯直连日 K 在 A 股数据源回退链中的位置。',
+    usage: '填写整数；数字越小越早尝试，默认 5，保持腾讯作为内置最终兜底。',
+    valueNotes: ['该设置只影响日 K 等通用数据源回退链，不控制实时行情源顺序。'],
+    impact: ['影响 A 股日 K 获取的数据源尝试顺序；实时行情仍由 REALTIME_SOURCE_PRIORITY 单独决定。'],
+    notes: ['除非有意调整腾讯日 K 在回退链中的位置，否则建议保持默认 5。'],
+  },
   'settings.data_source.TICKFLOW_KLINE_ADJUST': {
     title: 'TickFlow 日 K 复权模式',
     summary: '控制 TickFlow 日 K 线的复权口径。',

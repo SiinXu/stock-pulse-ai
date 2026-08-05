@@ -183,6 +183,7 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/ghcr-dockerhub.yml", "build-and-push", "packages", "write"),
         (".github/workflows/issue-claim.yml", "claim", "issues", "write"),
         (".github/workflows/network-smoke.yml", "smoke", "contents", "read"),
+        (".github/workflows/benchmarks.yml", "benchmark", "contents", "read"),
         (".github/workflows/pr-review.yml", "security-check", "contents", "read"),
         (".github/workflows/pr-review.yml", "auto-check", "contents", "read"),
         (".github/workflows/pr-review.yml", "ai-review", "contents", "read"),

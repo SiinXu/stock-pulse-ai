@@ -11,12 +11,32 @@ The floor is intentionally measured, not aspirational: set it to
 ``measured_percent - epsilon`` after a clean offline run. Raising the floor is
 always allowed; lowering it requires an explicit ``--allow-lower`` flag so
 accidental regressions cannot silently rewrite the baseline.
+
+Anti-lowering vs ``origin/main``
+--------------------------------
+The working-tree ``floor_percent`` must not fall below the value checked in on
+``origin/main`` (see ``assert_floor_not_lowered_vs_ref``). Raising is free.
+Missing refs / first-run clones skip the comparison with a logged notice.
+
+Legitimate floor lowering (maintainers only; keep it honest and loud)
+---------------------------------------------------------------------
+1. Re-measure the offline suite and run
+   ``python scripts/check_coverage_floor.py --write-baseline --allow-lower``.
+2. Open a dedicated PR that lowers ``floor_percent`` and explains the regression.
+3. In that same PR, set environment variable
+   ``COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN=1`` for the gate job *or* temporarily
+   edit this script's comparison so review sees an explicit maintainer decision
+   (do not silently lower only the JSON).
+4. After merge, clear the override so the ratchet re-arms against the new floor
+   on ``origin/main``.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -29,7 +49,9 @@ DEFAULT_BASELINE = ROOT / "scripts" / "coverage_floor_baseline.json"
 DEFAULT_REPORT = ROOT / "coverage.json"
 BASELINE_VERSION = 1
 DEFAULT_EPSILON = 0.5
+DEFAULT_MAIN_REF = "origin/main"
 SCOPED_PACKAGES = ("src", "api", "data_provider", "bot")
+ALLOW_LOWER_VS_MAIN_ENV = "COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN"
 
 
 class BaselineError(ValueError):
@@ -60,7 +82,9 @@ class Baseline:
                 "Measured offline-suite line-coverage floor for the packages "
                 "listed under packages. Floor is measured_percent - epsilon. "
                 "Do not lower floor_percent without an explicit --allow-lower "
-                "review; raise it only after a clean offline measurement."
+                "review; raise it only after a clean offline measurement. "
+                "The gate also refuses a working-tree floor lower than "
+                f"{DEFAULT_MAIN_REF} unless {ALLOW_LOWER_VS_MAIN_ENV}=1."
             ),
             "packages": list(self.packages),
             "floor_percent": self.floor_percent,
@@ -136,15 +160,7 @@ def serialize_baseline(baseline: Baseline) -> str:
 def read_total_percent(report_path: Path) -> float:
     """Extract totals.percent_covered from a coverage.py JSON report."""
 
-    try:
-        payload = json.loads(report_path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ReportError(f"coverage report not found: {report_path}") from exc
-    except json.JSONDecodeError as exc:
-        raise ReportError(f"coverage report is not valid JSON: {exc}") from exc
-
-    if not isinstance(payload, dict):
-        raise ReportError("coverage report root must be an object")
+    payload = _load_report_payload(report_path)
     totals = payload.get("totals")
     if not isinstance(totals, Mapping):
         raise ReportError("coverage report missing totals object")
@@ -158,6 +174,81 @@ def read_total_percent(report_path: Path) -> float:
     if not 0.0 <= value <= 100.0:
         raise ReportError(f"percent_covered out of range: {value}")
     return value
+
+
+def _load_report_payload(report_path: Path) -> dict[str, Any]:
+    """Load a coverage.py JSON report object."""
+
+    try:
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ReportError(f"coverage report not found: {report_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ReportError(f"coverage report is not valid JSON: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise ReportError("coverage report root must be an object")
+    return payload
+
+
+def report_file_paths(report_path: Path) -> tuple[str, ...]:
+    """Return measured file paths from a coverage.py JSON report."""
+
+    payload = _load_report_payload(report_path)
+    files = payload.get("files")
+    if files is None:
+        return ()
+    if not isinstance(files, Mapping):
+        raise ReportError("coverage report files must be an object when present")
+    return tuple(str(path) for path in files.keys())
+
+
+def package_prefixes_missing(
+    file_paths: Sequence[str],
+    packages: Sequence[str],
+) -> list[str]:
+    """Return baseline package prefixes with no measured files in the report.
+
+    A path matches package ``P`` when it is exactly ``P``, starts with ``P/``,
+    or starts with ``P\\`` (Windows-style). This makes ``baseline.packages``
+    enforceable: narrowing ``--cov=`` to a single well-covered package fails.
+    """
+
+    missing: list[str] = []
+    for package in packages:
+        prefix_fwd = f"{package}/"
+        prefix_bwd = f"{package}\\"
+        if any(
+            path == package
+            or path.startswith(prefix_fwd)
+            or path.startswith(prefix_bwd)
+            for path in file_paths
+        ):
+            continue
+        missing.append(package)
+    return missing
+
+
+def assert_cov_flags_match_packages(
+    cov_packages: Sequence[str],
+    baseline_packages: Sequence[str],
+) -> list[str]:
+    """Return violations when ``--cov`` packages do not match the baseline.
+
+    Order-sensitive exact match: the gate must pass the same package list the
+    baseline documents, so the measured total cannot silently exclude scopes.
+    """
+
+    cov_list = list(cov_packages)
+    base_list = list(baseline_packages)
+    if cov_list == base_list:
+        return []
+    return [
+        (
+            "coverage --cov packages "
+            f"{cov_list!r} do not match baseline.packages {base_list!r} exactly"
+        )
+    ]
 
 
 def floor_from_measurement(
@@ -190,6 +281,157 @@ def evaluate(
             )
         ]
     return []
+
+
+def load_ref_floor_percent(
+    *,
+    ref: str = DEFAULT_MAIN_REF,
+    baseline_git_path: str = "scripts/coverage_floor_baseline.json",
+    repo: Path = ROOT,
+    git_show=None,
+) -> float | None:
+    """Load ``floor_percent`` from ``ref:baseline_git_path``.
+
+    Returns ``None`` when the ref or blob is missing (first-run / shallow clone
+    without the remote tip). Callers log a notice and skip the anti-lowering
+    check in that case.
+    """
+
+    runner = git_show or _git_show
+    try:
+        stdout, returncode = runner(ref, baseline_git_path, repo=repo)
+    except OSError as exc:
+        print(
+            f"[coverage-floor] NOTICE: cannot run git show for {ref}: {exc}; "
+            "skipping anti-lowering comparison",
+            file=sys.stderr,
+        )
+        return None
+
+    if returncode != 0 or not stdout.strip():
+        return None
+
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        print(
+            f"[coverage-floor] NOTICE: {ref}:{baseline_git_path} is not valid "
+            f"JSON ({exc}); skipping anti-lowering comparison",
+            file=sys.stderr,
+        )
+        return None
+
+    if not isinstance(payload, dict):
+        print(
+            f"[coverage-floor] NOTICE: {ref}:{baseline_git_path} root is not "
+            "an object; skipping anti-lowering comparison",
+            file=sys.stderr,
+        )
+        return None
+
+    try:
+        floor = float(payload["floor_percent"])
+    except (KeyError, TypeError, ValueError) as exc:
+        print(
+            f"[coverage-floor] NOTICE: {ref}:{baseline_git_path} missing "
+            f"numeric floor_percent ({exc}); skipping anti-lowering comparison",
+            file=sys.stderr,
+        )
+        return None
+
+    if not 0.0 <= floor <= 100.0:
+        print(
+            f"[coverage-floor] NOTICE: {ref} floor_percent out of range "
+            f"({floor}); skipping anti-lowering comparison",
+            file=sys.stderr,
+        )
+        return None
+    return floor
+
+
+def _git_show(ref: str, path: str, *, repo: Path) -> tuple[str, int]:
+    """Run ``git show ref:path`` and return (stdout, returncode)."""
+
+    completed = subprocess.run(
+        ["git", "show", f"{ref}:{path}"],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return completed.stdout, completed.returncode
+
+
+def allow_lower_vs_main_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Return True when the loud maintainer override env var is set."""
+
+    source = env if env is not None else os.environ
+    raw = str(source.get(ALLOW_LOWER_VS_MAIN_ENV, "")).strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def assert_floor_not_lowered_vs_ref(
+    baseline_path: Path,
+    *,
+    ref: str = DEFAULT_MAIN_REF,
+    repo: Path = ROOT,
+    git_show=None,
+    env: Mapping[str, str] | None = None,
+) -> int:
+    """Fail when the working-tree floor is below the floor on ``ref``.
+
+    Missing refs skip with a notice (exit 0). An explicit maintainer override
+    via ``COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN=1`` also skips with a loud notice.
+    """
+
+    baseline = load_baseline(baseline_path)
+    if allow_lower_vs_main_enabled(env):
+        print(
+            (
+                f"[coverage-floor] NOTICE: {ALLOW_LOWER_VS_MAIN_ENV} is set; "
+                f"skipping anti-lowering comparison against {ref}. "
+                "This override is for intentional maintainer floor lowers only; "
+                "clear it after the new floor lands on main."
+            ),
+            file=sys.stderr,
+        )
+        return 0
+
+    ref_floor = load_ref_floor_percent(
+        ref=ref,
+        repo=repo,
+        git_show=git_show,
+    )
+    if ref_floor is None:
+        print(
+            (
+                f"[coverage-floor] NOTICE: could not load floor from "
+                f"{ref}:scripts/coverage_floor_baseline.json; "
+                "skipping anti-lowering comparison (missing ref or first-run)"
+            ),
+            file=sys.stderr,
+        )
+        return 0
+
+    if baseline.floor_percent + 1e-9 < ref_floor:
+        print(
+            (
+                f"[coverage-floor] ERROR: working-tree floor "
+                f"{baseline.floor_percent:.2f}% is below {ref} floor "
+                f"{ref_floor:.2f}%. Raising the floor is free; lowering "
+                f"requires an explicit maintainer review. See module docstring "
+                f"and set {ALLOW_LOWER_VS_MAIN_ENV}=1 only for intentional "
+                "lowers (keep the override temporary and loud)."
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    print(
+        f"[coverage-floor] OK: floor {baseline.floor_percent:.2f}% >= "
+        f"{ref} floor {ref_floor:.2f}%"
+    )
+    return 0
 
 
 def write_baseline_from_report(
@@ -248,9 +490,24 @@ def write_baseline_from_report(
 
 
 def run_check(report_path: Path, baseline_path: Path) -> int:
-    """Compare the coverage report against the checked-in floor."""
+    """Compare the coverage report against the checked-in floor and scope."""
 
     baseline = load_baseline(baseline_path)
+    file_paths = report_file_paths(report_path)
+    missing_packages = package_prefixes_missing(file_paths, baseline.packages)
+    if missing_packages:
+        print(
+            (
+                "[coverage-floor] ERROR: coverage report is missing measured "
+                f"files under baseline package prefix(es): "
+                f"{', '.join(missing_packages)}. "
+                "Do not narrow --cov= below baseline.packages; the gate must "
+                "measure every scoped package."
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
     actual = read_total_percent(report_path)
     violations = evaluate(actual=actual, floor=baseline.floor_percent)
     if violations:
@@ -269,13 +526,32 @@ def run_check(report_path: Path, baseline_path: Path) -> int:
 
     print(
         f"[coverage-floor] OK: {actual:.2f}% >= floor {baseline.floor_percent:.2f}% "
-        f"(report={report_path})"
+        f"(packages={','.join(baseline.packages)}; report={report_path})"
+    )
+    return 0
+
+
+def run_assert_cov_flags(
+    baseline_path: Path,
+    cov_packages: Sequence[str],
+) -> int:
+    """Assert CLI ``--cov`` package list matches ``baseline.packages`` exactly."""
+
+    baseline = load_baseline(baseline_path)
+    violations = assert_cov_flags_match_packages(cov_packages, baseline.packages)
+    if violations:
+        for message in violations:
+            print(f"[coverage-floor] ERROR: {message}", file=sys.stderr)
+        return 1
+    print(
+        f"[coverage-floor] OK: --cov packages match baseline.packages "
+        f"exactly ({list(baseline.packages)!r})"
     )
     return 0
 
 
 def run_self_tests() -> None:
-    """Exercise floor derivation, parsing, and ratchet direction."""
+    """Exercise floor derivation, parsing, scope, and anti-lowering."""
 
     cases = 0
     with tempfile.TemporaryDirectory(prefix="coverage-floor-") as tmp:
@@ -283,22 +559,34 @@ def run_self_tests() -> None:
         report = root / "coverage.json"
         baseline_path = root / "coverage_floor_baseline.json"
 
-        report.write_text(
-            json.dumps(
-                {
-                    "meta": {"version": "7.0.0"},
-                    "files": {},
-                    "totals": {
-                        "covered_lines": 430,
-                        "num_statements": 1000,
-                        "percent_covered": 43.0,
-                        "missing_lines": 570,
-                        "excluded_lines": 0,
+        def _write_report(
+            percent: float,
+            *,
+            files: dict[str, Any] | None = None,
+        ) -> None:
+            payload: dict[str, Any] = {
+                "meta": {"version": "7.0.0"},
+                "files": files
+                if files is not None
+                else {
+                    "src/mod.py": {"summary": {"percent_covered": percent}},
+                    "api/mod.py": {"summary": {"percent_covered": percent}},
+                    "data_provider/mod.py": {
+                        "summary": {"percent_covered": percent}
                     },
-                }
-            ),
-            encoding="utf-8",
-        )
+                    "bot/mod.py": {"summary": {"percent_covered": percent}},
+                },
+                "totals": {
+                    "covered_lines": int(percent * 10),
+                    "num_statements": 1000,
+                    "percent_covered": percent,
+                    "missing_lines": 1000 - int(percent * 10),
+                    "excluded_lines": 0,
+                },
+            }
+            report.write_text(json.dumps(payload), encoding="utf-8")
+
+        _write_report(43.0)
         measured = read_total_percent(report)
         if measured != 43.0:
             raise AssertionError(f"unexpected measured value: {measured}")
@@ -332,20 +620,7 @@ def run_self_tests() -> None:
         cases += 1
 
         # Raising measured coverage must be allowed to raise the floor.
-        report.write_text(
-            json.dumps(
-                {
-                    "totals": {
-                        "percent_covered": 50.0,
-                        "covered_lines": 500,
-                        "num_statements": 1000,
-                        "missing_lines": 500,
-                        "excluded_lines": 0,
-                    }
-                }
-            ),
-            encoding="utf-8",
-        )
+        _write_report(50.0)
         rc = write_baseline_from_report(
             report,
             baseline_path,
@@ -362,10 +637,7 @@ def run_self_tests() -> None:
         cases += 1
 
         # Lowering without --allow-lower must fail closed.
-        report.write_text(
-            json.dumps({"totals": {"percent_covered": 40.0}}),
-            encoding="utf-8",
-        )
+        _write_report(40.0)
         rc = write_baseline_from_report(
             report,
             baseline_path,
@@ -396,20 +668,179 @@ def run_self_tests() -> None:
             raise AssertionError(f"allow-lower floor wrong: {baseline.floor_percent}")
         cases += 1
 
-        # Check path.
-        report.write_text(
-            json.dumps({"totals": {"percent_covered": 39.5}}),
-            encoding="utf-8",
-        )
+        # Check path (full package scope present).
+        _write_report(39.5)
         if run_check(report, baseline_path) != 0:
             raise AssertionError("equal floor should pass check")
         cases += 1
-        report.write_text(
-            json.dumps({"totals": {"percent_covered": 39.4}}),
+        _write_report(39.4)
+        if run_check(report, baseline_path) == 0:
+            raise AssertionError("below floor should fail check")
+        cases += 1
+
+        # Scope assertion: missing package prefix must fail.
+        _write_report(
+            90.0,
+            files={
+                "src/only.py": {"summary": {"percent_covered": 90.0}},
+                "api/only.py": {"summary": {"percent_covered": 90.0}},
+                # data_provider and bot intentionally absent
+            },
+        )
+        # Keep floor low so only the package-scope check fails.
+        baseline_path.write_text(
+            serialize_baseline(
+                Baseline(
+                    floor_percent=10.0,
+                    measured_percent=90.0,
+                    epsilon=0.5,
+                    packages=SCOPED_PACKAGES,
+                    measured_command="self-test",
+                    notes="scope-missing",
+                )
+            ),
             encoding="utf-8",
         )
         if run_check(report, baseline_path) == 0:
-            raise AssertionError("below floor should fail check")
+            raise AssertionError("missing package prefixes must fail check")
+        cases += 1
+
+        missing = package_prefixes_missing(
+            ("src/a.py", "api/b.py"),
+            SCOPED_PACKAGES,
+        )
+        if missing != ["data_provider", "bot"]:
+            raise AssertionError(f"unexpected missing packages: {missing}")
+        cases += 1
+
+        if package_prefixes_missing(
+            (
+                "src/a.py",
+                "api/b.py",
+                "data_provider/c.py",
+                "bot/d.py",
+            ),
+            SCOPED_PACKAGES,
+        ):
+            raise AssertionError("full package set should not report missing")
+        cases += 1
+
+        # --cov flag exact match.
+        if assert_cov_flags_match_packages(
+            ["src", "api", "data_provider", "bot"],
+            SCOPED_PACKAGES,
+        ):
+            raise AssertionError("exact cov flags should match")
+        cases += 1
+        if not assert_cov_flags_match_packages(
+            ["src"],
+            SCOPED_PACKAGES,
+        ):
+            raise AssertionError("narrowed cov flags must fail")
+        cases += 1
+        if not assert_cov_flags_match_packages(
+            ["src", "api", "bot", "data_provider"],
+            SCOPED_PACKAGES,
+        ):
+            raise AssertionError("reordered cov flags must fail exact match")
+        cases += 1
+        if run_assert_cov_flags(
+            baseline_path,
+            ["src", "api", "data_provider", "bot"],
+        ) != 0:
+            raise AssertionError("run_assert_cov_flags should pass exact list")
+        cases += 1
+        if run_assert_cov_flags(baseline_path, ["src"]) == 0:
+            raise AssertionError("run_assert_cov_flags should fail narrowed list")
+        cases += 1
+
+        # Anti-lowering vs ref.
+        baseline_path.write_text(
+            serialize_baseline(
+                Baseline(
+                    floor_percent=80.0,
+                    measured_percent=80.5,
+                    epsilon=0.5,
+                    packages=SCOPED_PACKAGES,
+                    measured_command="self-test",
+                    notes="anti-lower",
+                )
+            ),
+            encoding="utf-8",
+        )
+
+        def fake_git_show_ok(ref: str, path: str, *, repo: Path):
+            payload = json.dumps({"floor_percent": 82.08})
+            return payload, 0
+
+        def fake_git_show_missing(ref: str, path: str, *, repo: Path):
+            return "", 128
+
+        if (
+            assert_floor_not_lowered_vs_ref(
+                baseline_path,
+                git_show=fake_git_show_ok,
+            )
+            == 0
+        ):
+            raise AssertionError("floor below ref must fail anti-lowering")
+        cases += 1
+
+        baseline_path.write_text(
+            serialize_baseline(
+                Baseline(
+                    floor_percent=83.0,
+                    measured_percent=83.5,
+                    epsilon=0.5,
+                    packages=SCOPED_PACKAGES,
+                    measured_command="self-test",
+                    notes="anti-lower-raise",
+                )
+            ),
+            encoding="utf-8",
+        )
+        if (
+            assert_floor_not_lowered_vs_ref(
+                baseline_path,
+                git_show=fake_git_show_ok,
+            )
+            != 0
+        ):
+            raise AssertionError("raised floor vs ref must pass")
+        cases += 1
+
+        if (
+            assert_floor_not_lowered_vs_ref(
+                baseline_path,
+                git_show=fake_git_show_missing,
+            )
+            != 0
+        ):
+            raise AssertionError("missing ref must skip anti-lowering")
+        cases += 1
+
+        baseline_path.write_text(
+            serialize_baseline(
+                Baseline(
+                    floor_percent=10.0,
+                    measured_percent=10.5,
+                    epsilon=0.5,
+                    packages=SCOPED_PACKAGES,
+                    measured_command="self-test",
+                    notes="anti-lower-override",
+                )
+            ),
+            encoding="utf-8",
+        )
+        if (
+            assert_floor_not_lowered_vs_ref(
+                baseline_path,
+                git_show=fake_git_show_ok,
+                env={ALLOW_LOWER_VS_MAIN_ENV: "1"},
+            )
+            != 0
+        ):
+            raise AssertionError("override env must allow intentional lower")
         cases += 1
 
         bad = root / "bad.json"
@@ -470,6 +901,34 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional notes recorded in the baseline.",
     )
     parser.add_argument(
+        "--assert-floor-not-lowered",
+        action="store_true",
+        help=(
+            f"Compare working-tree floor_percent against {DEFAULT_MAIN_REF} "
+            "and fail if lower (skip with notice when the ref is missing)."
+        ),
+    )
+    parser.add_argument(
+        "--main-ref",
+        default=DEFAULT_MAIN_REF,
+        help=f"Git ref used by --assert-floor-not-lowered (default {DEFAULT_MAIN_REF}).",
+    )
+    parser.add_argument(
+        "--assert-cov-flags",
+        action="store_true",
+        help=(
+            "Assert that --cov package values match baseline.packages exactly. "
+            "Pass packages via one or more --cov arguments."
+        ),
+    )
+    parser.add_argument(
+        "--cov",
+        action="append",
+        default=[],
+        dest="cov_packages",
+        help="Package name passed to pytest --cov= (repeatable; used with --assert-cov-flags).",
+    )
+    parser.add_argument(
         "--self-test",
         action="store_true",
         help="Run isolated guard regression cases and exit.",
@@ -485,20 +944,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_self_tests()
         return 0
 
-    report_path = args.report.resolve()
     baseline_path = args.baseline.resolve()
 
     try:
+        if args.assert_floor_not_lowered:
+            return assert_floor_not_lowered_vs_ref(
+                baseline_path,
+                ref=args.main_ref,
+            )
+        if args.assert_cov_flags:
+            if not args.cov_packages:
+                print(
+                    "[coverage-floor] ERROR: --assert-cov-flags requires one or "
+                    "more --cov package arguments",
+                    file=sys.stderr,
+                )
+                return 1
+            return run_assert_cov_flags(baseline_path, args.cov_packages)
         if args.write_baseline:
             return write_baseline_from_report(
-                report_path,
+                args.report.resolve(),
                 baseline_path,
                 epsilon=args.epsilon,
                 allow_lower=args.allow_lower,
                 measured_command=args.measured_command,
                 notes=args.notes,
             )
-        return run_check(report_path, baseline_path)
+        return run_check(args.report.resolve(), baseline_path)
     except (BaselineError, ReportError, ValueError) as exc:
         print(f"[coverage-floor] ERROR: {exc}", file=sys.stderr)
         return 1

@@ -1,8 +1,8 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-04
-- Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`
+- Last verified: 2026-08-05
+- Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
 
@@ -13,6 +13,8 @@ The backend CI gate (`./scripts/ci_gate.sh`) must:
 3. Measure and enforce a **measured** line-coverage floor for production packages.
 4. Fail collection on unknown pytest markers (`--strict-markers`).
 5. Keep wall-clock / throughput assertions out of the default offline gate so noisy runners do not redden CI.
+6. Refuse a working-tree coverage floor lower than `origin/main` (anti-lowering).
+7. Require the offline suite's `--cov=` scopes to match `baseline.packages` exactly, and require measured files under every package prefix.
 
 ## Default offline selection
 
@@ -74,6 +76,29 @@ The checked-in floor lives in [`scripts/coverage_floor_baseline.json`](../script
 - Falling below the floor fails the gate.
 - Raising the floor after a clean measurement is allowed.
 - Lowering the floor requires an explicit review: `python scripts/check_coverage_floor.py --write-baseline --allow-lower ...`.
+- **Anti-lowering vs `origin/main`**: the deterministic gate runs
+  `python scripts/check_coverage_floor.py --assert-floor-not-lowered`, which
+  compares the working-tree `floor_percent` to
+  `git show origin/main:scripts/coverage_floor_baseline.json`. A lower value
+  fails. Raising is free. Missing refs / first-run clones skip with a logged
+  notice.
+- **Package scope is enforceable**: `run_check` fails if the coverage report
+  has no measured files under any `baseline.packages` prefix, and `ci_gate.sh`
+  asserts that the offline suite's `--cov=` flags match `baseline.packages`
+  exactly (order-sensitive). Narrowing coverage to one well-covered package
+  cannot game the floor.
+
+### Legitimate floor lowering (maintainers only; keep it honest and loud)
+
+1. Re-measure the offline suite and run
+   `python scripts/check_coverage_floor.py --write-baseline --allow-lower`.
+2. Open a dedicated PR that lowers `floor_percent` and explains the regression.
+3. For that PR only, set `COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN=1` in the gate
+   environment (or temporarily edit the anti-lowering comparison in
+   `scripts/check_coverage_floor.py` so review sees an explicit maintainer
+   decision). Do **not** silently lower only the JSON.
+4. After merge, clear the override so the ratchet re-arms against the new floor
+   on `origin/main`.
 
 ### Measure and update the floor
 
@@ -85,19 +110,26 @@ DATABASE_PATH=/tmp/stockpulse-cov.sqlite \
     --cov-report=term \
     --cov-report=json:coverage.json
 
+python scripts/check_coverage_floor.py --assert-cov-flags \
+  --cov src --cov api --cov data_provider --cov bot
 python scripts/check_coverage_floor.py --write-baseline --report coverage.json
 # After review only, if the measured value legitimately dropped:
 # python scripts/check_coverage_floor.py --write-baseline --allow-lower --report coverage.json
 
 python scripts/check_coverage_floor.py --self-test
+python scripts/check_coverage_floor.py --assert-floor-not-lowered
 ```
 
-## Running benchmarks manually
+## Running benchmarks (scheduled + manual)
 
-Wall-clock assertions are marked `@pytest.mark.benchmark` and are **excluded** from `ci_gate.sh`. Run them on demand:
+Wall-clock assertions are marked `@pytest.mark.benchmark` and are **excluded**
+from `ci_gate.sh`. They run in the non-blocking workflow
+[`.github/workflows/benchmarks.yml`](../.github/workflows/benchmarks.yml)
+(`schedule` weekly + `workflow_dispatch`), which uploads pytest output as an
+artifact. That workflow is **not** a required branch-ruleset check.
 
 ```bash
-# All benchmarks only
+# All benchmarks only (same selection as the scheduled workflow)
 python -m pytest -m benchmark
 
 # Search-performance suite
@@ -106,6 +138,7 @@ python -m pytest tests/services/test_search_performance.py -m benchmark
 # Single cases
 python -m pytest tests/test_task_execution.py -k real_thread_pool_shutdown -m benchmark
 python -m pytest tests/security/test_sensitive_redaction.py -k field_scanner_checks_one_public -m benchmark
+python -m pytest tests/data_provider/test_hk_stock_name_fallback.py -k parallel_cold_lookups -m benchmark
 ```
 
 Current benchmark-marked wall-clock cases:
@@ -113,6 +146,7 @@ Current benchmark-marked wall-clock cases:
 - `tests/services/test_search_performance.py` (throughput / typo / fuzzy budgets)
 - `tests/test_task_execution.py::test_real_thread_pool_shutdown_returns_before_blocked_runner_exits` (`elapsed < 1`)
 - `tests/security/test_sensitive_redaction.py::test_field_scanner_checks_one_public_boundary_per_whitespace_run` (`elapsed < 0.5`)
+- `tests/data_provider/test_hk_stock_name_fallback.py::test_parallel_cold_lookups_share_one_em_request` (4-thread barrier / sleep; relocated from the blocking gate)
 
 ## Parallelism (`pytest-xdist`)
 

@@ -6,6 +6,7 @@ import { getFieldDescriptionZh, getFieldOptionLabelZh, getFieldTitleZh } from '.
 const requiredLocalizedKeys = [
   'TICKFLOW_API_KEY',
   'TICKFLOW_PRIORITY',
+  'TENCENT_PRIORITY',
   'TICKFLOW_KLINE_ADJUST',
   'TICKFLOW_BATCH_DAILY_ENABLED',
   'TICKFLOW_BATCH_SIZE',

@@ -60,6 +60,8 @@ class Config:
     tickflow_priority: int = 2
     tickflow_batch_daily_enabled: bool = True
     tickflow_batch_size: int = 100
+    # Tencent direct daily K-line priority (final A-share fallback by default).
+    tencent_priority: int = 5
     finnhub_api_key: Optional[str] = None
     alphavantage_api_key: Optional[str] = None
     longbridge_app_key: Optional[str] = None
