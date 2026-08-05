@@ -53,6 +53,22 @@ describe('SearchableSelect', () => {
     expect(within(listbox).queryByRole('option', { name: /GPT-5.5/ })).not.toBeInTheDocument();
   });
 
+  it('supports an opt-in rounded search field for modal selectors', () => {
+    render(
+      <SearchableSelect
+        value=""
+        onChange={() => {}}
+        options={options}
+        ariaLabel="主要模型"
+        searchInputRadius="lg"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '主要模型' }));
+
+    expect(screen.getByRole('combobox', { name: '搜索选项: 主要模型' }))
+      .toHaveClass('rounded-lg');
+  });
+
   it('keeps the trigger, clear action, search, and options at least 44px at every breakpoint', () => {
     render(
       <SearchableSelect

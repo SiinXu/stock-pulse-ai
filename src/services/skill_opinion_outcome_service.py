@@ -165,6 +165,80 @@ class SkillOpinionOutcomeService:
             "engine_version": SKILL_OPINION_OUTCOME_ENGINE_VERSION,
         }
 
+
+    def list_outcomes(
+        self,
+        *,
+        engine_version: Optional[str] = None,
+        skill_id: Optional[str] = None,
+        stock_code: Optional[str] = None,
+        horizon: Optional[str] = None,
+        eval_status: Optional[str] = None,
+        sample_id: Optional[int] = None,
+        analysis_history_id: Optional[int] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """Return a bounded page of persisted outcome rows."""
+        limit_norm = self._bounded_positive_int(
+            limit,
+            "limit",
+            maximum=200,
+        )
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
+        engine_version_norm = (
+            self._optional_text(engine_version, "engine_version")
+            if engine_version is not None
+            else SKILL_OPINION_OUTCOME_ENGINE_VERSION
+        )
+        skill_id_norm = (
+            self._optional_text(skill_id, "skill_id")
+            if skill_id is not None
+            else None
+        )
+        stock_code_norm = (
+            self._optional_text(stock_code, "stock_code")
+            if stock_code is not None
+            else None
+        )
+        horizon_norm = None
+        if horizon is not None:
+            horizon_norm = self._optional_text(horizon, "horizon")
+            if horizon_norm not in SUPPORTED_SKILL_OUTCOME_HORIZONS:
+                raise ValueError(
+                    "horizon must be one of "
+                    + ", ".join(SUPPORTED_SKILL_OUTCOME_HORIZONS)
+                )
+        eval_status_norm = (
+            self._optional_text(eval_status, "eval_status")
+            if eval_status is not None
+            else None
+        )
+        sample_id_norm = self._optional_positive_int(sample_id, "sample_id")
+        history_id_norm = self._optional_positive_int(
+            analysis_history_id,
+            "analysis_history_id",
+        )
+        items, total = self.repo.list_outcomes(
+            engine_version=engine_version_norm,
+            skill_id=skill_id_norm,
+            stock_code=stock_code_norm,
+            horizon=horizon_norm,
+            eval_status=eval_status_norm,
+            sample_id=sample_id_norm,
+            analysis_history_id=history_id_norm,
+            limit=limit_norm,
+            offset=offset,
+        )
+        return {
+            "items": items,
+            "total": total,
+            "limit": limit_norm,
+            "offset": offset,
+            "engine_version": engine_version_norm,
+        }
+
     def _record_retry_attempt(
         self,
         candidate: SkillOpinionOutcomeCandidate,

@@ -7,6 +7,7 @@ import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
 import { Progress } from '../components/common/Progress';
+import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -333,7 +334,7 @@ const BacktestPage: React.FC = () => {
     initialFilters.windowDays && initialFilters.windowDays > 1 ? initialFilters.windowDays : 10,
   );
 
-  const validateDraftFilters = (windowOverride?: number): BacktestFilterSnapshot | null => {
+  const validateDraftFilters = (windowOverride?: number, codeOverride?: string): BacktestFilterSnapshot | null => {
     const windowDays = windowOverride ?? parseEvalWindowDays(evalDays);
     const invalidWindow = windowDays === undefined;
     const invalidStart = Boolean(analysisDateFrom) && !isValidIsoDate(analysisDateFrom);
@@ -358,7 +359,7 @@ const BacktestPage: React.FC = () => {
     }
 
     return {
-      code: normalizeBacktestCode(codeFilter) ?? '',
+      code: normalizeBacktestCode(codeOverride ?? codeFilter) ?? '',
       windowDays,
       startDate: analysisDateFrom,
       endDate: analysisDateTo,
@@ -547,20 +548,14 @@ const BacktestPage: React.FC = () => {
   };
 
   // Filter by code
-  const handleFilter = () => {
-    const nextFilters = validateDraftFilters();
+  const handleFilter = (codeOverride?: string) => {
+    const nextFilters = validateDraftFilters(undefined, codeOverride);
     if (!nextFilters) return;
     setAppliedFilters(nextFilters);
     setCurrentPage(1);
     syncBacktestFiltersToUrl(nextFilters);
     void fetchResults(1, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
     void fetchPerformance(nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleFilter();
-    }
   };
 
   const handleShowNextDay = () => {
@@ -692,29 +687,41 @@ const BacktestPage: React.FC = () => {
       <PageHeader className="shrink-0" title={text.pageTitle} />
       <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
-          <div className="relative min-w-0 flex-[1_1_220px]">
-            <Input
-              type="text"
-              size="default"
+          <div
+            data-testid="backtest-stock-filter"
+            className="relative w-64 min-w-0 shrink-0 [&>div>p]:sr-only"
+          >
+            <StockAutocomplete
+              id="backtest-stock-filter"
               value={codeFilter}
-              onChange={(e) => setCodeFilter(e.target.value.toUpperCase())}
-              onKeyDown={handleKeyDown}
+              onChange={(value) => setCodeFilter(value.toUpperCase())}
+              onSubmit={(stockCode, _stockName, _selectionSource, metadata) => {
+                setCodeFilter((metadata?.displayCode ?? stockCode).toUpperCase());
+                handleFilter(stockCode);
+              }}
               placeholder={text.codePlaceholder}
+              ariaLabel={text.codePlaceholder}
               disabled={isRunning}
+              suggestionDensity="compact"
+              className="h-8 min-h-8 min-w-0 sm:h-8 sm:min-h-8 sm:min-w-0"
             />
           </div>
-          <Button
-            type="button"
-            onClick={handleFilter}
-            disabled={isRunning || isLoadingResults}
-            variant="secondary"
-            size="primary"
-            isLoading={isLoadingResults}
-            loadingText={text.filter}
-            className="whitespace-nowrap text-xs"
-          >
-            {text.filter}
-          </Button>
+          <div className="w-[5.25rem] shrink-0 [&>span]:w-full [&>span>button]:w-full">
+            <Tooltip content={text.resultPhaseHint} className="w-full">
+              <Button
+                type="button"
+                onClick={() => handleFilter()}
+                disabled={isRunning || isLoadingResults}
+                variant="secondary"
+                size="primary"
+                isLoading={isLoadingResults}
+                loadingText={text.filter}
+                className="whitespace-nowrap text-xs"
+              >
+                {text.filter}
+              </Button>
+            </Tooltip>
+          </div>
           <Input
             id="backtest-eval-window"
             label={text.evalWindow}
@@ -732,12 +739,18 @@ const BacktestPage: React.FC = () => {
               setEvalDays(nextValue);
               setEvalDaysError('');
             }}
-            error={evalDaysError}
             placeholder="10"
             disabled={isRunning}
             fieldClassName="w-24"
-            className="text-center tabular-nums"
+            aria-invalid={evalDaysError ? true : undefined}
+            aria-describedby={evalDaysError ? 'backtest-eval-window-error' : undefined}
+            className={`text-center tabular-nums ${evalDaysError ? 'border-danger/40 focus:border-danger' : ''}`}
           />
+          {evalDaysError ? (
+            <span id="backtest-eval-window-error" role="alert" className="sr-only">
+              {evalDaysError}
+            </span>
+          ) : null}
           <DatePicker
             id="backtest-date-from"
             size="compact"
@@ -777,7 +790,7 @@ const BacktestPage: React.FC = () => {
             onChange={handleValidationModeChange}
             ariaLabel={text.evalWindow}
             semantics="single-select"
-            className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
+            className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
           />
           <div className="flex h-8 items-center gap-1.5">
             <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
@@ -808,7 +821,12 @@ const BacktestPage: React.FC = () => {
           </div>
         )}
         {runError && (
-          <ApiErrorAlert error={runError} className="mt-2 max-w-4xl" />
+          <div
+            data-testid="backtest-run-error"
+            className="mt-2 max-w-4xl [&_details]:w-full [&_details]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto"
+          >
+            <ApiErrorAlert error={runError} />
+          </div>
         )}
         <p className="mt-2 text-xs text-muted-text">
           {isNextDayValidation

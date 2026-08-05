@@ -145,6 +145,8 @@ describe('MarketReviewPage', () => {
     expect(historyRail).toHaveClass('h-full');
     expect(historyRail).not.toHaveClass('self-start');
     expect(historyRail).not.toHaveClass('min-h-96');
+    expect(historyRail?.parentElement).toHaveClass('xl:grid-cols-[18rem_minmax(0,1fr)]');
+    expect(historyRail?.parentElement).not.toHaveClass('lg:grid-cols-[18rem_minmax(0,1fr)]');
   });
 
   it('bounds paginated history while keeping complete history content-sized', async () => {

@@ -731,7 +731,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
 
   if (savedSummary) {
     return (
-      <Modal isOpen onClose={onClose} title={text.title}>
+      <Modal isOpen onClose={onClose} title={text.title} showHeaderDivider={false}>
         <div data-testid="first-run-wizard" className="space-y-5">
           <InlineAlert
             variant="success"
@@ -812,6 +812,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       onClose={onClose}
       title={text.title}
       size={mode === 'local_model' && step === 'local_model' ? 'fullscreen' : 'default'}
+      showHeaderDivider={false}
     >
       <div data-testid="first-run-wizard" className="space-y-5">
         <p className="text-xs text-muted-text">{stepLabel}</p>
@@ -1299,7 +1300,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 border-t border-[var(--settings-border)] pt-4">
+        <div className="flex items-center justify-between gap-2 pt-4">
           <Button type="button" variant="secondary" size="default" onClick={onClose}>
             {text.cancel}
           </Button>

@@ -43,10 +43,12 @@ Example query string:
 ## Steps
 
 1. Open Backtest.  
-2. Optionally set code, window/dates, phase.  
-3. Run / query.  
+2. Optionally enter a code, name, pinyin, or alias in the compact stock field and choose a fuzzy suggestion; also set window/dates and phase as needed.
+3. **Filter** refreshes only the results and metrics below; **Run backtest** generates or recalculates evaluations.
 4. Read **sample count** before accuracy or win rate.  
 5. On empty results, read diagnostics (too few samples, cooling, narrow range)—do not spam-click.
+
+An invalid evaluation window no longer changes the input row height: the field shows its error state while the reason remains available to screen readers without adding a trailing control. Validation-mode switches and filter loading also keep stable control widths to avoid toolbar shifts; the Filter tooltip reiterates that filtering does not rerun the backtest.
 
 ## How to read metrics
 

@@ -30,6 +30,7 @@ from api.v1.endpoints import (
     scheduled_tasks,
     scorecard,
     security_audit,
+    skill_outcomes,
     stocks,
     system_config,
     usage,
@@ -157,6 +158,12 @@ router.include_router(
     model_packs.router,
     prefix="/model-packs",
     tags=["ModelPacks"],
+)
+
+router.include_router(
+    skill_outcomes.router,
+    prefix="/skill-outcomes",
+    tags=["SkillOutcomes"],
 )
 
 router.include_router(

@@ -15,10 +15,37 @@ runtime aggregation weights.
 
 ## Configuration
 
-V0 adds no configuration key. The new services have no automatic runtime hook,
-so existing analysis output and aggregation are unchanged. The default-off gate
-for Bayesian feedback belongs to the separately tracked weighting phase rather
-than a dormant or stubbed V0 setting.
+| Key | Default | Effect |
+| --- | --- | --- |
+| `SKILL_OPINION_RECORDING_ENABLED` | `false` | When off, analysis never writes skill-opinion samples. When on, valid skill opinions are recorded after strategy aggregation when `analysis_history_id` is already bound on the agent context, and saved reports are materialized after analysis history is persisted. Aggregation weights and analysis output remain unchanged either way. |
+
+The default-off gate for Bayesian feedback belongs to the separately tracked
+weighting phase ([#714](https://github.com/SiinXu/stock-pulse-ai/issues/714))
+rather than this recording flag.
+
+## Runtime wiring (V0)
+
+Production callers:
+
+1. **Config-gated sample recording** after skill aggregation
+   (`AgentOrchestrator._run_strategy_engine` →
+   `_maybe_record_skill_opinion_samples`) and after analysis history save
+   (`maybe_materialize_after_history_save`). Recording failures are logged with
+   `broad-exception: fallback_recorded` and never fail analysis.
+2. **Authenticated read/run API** under `/api/v1/skill-outcomes` (administrator
+   session contract shared with neighboring `/api/v1/*` routes):
+   - `POST /run` — explicit offline materialize + evaluate trigger
+   - `GET /` — recent outcomes
+   - `GET /stats` — sample-sufficiency-gated performance buckets
+   - `GET /samples` — recent low-sensitivity samples (no reasoning/model payloads)
+
+### Evaluation cadence (V0)
+
+**Explicit API trigger only.** V0 does not add scheduler infrastructure or piggyback
+a new background job. Operators (or follow-up automation) call
+`POST /api/v1/skill-outcomes/run` when local daily bars are available. The run
+endpoint materializes missing samples from saved reports and evaluates a bounded
+set of outcome keys (`limit` counts keys, not samples).
 
 ## Upstream-to-StockPulse design mapping
 
@@ -30,7 +57,7 @@ than a dormant or stubbed V0 setting.
 | Shared backtest start/window resolver | Outcome-owned exact-start resolver over persisted `market_phase_summary.effective_daily_bar_date` and local `stock_daily` rows | The port must not modify the sibling-owned backtest service/repository and must not guess an earlier bar or fetch network data. |
 | Outcome repository and service | New outcome repository and service modules | Outcome identity and terminal-state immutability remain unchanged. |
 | Performance statistics service | New read-only performance service | Each `skill_id + horizon + engine_version` bucket keeps its own sufficiency gate. |
-| Read-only API | No API in V0 | The inspected upstream commits expose services but no outcome API. A Web/API surface is tracked separately. |
+| Read-only API | Authenticated `/api/v1/skill-outcomes` (stats, samples, outcomes, explicit run) | Tracked by [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713). Web UI remains follow-up. |
 | Bayesian outcome weights (`831ada53`) | Deferred to [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) | Runtime integration requires existing Agent aggregator and config-registry changes outside this port's writable boundary. |
 | Decision-profile calibration (`aa68d45d`) | Deferred to [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) | The upstream change extends existing DecisionSignal repository/service/API contracts and Web UI, which are outside this V0 scope. |
 | Reassessment persistence (`487e49e5`) | Already present on `main` | StockPulse already supports `persist_status=created/existing/refreshed`; duplicating it would create a parallel contract. |
@@ -92,18 +119,20 @@ temporary pending rows do not dilute permanent metadata failures.
 
 ## Limitations and follow-up scope
 
-- V0 materializes samples when the sample/outcome service is invoked; it does
-  not add another side effect to the core history-save path.
+- With `SKILL_OPINION_RECORDING_ENABLED=false` (default), analysis has no sample
+  side effects; explicit `POST /skill-outcomes/run` can still materialize and
+  evaluate for administrators.
 - Histories saved without a structured skill synthesis create no samples.
 - Structured syntheses with no valid individual opinions also create no samples;
   later bounded scans may reconsider those histories.
 - Histories without an authoritative persisted effective daily-bar date are
   marked unable rather than guessed from an arbitrary local bar.
-- V0 has no Web UI and no new public API; the authenticated API/Web surface is
-  tracked in [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713).
+- V0 ships the authenticated API; the Web surface for buckets/thresholds remains
+  open under [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713).
 - Bayesian runtime weighting and decision-profile outcome calibration remain
   default-neutral until [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714)
   and [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) land.
 
 The migration is additive. Code rollback does not remove either table, so
 collected facts remain available if the feature is reintroduced.
+

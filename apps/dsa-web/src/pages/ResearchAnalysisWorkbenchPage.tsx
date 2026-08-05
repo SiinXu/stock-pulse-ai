@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   CheckCircle2,
+  CircleHelp,
   FileText,
   FileUp,
   FlaskConical,
@@ -42,6 +43,7 @@ import {
   Select,
   Surface,
   TabPanel,
+  Tooltip,
   WorkspaceLayout,
   getTabPanelId,
 } from '../components/common';
@@ -979,25 +981,46 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid gap-4 rounded-xl border border-border bg-background/20 p-4 lg:grid-cols-3 lg:items-end">
+            <div className="grid gap-4 rounded-xl border border-border bg-background/20 p-4 lg:grid-cols-3 lg:items-start">
               <div>
-                <label
-                  htmlFor="analysis-workbench-stock-search"
-                  className="mb-1.5 block text-xs font-medium text-secondary-text"
-                >
-                  {STOCK_SEARCH_TEXT[language].inputLabel}
-                </label>
-                <StockAutocomplete
-                  id="analysis-workbench-stock-search"
-                  value={query}
-                  onChange={setQuery}
-                  onSubmit={(stockCode, stockName, selectionSource) => {
-                    void handleSubmitAnalysis(stockCode, stockName, selectionSource);
-                  }}
-                  placeholder={t('home.placeholder')}
-                  disabled={isAnalyzing || !isExperienceModeReady}
-                  className={inputError ? 'border-danger/50' : undefined}
-                />
+                <div className="mb-1.5 flex h-5 items-center gap-1">
+                  <label
+                    htmlFor="analysis-workbench-stock-search"
+                    className="text-xs font-medium text-secondary-text"
+                  >
+                    {STOCK_SEARCH_TEXT[language].inputLabel}
+                  </label>
+                  <Tooltip
+                    content={(
+                      <span className="space-y-1">
+                        <span className="block">{STOCK_SEARCH_TEXT[language].suffixExamples}</span>
+                        <span className="block">{STOCK_SEARCH_TEXT[language].manualEntryHint}</span>
+                      </span>
+                    )}
+                  >
+                    <button
+                      type="button"
+                      data-testid="analysis-stock-search-help"
+                      aria-label={`${STOCK_SEARCH_TEXT[language].inputLabel} · ${t('common.details')}`}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </Tooltip>
+                </div>
+                <div className="[&>div>p]:sr-only">
+                  <StockAutocomplete
+                    id="analysis-workbench-stock-search"
+                    value={query}
+                    onChange={setQuery}
+                    onSubmit={(stockCode, stockName, selectionSource) => {
+                      void handleSubmitAnalysis(stockCode, stockName, selectionSource);
+                    }}
+                    placeholder={t('home.placeholder')}
+                    disabled={isAnalyzing || !isExperienceModeReady}
+                    className={inputError ? 'border-danger/50' : undefined}
+                  />
+                </div>
               </div>
               <Select
                 value={selectedStrategyId}
@@ -1005,7 +1028,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 options={strategyOptions}
                 label={t('home.strategy')}
                 disabled={isAnalyzing || !isExperienceModeReady}
-                className="w-full"
+                className="w-full [&>label]:flex [&>label]:h-5 [&>label]:items-center"
                 triggerClassName="w-full"
               />
               <AnalysisPhaseSelect
@@ -1013,8 +1036,19 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 value={analysisPhase}
                 onChange={setAnalysisPhase}
                 label={t('analysis.phase')}
-                hint={t('analysis.phaseHint')}
                 disabled={isAnalyzing || isBatchSubmitting || !isExperienceModeReady}
+                labelAction={(
+                  <Tooltip content={t('analysis.phaseHint')}>
+                    <button
+                      type="button"
+                      data-testid="analysis-phase-help"
+                      aria-label={`${t('analysis.phase')} · ${t('common.details')}`}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </Tooltip>
+                )}
               />
             </div>
 

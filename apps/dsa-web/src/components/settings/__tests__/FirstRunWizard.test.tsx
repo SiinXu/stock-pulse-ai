@@ -168,6 +168,25 @@ describe('FirstRunWizard', () => {
     vi.clearAllMocks();
   });
 
+  it('uses borderless modal dividers for every wizard step', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '快速配置向导' });
+    expect(dialog.querySelector('[data-overlay-slot="header"]')).not.toHaveClass('border-b', 'border-border');
+    expect(screen.getByRole('button', { name: '取消' }).parentElement).not.toHaveClass(
+      'border-t',
+      'border-[var(--settings-border)]',
+    );
+  });
+
   it('reuses the local-model panel and routes a ready setup to first analysis', () => {
     const onComplete = okComplete();
     const onConfigurationChanged = vi.fn();

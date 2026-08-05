@@ -917,6 +917,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the maximum wait time for Agent analysis.'],
     notes: ['Timeout does not affect other stocks in the analysis pipeline.'],
   },
+  'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
+    title: 'Skill Opinion Recording',
+    summary: 'Record individual skill opinions into the offline outcome-evaluation store.',
+    usage: 'Keep off unless you want analysis runs to materialize skill samples for later offline evaluation via /api/v1/skill-outcomes.',
+    valueNotes: [
+      'Disabled by default; analysis aggregation weights are unchanged either way.',
+      'When enabled, samples are written after aggregation when a history id is bound, and after history save via report materialization.',
+    ],
+    impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
+    notes: ['Recording failures are logged and never fail analysis.'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',

@@ -43,6 +43,8 @@ export interface StockAutocompleteProps {
   ariaLabel?: string;
   /** Additional CSS class name */
   className?: string;
+  /** Optional compact presentation for dense result toolbars. */
+  suggestionDensity?: 'default' | 'compact';
 }
 
 function FallbackInput({
@@ -131,6 +133,7 @@ function StockAutocompleteInner({
   placeholder,
   ariaLabel,
   className,
+  suggestionDensity = 'default',
 }: StockAutocompleteProps) {
   const { language, t } = useUiLanguage();
   const generatedHintId = useId();
@@ -337,6 +340,7 @@ function StockAutocompleteInner({
             });
           }}
           onMouseEnter={(index) => setHighlightedIndex(index)}
+          density={suggestionDensity}
           style={{ position: 'fixed', ...dropdownStyle }}
         />,
         document.body

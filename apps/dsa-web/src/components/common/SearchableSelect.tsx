@@ -40,6 +40,7 @@ interface SearchableSelectProps {
   error?: boolean;
   emptyText?: string;
   searchPlaceholder?: string;
+  searchInputRadius?: 'md' | 'lg';
   /**
    * Marker rendered when the current value is not in the options list. The
    * value is kept (never silently cleared) so a stale-but-persisted config
@@ -70,6 +71,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   error = false,
   emptyText,
   searchPlaceholder,
+  searchInputRadius = 'md',
   staleValueLabel,
   staleValueText,
   clearable = false,
@@ -320,7 +322,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   setActiveIndex(0);
                 }}
                 onKeyDown={handleSearchKeyDown}
-                className="h-11 min-h-11 w-full rounded-md bg-transparent px-2 text-base text-foreground focus:outline-none sm:text-xs"
+                className={cn(
+                  'h-11 min-h-11 w-full bg-transparent px-2 text-base text-foreground focus:outline-none sm:text-xs',
+                  searchInputRadius === 'lg' ? 'rounded-lg' : 'rounded-md',
+                )}
               />
             </div>
             <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="min-h-0 max-h-60 overflow-auto p-1">
