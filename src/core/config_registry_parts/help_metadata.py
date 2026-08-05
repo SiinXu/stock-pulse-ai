@@ -205,6 +205,11 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
         "examples": ["TICKFLOW_PRIORITY=2"],
         "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
     },
+    "TENCENT_PRIORITY": {
+        "help_key": "settings.data_source.TENCENT_PRIORITY",
+        "examples": ["TENCENT_PRIORITY=5", "TENCENT_PRIORITY=2"],
+        "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
+    },
     "TICKFLOW_KLINE_ADJUST": {
         "help_key": "settings.data_source.TICKFLOW_KLINE_ADJUST",
         "examples": ["TICKFLOW_KLINE_ADJUST=none"],

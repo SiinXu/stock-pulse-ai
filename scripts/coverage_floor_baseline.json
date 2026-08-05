@@ -11,5 +11,5 @@
   "measured_percent": 82.5785,
   "epsilon": 0.5,
   "measured_command": "python -m pytest -m 'not network and not benchmark' --cov=src --cov=api --cov=data_provider --cov=bot --cov-report=json:coverage.json",
-  "notes": "Measured from local offline suite on 2026-08-04 (7836 passed, 10 benchmark deselected); floor = measured - 0.5pt epsilon."
+  "notes": "Measured from local offline suite on 2026-08-04 (7836 passed, 5 network + 5 benchmark deselected); floor = measured - 0.5pt epsilon. Working-tree floor_percent must not fall below origin/main (see check_coverage_floor.py anti-lowering); intentional lowers require COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN=1 and an explicit review."
 }

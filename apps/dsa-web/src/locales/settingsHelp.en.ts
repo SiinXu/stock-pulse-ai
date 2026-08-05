@@ -278,6 +278,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects provider order for A-share daily K-line fetching. Realtime quotes are still controlled separately by REALTIME_SOURCE_PRIORITY.'],
     notes: ['Lower this value only if you want TickFlow daily K-lines to be tried earlier. Add tickflow to REALTIME_SOURCE_PRIORITY when you want TickFlow realtime quotes in the realtime fallback chain.'],
   },
+  'settings.data_source.TENCENT_PRIORITY': {
+    title: 'Tencent Daily K-line Priority',
+    summary: 'Controls where Tencent direct daily K-lines sit in the A-share provider fallback chain.',
+    usage: 'Use an integer. Lower numbers are tried earlier. The default is 5 so Tencent remains the final built-in A-share fallback.',
+    valueNotes: ['This setting only affects the daily K-line/general data-source fallback chain; it does not control realtime quote provider order.'],
+    impact: ['Affects provider order for A-share daily K-line fetching. Realtime quotes are still controlled separately by REALTIME_SOURCE_PRIORITY.'],
+    notes: ['Keep the default 5 unless you intentionally want Tencent daily K-lines earlier or later in the fallback chain.'],
+  },
   'settings.data_source.TICKFLOW_KLINE_ADJUST': {
     title: 'TickFlow K-line Adjustment',
     summary: 'Controls the adjustment mode for TickFlow daily K-lines.',
