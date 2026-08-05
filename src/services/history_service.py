@@ -15,7 +15,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
 
-from src.config import get_config, resolve_news_window_days
+from src.config import resolve_news_window_days
 from src.data.stock_index_loader import resolve_index_stock_code
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
@@ -61,6 +61,7 @@ from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
+    from src.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -85,15 +86,31 @@ class HistoryService:
     Encapsulates query logic for historical analysis records.
     """
     
-    def __init__(self, db_manager: Optional[DatabaseManager] = None):
+    def __init__(
+        self,
+        db_manager: Optional[DatabaseManager] = None,
+        config: Optional["Config"] = None,
+    ):
         """
         Initialize the history query service.
         
         Args:
             db_manager: Database manager (optional, defaults to singleton instance)
+            config: Optional Config injection; defaults to the composition root
         """
         self.db = db_manager or DatabaseManager.get_instance()
         self.repository = AnalysisRepository(self.db)
+        self._config = config
+
+    @property
+    def config(self) -> "Config":
+        """Return injected Config or the process composition-root Config."""
+
+        if self._config is not None:
+            return self._config
+        from src.application_services import get_application_services
+
+        return get_application_services().config
 
     @staticmethod
     def _serialize_created_at(value: Optional[datetime]) -> Optional[str]:
@@ -786,7 +803,7 @@ class HistoryService:
         ]
 
         # fallback historical link is also performed with hard filtering of publish time to avoid old library dirty data reappearing.
-        cfg = get_config()
+        cfg = self.config
         window_days = resolve_news_window_days(
             news_max_age_days=getattr(cfg, "news_max_age_days", 3),
             news_strategy_profile=getattr(cfg, "news_strategy_profile", "short"),
