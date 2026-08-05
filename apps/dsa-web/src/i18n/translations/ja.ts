@@ -78,6 +78,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.invalid_params.title": "リクエストパラメータは無効です",
   "api.error.STABLE_ERROR_TEXT.invalid_password.message": "パスワードを確認した後、もう一度試してみてください。",
   "api.error.STABLE_ERROR_TEXT.invalid_password.title": "パスワード認証に失敗しました",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.message": "設定でプライマリモデル、接続、または API キーを構成してから、もう一度お試しください。",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.title": "LLMモデルが設定されていません",
   "api.error.STABLE_ERROR_TEXT.no_channels.message": "まず設定で通知チャンネルを設定してください。",
   "api.error.STABLE_ERROR_TEXT.no_channels.title": "通知チャンネルの設定がされていません",
   "api.error.STABLE_ERROR_TEXT.not_changeable.message": "このパスワードソースはウェブアプリの変更をサポートしていません。",
@@ -215,6 +217,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.thinking": "AIは考えている...",
   "i18n.uiText.UI_TEXT.chat.thinkingProcess": "理由",
   "i18n.uiText.UI_TEXT.chat.thinkingStep": "ステップ{step}:理由付け",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_agent": "Agent モデル",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_primary": "主要モデル",
+  "i18n.uiText.UI_TEXT.home.setupCheck.notification": "通知チャネル",
+  "i18n.uiText.UI_TEXT.home.setupCheck.stock_list": "ウォッチリスト",
+  "i18n.uiText.UI_TEXT.home.setupCheck.storage": "データベース / ローカル保存",
   "i18n.uiText.UI_TEXT.research.cancel": "キャンセル",
   "i18n.uiText.UI_TEXT.research.chatMode": "チャット",
   "i18n.uiText.UI_TEXT.research.description": "1 つの質問に対してディープリサーチを実行します：分解・検索・統合し、結論とサブ質問の参照を提示します。同期実行で、キャンセル可能、結果はセッションごとに保持されます。",
@@ -4359,6 +4366,6 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "タスク状態：{status}（{progress}）；対象市場：{region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "認証を無効にする前に現在の管理者パスワードを入力してください",
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "認証を無効にする前に現在の管理者パスワードを入力してください"
 
 };

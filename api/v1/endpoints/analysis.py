@@ -75,7 +75,11 @@ from src.services._analysis_report_projection import (
     project_persisted_analysis_report,
 )
 from src.services.name_to_code_resolver import resolve_name_to_code
-from src.utils.market_review_region import normalize_market_review_region_lenient
+from src.utils.market_review_region import (
+    MARKET_REVIEW_REGION_VALID_INPUTS,
+    normalize_market_review_region_lenient,
+    normalize_market_review_region_strict,
+)
 from src.services.task_queue import (
     get_task_queue,
     DuplicateTaskError,
@@ -580,7 +584,11 @@ def _handle_sync_analysis(
     直接执行分析，等待完成后返回结果
     """
     import uuid
-    from src.services.analysis_service import AnalysisService
+    from src.services.analysis_service import (
+        AnalysisService,
+        LLM_NOT_CONFIGURED_ERROR_CODE,
+        is_llm_not_configured_error,
+    )
     
     query_id = uuid.uuid4().hex
     
@@ -600,6 +608,15 @@ def _handle_sync_analysis(
 
         if result is None:
             error_message = service.last_error or f"分析股票 {stock_code} 失败"
+            # Known first-run configuration gap: map only this condition to a
+            # stable 422 so clients can show setup guidance instead of a generic 500.
+            if is_llm_not_configured_error(service.last_error_code, error_message):
+                raise api_error(
+                    422,
+                    LLM_NOT_CONFIGURED_ERROR_CODE,
+                    "No LLM model is configured",
+                    params={"stock_code": stock_code},
+                )
             raise api_error(500, "analysis_failed", error_message)
 
         # Build report structure
@@ -665,9 +682,26 @@ def trigger_market_review(
     request = request or MarketReviewRequest()
 
     runtime_config = _with_request_report_language(config, request.report_language)
-    effective_region = request.region or (
-        normalize_market_review_region_lenient(runtime_config.market_review_region) or "cn"
-    )
+    # Validate region at the endpoint so the allowed set is preserved in the
+    # public error envelope (Pydantic ctx-backed messages are redacted globally).
+    if request.region is not None:
+        try:
+            effective_region = normalize_market_review_region_strict(request.region)
+        except ValueError as exc:
+            raise api_error(
+                422,
+                "validation_error",
+                str(exc),
+                params={
+                    "field": "region",
+                    "allowed": list(MARKET_REVIEW_REGION_VALID_INPUTS),
+                },
+            ) from exc
+    else:
+        effective_region = (
+            normalize_market_review_region_lenient(runtime_config.market_review_region)
+            or "cn"
+        )
 
     lock_token = _try_acquire_market_review_lock(runtime_config)
     if lock_token is None:

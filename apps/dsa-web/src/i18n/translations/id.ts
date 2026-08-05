@@ -78,6 +78,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.invalid_params.title": "Parameter permintaan tidak valid",
   "api.error.STABLE_ERROR_TEXT.invalid_password.message": "Coba lagi setelah memeriksa kata sandi.",
   "api.error.STABLE_ERROR_TEXT.invalid_password.title": "Verifikasi kata sandi gagal",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.message": "Konfigurasikan model utama, koneksi, atau kunci API di Pengaturan, lalu coba lagi.",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.title": "Tidak ada model LLM yang dikonfigurasi",
   "api.error.STABLE_ERROR_TEXT.no_channels.message": "Konfigurasikan saluran notifikasi di Pengaturan terlebih dahulu.",
   "api.error.STABLE_ERROR_TEXT.no_channels.title": "Tidak ada saluran notifikasi yang dikonfigurasi",
   "api.error.STABLE_ERROR_TEXT.not_changeable.message": "Sumber sandi ini tidak mendukung perubahan dari aplikasi Web.",
@@ -215,6 +217,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.thinking": "AI sedang berpikir...",
   "i18n.uiText.UI_TEXT.chat.thinkingProcess": "Penalaran",
   "i18n.uiText.UI_TEXT.chat.thinkingStep": "Langkah {step}: penalaran",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_agent": "Model Agent",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_primary": "Model utama",
+  "i18n.uiText.UI_TEXT.home.setupCheck.notification": "Notifikasi",
+  "i18n.uiText.UI_TEXT.home.setupCheck.stock_list": "Daftar pantauan",
+  "i18n.uiText.UI_TEXT.home.setupCheck.storage": "Basis data / penyimpanan lokal",
   "i18n.uiText.UI_TEXT.research.cancel": "Batal",
   "i18n.uiText.UI_TEXT.research.chatMode": "Obrolan",
   "i18n.uiText.UI_TEXT.research.description": "Jalankan riset mendalam untuk satu pertanyaan — uraikan, cari, dan sintesis menjadi temuan dengan referensi sub-pertanyaan. Berjalan sinkron, dapat dibatalkan, dan disimpan per sesi.",
@@ -4359,5 +4366,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Status tugas: {status} ({progress}); pasar efektif: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata sandi admin saat ini sebelum menonaktifkan autentikasi",
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata sandi admin saat ini sebelum menonaktifkan autentikasi"
 };

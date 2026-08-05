@@ -15,6 +15,15 @@ INSECURE_PUBLIC_BIND_ERROR_MESSAGE = (
     "to a loopback address or Unix socket. ALLOW_INSECURE_PUBLIC_BIND=true is an "
     "emergency-only, high-risk override."
 )
+UNVERIFIED_BIND_ERROR_MESSAGE = (
+    "Refusing to start the HTTP service: administrator authentication is disabled "
+    "and the bind target could not be verified as local (unrecognized launcher "
+    "without parseable bind flags, inherited file descriptor / --fd, or otherwise "
+    "unprovable locality). Enable ADMIN_AUTH_ENABLED, launch via a recognized "
+    "entrypoint (resolved uvicorn CLI or `python server.py`) with an explicit "
+    "loopback `--host`/`--uds`, pass explicit loopback bind flags on process argv, "
+    "or set ALLOW_INSECURE_PUBLIC_BIND=true as an emergency-only, high-risk override."
+)
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _LOCAL_HOSTNAMES = frozenset({"localhost", "localhost."})
 
@@ -80,4 +89,6 @@ def enforce_http_bind_security(
         )
         return
 
+    if inherited_socket:
+        raise InsecurePublicBindError(UNVERIFIED_BIND_ERROR_MESSAGE)
     raise InsecurePublicBindError(INSECURE_PUBLIC_BIND_ERROR_MESSAGE)

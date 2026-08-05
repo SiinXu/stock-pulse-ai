@@ -22,6 +22,18 @@
 
 `MARKDOWN_TO_IMAGE_CHANNELS`、`MD2IMG_ENGINE`、`MARKDOWN_TO_IMAGE_MAX_CHARS` 继续控制哪些通知渠道转图、使用哪个引擎以及最大输入长度。转换失败时仍回退为文本通知。
 
+## 转图引擎能力矩阵
+
+分享海报路径会把 `build_share_image_html()` 生成的完整 HTML 文档交给引擎渲染（不是纯 Markdown）。引擎对 raw HTML 的行为如下：
+
+| 引擎 (`MD2IMG_ENGINE`) | 依赖 | 分享海报 HTML | 说明 |
+| --- | --- | --- | --- |
+| `wkhtmltoimage`（默认） | `wkhtmltopdf` / imgkit | 支持（stdin HTML） | 将完整 HTML 文档直接交给 wkhtmltoimage |
+| `markdown-to-file`（`m2f`） | `npm i -g markdown-to-file` | 支持 raw HTML | `markdown-to-file@1.5.4` 使用 markdown-it `html: true`，模板以未转义 `{{{content}}}` 注入；代码围栏高亮会 escape，但 HTML block/inline 会透传。因此可与 wkhtml/Playwright 共用同一海报 HTML |
+| `playwright` | Web 依赖 + Chromium | 支持（打开 `.html` URI） | 对 HTML 文件截图，不经 Markdown escape |
+
+不要把「通知里的纯 Markdown 文本路径」与分享海报 HTML 路径混用能力假设：若未来 m2f 主版本改为 escape HTML，应拒绝该引擎用于分享海报并回退到下一引擎，避免输出 HTML 源码长图。
+
 小红书品牌使用以下可选配置，四项全部留空即关闭该区域：
 
 ```dotenv

@@ -78,6 +78,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.invalid_params.title": "請求引數無效",
   "api.error.STABLE_ERROR_TEXT.invalid_password.message": "檢查密碼後再試。",
   "api.error.STABLE_ERROR_TEXT.invalid_password.title": "密碼驗證失敗",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.message": "請先在設定中設定主要模型、模型連線或 API Key，然後再試一次。",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.title": "尚未配置 LLM 模型",
   "api.error.STABLE_ERROR_TEXT.no_channels.message": "請先在設定中配置通知渠道。",
   "api.error.STABLE_ERROR_TEXT.no_channels.title": "未配置通知渠道",
   "api.error.STABLE_ERROR_TEXT.not_changeable.message": "當前密碼來源不支援在網頁中修改。",
@@ -215,6 +217,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.thinking": "AI 正在思考...",
   "i18n.uiText.UI_TEXT.chat.thinkingProcess": "思考過程",
   "i18n.uiText.UI_TEXT.chat.thinkingStep": "第 {step} 步：思考",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_agent": "Agent 模型",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_primary": "主要模型",
+  "i18n.uiText.UI_TEXT.home.setupCheck.notification": "通知渠道",
+  "i18n.uiText.UI_TEXT.home.setupCheck.stock_list": "自選股",
+  "i18n.uiText.UI_TEXT.home.setupCheck.storage": "資料庫 / 本機儲存",
   "i18n.uiText.UI_TEXT.research.cancel": "取消",
   "i18n.uiText.UI_TEXT.research.chatMode": "對話",
   "i18n.uiText.UI_TEXT.research.description": "就一個問題執行深度研究：拆解、檢索、綜合，並給出結論與子問題引用。執行同步進行，可取消，結果按工作階段保留。",
@@ -4359,6 +4366,6 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "任務狀態：{status}（{progress}）；實際市場：{region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "關閉認證前請輸入目前管理員密碼",
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "關閉認證前請輸入目前管理員密碼"
 
 };

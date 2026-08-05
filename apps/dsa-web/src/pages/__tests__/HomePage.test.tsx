@@ -438,4 +438,61 @@ describe('HomePage attention hub', () => {
     );
   });
 
+
+  it('maps known setup-status check keys to localized banner labels', async () => {
+    vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['llm_primary', 'stock_list'],
+      nextStepKey: 'llm_primary',
+      checks: [
+        {
+          key: 'llm_primary',
+          title: '主要模型',
+          category: 'ai_model',
+          required: true,
+          status: 'needs_action',
+          message: 'missing model',
+        },
+        {
+          key: 'stock_list',
+          title: '自选股',
+          category: 'base',
+          required: true,
+          status: 'needs_action',
+          message: 'empty list',
+        },
+      ],
+    });
+
+    renderHome();
+
+    expect(await screen.findByText('Base configuration incomplete')).toBeInTheDocument();
+    // English UI maps keys rather than injecting backend Chinese titles.
+    expect(screen.getByText(/Missing Primary model, Watchlist/i)).toBeInTheDocument();
+    expect(screen.queryByText(/主要模型/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to backend setup-check titles for unknown keys', async () => {
+    vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['future_check'],
+      nextStepKey: 'future_check',
+      checks: [{
+        key: 'future_check',
+        title: 'Future readiness item',
+        category: 'system',
+        required: true,
+        status: 'needs_action',
+        message: 'unknown to this client',
+      }],
+    });
+
+    renderHome();
+
+    expect(await screen.findByText(/Missing Future readiness item/i)).toBeInTheDocument();
+  });
+
+
 });

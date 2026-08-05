@@ -107,29 +107,131 @@ import server
 
 
 @pytest.mark.parametrize(
-    ("uvicorn_env", "argv", "auth_enabled", "expected_code"),
+    ("uvicorn_env", "argv", "auth_enabled", "expected_code", "stderr_snippet"),
     [
-        ({"UVICORN_HOST": "127.0.0.1"}, ["uvicorn", "server:app"], False, 0),
-        ({"UVICORN_HOST": "0.0.0.0"}, ["uvicorn", "server:app"], False, 1),
+        ({"UVICORN_HOST": "127.0.0.1"}, ["uvicorn", "server:app"], False, 0, None),
+        (
+            {"UVICORN_HOST": "0.0.0.0"},
+            ["uvicorn", "server:app"],
+            False,
+            1,
+            "requested bind is not local-only",
+        ),
         (
             {"UVICORN_HOST": "0.0.0.0"},
             ["uvicorn", "server:app", "--host", "127.0.0.1"],
             False,
             0,
+            None,
         ),
-        ({"UVICORN_FD": "7"}, ["uvicorn", "server:app"], False, 1),
+        (
+            {"UVICORN_FD": "7"},
+            ["uvicorn", "server:app"],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
         (
             {"UVICORN_HOST": "0.0.0.0", "UVICORN_UDS": "/tmp/stockpulse.sock"},
             ["uvicorn", "server:app"],
             False,
             0,
+            None,
         ),
-        ({}, ["uvicorn-module", "server:app", "--host", "127.0.0.1"], False, 0),
-        ({}, ["custom-launcher"], False, 1),
-        ({}, ["/opt/custom/server.py"], False, 1),
-        ({}, ["/opt/custom/uvicorn", "server:app"], False, 1),
-        ({}, ["/opt/custom/uvicorn/__main__.py", "server:app"], False, 1),
-        ({}, ["custom-launcher"], True, 0),
+        ({}, ["uvicorn-module", "server:app", "--host", "127.0.0.1"], False, 0, None),
+        (
+            {},
+            ["custom-launcher"],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
+        (
+            {},
+            ["/opt/custom/server.py"],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
+        (
+            {},
+            ["/opt/custom/uvicorn", "server:app"],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
+        (
+            {},
+            ["/opt/custom/uvicorn/__main__.py", "server:app"],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
+        ({}, ["custom-launcher"], True, 0, None),
+        # Explicit loopback under unrecognized launchers must boot without auth.
+        (
+            {},
+            ["/opt/custom/uvicorn", "server:app", "--host", "127.0.0.1", "--port", "8000"],
+            False,
+            0,
+            None,
+        ),
+        (
+            {},
+            ["/opt/custom/uvicorn", "server:app", "--host", "localhost"],
+            False,
+            0,
+            None,
+        ),
+        (
+            {},
+            ["/opt/custom/uvicorn", "server:app", "--host", "0.0.0.0"],
+            False,
+            1,
+            "requested bind is not local-only",
+        ),
+        (
+            {},
+            [
+                "/opt/custom/uvicorn",
+                "server:app",
+                "--host",
+                "127.0.0.1",
+                "--fd",
+                "3",
+            ],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
+        # gunicorn-style import: no parseable uvicorn bind flags → fail closed.
+        (
+            {},
+            [
+                "/usr/bin/gunicorn",
+                "-k",
+                "uvicorn.workers.UvicornWorker",
+                "server:app",
+            ],
+            False,
+            1,
+            "bind target could not be verified as local",
+        ),
+        # Same worker shape with explicit loopback flags remains local-safe.
+        (
+            {},
+            [
+                "/usr/bin/gunicorn",
+                "-k",
+                "uvicorn.workers.UvicornWorker",
+                "server:app",
+                "--host",
+                "127.0.0.1",
+            ],
+            False,
+            0,
+            None,
+        ),
     ],
 )
 def test_server_module_uses_authoritative_uvicorn_bind_or_fails_closed(
@@ -138,6 +240,7 @@ def test_server_module_uses_authoritative_uvicorn_bind_or_fails_closed(
     argv: list[str],
     auth_enabled: bool,
     expected_code: int,
+    stderr_snippet: str | None,
 ) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
@@ -184,6 +287,11 @@ import server
         check=False,
     )
 
-    assert result.returncode == expected_code
+    assert result.returncode == expected_code, (
+        f"argv={resolved_argv!r} code={result.returncode} "
+        f"stderr={result.stderr!r} stdout={result.stdout!r}"
+    )
     if expected_code:
         assert "Refusing to start the HTTP service" in result.stderr
+        if stderr_snippet is not None:
+            assert stderr_snippet in result.stderr

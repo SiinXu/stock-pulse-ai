@@ -139,8 +139,17 @@ def _markdown_to_image_m2f(
         temp_dir = tempfile.mkdtemp()
         md_path = os.path.join(temp_dir, "report.md")
         with open(md_path, "w", encoding="utf-8") as f:
-            # m2f keeps raw HTML in Markdown input, allowing both engines to
-            # share the same deterministic poster layout and embedded QR codes.
+            # m2f (npm package markdown-to-file / yzane Markdown PDF fork) keeps
+            # raw HTML in Markdown input. Evidence (markdown-to-file@1.5.4
+            # extension.js convertMarkdownToHtml): markdown-it is constructed
+            # with ``html: true``, and the export template injects body content
+            # via unescaped Mustache ``{{{content}}}``. Code-fence bodies are
+            # escaped for highlighting only; HTML blocks and inline HTML are
+            # not escaped. This lets m2f share the same deterministic poster
+            # HTML (and embedded QR data URIs) as wkhtmltoimage / Playwright.
+            # Regression: if a future m2f major flips html:false or escapes
+            # html_block, posters would render as source text — refuse m2f for
+            # share-image HTML and fall through rather than ship garbage PNGs.
             f.write(
                 build_share_image_html(
                     markdown_text,

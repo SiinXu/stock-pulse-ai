@@ -111,7 +111,8 @@
 |--------|-------------|------|
 | 400 | `validation_error` | 参数错误（如缺少 stock_code） |
 | 409 | `duplicate_task` | 该股票正在分析中，拒绝重复提交 |
-| 500 | `internal_error` / `analysis_failed` | 分析过程发生错误 |
+| 422 | `llm_not_configured` | 未配置可用 LLM（首次运行最常见失败）；请在设置中配置主要模型 / 连接 / API Key 后重试 |
+| 500 | `internal_error` / `analysis_failed` | 分析过程发生错误（非上述已知配置缺口） |
 
 ## 完整 SKILL.md 示例
 
@@ -143,6 +144,7 @@ metadata:
    - 连接失败：提示检查 DSA 是否运行、DSA_BASE_URL 是否正确
    - 400：检查 stock_code 格式
    - 409：该股票正在分析中，可稍后重试或查询任务状态
+   - 422 `llm_not_configured`：未配置可用 LLM，引导用户在设置中配置主要模型 / 连接 / API Key
    - 500：提示查看 DSA 日志排查
 
 ## 股票代码格式
@@ -189,7 +191,8 @@ curl -X POST {DSA_BASE_URL}/api/v1/agent/chat \
 |------|----------|----------|
 | 连接失败 | DSA 未运行、端口错误、防火墙 | 确认 `python main.py --serve-only` 已启动，检查 `DSA_BASE_URL` |
 | 400 错误 | stock_code 格式错误或缺失 | 检查代码格式（见上文表格），确保请求体包含 `stock_code` |
-| 500 错误 | AI 配置、数据源、网络问题 | 查看 DSA 日志，确认 GEMINI_API_KEY 等已配置 |
+| 422 `llm_not_configured` | 未配置可用 LLM / API Key | 在设置中配置主要模型、模型连接或 API Key 后重试 |
+| 500 错误 | 数据源、网络或其它内部错误 | 查看 DSA 日志；若日志含 API Key 未配置，按 422 路径处理 |
 | Agent 400 | Agent 模式未启用 | 在 DSA 的 `.env` 中设置 `AGENT_MODE=true` |
 | 分析超时 | 同步模式等待时间过长 | 增加 HTTP 客户端超时，或改用 `async_mode: true` 轮询状态 |
 

@@ -1,6 +1,6 @@
 {
   "description": "Shrink-only allowlist of non-English UI keys whose value is currently byte-identical to English. New identical pairs fail CI; fixed pairs must be removed from this file. Add entries only with PR justification (proper nouns, codes, intentional English).",
-  "count": 3259,
+  "count": 3261,
   "pairs": [
     "de\tapi.error.STABLE_ERROR_TEXT.approval_auth_required.message",
     "de\tapi.error.STABLE_ERROR_TEXT.approval_auth_required.title",
@@ -90,6 +90,7 @@
     "de\ti18n.uiText.UI_TEXT.home.scheduledTasksListLabel",
     "de\ti18n.uiText.UI_TEXT.home.scheduledTasksToday",
     "de\ti18n.uiText.UI_TEXT.home.scheduledTasksTodayDescription",
+    "de\ti18n.uiText.UI_TEXT.home.setupCheck.stock_list",
     "de\ti18n.uiText.UI_TEXT.language.short.en",
     "de\ti18n.uiText.UI_TEXT.language.short.zh",
     "de\ti18n.uiText.UI_TEXT.layout.appFallbackTitle",
@@ -952,6 +953,7 @@
     "fr\ti18n.uiText.UI_TEXT.home.scheduledTasksListLabel",
     "fr\ti18n.uiText.UI_TEXT.home.scheduledTasksToday",
     "fr\ti18n.uiText.UI_TEXT.home.scheduledTasksTodayDescription",
+    "fr\ti18n.uiText.UI_TEXT.home.setupCheck.notification",
     "fr\ti18n.uiText.UI_TEXT.language.short.en",
     "fr\ti18n.uiText.UI_TEXT.language.short.zh",
     "fr\ti18n.uiText.UI_TEXT.layout.appFallbackTitle",

@@ -344,6 +344,9 @@ class AnalysisResult:
     data_sources: str = ""  # Data source explanation
     success: bool = True
     error_message: Optional[str] = None
+    # Stable machine-readable failure code for known client-fixable conditions
+    # (for example llm_not_configured). Optional; absent on success and generic failures.
+    error_code: Optional[str] = None
 
     # ========== Price Data (Snapshot for analysis) ===========
     current_price: Optional[float] = None  # The price of the stock during the analysis.
@@ -398,6 +401,7 @@ class AnalysisResult:
             'search_performed': self.search_performed,
             'success': self.success,
             'error_message': self.error_message,
+            'error_code': self.error_code,
             'current_price': self.current_price,
             'change_pct': self.change_pct,
             'model_used': self.model_used,

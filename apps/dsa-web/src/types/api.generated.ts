@@ -6704,7 +6704,7 @@ export interface components {
         MarketReviewRequest: {
             /**
              * Region
-             * @description Request-scoped market coverage for this review. Valid tokens: cn, hk, us, jp, kr, both. When omitted, MARKET_REVIEW_REGION is used.
+             * @description Request-scoped market coverage for this review. Valid tokens come from MARKET_REVIEW_REGION_VALID_INPUTS (cn, hk, us, jp, kr, both) or a comma-separated combination of cn/hk/us/jp/kr. When omitted, MARKET_REVIEW_REGION is used. Invalid values are rejected by the endpoint with the allowed set in the error message/params.
              */
             region?: string | null;
             /**

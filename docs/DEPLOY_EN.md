@@ -22,6 +22,31 @@ StockPulse is a **single-administrator / local-first** product, not multi-tenant
 - Non-local HTTP binds **fail closed** when auth is disabled; `ALLOW_INSECURE_PUBLIC_BIND=true` is emergency-only.
 - Optional **HITL risk-control bypass approval** is default-off; enable only with administrator auth and an operator who can decide within the proposal window. Proposal lifetime and the Agent pipeline deadline are separate clocks—see [Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md).
 
+#### HTTP launcher bind guard
+
+When `server:app` is imported, StockPulse inspects process argv to decide whether the listen target is local-only:
+
+| Launcher | Bind args | Auth off | Outcome |
+| --- | --- | --- | --- |
+| Resolved `uvicorn` CLI or `python server.py` | Default / loopback / Unix socket | allowed | Starts |
+| Any launcher (including custom `uvicorn` shims, `uv run`, supervisor) | Explicit loopback `--host` / `--uds` and no `--fd` | allowed | Starts — explicit loopback is authoritative regardless of launcher path |
+| Any launcher | Explicit non-loopback host (`0.0.0.0`, public IP, `*`) | refused | Error states the bind is not local-only |
+| Unrecognized launcher / gunicorn worker with no parseable bind flags, or any `--fd` | (none / FD) | refused | Error states the launcher was not recognized and the bind could not be verified as local |
+| Any of the refused rows above | — | allowed if `ADMIN_AUTH_ENABLED=true` | Starts |
+| Any of the refused rows above | — | `ALLOW_INSECURE_PUBLIC_BIND=true` | Starts with a persistent security warning (emergency only) |
+
+Recommended local commands:
+
+```bash
+uvicorn server:app --host 127.0.0.1 --port 8000
+python server.py
+python main.py --serve-only
+# Custom/shim launchers still work when the loopback is explicit:
+/path/to/custom/uvicorn server:app --host 127.0.0.1 --port 8000
+```
+
+For gunicorn, systemd, or other import-based workers without uvicorn-style `--host`/`--uds` on argv, either enable administrator auth, use a recognized local launcher, or accept the documented emergency override.
+
 Full checklist: [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries).
 
 ---
