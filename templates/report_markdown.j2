@@ -215,10 +215,10 @@
 
 {% if not dashboard %}
 {% if result.buy_reason %}
-**💡 操作理由**: {{ result.buy_reason }}
+**💡 {{ labels.buy_reason_label }}**: {{ result.buy_reason }}
 {% endif %}
 {% if result.risk_warning %}
-**⚠️ 风险提示**: {{ result.risk_warning }}
+**⚠️ {{ labels.risk_warning_label }}**: {{ result.risk_warning }}
 {% endif %}
 {% endif %}
 

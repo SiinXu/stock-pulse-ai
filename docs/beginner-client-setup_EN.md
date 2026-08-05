@@ -16,22 +16,28 @@ Chinese version: [beginner-client-setup.md](beginner-client-setup.md). After ins
 
 ## 1. Download the client
 
-Open the releases page:
+**Download only from this repository's releases page:**
 
 <https://github.com/SiinXu/stock-pulse-ai/releases>
 
-Installers are only available when a formal release has **Assets**. If the page is empty or the latest release has no matching package, StockPulse has not published a downloadable client yet — run from source / WebUI per the [README](../README.md). Do **not** download third-party packages that claim to be StockPulse.
+As of the published tags, the newest formal release that ships desktop installers is **`v3.29.0`**. A source/changelog version such as `4.0.0` does **not** mean a matching desktop installer exists. If the newest source tag has no `.exe` / `.zip` / `.dmg` under **Assets**, use the latest Desktop release that does, build locally per [desktop packaging](desktop-package.md), or run from source / WebUI per the [README](../README.md).
 
-Under **Assets**, pick:
+Do **not** install packages from the upstream `daily_stock_analysis` repo, app-store mirrors, or third-party mirrors that claim to be StockPulse, even when filenames look similar.
 
-| Computer | Download |
+Under **Assets**, pick the file for your machine:
+
+| Computer | Currently published names (example: `v3.29.0`) |
 | --- | --- |
-| Windows | `stockpulse-windows-installer-<version>.exe` |
-| Windows portable | `stockpulse-windows-noinstall-<version>.zip` |
-| macOS Apple silicon | `stockpulse-macos-arm64-<version>.dmg` |
-| macOS Intel | `stockpulse-macos-x64-<version>.dmg` |
+| Windows installer | `daily-stock-analysis-windows-installer-v3.29.0.exe` |
+| Windows portable | `daily-stock-analysis-windows-noinstall-v3.29.0.zip` |
+| macOS Apple silicon | `daily-stock-analysis-macos-arm64-v3.29.0.dmg` |
+| macOS Intel | `daily-stock-analysis-macos-x64-v3.29.0.dmg` |
 
-Do not download `latest.yml` or `*.blockmap` — they are not installers.
+Notes:
+
+- Published desktop assets still use the legacy `daily-stock-analysis-...` prefix (verify with `gh release view v3.29.0`).
+- The packaging pipeline on current `main` (`apps/dsa-desktop/package.json` and `.github/workflows/desktop-release.yml`) prepares **future** Desktop releases as `stockpulse-windows-installer-<tag>.exe`, `stockpulse-windows-noinstall-<tag>.zip`, `stockpulse-macos-arm64-<tag>.dmg`, and `stockpulse-macos-x64-<tag>.dmg`. Trust the actual **Assets** names on this repo only.
+- Skip `latest.yml` and `*.blockmap` — they are not installers.
 
 Mac chip type: Apple menu → About This Mac. M1/M2/M3/M4 → `arm64`; Intel → `x64`.
 

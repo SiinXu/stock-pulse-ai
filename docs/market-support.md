@@ -1,5 +1,31 @@
 # 市场支持与边界
 
+## 港股 (Hong Kong)
+
+港股是项目 headline 市场之一（与 A 股、美股并列），个股分析、大盘复盘区域 `hk`、以及 Market Light 告警区域均包含港股。完整多源优先级、熔断与降级见 [数据源稳定性](data-source-stability.md)（英文：[data-source-stability_EN.md](data-source-stability_EN.md)）。
+
+### 代码与识别
+
+- 常见写法：`hk00700`、`00700.HK`、`00700`（及索引/补全中的等价形式）。
+- 与 A 股六位数字码区分；裸码歧义时以市场检测与股票索引命中为准。
+
+### 日线与实时链路（摘要）
+
+| 能力 | 主要行为 | 失败时 |
+| --- | --- | --- |
+| 日线 | HK-capable numeric priority：配置且初始化成功的 Tushare（优先）→ AkShare → YFinance → 可选 Longbridge | 继续下一 HK-capable provider；全部失败后才考虑符合条件的 stale 日线缓存 |
+| 实时 | 配置且可用的 Longbridge 优先 | 回退 YFinance / AkShare 等市场能力源 |
+
+### 已知配置坑（Tushare 港股权限）
+
+若设置了 `TUSHARE_TOKEN` 但账号**没有港股日线接口权限**，Tushare 会以高优先级失败，表现可能与「查不到港股 / 不支持港股」类似（[完整指南](full-guide.md) 数据源补充说明）。处理：开通 Tushare 港股日线权限，或暂时移除该 Token 走 AkShare/YFinance，或配置可用的 `LONGBRIDGE_*`。排障问答见 [FAQ Q3b](FAQ.md#q3b-为什么我的港股没有被分析--查不到行情)。
+
+### 边界（不在本节夸大承诺）
+
+- 不承诺零延迟实时；免费源可能限流或字段缺失。
+- A 股专属能力（龙虎榜、北向资金口径等）不套用到港股。
+- 板块指数分析 MVP 仅覆盖 A 股 market-review；港股在该能力上为 `not_supported`（见下文 A 股板块节）。
+
 ## A 股板块指数分析 MVP（Issue #264）
 
 A 股大盘复盘会复用既有行业/概念涨跌榜和主要指数行情，生成确定性的板块指数分析。它不把板块代码送入个股入口，因此不会把与个股重号的指数代码误识别为股票。
