@@ -152,7 +152,7 @@ Current anchors include the Pydantic API schemas under [`api/v1/schemas/`](../ap
 | `SECRET-04` | MUST | Raw configuration backup and restore must require an explicit trusted local mode or authenticated administrator session. Returned settings must mask sensitive fields and must not treat a mask placeholder as a new secret. |
 | `SECRET-05` | SHOULD | Operators should rotate a credential after suspected disclosure, remove exposed artifacts, invalidate affected sessions, and record the incident without reproducing the secret. |
 
-Current anchors: [`.gitignore`](../.gitignore), [`.env.example`](../.env.example), [`src/utils/sanitize.py`](../src/utils/sanitize.py), and the backup gate in [`api/v1/endpoints/system_config.py`](../api/v1/endpoints/system_config.py). `log_safe_exception`, bounded diagnostic sanitizers, sensitive configuration metadata, and static exception-log guards provide meaningful coverage, but they do not yet establish a repository-wide guarantee for every provider, trace, and export path.
+Current anchors: [`.gitignore`](../.gitignore), [`.env.example`](../.env.example), [`src/utils/sanitize/`](../src/utils/sanitize/), and the backup gate in [`api/v1/endpoints/system_config.py`](../api/v1/endpoints/system_config.py). `log_safe_exception`, bounded diagnostic sanitizers, sensitive configuration metadata, and static exception-log guards provide meaningful coverage, but they do not yet establish a repository-wide guarantee for every provider, trace, and export path.
 
 ### Outbound network access
 

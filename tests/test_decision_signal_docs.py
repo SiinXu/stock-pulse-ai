@@ -117,7 +117,7 @@ def test_decision_signal_topic_source_anchors_exist() -> None:
         "api/v1/endpoints/decision_signals.py",
         "src/services/decision_signal_service.py",
         "src/schemas/decision_signal_presentation.py",
-        "src/utils/sanitize.py",
+        "src/utils/sanitize/",
     ):
         assert source_path in topic
         assert (ROOT / source_path).exists()

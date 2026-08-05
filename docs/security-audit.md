@@ -48,7 +48,7 @@ session-invalidation, HITL, or protected-data boundary tracked by #535.
 
 ## Persistence And Redaction
 
-`SecurityAuditService` calls the central `src/utils/sanitize.py` recursive
+`SecurityAuditService` calls the central `src.utils.sanitize` recursive
 redactor before `SecurityAuditRepository` receives an event. The repository
 exposes append, bounded query, and time-based retention only; it has no event
 update or per-row deletion API. Raw SQLite regression tests prove that tokens,
