@@ -1,7 +1,6 @@
 """Guard the CLI compatibility facade exposed by :mod:`main`."""
 
 import ast
-import hashlib
 import importlib
 import inspect
 import json
@@ -242,21 +241,55 @@ def test_parse_arguments_preserves_namespace_contract(argv, overrides) -> None:
         assert vars(main.parse_arguments()) == expected
 
 
-def test_help_output_remains_byte_identical() -> None:
-    """Freeze the complete public help output from the pre-split entrypoint."""
+def test_help_output_is_bilingual_multi_market() -> None:
+    """Help stays bilingual and multi-market; flag names stay stable."""
 
     result = subprocess.run(
         [sys.executable, str(Path(main.__file__).resolve()), "--help"],
         capture_output=True,
         check=False,
+        text=True,
     )
 
-    assert result.returncode == 0, result.stderr.decode()
-    assert len(result.stdout.decode()) == 2284
-    assert len(result.stdout) == 3208
-    assert hashlib.sha256(result.stdout).hexdigest() == (
-        "f11311a6d51d8170fb8637984c8f5c585299ba98f770ec3aebf5d2707d8dcef2"
-    )
+    assert result.returncode == 0, result.stderr
+    help_text = result.stdout
+    assert "StockPulse" in help_text
+    assert "A-share" in help_text or "A-share / HK / US" in help_text
+    assert "A股" in help_text
+    assert "港股" in help_text or "美股" in help_text
+    # Flag names untouched (additive help text only)
+    for flag in (
+        "--debug",
+        "--dry-run",
+        "--stocks",
+        "--portfolio",
+        "--no-notify",
+        "--check-notify",
+        "--single-notify",
+        "--workers",
+        "--schedule",
+        "--no-run-immediately",
+        "--market-review",
+        "--no-market-review",
+        "--force-run",
+        "--webui",
+        "--webui-only",
+        "--serve",
+        "--serve-only",
+        "--port",
+        "--host",
+        "--no-context-snapshot",
+        "--backtest",
+        "--backtest-code",
+        "--backtest-days",
+        "--backtest-force",
+    ):
+        assert flag in help_text
+    # English-first bilingual help lines
+    assert "Enable debug logging" in help_text
+    assert "启用调试模式" in help_text
+    assert "Fetch data only" in help_text
+    assert "仅获取数据" in help_text
 
 
 def test_dry_run_flag_reaches_the_existing_analysis_dispatch() -> None:

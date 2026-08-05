@@ -216,7 +216,7 @@ P5 通过 sidecar 表保存用户反馈和后验结果，不扩展 `decision_sig
 
 ## 脱敏与低敏边界
 
-信号写入和状态更新使用 `src/utils/sanitize.py` 中的 `sanitize_decision_signal_text()` 与 `sanitize_decision_signal_payload()`：
+信号写入和状态更新使用 `src/utils/sanitize/` 中的 `sanitize_decision_signal_text()` 与 `sanitize_decision_signal_payload()`：
 
 - 文本字段、JSON 字段和展示型短文本写入前会脱敏。
 - 覆盖敏感 key、Bearer、Authorization/Cookie header 或赋值、token-like 字符串、webhook URL、URL userinfo，以及带敏感 query/fragment 参数的 URL。

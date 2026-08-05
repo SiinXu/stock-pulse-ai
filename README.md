@@ -118,6 +118,9 @@ cp .env.example .env
 python main.py         # one-shot analysis
 ```
 
+No LLM key yet? Run `python main.py --dry-run` first for a data-only report, then add a provider key for AI analysis.
+
+
 Useful commands:
 
 ```bash
