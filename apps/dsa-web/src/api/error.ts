@@ -260,6 +260,54 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
       message: 'Install and enable the image renderer. For Playwright: cd apps/dsa-web && npm ci && npx playwright install chromium.',
     },
   }),
+  // Phase-1 validation catalog: append-only stable codes for top user-facing validation messages.
+  // Chinese API message strings remain the fallback; Web localizes via these catalog entries.
+  invalid_stock_or_name: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.invalid_stock_or_name", {
+    zh: { title: '股票代码或名称无效', message: '请输入有效的股票代码或股票名称。' },
+    en: { title: 'Invalid stock code or name', message: 'Enter a valid stock code or stock name.' },
+  }),
+  missing_stock_params: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.missing_stock_params", {
+    category: 'missing_params',
+    zh: { title: '缺少股票参数', message: '必须提供 stock_code 或 stock_codes 参数。' },
+    en: { title: 'Stock parameter missing', message: 'Provide stock_code or stock_codes.' },
+  }),
+  analysis_batch_limit_exceeded: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.analysis_batch_limit_exceeded", {
+    zh: { title: '批量分析数量超限', message: '单次分析请求最多支持 {max_batch_size} 只股票。' },
+    en: { title: 'Analysis batch limit exceeded', message: 'A single analysis request supports at most {max_batch_size} stocks.' },
+  }),
+  empty_stock_code: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.empty_stock_code", {
+    zh: { title: '股票代码为空', message: '股票代码不能为空或仅包含空白字符。' },
+    en: { title: 'Stock code is empty', message: 'Stock code cannot be empty or whitespace only.' },
+  }),
+  sync_mode_batch_unsupported: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.sync_mode_batch_unsupported", {
+    zh: { title: '同步模式不支持批量', message: '同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析。' },
+    en: { title: 'Sync mode does not support batches', message: 'Sync mode supports one stock only. Use async_mode=true for batch analysis.' },
+  }),
+  invalid_stock_code: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.invalid_stock_code", {
+    zh: { title: '股票代码格式无效', message: '“{stock_code}” 不是合法的股票代码格式。' },
+    en: { title: 'Invalid stock code format', message: '“{stock_code}” is not a valid stock code format.' },
+  }),
+  missing_upload_file: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.missing_upload_file", {
+    zh: { title: '未提供上传文件', message: '请使用表单字段 {field} 上传文件。' },
+    en: { title: 'Upload file missing', message: 'Upload a file using the form field {field}.' },
+  }),
+  missing_import_text: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.missing_import_text", {
+    zh: { title: '未提供导入文本', message: '请使用 JSON 字段 {field} 提交待解析文本。' },
+    en: { title: 'Import text missing', message: 'Submit text to parse using the JSON field {field}.' },
+  }),
+  unsupported_type: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.unsupported_type", {
+    zh: { title: '不支持的文件类型', message: '不支持的类型：{content_type}。允许：{allowed}。' },
+    en: { title: 'Unsupported file type', message: 'Unsupported type: {content_type}. Allowed: {allowed}.' },
+  }),
+  unsupported_content_type: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.unsupported_content_type", {
+    zh: { title: '不支持的请求类型', message: '请使用 multipart/form-data 上传文件，或 application/json 提交文本。' },
+    en: { title: 'Unsupported request content type', message: 'Use multipart/form-data to upload a file, or application/json to submit text.' },
+  }),
+  file_too_large: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.file_too_large", {
+    zh: { title: '文件过大', message: '上传内容超过 {limit_mb}MB 限制。' },
+    en: { title: 'File too large', message: 'The upload exceeds the {limit_mb}MB limit.' },
+  }),
+
 };
 
 const EN_ERROR_TEXT: Record<ApiErrorCategory, { title: string; message: string }> = {

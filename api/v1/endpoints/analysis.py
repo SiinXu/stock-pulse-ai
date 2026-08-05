@@ -251,7 +251,7 @@ def _coalesce_text(*values: Any) -> Optional[str]:
 
 
 def _invalid_analysis_input_error() -> HTTPException:
-    return api_error(400, "validation_error", "请输入有效的股票代码或股票名称")
+    return api_error(400, "invalid_stock_or_name", "请输入有效的股票代码或股票名称")
 
 
 def _is_obviously_invalid_analysis_input(text: str) -> bool:
@@ -354,7 +354,7 @@ def trigger_analysis(
         stock_codes.extend(request.stock_codes)
 
     if not stock_codes:
-        raise api_error(400, "validation_error", "必须提供 stock_code 或 stock_codes 参数")
+        raise api_error(400, "missing_stock_params", "必须提供 stock_code 或 stock_codes 参数")
 
     # Normalize and de-duplicate inputs while preserving compatibility.
     resolved = [_resolve_and_normalize_input(c) for c in stock_codes]
@@ -375,17 +375,22 @@ def trigger_analysis(
     # Limit the number of stocks in a single request to prevent DoS
     MAX_BATCH_SIZE = 50
     if len(stock_codes) > MAX_BATCH_SIZE:
-        raise api_error(400, "validation_error", f"单次分析请求最多支持 {MAX_BATCH_SIZE} 只股票")
+        raise api_error(
+            400,
+            "analysis_batch_limit_exceeded",
+            f"单次分析请求最多支持 {MAX_BATCH_SIZE} 只股票",
+            params={"max_batch_size": MAX_BATCH_SIZE},
+        )
 
     if not stock_codes:
-        raise api_error(400, "validation_error", "股票代码不能为空或仅包含空白字符")
+        raise api_error(400, "empty_stock_code", "股票代码不能为空或仅包含空白字符")
 
     # Sync mode only supports single-stock analysis.
     if not request.async_mode:
         if len(stock_codes) > 1:
             raise api_error(
                 400,
-                "validation_error",
+                "sync_mode_batch_unsupported",
                 "同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析",
             )
         return _handle_sync_analysis(stock_codes[0], request)
