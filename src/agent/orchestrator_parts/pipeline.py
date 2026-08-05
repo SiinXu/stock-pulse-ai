@@ -1081,6 +1081,91 @@ class _PipelineMethods:
         else:
             logger.info("[Orchestrator] strategy engine: NO_SKILLS")
 
+        self._maybe_record_skill_opinion_samples(ctx, result.valid_skill_opinions)
+
+    def _maybe_record_skill_opinion_samples(
+        self,
+        ctx: AgentContext,
+        valid_skill_opinions: List[Any],
+    ) -> None:
+        """Config-gated recording of valid skill opinions into the outcome store.
+
+        Default-off: no database writes and no analysis behavior change.
+        When enabled, persists low-sensitivity samples only when
+        ``ctx.meta["analysis_history_id"]`` is already bound (samples require a
+        history FK). Failures are logged and never fail the analysis.
+        """
+        from src.services.skill_opinion_sample_service import (
+            SkillOpinionSampleService,
+            is_skill_opinion_recording_enabled,
+        )
+
+        if not is_skill_opinion_recording_enabled(self.config):
+            return
+        if not valid_skill_opinions:
+            return
+
+        history_id = ctx.meta.get("analysis_history_id")
+        if not (
+            isinstance(history_id, int)
+            and not isinstance(history_id, bool)
+            and history_id > 0
+        ):
+            ctx.meta["skill_opinion_recording"] = {
+                "status": "deferred",
+                "reason": "missing_analysis_history_id",
+                "opinion_count": len(valid_skill_opinions),
+            }
+            return
+
+        stock_code = str(ctx.stock_code or "").strip()
+        if not stock_code:
+            ctx.meta["skill_opinion_recording"] = {
+                "status": "skipped",
+                "reason": "missing_stock_code",
+            }
+            return
+
+        quality = None
+        pack = ctx.get_data("analysis_context_pack_overview")
+        if isinstance(pack, dict):
+            quality_block = pack.get("data_quality")
+            if isinstance(quality_block, dict):
+                level = str(quality_block.get("level") or "").strip().lower()
+                quality = level or None
+
+        try:
+            created = SkillOpinionSampleService().record_from_agent_opinions(
+                analysis_history_id=history_id,
+                stock_code=stock_code,
+                opinions=valid_skill_opinions,
+                data_quality_level=quality,
+            )
+            ctx.meta["skill_opinion_recording"] = {
+                "status": "recorded",
+                "samples_created": created,
+                "analysis_history_id": history_id,
+            }
+            if created:
+                logger.info(
+                    "[Orchestrator] skill opinion samples recorded: history_id=%s created=%s",
+                    history_id,
+                    created,
+                )
+        except Exception as exc:  # broad-exception: fallback_recorded - Skill opinion recording must never fail analysis.
+            ctx.meta["skill_opinion_recording"] = {
+                "status": "failed",
+                "analysis_history_id": history_id,
+            }
+            log_safe_exception(
+                logger,
+                "[Orchestrator] skill opinion sample recording failed",
+                exc,
+                error_code="agent_skill_opinion_recording_failed",
+                level=logging.WARNING,
+                context={"analysis_history_id": history_id},
+            )
+
     def _apply_partition_fallback(self, ctx: AgentContext) -> None:
         """Partition skill opinions on timeout/budget-skip early-exit paths.
 

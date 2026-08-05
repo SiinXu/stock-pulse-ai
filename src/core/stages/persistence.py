@@ -190,6 +190,26 @@ class _PersistenceStageMixin:
                         context_snapshot=context_snapshot,
                         portfolio_context=portfolio_context,
                     )
+                    # Config-gated skill-opinion sample materialization from the
+                    # just-saved report (samples require analysis_history_id FK).
+                    try:
+                        from src.services.skill_opinion_sample_service import (
+                            SkillOpinionSampleService,
+                        )
+
+                        SkillOpinionSampleService().maybe_materialize_after_history_save(
+                            int(saved_history_id),
+                            config=getattr(self, "config", None),
+                        )
+                    except Exception as skill_exc:  # broad-exception: fallback_recorded - Outcome sample materialization must never fail history persistence.
+                        log_safe_exception(
+                            logger,
+                            "Skill opinion sample recording after history save failed",
+                            skill_exc,
+                            error_code="skill_opinion_sample_after_history_failed",
+                            level=logging.WARNING,
+                            context={"analysis_history_id": saved_history_id},
+                        )
             except Exception as exc:  # broad-exception: fallback_recorded - History failure remains isolated after the side-effect fence records whether a write committed.
                 persistence_error = exc
                 valid_saved_history_id = False

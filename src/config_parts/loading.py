@@ -736,6 +736,10 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            skill_opinion_recording_enabled=parse_env_bool(
+                os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
+                False,
+            ),
             agent_technical_agent_timeout_s=parse_env_float(
                 os.getenv('AGENT_TECHNICAL_AGENT_TIMEOUT_S'), 0,
                 field_name='AGENT_TECHNICAL_AGENT_TIMEOUT_S', minimum=0,

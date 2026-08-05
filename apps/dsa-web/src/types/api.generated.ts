@@ -2149,6 +2149,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/skill-outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询技能观点后验结果
+         * @description 分页查询 skill-opinion outcome；默认当前 engine_version。
+         */
+        get: operations["listSkillOpinionOutcomes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skill-outcomes/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 触发技能观点后验评估
+         * @description 显式触发 skill-opinion sample materialization 与 offline outcome 评估。V0 不新增调度器；limit 计数 outcome keys，不计数 samples。不拉取或回填行情。
+         */
+        post: operations["runSkillOpinionOutcomes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skill-outcomes/samples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询最近技能观点样本
+         * @description 只读返回低敏感 skill opinion samples；不含 reasoning 或模型原文。
+         */
+        get: operations["listSkillOpinionSamples"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skill-outcomes/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询技能观点后验统计
+         * @description 按 skill_id + horizon + engine_version 独立分桶；不足 30 个 evaluated 样本时只返回计数，不返回比率。
+         */
+        get: operations["getSkillOpinionOutcomeStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/extract-from-image": {
         parameters: {
             query?: never;
@@ -8823,6 +8903,201 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /** SkillOpinionOutcomeItem */
+        SkillOpinionOutcomeItem: {
+            /** Analysis Date */
+            analysis_date?: string | null;
+            /** Analysis History Id */
+            analysis_history_id: number;
+            /** Created At */
+            created_at?: string | null;
+            /** Direction Correct */
+            direction_correct?: boolean | null;
+            /** Directional Return Pct */
+            directional_return_pct?: number | null;
+            /** End Close */
+            end_close?: number | null;
+            /** End Trade Date */
+            end_trade_date?: string | null;
+            /** Engine Version */
+            engine_version: string;
+            /** Eval Status */
+            eval_status: string;
+            /** Horizon */
+            horizon: string;
+            /** Id */
+            id: number;
+            /** Outcome */
+            outcome?: string | null;
+            /** Signal */
+            signal: string;
+            /** Skill Id */
+            skill_id: string;
+            /** Skill Opinion Sample Id */
+            skill_opinion_sample_id: number;
+            /** Start Price */
+            start_price?: number | null;
+            /** Start Trade Date */
+            start_trade_date?: string | null;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Return Pct */
+            stock_return_pct?: number | null;
+            /** Unable Reason */
+            unable_reason?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** SkillOpinionOutcomeListResponse */
+        SkillOpinionOutcomeListResponse: {
+            /** Engine Version */
+            engine_version: string;
+            /** Items */
+            items?: components["schemas"]["SkillOpinionOutcomeItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** SkillOpinionOutcomeRunErrorItem */
+        SkillOpinionOutcomeRunErrorItem: {
+            /** Error Type */
+            error_type: string;
+            /** Horizon */
+            horizon?: string | null;
+            /** Sample Id */
+            sample_id?: number | null;
+        };
+        /**
+         * SkillOpinionOutcomeRunRequest
+         * @description Explicit offline evaluation trigger (no new scheduler in V0).
+         */
+        SkillOpinionOutcomeRunRequest: {
+            /** Analysis History Id */
+            analysis_history_id?: number | null;
+            /** Horizons */
+            horizons?: ("1d" | "3d" | "5d" | "10d")[] | null;
+            /**
+             * Limit
+             * @default 100
+             */
+            limit: number;
+            /** Sample Id */
+            sample_id?: number | null;
+            /** Skill Id */
+            skill_id?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+        };
+        /** SkillOpinionOutcomeRunResponse */
+        SkillOpinionOutcomeRunResponse: {
+            /** Created */
+            created: number;
+            /** Engine Version */
+            engine_version: string;
+            /** Errors */
+            errors?: components["schemas"]["SkillOpinionOutcomeRunErrorItem"][];
+            /** Failed */
+            failed: number;
+            /** Histories Scanned */
+            histories_scanned: number;
+            /** Items */
+            items?: components["schemas"]["SkillOpinionOutcomeItem"][];
+            /** Limit Unit */
+            limit_unit: string;
+            /** Processed Keys */
+            processed_keys: number;
+            /** Samples Created */
+            samples_created: number;
+            /** Skipped */
+            skipped: number;
+            /** Updated */
+            updated: number;
+        };
+        /** SkillOpinionPerformanceBucketItem */
+        SkillOpinionPerformanceBucketItem: {
+            /** Avg Directional Return Pct */
+            avg_directional_return_pct?: number | null;
+            /** Engine Version */
+            engine_version: string;
+            /** Evaluated */
+            evaluated: number;
+            /** Hit */
+            hit: number;
+            /** Hit Rate Pct */
+            hit_rate_pct?: number | null;
+            /** Horizon */
+            horizon: string;
+            /** Miss */
+            miss: number;
+            /** Miss Rate Pct */
+            miss_rate_pct?: number | null;
+            /** Observational */
+            observational: number;
+            /** Pending */
+            pending: number;
+            /** Sample Status */
+            sample_status: string;
+            /** Sample Sufficient */
+            sample_sufficient: boolean;
+            /** Skill Id */
+            skill_id: string;
+            /** Total */
+            total: number;
+            /** Unable */
+            unable: number;
+            /** Unable Rate Pct */
+            unable_rate_pct?: number | null;
+        };
+        /** SkillOpinionPerformanceStatsResponse */
+        SkillOpinionPerformanceStatsResponse: {
+            /** Buckets */
+            buckets?: components["schemas"]["SkillOpinionPerformanceBucketItem"][];
+            /** Engine Version */
+            engine_version: string;
+            /** Minimum Evaluated Sample Size */
+            minimum_evaluated_sample_size: number;
+        };
+        /** SkillOpinionSampleItem */
+        SkillOpinionSampleItem: {
+            /** Analysis History Id */
+            analysis_history_id: number;
+            /** Confidence */
+            confidence: number;
+            /** Created At */
+            created_at?: string | null;
+            /** Data Quality Level */
+            data_quality_level?: string | null;
+            /** Horizon */
+            horizon?: string | null;
+            /** Id */
+            id: number;
+            /** Opinion Created At */
+            opinion_created_at?: string | null;
+            /** Sample Schema Version */
+            sample_schema_version: string;
+            /** Signal */
+            signal: string;
+            /** Skill Id */
+            skill_id: string;
+            /** Skill Version */
+            skill_version?: string | null;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** SkillOpinionSampleListResponse */
+        SkillOpinionSampleListResponse: {
+            /** Items */
+            items?: components["schemas"]["SkillOpinionSampleItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
         };
         /** SkillsResponse */
         SkillsResponse: {
@@ -16405,6 +16680,255 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listSkillOpinionOutcomes: {
+        parameters: {
+            query?: {
+                skill_id?: string | null;
+                stock_code?: string | null;
+                horizon?: string | null;
+                eval_status?: string | null;
+                sample_id?: number | null;
+                analysis_history_id?: number | null;
+                engine_version?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOpinionOutcomeListResponse"];
+                };
+            };
+            /** @description 查询参数非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    runSkillOpinionOutcomes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillOpinionOutcomeRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOpinionOutcomeRunResponse"];
+                };
+            };
+            /** @description 请求字段非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求体校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 评估失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listSkillOpinionSamples: {
+        parameters: {
+            query?: {
+                skill_id?: string | null;
+                stock_code?: string | null;
+                analysis_history_id?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOpinionSampleListResponse"];
+                };
+            };
+            /** @description 查询参数非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSkillOpinionOutcomeStats: {
+        parameters: {
+            query?: {
+                skill_id?: string | null;
+                skill_ids?: string[] | null;
+                horizons?: string[] | null;
+                engine_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOpinionPerformanceStatsResponse"];
+                };
+            };
+            /** @description 查询参数非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 统计失败 */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
