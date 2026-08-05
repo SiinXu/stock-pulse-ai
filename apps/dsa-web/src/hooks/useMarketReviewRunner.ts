@@ -5,6 +5,10 @@ import { analysisApi } from '../api/analysis';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { HistoryListResponse, MarketReviewRegion } from '../types/analysis';
+import {
+  formatMarketReviewRegionLabels,
+  MARKET_REVIEW_REGION_UI_TEXT_KEYS,
+} from '../utils/marketReviewRegion';
 
 export type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -30,7 +34,15 @@ export function useMarketReviewRunner({
   onPersistedReport,
   onFeedback,
 }: UseMarketReviewRunnerOptions) {
-  const { t } = useUiLanguage();
+  const { t, language } = useUiLanguage();
+  const formatRegionToken = useCallback(
+    (regionToken: string) => formatMarketReviewRegionLabels(
+      regionToken,
+      (region) => t(MARKET_REVIEW_REGION_UI_TEXT_KEYS[region]),
+      language,
+    ),
+    [language, t],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<MarketReviewNotice>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
@@ -100,7 +112,7 @@ export function useMarketReviewRunner({
               ? t('home.taskStatusWithRegion', {
                 status: status.status,
                 progress,
-                region: status.region,
+                region: formatRegionToken(status.region),
               })
               : t('home.taskStatus', { status: status.status, progress }),
           });
@@ -169,7 +181,7 @@ export function useMarketReviewRunner({
     };
 
     await runPoll();
-  }, [refreshMarketReviewHistory, stopPolling, t]);
+  }, [formatRegionToken, refreshMarketReviewHistory, stopPolling, t]);
 
   const triggerMarketReview = useCallback(async () => {
     setIsSubmitting(true);
@@ -187,7 +199,7 @@ export function useMarketReviewRunner({
         title: t('home.marketReviewSubmitted'),
         message: t('home.marketReviewSubmittedWithRegion', {
           message: result.message,
-          region: result.region,
+          region: formatRegionToken(result.region),
         }),
       });
       onFeedbackRef.current?.();
@@ -200,7 +212,7 @@ export function useMarketReviewRunner({
     } finally {
       if (activeRef.current) setIsSubmitting(false);
     }
-  }, [notify, pollStatus, regions, t]);
+  }, [formatRegionToken, notify, pollStatus, regions, t]);
 
   return {
     clear,
