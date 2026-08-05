@@ -150,6 +150,9 @@ from api.v1.schemas.decision_signals import (
     DecisionSignalOutcomeRunResponse,
     DecisionSignalOutcomeStatsBucket,
     DecisionSignalOutcomeStatsResponse,
+    DecisionSignalProfileCalibration,
+    DecisionSignalProfileCalibrationBreakdowns,
+    DecisionSignalProfileCalibrationBucket,
     DecisionSignalStatusUpdateRequest,
 )
 
@@ -287,5 +290,8 @@ __all__ = [
     "DecisionSignalOutcomeRunResponse",
     "DecisionSignalOutcomeStatsBucket",
     "DecisionSignalOutcomeStatsResponse",
+    "DecisionSignalProfileCalibration",
+    "DecisionSignalProfileCalibrationBreakdowns",
+    "DecisionSignalProfileCalibrationBucket",
     "DecisionSignalStatusUpdateRequest",
 ]

@@ -59,7 +59,7 @@ set of outcome keys (`limit` counts keys, not samples).
 | Performance statistics service | New read-only performance service | Each `skill_id + horizon + engine_version` bucket keeps its own sufficiency gate. |
 | Read-only API | Authenticated `/api/v1/skill-outcomes` (stats, samples, outcomes, explicit run) | Tracked by [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713). Web UI remains follow-up. |
 | Bayesian outcome weights (`831ada53`) | Deferred to [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) | Runtime integration requires existing Agent aggregator and config-registry changes outside this port's writable boundary. |
-| Decision-profile calibration (`aa68d45d`) | Deferred to [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) | The upstream change extends existing DecisionSignal repository/service/API contracts and Web UI, which are outside this V0 scope. |
+| Decision-profile calibration (`aa68d45d`) | Implemented under [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) on DecisionSignal stats (`decision_profile_calibration_service` + optional `profile_calibration` behind `DECISION_PROFILE_CALIBRATION_ENABLED`) | See [decision-signals.md](decision-signals.md); this skill-opinion plane remains independent. |
 | Reassessment persistence (`487e49e5`) | Already present on `main` | StockPulse already supports `persist_status=created/existing/refreshed`; duplicating it would create a parallel contract. |
 
 ## Data model
@@ -129,9 +129,11 @@ temporary pending rows do not dilute permanent metadata failures.
   marked unable rather than guessed from an arbitrary local bar.
 - V0 ships the authenticated API; the Web surface for buckets/thresholds remains
   open under [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713).
-- Bayesian runtime weighting and decision-profile outcome calibration remain
-  default-neutral until [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714)
-  and [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) land.
+- Bayesian runtime weighting remains default-neutral until
+  [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) lands.
+- Decision-profile outcome calibration lives on the DecisionSignal stats surface
+  (default-off `DECISION_PROFILE_CALIBRATION_ENABLED`); details are in
+  [decision-signals.md](decision-signals.md) / [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715).
 
 The migration is additive. Code rollback does not remove either table, so
 collected facts remain available if the feature is reintroduced.

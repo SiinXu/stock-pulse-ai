@@ -46,6 +46,7 @@ import {
   DecisionSignalCard,
   DecisionSignalDetails,
 } from '../components/decision-signals/DecisionSignalDisplay';
+import { DecisionSignalProfileCalibration } from '../components/decision-signals/DecisionSignalProfileCalibration';
 import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
 import { DecisionSignalOutcomeRunPanel } from '../components/decision-signals/DecisionSignalOutcomeRunPanel';
@@ -2388,28 +2389,33 @@ const DecisionSignalsPage: React.FC = () => {
             ) : statsLoading ? (
               <Loading />
             ) : outcomeStats && outcomeStats.total > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <StatCard label={t('decisionSignals.statsTotal')} value={outcomeStats.total} />
-                <StatCard
-                  tone="success"
-                  label={t('decisionSignals.statsHitRate')}
-                  value={<span className="text-success">{formatStatPercent(outcomeStats.hitRatePct)}</span>}
-                />
-                <StatCard
-                  tone="success"
-                  label={t('decisionSignals.outcome.hit')}
-                  value={<span className="text-success">{outcomeStats.hit}</span>}
-                />
-                <StatCard
-                  tone="danger"
-                  label={t('decisionSignals.outcome.miss')}
-                  value={<span className="text-danger">{outcomeStats.miss}</span>}
-                />
-                <StatCard
-                  tone="warning"
-                  label={t('decisionSignals.outcome.unable')}
-                  value={<span className="text-warning">{outcomeStats.unable}</span>}
-                />
+              <div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <StatCard label={t('decisionSignals.statsTotal')} value={outcomeStats.total} />
+                  <StatCard
+                    tone="success"
+                    label={t('decisionSignals.statsHitRate')}
+                    value={<span className="text-success">{formatStatPercent(outcomeStats.hitRatePct)}</span>}
+                  />
+                  <StatCard
+                    tone="success"
+                    label={t('decisionSignals.outcome.hit')}
+                    value={<span className="text-success">{outcomeStats.hit}</span>}
+                  />
+                  <StatCard
+                    tone="danger"
+                    label={t('decisionSignals.outcome.miss')}
+                    value={<span className="text-danger">{outcomeStats.miss}</span>}
+                  />
+                  <StatCard
+                    tone="warning"
+                    label={t('decisionSignals.outcome.unable')}
+                    value={<span className="text-warning">{outcomeStats.unable}</span>}
+                  />
+                </div>
+                {outcomeStats.profileCalibration ? (
+                  <DecisionSignalProfileCalibration calibration={outcomeStats.profileCalibration} />
+                ) : null}
               </div>
             ) : (
               <EmptyState
