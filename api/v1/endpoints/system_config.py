@@ -373,8 +373,13 @@ def get_kronos_status() -> KronosStatusResponse:
 
         payload = build_kronos_status_report(get_config()).to_dict()
         return KronosStatusResponse.model_validate(payload)
-    except Exception as exc:
-        _log_config_exception("Kronos status load failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map Kronos status probe failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Kronos status load failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={
