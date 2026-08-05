@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] First-run analysis without an LLM now returns stable `llm_not_configured` (HTTP 422 sync / task `message_code`) and Home setup banners localize readiness check keys; invalid market-review `region` errors include the allowed set.
 - [Fixed] Honored explicit loopback `--host`/`--uds` under unrecognized HTTP launchers (custom uvicorn shims, `uv run`, gunicorn-style argv) while keeping fail-closed behavior and clearer errors when the bind cannot be verified as local.
 - [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.
+- [Fixed] Stopped backtests from permanently poisoning legacy pre-phase snapshots and suspended-stock rows as `insufficient_data`, re-attempting non-completed results and marking `legacy_analysis_date` / `prior_session_start` resolution notes when degraded.
+- [Changed] `GET /api/v1/backtest/performance/{code}` returns the canonical bare stock code in the summary payload (for example `AAPL` not `AAPL.US`).
+
 - [Fixed] Preserve usable AkShare Hong Kong Eastmoney realtime snapshots across failed refreshes; apply the short failure TTL only when no usable snapshot exists, then fall back to Sina.
 - [Docs] Document md2img engine HTML capability matrix (wkhtmltoimage / markdown-to-file raw HTML / Playwright) for share-image posters.
 - [Tests] Cover HK realtime cache resilience across warm/cold refresh failures and m2f share-image HTML pass-through regression notes.

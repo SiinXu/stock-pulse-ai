@@ -1537,7 +1537,7 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 4. 评估止盈/止损命中情况，模拟执行收益
 5. 汇总为整体和单股两个维度的表现指标
 
-回测起始日优先使用历史快照中的 `market_phase_summary.effective_daily_bar_date`；旧快照仅在市场与阶段信息可信时通过交易日历解析。起始 K 线与后续窗口必须来自同一个市场身份和同一种已存代码形态，不会再把一个别名的起始价与另一个别名的后续 K 线拼接。缺少权威起始日或完整窗口时，结果会标记为数据不足，而不会回退到任意旧 K 线。
+回测起始日优先使用历史快照中的 `market_phase_summary.effective_daily_bar_date`；旧快照仅在市场与阶段信息可信时通过交易日历解析。当缺少 `market_phase_summary` 且无法重建（phase 出现前的历史行）时，回退到分析日作为期望起始日（phase 前语义），并写入 `resolution_notes=legacy_analysis_date`，而不是永久标记为 `insufficient_data`。起始 K 线与后续窗口必须来自同一个市场身份和同一种已存代码形态，不会再把一个别名的起始价与另一个别名的后续 K 线拼接。若期望起始日当天没有 K 线（停牌/临时停市或本地缺口），在有界回看内（最多 10 个交易日；日历不可用时约 21 个自然日）使用最近的前一交易日 K 线，并写入 `resolution_notes=prior_session_start`。确实完全没有可用数据时仍为 `insufficient_data`。非 `force` 运行仅跳过同一 `(analysis_history_id, eval_window_days, engine_version)` 下 `eval_status=completed` 的结果，因此已被毒化的 `insufficient_data` / `error` 行会在后续运行中自动重试（在完成前会增加重算成本）。`GET /api/v1/backtest/performance/{code}` 在汇总存在时返回规范裸代码（例如 `AAPL` 而非 `AAPL.US`）。
 
 ### 操作建议映射
 

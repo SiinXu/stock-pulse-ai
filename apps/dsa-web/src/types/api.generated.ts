@@ -4124,6 +4124,11 @@ export interface components {
             outcome?: string | null;
             /** Position Recommendation */
             position_recommendation?: string | null;
+            /**
+             * Resolution Notes
+             * @description Optional comma-separated start-resolution markers such as legacy_analysis_date or prior_session_start
+             */
+            resolution_notes?: string | null;
             /** Simulated Entry Price */
             simulated_entry_price?: number | null;
             /** Simulated Exit Price */
