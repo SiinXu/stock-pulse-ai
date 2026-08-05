@@ -1,9 +1,11 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Share2, TriangleAlert } from 'lucide-react';
+import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import type { ReportLanguage } from '../../types/analysis';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import { ApiErrorAlert } from '../common/ApiErrorAlert';
 import { Tooltip } from '../common/Tooltip';
 
 type DesktopWindow = Window & {
@@ -24,13 +26,16 @@ const safeFilenamePart = (value: string): string => {
   return normalized.slice(0, 72) || 'report';
 };
 
+/** DOM-attached synchronous download (matches chatExport / Settings patterns for Firefox/Safari). */
 const downloadBlob = (blob: Blob, filename: string): void => {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = objectUrl;
   anchor.download = filename;
+  document.body.appendChild(anchor);
   anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(objectUrl);
 };
 
 export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
@@ -45,16 +50,19 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
   const [stateSnapshot, setStateSnapshot] = useState<{
     recordId?: number;
     state: ShareState;
+    error: ParsedApiError | null;
   }>(() => ({
     recordId: activeRecordId,
     state: 'idle',
+    error: null,
   }));
   const resetTimerRef = useRef<number | null>(null);
   const loadTokenRef = useRef(0);
   const cachedImageRef = useRef<{ recordId: number; blob: Blob } | null>(null);
   const state = stateSnapshot.recordId === activeRecordId ? stateSnapshot.state : 'idle';
-  const setState = useCallback((nextState: ShareState) => {
-    setStateSnapshot({ recordId: activeRecordId, state: nextState });
+  const shareError = stateSnapshot.recordId === activeRecordId ? stateSnapshot.error : null;
+  const setState = useCallback((nextState: ShareState, nextError: ParsedApiError | null = null) => {
+    setStateSnapshot({ recordId: activeRecordId, state: nextState, error: nextError });
   }, [activeRecordId]);
   const clearResetTimer = useCallback(() => {
     if (resetTimerRef.current !== null) {
@@ -69,7 +77,7 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
     resetTimerRef.current = window.setTimeout(() => {
       setStateSnapshot((current) => (
         current.recordId === scheduledRecordId
-          ? { recordId: scheduledRecordId, state: 'idle' }
+          ? { recordId: scheduledRecordId, state: 'idle', error: null }
           : current
       ));
     }, 2200);
@@ -104,7 +112,7 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
       } catch (error) {
         if (loadTokenRef.current !== loadToken) return;
         console.error('Generate share image failed:', error);
-        setState('error');
+        setState('error', getParsedApiError(error));
         return;
       }
       if (loadTokenRef.current !== loadToken) return;
@@ -150,7 +158,7 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
       scheduleReset();
     } catch (error) {
       console.error('Generate share image failed:', error);
-      setState('error');
+      setState('error', getParsedApiError(error));
     }
   }, [activeRecordId, clearResetTimer, reportTitle, scheduleReset, setState, state]);
 
@@ -167,22 +175,33 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
         : text.generateShareImage;
 
   return (
-    <Tooltip content={tooltipText}>
-      <span className="inline-flex shrink-0">
-        <button
-          type="button"
-          onClick={() => void handleShare()}
-          disabled={state === 'loading'}
-          className={`home-surface-button flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium text-secondary-text hover:text-foreground disabled:opacity-50 ${className}`}
-          aria-label={tooltipText}
-        >
-          {state === 'loading' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : null}
-          {state === 'success' ? <Check className="h-5 w-5 text-success" aria-hidden="true" /> : null}
-          {state === 'error' ? <TriangleAlert className="h-5 w-5 text-danger" aria-hidden="true" /> : null}
-          {state === 'idle' || state === 'ready' ? <Share2 className="h-5 w-5" aria-hidden="true" /> : null}
-          <span>{tooltipText}</span>
-        </button>
-      </span>
-    </Tooltip>
+    <span className={`inline-flex max-w-full flex-col items-end gap-2 ${className}`.trim()}>
+      <Tooltip content={tooltipText}>
+        <span className="inline-flex shrink-0">
+          <button
+            type="button"
+            onClick={() => void handleShare()}
+            disabled={state === 'loading'}
+            className="home-surface-button flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium text-secondary-text hover:text-foreground disabled:opacity-50"
+            aria-label={tooltipText}
+          >
+            {state === 'loading' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : null}
+            {state === 'success' ? <Check className="h-5 w-5 text-success" aria-hidden="true" /> : null}
+            {state === 'error' ? <TriangleAlert className="h-5 w-5 text-danger" aria-hidden="true" /> : null}
+            {state === 'idle' || state === 'ready' ? <Share2 className="h-5 w-5" aria-hidden="true" /> : null}
+            <span>{tooltipText}</span>
+          </button>
+        </span>
+      </Tooltip>
+      {state === 'error' && shareError ? (
+        <div className="w-full min-w-[16rem] max-w-md" data-testid="share-image-error">
+          <ApiErrorAlert
+            error={shareError}
+            actionLabel={text.shareImageFailed}
+            onAction={() => void handleShare()}
+          />
+        </div>
+      ) : null}
+    </span>
   );
 };

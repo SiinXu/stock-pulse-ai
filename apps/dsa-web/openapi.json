@@ -3829,6 +3829,18 @@
             ],
             "title": "Position Recommendation"
           },
+          "resolution_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional comma-separated start-resolution markers such as legacy_analysis_date or prior_session_start",
+            "title": "Resolution Notes"
+          },
           "simulated_entry_price": {
             "anyOf": [
               {
@@ -23634,7 +23646,7 @@
     },
     "/api/v1/history/{record_id}/share-image": {
       "get": {
-        "description": "Build a deterministic PNG share image from the historical report Markdown and any persisted structured payload.",
+        "description": "Build a deterministic PNG share image from the historical report Markdown and any persisted structured payload. Content longer than SHARE_IMAGE_MAX_CHARS returns 413 share_image_content_too_large instead of a false renderer-unavailable 503.",
         "operationId": "get_history_share_image_api_v1_history__record_id__share_image_get",
         "parameters": [
           {
@@ -23663,6 +23675,16 @@
               }
             },
             "description": "Report not found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Report content exceeds SHARE_IMAGE_MAX_CHARS"
           },
           "422": {
             "content": {

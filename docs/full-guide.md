@@ -137,7 +137,8 @@ stock-pulse-ai/
 | `NOTIFICATION_TIMEZONE` | 静默时段使用的 IANA 时区，如 `Asia/Shanghai`；留空跟随 `TZ` 或系统本地时区 | 可选 |
 | `NOTIFICATION_MIN_SEVERITY` | 最低通知级别：`info`、`warning`、`error`、`critical`；留空保持现状 | 可选 |
 | `NOTIFICATION_DAILY_DIGEST_ENABLED` | 每日摘要预留开关；当前不会发送摘要或持久化摘要内容 | 可选 |
-| `MARKDOWN_TO_IMAGE_MAX_CHARS` | 超过此长度不转图片，避免超大图片（默认 15000） | 可选 |
+| `MARKDOWN_TO_IMAGE_MAX_CHARS` | 超过此长度不转图片，避免超大图片（默认 15000；仅 IM 通知转图） | 可选 |
+| `SHARE_IMAGE_MAX_CHARS` | Web/API 历史分享图 Markdown 上限（默认 100000，独立于 IM 的 15000）；超限返回 HTTP 413 `share_image_content_too_large` | 可选 |
 | `MD2IMG_ENGINE` | 转图引擎：`wkhtmltoimage`（默认，需 wkhtmltopdf）或 `markdown-to-file`（emoji 更好，需 `npm i -g markdown-to-file`） | 可选 |
 | `PREFETCH_REALTIME_QUOTES` | 设为 `false` 可禁用实时行情预取，避免 efinance/akshare_em 全市场拉取（默认 true） | 可选 |
 
@@ -1537,7 +1538,7 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 4. 评估止盈/止损命中情况，模拟执行收益
 5. 汇总为整体和单股两个维度的表现指标
 
-回测起始日优先使用历史快照中的 `market_phase_summary.effective_daily_bar_date`；旧快照仅在市场与阶段信息可信时通过交易日历解析。起始 K 线与后续窗口必须来自同一个市场身份和同一种已存代码形态，不会再把一个别名的起始价与另一个别名的后续 K 线拼接。缺少权威起始日或完整窗口时，结果会标记为数据不足，而不会回退到任意旧 K 线。
+回测起始日优先使用历史快照中的 `market_phase_summary.effective_daily_bar_date`；旧快照仅在市场与阶段信息可信时通过交易日历解析。当缺少 `market_phase_summary` 且无法重建（phase 出现前的历史行）时，回退到分析日作为期望起始日（phase 前语义），并写入 `resolution_notes=legacy_analysis_date`，而不是永久标记为 `insufficient_data`。起始 K 线与后续窗口必须来自同一个市场身份和同一种已存代码形态，不会再把一个别名的起始价与另一个别名的后续 K 线拼接。若期望起始日当天没有 K 线（停牌/临时停市或本地缺口），在有界回看内（最多 10 个交易日；日历不可用时约 21 个自然日）使用最近的前一交易日 K 线，并写入 `resolution_notes=prior_session_start`。确实完全没有可用数据时仍为 `insufficient_data`。非 `force` 运行仅跳过同一 `(analysis_history_id, eval_window_days, engine_version)` 下 `eval_status=completed` 的结果，因此已被毒化的 `insufficient_data` / `error` 行会在后续运行中自动重试（在完成前会增加重算成本）。`GET /api/v1/backtest/performance/{code}` 在汇总存在时返回规范裸代码（例如 `AAPL` 而非 `AAPL.US`）。
 
 ### 操作建议映射
 

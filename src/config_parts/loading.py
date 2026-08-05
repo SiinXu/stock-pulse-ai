@@ -901,6 +901,12 @@ class _ConfigLoadingMethods:
                 minimum=1,
             ),
             md2img_engine=cls._parse_md2img_engine(os.getenv('MD2IMG_ENGINE', 'wkhtmltoimage')),
+            share_image_max_chars=parse_env_int(
+                os.getenv('SHARE_IMAGE_MAX_CHARS'),
+                100000,
+                field_name='SHARE_IMAGE_MAX_CHARS',
+                minimum=1,
+            ),
             share_image_xiaohongshu_url=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_URL') or '').strip() or None,
             share_image_xiaohongshu_handle=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_HANDLE') or '').strip() or None,
             share_image_xiaohongshu_id=(os.getenv('SHARE_IMAGE_XIAOHONGSHU_ID') or '').strip() or None,

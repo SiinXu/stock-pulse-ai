@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Moved stock-list splitting to a leaf utility, removing the config-to-services import edge.
 - [Added] Added a shrink-only import-cycle ratchet to the deterministic CI gate.
 
+- [Tests] Ran the API suite against the real Starlette test client in a dedicated CI job behind a default-off flag.
+- [Chore] Extended CI path filters to the backend code the e2e stack boots and added a push-to-main run.
 - [Fixed] First-run analysis without an LLM now returns stable `llm_not_configured` (HTTP 422 sync / task `message_code`) and Home setup banners localize readiness check keys; invalid market-review `region` errors include the allowed set.
 - [Fixed] Honored explicit loopback `--host`/`--uds` under unrecognized HTTP launchers (custom uvicorn shims, `uv run`, gunicorn-style argv) while keeping fail-closed behavior and clearer errors when the bind cannot be verified as local.
 - [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.
+- [Fixed] Stopped backtests from permanently poisoning legacy pre-phase snapshots and suspended-stock rows as `insufficient_data`, re-attempting non-completed results and marking `legacy_analysis_date` / `prior_session_start` resolution notes when degraded.
+- [Changed] `GET /api/v1/backtest/performance/{code}` returns the canonical bare stock code in the summary payload (for example `AAPL` not `AAPL.US`).
+
 - [Fixed] Preserve usable AkShare Hong Kong Eastmoney realtime snapshots across failed refreshes; apply the short failure TTL only when no usable snapshot exists, then fall back to Sina.
 - [Docs] Document md2img engine HTML capability matrix (wkhtmltoimage / markdown-to-file raw HTML / Playwright) for share-image posters.
 - [Tests] Cover HK realtime cache resilience across warm/cold refresh failures and m2f share-image HTML pass-through regression notes.
@@ -23,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Marked the HK cold-lookup barrier test as `@pytest.mark.benchmark` so it leaves the blocking offline gate and runs in the scheduled benchmark workflow.
 - [Fixed] Registered `TENCENT_PRIORITY` in the config registry and read it via the Config object (env fallback preserved) so Web settings changes apply to the Tencent daily fetcher.
 - [Docs] Documented coverage-floor anti-lowering semantics, legitimate floor-lowering path, package-scope assertions, and the scheduled benchmark runner in `docs/testing-ci-gate.md`.
+- [Fixed] Share-image API returns HTTP 413 `share_image_content_too_large` when report Markdown exceeds `SHARE_IMAGE_MAX_CHARS` (default 100000), instead of a false 503 renderer-unavailable; Web shows the localized ParsedApiError, uses a 90s per-request timeout, and downloads via a DOM-attached anchor.
 - [Tests] Wait for decision-memory controls and legacy usage-route synchronization before asserting or interacting, eliminating full-suite timing races.
 - [Tests] Cover share-image parsing, merge, localization, safety, and branding contracts so the repository coverage floor remains enforceable after the upstream parity merge.
 - [Fixed] Made OpenAPI type drift and every always-run CI gate required by the main branch ruleset and aligned contribution guidance.

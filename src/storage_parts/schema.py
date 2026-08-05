@@ -371,6 +371,10 @@ class BacktestResult(Base):
     simulated_exit_reason = Column(String(24))  # stop_loss/take_profit/window_end/cash/ambiguous_stop_loss
     simulated_return_pct = Column(Float)
 
+    # Optional resolution markers (comma-separated), e.g. legacy_analysis_date,
+    # prior_session_start. Additive; null for exact authoritative resolution.
+    resolution_notes = Column(String(64), nullable=True)
+
     __table_args__ = (
         UniqueConstraint(
             'analysis_history_id',
