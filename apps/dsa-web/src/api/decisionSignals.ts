@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import apiClient from './index';
+import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type {
   DecisionSignalCreateRequest,
@@ -25,6 +27,232 @@ import type {
   DecisionSignalStatusUpdateRequest,
 } from '../types/decisionSignals';
 
+import type { components } from '../types/api.generated';
+
+type OpenApiDecisionSignalItem = components['schemas']['DecisionSignalItem'];
+type OpenApiDecisionSignalListResponse = components['schemas']['DecisionSignalListResponse'];
+type OpenApiDecisionSignalOutcomeItem = components['schemas']['DecisionSignalOutcomeItem'];
+type _AssertItemFields = keyof OpenApiDecisionSignalItem;
+type _AssertListFields = keyof OpenApiDecisionSignalListResponse;
+type _AssertOutcomeFields = keyof OpenApiDecisionSignalOutcomeItem;
+const _itemFieldAnchor: _AssertItemFields = 'stock_code';
+const _listFieldAnchor: _AssertListFields = 'page_size';
+const _outcomeFieldAnchor: _AssertOutcomeFields = 'stock_return_pct';
+void _itemFieldAnchor;
+void _listFieldAnchor;
+void _outcomeFieldAnchor;
+
+const decisionSignalPresentationSchema = z.object({
+  action: z.string(),
+  label: z.string(),
+  confidence: z.number().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  risk: z.string().nullable().optional(),
+  timestamp: z.string().nullable().optional(),
+}).passthrough();
+
+const decisionSignalItemSchema = z.object({
+  id: z.number(),
+  stockCode: z.string(),
+  market: z.string(),
+  sourceType: z.string(),
+  triggerSource: z.string(),
+  action: z.string(),
+  planQuality: z.string(),
+  status: z.string(),
+  presentation: decisionSignalPresentationSchema,
+  stockName: z.string().nullable().optional(),
+  sourceAgent: z.string().nullable().optional(),
+  sourceReportId: z.number().nullable().optional(),
+  traceId: z.string().nullable().optional(),
+  decisionProfile: z.string().nullable().optional(),
+  marketPhase: z.string().nullable().optional(),
+  actionLabel: z.string().nullable().optional(),
+  confidence: z.number().nullable().optional(),
+  score: z.number().nullable().optional(),
+  horizon: z.string().nullable().optional(),
+  entryLow: z.number().nullable().optional(),
+  entryHigh: z.number().nullable().optional(),
+  stopLoss: z.number().nullable().optional(),
+  targetPrice: z.number().nullable().optional(),
+  invalidation: z.string().nullable().optional(),
+  watchConditions: z.string().nullable().optional(),
+  reason: z.string().nullable().optional(),
+  riskSummary: z.string().nullable().optional(),
+  catalystSummary: z.string().nullable().optional(),
+  evidence: z.unknown().optional(),
+  dataQualitySummary: z.unknown().optional(),
+  expiresAt: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+  metadata: z.unknown().optional(),
+}).passthrough();
+
+const decisionSignalListResponseSchema = z.object({
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  items: z.array(decisionSignalItemSchema).optional(),
+}).passthrough();
+
+const decisionSignalMutationResponseSchema = z.object({
+  created: z.boolean(),
+  item: decisionSignalItemSchema,
+}).passthrough();
+
+const decisionSignalPreviewSchema = z.object({
+  action: z.string(),
+  metadata: z.record(z.string(), z.unknown()),
+  confidence: z.number().nullable().optional(),
+  entryHigh: z.number().nullable().optional(),
+  entryLow: z.number().nullable().optional(),
+  horizon: z.string().nullable().optional(),
+  invalidation: z.string().nullable().optional(),
+  reason: z.string().nullable().optional(),
+  riskSummary: z.string().nullable().optional(),
+  score: z.number().nullable().optional(),
+  stopLoss: z.number().nullable().optional(),
+  targetPrice: z.number().nullable().optional(),
+  watchConditions: z.string().nullable().optional(),
+}).passthrough();
+
+const decisionSignalWarningSchema = z.object({
+  code: z.string(),
+  message: z.string().nullable().optional(),
+  params: z.record(z.string(), z.unknown()).nullable().optional(),
+}).passthrough();
+
+const decisionSignalReassessResponseSchema = z.object({
+  created: z.boolean(),
+  preview: decisionSignalPreviewSchema.nullable().optional(),
+  item: decisionSignalItemSchema.nullable().optional(),
+  persistStatus: z.string().nullable().optional(),
+  warnings: z.array(decisionSignalWarningSchema).optional(),
+  blockedReason: z.string().nullable().optional(),
+}).passthrough();
+
+const decisionSignalOutcomeItemSchema = z.object({
+  id: z.number(),
+  signalId: z.number(),
+  horizon: z.string(),
+  engineVersion: z.string(),
+  evalStatus: z.string(),
+  holdingState: z.string(),
+  action: z.string().nullable().optional(),
+  anchorDate: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+  dataQualityLevel: z.string().nullable().optional(),
+  directionCorrect: z.boolean().nullable().optional(),
+  directionExpected: z.string().nullable().optional(),
+  endClose: z.number().nullable().optional(),
+  evalWindowDays: z.number().nullable().optional(),
+  market: z.string().nullable().optional(),
+  marketPhase: z.string().nullable().optional(),
+  maxHigh: z.number().nullable().optional(),
+  minLow: z.number().nullable().optional(),
+  outcome: z.string().nullable().optional(),
+  planQuality: z.string().nullable().optional(),
+  sourceAgent: z.string().nullable().optional(),
+  sourceType: z.string().nullable().optional(),
+  startPrice: z.number().nullable().optional(),
+  stockReturnPct: z.number().nullable().optional(),
+  unableReason: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+}).passthrough();
+
+const decisionSignalOutcomeListResponseSchema = z.object({
+  total: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  items: z.array(decisionSignalOutcomeItemSchema).optional(),
+}).passthrough();
+
+const decisionSignalOutcomeRunResponseSchema = z.object({
+  created: z.number(),
+  engineVersion: z.string(),
+  evaluated: z.number(),
+  skipped: z.number(),
+  updated: z.number(),
+  items: z.array(decisionSignalOutcomeItemSchema).optional(),
+}).passthrough();
+
+const decisionSignalOutcomeStatsBucketSchema = z.object({
+  dimension: z.string(),
+  value: z.string(),
+  total: z.number(),
+  completed: z.number(),
+  hit: z.number(),
+  miss: z.number(),
+  neutral: z.number(),
+  unable: z.number(),
+  hitRatePct: z.number().nullable().optional(),
+  avgStockReturnPct: z.number().nullable().optional(),
+  unableReasons: z.record(z.string(), z.number()).optional(),
+}).passthrough();
+
+const decisionSignalOutcomeStatsResponseSchema = z.object({
+  engineVersion: z.string(),
+  total: z.number(),
+  completed: z.number(),
+  unable: z.number(),
+  hit: z.number(),
+  miss: z.number(),
+  neutral: z.number(),
+  avgStockReturnPct: z.number().nullable().optional(),
+  hitRatePct: z.number().nullable().optional(),
+  horizons: z.array(z.string()).nullable().optional(),
+  statuses: z.array(z.string()).optional(),
+  unableReasons: z.record(z.string(), z.number()).optional(),
+  breakdowns: z.record(z.string(), z.array(decisionSignalOutcomeStatsBucketSchema)).optional(),
+}).passthrough();
+
+const decisionSignalFeedbackItemSchema = z.object({
+  signalId: z.number(),
+  feedbackValue: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  reasonCode: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+}).passthrough();
+
+const decisionSignalMemoryFlagItemSchema = z.object({
+  signalId: z.number(),
+  memorable: z.boolean().optional(),
+  ignored: z.boolean().optional(),
+  createdAt: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+}).passthrough();
+
+function parseValidatedPayload<T>(
+  camel: unknown,
+  schema: z.ZodTypeAny,
+  label: string,
+): T {
+  const result = schema.safeParse(camel);
+  if (!result.success) {
+    const issueSummary = result.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+    if (import.meta.env.DEV) {
+      console.error(`[decisionSignals] response validation failed (${label})`, result.error.issues);
+    }
+    throw createApiError(
+      createParsedApiError({
+        title: '响应校验失败',
+        message: `接口响应未通过校验（${label}）。${issueSummary}`,
+        rawMessage: result.error.message,
+        category: 'unknown',
+        code: 'api_response_validation_failed',
+        params: { label, issues: issueSummary },
+        details: result.error.issues,
+      }),
+    );
+  }
+  return camel as T;
+}
+
 function omitUndefined(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
@@ -48,33 +276,54 @@ function toDecisionSignalItem(data: Record<string, unknown>): DecisionSignalItem
   if ('evidence' in data) item.evidence = data.evidence;
   if ('data_quality_summary' in data) item.dataQualitySummary = data.data_quality_summary;
   if ('metadata' in data) item.metadata = data.metadata;
-  return item;
+  return parseValidatedPayload<DecisionSignalItem>(item, decisionSignalItemSchema, 'DecisionSignalItem');
 }
 
 function toDecisionSignalMutationResponse(data: Record<string, unknown>): DecisionSignalMutationResponse {
   const response = toCamelCase<DecisionSignalMutationResponse>(data);
   response.item = toDecisionSignalItem(data.item as Record<string, unknown>);
-  return response;
+  return parseValidatedPayload(response, decisionSignalMutationResponseSchema, 'DecisionSignalMutationResponse');
 }
 
 function toDecisionSignalReassessResponse(data: Record<string, unknown>): DecisionSignalReassessResponse {
-  const response = toCamelCase<DecisionSignalReassessResponse>(data);
   const rawPreview = data.preview;
-  if (rawPreview !== null && (typeof rawPreview !== 'object' || Array.isArray(rawPreview))) {
-    throw new Error('DecisionSignal reassess response preview must be an object');
+  if (rawPreview !== null && rawPreview !== undefined
+    && (typeof rawPreview !== 'object' || Array.isArray(rawPreview))) {
+    throw createApiError(
+      createParsedApiError({
+        title: '响应校验失败',
+        message: '接口响应未通过校验（DecisionSignalReassessResponse）。preview: Expected object, received non-object',
+        rawMessage: 'preview must be an object or null',
+        category: 'unknown',
+        code: 'api_response_validation_failed',
+        params: {
+          label: 'DecisionSignalReassessResponse',
+          issues: 'preview: Expected object, received non-object',
+        },
+      }),
+    );
   }
+
+  let preview: DecisionSignalReassessResponse['preview'] = null;
   if (rawPreview) {
-    response.preview = toCamelCase<DecisionSignalReassessResponse['preview']>(rawPreview);
-    if (response.preview) {
-      response.preview.metadata = (rawPreview as Record<string, unknown>).metadata as Record<string, unknown> ?? {};
-    }
-  } else {
-    response.preview = null;
+    const previewCamel = toCamelCase<NonNullable<DecisionSignalReassessResponse['preview']>>(rawPreview);
+    previewCamel.metadata = (rawPreview as Record<string, unknown>).metadata as Record<string, unknown> ?? {};
+    preview = parseValidatedPayload(previewCamel, decisionSignalPreviewSchema, 'DecisionSignalPreview');
   }
-  if (data.item) {
-    response.item = toDecisionSignalItem(data.item as Record<string, unknown>);
-  }
-  return response;
+
+  const response: DecisionSignalReassessResponse = {
+    created: Boolean(data.created),
+    preview,
+    item: data.item
+      ? toDecisionSignalItem(data.item as Record<string, unknown>)
+      : (data.item === null ? null : undefined),
+    persistStatus: (data.persist_status as DecisionSignalReassessResponse['persistStatus']) ?? null,
+    warnings: Array.isArray(data.warnings)
+      ? data.warnings.map((warning) => toCamelCase(warning as Record<string, unknown>))
+      : [],
+    blockedReason: (data.blocked_reason as string | null | undefined) ?? null,
+  };
+  return parseValidatedPayload(response, decisionSignalReassessResponseSchema, 'DecisionSignalReassessResponse');
 }
 
 export function getDecisionSignalReassessBlockedError(
@@ -101,40 +350,76 @@ export function getDecisionSignalReassessBlockedError(
 }
 
 function toDecisionSignalListResponse(data: Record<string, unknown>): DecisionSignalListResponse {
-  const response = toCamelCase<DecisionSignalListResponse>(data);
-  if (!Array.isArray(data.items)) {
-    throw new Error('DecisionSignal list response items must be an array');
+  if ('items' in data && data.items !== undefined && !Array.isArray(data.items)) {
+    return parseValidatedPayload(
+      { total: data.total, page: data.page, pageSize: data.page_size, items: data.items },
+      decisionSignalListResponseSchema,
+      'DecisionSignalListResponse',
+    );
   }
-  response.items = data.items.map((item) => toDecisionSignalItem(item as Record<string, unknown>));
-  return response;
+  const items = Array.isArray(data.items)
+    ? data.items.map((item) => toDecisionSignalItem(item as Record<string, unknown>))
+    : [];
+  const response: DecisionSignalListResponse = {
+    total: data.total as number,
+    page: data.page as number,
+    pageSize: data.page_size as number,
+    items,
+  };
+  return parseValidatedPayload(response, decisionSignalListResponseSchema, 'DecisionSignalListResponse');
 }
 
 function toDecisionSignalOutcomeItem(data: Record<string, unknown>): DecisionSignalOutcomeItem {
-  return toCamelCase<DecisionSignalOutcomeItem>(data);
+  const item = toCamelCase<DecisionSignalOutcomeItem>(data);
+  return parseValidatedPayload(item, decisionSignalOutcomeItemSchema, 'DecisionSignalOutcomeItem');
 }
 
 function toDecisionSignalOutcomeListResponse(data: Record<string, unknown>): DecisionSignalOutcomeListResponse {
-  const response = toCamelCase<DecisionSignalOutcomeListResponse>(data);
-  if (!Array.isArray(data.items)) {
-    throw new Error('DecisionSignal outcome list response items must be an array');
+  if ('items' in data && data.items !== undefined && !Array.isArray(data.items)) {
+    return parseValidatedPayload(
+      { total: data.total, page: data.page, pageSize: data.page_size, items: data.items },
+      decisionSignalOutcomeListResponseSchema,
+      'DecisionSignalOutcomeListResponse',
+    );
   }
-  response.items = data.items.map((item) => toDecisionSignalOutcomeItem(item as Record<string, unknown>));
-  return response;
+  const items = Array.isArray(data.items)
+    ? data.items.map((item) => toDecisionSignalOutcomeItem(item as Record<string, unknown>))
+    : [];
+  const response: DecisionSignalOutcomeListResponse = {
+    total: data.total as number,
+    page: data.page as number,
+    pageSize: data.page_size as number,
+    items,
+  };
+  return parseValidatedPayload(response, decisionSignalOutcomeListResponseSchema, 'DecisionSignalOutcomeListResponse');
 }
 
 function toDecisionSignalOutcomeRunResponse(data: Record<string, unknown>): DecisionSignalOutcomeRunResponse {
-  const response = toCamelCase<DecisionSignalOutcomeRunResponse>(data);
-  if (!Array.isArray(data.items)) {
-    throw new Error('DecisionSignal outcome run response items must be an array');
+  if ('items' in data && data.items !== undefined && !Array.isArray(data.items)) {
+    return parseValidatedPayload(
+      toCamelCase(data),
+      decisionSignalOutcomeRunResponseSchema,
+      'DecisionSignalOutcomeRunResponse',
+    );
   }
-  response.items = data.items.map((item) => toDecisionSignalOutcomeItem(item as Record<string, unknown>));
-  return response;
+  const items = Array.isArray(data.items)
+    ? data.items.map((item) => toDecisionSignalOutcomeItem(item as Record<string, unknown>))
+    : [];
+  const response: DecisionSignalOutcomeRunResponse = {
+    created: data.created as number,
+    engineVersion: data.engine_version as string,
+    evaluated: data.evaluated as number,
+    skipped: data.skipped as number,
+    updated: data.updated as number,
+    items,
+  };
+  return parseValidatedPayload(response, decisionSignalOutcomeRunResponseSchema, 'DecisionSignalOutcomeRunResponse');
 }
 
 function toDecisionSignalStatsBucket(data: Record<string, unknown>): DecisionSignalOutcomeStatsBucket {
   const bucket = toCamelCase<DecisionSignalOutcomeStatsBucket>(data);
   bucket.unableReasons = (data.unable_reasons as Record<string, number> | undefined) ?? {};
-  return bucket;
+  return parseValidatedPayload(bucket, decisionSignalOutcomeStatsBucketSchema, 'DecisionSignalOutcomeStatsBucket');
 }
 
 function toDecisionSignalOutcomeStatsResponse(data: Record<string, unknown>): DecisionSignalOutcomeStatsResponse {
@@ -149,15 +434,17 @@ function toDecisionSignalOutcomeStatsResponse(data: Record<string, unknown>): De
         : [];
     }
   }
-  return response;
+  return parseValidatedPayload(response, decisionSignalOutcomeStatsResponseSchema, 'DecisionSignalOutcomeStatsResponse');
 }
 
 function toDecisionSignalFeedbackItem(data: Record<string, unknown>): DecisionSignalFeedbackItem {
-  return toCamelCase<DecisionSignalFeedbackItem>(data);
+  const item = toCamelCase<DecisionSignalFeedbackItem>(data);
+  return parseValidatedPayload(item, decisionSignalFeedbackItemSchema, 'DecisionSignalFeedbackItem');
 }
 
 function toDecisionSignalMemoryFlagItem(data: Record<string, unknown>): DecisionSignalMemoryFlagItem {
-  return toCamelCase<DecisionSignalMemoryFlagItem>(data);
+  const item = toCamelCase<DecisionSignalMemoryFlagItem>(data);
+  return parseValidatedPayload(item, decisionSignalMemoryFlagItemSchema, 'DecisionSignalMemoryFlagItem');
 }
 
 function toSnakeCreatePayload(payload: DecisionSignalCreateRequest): Record<string, unknown> {

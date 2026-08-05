@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import apiClient from './index';
+import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type { TaskAccepted } from '../types/analysis';
 import type {
@@ -25,6 +27,144 @@ import type {
   PortfolioTradeCreateRequest,
   PortfolioTradeListResponse,
 } from '../types/portfolio';
+
+import type { components } from '../types/api.generated';
+
+type OpenApiPortfolioSnapshot = components['schemas']['PortfolioSnapshotResponse'];
+type OpenApiPortfolioAccountItem = components['schemas']['PortfolioAccountItem'];
+type OpenApiPaperTradeCreated = components['schemas']['PaperTradeCreatedResponse'];
+type _AssertSnapshotFields = keyof OpenApiPortfolioSnapshot;
+type _AssertAccountFields = keyof OpenApiPortfolioAccountItem;
+type _AssertPaperTradeFields = keyof OpenApiPaperTradeCreated;
+const _snapshotFieldAnchor: _AssertSnapshotFields = 'total_equity';
+const _accountFieldAnchor: _AssertAccountFields = 'base_currency';
+const _paperTradeFieldAnchor: _AssertPaperTradeFields = 'price_source';
+void _snapshotFieldAnchor;
+void _accountFieldAnchor;
+void _paperTradeFieldAnchor;
+
+const portfolioAccountItemSchema = z.object({
+  id: z.number(), name: z.string(), market: z.string(), baseCurrency: z.string(), isActive: z.boolean(),
+  accountType: z.string().optional(), ownerId: z.string().nullable().optional(), broker: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(), updatedAt: z.string().nullable().optional(),
+}).passthrough();
+const portfolioAccountListResponseSchema = z.object({ accounts: z.array(portfolioAccountItemSchema).optional() }).passthrough();
+const portfolioPositionItemSchema = z.object({
+  symbol: z.string(), market: z.string(), currency: z.string(), quantity: z.number(), avgCost: z.number(),
+  totalCost: z.number(), lastPrice: z.number(), marketValueBase: z.number(), unrealizedPnlBase: z.number(),
+  valuationCurrency: z.string(), unrealizedPnlPct: z.number().nullable().optional(), priceSource: z.string().optional(),
+  priceProvider: z.string().nullable().optional(), priceDate: z.string().nullable().optional(),
+  priceStale: z.boolean().optional(), priceAvailable: z.boolean().optional(), dataQuality: z.string().optional(),
+  limitations: z.array(z.string()).optional(),
+}).passthrough();
+const portfolioAccountSnapshotSchema = z.object({
+  accountId: z.number(), accountName: z.string(), asOf: z.string(), baseCurrency: z.string(), costMethod: z.string(),
+  market: z.string(), feeTotal: z.number(), fxStale: z.boolean(), realizedPnl: z.number(), taxTotal: z.number(),
+  totalCash: z.number(), totalEquity: z.number(), totalMarketValue: z.number(), unrealizedPnl: z.number(),
+  ownerId: z.string().nullable().optional(), broker: z.string().nullable().optional(), dataQuality: z.string().optional(),
+  limitations: z.array(z.string()).optional(), positions: z.array(portfolioPositionItemSchema).optional(),
+}).passthrough();
+const portfolioSnapshotResponseSchema = z.object({
+  asOf: z.string(), costMethod: z.string(), currency: z.string(), accountCount: z.number(),
+  totalCash: z.number(), totalMarketValue: z.number(), totalEquity: z.number(), realizedPnl: z.number(),
+  unrealizedPnl: z.number(), feeTotal: z.number(), taxTotal: z.number(), fxStale: z.boolean(),
+  dataQuality: z.string().optional(), limitations: z.array(z.string()).optional(),
+  accounts: z.array(portfolioAccountSnapshotSchema).optional(),
+}).passthrough();
+const portfolioDeleteResponseSchema = z.object({ deleted: z.number() }).passthrough();
+const portfolioEventCreatedResponseSchema = z.object({ id: z.number() }).passthrough();
+const paperTradeCreatedResponseSchema = z.object({ id: z.number(), price: z.number(), priceSource: z.string() }).passthrough();
+const portfolioRiskResponseSchema = z.object({
+  asOf: z.string(), costMethod: z.string(), currency: z.string(), accountId: z.number().nullable().optional(),
+  concentration: z.record(z.string(), z.unknown()).optional(), sectorConcentration: z.record(z.string(), z.unknown()).optional(),
+  drawdown: z.record(z.string(), z.unknown()).optional(), stopLoss: z.record(z.string(), z.unknown()).optional(),
+  thresholds: z.record(z.string(), z.unknown()).optional(), decisionSignalRisk: z.unknown().optional(),
+}).passthrough();
+const portfolioFxRefreshResponseSchema = z.object({
+  asOf: z.string(), accountCount: z.number(), refreshEnabled: z.boolean(), pairCount: z.number(),
+  updatedCount: z.number(), staleCount: z.number(), errorCount: z.number(),
+  disabledReason: z.string().nullable().optional(),
+}).passthrough();
+const portfolioTradeListItemSchema = z.object({
+  id: z.number(), accountId: z.number(), symbol: z.string(), market: z.string(), currency: z.string(),
+  tradeDate: z.string(), side: z.string(), quantity: z.number(), price: z.number(), fee: z.number(), tax: z.number(),
+  tradeUid: z.string().nullable().optional(), note: z.string().nullable().optional(), createdAt: z.string().nullable().optional(),
+}).passthrough();
+const portfolioTradeListResponseSchema = z.object({
+  total: z.number(), page: z.number(), pageSize: z.number(), items: z.array(portfolioTradeListItemSchema).optional(),
+}).passthrough();
+const portfolioCashLedgerListItemSchema = z.object({
+  id: z.number(), accountId: z.number(), eventDate: z.string(), direction: z.string(), amount: z.number(),
+  currency: z.string(), note: z.string().nullable().optional(), createdAt: z.string().nullable().optional(),
+}).passthrough();
+const portfolioCashLedgerListResponseSchema = z.object({
+  total: z.number(), page: z.number(), pageSize: z.number(), items: z.array(portfolioCashLedgerListItemSchema).optional(),
+}).passthrough();
+const portfolioCorporateActionListItemSchema = z.object({
+  id: z.number(), accountId: z.number(), symbol: z.string(), market: z.string(), currency: z.string(),
+  effectiveDate: z.string(), actionType: z.string(), cashDividendPerShare: z.number().nullable().optional(),
+  splitRatio: z.number().nullable().optional(), note: z.string().nullable().optional(), createdAt: z.string().nullable().optional(),
+}).passthrough();
+const portfolioCorporateActionListResponseSchema = z.object({
+  total: z.number(), page: z.number(), pageSize: z.number(), items: z.array(portfolioCorporateActionListItemSchema).optional(),
+}).passthrough();
+const portfolioImportBrokerItemSchema = z.object({
+  broker: z.string(), aliases: z.array(z.string()).optional(), displayName: z.string().nullable().optional(),
+}).passthrough();
+const portfolioImportBrokerListResponseSchema = z.object({ brokers: z.array(portfolioImportBrokerItemSchema).optional() }).passthrough();
+const portfolioImportTradeItemSchema = z.object({
+  tradeDate: z.string(), symbol: z.string(), side: z.string(), quantity: z.number(), price: z.number(),
+  fee: z.number(), tax: z.number(), dedupHash: z.string(), tradeUid: z.string().nullable().optional(),
+  currency: z.string().nullable().optional(),
+}).passthrough();
+const portfolioImportParseResponseSchema = z.object({
+  broker: z.string(), recordCount: z.number(), skippedCount: z.number(), errorCount: z.number(),
+  records: z.array(portfolioImportTradeItemSchema).optional(), errors: z.array(z.string()).optional(),
+}).passthrough();
+const portfolioImportCommitResponseSchema = z.object({
+  accountId: z.number(), recordCount: z.number(), insertedCount: z.number(), duplicateCount: z.number(),
+  failedCount: z.number(), dryRun: z.boolean(), errors: z.array(z.string()).optional(),
+}).passthrough();
+const taskAcceptedSchema = z.object({
+  taskId: z.string(), status: z.string(), analysisPhase: z.string().optional(),
+  message: z.string().nullable().optional(), messageCode: z.string().optional(),
+  messageParams: z.record(z.string(), z.unknown()).optional(),
+}).passthrough();
+
+function parseCamelCasePayload<T>(
+  data: unknown,
+  schema: z.ZodTypeAny,
+  label: string,
+): T {
+  const camel = toCamelCase<unknown>(data);
+  const result = schema.safeParse(camel);
+  if (!result.success) {
+    const issueSummary = result.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+    if (import.meta.env.DEV) {
+      console.error(`[portfolio] response validation failed (${label})`, result.error.issues);
+    }
+    throw createApiError(
+      createParsedApiError({
+        title: '响应校验失败',
+        message: `接口响应未通过校验（${label}）。${issueSummary}`,
+        rawMessage: result.error.message,
+        category: 'unknown',
+        code: 'api_response_validation_failed',
+        params: { label, issues: issueSummary },
+        details: result.error.issues,
+      }),
+    );
+  }
+  return camel as T;
+}
+
+function withDefaultArrayItems<T extends { items?: unknown[] }>(payload: T): T & { items: NonNullable<T['items']> } {
+  if (!Array.isArray(payload.items)) return { ...payload, items: [] as NonNullable<T['items']> };
+  return payload as T & { items: NonNullable<T['items']> };
+}
 
 type SnapshotQuery = {
   accountId?: number;
@@ -113,7 +253,9 @@ export const portfolioApi = {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/accounts', {
       params: { include_inactive: includeInactive },
     });
-    return toCamelCase<PortfolioAccountListResponse>(response.data);
+    const parsed = parseCamelCasePayload<PortfolioAccountListResponse>(response.data, portfolioAccountListResponseSchema, 'PortfolioAccountListResponse');
+    if (!Array.isArray(parsed.accounts)) return { ...parsed, accounts: [] };
+    return parsed;
   },
 
   async createAccount(payload: PortfolioAccountCreateRequest): Promise<PortfolioAccountItem> {
@@ -125,7 +267,7 @@ export const portfolioApi = {
       owner_id: payload.ownerId,
       account_type: payload.accountType ?? 'real',
     });
-    return toCamelCase<PortfolioAccountItem>(response.data);
+    return parseCamelCasePayload<PortfolioAccountItem>(response.data, portfolioAccountItemSchema, 'PortfolioAccountItem');
   },
 
   async updateAccount(accountId: number, payload: PortfolioAccountUpdateRequest): Promise<PortfolioAccountItem> {
@@ -140,19 +282,21 @@ export const portfolioApi = {
       `/api/v1/portfolio/accounts/${accountId}`,
       body,
     );
-    return toCamelCase<PortfolioAccountItem>(response.data);
+    return parseCamelCasePayload<PortfolioAccountItem>(response.data, portfolioAccountItemSchema, 'PortfolioAccountItem');
   },
 
   async deleteAccount(accountId: number): Promise<PortfolioDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/portfolio/accounts/${accountId}`);
-    return toCamelCase<PortfolioDeleteResponse>(response.data);
+    return parseCamelCasePayload<PortfolioDeleteResponse>(response.data, portfolioDeleteResponseSchema, 'PortfolioDeleteResponse');
   },
 
   async getSnapshot(query: SnapshotQuery = {}): Promise<PortfolioSnapshotResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/snapshot', {
       params: buildSnapshotParams(query),
     });
-    return toCamelCase<PortfolioSnapshotResponse>(response.data);
+    const parsed = parseCamelCasePayload<PortfolioSnapshotResponse>(response.data, portfolioSnapshotResponseSchema, 'PortfolioSnapshotResponse');
+    if (!Array.isArray(parsed.accounts)) return { ...parsed, accounts: [] };
+    return parsed;
   },
 
   async analyzePosition(symbol: string, payload: PortfolioPositionAnalysisRequest = {}): Promise<TaskAccepted> {
@@ -164,21 +308,21 @@ export const portfolioApi = {
         force: payload.force ?? false,
       },
     );
-    return toCamelCase<TaskAccepted>(response.data);
+    return parseCamelCasePayload<TaskAccepted>(response.data, taskAcceptedSchema, 'TaskAccepted');
   },
 
   async getRisk(query: SnapshotQuery = {}): Promise<PortfolioRiskResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/risk', {
       params: buildSnapshotParams(query),
     });
-    return toCamelCase<PortfolioRiskResponse>(response.data);
+    return parseCamelCasePayload<PortfolioRiskResponse>(response.data, portfolioRiskResponseSchema, 'PortfolioRiskResponse');
   },
 
   async refreshFx(query: FxRefreshQuery = {}): Promise<PortfolioFxRefreshResponse> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/fx/refresh', undefined, {
       params: buildFxRefreshParams(query),
     });
-    return toCamelCase<PortfolioFxRefreshResponse>(response.data);
+    return parseCamelCasePayload<PortfolioFxRefreshResponse>(response.data, portfolioFxRefreshResponseSchema, 'PortfolioFxRefreshResponse');
   },
 
   async createTrade(payload: PortfolioTradeCreateRequest): Promise<PortfolioEventCreatedResponse> {
@@ -197,7 +341,7 @@ export const portfolioApi = {
       trade_uid: payload.tradeUid,
       note: payload.note,
     }, { headers: { 'Idempotency-Key': payload.operationId } });
-    return toCamelCase<PortfolioEventCreatedResponse>(response.data);
+    return parseCamelCasePayload<PortfolioEventCreatedResponse>(response.data, portfolioEventCreatedResponseSchema, 'PortfolioEventCreatedResponse');
   },
 
   async createPaperTrade(
@@ -217,12 +361,12 @@ export const portfolioApi = {
       },
       { headers: { 'Idempotency-Key': payload.operationId } },
     );
-    return toCamelCase<PaperTradeCreatedResponse>(response.data);
+    return parseCamelCasePayload<PaperTradeCreatedResponse>(response.data, paperTradeCreatedResponseSchema, 'PaperTradeCreatedResponse');
   },
 
   async deleteTrade(tradeId: number): Promise<PortfolioDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/portfolio/trades/${tradeId}`);
-    return toCamelCase<PortfolioDeleteResponse>(response.data);
+    return parseCamelCasePayload<PortfolioDeleteResponse>(response.data, portfolioDeleteResponseSchema, 'PortfolioDeleteResponse');
   },
 
   async createCashLedger(payload: PortfolioCashLedgerCreateRequest): Promise<PortfolioEventCreatedResponse> {
@@ -235,12 +379,12 @@ export const portfolioApi = {
       currency: payload.currency,
       note: payload.note,
     }, { headers: { 'Idempotency-Key': payload.operationId } });
-    return toCamelCase<PortfolioEventCreatedResponse>(response.data);
+    return parseCamelCasePayload<PortfolioEventCreatedResponse>(response.data, portfolioEventCreatedResponseSchema, 'PortfolioEventCreatedResponse');
   },
 
   async deleteCashLedger(entryId: number): Promise<PortfolioDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/portfolio/cash-ledger/${entryId}`);
-    return toCamelCase<PortfolioDeleteResponse>(response.data);
+    return parseCamelCasePayload<PortfolioDeleteResponse>(response.data, portfolioDeleteResponseSchema, 'PortfolioDeleteResponse');
   },
 
   async createCorporateAction(payload: PortfolioCorporateActionCreateRequest): Promise<PortfolioEventCreatedResponse> {
@@ -256,12 +400,12 @@ export const portfolioApi = {
       split_ratio: payload.splitRatio,
       note: payload.note,
     }, { headers: { 'Idempotency-Key': payload.operationId } });
-    return toCamelCase<PortfolioEventCreatedResponse>(response.data);
+    return parseCamelCasePayload<PortfolioEventCreatedResponse>(response.data, portfolioEventCreatedResponseSchema, 'PortfolioEventCreatedResponse');
   },
 
   async deleteCorporateAction(actionId: number): Promise<PortfolioDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/portfolio/corporate-actions/${actionId}`);
-    return toCamelCase<PortfolioDeleteResponse>(response.data);
+    return parseCamelCasePayload<PortfolioDeleteResponse>(response.data, portfolioDeleteResponseSchema, 'PortfolioDeleteResponse');
   },
 
   async listTrades(query: TradeListQuery = {}): Promise<PortfolioTradeListResponse> {
@@ -273,7 +417,7 @@ export const portfolioApi = {
       params.side = query.side;
     }
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/trades', { params });
-    return toCamelCase<PortfolioTradeListResponse>(response.data);
+    return withDefaultArrayItems(parseCamelCasePayload<PortfolioTradeListResponse>(response.data, portfolioTradeListResponseSchema, 'PortfolioTradeListResponse'));
   },
 
   async listCashLedger(query: CashListQuery = {}): Promise<PortfolioCashLedgerListResponse> {
@@ -282,7 +426,7 @@ export const portfolioApi = {
       params.direction = query.direction;
     }
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/cash-ledger', { params });
-    return toCamelCase<PortfolioCashLedgerListResponse>(response.data);
+    return withDefaultArrayItems(parseCamelCasePayload<PortfolioCashLedgerListResponse>(response.data, portfolioCashLedgerListResponseSchema, 'PortfolioCashLedgerListResponse'));
   },
 
   async listCorporateActions(query: CorporateListQuery = {}): Promise<PortfolioCorporateActionListResponse> {
@@ -294,12 +438,14 @@ export const portfolioApi = {
       params.action_type = query.actionType;
     }
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/corporate-actions', { params });
-    return toCamelCase<PortfolioCorporateActionListResponse>(response.data);
+    return withDefaultArrayItems(parseCamelCasePayload<PortfolioCorporateActionListResponse>(response.data, portfolioCorporateActionListResponseSchema, 'PortfolioCorporateActionListResponse'));
   },
 
   async listImportBrokers(): Promise<PortfolioImportBrokerListResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/portfolio/imports/csv/brokers');
-    return toCamelCase<PortfolioImportBrokerListResponse>(response.data);
+    const parsed = parseCamelCasePayload<PortfolioImportBrokerListResponse>(response.data, portfolioImportBrokerListResponseSchema, 'PortfolioImportBrokerListResponse');
+    if (!Array.isArray(parsed.brokers)) return { ...parsed, brokers: [] };
+    return parsed;
   },
 
   async parseCsvImport(broker: string, file: File): Promise<PortfolioImportParseResponse> {
@@ -309,7 +455,8 @@ export const portfolioApi = {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/imports/csv/parse', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return toCamelCase<PortfolioImportParseResponse>(response.data);
+    const parsed = parseCamelCasePayload<PortfolioImportParseResponse>(response.data, portfolioImportParseResponseSchema, 'PortfolioImportParseResponse');
+    return { ...parsed, records: Array.isArray(parsed.records) ? parsed.records : [], errors: Array.isArray(parsed.errors) ? parsed.errors : [] };
   },
 
   async commitCsvImport(
@@ -331,6 +478,8 @@ export const portfolioApi = {
         'Idempotency-Key': operationId,
       },
     });
-    return toCamelCase<PortfolioImportCommitResponse>(response.data);
+    const parsed = parseCamelCasePayload<PortfolioImportCommitResponse>(response.data, portfolioImportCommitResponseSchema, 'PortfolioImportCommitResponse');
+    if (!Array.isArray(parsed.errors)) return { ...parsed, errors: [] };
+    return parsed;
   },
 };
