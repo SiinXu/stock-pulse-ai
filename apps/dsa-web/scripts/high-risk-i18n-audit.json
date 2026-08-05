@@ -10,7 +10,103 @@
       98,
       101,
       102
-    ]
+    ],
+    "trading_action": {
+      "keyCount": 18,
+      "keySetSha256": "540793c729e5930866343eb5d15a652ff2de74e2df674434675651023bc0c648",
+      "bundleSha256": {
+        "zh": "0721b1cd32dea2ec33cd2b04cf74522d438028614c78d85d8dfed3806896dee8",
+        "zh-TW": "23b46c5b189e3f1e39a3c3b88b04d2d8ab76db590acd44c8436e8f744da73852",
+        "en": "0606312d21af93747a995e951e7d94df1d62adf6508121d807c5745539a1806a",
+        "ja": "5965dabcb714ff82ade68944d73e63841623575da656225ac1d3f59ce026b911",
+        "ko": "115e71310a33606bd9343859d045f8c9b39348d6084854d56c6595cc8c7af8d8",
+        "de": "2093f2ef1297aafd5240eb9ddce535678d61ddca4cf3f431fe29369dbd9642d1",
+        "es": "22c9961498d56faa54f6e3524ab782ba01510ad4ca98950a3178260e315266bb",
+        "ms": "f064d39e6d40aad13f0831821373d731d75d6e41bddf633ee74b22a1e2cecfb2",
+        "fr": "0bebc652f2511f8e3014a9ec9d31932ab70355f3aadeef73fc4b342f92e22089",
+        "id": "a3cf0145584c8ecf5990d47dbb948b96f778e9298904fd8c5b82f400d6b3216f"
+      }
+    },
+    "risk": {
+      "keyCount": 75,
+      "keySetSha256": "fb6fdab4339afd794be39224f7643ee44bb60b158e21690297212bafa6664ce7",
+      "bundleSha256": {
+        "zh": "b279e80767790f29046f00c6025e40372ec91c0bc72bed23e4beea9f5c406e3e",
+        "zh-TW": "2cea7e03ce8c610a3127d2ed8f957b6cad645e2e7f8155fc180ff7f261d917d8",
+        "en": "7bc155fae0ad636cce152da53c3d2211384b48291b198f69b0ca8fd21a9bc464",
+        "ja": "0989bc5bcf72f790afe02142e88ed14091035c5c1b54cb222ee5f0f8b99202d5",
+        "ko": "8defc554bd496934f47f34b871843bfad800fda6de50394f351ff838c16594b6",
+        "de": "d830ae0120cee11dc5861d33f9b1b98036de1df37e5d7eca497dedf902e58063",
+        "es": "7f1c4a592cb0e305a07e6924e51a86078b31167316eb16718dead1aa1be61060",
+        "ms": "7ece545ca43ddd97fd02cdd5c646ab1ad91db791c60234356e40ceae57cc0f6e",
+        "fr": "bf79b0c65e6b4f88eeb0d772259799671e7b9ac153b66a2e4b0a356f214b6a1b",
+        "id": "5bd2ab43e1908c728d16baf775e2133e6bdb5b6308b5a167e0df4a11d47aa68b"
+      }
+    },
+    "authentication": {
+      "keyCount": 90,
+      "keySetSha256": "35cb705c0b7d9b0ee5a603c85407f9b7d62f0c2d2553094f137692982f3e4489",
+      "bundleSha256": {
+        "zh": "a32bf28a81d37d750708013cd8136a0b5abe3d363eb97819386a3df75e03f005",
+        "zh-TW": "81ec8686a13ec6fa1483fcc7fc53f9bbbd5dc025f21b7eae5f5d51cc0cc7567e",
+        "en": "b170ead615c75da1f34972b8b1bdb118a0685d5ac35ca0338199ac04929aeb3d",
+        "ja": "14ee900e0c48f068825f644e92d41101665eafefaad82760e45939637772e96b",
+        "ko": "f0dbf80705d2b6ae06cdf4ec29b919d19176e8ed92152a051aa370fd8d0be42f",
+        "de": "1a87bda95d5bc8910582f777cbc2c5bfd7ce01172a4929c000b25350e14b6194",
+        "es": "9010c60beec540c5d0b28152ed0e034bba04d7dd3f38a9374d76ef02eedada73",
+        "ms": "ca1cab524a9e56a33cd45c552800a6cc80e4c1f4d15f61279cee85a0a3b94b63",
+        "fr": "aa51a1f879c7a1775a857f74b6282649691a59cbf02a876326d45e47679266ff",
+        "id": "fbb5c89ada9dd574d588014d27f50d7f3b8cc0e5b160e56093cf9ea8c4f3cec8"
+      }
+    },
+    "credential": {
+      "keyCount": 43,
+      "keySetSha256": "ee1768aab8ff28919388b2d87a91ad5afb4b9ece13c5994549a700eb415f17cd",
+      "bundleSha256": {
+        "zh": "924d2fb635fb27d2e914d7006f7c991f90815d52551d1213c71456bed97517c8",
+        "zh-TW": "87dc384cdf09551142696acaaafe8cce6a8194dbe2a2f5aa885be12e544e3599",
+        "en": "17fd6c4101e43450c6c1c3641dddc9c5e7cf5128c4603503cb2435c30c99f1e3",
+        "ja": "c0c6aa84871dd1e2915e6dab8fe1c2222d2c07f0fc1ebe8da92e064515825bdd",
+        "ko": "7c061a81975b6bbf3e46b915c06eef35cf468192972f7a03c51841c714a92d3b",
+        "de": "1700dcda200fdcb61b6ce10a7fb95732210ef73a9ea7f08bcaa15aa8ed924f90",
+        "es": "122e2233c2df3160fe06fcad4e5bd7328f2b7d5012c263bd93946be6b1f0951b",
+        "ms": "938d606e074af47a29a6d0711ff89fa968026733ce0f4a009d0237d71420ffda",
+        "fr": "3223084ce609277b7f8dce5d6f075068c30995ccb321d0f59ddae88b6ebf50aa",
+        "id": "5a91f3f08f5ae8572024d09bdf337555b6c2311941405b1619396f37ae4f72c1"
+      }
+    },
+    "error": {
+      "keyCount": 112,
+      "keySetSha256": "9c5aaa83de0be8bf73efc381737a8a98a065ee76ccca4ede4b5f6b5abdbb7df2",
+      "bundleSha256": {
+        "zh": "43e9423a1f4ea484be19cff264b32131b29b567fb88908a2b58cc8b9eb6e818e",
+        "zh-TW": "6af27f6ed0167fc546e02f5f6c951bb7d68920f807deef47477d2f369477d318",
+        "en": "726d3bf75b0f7148ca07b1d3566ba9cbc1cec5c4c5b84338e30c9e385aa3e8ff",
+        "ja": "d023f1da4463548c9db8cd6cd1175e12ee7e0187b4666611ddc843bd73891838",
+        "ko": "d8f3158a506982f8fc035606ab9dc32c59ca513c8dc4fdb6de9f07f96c2eb69d",
+        "de": "ab91c373da25920ec9e582a53be9a2ac8cea9caec80b0e211068b95607080b38",
+        "es": "27a1d7f2e5fdf051aae32b0d774478207d283484994b7efc5bce5bcd1a072330",
+        "ms": "49fdd04fdc3429d8c6396f58a0ad83ceac86e21cb682eee3b0d8626c35f9186a",
+        "fr": "8848a8f0a98a702f901168d8b9f5367a51d3e680da5d9f19e0c85206b0a82df4",
+        "id": "ead26ae12983275c433e79830b817bad6d41fdbee5c17035b2fcf68d20287cc1"
+      }
+    },
+    "disclaimer": {
+      "keyCount": 3,
+      "keySetSha256": "ad4ade36b1c0350deea7aee017e579c7cc934245b0e1215e8ba8e939430ecef6",
+      "bundleSha256": {
+        "zh": "ff1c949bc2a60d6b698773c2beb9e9a80fa53a6e5176c5a82bc76563aa7d2c38",
+        "zh-TW": "e5b8e546c465cbb2e421a36563785e1e287538040957d56dbd37d4887071db35",
+        "en": "e347cfc32b35f28f773cc818e887c70967d0f860e235eafcab54783bc0211ddf",
+        "ja": "0b4996670f76806d75025a622436e2bfefa43c8d480233dfc25efc0d4a651de9",
+        "ko": "6ad1400f748c97688fe91b4ad6ff73d28b45fa1745cc1f36ec1d207dc0e56a7f",
+        "de": "fea335d3e8c155ab73a0477333ef80161ef8cf54c90565648528d0a1cbc43dfe",
+        "es": "29493337b459594b37f330200cad2963b90892c3c5ad3c079305e04097417ddf",
+        "ms": "0121cc007bce4a04517d3818c773b923a062b72517d4fac3162ea98e716376e2",
+        "fr": "3ab5eddc5a87370918a52182e8fb9b4a9386ff9a205528337774f6956091debd",
+        "id": "078c66aacfaede34bcc98882718c5328dbf8e5de094e552f666804cf16dbdd46"
+      }
+    }
   },
   "decisionEvidence": {
     "count": 95,
@@ -394,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 110,
-        "keySetSha256": "287a7020f60361e05ae78a4d14012ac1d3b376466709d8136614b53a744d89fb",
+        "keyCount": 112,
+        "keySetSha256": "9c5aaa83de0be8bf73efc381737a8a98a065ee76ccca4ede4b5f6b5abdbb7df2",
         "bundleSha256": {
-          "zh": "5e8249b53f304eac81d84d3c3aac7723f8cf4dc001de8ad22ff67d11d481b5d2",
-          "zh-TW": "d86f38f864074b17a04bd6977bee4544380a9710cef028499db4365f4079fe0d",
-          "en": "b7436b4c78a430094721dc26e191b8048302d314b92b4ab3dbd863612344b14c",
-          "ja": "8232001e85541d0ef9bc5f7f631088b638ca1997b2e1188ff1aa6f8fbe824bac",
-          "ko": "c15a9717519706292fe0e48c81e415cc5031ba7b32bc97c9434a532b6ab9f6cc",
-          "de": "c654df6acb55b282f45ac7cda9bec2ab56cd1f00e1614ad361c43803e1259dbe",
-          "es": "242f71087751811d7c2b66803cc3a8e0d66d34740fa6156fc5505e9d279e1aa8",
-          "ms": "70f961ce03b543d7dcaa1714f27f2830ef1ca5245a9446c04e277071fb834995",
-          "fr": "621b682f4a1e3e0fd99ea23d3a2bd32354bcdf84f49319083cea5dec2f82d0ac",
-          "id": "af8fa53d626f0109e24d3df4ac7e6d74064f020c3cc415415b74e02afadf717f"
+          "zh": "43e9423a1f4ea484be19cff264b32131b29b567fb88908a2b58cc8b9eb6e818e",
+          "zh-TW": "6af27f6ed0167fc546e02f5f6c951bb7d68920f807deef47477d2f369477d318",
+          "en": "726d3bf75b0f7148ca07b1d3566ba9cbc1cec5c4c5b84338e30c9e385aa3e8ff",
+          "ja": "d023f1da4463548c9db8cd6cd1175e12ee7e0187b4666611ddc843bd73891838",
+          "ko": "d8f3158a506982f8fc035606ab9dc32c59ca513c8dc4fdb6de9f07f96c2eb69d",
+          "de": "ab91c373da25920ec9e582a53be9a2ac8cea9caec80b0e211068b95607080b38",
+          "es": "27a1d7f2e5fdf051aae32b0d774478207d283484994b7efc5bce5bcd1a072330",
+          "ms": "49fdd04fdc3429d8c6396f58a0ad83ceac86e21cb682eee3b0d8626c35f9186a",
+          "fr": "8848a8f0a98a702f901168d8b9f5367a51d3e680da5d9f19e0c85206b0a82df4",
+          "id": "ead26ae12983275c433e79830b817bad6d41fdbee5c17035b2fcf68d20287cc1"
         }
       }
     },
@@ -541,6 +637,7 @@
         "invalid_import_file",
         "invalid_params",
         "invalid_password",
+        "llm_not_configured",
         "no_channels",
         "not_changeable",
         "not_found",
@@ -728,6 +825,10 @@
         "validation_failed": [
           "api.error.STABLE_ERROR_TEXT.validation_failed.title",
           "api.error.STABLE_ERROR_TEXT.validation_failed.message"
+        ],
+        "llm_not_configured": [
+          "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
+          "api.error.STABLE_ERROR_TEXT.llm_not_configured.message"
         ]
       }
     },
