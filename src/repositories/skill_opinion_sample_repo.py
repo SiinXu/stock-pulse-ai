@@ -158,6 +158,49 @@ class SkillOpinionSampleRepository:
             ).all()
         return [self._sample(row) for row in rows]
 
+
+    def list_recent(
+        self,
+        *,
+        skill_id: Optional[str] = None,
+        stock_code: Optional[str] = None,
+        analysis_history_id: Optional[int] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[List[SkillOpinionSample], int]:
+        """Return recent samples newest-first with a total count."""
+        from sqlalchemy import func
+
+        conditions = []
+        if skill_id is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.skill_id == skill_id
+            )
+        if stock_code is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.stock_code == stock_code
+            )
+        if analysis_history_id is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.analysis_history_id
+                == analysis_history_id
+            )
+        with self.db.get_session() as session:
+            count_stmt = select(func.count()).select_from(
+                skill_opinion_sample_table
+            )
+            list_stmt = select(skill_opinion_sample_table).order_by(
+                skill_opinion_sample_table.c.id.desc()
+            )
+            if conditions:
+                count_stmt = count_stmt.where(and_(*conditions))
+                list_stmt = list_stmt.where(and_(*conditions))
+            total = int(session.execute(count_stmt).scalar_one() or 0)
+            rows = session.execute(
+                list_stmt.offset(offset).limit(limit)
+            ).all()
+        return [self._sample(row) for row in rows], total
+
     @staticmethod
     def _history(row: Any) -> AnalysisHistoryProjection:
         mapping = row._mapping

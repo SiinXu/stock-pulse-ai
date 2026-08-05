@@ -243,6 +243,130 @@ class SkillOpinionOutcomeRepository:
             ).one_or_none()
         return self._outcome(row) if row is not None else None
 
+
+    def list_outcomes(
+        self,
+        *,
+        engine_version: Optional[str] = None,
+        skill_id: Optional[str] = None,
+        stock_code: Optional[str] = None,
+        horizon: Optional[str] = None,
+        eval_status: Optional[str] = None,
+        sample_id: Optional[int] = None,
+        analysis_history_id: Optional[int] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Return recent outcomes joined to sample identity fields."""
+        conditions = []
+        if engine_version is not None:
+            conditions.append(
+                skill_opinion_outcome_table.c.engine_version == engine_version
+            )
+        if skill_id is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.skill_id == skill_id
+            )
+        if stock_code is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.stock_code == stock_code
+            )
+        if horizon is not None:
+            conditions.append(
+                skill_opinion_outcome_table.c.horizon == horizon
+            )
+        if eval_status is not None:
+            conditions.append(
+                skill_opinion_outcome_table.c.eval_status == eval_status
+            )
+        if sample_id is not None:
+            conditions.append(
+                skill_opinion_outcome_table.c.skill_opinion_sample_id
+                == sample_id
+            )
+        if analysis_history_id is not None:
+            conditions.append(
+                skill_opinion_sample_table.c.analysis_history_id
+                == analysis_history_id
+            )
+
+        join_clause = skill_opinion_outcome_table.join(
+            skill_opinion_sample_table,
+            skill_opinion_outcome_table.c.skill_opinion_sample_id
+            == skill_opinion_sample_table.c.id,
+        )
+        with self.db.get_session() as session:
+            count_stmt = select(func.count()).select_from(join_clause)
+            list_stmt = (
+                select(
+                    skill_opinion_outcome_table,
+                    skill_opinion_sample_table.c.analysis_history_id,
+                    skill_opinion_sample_table.c.stock_code,
+                    skill_opinion_sample_table.c.skill_id,
+                    skill_opinion_sample_table.c.signal,
+                )
+                .select_from(join_clause)
+                .order_by(skill_opinion_outcome_table.c.id.desc())
+            )
+            if conditions:
+                count_stmt = count_stmt.where(and_(*conditions))
+                list_stmt = list_stmt.where(and_(*conditions))
+            total = int(session.execute(count_stmt).scalar_one() or 0)
+            rows = session.execute(
+                list_stmt.offset(offset).limit(limit)
+            ).all()
+
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            mapping = row._mapping
+            outcome = self._outcome(row)
+            items.append(
+                {
+                    "id": outcome.id,
+                    "skill_opinion_sample_id": outcome.skill_opinion_sample_id,
+                    "analysis_history_id": int(mapping["analysis_history_id"]),
+                    "stock_code": str(mapping["stock_code"]),
+                    "skill_id": str(mapping["skill_id"]),
+                    "signal": str(mapping["signal"]),
+                    "horizon": outcome.horizon,
+                    "engine_version": outcome.engine_version,
+                    "eval_status": outcome.eval_status,
+                    "outcome": outcome.outcome,
+                    "direction_correct": outcome.direction_correct,
+                    "unable_reason": outcome.unable_reason,
+                    "analysis_date": (
+                        outcome.analysis_date.isoformat()
+                        if outcome.analysis_date
+                        else None
+                    ),
+                    "start_trade_date": (
+                        outcome.start_trade_date.isoformat()
+                        if outcome.start_trade_date
+                        else None
+                    ),
+                    "end_trade_date": (
+                        outcome.end_trade_date.isoformat()
+                        if outcome.end_trade_date
+                        else None
+                    ),
+                    "start_price": outcome.start_price,
+                    "end_close": outcome.end_close,
+                    "stock_return_pct": outcome.stock_return_pct,
+                    "directional_return_pct": outcome.directional_return_pct,
+                    "created_at": (
+                        outcome.created_at.isoformat()
+                        if outcome.created_at
+                        else None
+                    ),
+                    "updated_at": (
+                        outcome.updated_at.isoformat()
+                        if outcome.updated_at
+                        else None
+                    ),
+                }
+            )
+        return items, total
+
     def resolve_daily_window(
         self,
         *,

@@ -252,6 +252,38 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "SKILL_OPINION_RECORDING_ENABLED": {
+        "title": "Skill Opinion Recording",
+        "description": (
+            "When enabled, record each valid individual skill opinion into the "
+            "offline outcome-evaluation store after skill aggregation (and "
+            "materialize from saved reports when analysis history is available). "
+            "Default off keeps analysis output and database writes unchanged. "
+            "Does not alter runtime aggregation weights."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 62,
+        "help_key": "settings.agent.SKILL_OPINION_RECORDING_ENABLED",
+        "examples": [
+            "SKILL_OPINION_RECORDING_ENABLED=false",
+            "SKILL_OPINION_RECORDING_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Skill Opinion Outcome Evaluation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/skill-opinion-outcome-evaluation.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_CRITIC_ENABLED": {
         "title": "Bounded Multi-Agent Critic",
         "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request at most one retry of an already-entered intelligence or catalog-backed skill stage.",

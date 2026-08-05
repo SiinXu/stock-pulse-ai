@@ -15661,6 +15661,678 @@
         "title": "SkillInfo",
         "type": "object"
       },
+      "SkillOpinionOutcomeItem": {
+        "properties": {
+          "analysis_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Date"
+          },
+          "analysis_history_id": {
+            "title": "Analysis History Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "direction_correct": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction Correct"
+          },
+          "directional_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Directional Return Pct"
+          },
+          "end_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Close"
+          },
+          "end_trade_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Trade Date"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "eval_status": {
+            "title": "Eval Status",
+            "type": "string"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "skill_opinion_sample_id": {
+            "title": "Skill Opinion Sample Id",
+            "type": "integer"
+          },
+          "start_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Price"
+          },
+          "start_trade_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Trade Date"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Return Pct"
+          },
+          "unable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unable Reason"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "skill_opinion_sample_id",
+          "analysis_history_id",
+          "stock_code",
+          "skill_id",
+          "signal",
+          "horizon",
+          "engine_version",
+          "eval_status"
+        ],
+        "title": "SkillOpinionOutcomeItem",
+        "type": "object"
+      },
+      "SkillOpinionOutcomeListResponse": {
+        "properties": {
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOpinionOutcomeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "engine_version"
+        ],
+        "title": "SkillOpinionOutcomeListResponse",
+        "type": "object"
+      },
+      "SkillOpinionOutcomeRunErrorItem": {
+        "properties": {
+          "error_type": {
+            "title": "Error Type",
+            "type": "string"
+          },
+          "horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon"
+          },
+          "sample_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Id"
+          }
+        },
+        "required": [
+          "error_type"
+        ],
+        "title": "SkillOpinionOutcomeRunErrorItem",
+        "type": "object"
+      },
+      "SkillOpinionOutcomeRunRequest": {
+        "additionalProperties": false,
+        "description": "Explicit offline evaluation trigger (no new scheduler in V0).",
+        "properties": {
+          "analysis_history_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis History Id"
+          },
+          "horizons": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "1d",
+                    "3d",
+                    "5d",
+                    "10d"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizons"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "sample_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Id"
+          },
+          "skill_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Id"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          }
+        },
+        "title": "SkillOpinionOutcomeRunRequest",
+        "type": "object"
+      },
+      "SkillOpinionOutcomeRunResponse": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOpinionOutcomeRunErrorItem"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "histories_scanned": {
+            "title": "Histories Scanned",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOpinionOutcomeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit_unit": {
+            "title": "Limit Unit",
+            "type": "string"
+          },
+          "processed_keys": {
+            "title": "Processed Keys",
+            "type": "integer"
+          },
+          "samples_created": {
+            "title": "Samples Created",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "processed_keys",
+          "created",
+          "updated",
+          "skipped",
+          "failed",
+          "histories_scanned",
+          "samples_created",
+          "limit_unit",
+          "engine_version"
+        ],
+        "title": "SkillOpinionOutcomeRunResponse",
+        "type": "object"
+      },
+      "SkillOpinionPerformanceBucketItem": {
+        "properties": {
+          "avg_directional_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Directional Return Pct"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "evaluated": {
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "hit": {
+            "title": "Hit",
+            "type": "integer"
+          },
+          "hit_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate Pct"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "miss": {
+            "title": "Miss",
+            "type": "integer"
+          },
+          "miss_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Miss Rate Pct"
+          },
+          "observational": {
+            "title": "Observational",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "sample_status": {
+            "title": "Sample Status",
+            "type": "string"
+          },
+          "sample_sufficient": {
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "unable": {
+            "title": "Unable",
+            "type": "integer"
+          },
+          "unable_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unable Rate Pct"
+          }
+        },
+        "required": [
+          "skill_id",
+          "horizon",
+          "engine_version",
+          "total",
+          "pending",
+          "evaluated",
+          "observational",
+          "unable",
+          "hit",
+          "miss",
+          "sample_sufficient",
+          "sample_status"
+        ],
+        "title": "SkillOpinionPerformanceBucketItem",
+        "type": "object"
+      },
+      "SkillOpinionPerformanceStatsResponse": {
+        "properties": {
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOpinionPerformanceBucketItem"
+            },
+            "title": "Buckets",
+            "type": "array"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "minimum_evaluated_sample_size": {
+            "title": "Minimum Evaluated Sample Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "engine_version",
+          "minimum_evaluated_sample_size"
+        ],
+        "title": "SkillOpinionPerformanceStatsResponse",
+        "type": "object"
+      },
+      "SkillOpinionSampleItem": {
+        "properties": {
+          "analysis_history_id": {
+            "title": "Analysis History Id",
+            "type": "integer"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "data_quality_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Quality Level"
+          },
+          "horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "opinion_created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opinion Created At"
+          },
+          "sample_schema_version": {
+            "title": "Sample Schema Version",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "skill_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Version"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "analysis_history_id",
+          "stock_code",
+          "skill_id",
+          "signal",
+          "confidence",
+          "sample_schema_version"
+        ],
+        "title": "SkillOpinionSampleItem",
+        "type": "object"
+      },
+      "SkillOpinionSampleListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOpinionSampleItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "SkillOpinionSampleListResponse",
+        "type": "object"
+      },
       "SkillsResponse": {
         "properties": {
           "default_skill_id": {
@@ -27997,6 +28669,583 @@
         "summary": "List privileged-operation security audit events",
         "tags": [
           "SecurityAudit"
+        ]
+      }
+    },
+    "/api/v1/skill-outcomes": {
+      "get": {
+        "description": "分页查询 skill-opinion outcome；默认当前 engine_version。",
+        "operationId": "listSkillOpinionOutcomes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "skill_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stock_code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stock Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Horizon"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eval_status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Eval Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sample_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sample Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "analysis_history_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Analysis History Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "engine_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Engine Version"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillOpinionOutcomeListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数非法"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数校验失败"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询失败"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "查询技能观点后验结果",
+        "tags": [
+          "SkillOutcomes"
+        ]
+      }
+    },
+    "/api/v1/skill-outcomes/run": {
+      "post": {
+        "description": "显式触发 skill-opinion sample materialization 与 offline outcome 评估。V0 不新增调度器；limit 计数 outcome keys，不计数 samples。不拉取或回填行情。",
+        "operationId": "runSkillOpinionOutcomes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillOpinionOutcomeRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillOpinionOutcomeRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求字段非法"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求体校验失败"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "评估失败"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "触发技能观点后验评估",
+        "tags": [
+          "SkillOutcomes"
+        ]
+      }
+    },
+    "/api/v1/skill-outcomes/samples": {
+      "get": {
+        "description": "只读返回低敏感 skill opinion samples；不含 reasoning 或模型原文。",
+        "operationId": "listSkillOpinionSamples",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "skill_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stock_code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stock Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "analysis_history_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Analysis History Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillOpinionSampleListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数非法"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数校验失败"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询失败"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "查询最近技能观点样本",
+        "tags": [
+          "SkillOutcomes"
+        ]
+      }
+    },
+    "/api/v1/skill-outcomes/stats": {
+      "get": {
+        "description": "按 skill_id + horizon + engine_version 独立分桶；不足 30 个 evaluated 样本时只返回计数，不返回比率。",
+        "operationId": "getSkillOpinionOutcomeStats",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "skill_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skill_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Ids"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizons",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Horizons"
+            }
+          },
+          {
+            "in": "query",
+            "name": "engine_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Engine Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillOpinionPerformanceStatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数非法"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数校验失败"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统计失败"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "查询技能观点后验统计",
+        "tags": [
+          "SkillOutcomes"
         ]
       }
     },
