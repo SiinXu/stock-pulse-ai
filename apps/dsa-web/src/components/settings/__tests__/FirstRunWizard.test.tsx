@@ -1344,9 +1344,37 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /本机 CLI/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('选择本机 CLI 后端'), 'claude_code_cli');
+    expect(screen.getByTestId('wizard-cli-capability-note')).toHaveTextContent(/CLI 后端仅覆盖报告生成|问股 Agent/);
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByTestId('wizard-cli-capability-note-review')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
     await waitFor(() => expect(onComplete).toHaveBeenCalledWith([{ key: 'GENERATION_BACKEND', value: 'claude_code_cli' }]));
+  });
+
+  it('CLI path can acknowledge Agent-off and persist the acknowledgment key', async () => {
+    const onComplete = okComplete();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+        connectionFields={[]}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /本机 CLI/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('选择本机 CLI 后端'), 'codex_cli');
+    fireEvent.click(screen.getByLabelText(/我暂时不需要问股 Agent/));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
+    await waitFor(() => {
+      expect(onComplete).toHaveBeenCalledWith([
+        { key: 'GENERATION_BACKEND', value: 'codex_cli' },
+        { key: 'AGENT_FEATURES_ACKNOWLEDGED_OFF', value: 'true' },
+      ]);
+    });
   });
 
   it('presents discovered models for confirmation instead of auto-selecting them all', async () => {
