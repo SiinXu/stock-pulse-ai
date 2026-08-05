@@ -360,6 +360,15 @@ export const fixtureDecisionSignal: DecisionSignalItem = {
   createdAt: FIXTURE_TIMESTAMP,
   updatedAt: FIXTURE_TIMESTAMP,
   metadata: { fixture: true },
+  // OpenAPI-required presentation for playground mocks.
+  presentation: {
+    action: 'watch',
+    label: 'Watch',
+    confidence: 0.74,
+    summary: 'Constructive trend with disciplined entry requirements.',
+    risk: 'Valuation and crowded positioning remain the primary risks.',
+    timestamp: FIXTURE_TIMESTAMP,
+  },
 };
 
 export const fixtureDecisionSignals: DecisionSignalItem[] = [

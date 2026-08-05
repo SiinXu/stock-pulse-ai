@@ -12,7 +12,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 // ESLint max-lines supports one severity per matching rule entry, so the
 // default is error@800; treat 500 as the review soft target.
 const pageLineBaselines = {
-  'src/pages/DecisionSignalsPage.tsx': 2586,
+  'src/pages/DecisionSignalsPage.tsx': 1513,
   'src/pages/PortfolioPage.tsx': 2291,
   'src/pages/SettingsPage.tsx': 2030,
   'src/pages/ChatPage.tsx': 1770,
