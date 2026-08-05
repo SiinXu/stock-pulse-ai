@@ -288,7 +288,7 @@ export function registerSettingsPageOverviewTests(): void {
         },
         {
           key: 'llm_agent',
-          title: 'Agent 渠道',
+          title: 'Agent 模型',
           category: 'agent',
           required: true,
           status: 'needs_action',
@@ -309,7 +309,7 @@ export function registerSettingsPageOverviewTests(): void {
 
     render(<SettingsPage />);
 
-    await screen.findByText('还缺少 1 项：Agent 渠道');
+    await screen.findByText('还缺少 1 项：Agent 模型');
     expect(screen.getByRole('button', { name: '简短试跑' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: '简短试跑' }));
