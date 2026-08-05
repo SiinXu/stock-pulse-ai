@@ -14,7 +14,7 @@ StockPulse applies one central redaction rule set before operational data crosse
 - Single-agent provider protocol traces before persistence.
 - Durable `security-audit-v1` events before the repository or SQLite boundary.
 
-The central implementation is `src/utils/sanitize.py`. Callers that already have the exact runtime credential can also pass it as an exact redaction value; this closes gaps for provider-specific tokens that do not have a recognizable prefix.
+The central implementation is the `src/utils/sanitize/` package (imported as `src.utils.sanitize`). Callers that already have the exact runtime credential can also pass it as an exact redaction value; this closes gaps for provider-specific tokens that do not have a recognizable prefix.
 
 ## What Is Redacted
 
