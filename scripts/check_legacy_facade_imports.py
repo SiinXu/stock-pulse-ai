@@ -37,6 +37,21 @@ LEGACY_FACADES: Mapping[str, str] = {
     "src.market_analyzer": "src.market.analyzer",
     "src.analysis_context_pack_overview": "src.analysis_context_pack.overview",
     "src.analysis_context_pack_prompt": "src.analysis_context_pack.prompt",
+    "src.notification_sender": "src.notification_parts.senders",
+    "src.notification_sender.astrbot_sender": "src.notification_parts.senders.astrbot_sender",
+    "src.notification_sender.custom_webhook_sender": "src.notification_parts.senders.custom_webhook_sender",
+    "src.notification_sender.dingtalk_sender": "src.notification_parts.senders.dingtalk_sender",
+    "src.notification_sender.discord_sender": "src.notification_parts.senders.discord_sender",
+    "src.notification_sender.email_sender": "src.notification_parts.senders.email_sender",
+    "src.notification_sender.feishu_sender": "src.notification_parts.senders.feishu_sender",
+    "src.notification_sender.gotify_sender": "src.notification_parts.senders.gotify_sender",
+    "src.notification_sender.ntfy_sender": "src.notification_parts.senders.ntfy_sender",
+    "src.notification_sender.pushover_sender": "src.notification_parts.senders.pushover_sender",
+    "src.notification_sender.pushplus_sender": "src.notification_parts.senders.pushplus_sender",
+    "src.notification_sender.serverchan3_sender": "src.notification_parts.senders.serverchan3_sender",
+    "src.notification_sender.slack_sender": "src.notification_parts.senders.slack_sender",
+    "src.notification_sender.telegram_sender": "src.notification_parts.senders.telegram_sender",
+    "src.notification_sender.wechat_sender": "src.notification_parts.senders.wechat_sender",
 }
 
 # Shim files that re-export the canonical package; they are not importers of
@@ -50,6 +65,21 @@ FACADE_DEFINITION_FILES: Mapping[str, str] = {
     "src.market_analyzer": "src/market_analyzer.py",
     "src.analysis_context_pack_overview": "src/analysis_context_pack_overview.py",
     "src.analysis_context_pack_prompt": "src/analysis_context_pack_prompt.py",
+    "src.notification_sender": "src/notification_sender/__init__.py",
+    "src.notification_sender.astrbot_sender": "src/notification_sender/astrbot_sender.py",
+    "src.notification_sender.custom_webhook_sender": "src/notification_sender/custom_webhook_sender.py",
+    "src.notification_sender.dingtalk_sender": "src/notification_sender/dingtalk_sender.py",
+    "src.notification_sender.discord_sender": "src/notification_sender/discord_sender.py",
+    "src.notification_sender.email_sender": "src/notification_sender/email_sender.py",
+    "src.notification_sender.feishu_sender": "src/notification_sender/feishu_sender.py",
+    "src.notification_sender.gotify_sender": "src/notification_sender/gotify_sender.py",
+    "src.notification_sender.ntfy_sender": "src/notification_sender/ntfy_sender.py",
+    "src.notification_sender.pushover_sender": "src/notification_sender/pushover_sender.py",
+    "src.notification_sender.pushplus_sender": "src/notification_sender/pushplus_sender.py",
+    "src.notification_sender.serverchan3_sender": "src/notification_sender/serverchan3_sender.py",
+    "src.notification_sender.slack_sender": "src/notification_sender/slack_sender.py",
+    "src.notification_sender.telegram_sender": "src/notification_sender/telegram_sender.py",
+    "src.notification_sender.wechat_sender": "src/notification_sender/wechat_sender.py",
 }
 
 PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
@@ -110,14 +140,23 @@ def _is_facade_definition(relative_path: str) -> bool:
 
 
 def _facade_for_module(module_name: str | None) -> str | None:
-    """Map an imported module name to a guarded legacy facade, if any."""
+    """Map an imported module name to a guarded legacy facade, if any.
+
+    Prefer the longest matching facade so nested packages such as
+    ``src.notification_sender.email_sender`` are not attributed to the parent
+    package facade ``src.notification_sender``.
+    """
 
     if not module_name:
         return None
-    for facade in LEGACY_FACADES:
-        if module_name == facade or module_name.startswith(facade + "."):
-            return facade
-    return None
+    matches = [
+        facade
+        for facade in LEGACY_FACADES
+        if module_name == facade or module_name.startswith(facade + ".")
+    ]
+    if not matches:
+        return None
+    return max(matches, key=len)
 
 
 def _facade_from_import_from(node: ast.ImportFrom) -> list[tuple[str, int]]:
@@ -380,6 +419,62 @@ def run_self_tests() -> None:
             cases += 1
         else:
             raise AssertionError("unknown facade was accepted")
+
+        # Nested notification_sender package/leaf facades: new leaf importers fail,
+        # and longest-match keeps leaf imports off the package allowlist.
+        (root / "src" / "notification_parts").mkdir()
+        (root / "src" / "notification_parts" / "senders").mkdir()
+        (root / "src" / "notification_parts" / "senders" / "email_sender.py").write_text(
+            "class EmailSender:\n    pass\n",
+            encoding="utf-8",
+        )
+        (root / "src" / "notification_sender").mkdir()
+        (root / "src" / "notification_sender" / "__init__.py").write_text(
+            "from .email_sender import EmailSender\n",
+            encoding="utf-8",
+        )
+        (root / "src" / "notification_sender" / "email_sender.py").write_text(
+            "from src.notification_parts.senders.email_sender import EmailSender\n",
+            encoding="utf-8",
+        )
+        sender_baseline = {
+            "version": BASELINE_VERSION,
+            "facades": {
+                "src.notification_sender": ["src/notification.py"],
+                "src.notification_sender.email_sender": [],
+            },
+        }
+        sender_baseline_path = root / "scripts" / "sender_baseline.json"
+        sender_baseline_path.write_text(json.dumps(sender_baseline), encoding="utf-8")
+        (root / "src" / "notification.py").write_text(
+            "from src.notification_sender import EmailSender\n",
+            encoding="utf-8",
+        )
+        # grandfathered package importer is clean
+        violations = collect_violations(root, sender_baseline_path)
+        if any(item.path == "src/notification.py" for item in violations):
+            raise AssertionError(
+                f"grandfathered package importer rejected: {violations!r}"
+            )
+        cases += 1
+
+        (root / "src" / "new_sender_caller.py").write_text(
+            "from src.notification_sender.email_sender import EmailSender\n",
+            encoding="utf-8",
+        )
+        violations = collect_violations(root, sender_baseline_path)
+        leaf_hits = [
+            item
+            for item in violations
+            if item.path == "src/new_sender_caller.py"
+            and item.facade == "src.notification_sender.email_sender"
+        ]
+        if not leaf_hits:
+            raise AssertionError(
+                f"new notification_sender leaf importer was not rejected "
+                f"as leaf facade: {violations!r}"
+            )
+        cases += 1
 
     print(f"Legacy facade import self-tests passed ({cases} cases).")
 
