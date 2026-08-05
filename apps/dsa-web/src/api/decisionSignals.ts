@@ -1,4 +1,5 @@
 import { z } from 'zod';
+// Portfolio-cluster OpenAPI migration (issue #721 slice B).
 import apiClient from './index';
 import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
