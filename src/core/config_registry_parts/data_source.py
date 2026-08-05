@@ -97,6 +97,25 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {"min": 0, "max": 99},
         "display_order": 16,
     },
+    "TENCENT_PRIORITY": {
+        "title": "Tencent Daily K-line Priority",
+        "description": (
+            "Priority for Tencent direct daily K-line fetcher. Lower numbers are "
+            "tried earlier; default 5 keeps Tencent as the final built-in A-share "
+            "fallback. Realtime quote order is controlled separately by "
+            "REALTIME_SOURCE_PRIORITY."
+        ),
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "5",
+        "options": [],
+        "validation": {"min": 0, "max": 99},
+        "display_order": 16,
+    },
     "TICKFLOW_KLINE_ADJUST": {
         "title": "TickFlow K-line Adjust",
         "description": "Adjustment mode for TickFlow daily K-lines. Default none preserves the existing unadjusted technical-indicator baseline.",

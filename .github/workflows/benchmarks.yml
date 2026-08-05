@@ -1,0 +1,77 @@
+# Scheduled / on-demand wall-clock benchmark runner (non-blocking).
+# Not part of the required branch ruleset. Complements ci_gate.sh which
+# excludes @pytest.mark.benchmark from the offline gate.
+
+name: Benchmarks
+
+permissions: {}
+
+on:
+  schedule:
+    # Weekly on Mondays at 03:00 UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+            build-constraints.txt
+            .github/requirements-ci.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade --constraint constraints.txt pip
+          for attempt in 1 2 3; do
+            if python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Dependency install failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+            echo "Dependency install attempt ${attempt} failed, retrying in 15s..." >&2
+            sleep 15
+          done
+          python -m pip check
+
+      - name: Run benchmark suite
+        # continue-on-error: wall-clock assertions may flake on busy runners;
+        # artifacts still upload for review. This job is not a required check.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          test_data_dir="$(mktemp -d)"
+          DATABASE_PATH="${test_data_dir}/stockpulse-benchmark.sqlite" \
+            python -m pytest -m benchmark \
+              --timeout=120 --timeout-method=thread \
+              -o faulthandler_timeout=300 \
+              -v --tb=short | tee benchmark-pytest.log
+          rm -rf "${test_data_dir}"
+
+      - name: Upload benchmark output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-logs-${{ github.run_number }}
+          path: benchmark-pytest.log
+          if-no-files-found: ignore

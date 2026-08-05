@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
@@ -11,14 +12,48 @@ from data_provider.tencent_fetcher import TencentFetcher, _to_tencent_symbol
 
 
 def test_tencent_priority_defaults_to_final_fallback_and_allows_override() -> None:
-    with patch.dict("os.environ", {"TENCENT_PRIORITY": "5"}):
-        assert TencentFetcher().priority == 5
-    with patch.dict("os.environ", {"TENCENT_PRIORITY": "2"}):
-        assert TencentFetcher().priority == 2
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "5"}, clear=False):
+        with patch(
+            "src.config.get_config",
+            side_effect=RuntimeError("config unavailable"),
+        ):
+            assert TencentFetcher().priority == 5
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "2"}, clear=False):
+        with patch(
+            "src.config.get_config",
+            side_effect=RuntimeError("config unavailable"),
+        ):
+            assert TencentFetcher().priority == 2
 
 
 def test_invalid_tencent_priority_falls_back_to_final_position() -> None:
-    with patch.dict("os.environ", {"TENCENT_PRIORITY": "invalid"}):
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "invalid"}, clear=False):
+        with patch(
+            "src.config.get_config",
+            side_effect=RuntimeError("config unavailable"),
+        ):
+            assert TencentFetcher().priority == 5
+
+
+def test_tencent_priority_prefers_config_object_over_env() -> None:
+    """Web/settings path: Config.tencent_priority must win over process env."""
+
+    config = SimpleNamespace(tencent_priority=3)
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "9"}, clear=False):
+        with patch("src.config.get_config", return_value=config):
+            assert TencentFetcher().priority == 3
+
+
+def test_tencent_priority_falls_back_to_env_when_config_lacks_attribute() -> None:
+    config = SimpleNamespace()  # no tencent_priority
+    with patch.dict("os.environ", {"TENCENT_PRIORITY": "4"}, clear=False):
+        with patch("src.config.get_config", return_value=config):
+            assert TencentFetcher().priority == 4
+
+
+def test_invalid_config_tencent_priority_falls_back_to_final_position() -> None:
+    config = SimpleNamespace(tencent_priority="not-an-int")
+    with patch("src.config.get_config", return_value=config):
         assert TencentFetcher().priority == 5
 
 
