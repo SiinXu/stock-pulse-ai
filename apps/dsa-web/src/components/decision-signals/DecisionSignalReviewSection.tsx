@@ -28,7 +28,7 @@ export type DecisionSignalReviewSectionProps = {
   showExplorer: boolean;
 };
 
-export const DecisionSignalReviewSection: React.FC<DecisionSignalReviewSectionProps> = ({
+const DecisionSignalReviewSection: React.FC<DecisionSignalReviewSectionProps> = ({
   stats,
   loading,
   error,
@@ -100,3 +100,5 @@ export const DecisionSignalReviewSection: React.FC<DecisionSignalReviewSectionPr
     </>
   );
 };
+
+export default DecisionSignalReviewSection;

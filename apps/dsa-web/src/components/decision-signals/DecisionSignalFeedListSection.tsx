@@ -54,7 +54,7 @@ export type DecisionSignalFeedListSectionProps = {
   onCreateFirstRule: () => void;
 };
 
-export const DecisionSignalFeedListSection: React.FC<DecisionSignalFeedListSectionProps> = ({
+const DecisionSignalFeedListSection: React.FC<DecisionSignalFeedListSectionProps> = ({
   filters,
   onFiltersChange,
   onApplyFilters,
@@ -230,3 +230,5 @@ export const DecisionSignalFeedListSection: React.FC<DecisionSignalFeedListSecti
     </div>
   );
 };
+
+export default DecisionSignalFeedListSection;

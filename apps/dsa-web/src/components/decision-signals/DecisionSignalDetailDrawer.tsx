@@ -53,7 +53,7 @@ export type DecisionSignalDetailDrawerProps = {
   ) => void;
 };
 
-export const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
+const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
   selected,
   onClose,
   statusError,
@@ -145,3 +145,5 @@ export const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProp
     </Drawer>
   );
 };
+
+export default DecisionSignalDetailDrawer;

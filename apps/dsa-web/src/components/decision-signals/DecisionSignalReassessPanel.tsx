@@ -37,7 +37,7 @@ export type DecisionSignalReassessPanelProps = {
   onRequestPersist: () => void;
 };
 
-export const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = ({
+const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = ({
   sourceReportId,
   profile,
   onProfileChange,
@@ -265,3 +265,5 @@ export const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelPr
     </Surface>
   );
 };
+
+export default DecisionSignalReassessPanel;

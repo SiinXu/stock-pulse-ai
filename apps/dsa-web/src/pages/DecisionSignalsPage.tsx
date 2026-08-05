@@ -25,13 +25,13 @@ import {
 } from '../components/common';
 import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
-import { DecisionSignalDetailDrawer } from '../components/decision-signals/DecisionSignalDetailDrawer';
-import { DecisionSignalFeedListSection } from '../components/decision-signals/DecisionSignalFeedListSection';
-import { DecisionSignalLatestSection } from '../components/decision-signals/DecisionSignalLatestSection';
-import { DecisionSignalReassessPanel } from '../components/decision-signals/DecisionSignalReassessPanel';
-import { DecisionSignalReviewSection } from '../components/decision-signals/DecisionSignalReviewSection';
-import { DecisionSignalStockContextModal } from '../components/decision-signals/DecisionSignalStockContextModal';
-import { DecisionSignalTimelineSection } from '../components/decision-signals/DecisionSignalTimelineSection';
+import DecisionSignalDetailDrawer from '../components/decision-signals/DecisionSignalDetailDrawer';
+import DecisionSignalFeedListSection from '../components/decision-signals/DecisionSignalFeedListSection';
+import DecisionSignalLatestSection from '../components/decision-signals/DecisionSignalLatestSection';
+import DecisionSignalReassessPanel from '../components/decision-signals/DecisionSignalReassessPanel';
+import DecisionSignalReviewSection from '../components/decision-signals/DecisionSignalReviewSection';
+import DecisionSignalStockContextModal from '../components/decision-signals/DecisionSignalStockContextModal';
+import DecisionSignalTimelineSection from '../components/decision-signals/DecisionSignalTimelineSection';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
   type ManualSignalDraft,

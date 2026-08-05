@@ -26,7 +26,7 @@ export type DecisionSignalLatestSectionProps = {
   onSelect: (item: DecisionSignalItem) => void;
 };
 
-export const DecisionSignalLatestSection: React.FC<DecisionSignalLatestSectionProps> = ({
+const DecisionSignalLatestSection: React.FC<DecisionSignalLatestSectionProps> = ({
   activeStockContext,
   activeStockLabel,
   loading,
@@ -81,3 +81,5 @@ export const DecisionSignalLatestSection: React.FC<DecisionSignalLatestSectionPr
     </Card>
   );
 };
+
+export default DecisionSignalLatestSection;

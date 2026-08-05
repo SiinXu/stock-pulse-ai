@@ -38,7 +38,7 @@ export type DecisionSignalStockContextModalProps = {
   onCandidateSelect: (candidate: StockCandidate) => void;
 };
 
-export const DecisionSignalStockContextModal: React.FC<DecisionSignalStockContextModalProps> = ({
+const DecisionSignalStockContextModal: React.FC<DecisionSignalStockContextModalProps> = ({
   isOpen,
   onClose,
   stockDraft,
@@ -135,3 +135,5 @@ export const DecisionSignalStockContextModal: React.FC<DecisionSignalStockContex
     </Modal>
   );
 };
+
+export default DecisionSignalStockContextModal;

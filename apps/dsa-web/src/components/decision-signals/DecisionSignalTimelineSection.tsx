@@ -40,7 +40,7 @@ export type DecisionSignalTimelineSectionProps = {
   onSelect: (item: DecisionSignalItem) => void;
 };
 
-export const DecisionSignalTimelineSection: React.FC<DecisionSignalTimelineSectionProps> = ({
+const DecisionSignalTimelineSection: React.FC<DecisionSignalTimelineSectionProps> = ({
   activeStockContext,
   activeStockLabel,
   filters,
@@ -158,3 +158,5 @@ export const DecisionSignalTimelineSection: React.FC<DecisionSignalTimelineSecti
     </Card>
   );
 };
+
+export default DecisionSignalTimelineSection;
