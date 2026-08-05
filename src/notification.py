@@ -557,6 +557,9 @@ from src.notification_parts import rendering as _notification_rendering  # noqa:
 from src.notification_parts import report_setup as _notification_report_setup  # noqa: E402
 from src.notification_parts import routing as _notification_routing  # noqa: E402
 
+# Resolve free-function dependencies once the public facade symbols exist.
+_notification_dispatch.configure_dispatch_ports()
+
 _ReportSetupMethods = _notification_report_setup._ReportSetupMethods
 _RoutingMethods = _notification_routing._RoutingMethods
 _notification_delivery_snapshot_context = (

@@ -8,7 +8,7 @@ from collections import defaultdict
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Protocol
 
 from src.utils.sanitize import (
     sanitize_diagnostic_text as _sanitize_dispatch_log_value,
@@ -33,6 +33,131 @@ if TYPE_CHECKING:
         sanitize_diagnostic_text,
         sanitize_exception_chain,
     )
+
+
+class _ImageBuilder(Protocol):
+    """Convert Markdown report content into optional PNG bytes."""
+
+    def __call__(
+        self,
+        content: str,
+        *,
+        max_chars: int,
+    ) -> Optional[bytes]:
+        """Render one Markdown document to image bytes when possible."""
+
+
+@dataclass(frozen=True)
+class DispatchFacadePorts:
+    """Public-facade symbols free functions need without import-time cycles.
+
+    Bound once at the notification composition root after ``NotificationChannel``
+    and related types exist on ``src.notification``.
+    """
+
+    NotificationChannel: Any
+    ChannelAttemptResult: Any
+    NotificationDispatchResult: Any
+    ChannelDetector: Any
+    WECHAT_IMAGE_MAX_BYTES: int
+    logger: Any
+    log_safe_exception: Callable[..., Any]
+    sanitize_exception_chain: Callable[..., Any]
+    ensure_notification_runtime: Callable[..., Any]
+    ROUTABLE_NOTIFICATION_CHANNELS: Any
+    available_notification_channel_snapshot: Callable[..., Any]
+
+
+@dataclass(frozen=True)
+class DispatchPorts:
+    """Injectable dispatch dependencies derived from the deferred-import inventory.
+
+    Port roles:
+    - ``image_builder``: optional Markdown-to-image conversion (four prior sites)
+    - ``normalize_stock_code``: aggregate email receiver routing by stock code
+    - ``report_type_cls``: aggregate WeCom brief vs dashboard branch
+    - ``facade``: cycle-avoidance symbols from the public notification facade
+    """
+
+    image_builder: _ImageBuilder
+    normalize_stock_code: Callable[[str], Any]
+    report_type_cls: Any
+    facade: DispatchFacadePorts
+
+
+_PORTS: Optional[DispatchPorts] = None
+
+
+def build_default_dispatch_ports() -> DispatchPorts:
+    """Build ports with the same imports dispatch previously deferred locally.
+
+    Called at the notification facade composition point so free functions never
+    re-import cycle-sensitive symbols. ``image_builder`` looks up
+    ``src.md2img.markdown_to_image`` on each call so existing test patch seams
+    on that attribute keep working.
+    """
+
+    from data_provider.base import normalize_stock_code
+    from src.enums import ReportType
+    from src.notification import (
+        ChannelAttemptResult,
+        ChannelDetector,
+        NotificationChannel,
+        NotificationDispatchResult,
+        WECHAT_IMAGE_MAX_BYTES,
+        _ROUTABLE_NOTIFICATION_CHANNELS,
+        _available_notification_channel_snapshot,
+        _ensure_notification_runtime,
+        log_safe_exception,
+        logger,
+        sanitize_exception_chain,
+    )
+    import src.md2img as md2img
+
+    def image_builder(content: str, *, max_chars: int) -> Optional[bytes]:
+        """Delegate to the process-wide Markdown image converter."""
+
+        # Attribute lookup (not a bound local) preserves patch seams.
+        return md2img.markdown_to_image(content, max_chars=max_chars)
+
+    return DispatchPorts(
+        image_builder=image_builder,
+        normalize_stock_code=normalize_stock_code,
+        report_type_cls=ReportType,
+        facade=DispatchFacadePorts(
+            NotificationChannel=NotificationChannel,
+            ChannelAttemptResult=ChannelAttemptResult,
+            NotificationDispatchResult=NotificationDispatchResult,
+            ChannelDetector=ChannelDetector,
+            WECHAT_IMAGE_MAX_BYTES=WECHAT_IMAGE_MAX_BYTES,
+            logger=logger,
+            log_safe_exception=log_safe_exception,
+            sanitize_exception_chain=sanitize_exception_chain,
+            ensure_notification_runtime=_ensure_notification_runtime,
+            ROUTABLE_NOTIFICATION_CHANNELS=_ROUTABLE_NOTIFICATION_CHANNELS,
+            available_notification_channel_snapshot=(
+                _available_notification_channel_snapshot
+            ),
+        ),
+    )
+
+
+def configure_dispatch_ports(ports: Optional[DispatchPorts] = None) -> DispatchPorts:
+    """Install process-wide dispatch ports (idempotent replace)."""
+
+    global _PORTS
+    _PORTS = ports if ports is not None else build_default_dispatch_ports()
+    return _PORTS
+
+
+def get_dispatch_ports() -> DispatchPorts:
+    """Return configured ports, building the default composition when unset."""
+
+    global _PORTS
+    if _PORTS is None:
+        configure_dispatch_ports()
+    assert _PORTS is not None
+    return _PORTS
 
 
 @dataclass
@@ -104,7 +229,7 @@ class _AggregateDispatchContext:
 def _channel_id(channel: Any) -> str:
     """Return the canonical identifier for a built-in or plugin channel."""
 
-    from src.notification import NotificationChannel
+    NotificationChannel = get_dispatch_ports().facade.NotificationChannel
 
     return (
         channel.value
@@ -126,12 +251,11 @@ def _safe_attempt_sender(
     def _send():
         """Execute one sender and normalize its structured result."""
 
-        from src.notification import (
-            ChannelAttemptResult,
-            NotificationChannel,
-            log_safe_exception,
-            sanitize_exception_chain,
-        )
+        facade = get_dispatch_ports().facade
+        ChannelAttemptResult = facade.ChannelAttemptResult
+        NotificationChannel = facade.NotificationChannel
+        log_safe_exception = facade.log_safe_exception
+        sanitize_exception_chain = facade.sanitize_exception_chain
 
         dispatch_logger = logging.getLogger(
             "src.core.pipeline" if aggregate else "src.notification"
@@ -193,7 +317,7 @@ def _context_attempt_sender(
     def _send():
         """Execute context delivery while preserving exception ordering."""
 
-        from src.notification import ChannelAttemptResult
+        ChannelAttemptResult = get_dispatch_ports().facade.ChannelAttemptResult
 
         started_at = time.monotonic()
         result = send()
@@ -265,7 +389,7 @@ def _full_report_image_channel_ids(
 ) -> tuple[str, ...]:
     """Return routed channels that require the shared full-report image."""
 
-    from src.notification import NotificationChannel
+    NotificationChannel = get_dispatch_ports().facade.NotificationChannel
 
     return tuple(
         channel_id
@@ -295,11 +419,11 @@ def _prepare_full_report_image(
 ) -> _ImagePreparationOutcome:
     """Render the shared full-report image required by routed channels."""
 
-    from src.notification import (
-        logger,
-        log_safe_exception,
-        sanitize_exception_chain,
-    )
+    ports = get_dispatch_ports()
+    facade = ports.facade
+    logger = facade.logger
+    log_safe_exception = facade.log_safe_exception
+    sanitize_exception_chain = facade.sanitize_exception_chain
     channels_needing_image = _full_report_image_channel_ids(
         service,
         target_channels,
@@ -308,10 +432,8 @@ def _prepare_full_report_image(
     if not channels_needing_image:
         return _ImagePreparationOutcome()
 
-    from src.md2img import markdown_to_image
-
     try:
-        image_bytes = markdown_to_image(
+        image_bytes = ports.image_builder(
             content,
             max_chars=service._markdown_to_image_max_chars,
         )
@@ -348,11 +470,10 @@ def _should_use_image_for_channel(
 ) -> bool:
     """Apply the facade image policy for real and compatibility notifiers."""
 
-    from src.notification import (
-        NotificationChannel,
-        WECHAT_IMAGE_MAX_BYTES,
-        logger,
-    )
+    facade = get_dispatch_ports().facade
+    NotificationChannel = facade.NotificationChannel
+    WECHAT_IMAGE_MAX_BYTES = facade.WECHAT_IMAGE_MAX_BYTES
+    logger = facade.logger
 
     configured = (
         channel.value
@@ -398,7 +519,9 @@ def _send_to_static_channel(
 ) -> bool:
     """Send one built-in channel through the canonical static policy."""
 
-    from src.notification import NotificationChannel, logger
+    facade = get_dispatch_ports().facade
+    NotificationChannel = facade.NotificationChannel
+    logger = facade.logger
 
     use_image = _use_image_for_channel(
         service,
@@ -502,9 +625,10 @@ def _aggregate_static_attempts(
 ) -> List[tuple[str, Optional[List[Any]], Callable[[], Any]]]:
     """Build aggregate channel attempts without leaking sender policy to Pipeline."""
 
-    from data_provider.base import normalize_stock_code
-    from src.enums import ReportType
-    from src.notification import NotificationChannel
+    ports = get_dispatch_ports()
+    normalize_stock_code = ports.normalize_stock_code
+    ReportType = ports.report_type_cls
+    NotificationChannel = ports.facade.NotificationChannel
 
     channel_id = channel.value
     results = aggregate.results
@@ -525,9 +649,7 @@ def _aggregate_static_attempts(
             )
             wechat_image_bytes = None
             if channel_id in service._markdown_to_image_channels:
-                from src.md2img import markdown_to_image
-
-                wechat_image_bytes = markdown_to_image(
+                wechat_image_bytes = get_dispatch_ports().image_builder(
                     dashboard_content,
                     max_chars=service._markdown_to_image_max_chars,
                 )
@@ -611,9 +733,7 @@ def _aggregate_static_attempts(
                     )
                     group_image_bytes = None
                     if channel_id in service._markdown_to_image_channels:
-                        from src.md2img import markdown_to_image
-
-                        group_image_bytes = markdown_to_image(
+                        group_image_bytes = get_dispatch_ports().image_builder(
                             group_report,
                             max_chars=service._markdown_to_image_max_chars,
                         )
@@ -695,11 +815,10 @@ def _dispatch_target_attempts(
 ) -> List[_DispatchAttemptRecord]:
     """Prepare payloads and isolate each routed target attempt."""
 
-    from src.notification import (
-        ChannelDetector,
-        NotificationChannel,
-        logger,
-    )
+    facade = get_dispatch_ports().facade
+    ChannelDetector = facade.ChannelDetector
+    NotificationChannel = facade.NotificationChannel
+    logger = facade.logger
 
     image_preparation = _prepare_full_report_image(
         service,
@@ -724,7 +843,7 @@ def _dispatch_target_attempts(
     for channel in target_channels:
         channel_id = _channel_id(channel)
         if channel_id in image_preparation.failed_channel_ids:
-            from src.notification import ChannelAttemptResult
+            ChannelAttemptResult = facade.ChannelAttemptResult
 
             def _image_preparation_failure(
                 channel_id=channel_id,
@@ -777,12 +896,9 @@ def _dispatch_target_attempts(
                         aggregate=aggregate,
                     )
                 except Exception as exc:  # broad-exception: fallback_recorded - malformed channel preparation becomes one isolated attempt
-                    from src.notification import (
-                        ChannelAttemptResult,
-                        log_safe_exception,
-                        logger,
-                        sanitize_exception_chain,
-                    )
+                    ChannelAttemptResult = facade.ChannelAttemptResult
+                    log_safe_exception = facade.log_safe_exception
+                    sanitize_exception_chain = facade.sanitize_exception_chain
 
                     log_safe_exception(
                         logger,
@@ -860,7 +976,9 @@ def _release_noise_reservation(service: Any, decision: Any) -> None:
     try:
         release_noise(decision)
     except Exception as exc:  # broad-exception: fallback_recorded - cleanup failures are safely logged without changing the dispatch outcome
-        from src.notification import logger, log_safe_exception
+        facade = get_dispatch_ports().facade
+        logger = facade.logger
+        log_safe_exception = facade.log_safe_exception
 
         log_safe_exception(
             logger,
@@ -888,7 +1006,9 @@ def _finalize_noise_control(
                 record_noise(decision)
                 return
             except Exception as exc:  # broad-exception: fallback_recorded - a successful delivery remains committed when noise persistence fails
-                from src.notification import logger, log_safe_exception
+                facade = get_dispatch_ports().facade
+                logger = facade.logger
+                log_safe_exception = facade.log_safe_exception
 
                 log_safe_exception(
                     logger,
@@ -916,13 +1036,14 @@ def _dispatch_with_results_under_lease(
 ) -> _DispatchExecution:
     """Run the canonical route/noise/isolation/mapping/aggregation policy."""
 
-    from src.notification import (
-        NotificationDispatchResult,
-        _ROUTABLE_NOTIFICATION_CHANNELS,
-        _available_notification_channel_snapshot,
-        logger,
-        log_safe_exception,
+    facade = get_dispatch_ports().facade
+    NotificationDispatchResult = facade.NotificationDispatchResult
+    _ROUTABLE_NOTIFICATION_CHANNELS = facade.ROUTABLE_NOTIFICATION_CHANNELS
+    _available_notification_channel_snapshot = (
+        facade.available_notification_channel_snapshot
     )
+    logger = facade.logger
+    log_safe_exception = facade.log_safe_exception
 
     if notification_available is False:
         return _DispatchExecution(
@@ -1219,7 +1340,9 @@ def dispatch_aggregate_with_results(
 ) -> _DispatchExecution:
     """Dispatch an aggregate report through the canonical notification owner."""
 
-    from src.notification import _ensure_notification_runtime
+    _ensure_notification_runtime = (
+        get_dispatch_ports().facade.ensure_notification_runtime
+    )
 
     application_services = None
     if hasattr(service, "_notification_runtime_lock"):
@@ -1617,8 +1740,11 @@ class _DispatchMethods:
             }
         )
         if channels_needing_image:
-            from src.md2img import markdown_to_image
-            image_bytes = markdown_to_image(
+            # Bound methods resolve free names against notification.py globals;
+            # import the ports helper explicitly to keep the call site stable.
+            from src.notification_parts.dispatch import get_dispatch_ports as _get_ports
+
+            image_bytes = _get_ports().image_builder(
                 content, max_chars=self._markdown_to_image_max_chars
             )
             if image_bytes:
@@ -1806,6 +1932,7 @@ class _DispatchMethods:
         Returns:
             保存的文件路径
         """
+        # Bound method: local import keeps Path out of the public facade globals.
         from pathlib import Path
 
         if filename is None:
