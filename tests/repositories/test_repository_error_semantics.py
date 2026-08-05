@@ -236,3 +236,5 @@ def test_history_list_maps_repository_error_to_500() -> None:
 
     assert raised.value.status_code == 500
     assert raised.value.detail.get("error") == "internal_error"
+
+# CI re-trigger marker for runner queue recovery
