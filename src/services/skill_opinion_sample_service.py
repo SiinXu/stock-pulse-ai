@@ -45,12 +45,9 @@ _QUALITY_LEVELS = frozenset(
 def is_skill_opinion_recording_enabled(config: Any = None) -> bool:
     """Return whether config-gated skill-opinion sample recording is on."""
     if config is None:
-        try:
-            from src.config import Config
+        from src.config import Config
 
-            config = Config.get_instance()
-        except Exception:  # broad-exception: fallback_recorded - Config may be unavailable during early import or test teardown.
-            return False
+        config = Config.get_instance()
     return bool(getattr(config, "skill_opinion_recording_enabled", False))
 
 

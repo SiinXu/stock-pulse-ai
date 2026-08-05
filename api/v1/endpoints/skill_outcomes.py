@@ -53,17 +53,6 @@ def _bad_request(exc: Exception, *, error: str = "validation_error") -> HTTPExce
     )
 
 
-def _internal_error(message: str, exc: Exception) -> HTTPException:
-    log_safe_exception(
-        logger,
-        message,
-        exc,
-        error_code="internal_error",
-    )
-    return HTTPException(
-        status_code=500,
-        detail={"error": "internal_error", "message": message},
-    )
 
 
 @router.post(
@@ -100,8 +89,20 @@ def run_outcomes(
         )
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
-        raise _internal_error("Run skill opinion outcomes failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map run failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Run skill opinion outcomes failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Run skill opinion outcomes failed",
+            },
+        )
 
 
 @router.get(
@@ -145,8 +146,20 @@ def list_outcomes(
         )
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
-        raise _internal_error("List skill opinion outcomes failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map list failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "List skill opinion outcomes failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "List skill opinion outcomes failed",
+            },
+        )
 
 
 @router.get(
@@ -186,8 +199,20 @@ def get_stats(
         return SkillOpinionPerformanceStatsResponse(**payload)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
-        raise _internal_error("Get skill opinion outcome stats failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map stats failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Get skill opinion outcome stats failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Get skill opinion outcome stats failed",
+            },
+        )
 
 
 @router.get(
@@ -223,5 +248,17 @@ def list_samples(
         )
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
-        raise _internal_error("List skill opinion samples failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map sample list failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "List skill opinion samples failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "List skill opinion samples failed",
+            },
+        )
