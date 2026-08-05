@@ -144,6 +144,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('signals', 'decision-signal-timeline', 'DecisionSignalTimeline', 'components/decision-signals/DecisionSignalTimeline.tsx', ['default', 'loading', 'empty', 'error']),
   entry('signals', 'decision-signal-create-drawer', 'DecisionSignalCreateDrawer', 'components/decision-signals/DecisionSignalCreateDrawer.tsx', ['interactive', 'states']),
   entry('signals', 'decision-signal-outcome-run-panel', 'DecisionSignalOutcomeRunPanel', 'components/decision-signals/DecisionSignalOutcomeRunPanel.tsx', ['interactive', 'empty', 'error']),
+  entry('signals', 'skill-outcome-performance-table', 'SkillOutcomePerformanceTable', 'components/skill-outcomes/SkillOutcomePerformanceTable.tsx', ['default', 'empty']),
+  entry('signals', 'skill-outcome-recent-lists', 'SkillOutcomeRecentLists', 'components/skill-outcomes/SkillOutcomeRecentLists.tsx', ['default', 'empty']),
+  entry('signals', 'skill-outcome-run-panel', 'SkillOutcomeRunPanel', 'components/skill-outcomes/SkillOutcomeRunPanel.tsx', ['interactive', 'empty', 'error']),
 
   entry('reports', 'analysis-context-summary', 'AnalysisContextSummary', 'components/report/AnalysisContextSummary.tsx', ['default', 'empty']),
   entry('reports', 'market-review-report-view', 'MarketReviewReportView', 'components/report/MarketReviewReportView.tsx', ['default', 'loading', 'error']),
