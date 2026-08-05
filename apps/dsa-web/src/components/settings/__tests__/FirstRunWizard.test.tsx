@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FirstRunWizard } from '../FirstRunWizard';
 import type { LlmConnectionFieldSchema } from '../../../types/systemConfig';
+import { chooseOption, openListbox } from '../../../test-utils';
 
 const { discoverLLMChannelModels, testLLMChannel } = vi.hoisted(() => ({
   discoverLLMChannelModels: vi.fn(),
@@ -42,20 +43,6 @@ vi.mock('../LocalModelsPanel', () => ({
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
-
-function openListbox(trigger: HTMLElement) {
-  fireEvent.click(trigger);
-  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  const listbox = openListbox(trigger);
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
-}
-
 
 const CATALOG = [
   { id: 'aihubmix', label: 'AIHubmix', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', capabilities: ['openai-compatible'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },

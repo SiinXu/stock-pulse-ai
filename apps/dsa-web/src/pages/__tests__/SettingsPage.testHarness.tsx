@@ -6,6 +6,7 @@ import type { LlmConnectionFieldSchema } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
 import SettingsPage from '../SettingsPage';
+import { createDeferred } from '../../test-utils';
 
 const {
   analyzeAsync,
@@ -789,16 +790,6 @@ function useAdvancedConfigState(overrides: ConfigOverride = {}) {
   // Env backup lives on the Advanced Config Backup tab.
   routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'backup' });
   return state;
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, resolve, reject };
 }
 
 async function expectConnectionDraftAutosaveBlockedBySchema(

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSystemConfig } from '../useSystemConfig';
+import { createDeferred } from '../../test-utils';
 
 const { getConfig, validate, update, ConflictError } = vi.hoisted(() => ({
   getConfig: vi.fn(),
@@ -138,16 +139,6 @@ const sampleLlmConfig = {
     },
   ],
 };
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, resolve, reject };
-}
 
 describe('useSystemConfig', () => {
   beforeEach(() => {
