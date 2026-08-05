@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "description": "Allowlisted bidirectional package import pairs (module-level imports only). New pairs are banned; shrink this list by breaking cycles and running --write-baseline. Growth requires an explicit PR justification and is refused by --write-baseline.",
+  "pair_count": 12,
+  "pairs": [
+    [
+      "data_provider",
+      "src.services"
+    ],
+    [
+      "src.agent",
+      "src.services"
+    ],
+    [
+      "src.agent",
+      "src.storage"
+    ],
+    [
+      "src.analyzer",
+      "src.services"
+    ],
+    [
+      "src.config",
+      "src.core"
+    ],
+    [
+      "src.core",
+      "src.services"
+    ],
+    [
+      "src.data",
+      "src.services"
+    ],
+    [
+      "src.market",
+      "src.services"
+    ],
+    [
+      "src.notification_contracts",
+      "src.notification_parts"
+    ],
+    [
+      "src.report_language",
+      "src.schemas"
+    ],
+    [
+      "src.repositories",
+      "src.services"
+    ],
+    [
+      "src.storage",
+      "src.storage_parts"
+    ]
+  ]
+}

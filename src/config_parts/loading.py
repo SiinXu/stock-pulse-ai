@@ -52,7 +52,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.scheduler import normalize_schedule_times
-from src.services.stock_list_parser import split_stock_list
+from src.utils.stock_list import split_stock_list
 from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:

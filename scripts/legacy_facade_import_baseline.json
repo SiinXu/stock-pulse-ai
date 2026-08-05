@@ -47,7 +47,31 @@
       "src/agent/executor_parts/chat.py",
       "src/agent/executor_parts/loop.py",
       "src/analyzer.py"
-    ]
+    ],
+    "src.notification_sender": [
+      "src/notification.py",
+      "src/services/system_config_service_parts/notifications.py"
+    ],
+    "src.notification_sender.astrbot_sender": [],
+    "src.notification_sender.custom_webhook_sender": [],
+    "src.notification_sender.dingtalk_sender": [],
+    "src.notification_sender.discord_sender": [],
+    "src.notification_sender.email_sender": [],
+    "src.notification_sender.feishu_sender": [],
+    "src.notification_sender.gotify_sender": [
+      "src/services/notification_diagnostics.py",
+      "src/services/system_config_service.py"
+    ],
+    "src.notification_sender.ntfy_sender": [
+      "src/services/notification_diagnostics.py",
+      "src/services/system_config_service.py"
+    ],
+    "src.notification_sender.pushover_sender": [],
+    "src.notification_sender.pushplus_sender": [],
+    "src.notification_sender.serverchan3_sender": [],
+    "src.notification_sender.slack_sender": [],
+    "src.notification_sender.telegram_sender": [],
+    "src.notification_sender.wechat_sender": []
   },
   "catalog": {
     "src.analysis_context_pack_overview": {
@@ -127,6 +151,90 @@
         "src/agent/executor_parts/loop.py",
         "src/analyzer.py"
       ]
+    },
+    "src.notification_sender": {
+      "canonical": "src.notification_parts.senders",
+      "definition": "src/notification_sender/__init__.py",
+      "importers": [
+        "src/notification.py",
+        "src/services/system_config_service_parts/notifications.py"
+      ]
+    },
+    "src.notification_sender.astrbot_sender": {
+      "canonical": "src.notification_parts.senders.astrbot_sender",
+      "definition": "src/notification_sender/astrbot_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.custom_webhook_sender": {
+      "canonical": "src.notification_parts.senders.custom_webhook_sender",
+      "definition": "src/notification_sender/custom_webhook_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.dingtalk_sender": {
+      "canonical": "src.notification_parts.senders.dingtalk_sender",
+      "definition": "src/notification_sender/dingtalk_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.discord_sender": {
+      "canonical": "src.notification_parts.senders.discord_sender",
+      "definition": "src/notification_sender/discord_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.email_sender": {
+      "canonical": "src.notification_parts.senders.email_sender",
+      "definition": "src/notification_sender/email_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.feishu_sender": {
+      "canonical": "src.notification_parts.senders.feishu_sender",
+      "definition": "src/notification_sender/feishu_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.gotify_sender": {
+      "canonical": "src.notification_parts.senders.gotify_sender",
+      "definition": "src/notification_sender/gotify_sender.py",
+      "importers": [
+        "src/services/notification_diagnostics.py",
+        "src/services/system_config_service.py"
+      ]
+    },
+    "src.notification_sender.ntfy_sender": {
+      "canonical": "src.notification_parts.senders.ntfy_sender",
+      "definition": "src/notification_sender/ntfy_sender.py",
+      "importers": [
+        "src/services/notification_diagnostics.py",
+        "src/services/system_config_service.py"
+      ]
+    },
+    "src.notification_sender.pushover_sender": {
+      "canonical": "src.notification_parts.senders.pushover_sender",
+      "definition": "src/notification_sender/pushover_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.pushplus_sender": {
+      "canonical": "src.notification_parts.senders.pushplus_sender",
+      "definition": "src/notification_sender/pushplus_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.serverchan3_sender": {
+      "canonical": "src.notification_parts.senders.serverchan3_sender",
+      "definition": "src/notification_sender/serverchan3_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.slack_sender": {
+      "canonical": "src.notification_parts.senders.slack_sender",
+      "definition": "src/notification_sender/slack_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.telegram_sender": {
+      "canonical": "src.notification_parts.senders.telegram_sender",
+      "definition": "src/notification_sender/telegram_sender.py",
+      "importers": []
+    },
+    "src.notification_sender.wechat_sender": {
+      "canonical": "src.notification_parts.senders.wechat_sender",
+      "definition": "src/notification_sender/wechat_sender.py",
+      "importers": []
     }
   }
 }
