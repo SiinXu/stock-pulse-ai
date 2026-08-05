@@ -10,16 +10,7 @@ import { extractStockCodeFromMessage, extractStockCodesFromMessage } from '../..
 import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
+import { createDeferred } from '../../test-utils';
 
 async function getReadySendButton(): Promise<HTMLButtonElement> {
   await act(async () => {
@@ -55,6 +46,7 @@ const {
   mockDeleteChatSession,
   mockSendChat,
   mockGetSystemConfig,
+  mockGetSetupStatus,
   mockUpdateSystemConfig,
   mockGetWatchlist,
   mockAddToWatchlist,
@@ -66,6 +58,7 @@ const {
   mockDeleteChatSession: vi.fn(),
   mockSendChat: vi.fn(),
   mockGetSystemConfig: vi.fn(),
+  mockGetSetupStatus: vi.fn(),
   mockUpdateSystemConfig: vi.fn(),
   mockGetWatchlist: vi.fn(),
   mockAddToWatchlist: vi.fn(),
@@ -122,6 +115,7 @@ vi.mock('../../api/agent', () => ({
 vi.mock('../../api/systemConfig', () => ({
   systemConfigApi: {
     getConfig: mockGetSystemConfig,
+    getSetupStatus: mockGetSetupStatus,
     update: mockUpdateSystemConfig,
     getWatchlist: mockGetWatchlist,
     addToWatchlist: mockAddToWatchlist,
@@ -216,6 +210,7 @@ beforeEach(() => {
       },
     ],
   });
+  mockGetSetupStatus.mockResolvedValue({ isComplete: true, readyForSmoke: true, requiredMissingKeys: [], nextStepKey: null, checks: [] });
   mockUpdateSystemConfig.mockResolvedValue({
     success: true,
     configVersion: 'cfg-v2',

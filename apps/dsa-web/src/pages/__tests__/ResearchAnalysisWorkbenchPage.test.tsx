@@ -24,6 +24,7 @@ import {
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { AnalysisReport, HistoryItem, StockBarItem, TaskInfo } from '../../types/analysis';
 import ResearchAnalysisWorkbenchPage from '../ResearchAnalysisWorkbenchPage';
+import { createDeferred } from '../../test-utils';
 
 type LifecycleOptions = Parameters<
   (typeof import('../../hooks/useDashboardLifecycle'))['useDashboardLifecycle']
@@ -178,14 +179,6 @@ const stockBarItem = (
   analysisCount: 1,
   lastAnalysisTime,
 });
-
-function deferredPromise<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve;
-  });
-  return { promise, resolve };
-}
 
 function LocationProbe() {
   const location = useLocation();
@@ -442,7 +435,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
   });
 
   it('does not navigate back to tasks when a reanalysis finishes after leaving the workbench', async () => {
-    const pendingAnalysis = deferredPromise<{ taskId: string; status: 'pending' }>();
+    const pendingAnalysis = createDeferred<{ taskId: string; status: 'pending' }>();
     vi.mocked(analysisApi.analyzeAsync).mockReturnValueOnce(pendingAnalysis.promise);
     useStockPoolStore.setState({ historyItems: [historyItem] });
     renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
@@ -667,7 +660,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
   });
 
   it('removes the previous imported batch while a replacement file is parsing', async () => {
-    const replacementImport = deferredPromise<{ codes: string[] }>();
+    const replacementImport = createDeferred<{ codes: string[] }>();
     vi.mocked(stocksApi.parseImport)
       .mockResolvedValueOnce({ codes: ['AAPL'] })
       .mockReturnValueOnce(replacementImport.promise);

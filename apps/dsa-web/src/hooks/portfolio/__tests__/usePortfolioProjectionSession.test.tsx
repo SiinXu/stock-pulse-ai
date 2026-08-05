@@ -5,6 +5,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePortfolioProjectionSession } from '../usePortfolioProjectionSession';
+import { createDeferred } from '../../../test-utils';
 
 const {
   getSnapshot,
@@ -32,14 +33,6 @@ vi.mock('../../../api/portfolio', () => ({
     refreshFx,
   },
 }));
-
-function deferredPromise<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve;
-  });
-  return { promise, resolve };
-}
 
 function makeSnapshot(accountId: number) {
   return {
@@ -163,8 +156,8 @@ describe('usePortfolioProjectionSession', () => {
   });
 
   it('rejects stale scope responses and resolves stable refresh calls against the active scope', async () => {
-    const accountOneSnapshot = deferredPromise<ReturnType<typeof makeSnapshot>>();
-    const accountOneTrades = deferredPromise<ReturnType<typeof makeTradePage>>();
+    const accountOneSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
+    const accountOneTrades = createDeferred<ReturnType<typeof makeTradePage>>();
     getSnapshot.mockImplementation(({ accountId }: { accountId?: number } = {}) => (
       accountId === 1
         ? accountOneSnapshot.promise
@@ -226,8 +219,8 @@ describe('usePortfolioProjectionSession', () => {
   });
 
   it('invalidates an in-flight event response as soon as filters are applied', async () => {
-    const staleTrades = deferredPromise<ReturnType<typeof makeTradePage>>();
-    const filteredTrades = deferredPromise<ReturnType<typeof makeTradePage>>();
+    const staleTrades = createDeferred<ReturnType<typeof makeTradePage>>();
+    const filteredTrades = createDeferred<ReturnType<typeof makeTradePage>>();
     getSnapshot.mockResolvedValue(makeSnapshot(1));
     listTrades
       .mockReturnValueOnce(staleTrades.promise)
@@ -258,7 +251,7 @@ describe('usePortfolioProjectionSession', () => {
   });
 
   it('invalidates an in-flight event response as soon as ledger type changes', async () => {
-    const staleTrades = deferredPromise<ReturnType<typeof makeTradePage>>();
+    const staleTrades = createDeferred<ReturnType<typeof makeTradePage>>();
     getSnapshot.mockResolvedValue(makeSnapshot(1));
     listTrades.mockReturnValueOnce(staleTrades.promise);
     listCashLedger.mockReturnValueOnce(new Promise(() => {}));
@@ -288,8 +281,8 @@ describe('usePortfolioProjectionSession', () => {
   });
 
   it('invalidates an in-flight event response as soon as the page changes', async () => {
-    const staleTrades = deferredPromise<ReturnType<typeof makeTradePage>>();
-    const nextPageTrades = deferredPromise<ReturnType<typeof makeTradePage>>();
+    const staleTrades = createDeferred<ReturnType<typeof makeTradePage>>();
+    const nextPageTrades = createDeferred<ReturnType<typeof makeTradePage>>();
     getSnapshot.mockResolvedValue(makeSnapshot(1));
     listTrades
       .mockReturnValueOnce(staleTrades.promise)
@@ -319,7 +312,7 @@ describe('usePortfolioProjectionSession', () => {
   });
 
   it('releases loading when an FX follow-up supersedes a loading projection', async () => {
-    const fxResult = deferredPromise<{
+    const fxResult = createDeferred<{
       asOf: string;
       accountCount: number;
       refreshEnabled: boolean;
@@ -328,7 +321,7 @@ describe('usePortfolioProjectionSession', () => {
       staleCount: number;
       errorCount: number;
     }>();
-    const committedRefreshSnapshot = deferredPromise<ReturnType<typeof makeSnapshot>>();
+    const committedRefreshSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
     getSnapshot
       .mockResolvedValueOnce(makeSnapshot(1))
       .mockReturnValueOnce(committedRefreshSnapshot.promise)
@@ -384,10 +377,10 @@ describe('usePortfolioProjectionSession', () => {
   });
 
   it('rejects a later ledger response when paper refresh forces trade page one', async () => {
-    const accountsRefresh = deferredPromise<boolean>();
-    const paperSnapshot = deferredPromise<ReturnType<typeof makeSnapshot>>();
-    const laterCashPage = deferredPromise<ReturnType<typeof makeCashPage>>();
-    const correctedTradePage = deferredPromise<ReturnType<typeof makeTradePage>>();
+    const accountsRefresh = createDeferred<boolean>();
+    const paperSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
+    const laterCashPage = createDeferred<ReturnType<typeof makeCashPage>>();
+    const correctedTradePage = createDeferred<ReturnType<typeof makeTradePage>>();
     getSnapshot
       .mockResolvedValueOnce(makeSnapshot(1))
       .mockReturnValueOnce(paperSnapshot.promise);
