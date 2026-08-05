@@ -12,6 +12,22 @@ import { ApiErrorAlert, Button, Loading, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
+const SETUP_CHECK_LABEL_KEYS: Record<string, UiTextKey> = {
+  llm_primary: 'home.setupCheck.llm_primary',
+  llm_agent: 'home.setupCheck.llm_agent',
+  stock_list: 'home.setupCheck.stock_list',
+  notification: 'home.setupCheck.notification',
+  storage: 'home.setupCheck.storage',
+};
+
+function resolveSetupCheckLabel(
+  check: Pick<SetupStatusCheck, 'key' | 'title'>,
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+): string {
+  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
+  return textKey ? t(textKey) : check.title;
+}
+
 type FirstRunSetupCardProps = {
   status: SetupStatusResponse | null;
   isLoading: boolean;
@@ -89,7 +105,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
     : requiredMissing.length
       ? t('settings.setupGuideMissingSummary', {
         count: requiredMissing.length,
-        labels: requiredMissing.slice(0, 3).map((check) => check.title).join(listSeparator),
+        labels: requiredMissing.slice(0, 3).map((check) => resolveSetupCheckLabel(check, t)).join(listSeparator),
       })
       : t('settings.setupGuideReadySummary');
 
@@ -172,7 +188,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
                   {getSetupCheckIcon(check)}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{check.title}</p>
+                      <p className="text-sm font-semibold text-foreground">{resolveSetupCheckLabel(check, t)}</p>
                       <span className="rounded-full border settings-border bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-text">
                         {getSetupCheckStatusLabel(check, t)}
                       </span>

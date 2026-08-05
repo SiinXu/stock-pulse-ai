@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAgentChatStore } from '../agentChatStore';
+import { createDeferred } from '../../test-utils';
 
 vi.mock('../../api/agent', () => ({
   agentApi: {
@@ -26,16 +27,6 @@ function createStreamResponse(lines: string[]) {
       headers: { 'Content-Type': 'text/event-stream' },
     },
   );
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
 }
 
 beforeEach(() => {

@@ -824,6 +824,28 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     examples: [],
   },
+  'settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF': {
+    title: 'Acknowledge Agent Features Off',
+    summary: 'Confirms that Q&A Agent features are not needed so the Agent readiness check can settle for CLI-only setups.',
+    usage: 'Enable this when you use a local CLI backend for report generation and do not need the Q&A Agent. Turn it off when you are ready to configure a tool-capable API model for Agent.',
+    valueNotes: [
+      'Default is off: the Agent model readiness check still requires action until an API model is available or you acknowledge Agent-off.',
+      'When a tool-capable API model becomes available for Agent, this acknowledgment is superseded automatically and does not block Agent readiness.',
+      'CLI backends remain generation-only; this switch does not make CLI backends Agent-capable.',
+    ],
+    impact: [
+      'Settles the llm_agent setup check without blocking first-run completion.',
+      'Chat shows an informative empty state linking to Settings while Agent remains unavailable.',
+    ],
+    notes: [
+      'Prefer adding an API model connection when you need Q&A Agent.',
+      'See the LLM configuration guide for CLI vs Agent capability boundaries.',
+    ],
+    examples: [
+      'AGENT_FEATURES_ACKNOWLEDGED_OFF=false',
+      'AGENT_FEATURES_ACKNOWLEDGED_OFF=true',
+    ],
+  },
   'settings.agent.AGENT_MAX_STEPS': {
     title: 'Agent Max Steps',
     summary: 'Controls the maximum reasoning-step limit for the Agent.',
