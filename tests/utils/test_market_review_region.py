@@ -15,3 +15,15 @@ def test_strict_request_validation_and_ordering():
     assert normalize_market_review_region_strict("US, cn") == "cn,us"
     with pytest.raises(ValueError):
         normalize_market_review_region_strict("cn,both")
+
+
+def test_strict_invalid_region_message_includes_allowed_set():
+    from src.utils.market_review_region import MARKET_REVIEW_REGION_VALID_INPUTS
+
+    with pytest.raises(ValueError) as exc_info:
+        normalize_market_review_region_strict("mars")
+    message = str(exc_info.value)
+    for token in MARKET_REVIEW_REGION_VALID_INPUTS:
+        assert token in message
+    assert "mars" in message
+

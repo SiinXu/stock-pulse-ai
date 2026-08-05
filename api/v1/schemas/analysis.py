@@ -12,10 +12,9 @@
 
 from typing import Optional, List, Any, Dict, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from src.task_execution import TaskStatusEnum
 from src.utils.analysis_metadata import SELECTION_SOURCE_PATTERN
-from src.utils.market_review_region import normalize_market_review_region_strict
 
 
 AnalysisPhase = Literal["auto", "premarket", "intraday", "postmarket"]
@@ -122,17 +121,13 @@ class MarketReviewRequest(BaseModel):
         min_length=1,
         max_length=64,
         description=(
-            "Request-scoped market coverage for this review. Valid tokens: "
-            "cn, hk, us, jp, kr, both. When omitted, MARKET_REVIEW_REGION is used."
+            "Request-scoped market coverage for this review. Valid tokens come from "
+            "MARKET_REVIEW_REGION_VALID_INPUTS (cn, hk, us, jp, kr, both) or a "
+            "comma-separated combination of cn/hk/us/jp/kr. When omitted, "
+            "MARKET_REVIEW_REGION is used. Invalid values are rejected by the "
+            "endpoint with the allowed set in the error message/params."
         ),
     )
-
-    @field_validator("region")
-    @classmethod
-    def normalize_region(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        return normalize_market_review_region_strict(value)
 
 
 class MarketReviewAccepted(BaseModel):

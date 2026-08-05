@@ -76,6 +76,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.invalid_params.title": "Los parámetros de la solicitud son inválidos",
   "api.error.STABLE_ERROR_TEXT.invalid_password.message": "Inténtalo de nuevo después de comprobar la contraseña.",
   "api.error.STABLE_ERROR_TEXT.invalid_password.title": "Error de verificación de contraseña",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.message": "Configura un modelo principal, una conexión o una clave API en Ajustes y vuelve a intentarlo.",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.title": "No hay ningún modelo LLM configurado",
   "api.error.STABLE_ERROR_TEXT.no_channels.message": "Configura primero un canal de notificaciones en Configuración.",
   "api.error.STABLE_ERROR_TEXT.no_channels.title": "Sin canal de notificación configurado",
   "api.error.STABLE_ERROR_TEXT.not_changeable.message": "Esta fuente de contraseña no admite cambios desde la aplicación web.",
@@ -213,6 +215,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.thinking": "La IA está pensando...",
   "i18n.uiText.UI_TEXT.chat.thinkingProcess": "Razonamiento",
   "i18n.uiText.UI_TEXT.chat.thinkingStep": "Paso {step}: razonamiento",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_agent": "Modelo de Agent",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_primary": "Modelo principal",
+  "i18n.uiText.UI_TEXT.home.setupCheck.notification": "Notificaciones",
+  "i18n.uiText.UI_TEXT.home.setupCheck.stock_list": "Lista de seguimiento",
+  "i18n.uiText.UI_TEXT.home.setupCheck.storage": "Base de datos / almacenamiento local",
   "i18n.uiText.UI_TEXT.research.cancel": "Cancelar",
   "i18n.uiText.UI_TEXT.research.chatMode": "Chat",
   "i18n.uiText.UI_TEXT.research.description": "Ejecuta una investigación profunda sobre una pregunta: descompone, busca y sintetiza en hallazgos con referencias de subpreguntas. Se ejecuta de forma sincrónica, es cancelable y se conserva por sesión.",
@@ -4357,5 +4364,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Introduzca la contraseña de administrador actual antes de desactivar la autenticación",
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Introduzca la contraseña de administrador actual antes de desactivar la autenticación"
 };

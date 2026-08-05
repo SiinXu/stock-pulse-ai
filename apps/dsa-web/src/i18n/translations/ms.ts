@@ -76,6 +76,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.invalid_params.title": "Parameter permintaan tidak sah",
   "api.error.STABLE_ERROR_TEXT.invalid_password.message": "Cuba lagi selepas menyemak kata laluan.",
   "api.error.STABLE_ERROR_TEXT.invalid_password.title": "Pengesahan kata laluan gagal",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.message": "Konfigurasikan model utama, sambungan atau kunci API dalam Tetapan, kemudian cuba lagi.",
+  "api.error.STABLE_ERROR_TEXT.llm_not_configured.title": "Tiada model LLM dikonfigurasikan",
   "api.error.STABLE_ERROR_TEXT.no_channels.message": "Konfigurasikan saluran pemberitahuan dalam Tetapan terlebih dahulu.",
   "api.error.STABLE_ERROR_TEXT.no_channels.title": "Tiada saluran pemberitahuan dikonfigurasikan",
   "api.error.STABLE_ERROR_TEXT.not_changeable.message": "Sumber kata laluan ini tidak menyokong perubahan daripada apl Web.",
@@ -213,6 +215,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.thinking": "AI sedang berfikir...",
   "i18n.uiText.UI_TEXT.chat.thinkingProcess": "Penaakulan",
   "i18n.uiText.UI_TEXT.chat.thinkingStep": "Langkah {step}: penaakulan",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_agent": "Model Agent",
+  "i18n.uiText.UI_TEXT.home.setupCheck.llm_primary": "Model utama",
+  "i18n.uiText.UI_TEXT.home.setupCheck.notification": "Pemberitahuan",
+  "i18n.uiText.UI_TEXT.home.setupCheck.stock_list": "Senarai pantau",
+  "i18n.uiText.UI_TEXT.home.setupCheck.storage": "Pangkalan data / storan setempat",
   "i18n.uiText.UI_TEXT.research.cancel": "Batal",
   "i18n.uiText.UI_TEXT.research.chatMode": "Sembang",
   "i18n.uiText.UI_TEXT.research.description": "Jalankan penyelidikan mendalam bagi satu soalan — pecahkan, cari dan sintesiskan kepada penemuan dengan rujukan sub-soalan. Berjalan secara segerak, boleh dibatalkan dan disimpan mengikut sesi.",
@@ -4357,5 +4364,5 @@ export const translations: Record<UiTranslationKey, string> = {
 
   "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
 
-  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata laluan admin semasa sebelum menyahdayakan pengesahan",
+  "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata laluan admin semasa sebelum menyahdayakan pengesahan"
 };

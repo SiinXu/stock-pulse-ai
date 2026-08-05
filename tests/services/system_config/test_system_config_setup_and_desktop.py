@@ -27,6 +27,16 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(status["next_step_key"], "llm_primary")
         self.assertIn("llm_primary", status["required_missing_keys"])
         self.assertIn("stock_list", status["required_missing_keys"])
+        # Every readiness check carries a stable machine key for client localization.
+        for check in status["checks"]:
+            self.assertIsInstance(check.get("key"), str)
+            self.assertTrue(str(check["key"]).strip())
+            self.assertIn("title", check)
+            self.assertIn("message", check)
+        check_keys = {check["key"] for check in status["checks"]}
+        self.assertTrue(
+            {"llm_primary", "llm_agent", "stock_list", "notification", "storage"}.issubset(check_keys)
+        )
 
     def test_get_setup_status_marks_minimal_config_complete(self) -> None:
         self._rewrite_env(

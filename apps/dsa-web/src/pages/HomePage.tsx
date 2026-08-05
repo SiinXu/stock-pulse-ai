@@ -48,7 +48,8 @@ import type {
   ScheduledTaskOccurrenceStatus,
   ScheduledTaskTodayItem,
 } from '../types/scheduledTasks';
-import type { SetupStatusResponse } from '../types/systemConfig';
+import type { SetupStatusCheck, SetupStatusResponse } from '../types/systemConfig';
+import type { UiTextKey } from '../i18n/uiText';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { buildDeepLink } from '../utils/deepLink';
@@ -60,6 +61,25 @@ import {
 import { getUiListSeparator } from '../utils/uiLocale';
 
 export const HOME_CONFIGURABLE_STORAGE_KEY = 'dsa.home.configurable.expanded';
+
+
+const SETUP_CHECK_LABEL_KEYS: Record<string, UiTextKey> = {
+  llm_primary: 'home.setupCheck.llm_primary',
+  llm_agent: 'home.setupCheck.llm_agent',
+  stock_list: 'home.setupCheck.stock_list',
+  notification: 'home.setupCheck.notification',
+  storage: 'home.setupCheck.storage',
+};
+
+/** Map setup-status check keys to localized labels; unknown keys fall back to backend title. */
+function resolveSetupCheckLabel(
+  check: Pick<SetupStatusCheck, 'key' | 'title'>,
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+): string {
+  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
+  return textKey ? t(textKey) : check.title;
+}
+
 
 function readHomeConfigurableExpanded(): boolean {
   if (typeof window === 'undefined') return false;
@@ -320,9 +340,9 @@ const HomePage: React.FC = () => {
   const latestMarketReview = data.latestMarketReview;
   const setupMissingLabels = useMemo(() => setupStatus?.checks
     .filter((check) => check.required && check.status === 'needs_action')
-    .map((check) => check.title)
+    .map((check) => resolveSetupCheckLabel(check, t))
     .slice(0, 3)
-    .join(getUiListSeparator(language)) ?? '', [language, setupStatus]);
+    .join(getUiListSeparator(language)) ?? '', [language, setupStatus, t]);
 
   const toggleConfigurable = useCallback(() => {
     setConfigurableExpanded((expanded) => {

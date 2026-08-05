@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] First-run analysis without an LLM now returns stable `llm_not_configured` (HTTP 422 sync / task `message_code`) and Home setup banners localize readiness check keys; invalid market-review `region` errors include the allowed set.
 - [Fixed] Honored explicit loopback `--host`/`--uds` under unrecognized HTTP launchers (custom uvicorn shims, `uv run`, gunicorn-style argv) while keeping fail-closed behavior and clearer errors when the bind cannot be verified as local.
 - [Fixed] Restored external report links in the desktop app by forwarding blocked http/https navigations to the system browser.
 - [Fixed] Preserve usable AkShare Hong Kong Eastmoney realtime snapshots across failed refreshes; apply the short failure TTL only when no usable snapshot exists, then fall back to Sina.
