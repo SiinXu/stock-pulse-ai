@@ -3,6 +3,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAvailableModels } from '../useAvailableModels';
+import { createDeferred } from '../../test-utils';
 
 const { getLlmAvailableModels } = vi.hoisted(() => ({
   getLlmAvailableModels: vi.fn(),
@@ -27,16 +28,6 @@ function modelEntry(route: string) {
     providerLabel: 'OpenAI 官方',
     available: true,
   };
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, resolve, reject };
 }
 
 describe('useAvailableModels', () => {

@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BarChart3,
   FlaskConical,
+  Gauge,
   Search,
   type LucideIcon,
 } from 'lucide-react';
@@ -56,6 +57,13 @@ const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
     to: APP_ROUTE_PATHS.researchBacktest,
     icon: Activity,
   },
+  {
+    key: 'skill-outcomes',
+    titleKey: 'layout.nav.skillOutcomes',
+    descriptionKey: 'researchOverview.skillOutcomesDescription',
+    to: APP_ROUTE_PATHS.researchSkillOutcomes,
+    icon: Gauge,
+  },
 ];
 
 const ResearchOverviewPage: React.FC = () => {
@@ -82,7 +90,7 @@ const ResearchOverviewPage: React.FC = () => {
         description={t('researchOverview.description')}
       />
 
-      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {RESEARCH_DESTINATIONS.map((destination) => {
           const Icon = destination.icon;
           const title = t(destination.titleKey);

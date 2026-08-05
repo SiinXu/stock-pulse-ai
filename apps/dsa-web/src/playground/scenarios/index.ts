@@ -5,6 +5,7 @@ import { COMMON_SCENARIOS } from './commonScenarios';
 import { DECISION_REPORT_RUN_FLOW_SCENARIOS } from './decisionReportRunFlowScenarios';
 import { LAYOUT_DASHBOARD_SCENARIOS } from './layoutDashboardScenarios';
 import { SETTINGS_SCENARIOS } from './settingsScenarios';
+import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
 
@@ -13,6 +14,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...LAYOUT_DASHBOARD_SCENARIOS,
   ...ALERT_HISTORY_SCENARIOS,
   ...DECISION_REPORT_RUN_FLOW_SCENARIOS,
+  ...SKILL_OUTCOME_SCENARIOS,
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
