@@ -971,6 +971,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: '技能观点后验加权',
+    summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
+    usage: '默认关闭以保持聚合路径字节级一致。仅在完成样本记录/评估（或回填）并检查 GET /api/v1/skill-outcomes/stats 后再开启。',
+    valueNotes: [
+      '默认关闭；关闭时聚合路径与既有回测/记忆加权行为一致。',
+      '开启后每个 skill_id+horizon+engine_version 桶需独立达到 30 条 evaluated 样本；因子限制在 [1/1.2, 1.2]，不足或失败时中性 1.0。',
+    ],
+    impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
+    notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',

@@ -9,19 +9,20 @@ that immutable sample against later locally stored daily bars, and exposes
 sample-sufficiency-gated performance statistics.
 
 The first StockPulse version is deliberately offline and read-only with respect
-to market data. It never fetches or refills prices, never reads the final Agent
-decision as a substitute for an individual skill opinion, and does not alter
-runtime aggregation weights.
+to market data. It never fetches or refills prices and never reads the final Agent
+decision as a substitute for an individual skill opinion. Runtime Bayesian
+aggregation weights are available behind a separate default-off gate.
 
 ## Configuration
 
 | Key | Default | Effect |
 | --- | --- | --- |
 | `SKILL_OPINION_RECORDING_ENABLED` | `false` | When off, analysis never writes skill-opinion samples. When on, valid skill opinions are recorded after strategy aggregation when `analysis_history_id` is already bound on the agent context, and saved reports are materialized after analysis history is persisted. Aggregation weights and analysis output remain unchanged either way. |
+| `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | When off, skill aggregation is byte-identical to the prior path (including `AGENT_SKILL_AUTOWEIGHT` backtest/memory behavior). When on, the pipeline installs an outcome-aware aggregator that multiplies each skill's confidence by a conservative Bayesian factor derived only from sufficient `skill_id + horizon + engine_version` buckets. Missing, insufficient, malformed, or mismatched-version statistics fail neutral (`1.0`). |
 
-The default-off gate for Bayesian feedback belongs to the separately tracked
-weighting phase ([#714](https://github.com/SiinXu/stock-pulse-ai/issues/714))
-rather than this recording flag.
+These two gates are independent. Recording can accumulate samples without changing
+weights; weights should stay off until operators have reviewed sample-sufficient
+stats.
 
 ## Runtime wiring (V0)
 
@@ -58,7 +59,7 @@ set of outcome keys (`limit` counts keys, not samples).
 | Outcome repository and service | New outcome repository and service modules | Outcome identity and terminal-state immutability remain unchanged. |
 | Performance statistics service | New read-only performance service | Each `skill_id + horizon + engine_version` bucket keeps its own sufficiency gate. |
 | Read-only API + Web surface | Authenticated `/api/v1/skill-outcomes` (stats, samples, outcomes, explicit run) plus Research page `/research/skill-outcomes` | API merged via [#756](https://github.com/SiinXu/stock-pulse-ai/pull/756); Web surface closes the remaining half of [#713](https://github.com/SiinXu/stock-pulse-ai/issues/713). |
-| Bayesian outcome weights (`831ada53`) | Deferred to [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714) | Runtime integration requires existing Agent aggregator and config-registry changes outside this port's writable boundary. |
+| Bayesian outcome weights (`831ada53`) | Default-off `SkillOpinionWeightService` + pipeline aggregation seam ([#714](https://github.com/SiinXu/stock-pulse-ai/issues/714)) | StockPulse uses a dedicated gate (not upstream's always-on `AGENT_SKILL_AUTOWEIGHT` repurpose) so gate-off analysis stays byte-identical. |
 | Decision-profile calibration (`aa68d45d`) | Deferred to [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) | The upstream change extends existing DecisionSignal repository/service/API contracts and Web UI, which are outside this V0 scope. |
 | Reassessment persistence (`487e49e5`) | Already present on `main` | StockPulse already supports `persist_status=created/existing/refreshed`; duplicating it would create a parallel contract. |
 
@@ -130,10 +131,7 @@ temporary pending rows do not dilute permanent metadata failures.
 - V0 ships the authenticated API and the Research Web surface for buckets,
   thresholds, pending/unable counts, and explicit offline evaluation under
   `/research/skill-outcomes` ([#713](https://github.com/SiinXu/stock-pulse-ai/issues/713)).
-- Bayesian runtime weighting and decision-profile outcome calibration remain
-  default-neutral until [#714](https://github.com/SiinXu/stock-pulse-ai/issues/714)
-  and [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) land.
-
-The migration is additive. Code rollback does not remove either table, so
-collected facts remain available if the feature is reintroduced.
-
+- Bayesian runtime weighting is available behind
+  `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` (default off). Decision-profile
+  outcome calibration remains deferred to
+  [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715).
