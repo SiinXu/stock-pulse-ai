@@ -25,6 +25,7 @@ function formatBytes(value: number | null | undefined): string | null {
   return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+/** V0 status diagnostics panel for the Local Models settings surface. */
 export const KronosStatusPanel: React.FC<KronosStatusPanelProps> = ({
   disabled = false,
 }) => {
