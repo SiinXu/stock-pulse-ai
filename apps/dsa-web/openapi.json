@@ -3829,6 +3829,18 @@
             ],
             "title": "Position Recommendation"
           },
+          "resolution_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional comma-separated start-resolution markers such as legacy_analysis_date or prior_session_start",
+            "title": "Resolution Notes"
+          },
           "simulated_entry_price": {
             "anyOf": [
               {
