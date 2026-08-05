@@ -67,6 +67,8 @@ AGENT_GENERATION_BACKEND=auto
 - 本地 CLI 执行上限有硬边界：`GENERATION_BACKEND_TIMEOUT_SECONDS` 最大 `3600`，`GENERATION_BACKEND_MAX_OUTPUT_BYTES` 最大 `33554432`，`GENERATION_BACKEND_MAX_CONCURRENCY` 最大 `16`，`LOCAL_CLI_BACKEND_MAX_CONCURRENCY` 最大 `4`。诊断 stdout/stderr 与最终响应合计超过输出上限时会返回结构化 `output_too_large`；对 `--output-last-message` preset，stdout 中重复打印的最终响应不会重复计入，也不会作为 `stdout_preview` 暴露。
 - 本地 CLI 默认并发为 1；有效并发为 `min(LOCAL_CLI_BACKEND_MAX_CONCURRENCY, GENERATION_BACKEND_MAX_CONCURRENCY)`，不继承 `MAX_WORKERS`。
 - `AGENT_GENERATION_BACKEND=auto` 不会继承 `GENERATION_BACKEND` 的 local CLI 值；Agent 工具调用继续使用 LiteLLM。Web 设置页仅暴露 `auto|litellm`；手写 `AGENT_GENERATION_BACKEND=codex_cli|claude_code_cli|opencode_cli` 不实现 text-only Agent mode，会返回明确 unsupported tool-calling 诊断。
+- **CLI 能力边界（首跑向导与设置页会披露）**：本地 CLI backend 仅覆盖股票报告 / 大盘复盘等生成任务；问股 Agent 需要支持工具调用的 API 模型（LiteLLM 连接），否则 Agent 不可用。
+- **`AGENT_FEATURES_ACKNOWLEDGED_OFF`**（默认 `false`）：CLI-only 用户可确认「暂不使用问股 Agent」，使 `llm_agent` 就绪检查进入可收敛状态（`optional`，不再 `needs_action`）。一旦配置了可用的 Agent API 模型，该确认会被自动覆盖。此开关不会让 CLI backend 具备 Agent 工具调用能力。问股页在 Agent 不可用时展示引导至设置的空状态。
 - Phase 6a 建立的 DSA Tool Surface 现已由 #191 收紧为 deny-by-default 执行边界：除共享 schema、结构化错误和审计/脱敏外，还强制受支持 capability、execution-owned grant、stock scope、递归 URL outbound policy 与有界参数检查；模型输出不能自行增加 capability。stock-scoped 工具调用必须显式传入 `ToolAccessContext.stock_scope`，有 `stock_code` 参数但未声明 stock scope 的工具会 fail-closed。它不新增外部 runtime adapter、MCP server、REST API、Web UI 或 `.env` 配置，也不改变 generation backend / Agent backend 路由。Codex / Claude / OpenCode / Hermes 在完成 wire-level tool call / tool result roundtrip probe 前仍不能绕过 Tool Surface 直接拼 provider-specific tool schema，`codex_cli` / `claude_code_cli` / `opencode_cli` 仍保持 generation-only，`supports_tools=false`。
 - Web 设置页的生成后端快速检查只读取已保存的 `.env`、运行时兜底值和未保存草稿；它不会写配置、重载运行时，也不会发起真实模型请求。`available` 只表示当前配置具备尝试运行的条件。JSON 冒烟测试是单独的显式操作，会使用服务端固定的 JSON 提示词和 schema 发起一次真实的生成后端请求，用于验证提取器、JSON 契约、超时、输出限制和 usage-unavailable 语义。
 - `GET /api/v1/system/config/generation-backends/status` 只读取已保存配置；未保存草稿需调用 `POST /api/v1/system/config/generation-backends/status/preview` 或 `POST /api/v1/system/config/generation-backends/smoke-test`。被遮罩的密钥字段会继续沿用已保存值。`health_status` 与 `last_error_code/message` 只代表本次计算结果，不是历史持久健康状态。
@@ -143,7 +145,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 > **重要**：Ollama 必须使用 `OLLAMA_API_BASE` 配置，**不要**使用 `OPENAI_BASE_URL`，否则系统会错误拼接 URL（如 404、`api/generate/api/show`）。远程 Ollama 时，将 `OLLAMA_API_BASE` 设为实际地址（如 `http://192.168.1.100:11434`）。当前依赖约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 requirements.txt 一致）。
 >
-> **出站安全**：loopback 与私网地址默认拒绝。使用本地/私有 Ollama 时，还需在 `.env` 中设置精确目标，例如 `OUTBOUND_HTTP_ALLOWLIST=localhost:11434`；Hermes 同理使用 `127.0.0.1:8642`。规则与限制见 [出站 HTTP 安全策略](security-outbound-policy.md)。
+> **出站安全**：管理员配置的 loopback Ollama（`LLM_OLLAMA_BASE_URL` 指向 `127.0.0.0/8`、`::1` 或 `localhost`）默认允许，无需手写 `OUTBOUND_HTTP_ALLOWLIST`；非 loopback 目标仍需精确 allowlist。Hermes 仍建议显式 allowlist（例如 `127.0.0.1:8642`）。规则与限制见 [出站 HTTP 安全策略](security-outbound-policy.md)。
 
 #### 设置页本地模型中心（推荐且唯一下载入口）
 

@@ -9,6 +9,7 @@ import {
 } from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import BacktestPage from '../BacktestPage';
+import { createDeferred, chooseOption } from '../../test-utils';
 
 vi.mock('../../hooks/useStockIndex', () => ({
   useStockIndex: () => ({
@@ -36,15 +37,6 @@ if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
 
-function chooseOption(trigger: HTMLElement, value: string) {
-  fireEvent.click(trigger);
-  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
-  const option = within(listbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
-}
-
 function chooseVisibleDate(label: string): string {
   fireEvent.click(screen.getByRole('textbox', { name: label }));
   const dialog = screen.getByRole('dialog', { name: label });
@@ -52,14 +44,6 @@ function chooseVisibleDate(label: string): string {
   const value = day.dataset.date!;
   fireEvent.click(day);
   return value;
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
-    resolve = next;
-  });
-  return { promise, resolve };
 }
 
 const {

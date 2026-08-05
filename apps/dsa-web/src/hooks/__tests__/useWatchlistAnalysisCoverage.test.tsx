@@ -3,20 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../api/history';
 import type { HistoryListResponse, StockBarItem } from '../../types/analysis';
 import { useWatchlistAnalysisCoverage } from '../useWatchlistAnalysisCoverage';
+import { createDeferred } from '../../test-utils';
 
 vi.mock('../../api/history', () => ({
   historyApi: {
     getList: vi.fn(),
   },
 }));
-
-function deferredPromise<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve;
-  });
-  return { promise, resolve };
-}
 
 function historyResponse(createdAt: string): HistoryListResponse {
   return {
@@ -51,7 +44,7 @@ describe('useWatchlistAnalysisCoverage', () => {
   });
 
   it('blocks a repeated missing-symbol signature until its new fallback lookup settles', async () => {
-    const repeatedLookup = deferredPromise<HistoryListResponse>();
+    const repeatedLookup = createDeferred<HistoryListResponse>();
     const watchlistCodes = ['AAPL'];
     vi.mocked(historyApi.getList)
       .mockResolvedValueOnce(historyResponse('2020-01-01T00:00:00Z'))

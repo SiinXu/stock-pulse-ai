@@ -867,6 +867,28 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     examples: [],
   },
+  'settings.agent.AGENT_FEATURES_ACKNOWLEDGED_OFF': {
+    title: '确认暂不使用 Agent 功能',
+    summary: '确认当前不需要问股 Agent，以便 CLI-only 场景下 Agent 就绪检查可以收敛。',
+    usage: '当你用本机 CLI 后端做报告生成且暂不需要问股 Agent 时开启。准备好配置支持工具调用的 API 模型后再关闭。',
+    valueNotes: [
+      '默认关闭：在配置 API 模型或确认暂不使用 Agent 之前，Agent 模型就绪检查仍会提示需要处理。',
+      '一旦 Agent 已有可用的工具调用 API 模型，该确认会被自动覆盖，不再阻止 Agent 就绪。',
+      'CLI 后端仍只支持生成；此开关不会让 CLI 具备 Agent 工具调用能力。',
+    ],
+    impact: [
+      '使 llm_agent 就绪检查进入可收敛状态，不再阻塞首次配置完成。',
+      'Agent 不可用时，问股页展示引导至设置的空状态，而不是失败体验。',
+    ],
+    notes: [
+      '需要问股 Agent 时，请优先添加 API 模型连接。',
+      'CLI 与 Agent 能力边界详见 LLM 配置指南。',
+    ],
+    examples: [
+      'AGENT_FEATURES_ACKNOWLEDGED_OFF=false',
+      'AGENT_FEATURES_ACKNOWLEDGED_OFF=true',
+    ],
+  },
   'settings.agent.AGENT_MAX_STEPS': {
     title: 'Agent 最大推理步数',
     summary: '控制 Agent 推理链路的最大步数上限。',

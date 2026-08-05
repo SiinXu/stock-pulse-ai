@@ -39,6 +39,7 @@ import type {
 import type { StockIndexItem } from '../../types/stockIndex';
 import { buildDeepLink } from '../../utils/deepLink';
 import DecisionSignalsPage from '../DecisionSignalsPage';
+import { createDeferred, chooseOption } from '../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -52,14 +53,6 @@ function openSelectListbox(trigger: HTMLElement) {
 
 function closeSelectListbox(trigger: HTMLElement) {
   fireEvent.click(trigger);
-}
-
-function chooseOption(trigger: HTMLElement, value: string) {
-  const optionListbox = openSelectListbox(trigger);
-  const option = within(optionListbox)
-    .getAllByRole('option')
-    .find((item) => item.getAttribute('data-value') === value)!;
-  fireEvent.click(option);
 }
 
 let stockIndexState: {
@@ -419,14 +412,6 @@ function renderPage(navigationFixture?: React.ReactNode) {
   );
 }
 
-function deferredPromise<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
-
 function openStockContextModal() {
   const openModal = screen.queryAllByRole('dialog').find((dialog) => (
     within(dialog).queryByLabelText('当前股票')
@@ -664,7 +649,7 @@ describe('DecisionSignalsPage', () => {
 
   it('caps overlapping signal-list generations at six requests', async () => {
     watchlistCodes = Array.from({ length: 12 }, (_, index) => `WATCH-${index + 1}`);
-    const pendingStockRequests = deferredPromise<void>();
+    const pendingStockRequests = createDeferred<void>();
     let activeRequests = 0;
     let peakRequests = 0;
     vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => {
@@ -749,7 +734,7 @@ describe('DecisionSignalsPage', () => {
 
   it('ignores a stale partial watchlist error after switching to All', async () => {
     watchlistCodes = ['OLD', 'NEW'];
-    const oldWatchlistResponse = deferredPromise<DecisionSignalListResponse>();
+    const oldWatchlistResponse = createDeferred<DecisionSignalListResponse>();
     vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => {
       if (params?.stockCode === 'OLD') throw new Error('stale watchlist failure');
       if (params?.stockCode === 'NEW') return oldWatchlistResponse.promise;
@@ -1535,7 +1520,7 @@ describe('DecisionSignalsPage', () => {
       stockName: '平安银行',
       sourceReportId: 3002,
     });
-    const pending = deferredPromise<DecisionSignalReassessResponse>();
+    const pending = createDeferred<DecisionSignalReassessResponse>();
     vi.mocked(decisionSignalsApi.list).mockResolvedValueOnce(listResponse([signal, nextSignal], 2));
     vi.mocked(decisionSignalsApi.reassess).mockReturnValueOnce(pending.promise);
 
@@ -1843,7 +1828,7 @@ describe('DecisionSignalsPage', () => {
   });
 
   it('ignores stale latest-search responses', async () => {
-    const firstSearch = deferredPromise<DecisionSignalListResponse>();
+    const firstSearch = createDeferred<DecisionSignalListResponse>();
     const secondSignal = {
       ...signal,
       id: 8,
@@ -2291,7 +2276,7 @@ describe('DecisionSignalsPage', () => {
   });
 
   it('ignores stale feedback submit responses after selecting another signal', async () => {
-    const feedbackSave = deferredPromise<DecisionSignalFeedbackItem>();
+    const feedbackSave = createDeferred<DecisionSignalFeedbackItem>();
     const nextSignal = makeSignal({
       id: 8,
       stockCode: 'AAPL',
@@ -2458,7 +2443,7 @@ describe('DecisionSignalsPage', () => {
   });
 
   it('ignores duplicate status confirmation clicks and disables confirmation controls', async () => {
-    const statusUpdate = deferredPromise<DecisionSignalItem>();
+    const statusUpdate = createDeferred<DecisionSignalItem>();
     vi.mocked(decisionSignalsApi.updateStatus).mockReturnValueOnce(statusUpdate.promise);
     renderPage();
 

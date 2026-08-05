@@ -75,7 +75,9 @@ def _actionable_request_error(exc: BaseException) -> ModelPackError:
             "ollama_access_blocked",
             (
                 "StockPulse cannot reach the configured Ollama server under the outbound "
-                "security policy. Add its exact host and port to OUTBOUND_HTTP_ALLOWLIST, "
+                "security policy. Loopback addresses (127.0.0.0/8, ::1, localhost) are "
+                "allowed for the admin-configured LLM_OLLAMA_BASE_URL by default. For a "
+                "non-loopback host, add its exact host and port to OUTBOUND_HTTP_ALLOWLIST, "
                 "then try again."
             ),
         )
@@ -114,6 +116,7 @@ class OllamaHttpModelPackExecutor:
         kwargs.setdefault("allow_redirects", False)
         kwargs.setdefault("max_response_bytes", MAX_OLLAMA_RESPONSE_BYTES)
         kwargs.setdefault("timeout", self._timeout_seconds)
+        kwargs.setdefault("allow_admin_loopback", True)
         try:
             return self._requester(method, url, **kwargs)
         except ModelPackError:

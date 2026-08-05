@@ -4,6 +4,8 @@ StockPulse applies one fail-closed policy to HTTP targets that can be selected b
 
 The policy is enabled without configuration. A default installation can reach public HTTP(S) services, while loopback and other non-public destinations are denied.
 
+**Narrow admin-loopback exception (Ollama path only):** server-owned `LLM_OLLAMA_BASE_URL` on pure loopback (`127.0.0.0/8`, `::1`, `localhost` / `*.localhost`) opts into `allow_admin_loopback`. Non-loopback private Ollama, `.local`, metadata, and redirects off-loopback stay fail-closed.
+
 ## Default Policy
 
 | Control | Default behavior |

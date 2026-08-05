@@ -960,6 +960,52 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertIn("未检测到可用模型配置", checks["llm_agent"]["message"])
         self.assertNotIn("需要 LiteLLM backend", checks["llm_agent"]["message"])
 
+    def test_get_setup_status_cli_only_acknowledged_off_settles_agent_check(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=codex_cli",
+            "GENERATION_FALLBACK_BACKEND=",
+            "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+            "STOCK_LIST=600519",
+        )
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("src.services.system_config_service.shutil.which", return_value="/usr/bin/codex"):
+            status = self.service.get_setup_status()
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertEqual(checks["llm_agent"]["status"], "optional")
+        self.assertIn("已确认暂不使用问股 Agent", checks["llm_agent"]["message"])
+        self.assertNotIn("llm_agent", status["required_missing_keys"])
+
+    def test_get_setup_status_acknowledged_off_superseded_when_api_model_available(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=codex_cli",
+            "GENERATION_FALLBACK_BACKEND=",
+            "AGENT_FEATURES_ACKNOWLEDGED_OFF=true",
+            "LITELLM_MODEL=openai/gpt-5.5",
+            "OPENAI_API_KEY=secret-key-value",
+            "STOCK_LIST=600519",
+        )
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("src.services.system_config_service.shutil.which", return_value="/usr/bin/codex"):
+            status = self.service.get_setup_status()
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertIn("Agent 工具调用仍使用主要模型", checks["llm_agent"]["message"])
+        self.assertNotIn("已确认暂不使用问股 Agent", checks["llm_agent"]["message"])
+
+    def test_get_setup_status_api_only_agent_inherits_without_ack(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "LITELLM_MODEL=openai/gpt-5.5",
+            "OPENAI_API_KEY=secret-key-value",
+            "STOCK_LIST=600519",
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            status = self.service.get_setup_status()
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertEqual(checks["llm_agent"]["status"], "inherited")
+        self.assertNotIn("llm_agent", status["required_missing_keys"])
+
+
     def test_get_setup_status_accepts_anspire_one_key_llm(self) -> None:
         self._rewrite_env(
             "ANSPIRE_API_KEYS=sk-anspire-test-value",
