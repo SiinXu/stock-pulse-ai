@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""First-run failure UX: stable llm_not_configured and setup/region guidance."""
+"""First-run failure UX: stable llm_not_configured and setup/region guidance.
+
+CI re-request marker for inventory refresh follow-up.
+"""
 
 from __future__ import annotations
 
