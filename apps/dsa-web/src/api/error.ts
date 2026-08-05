@@ -230,6 +230,11 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '分析失败', message: '分析未能完成，请检查配置后重试。' },
     en: { title: 'Analysis failed', message: 'The analysis could not finish. Check the configuration and try again.' },
   }),
+  api_response_validation_failed: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.api_response_validation_failed", {
+    category: 'unknown',
+    zh: { title: '响应校验失败', message: '接口响应未通过校验（{label}）。{issues}' },
+    en: { title: 'Response validation failed', message: 'API response failed validation ({label}). {issues}' },
+  }),
 };
 
 const EN_ERROR_TEXT: Record<ApiErrorCategory, { title: string; message: string }> = {

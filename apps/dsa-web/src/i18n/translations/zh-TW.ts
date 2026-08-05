@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift 無法使用",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "分析未能完成，請檢查配置後重試。",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "分析失敗",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "介面回應未通過校驗（{label}）。{issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "回應校驗失敗",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "當前服務尚未啟用密碼登入。",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "密碼登入未啟用",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "伺服器配置已更新，請重新整理後重新應用本次修改。",

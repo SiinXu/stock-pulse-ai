@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift를 사용할 수 없습니다",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "분석이 완료되지 않았으니, 구성을 확인하고 다시 시도해 주세요.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "분석 실패",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "API 응답 검증에 실패했습니다({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "응답 검증 실패",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "이 서비스에서는 비밀번호 로그인이 활성화되어 있지 않습니다.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "비밀번호 로그인이 활성화되지 않음",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "서버 구성이 바뀌었어요. 새로고침하고 변경 사항을 다시 적용하세요.",

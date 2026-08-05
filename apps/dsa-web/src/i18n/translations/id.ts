@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift tidak tersedia",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "Analisis belum selesai; silakan periksa konfigurasi dan coba lagi.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "Analisis gagal",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "Respons API gagal validasi ({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "Validasi respons gagal",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "Login kata sandi tidak diaktifkan untuk layanan ini.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "Login kata sandi tidak diaktifkan",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "Konfigurasi server berubah. Segarkan dan terapkan perubahan Anda lagi.",
@@ -4329,33 +4331,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Pohon keputusan dapat berisi paling banyak {limit} node.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Sebuah kerangka kerja dapat berisi paling banyak {limit} aturan risiko.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Kerangka kerja dapat berisi paling banyak {limit} kriteria pelacakan.",
-  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "Semua pasar",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "Saham A",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Ditentukan server saat dikirim",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Pilih satu atau lebih pasar untuk ulasan ini.",
 
   "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Jepang",
 
   "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Hanya berlaku untuk eksekusi ini dan tidak mengubah pengaturan global.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Pilih pasar untuk ulasan pasar",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Default server",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Pasar untuk ulasan ini",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "AS",
 
-  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; pasar efektif: {region}",
 
-  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Status tugas: {status} ({progress}); pasar efektif: {region}",
 
   "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Masukkan kata sandi admin saat ini sebelum menonaktifkan autentikasi",
 };

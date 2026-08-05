@@ -50,6 +50,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title": "AlphaSift no está disponible",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.message": "El análisis no se completó; por favor, compruebe la configuración e inténtelo de nuevo.",
   "api.error.STABLE_ERROR_TEXT.analysis_failed.title": "Análisis fallido",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message": "La respuesta de la API no superó la validación ({label}). {issues}",
+  "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title": "Error de validación de la respuesta",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.message": "El inicio de sesión con contraseña no está habilitado para este servicio.",
   "api.error.STABLE_ERROR_TEXT.auth_disabled.title": "Inicio de sesión con contraseña no habilitado",
   "api.error.STABLE_ERROR_TEXT.config_conflict.message": "La configuración del servidor cambió. Actualiza y aplica tus cambios de nuevo.",
@@ -4329,33 +4331,33 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyNodes": "Un árbol de decisión puede contener como máximo {limit} nodos.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyRiskRules": "Un marco puede contener como máximo {limit} reglas de riesgo.",
   "i18n.uiText.UI_TEXT.settings.frameworkValidationTooManyTrackingCriteria": "Un marco puede contener como máximo {limit} criterios de seguimiento.",
-  "i18n.uiText.UI_TEXT.home.marketRegionAll": "All markets",
+  "i18n.uiText.UI_TEXT.home.marketRegionAll": "Todos los mercados",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionCn": "A-shares",
+  "i18n.uiText.UI_TEXT.home.marketRegionCn": "Acciones A",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Resolved by the server when submitted",
+  "i18n.uiText.UI_TEXT.home.marketRegionDefaultUnavailable": "Lo resuelve el servidor al enviar",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Choose one or more markets for this review run.",
+  "i18n.uiText.UI_TEXT.home.marketRegionDescription": "Elija uno o más mercados para esta revisión.",
 
   "i18n.uiText.UI_TEXT.home.marketRegionHk": "Hong Kong",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japan",
+  "i18n.uiText.UI_TEXT.home.marketRegionJp": "Japón",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Korea",
+  "i18n.uiText.UI_TEXT.home.marketRegionKr": "Corea",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Applies only to this run and does not change global settings.",
+  "i18n.uiText.UI_TEXT.home.marketRegionOneTimeHint": "Solo afecta a esta ejecución y no cambia la configuración global.",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Select market review regions",
+  "i18n.uiText.UI_TEXT.home.marketRegionSelector": "Seleccionar mercados de la revisión",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Server default",
+  "i18n.uiText.UI_TEXT.home.marketRegionServerDefault": "Predeterminado del servidor",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Markets for this review",
+  "i18n.uiText.UI_TEXT.home.marketRegionTitle": "Mercados de esta revisión",
 
-  "i18n.uiText.UI_TEXT.home.marketRegionUs": "US",
+  "i18n.uiText.UI_TEXT.home.marketRegionUs": "EE. UU.",
 
-  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.marketReviewSubmittedWithRegion": "{message}; mercado efectivo: {region}",
 
-  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Task status: {status} ({progress}); effective region: {region}",
+  "i18n.uiText.UI_TEXT.home.taskStatusWithRegion": "Estado de la tarea: {status} ({progress}); mercado efectivo: {region}",
 
   "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword": "Introduzca la contraseña de administrador actual antes de desactivar la autenticación",
 };
