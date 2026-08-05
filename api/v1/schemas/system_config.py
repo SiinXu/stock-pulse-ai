@@ -237,6 +237,7 @@ class SystemConfigFieldSchema(BaseModel):
             "model_access",
             "task_routing",
             "developer_diagnostics",
+            "local_models",
             "hidden_legacy",
         ]
     ] = Field(

@@ -9586,7 +9586,7 @@ export interface components {
              * Ui Placement
              * @description Dedicated settings surface that owns this field; null means generic rendering
              */
-            ui_placement?: ("model_access" | "task_routing" | "developer_diagnostics" | "hidden_legacy") | null;
+            ui_placement?: ("model_access" | "task_routing" | "developer_diagnostics" | "local_models" | "hidden_legacy") | null;
             /**
              * Unit
              * @description Short unit label displayed next to the field value
