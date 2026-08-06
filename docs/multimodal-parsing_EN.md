@@ -86,3 +86,7 @@ including the full prompt in the PR description (same house rule as
 3. Restart the process so the tool registry cache rebuilds without the tools
 
 No database migration is involved.
+
+## CI note
+
+Phase 1 landings must keep the config-access and broad-exception ratchets green.
