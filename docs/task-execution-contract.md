@@ -208,8 +208,9 @@ The bounded, connectivity-free `SystemConfigService.update()` and the task's
 `completed` transition then share the queue's final-result commit boundary, so a
 cancelled or interrupted pull cannot leave an activation side effect behind.
 
-This task does not add HTTP cancel/retry routes, an external broker, cross-process
-task sharing, or durable recovery after an ungraceful process loss.
+This contract does not add HTTP cancel/retry routes, an external broker, or
+cross-process task sharing. Restart recovery (below) is deliberately narrower
+than a distributed queue.
 
 ## Single-Process Authority
 
@@ -223,8 +224,32 @@ Because the authority is process-local, `interrupted` is the recovery verdict fo
 work fenced by a graceful shutdown: every non-terminal task transitions to the
 terminal `interrupted` state, and first-terminal-wins means a worker result that
 lands after the interrupt (a late `completed`/`failed`) is rejected instead of
-resurrecting the task. There is no cross-process or durable recovery; an
-`interrupted` task stays terminal.
+resurrecting the task. An `interrupted` task stays terminal.
+
+## Restart Recovery (Process-Local Checkpoints)
+
+Ungraceful process loss used to drop in-memory tasks without an operator-visible
+terminal state. The queue now writes best-effort SQLite checkpoints for
+non-terminal tasks and reconciles them once at process start:
+
+| Kind / situation | Decision | Outcome |
+| --- | --- | --- |
+| `stock_analysis` pending/processing | Safe to requeue (idempotent analysis rebuild from metadata) | Same `task_id` re-admitted with `message_code=task.recovered.requeued` |
+| `stock_analysis` cancel_requested | Not safely resumable | Terminal `interrupted` with `task.interrupted.process_restart` |
+| Background / market review / screening / local model pull / model pack import / other kinds | Not safe to requeue (callable or side-effect identity is not rebuildable) | Terminal `interrupted` with `task.interrupted.process_restart` |
+| Completed / failed / cancelled / interrupted | No checkpoint retained | Unchanged; never resurrected or fake-completed |
+
+Persistence points (smallest crash-consistency set):
+
+1. After successful stage → `pending` checkpoint
+2. After worker claim → `processing` checkpoint
+3. After cancel request → `cancel_requested` checkpoint
+4. On terminal transition or rollback → delete checkpoint
+
+Recovery runs before scheduled-task reconciliation so ADR-008 occurrence fences
+observe restored execution ids instead of classifying them as
+`scheduled_task_execution_state_lost`. This is still one process-local authority:
+checkpoints are not leases, not multi-worker coordination, and not a broker.
 
 ## Bot Semantics
 
