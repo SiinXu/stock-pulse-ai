@@ -318,7 +318,8 @@ jobs:
             local label="$2"
             echo "=== launch attempt (${label}): ${binary} --version (30s timeout) ==="
             set +e
-            launch_out="$(run_with_timeout 30 env ELECTRON_ENABLE_LOGGING=0 "${binary}" --version)"
+            # ELECTRON_RUN_AS_NODE runs as Node and exits; avoids starting main.js GUI lifecycle.
+            launch_out="$(run_with_timeout 30 env ELECTRON_RUN_AS_NODE=1 ELECTRON_ENABLE_LOGGING=0 "${binary}" -e 'console.log(process.versions.electron || process.version)')"
             launch_rc=$?
             set -e
             printf '%s\n' "${launch_out}"
@@ -399,9 +400,9 @@ jobs:
           test -x "$mounted_bin"
           echo "=== DMG-mounted codesign -dv ==="
           codesign -dv --verbose=4 "$app_bundle" 2>&1 || true
-          echo "=== DMG-mounted --version (30s timeout) ==="
+          echo "=== DMG-mounted Electron runtime probe (30s timeout) ==="
           (
-            "$mounted_bin" --version
+            env ELECTRON_RUN_AS_NODE=1 "$mounted_bin" -e 'console.log(process.versions.electron || process.version)'
           ) &
           _pid=$!
           (
