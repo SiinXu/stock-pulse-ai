@@ -1,13 +1,12 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker, useNavigate, useSearchParams } from 'react-router-dom';
+import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
-  buildAnalysisWorkbenchHref,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
@@ -45,7 +44,6 @@ import {
   SettingsSectionCard,
   SettingsErrorSummary,
   type ErrorSummaryEntry,
-  FirstRunWizard,
   type WizardDraftItem,
   type WizardCompleteResult,
   type ModelReferenceReplacement,
@@ -77,6 +75,7 @@ import {
 } from '../components/settings/settingsGenerationDraftModel';
 import SettingsConflictPanel from '../components/settings/SettingsConflictPanel';
 import SettingsActiveConfigPanel from '../components/settings/SettingsActiveConfigPanel';
+import { SettingsOnboardingHosts } from '../components/onboarding/SettingsOnboardingHosts';
 import {
   SETTINGS_SECTIONS,
   getDefaultView,
@@ -149,7 +148,6 @@ function parseSetupStockList(value: unknown) {
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
-  const navigate = useNavigate();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -158,6 +156,7 @@ const SettingsPage: React.FC = () => {
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(false);
   const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
   const { beginnerMode, setBeginnerMode } = useBeginnerMode();
   // Advanced sections stay hidden until the user reveals them; re-hiding on
@@ -1992,37 +1991,27 @@ const SettingsPage: React.FC = () => {
           leaveBlocker.reset?.();
         }}
       />
-      {isWizardOpen ? (
-        <FirstRunWizard
-          onComplete={handleWizardComplete}
-          onClose={() => setIsWizardOpen(false)}
-          isSaving={isSaving}
-          language={uiLanguage}
-          existingChannelNames={existingChannelNames}
-          providers={providerCatalog}
-          connectionFields={providerConnectionFields}
-          emptyApiKeyHosts={providerEmptyApiKeyHosts}
-          routingOptions={modelSelectorOptions}
-          initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '')
-            .split(',')
-            .map((entry) => resolveConfiguredModelRef(entry))
-            .filter(Boolean)
-            .join(',')}
-          initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
-          onViewRouting={() => {
-            setIsWizardOpen(false);
-            selectSectionView('ai_models', 'task_routing');
-          }}
-          onLocalModelConfigurationChanged={async () => {
-            await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
-            applyPostSaveEffects();
-          }}
-          onStartFirstAnalysis={() => {
-            setIsWizardOpen(false);
-            navigate(buildAnalysisWorkbenchHref());
-          }}
-        />
-      ) : null}
+      <SettingsOnboardingHosts
+        isWizardOpen={isWizardOpen}
+        isAgentOnboardingOpen={isAgentOnboardingOpen}
+        setIsWizardOpen={setIsWizardOpen}
+        setIsAgentOnboardingOpen={setIsAgentOnboardingOpen}
+        handleWizardComplete={handleWizardComplete}
+        isSaving={isSaving}
+        uiLanguage={uiLanguage}
+        existingChannelNames={existingChannelNames}
+        providerCatalog={providerCatalog}
+        providerConnectionFields={providerConnectionFields}
+        providerEmptyApiKeyHosts={providerEmptyApiKeyHosts}
+        modelSelectorOptions={modelSelectorOptions}
+        initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '').split(',').map((entry) => resolveConfiguredModelRef(entry)).filter(Boolean).join(',')}
+        initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
+        onViewRouting={() => { setIsWizardOpen(false); selectSectionView('ai_models', 'task_routing'); }}
+        onLocalModelConfigurationChanged={async () => { await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS); applyPostSaveEffects(); }}
+        onAgentApplied={() => { void refreshAfterExternalSave([]); applyPostSaveEffects(); }}
+        setupStatus={setupStatus}
+        t={t}
+      />
     </AppPage>
   );
 };

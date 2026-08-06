@@ -91,6 +91,8 @@ interface FirstRunWizardProps {
   onLocalModelConfigurationChanged?: () => void | Promise<void>;
   /** Leaves setup for the canonical first-analysis workspace. */
   onStartFirstAnalysis?: () => void;
+  /** Opens agent-guided onboarding (profile → plan → apply) after first-run save. */
+  onContinueAgentOnboarding?: () => void;
 }
 
 type WizardMode = 'cloud' | 'local_model' | 'cli';
@@ -149,6 +151,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   onViewRouting,
   onLocalModelConfigurationChanged,
   onStartFirstAnalysis,
+  onContinueAgentOnboarding,
 }) => {
   const text = SETTINGS_WIZARD_TEXT[language];
   const [step, setStep] = useState<StepId>('mode');
@@ -785,6 +788,17 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             {savedSummary.mode === 'cloud' && onViewRouting ? (
               <Button type="button" variant="secondary" size="default" onClick={onViewRouting}>
                 {text.viewRouting}
+              </Button>
+            ) : null}
+            {onContinueAgentOnboarding ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="default"
+                data-testid="wizard-continue-agent-onboarding"
+                onClick={onContinueAgentOnboarding}
+              >
+                {text.continueAgentOnboarding}
               </Button>
             ) : null}
             <Button

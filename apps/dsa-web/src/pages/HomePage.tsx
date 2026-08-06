@@ -13,7 +13,6 @@ import {
   PlayCircle,
   RefreshCw,
   ShieldAlert,
-  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { alertsApi } from '../api/alerts';
@@ -32,6 +31,7 @@ import {
   StatePanel,
   WorkspacePage,
 } from '../components/common';
+import { HomeOnboardingSection } from '../components/onboarding/HomeOnboardingSection';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -357,6 +357,11 @@ const HomePage: React.FC = () => {
     dismissOnboarding();
     setOnboardingDismissed(true);
   }, []);
+  const refreshSetupStatus = useCallback(() => {
+    void systemConfigApi.getSetupStatus()
+      .then((status) => setSetupStatus(status))
+      .catch(() => setSetupStatus(null));
+  }, []);
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
     void loadAttentionData();
@@ -400,39 +405,15 @@ const HomePage: React.FC = () => {
         )}
       />
 
-      {setupStatus && !setupStatus.isComplete && !onboardingDismissed ? (
-        <InlineAlert
-          variant="warning"
-          size="compact"
-          title={t('home.setupIncomplete')}
-          message={setupMissingLabels
-            ? t('home.setupMissingWithLabels', { labels: setupMissingLabels })
-            : t('home.setupMissingGeneric')}
-          action={(
-            <div className="flex items-center gap-1">
-              <Button
-                variant="secondary"
-                size="default"
-                onClick={() => navigate(buildSettingsHref({
-                  section: 'overview',
-                  view: 'readiness',
-                  source: 'onboarding',
-                }))}
-              >
-                {t('home.startGuidedSetup')}
-              </Button>
-              <IconButton
-                variant="ghost"
-                size="default"
-                aria-label={t('common.close')}
-                onClick={handleDismissOnboarding}
-              >
-                <X aria-hidden="true" />
-              </IconButton>
-            </div>
-          )}
-        />
-      ) : null}
+      <HomeOnboardingSection
+        setupStatus={setupStatus}
+        setupMissingLabels={setupMissingLabels}
+        onboardingDismissed={onboardingDismissed}
+        onDismissOnboarding={handleDismissOnboarding}
+        onSetupRefresh={refreshSetupStatus}
+        reportLanguage={language === 'zh' ? 'zh' : 'en'}
+        t={t}
+      />
 
       {failedSourceCount > 0 ? (
         <InlineAlert
