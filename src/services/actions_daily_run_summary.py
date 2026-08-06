@@ -42,7 +42,7 @@ from src.services.actions_outcome_codes import (
     has_any_llm_secret,
     has_watchlist_configured,
 )
-from src.utils.sanitize import redact_sensitive_text
+from src.utils.sanitize import log_safe_exception, redact_sensitive_text
 
 logger = logging.getLogger(__name__)
 
@@ -213,10 +213,13 @@ def write_run_status(
         )
         return target
     except Exception as exc:  # broad-exception: fallback_recorded - status write must not fail analysis
-        logger.warning(
-            "Failed to write Actions run status to %s: %s",
-            target,
-            sanitize_summary_text(exc, max_length=160),
+        log_safe_exception(
+            logger,
+            "Failed to write Actions run status",
+            exc,
+            error_code="actions_run_status_write_failed",
+            level=logging.WARNING,
+            context={"path": str(target)},
         )
         return None
 
@@ -269,10 +272,13 @@ def load_run_status(path: Optional[Path] = None) -> Optional[RunStatusDocument]:
             extra=dict(extra),
         )
     except Exception as exc:  # broad-exception: fallback_recorded - corrupt status falls back to heuristics
-        logger.warning(
-            "Failed to load Actions run status from %s: %s",
-            target,
-            sanitize_summary_text(exc, max_length=160),
+        log_safe_exception(
+            logger,
+            "Failed to load Actions run status",
+            exc,
+            error_code="actions_run_status_load_failed",
+            level=logging.WARNING,
+            context={"path": str(target)},
         )
         return None
 
@@ -584,9 +590,12 @@ def append_github_step_summary(markdown: str, *, summary_path: Optional[Path] = 
                 handle.write("\n")
         return True
     except Exception as exc:  # broad-exception: fallback_recorded - step summary must not fail the job
-        logger.warning(
-            "Failed to write GitHub Step Summary: %s",
-            sanitize_summary_text(exc, max_length=160),
+        log_safe_exception(
+            logger,
+            "Failed to write GitHub Step Summary",
+            exc,
+            error_code="actions_step_summary_write_failed",
+            level=logging.WARNING,
         )
         try:
             print(markdown)
@@ -646,14 +655,17 @@ def maybe_send_failure_notification(
             "reason": "sent" if ok else "dispatch_failed",
         }
     except Exception as exc:  # broad-exception: fallback_recorded - notify must never fail the run
-        logger.warning(
-            "Failure notification degraded: %s",
-            sanitize_summary_text(exc, max_length=160),
+        log_safe_exception(
+            logger,
+            "Failure notification degraded",
+            exc,
+            error_code="actions_failure_notify_degraded",
+            level=logging.WARNING,
         )
         return {
             "attempted": True,
             "sent": False,
-            "reason": f"exception:{sanitize_summary_text(exc, max_length=80)}",
+            "reason": "exception",
         }
 
 
