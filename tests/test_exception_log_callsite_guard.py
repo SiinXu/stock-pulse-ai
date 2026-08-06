@@ -294,9 +294,10 @@ _IMPORTED_RECEIVER_DECORATORS = {
     "contextmanager": {"contextlib"},
     "override": {"typing", "typing_extensions"},
     "property": {"builtins"},
+    "provider_retry": {"data_provider.retry_policy"},
     "retry": {"tenacity"},
 }
-_CALLED_RECEIVER_DECORATORS = {"retry"}
+_CALLED_RECEIVER_DECORATORS = {"provider_retry", "retry"}
 
 
 def _decorator_bindings(scope: ast.AST, name: str) -> list[str | None]:

@@ -21,14 +21,8 @@ from contextlib import contextmanager
 from typing import Optional, Generator, List, Tuple
 
 import pandas as pd
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
 
-from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
+from src.utils.sanitize import log_safe_exception
 
 from .base import (
     BaseFetcher,
@@ -39,11 +33,20 @@ from .base import (
     normalize_stock_code,
     _is_hk_market,
 )
+from data_provider.retry_policy import (
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    DEFAULT_RETRYABLE_EXCEPTIONS,
+    call_with_timeout,
+    provider_retry,
+)
 import os
 
 logger = logging.getLogger(__name__)
 
 _PYTDX_CONNECTION_COOLDOWN_SECONDS = 15.0
+# Per-host connect deadline stays explicit and shorter than the overall request
+# timeout (intentional deviation from DEFAULT_REQUEST_TIMEOUT_SECONDS).
+_PYTDX_CONNECT_TIMEOUT_SECONDS = 5
 
 
 def _parse_hosts_from_env() -> Optional[List[Tuple[str, int]]]:
@@ -132,7 +135,11 @@ class PytdxFetcher(BaseFetcher):
     # Pytdx get_security_list returns at most 1000 items per page
     SECURITY_LIST_PAGE_SIZE = 1000
     
-    def __init__(self, hosts: Optional[List[Tuple[str, int]]] = None):
+    def __init__(
+        self,
+        hosts: Optional[List[Tuple[str, int]]] = None,
+        request_timeout_seconds: Optional[float] = None,
+    ):
         """
         初始化 PytdxFetcher
 
@@ -140,6 +147,10 @@ class PytdxFetcher(BaseFetcher):
             hosts: 服务器列表 [(host, port), ...]。若未传入，优先使用环境变量
                    PYTDX_SERVERS（ip:port,ip:port）或 PYTDX_HOST+PYTDX_PORT，
                    否则使用内置 DEFAULT_HOSTS。
+            request_timeout_seconds: Overall request deadline for a bars fetch
+                (connect + query). Defaults to the shared provider request-timeout
+                contract. Per-host connect still uses
+                ``_PYTDX_CONNECT_TIMEOUT_SECONDS``.
         """
         if hosts is not None:
             self._hosts = hosts
@@ -153,6 +164,11 @@ class PytdxFetcher(BaseFetcher):
         self._stock_name_cache = {}    # Stock Name Cache {code: name}
         self._unavailable_until = 0.0
         self._last_unavailable_reason = ""
+        self._request_timeout_seconds = (
+            DEFAULT_REQUEST_TIMEOUT_SECONDS
+            if request_timeout_seconds is None
+            else float(request_timeout_seconds)
+        )
 
     def _is_in_connection_cooldown(self) -> bool:
         return time.time() < self._unavailable_until
@@ -215,12 +231,12 @@ class PytdxFetcher(BaseFetcher):
                 host, port = self._hosts[host_idx]
                 
                 try:
-                    if api.connect(host, port, time_out=5):
+                    if api.connect(host, port, time_out=_PYTDX_CONNECT_TIMEOUT_SECONDS):
                         connected = True
                         self._current_host_idx = host_idx
                         logger.debug(f"Pytdx 连接成功: {host}:{port}")
                         break
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Try next host after connection failure.
                     log_safe_exception(
                         logger,
                         "Pytdx server connection failed",
@@ -315,16 +331,10 @@ class PytdxFetcher(BaseFetcher):
 
                 start += self.SECURITY_LIST_PAGE_SIZE
     
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=safe_before_sleep_log(
-            logger,
-            logging.WARNING,
-            event="Pytdx daily data retry scheduled",
-            error_code="pytdx_daily_data_retry",
-        ),
+    @provider_retry(
+        target_logger=logger,
+        event="Pytdx daily data retry scheduled",
+        error_code="pytdx_daily_data_retry",
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -336,7 +346,7 @@ class PytdxFetcher(BaseFetcher):
         1. 检查是否为美股（不支持）
         2. 使用上下文管理器管理连接
         3. 判断市场代码
-        4. 调用 API 获取 K 线数据
+        4. 调用 API 获取 K 线数据 (bounded by request timeout)
         """
         # U.S. stocks are not supported, Throw an exception to allow DataFetcherManager Switch to another data source
         if _is_us_code(stock_code):
@@ -362,9 +372,9 @@ class PytdxFetcher(BaseFetcher):
         count = min(max(days * 5 // 7 + 10, 30), 800)  # Estimate the trading day, up to 800 entries
         
         logger.debug(f"调用 Pytdx get_security_bars(market={market}, code={code}, count={count})")
-        
-        with self._pytdx_session() as api:
-            try:
+
+        def _query() -> pd.DataFrame:
+            with self._pytdx_session() as api:
                 # Get daily K-line data
                 # category: 9-day line, 0-5 minutes, 1-15 minutes, 2-30 minutes, 3-1 hour
                 data = api.get_security_bars(
@@ -374,23 +384,39 @@ class PytdxFetcher(BaseFetcher):
                     start=0,  # From latest.
                     count=count
                 )
-                
+
                 if data is None or len(data) == 0:
                     raise DataFetchError(f"Pytdx 未查询到 {stock_code} 的数据")
-                
+
                 # Convert to DataFrame
                 df = api.to_df(data)
-                
+
                 # Filter date range
                 df['datetime'] = pd.to_datetime(df['datetime'])
                 df = df[(df['datetime'] >= start_date) & (df['datetime'] <= end_date)]
-                
+
                 return df
-                
-            except Exception as e:
-                if isinstance(e, DataFetchError):
-                    raise
-                raise DataFetchError(f"Pytdx 获取数据失败: {e}") from e
+
+        try:
+            return call_with_timeout(
+                _query,
+                timeout=self._request_timeout_seconds,
+                call_name="pytdx.get_security_bars",
+            )
+        except DEFAULT_RETRYABLE_EXCEPTIONS:
+            # Preserve retryable exceptions for provider_retry; do not wrap.
+            raise
+        except DataFetchError:
+            raise
+        except Exception as e:  # broad-exception: fallback_recorded - Map library failures to DataFetchError for manager fallback.
+            log_safe_exception(
+                logger,
+                "Pytdx raw data fetch failed",
+                e,
+                error_code="pytdx_raw_data_fetch_failed",
+                level=logging.DEBUG,
+            )
+            raise DataFetchError(f"Pytdx 获取数据失败: {e}") from e
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """
@@ -546,5 +572,12 @@ if __name__ == "__main__":
         quote = fetcher.get_realtime_quote('600519')
         print(f"实时行情: {quote}")
         
-    except Exception as e:
+    except Exception as e:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        log_safe_exception(
+            logger,
+            "Pytdx manual smoke failed",
+            e,
+            error_code="pytdx_manual_smoke_failed",
+            level=logging.ERROR,
+        )
         print(f"获取失败: {e}")
