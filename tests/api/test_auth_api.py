@@ -182,7 +182,7 @@ class AuthApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_logout_clears_cookie(self) -> None:
-        response = asyncio.run(auth_endpoint.auth_logout(self._build_request()))
+        response = asyncio.run(auth_endpoint.auth_logout(self._build_request(), security_audit=self.audit))
         self.assertEqual(response.status_code, 204)
         self.assertIn("dsa_session=", response.headers["set-cookie"])
 
@@ -199,14 +199,14 @@ class AuthApiTestCase(unittest.TestCase):
         session_cookie = cookie_header.split("dsa_session=", 1)[1].split(";", 1)[0]
         self.assertTrue(auth.verify_session(session_cookie))
 
-        logout_response = asyncio.run(auth_endpoint.auth_logout(self._build_request()))
+        logout_response = asyncio.run(auth_endpoint.auth_logout(self._build_request(), security_audit=self.audit))
 
         self.assertEqual(logout_response.status_code, 204)
         self.assertFalse(auth.verify_session(session_cookie))
 
     def test_logout_returns_500_when_session_invalidation_fails(self) -> None:
         with patch.object(auth_endpoint, "rotate_session_secret", return_value=False):
-            response = asyncio.run(auth_endpoint.auth_logout(self._build_request()))
+            response = asyncio.run(auth_endpoint.auth_logout(self._build_request(), security_audit=self.audit))
 
         self.assertEqual(response.status_code, 500)
         self.assertIn(b'"error":"internal_error"', response.body)
@@ -223,11 +223,13 @@ class AuthApiTestCase(unittest.TestCase):
 
         response = asyncio.run(
             auth_endpoint.auth_change_password(
+                self._build_request(),
                 auth_endpoint.ChangePasswordRequest(
                     currentPassword="oldpass6",
                     newPassword="newpass6",
                     newPasswordConfirm="newpass6",
-                )
+                ),
+                security_audit=self.audit,
             )
         )
         self.assertIn(response.status_code, (200, 204))
@@ -244,11 +246,13 @@ class AuthApiTestCase(unittest.TestCase):
 
         response = asyncio.run(
             auth_endpoint.auth_change_password(
+                self._build_request(),
                 auth_endpoint.ChangePasswordRequest(
                     currentPassword="wrong",
                     newPassword="new123",
                     newPasswordConfirm="new123",
-                )
+                ),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(response.status_code, 400)
@@ -378,6 +382,7 @@ class AuthApiTestCase(unittest.TestCase):
                         password="initpass123",
                         passwordConfirm="initpass123",
                     ),
+                    security_audit=self.audit,
                 )
             )
 
@@ -400,6 +405,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=True),
+                    security_audit=self.audit,
                 )
             )
 
@@ -428,7 +434,8 @@ class AuthApiTestCase(unittest.TestCase):
                                 password="initpass123",
                                 passwordConfirm="initpass123",
                             ),
-                        )
+                    security_audit=self.audit,
+                )
                     )
 
         self.assertEqual(has_password_mock.call_count, 2)
@@ -445,6 +452,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(cookies={auth.COOKIE_NAME: session_cookie}),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
+                    security_audit=self.audit,
                 )
             )
 
@@ -505,6 +513,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False),
+                    security_audit=self.audit,
                 )
             )
 
@@ -546,7 +555,8 @@ class AuthApiTestCase(unittest.TestCase):
                     auth_endpoint.auth_update_settings(
                         self._build_request(),
                         auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
-                    )
+                    security_audit=self.audit,
+                )
                 )
 
         self.assertEqual(response.status_code, 500)
@@ -560,6 +570,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
+                    security_audit=self.audit,
                 )
             )
         self.assertEqual(disable_response.status_code, 200)
@@ -569,6 +580,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=True, currentPassword="passwd6"),
+                    security_audit=self.audit,
                 )
             )
 
@@ -585,6 +597,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
+                    security_audit=self.audit,
                 )
             )
         self.assertEqual(disable_response.status_code, 200)
@@ -594,6 +607,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=True),
+                    security_audit=self.audit,
                 )
             )
 
@@ -608,6 +622,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
+                    security_audit=self.audit,
                 )
             )
         self.assertEqual(disable_response.status_code, 200)
@@ -617,6 +632,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=True, currentPassword="wrongpass"),
+                    security_audit=self.audit,
                 )
             )
 
@@ -640,7 +656,8 @@ class AuthApiTestCase(unittest.TestCase):
                             password="initpass123",
                             passwordConfirm="initpass123",
                         ),
-                    )
+                    security_audit=self.audit,
+                )
                 )
 
         self.assertEqual(response.status_code, 500)
@@ -654,6 +671,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
+                    security_audit=self.audit,
                 )
             )
             self.assertEqual(disable_response.status_code, 200)
@@ -667,6 +685,7 @@ class AuthApiTestCase(unittest.TestCase):
                         password="newpass123",
                         passwordConfirm="newpass123",
                     ),
+                    security_audit=self.audit,
                 )
             )
 
@@ -700,6 +719,7 @@ class AuthApiTestCase(unittest.TestCase):
                 auth_endpoint.auth_update_settings(
                     self._build_request(cookies={"dsa_session": "invalid"}),
                     auth_endpoint.AuthSettingsRequest(authEnabled=True),
+                    security_audit=self.audit,
                 )
             )
 
