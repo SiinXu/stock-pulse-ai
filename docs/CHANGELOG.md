@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Built-in strategies under `strategies/` (including `personas/`) are published as first-class `analysis_strategy` plugins (`builtin.analysis-strategy.<name>`); YAML remains the definition source, `SkillManager.load_builtin_skills()` is a legacy shim, and `AGENT_SKILL_DIR` custom overrides keep working without migration.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
