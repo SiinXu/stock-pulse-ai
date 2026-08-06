@@ -399,10 +399,12 @@ def get_generation_backend_status(
 def get_kronos_status() -> KronosStatusResponse:
     """Return Kronos install/config readiness without writing config or downloading."""
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
         from src.services.kronos_forecast_service import build_kronos_status_report
 
-        payload = build_kronos_status_report(get_config()).to_dict()
+        payload = build_kronos_status_report(
+            get_application_services().config
+        ).to_dict()
         return KronosStatusResponse.model_validate(payload)
     except Exception as exc:  # broad-exception: fallback_recorded - map Kronos status probe failures to a sanitized API error
         log_safe_exception(
