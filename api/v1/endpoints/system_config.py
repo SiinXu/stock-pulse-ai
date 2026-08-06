@@ -118,15 +118,20 @@ def _record_config_audit(
     outcome: str = "pending",
     reason_code: str = "attempt_started",
     metadata: dict[str, Any],
+    event_type: str = "system_config.write",
+    action: str | None = None,
+    target_type: str = "system_config",
+    target_id: str = "runtime",
 ) -> None:
+    resolved_action = action or event_type
     common = dict(
-        event_type="system_config.write",
+        event_type=event_type,
         actor_type="administrator",
         actor_id=_config_audit_actor(),
         execution_id=correlation_id,
-        action="system_config.write",
-        target_type="system_config",
-        target_id="runtime",
+        action=resolved_action,
+        target_type=target_type,
+        target_id=target_id,
         correlation_id=correlation_id,
         metadata=metadata,
     )
@@ -145,6 +150,32 @@ def _record_config_audit(
             "security_audit_unavailable",
             "Security audit storage is unavailable",
         )
+
+
+def _bounded_config_identity(value: str) -> str:
+    if len(value) <= SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH:
+        return value
+    return f"sha256:{hashlib.sha256(value.encode('utf-8')).hexdigest()}"
+
+
+def _backup_audit_metadata(
+    *,
+    config_version: str | None = None,
+    reload_now: bool | None = None,
+    validate_connectivity: bool | None = None,
+    content_byte_length: int | None = None,
+) -> dict[str, Any]:
+    """Build redacted metadata for config backup/export/import/rollback paths."""
+    metadata: dict[str, Any] = {}
+    if config_version is not None:
+        metadata["config_version"] = _bounded_config_identity(config_version)
+    if reload_now is not None:
+        metadata["reload_now"] = reload_now
+    if validate_connectivity is not None:
+        metadata["validate_connectivity"] = validate_connectivity
+    if content_byte_length is not None:
+        metadata["content_byte_length"] = int(content_byte_length)
+    return metadata
 
 
 def _config_audit_actor() -> str:
@@ -783,15 +814,36 @@ def update_system_config(
 def rollback_system_config(
     request: RollbackSystemConfigRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> UpdateSystemConfigResponse:
     """Restore the previous runtime configuration in one authenticated action."""
+    audit_service = _require_config_audit_service(security_audit)
+    correlation_id = SecurityAuditService.new_correlation_id()
+    audit_metadata = _backup_audit_metadata(config_version=request.config_version)
+    _record_config_audit(
+        audit_service,
+        phase="attempt",
+        correlation_id=correlation_id,
+        event_type="system_config.rollback",
+        action="system_config.rollback",
+        metadata=audit_metadata,
+    )
     try:
         payload = service.restore_last_good_config(
             config_version=request.config_version,
             actor=_config_audit_actor(),
         )
-        return UpdateSystemConfigResponse.model_validate(payload)
     except ConfigValidationError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.rollback",
+            action="system_config.rollback",
+            outcome="rejected",
+            reason_code="validation_failed",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -801,6 +853,16 @@ def rollback_system_config(
             },
         )
     except ConfigConflictError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.rollback",
+            action="system_config.rollback",
+            outcome="rejected",
+            reason_code="config_version_conflict",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=409,
             detail={
@@ -810,6 +872,16 @@ def rollback_system_config(
             },
         )
     except ConfigRollbackError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.rollback",
+            action="system_config.rollback",
+            outcome="rejected",
+            reason_code="rollback_unavailable",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=409,
             detail={
@@ -818,6 +890,16 @@ def rollback_system_config(
             },
         )
     except Exception as exc:  # broad-exception: fallback_recorded - map rollback failures to a sanitized API error
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.rollback",
+            action="system_config.rollback",
+            outcome="failure",
+            reason_code="config_rollback_failed",
+            metadata=audit_metadata,
+        )
         log_safe_exception(
             logger,
             "System configuration rollback failed",
@@ -831,6 +913,17 @@ def rollback_system_config(
                 "message": "Failed to roll back system configuration",
             },
         )
+    _record_config_audit(
+        audit_service,
+        phase="completion",
+        correlation_id=correlation_id,
+        event_type="system_config.rollback",
+        action="system_config.rollback",
+        outcome="success",
+        reason_code="config_rolled_back",
+        metadata=audit_metadata,
+    )
+    return UpdateSystemConfigResponse.model_validate(payload)
 
 
 @router.get(
@@ -848,11 +941,33 @@ def rollback_system_config(
 def export_system_config(
     request: Request,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ExportSystemConfigResponse:
     """Export the active `.env` file for config backup."""
+    audit_service = _require_config_audit_service(security_audit)
+    correlation_id = SecurityAuditService.new_correlation_id()
+    audit_metadata = _backup_audit_metadata()
+    _record_config_audit(
+        audit_service,
+        phase="attempt",
+        correlation_id=correlation_id,
+        event_type="system_config.export",
+        action="system_config.export",
+        metadata=audit_metadata,
+    )
     try:
         _allow_env_backup_access(request)
     except EnvBackupAccessDenied as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.export",
+            action="system_config.export",
+            outcome="denied",
+            reason_code="env_backup_access_denied",
+            metadata={**audit_metadata, "status_code": int(exc.status_code)},
+        )
         _log_config_exception(
             "System configuration export blocked",
             exc,
@@ -864,9 +979,23 @@ def export_system_config(
 
     try:
         payload = service.export_env()
-        return ExportSystemConfigResponse.model_validate(payload)
-    except Exception as exc:
-        _log_config_exception("System configuration export failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map export failures to a sanitized API error
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.export",
+            action="system_config.export",
+            outcome="failure",
+            reason_code="config_export_failed",
+            metadata=audit_metadata,
+        )
+        log_safe_exception(
+            logger,
+            "System configuration export failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -874,6 +1003,22 @@ def export_system_config(
                 "message": "Failed to export system configuration",
             },
         )
+    content = str(payload.get("content") or "")
+    success_metadata = _backup_audit_metadata(
+        config_version=str(payload.get("config_version") or ""),
+        content_byte_length=len(content.encode("utf-8")),
+    )
+    _record_config_audit(
+        audit_service,
+        phase="completion",
+        correlation_id=correlation_id,
+        event_type="system_config.export",
+        action="system_config.export",
+        outcome="success",
+        reason_code="config_exported",
+        metadata=success_metadata,
+    )
+    return ExportSystemConfigResponse.model_validate(payload)
 
 
 @router.post(
@@ -906,11 +1051,39 @@ def import_system_config(
     request: ImportSystemConfigRequest,
     request_obj: Request,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> UpdateSystemConfigResponse:
     """Import a `.env` backup into the active config."""
+    audit_service = _require_config_audit_service(security_audit)
+    correlation_id = SecurityAuditService.new_correlation_id()
+    content = request.content or ""
+    audit_metadata = _backup_audit_metadata(
+        config_version=request.config_version,
+        reload_now=request.reload_now,
+        validate_connectivity=request.validate_connectivity,
+        content_byte_length=len(content.encode("utf-8")),
+    )
+    _record_config_audit(
+        audit_service,
+        phase="attempt",
+        correlation_id=correlation_id,
+        event_type="system_config.import",
+        action="system_config.import",
+        metadata=audit_metadata,
+    )
     try:
         _allow_env_backup_access(request_obj)
     except EnvBackupAccessDenied as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.import",
+            action="system_config.import",
+            outcome="denied",
+            reason_code="env_backup_access_denied",
+            metadata={**audit_metadata, "status_code": int(exc.status_code)},
+        )
         _log_config_exception(
             "System configuration import blocked",
             exc,
@@ -929,8 +1102,17 @@ def import_system_config(
             connectivity_timeout_seconds=request.connectivity_timeout_seconds,
             actor=_config_audit_actor(),
         )
-        return UpdateSystemConfigResponse.model_validate(payload)
     except ConfigImportError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.import",
+            action="system_config.import",
+            outcome="rejected",
+            reason_code="invalid_import_file",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -939,6 +1121,16 @@ def import_system_config(
             },
         )
     except ConfigValidationError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.import",
+            action="system_config.import",
+            outcome="rejected",
+            reason_code="validation_failed",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -948,6 +1140,16 @@ def import_system_config(
             },
         )
     except ConfigConflictError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.import",
+            action="system_config.import",
+            outcome="rejected",
+            reason_code="config_version_conflict",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=409,
             detail={
@@ -957,6 +1159,16 @@ def import_system_config(
             },
         )
     except Exception as exc:  # broad-exception: fallback_recorded - map import failures to a sanitized API error
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            event_type="system_config.import",
+            action="system_config.import",
+            outcome="failure",
+            reason_code="config_import_failed",
+            metadata=audit_metadata,
+        )
         log_safe_exception(
             logger,
             "System configuration import failed",
@@ -970,6 +1182,17 @@ def import_system_config(
                 "message": "Failed to import system configuration",
             },
         )
+    _record_config_audit(
+        audit_service,
+        phase="completion",
+        correlation_id=correlation_id,
+        event_type="system_config.import",
+        action="system_config.import",
+        outcome="success",
+        reason_code="config_imported",
+        metadata=audit_metadata,
+    )
+    return UpdateSystemConfigResponse.model_validate(payload)
 
 
 @router.post(
