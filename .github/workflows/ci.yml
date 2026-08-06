@@ -497,12 +497,14 @@ jobs:
       - name: 🏗️ Build
         run: npm run build
 
+  # Observation only: not in the main ruleset required checks. Skip on pull_request
+  # so PR throughput stays on the blocking gate; still run on push-to-main when paths match.
   web-e2e:
     name: web-e2e
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [changes, ai-governance]
-    if: needs.changes.outputs.web_e2e == 'true'
+    if: github.event_name == 'push' && needs.changes.outputs.web_e2e == 'true'
     permissions:
       contents: read
     env:
@@ -589,11 +591,13 @@ jobs:
 
   # Non-required: exercise tests/api against the real Starlette TestClient.
   # Default offline suite keeps STOCKPULSE_TEST_THREADLESS=1 (threadless client).
+  # Observation only — run on push-to-main, not on pull_request.
   api-real-client:
     name: api-real-client
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [ai-governance]
+    if: github.event_name == 'push'
     permissions:
       contents: read
     steps:
