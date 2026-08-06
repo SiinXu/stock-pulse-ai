@@ -61,7 +61,6 @@
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.refresh_fx_rates","caught":["Exception"],"digest":"8ad9c26e4d35c7ba607b25858170dd523d6918cdbd739d4740b6cec2391b2ba3"},
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.update_account","caught":["Exception"],"digest":"cd6f6b208a6d749bfed6cc1172acac6fc1d85bb15d9012e39d49c4e6e8719ef5"},
     {"path":"api/v1/endpoints/system_config.py","scope":"<module>.discover_llm_channel_models","caught":["Exception"],"digest":"d5f2ce11f29b0c932f1b6808ec403d8afdc870be4711a5e29476af334b23611b"},
-    {"path":"api/v1/endpoints/system_config.py","scope":"<module>.export_system_config","caught":["Exception"],"digest":"4323cef268cbc7278ce77049772188d8384fc8f1e16ca0c63b1d338ac44fac70"},
     {"path":"api/v1/endpoints/system_config.py","scope":"<module>.get_generation_backend_status","caught":["Exception"],"digest":"1eb344e6b86678bc01f0a736ca041e9dbb8d39767f8aa2c372ec8bd66d96ac5d"},
     {"path":"api/v1/endpoints/system_config.py","scope":"<module>.get_llm_available_models","caught":["Exception"],"digest":"f0051a86612d0896e856409ebcae644f3ab2f617c5dac782cdbade9d86048808"},
     {"path":"api/v1/endpoints/system_config.py","scope":"<module>.get_llm_config_mode_status","caught":["Exception"],"digest":"c1097b5d5a3c855bebb8cd764240e2c4b8889f90b2e368a4b57904175495ea80"},

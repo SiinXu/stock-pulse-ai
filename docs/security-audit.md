@@ -43,8 +43,28 @@ reload intent remain in the event. Values are never included.
 Phase 1 records login success and rejection, sensitive System Configuration
 writes, real `BoundToolSession` allow/deny decisions, and asynchronous analysis
 task acceptance or duplicate rejection. It records configuration key names,
-never values. It does not yet cover every backup/restore, auth-policy, export,
-session-invalidation, HITL, or protected-data boundary tracked by #535.
+never values.
+
+Connected privileged paths for #535 (this coverage set) also record:
+
+| Operation | `event_type` | Status |
+| --- | --- | --- |
+| Login success/failure | `auth.login` | Connected (Phase 1) |
+| Auth enable/disable | `auth.policy` | Connected |
+| Logout / session invalidation | `auth.logout` | Connected |
+| Password change | `auth.password_change` | Connected |
+| System config write | `system_config.write` | Connected (Phase 1) |
+| Config export (env backup) | `system_config.export` | Connected |
+| Config import (env restore) | `system_config.import` | Connected |
+| Config last-good rollback | `system_config.rollback` | Connected |
+| Tool allow/deny | `tool.execute` | Connected (Phase 1) |
+| Analysis accept/reject | `analysis.submit` | Connected (Phase 1) |
+| HITL proposal/transition/consume | `approval_*` | Connected (approval gate) |
+| Analysis evidence-package export (#127) | — | Out of scope (separate product) |
+
+Export/import/rollback metadata carries only bounded config version, flags, and
+byte length—never raw `.env` content or secret values. Auth policy/password
+events never store password material.
 
 ## Persistence And Redaction
 
@@ -75,9 +95,10 @@ integration.
 Protected paths persist the attempt before executing the protected operation.
 If that write fails, the operation fails closed with
 `security_audit_unavailable`: login does not issue a cookie, configuration does
-not call the mutation service, a tool handler is not invoked, and analysis work
-is not enqueued. Completion-write failures are also surfaced rather than
-swallowed.
+not call the mutation service, auth policy/session/password changes do not
+proceed, config export/import/rollback do not run, a tool handler is not
+invoked, and analysis work is not enqueued. Completion-write failures are also
+surfaced rather than swallowed.
 
 The dependency factory and its FastAPI validation wrapper are separate, so a
 test or integration override that returns a missing or malformed recorder is

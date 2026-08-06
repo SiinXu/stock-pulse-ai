@@ -22,8 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 - [Chore] Upgraded the Electron desktop stack (Electron 43.3.0, electron-builder 26.15.7, electron-updater 6.8.9, tar override 7.5.22) and added ESLint flat config with // @ts-check for main.js.
 
+- [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
+- [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
 - [Changed] Migrated integrations-cluster Web API modules (alerts, alphasift, intelligence, investmentFramework, localModels, modelPacks) to OpenAPI-generated types with Zod boundary validation.
+- [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
 - [Chore] Extracted the AkShare realtime snapshot cache into akshare_parts with unchanged fetcher behavior.
