@@ -13,7 +13,6 @@ import {
   PlayCircle,
   RefreshCw,
   ShieldAlert,
-  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { alertsApi } from '../api/alerts';
@@ -21,6 +20,8 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { historyApi } from '../api/history';
 import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
+import type { ParsedApiError } from '../api/error';
+import { parseApiError } from '../api/error';
 import {
   Badge,
   Button,
@@ -32,6 +33,7 @@ import {
   StatePanel,
   WorkspacePage,
 } from '../components/common';
+import { HomeReadinessCard } from '../components/home';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -49,8 +51,7 @@ import type {
   ScheduledTaskOccurrenceStatus,
   ScheduledTaskTodayItem,
 } from '../types/scheduledTasks';
-import type { SetupStatusCheck, SetupStatusResponse } from '../types/systemConfig';
-import type { UiTextKey } from '../i18n/uiText';
+import type { SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { buildDeepLink } from '../utils/deepLink';
@@ -59,28 +60,8 @@ import {
   dismissOnboarding,
   readOnboardingDismissed,
 } from '../utils/onboardingPreferences';
-import { getUiListSeparator } from '../utils/uiLocale';
 
 export const HOME_CONFIGURABLE_STORAGE_KEY = 'dsa.home.configurable.expanded';
-
-
-const SETUP_CHECK_LABEL_KEYS: Record<string, UiTextKey> = {
-  llm_primary: 'home.setupCheck.llm_primary',
-  llm_agent: 'home.setupCheck.llm_agent',
-  stock_list: 'home.setupCheck.stock_list',
-  notification: 'home.setupCheck.notification',
-  storage: 'home.setupCheck.storage',
-};
-
-/** Map setup-status check keys to localized labels; unknown keys fall back to backend title. */
-function resolveSetupCheckLabel(
-  check: Pick<SetupStatusCheck, 'key' | 'title'>,
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
-): string {
-  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
-  return textKey ? t(textKey) : check.title;
-}
-
 
 function readHomeConfigurableExpanded(): boolean {
   if (typeof window === 'undefined') return false;
@@ -278,6 +259,8 @@ const HomePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [failedSourceCount, setFailedSourceCount] = useState(0);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [setupStatusLoading, setSetupStatusLoading] = useState(true);
+  const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(readOnboardingDismissed);
   const [configurableExpanded, setConfigurableExpanded] = useState(
     readHomeConfigurableExpanded,
@@ -319,14 +302,36 @@ const HomePage: React.FC = () => {
     };
   }, [applyAttentionData]);
 
+  const loadSetupStatus = useCallback(async () => {
+    setSetupStatusLoading(true);
+    setSetupStatusError(null);
+    try {
+      const status = await systemConfigApi.getSetupStatus();
+      setSetupStatus(status);
+    } catch (error) {
+      setSetupStatus(null);
+      setSetupStatusError(parseApiError(error));
+    } finally {
+      setSetupStatusLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
+    setSetupStatusLoading(true);
     systemConfigApi.getSetupStatus()
       .then((status) => {
-        if (active) setSetupStatus(status);
+        if (!active) return;
+        setSetupStatus(status);
+        setSetupStatusError(null);
       })
-      .catch(() => {
-        if (active) setSetupStatus(null);
+      .catch((error) => {
+        if (!active) return;
+        setSetupStatus(null);
+        setSetupStatusError(parseApiError(error));
+      })
+      .finally(() => {
+        if (active) setSetupStatusLoading(false);
       });
     return () => {
       active = false;
@@ -339,11 +344,22 @@ const HomePage: React.FC = () => {
     [data.activeSignals],
   );
   const latestMarketReview = data.latestMarketReview;
-  const setupMissingLabels = useMemo(() => setupStatus?.checks
-    .filter((check) => check.required && check.status === 'needs_action')
-    .map((check) => resolveSetupCheckLabel(check, t))
-    .slice(0, 3)
-    .join(getUiListSeparator(language)) ?? '', [language, setupStatus, t]);
+  const lastSuccessSignal = useMemo(() => {
+    if (isLoading || !availability.recentAnalyses) return null;
+    const latest = data.recentAnalyses[0];
+    return {
+      ok: Boolean(latest),
+      href: buildAnalysisWorkbenchHref({
+        segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+      }),
+      detail: latest
+        ? t('home.readiness.lastSuccess.detail', {
+          stock: latest.stockName || latest.stockCode,
+          time: formatDateTime(latest.createdAt, language),
+        })
+        : undefined,
+    };
+  }, [availability.recentAnalyses, data.recentAnalyses, isLoading, language, t]);
 
   const toggleConfigurable = useCallback(() => {
     setConfigurableExpanded((expanded) => {
@@ -360,7 +376,8 @@ const HomePage: React.FC = () => {
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
     void loadAttentionData();
-  }, [loadAttentionData]);
+    void loadSetupStatus();
+  }, [loadAttentionData, loadSetupStatus]);
 
   const analysisHref = buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
@@ -400,37 +417,16 @@ const HomePage: React.FC = () => {
         )}
       />
 
-      {setupStatus && !setupStatus.isComplete && !onboardingDismissed ? (
-        <InlineAlert
-          variant="warning"
-          size="compact"
-          title={t('home.setupIncomplete')}
-          message={setupMissingLabels
-            ? t('home.setupMissingWithLabels', { labels: setupMissingLabels })
-            : t('home.setupMissingGeneric')}
-          action={(
-            <div className="flex items-center gap-1">
-              <Button
-                variant="secondary"
-                size="default"
-                onClick={() => navigate(buildSettingsHref({
-                  section: 'overview',
-                  view: 'readiness',
-                  source: 'onboarding',
-                }))}
-              >
-                {t('home.startGuidedSetup')}
-              </Button>
-              <IconButton
-                variant="ghost"
-                size="default"
-                aria-label={t('common.close')}
-                onClick={handleDismissOnboarding}
-              >
-                <X aria-hidden="true" />
-              </IconButton>
-            </div>
-          )}
+      {!onboardingDismissed || setupStatusLoading || setupStatusError || setupStatus ? (
+        <HomeReadinessCard
+          status={setupStatus}
+          isLoading={setupStatusLoading}
+          error={setupStatusError}
+          lastSuccess={lastSuccessSignal}
+          onRefresh={() => { void loadSetupStatus(); }}
+          onDismiss={handleDismissOnboarding}
+          dismissible={Boolean(setupStatus && !setupStatus.isComplete)}
+          t={t}
         />
       ) : null}
 
