@@ -1093,6 +1093,10 @@ class _ConfigLoadingMethods:
                 or _KRONOS_MODEL_SIZE_DEFAULT
             ),
             kronos_weights_dir=os.getenv('KRONOS_WEIGHTS_DIR', '').strip() or None,
+            multimodal_agent_tools_enabled=parse_env_bool(
+                os.getenv('MULTIMODAL_AGENT_TOOLS_ENABLED'), default=False
+            ),
+            multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
