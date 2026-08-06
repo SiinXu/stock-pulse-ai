@@ -738,4 +738,126 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
 
+    "DAILY_BRIEF_ENABLED": {
+        "title": "Daily Brief Enabled",
+        "description": (
+            "Opt-in daily brief that reviews historical prediction accuracy "
+            "(decision-signal outcomes, backtest summary, skill-opinion performance) "
+            "before summarizing yesterday's analyses and today's watchlist. "
+            "Default off. Does not invent hit rates when history is insufficient."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 58,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_ENABLED=false",
+            "DAILY_BRIEF_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_SCHEDULE_TIME": {
+        "title": "Daily Brief Schedule Time",
+        "description": (
+            "Local wall-clock time (24-hour HH:MM) when the enabled daily brief may fire. "
+            "The scheduler polls periodically and runs at most once per local calendar day "
+            "after this time."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "08:30",
+        "options": [],
+        "validation": {"pattern": r"^(?:[01]\d|2[0-3]):[0-5]\d$"},
+        "display_order": 59,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_SCHEDULE_TIME=08:30",
+            "DAILY_BRIEF_SCHEDULE_TIME=09:00",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_TIMEZONE": {
+        "title": "Daily Brief Timezone",
+        "description": (
+            "IANA timezone used for the daily brief schedule and for mapping "
+            "analysis timestamps onto 'yesterday'. Defaults to Asia/Shanghai when unset "
+            "or invalid."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "Asia/Shanghai",
+        "options": [],
+        "validation": {},
+        "display_order": 60,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_TIMEZONE=Asia/Shanghai",
+            "DAILY_BRIEF_TIMEZONE=America/New_York",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_MIN_SAMPLES": {
+        "title": "Daily Brief Min Samples",
+        "description": (
+            "Minimum completed (hit+miss or backtest completed) samples before the brief "
+            "publishes a percentage for a given accuracy source. Below this threshold the "
+            "brief states insufficient history explicitly."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10",
+        "options": [],
+        "validation": {"min": 1, "max": 10000},
+        "display_order": 61,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_MIN_SAMPLES=10",
+            "DAILY_BRIEF_MIN_SAMPLES=20",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+
 }
