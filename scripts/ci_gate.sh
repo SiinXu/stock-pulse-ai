@@ -76,6 +76,7 @@ offline_test_suite() {
     python -m pytest -m "not network and not benchmark" \
       --timeout=120 --timeout-method=thread \
       -o faulthandler_timeout=300 \
+      --durations=30 --durations-min=0.5 \
       --cov=src --cov=api --cov=data_provider --cov=bot \
       --cov-report=term \
       --cov-report="json:${coverage_report}" \

@@ -16,6 +16,10 @@ from src.utils.sanitize import log_safe_exception
 
 from .errors import PluginContextClosedError, PluginRegistryError
 from .manifest import API_MAJOR_PATTERN, PLUGIN_ID_PATTERN
+from .surface import (
+    PLUGIN_EXTENSION_SURFACE_V1_POINT_ORDER,
+    PLUGIN_EXTENSION_SURFACE_V1_POINTS,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -28,14 +32,12 @@ ExtensionPoint = Literal[
     "report_template",
     "event_hook",
 ]
+# Single source of order: the frozen ADR-007 surface declaration.
 EXTENSION_POINTS: tuple[ExtensionPoint, ...] = (
-    "data_provider",
-    "analysis_strategy",
-    "agent_tool",
-    "notification_channel",
-    "report_template",
-    "event_hook",
+    PLUGIN_EXTENSION_SURFACE_V1_POINT_ORDER  # type: ignore[assignment]
 )
+if frozenset(EXTENSION_POINTS) != PLUGIN_EXTENSION_SURFACE_V1_POINTS:
+    raise RuntimeError("EXTENSION_POINTS drifted from the frozen v1 surface")
 JSONScalar: TypeAlias = None | bool | int | float | str
 JSONValue: TypeAlias = JSONScalar | tuple["JSONValue", ...] | Mapping[str, "JSONValue"]
 IdentityResolver: TypeAlias = Callable[[object], str]

@@ -66,6 +66,72 @@ def _security_audit_error() -> JSONResponse:
     )
 
 
+def _auth_client_actor_id(request: Request) -> str:
+    """Return a stable, non-PII remote actor id derived from the client IP hash."""
+    ip = get_client_ip(request)
+    return f"client:{hashlib.sha256(ip.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _record_auth_attempt(
+    service: SecurityAuditRecorder,
+    *,
+    event_type: str,
+    action: str,
+    correlation_id: str,
+    actor_id: str,
+    target_type: str = "admin_session",
+    target_id: str = "primary",
+    metadata: dict | None = None,
+) -> JSONResponse | None:
+    try:
+        service.record_attempt(
+            event_type=event_type,
+            actor_type="remote_client",
+            actor_id=actor_id,
+            execution_id=correlation_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            correlation_id=correlation_id,
+            metadata=metadata or {},
+        )
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
+    return None
+
+
+def _record_auth_completion(
+    service: SecurityAuditRecorder,
+    *,
+    event_type: str,
+    action: str,
+    correlation_id: str,
+    actor_id: str,
+    outcome: str,
+    reason_code: str,
+    target_type: str = "admin_session",
+    target_id: str = "primary",
+    metadata: dict | None = None,
+) -> JSONResponse | None:
+    try:
+        service.record_completion(
+            event_type=event_type,
+            actor_type="remote_client",
+            actor_id=actor_id,
+            execution_id=correlation_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            outcome=outcome,
+            reason_code=reason_code,
+            correlation_id=correlation_id,
+            metadata=metadata or {},
+        )
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
+    return None
+
+
 def _record_login_completion(
     service: SecurityAuditRecorder,
     *,
@@ -74,22 +140,15 @@ def _record_login_completion(
     outcome: str,
     reason_code: str,
 ) -> JSONResponse | None:
-    try:
-        service.record_completion(
-            event_type="auth.login",
-            actor_type="remote_client",
-            actor_id=actor_id,
-            execution_id=correlation_id,
-            action="auth.login",
-            target_type="admin_session",
-            target_id="primary",
-            outcome=outcome,
-            reason_code=reason_code,
-            correlation_id=correlation_id,
-        )
-    except SecurityAuditUnavailable:
-        return _security_audit_error()
-    return None
+    return _record_auth_completion(
+        service,
+        event_type="auth.login",
+        action="auth.login",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        outcome=outcome,
+        reason_code=reason_code,
+    )
 
 
 class LoginRequest(BaseModel):
@@ -266,11 +325,73 @@ async def auth_status(request: Request):
         "even when the request has a valid session cookie."
     ),
 )
-async def auth_update_settings(request: Request, body: AuthSettingsRequest):
+async def auth_update_settings(
+    request: Request,
+    body: AuthSettingsRequest,
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
+):
     """Manage auth enablement from the settings page."""
+    try:
+        audit_service = require_security_audit_recorder(security_audit)
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
+
     target_enabled = body.auth_enabled
     current_enabled = is_auth_enabled()
     stored_password_exists = has_stored_password()
+    correlation_id = SecurityAuditService.new_correlation_id()
+    actor_id = _auth_client_actor_id(request)
+    policy_metadata = {
+        "target_enabled": target_enabled,
+        "previous_enabled": current_enabled,
+        "stored_password_exists": stored_password_exists,
+    }
+    audit_error = _record_auth_attempt(
+        audit_service,
+        event_type="auth.policy",
+        action="auth.policy.update",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        target_type="auth_policy",
+        target_id="admin_auth",
+        metadata=policy_metadata,
+    )
+    if audit_error is not None:
+        return audit_error
+
+    def _deny(status_code: int, error: str, message: str) -> JSONResponse:
+        completion_error = _record_auth_completion(
+            audit_service,
+            event_type="auth.policy",
+            action="auth.policy.update",
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="denied",
+            reason_code=error,
+            target_type="auth_policy",
+            target_id="admin_auth",
+            metadata=policy_metadata,
+        )
+        if completion_error is not None:
+            return completion_error
+        return _auth_error(status_code, error, message)
+
+    def _fail(status_code: int, error: str, message: str) -> JSONResponse:
+        completion_error = _record_auth_completion(
+            audit_service,
+            event_type="auth.policy",
+            action="auth.policy.update",
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="failure",
+            reason_code=error,
+            target_type="auth_policy",
+            target_id="admin_auth",
+            metadata=policy_metadata,
+        )
+        if completion_error is not None:
+            return completion_error
+        return _auth_error(status_code, error, message)
 
     password = (body.password or "").strip()
     confirm = (body.password_confirm or "").strip()
@@ -279,26 +400,26 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
     if target_enabled:
         if password or confirm:
             if stored_password_exists:
-                return _auth_error(
+                return _deny(
                     400,
                     "password_already_set",
                     "已存在管理员密码，请启用认证后通过修改密码功能更新",
                 )
             if not password:
-                return _auth_error(400, "password_required", "请输入要设置的管理员密码")
+                return _deny(400, "password_required", "请输入要设置的管理员密码")
             if password != confirm:
-                return _auth_error(400, "password_mismatch", "两次输入的密码不一致")
+                return _deny(400, "password_mismatch", "两次输入的密码不一致")
             if has_stored_password():
-                return _auth_error(
+                return _deny(
                     400,
                     "password_already_set",
                     "已存在管理员密码，请启用认证后通过修改密码功能更新",
                 )
             err = set_initial_password(password)
             if err:
-                return _auth_error(400, "invalid_password", err)
+                return _deny(400, "invalid_password", err)
         elif not stored_password_exists:
-            return _auth_error(400, "password_required", "开启密码登录前请先设置密码")
+            return _deny(400, "password_required", "开启密码登录前请先设置密码")
         else:
             # P1 Vulnerability Fix: Enforce current-password check independent of global cached flag
             # We must verify they actually possess a valid admin session, otherwise an attacker
@@ -307,32 +428,46 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
             cookie_val = request.cookies.get(COOKIE_NAME)
             # if target_enabled is True here, they are requesting to enable or keep auth enabled
             is_valid_session = cookie_val and verify_session(cookie_val)
-            
+
             if not is_valid_session:
                 if not current_password:
-                    return _auth_error(400, "current_required", "重新开启认证前请输入当前密码")
+                    return _deny(400, "current_required", "重新开启认证前请输入当前密码")
                 ip = get_client_ip(request)
                 if not check_rate_limit(ip):
-                    return _auth_error(429, "rate_limited", "Too many failed attempts. Please try again later.")
+                    return _deny(429, "rate_limited", "Too many failed attempts. Please try again later.")
                 if not verify_stored_password(current_password):
                     record_login_failure(ip)
-                    return _auth_error(401, "invalid_password", "当前密码错误")
+                    return _deny(401, "invalid_password", "当前密码错误")
                 clear_rate_limit(ip)
     else:
         if current_enabled:
             if not current_password:
-                return _auth_error(400, "current_required", "关闭认证前请输入当前密码")
+                return _deny(400, "current_required", "关闭认证前请输入当前密码")
             ip = get_client_ip(request)
             if not check_rate_limit(ip):
-                return _auth_error(429, "rate_limited", "Too many failed attempts. Please try again later.")
+                return _deny(429, "rate_limited", "Too many failed attempts. Please try again later.")
             if not verify_stored_password(current_password):
                 record_login_failure(ip)
-                return _auth_error(401, "invalid_password", "当前密码错误")
+                return _deny(401, "invalid_password", "当前密码错误")
             clear_rate_limit(ip)
 
     try:
         auth_applied = _apply_auth_enabled(target_enabled, request=request)
     except ConfigConflictError as exc:
+        completion_error = _record_auth_completion(
+            audit_service,
+            event_type="auth.policy",
+            action="auth.policy.update",
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="rejected",
+            reason_code="config_conflict",
+            target_type="auth_policy",
+            target_id="admin_auth",
+            metadata=policy_metadata,
+        )
+        if completion_error is not None:
+            return completion_error
         return error_json_response(
             409,
             "config_conflict",
@@ -340,7 +475,7 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
             params={"current_config_version": exc.current_version},
         )
     if not auth_applied:
-        return _auth_error(500, "internal_error", "Failed to update auth settings")
+        return _fail(500, "internal_error", "Failed to update auth settings")
 
     if target_enabled != current_enabled:
         if not rotate_session_secret():
@@ -350,7 +485,7 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
                 rollback_ok = False
             if not rollback_ok:
                 logger.error("Failed to roll back auth state after session secret rotation failure")
-            return _auth_error(500, "internal_error", "Failed to rotate session secret")
+            return _fail(500, "internal_error", "Failed to rotate session secret")
 
     if target_enabled:
         session_val = create_session()
@@ -361,7 +496,21 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
                 rollback_ok = False
             if not rollback_ok:
                 logger.error("Failed to roll back auth state after session creation failure")
-            return _auth_error(500, "internal_error", "Failed to create session")
+            return _fail(500, "internal_error", "Failed to create session")
+        completion_error = _record_auth_completion(
+            audit_service,
+            event_type="auth.policy",
+            action="auth.policy.update",
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="success",
+            reason_code="auth_policy_updated",
+            target_type="auth_policy",
+            target_id="admin_auth",
+            metadata=policy_metadata,
+        )
+        if completion_error is not None:
+            return completion_error
         # We manually set loggedIn=True because the cookie is being set in this response
         # and won't be visible in request.cookies until the NEXT request.
         content = _get_auth_status_dict(request)
@@ -370,10 +519,23 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
         _set_session_cookie(resp, session_val, request)
         return resp
 
+    completion_error = _record_auth_completion(
+        audit_service,
+        event_type="auth.policy",
+        action="auth.policy.update",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        outcome="success",
+        reason_code="auth_policy_updated",
+        target_type="auth_policy",
+        target_id="admin_auth",
+        metadata=policy_metadata,
+    )
+    if completion_error is not None:
+        return completion_error
     resp = JSONResponse(content=_get_auth_status_dict(request))
     resp.delete_cookie(key=COOKIE_NAME, path="/")
     return resp
-
 
 
 @router.post(
@@ -393,20 +555,16 @@ async def auth_login(
         return _security_audit_error()
     correlation_id = SecurityAuditService.new_correlation_id()
     ip = get_client_ip(request)
-    actor_id = f"client:{hashlib.sha256(ip.encode('utf-8')).hexdigest()[:16]}"
-    try:
-        audit_service.record_attempt(
-            event_type="auth.login",
-            actor_type="remote_client",
-            actor_id=actor_id,
-            execution_id=correlation_id,
-            action="auth.login",
-            target_type="admin_session",
-            target_id="primary",
-            correlation_id=correlation_id,
-        )
-    except SecurityAuditUnavailable:
-        return _security_audit_error()
+    actor_id = _auth_client_actor_id(request)
+    audit_error = _record_auth_attempt(
+        audit_service,
+        event_type="auth.login",
+        action="auth.login",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+    )
+    if audit_error is not None:
+        return audit_error
 
     if not is_auth_enabled():
         audit_error = _record_login_completion(
@@ -522,23 +680,75 @@ async def auth_login(
     summary="Change password",
     description="Change password. Requires valid session.",
 )
-async def auth_change_password(body: ChangePasswordRequest):
+async def auth_change_password(
+    request: Request,
+    body: ChangePasswordRequest,
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
+):
     """Change password. Requires login."""
+    try:
+        audit_service = require_security_audit_recorder(security_audit)
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
+    correlation_id = SecurityAuditService.new_correlation_id()
+    actor_id = _auth_client_actor_id(request)
+    audit_error = _record_auth_attempt(
+        audit_service,
+        event_type="auth.password_change",
+        action="auth.password.change",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        target_type="admin_credential",
+        target_id="primary",
+    )
+    if audit_error is not None:
+        return audit_error
+
+    def _deny(status_code: int, error: str, message: str) -> JSONResponse:
+        completion_error = _record_auth_completion(
+            audit_service,
+            event_type="auth.password_change",
+            action="auth.password.change",
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="denied",
+            reason_code=error,
+            target_type="admin_credential",
+            target_id="primary",
+        )
+        if completion_error is not None:
+            return completion_error
+        return _auth_error(status_code, error, message)
+
     if not is_password_changeable():
-        return _auth_error(400, "not_changeable", "Password cannot be changed via web")
+        return _deny(400, "not_changeable", "Password cannot be changed via web")
 
     current = (body.current_password or "").strip()
     new_pwd = (body.new_password or "").strip()
     new_confirm = (body.new_password_confirm or "").strip()
 
     if not current:
-        return _auth_error(400, "current_required", "请输入当前密码")
+        return _deny(400, "current_required", "请输入当前密码")
     if new_pwd != new_confirm:
-        return _auth_error(400, "password_mismatch", "两次输入的新密码不一致")
+        return _deny(400, "password_mismatch", "两次输入的新密码不一致")
 
     err = change_password(current, new_pwd)
     if err:
-        return _auth_error(400, "invalid_password", err)
+        return _deny(400, "invalid_password", err)
+
+    completion_error = _record_auth_completion(
+        audit_service,
+        event_type="auth.password_change",
+        action="auth.password.change",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        outcome="success",
+        reason_code="password_changed",
+        target_type="admin_credential",
+        target_id="primary",
+    )
+    if completion_error is not None:
+        return completion_error
     return Response(status_code=204)
 
 
@@ -547,10 +757,52 @@ async def auth_change_password(body: ChangePasswordRequest):
     summary="Logout",
     description="Clear session cookie.",
 )
-async def auth_logout(request: Request):
-    """Clear session cookie."""
+async def auth_logout(
+    request: Request,
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
+):
+    """Clear session cookie and invalidate the shared session secret when auth is enabled."""
+    try:
+        audit_service = require_security_audit_recorder(security_audit)
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
+    correlation_id = SecurityAuditService.new_correlation_id()
+    actor_id = _auth_client_actor_id(request)
+    audit_error = _record_auth_attempt(
+        audit_service,
+        event_type="auth.logout",
+        action="auth.session.invalidate",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+    )
+    if audit_error is not None:
+        return audit_error
+
     if is_auth_enabled() and not rotate_session_secret():
+        completion_error = _record_auth_completion(
+            audit_service,
+            event_type="auth.logout",
+            action="auth.session.invalidate",
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="failure",
+            reason_code="session_invalidation_failed",
+        )
+        if completion_error is not None:
+            return completion_error
         return _auth_error(500, "internal_error", "Failed to invalidate session")
+
+    completion_error = _record_auth_completion(
+        audit_service,
+        event_type="auth.logout",
+        action="auth.session.invalidate",
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        outcome="success",
+        reason_code="session_invalidated",
+    )
+    if completion_error is not None:
+        return completion_error
     resp = Response(status_code=204)
     resp.delete_cookie(key=COOKIE_NAME, path="/")
     return resp
