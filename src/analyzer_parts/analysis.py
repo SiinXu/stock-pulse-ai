@@ -171,15 +171,38 @@ class GeminiAnalyzer:
                 confidence_level=localize_confidence_level('低', report_language),
                 analysis_summary=_localized_text(
                     report_language,
-                    en='AI analysis is unavailable because no API key is configured.',
-                    zh='AI 分析功能未启用（未配置 API Key）',
-                    ko='API 키가 설정되지 않아 AI 분석을 사용할 수 없습니다.',
+                    en=(
+                        "AI analysis is unavailable because no usable model is configured. "
+                        "For a zero-key first success, run data-only: `python main.py --dry-run` "
+                        "(same market-data artifact as dry-run). Or start local Ollama and apply "
+                        "the local-zero-cost path from setup readiness."
+                    ),
+                    zh=(
+                        "AI 分析未启用：尚未配置可用模型。"
+                        "零 Key 首次成功请先跑 data-only：`python main.py --dry-run`"
+                        "（与 dry-run 行情数据产物一致）；或启动本机 Ollama，在就绪检查中应用本地零成本路径。"
+                    ),
+                    ko=(
+                        "사용 가능한 모델이 없어 AI 분석을 사용할 수 없습니다. "
+                        "키 없이 첫 성공을 보려면 data-only 경로를 사용하세요: `python main.py --dry-run` "
+                        "(dry-run 시세 데이터 결과와 동일). 또는 로컬 Ollama를 실행한 뒤 설정 준비 상태에서 "
+                        "로컬 제로코스트 경로를 적용하세요."
+                    ),
                 ),
                 risk_warning=_localized_text(
                     report_language,
-                    en='Configure an LLM API key (GEMINI_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY) and retry.',
-                    zh='请配置 LLM API Key（GEMINI_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY）后重试',
-                    ko='LLM API 키(GEMINI_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY)를 설정한 뒤 다시 시도하세요.',
+                    en=(
+                        "Configure a cloud LLM key (GEMINI_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY), "
+                        "or use local Ollama (no cloud key), then retry AI analysis."
+                    ),
+                    zh=(
+                        "请配置云端 LLM API Key（GEMINI_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY），"
+                        "或使用本机 Ollama（无需云端 Key）后重试 AI 分析。"
+                    ),
+                    ko=(
+                        "클라우드 LLM API 키(GEMINI_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY)를 설정하거나 "
+                        "로컬 Ollama(클라우드 키 불필요)를 적용한 뒤 AI 분석을 다시 시도하세요."
+                    ),
                 ),
                 success=False,
                 error_message=_localized_text(

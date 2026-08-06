@@ -737,5 +737,68 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "LOCAL_RUNTIME_AUTO_DETECT": {
+        "title": "Local Runtime Auto-Detect",
+        "description": (
+            "When enabled (default), setup readiness performs a fast loopback-only probe for a "
+            "running local generation runtime such as Ollama (127.0.0.0/8, ::1, localhost). "
+            "Probe failures are log-only and never block startup. Disable to skip the probe."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 58,
+        "help_key": "settings.system.LOCAL_RUNTIME_AUTO_DETECT",
+        "examples": [
+            "LOCAL_RUNTIME_AUTO_DETECT=true",
+            "LOCAL_RUNTIME_AUTO_DETECT=false",
+        ],
+        "docs": [
+            {
+                "label": "Beginner client setup",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/beginner-client-setup_EN.md",
+            },
+            {
+                "label": "LLM configuration guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/LLM_CONFIG_GUIDE_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS": {
+        "title": "Local Runtime Detect Timeout",
+        "description": (
+            "Per-request timeout in seconds for the loopback local-runtime detect probe. "
+            "Clamped to 0.05–2.0; keep low so setup status stays fast when Ollama is down."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.35",
+        "options": [],
+        "validation": {"min": 0.05, "max": 2.0},
+        "display_order": 59,
+        "help_key": "settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS",
+        "examples": [
+            "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35",
+            "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5",
+        ],
+        "docs": [
+            {
+                "label": "Beginner client setup",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/beginner-client-setup_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 
 }
