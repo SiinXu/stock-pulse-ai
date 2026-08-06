@@ -765,6 +765,7 @@ class _ConfigLoadingMethods:
                 field_name='AGENT_SKILL_AGENT_TIMEOUT_S', minimum=0,
             ),
             agent_risk_override=os.getenv('AGENT_RISK_OVERRIDE', 'true').lower() == 'true',
+            agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
                 30000,

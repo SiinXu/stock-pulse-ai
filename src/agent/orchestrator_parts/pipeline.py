@@ -34,6 +34,7 @@ from src.agent.soul import (
 )
 from src.agent.skills.engine import StrategyResultStatus
 from src.agent.stream_events import stream_event
+from src.agent.deliberation_scheduler import AgentSkillScheduler, SkillBatchResult
 from src.agent.tools.registry import ToolRegistry
 from src.utils.sanitize import log_safe_exception
 
@@ -229,6 +230,36 @@ class _PipelineMethods:
                 self._skill_agent_names = {a.agent_name for a in specialist_agents}
                 specialist_agents_inserted = True
                 if specialist_agents:
+                    if getattr(self.config, "agent_multi_strategy_deliberation", False):
+                        batch = self._run_specialist_agent_batch(
+                            specialist_agents,
+                            ctx,
+                            progress_callback=progress_callback,
+                            timeout_seconds=remaining_budget,
+                        )
+                        for stage_result in batch.stage_results:
+                            stats.record_stage(stage_result)
+                            all_tool_calls.extend(
+                                tc for tc in (stage_result.meta.get("tool_calls_log") or [])
+                            )
+                            models_used.extend(stage_result.meta.get("models_used", []))
+                            if stage_result.status == StageStatus.FAILED:
+                                self._record_degraded_stage(ctx, stage_result.stage_name, stage_result)
+                        ctx.opinions.extend(batch.opinions)
+                        invalid_bucket = ctx.meta.get("invalid_opinions")
+                        if not isinstance(invalid_bucket, list):
+                            invalid_bucket = []
+                        invalid_bucket.extend(batch.invalid_records)
+                        ctx.meta["invalid_opinions"] = invalid_bucket
+                        ctx.meta["skill_scheduler"] = {
+                            "mode": "thread_pool",
+                            "max_concurrency": batch.max_concurrency,
+                            "timeout_per_skill": batch.timeout_per_skill,
+                            "scheduled_skill_count": len(specialist_agents),
+                            "completed_skill_count": sum(1 for item in batch.stage_results if item.success),
+                            "invalid_skill_count": len(batch.invalid_records),
+                        }
+                        continue
                     agents[index:index] = specialist_agents
                     continue
 
@@ -956,6 +987,44 @@ class _PipelineMethods:
         else:
             return [technical, intel, decision]
 
+
+    def _run_specialist_agent_batch(self, agents, ctx, *, progress_callback=None, timeout_seconds=None) -> SkillBatchResult:
+        from math import ceil
+        sub_agent_timeout_map = self._get_sub_agent_timeout_map()
+        configured_skill_timeout = sub_agent_timeout_map.get("skill", 0.0)
+        budget_per_skill = self._skill_batch_timeout_slice(len(agents), timeout_seconds=timeout_seconds)
+        if configured_skill_timeout and budget_per_skill is not None:
+            timeout_per_skill = min(configured_skill_timeout, budget_per_skill)
+        elif configured_skill_timeout:
+            timeout_per_skill = configured_skill_timeout
+        elif budget_per_skill is not None:
+            timeout_per_skill = budget_per_skill
+        else:
+            timeout_per_skill = 0.0
+        scheduler = AgentSkillScheduler(max_concurrency=3, timeout_per_skill=timeout_per_skill)
+        if progress_callback:
+            for agent in agents:
+                progress_callback(stream_event("stage_start", stage=agent.agent_name, message=f"Starting {agent.agent_name} analysis..."))
+        batch = scheduler.run(agents, ctx, self._run_stage_agent, progress_callback=progress_callback)
+        if progress_callback:
+            for result in batch.stage_results:
+                progress_callback(stream_event("stage_done", stage=result.stage_name, status=result.status.value, duration=result.duration_s))
+        return batch
+
+    def _skill_batch_timeout_slice(self, agent_count, *, timeout_seconds):
+        from math import ceil
+        if timeout_seconds is None:
+            return None
+        try:
+            remaining = float(timeout_seconds)
+        except (TypeError, ValueError):
+            return None
+        if remaining <= 0:
+            return 0.0
+        count = max(1, int(agent_count or 1))
+        worker_count = min(3, count)
+        return remaining / max(1, ceil(count / worker_count))
+
     def _build_specialist_agents(self, ctx: AgentContext) -> list:
         """Build specialist sub-agents based on requested skills.
 
@@ -981,7 +1050,8 @@ class _PipelineMethods:
 
             from src.agent.skills.skill_agent import SkillAgent
             agents = []
-            for skill_id in selected[:3]:  # cap at 3 concurrent skills
+            skill_cap = 4 if getattr(self.config, "agent_multi_strategy_deliberation", False) else 3
+            for skill_id in selected[:skill_cap]:
                 agent = self._prepare_agent(SkillAgent(
                     skill_id=skill_id,
                     skill_manager=self.skill_manager,
@@ -1057,7 +1127,13 @@ class _PipelineMethods:
         ``ctx.meta["invalid_opinions"]`` (Diagnostics only), and rebuilds
         ``ctx.opinions`` as non-skill evidence + valid skills + consensus.
         """
-        result = self.strategy_engine.process(ctx.opinions)
+        existing_invalid = ctx.meta.get("invalid_opinions")
+        if not isinstance(existing_invalid, list):
+            existing_invalid = []
+        result = self.strategy_engine.process(
+            ctx.opinions,
+            diagnostic_records=existing_invalid,
+        )
 
         ctx.meta["invalid_opinions"] = list(result.invalid_records)
         ctx.opinions = list(result.non_skill_opinions) + list(result.valid_skill_opinions)
