@@ -274,10 +274,26 @@ def _is_private_ip(address: ipaddress._BaseAddress) -> bool:
     )
 
 
+def _is_loopback_ip(address: ipaddress._BaseAddress) -> bool:
+    candidates = [address]
+    mapped = getattr(address, "ipv4_mapped", None)
+    if mapped is not None:
+        candidates.append(mapped)
+    return any(candidate.is_loopback for candidate in candidates)
+
+
+def _is_admin_loopback_hostname(hostname: str, literal_ip: Optional[ipaddress._BaseAddress]) -> bool:
+    """Return whether a host is pure loopback (not private LAN or .local mDNS)."""
+    if literal_ip is not None:
+        return _is_loopback_ip(literal_ip)
+    return hostname == "localhost" or hostname.endswith(".localhost")
+
+
 def _inspect_target(
     raw_url: str,
     *,
     allowlist: Optional[Iterable[str]] = None,
+    allow_admin_loopback: bool = False,
 ) -> OutboundTarget:
     value = str(raw_url or "")
     if not value or any(
@@ -307,11 +323,18 @@ def _inspect_target(
     literal_ip = _literal_ip(hostname)
     normalized_host = str(literal_ip) if literal_ip is not None else hostname
     entries = _allowlist_entries(allowlist)
+    allowlisted = _is_allowlisted(normalized_host, scheme, port, entries)
+    if (
+        allow_admin_loopback
+        and not allowlisted
+        and _is_admin_loopback_hostname(hostname, literal_ip)
+    ):
+        allowlisted = True
     target = OutboundTarget(
         scheme=scheme,
         hostname=normalized_host,
         port=port,
-        allowlisted=_is_allowlisted(normalized_host, scheme, port, entries),
+        allowlisted=allowlisted,
         literal_ip=literal_ip,
     )
 
@@ -322,7 +345,10 @@ def _inspect_target(
             _reject_target("local_host_blocked", target)
     if literal_ip is not None:
         if _is_hard_blocked_ip(literal_ip):
-            _reject_target("restricted_ip_blocked", target)
+            # IPv6 loopback (::1) is also flagged reserved by ipaddress; still
+            # allow pure loopback under the narrow admin-loopback exemption.
+            if not (allow_admin_loopback and _is_loopback_ip(literal_ip)):
+                _reject_target("restricted_ip_blocked", target)
         if _is_private_ip(literal_ip) and not target.allowlisted:
             _reject_target("private_ip_blocked", target)
     return target
@@ -350,10 +376,15 @@ def validate_outbound_url(
     *,
     allowlist: Optional[Iterable[str]] = None,
     resolve_dns: bool = True,
+    allow_admin_loopback: bool = False,
 ) -> OutboundTarget:
     """Validate an HTTP(S) URL and, by default, all current DNS answers."""
 
-    target = _inspect_target(raw_url, allowlist=allowlist)
+    target = _inspect_target(
+        raw_url,
+        allowlist=allowlist,
+        allow_admin_loopback=allow_admin_loopback,
+    )
     if not resolve_dns or target.literal_ip is not None:
         return target
     try:
@@ -665,6 +696,7 @@ def safe_request(
     max_redirects: int = 5,
     max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
     allowlist: Optional[Iterable[str]] = None,
+    allow_admin_loopback: bool = False,
     transport: Any = None,
     **kwargs: Any,
 ) -> requests.Response:
@@ -679,7 +711,11 @@ def safe_request(
     redirects_followed = 0
 
     while True:
-        target = _inspect_target(current_url, allowlist=allowlist)
+        target = _inspect_target(
+            current_url,
+            allowlist=allowlist,
+            allow_admin_loopback=allow_admin_loopback,
+        )
         request_kwargs = dict(current_kwargs)
         caller_streams_response = bool(request_kwargs.get("stream", False))
         if not caller_streams_response:
@@ -713,7 +749,11 @@ def safe_request(
         response_url = str(getattr(response, "url", "") or current_url)
         next_url = urljoin(response_url, location)
         try:
-            next_target = _inspect_target(next_url, allowlist=allowlist)
+            next_target = _inspect_target(
+                next_url,
+                allowlist=allowlist,
+                allow_admin_loopback=allow_admin_loopback,
+            )
         except OutboundPolicyError:
             response.close()
             raise

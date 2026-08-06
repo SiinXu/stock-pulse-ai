@@ -19,6 +19,7 @@ test('tar override remains compatible with the app-builder-lib archive path', as
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-builder-tar-'));
   const source = path.join(root, 'source');
+  // Prefix basename is used as the archive member prefix by app-builder-lib.
   const output = path.join(root, 'probe.tar.gz');
   const tempDirManager = new TmpDir('desktop-tar-override-test');
 
@@ -26,14 +27,15 @@ test('tar override remains compatible with the app-builder-lib archive path', as
     fs.mkdirSync(source);
     fs.writeFileSync(path.join(source, 'probe.txt'), 'ok\n');
 
-    await createBuilderTar(
-      'normal',
-      'tar.gz',
-      output,
-      source,
-      false,
-      tempDirManager
-    );
+    // electron-builder 26+ accepts a single options object (was positional).
+    await createBuilderTar({
+      compression: 'normal',
+      format: 'tar.gz',
+      outFile: output,
+      dirToArchive: source,
+      isMacApp: false,
+      tempDirManager,
+    });
 
     const entries = [];
     await tar.list({

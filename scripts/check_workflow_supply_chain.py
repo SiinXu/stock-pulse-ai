@@ -192,6 +192,8 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/pr-review.yml", "comment", "pull-requests", "write"),
         (".github/workflows/stale.yml", "stale", "issues", "write"),
         (".github/workflows/stale.yml", "stale", "pull-requests", "write"),
+        (".github/workflows/upstream-parity.yml", "parity", "contents", "read"),
+        (".github/workflows/upstream-parity.yml", "parity", "issues", "write"),
     }
 )
 
