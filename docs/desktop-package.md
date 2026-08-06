@@ -141,6 +141,25 @@ Desktop 启动后会在系统 tray / macOS 菜单栏创建 StockPulse 图标。�
 
 助手使用独立 preload，保持 `contextIsolation: true`、`nodeIntegration: false` 和 `sandbox: true`。renderer 没有任意 URL、网络、Node 或 shell 权限；主进程拒绝新窗口、同窗导航和重定向，IPC handler 还会校验调用方必须是当前助手窗口。electron-builder 会把现有 StockPulse 32px 品牌 PNG 复制为 `assistant-tray.png`，无需依赖 Web 构建产物提供 tray 图标。
 
+## 首次启动与一键本地安装
+
+首次在运行时目录生成 `.env` 时（真正的 fresh install），主窗口在后端 `/api/health` 就绪后会打开既有 Web **首次配置向导**路由：
+
+`/settings?section=overview&view=readiness&from=onboarding`
+
+该路由复用 `FirstRunWizard`（云 API / 本地模型 / CLI），不会另起第二套桌面 UI。已有协议深链（`stockpulse://…`）优先；返回用户若配置仍不完整，继续依赖 Home 上的引导横幅，而不是每次启动强制弹窗。
+
+窗口状态：主 `BrowserWindow` 以 `show: false` 创建，加载页（或错误页）就绪后再 `show`/`focus`，避免首次启动白屏闪烁。后端就绪后会非阻塞地探测系统/内嵌 Ollama，使向导内的本地模型面板尽早显示 runtime 状态。
+
+**一键本地安装**复用既有 Model Pack + Ollama 路径，不新增第二套下载通道：
+
+1. 用户在本地模型面板点击 **Import Model Pack**（或向导本地模型步骤中的同一控件）——必须显式选择 `.modelpack` / `.zip` 或解压目录，**从不静默下载多 GB 权重**。
+2. 主进程依次：探测 runtime → 若为 `stopped` 则启动系统或内嵌 Ollama → 校验并导入 pack，进度合并到同一条 progress 条。
+3. 失败返回可操作文案与稳定错误码（如 `ollama_unavailable`、`insufficient_disk_space`、`hash_mismatch`），不把 Python/Node traceback 暴露给 UI。
+4. Catalog 推荐模型的 Ollama pull 仍须用户点选，且仅允许 allowlist 内 pullable 条目；Kronos 权重继续走显式 `scripts/download_kronos_weights.py` / 源码环境，预构建桌面包不包含 PyTorch 或 Kronos 权重（见 [Kronos 本地模型](kronos-local-model.md)）。
+
+与 go-stock / FinRobot Desktop 的定位对齐点：一键安装包 + 清晰首次路径 + 本地模型优先选项 + 诚实标注离线能力边界（云 LLM / 行情 API 仍可能需要）。本仓库**不**在首次打开时消耗云 token。
+
 ## 桌面本地模型
 
 **设置 -> AI 与模型 -> 本地模型** 是 Desktop 与 Web 共用、全系统唯一的模型下载管理入口。tray 的 `Local Models…` 会显示并聚焦主窗口，然后定位到 `/settings?section=ai_models&view=local_models`；旧的 520x640 独立窗口、renderer 和 `model-preload.js` 已退役，不保留第二套界面。
@@ -148,6 +167,7 @@ Desktop 启动后会在系统 tray / macOS 菜单栏创建 StockPulse 图标。�
 - 发现与状态：先探测 `LLM_OLLAMA_BASE_URL`（默认 `http://127.0.0.1:11434`）的 `/api/tags`；已有健康服务时直接复用。端点不可用时，先以固定参数 `ollama --version` 解析系统安装，再验证安装包内 `resources/ollama/runtime-manifest.json`、完整运行时文件集合和内嵌二进制；两者都不可用时显示安装引导。状态分为 `running` / `stopped` / `not-installed` / `starting` / `error`。Electron 还通过 `os.totalmem()` 向共享面板提供本机内存，用于推荐档高亮。
 - 下载：只允许下载权威 catalog 中标记为 pullable 的推荐模型；loopback HTTP `POST /api/pull` 流式展示进度。任意自定义名称和 guided-only 金融模型不会被下载。流式响应同时受单事件大小、未完成缓冲区和 30 分钟绝对截止时间约束，持续发送小事件也不能无限占用操作锁。
 - 启停：`Start service` 以解析后的系统或内嵌二进制加固定参数数组 `['serve']` 拉起受管进程并轮询健康；`Stop` 只结束桌面自己拉起的进程。内嵌服务只接受 loopback HTTP 地址，并把 `OLLAMA_HOST` 对齐到 `LLM_OLLAMA_BASE_URL`。
+- 一键导入：`Import Model Pack` 在用户选定 pack 后自动 detect/start runtime 再导入（见上一节）；runtime 未安装时返回安装引导，不会静默拉起下载。
 - 装完即用：下载完成后由后端 `SystemConfigService` 追加 `LLM_OLLAMA_MODELS`、确保 Ollama channel 存在并热加载；只有没有主模型时才自动选为主模型。Desktop 在下载前记录后端配置版本，主进程返回实际运行时规范化地址的 SHA-256 身份摘要；激活请求不携带目标 URL，后端从服务端配置重算摘要和目标，任一快照值变化都拒绝跨运行时激活。主模型切换与 Agent 模型指定均为面板内独立显式操作。配置写入不在 Electron 中重复实现。
 - 删除：共享面板先取得同一配置版本和运行时身份摘要，再调用后端取消注册或预留未注册模型；后端阻止删除被主模型、Agent、Vision、fallback 或有效隐式主 channel 引用的模型，主进程也会在请求前重算摘要确认自身运行时未变化，并对 plain route 和 connection-aware ModelRef 做同等复核。后端对已注册模型和仅存在于 Ollama 的未注册模型都签发绑定模型、原运行时与预留后配置版本的短时一次性恢复 token，并在 token 待处理期间阻止同一模型经本地模型服务并发下载或重新注册。预约存续期间，所有经 `SystemConfigService` 发起的配置写入（包括任务模型分配）也会暂时返回版本冲突，避免在取消注册后、删除权重前重新引用该模型；确认删除、完成恢复或短 TTL 到期后解除。若 IPC 删除失败，恢复通道只在原运行时仍报告对应权重时写回已移除的 catalog 注册；运行时停止、不可达或权重缺失都会拒绝恢复。未注册模型只释放预留，不创建注册。若 Desktop 保守判断权重仍在、但后端随后的原运行时探测确认权重已缺失，共享面板会按删除完成收敛并保持取消注册状态。若权重删除成功，Web 端会重试一次幂等 token 撤销；网络或状态响应导致撤销无法确认时返回非破坏性的 `local_model_delete_finalize_unconfirmed` 警告，不会把已完成的删除误报为失败。token 不能恢复已缺失的权重，并会按短 TTL 过期；后端未收到最终确认时，配置写入可能在 TTL 剩余时间内继续返回冲突，刷新后重试即可。
 
