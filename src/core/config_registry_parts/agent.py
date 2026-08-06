@@ -641,7 +641,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 705,
-        "help_key": "settings.agent.AGENT_OBSERVABILITY_ENABLED",
+        "help_key": "settings.agent.observability",
         "examples": [
             "AGENT_OBSERVABILITY_ENABLED=true",
             "AGENT_OBSERVABILITY_ENABLED=false",
@@ -665,7 +665,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 706,
-        "help_key": "settings.agent.AGENT_OBSERVABILITY_DEEP_PAYLOAD",
+        "help_key": "settings.agent.observability",
         "examples": [
             "AGENT_OBSERVABILITY_DEEP_PAYLOAD=false",
             "AGENT_OBSERVABILITY_DEEP_PAYLOAD=true",
