@@ -204,7 +204,8 @@ powershell -ExecutionPolicy Bypass -File scripts\build-all.ps1
   - Windows 免安装包：`stockpulse-windows-noinstall-<tag>.zip`
   - macOS Intel：`stockpulse-macos-x64-<tag>.dmg`
   - macOS Apple Silicon：`stockpulse-macos-arm64-<tag>.dmg`
-- macOS CI 会在打包后执行 **launch smoke**：`codesign -dv` 审计 + 对 `.app` 主二进制执行 `--version`。若 as-packaged（当前 clean-unsigned 契约）无法启动，流水线会对产物做最小 **ad-hoc** `codesign --sign -` 并重写 DMG，再二次断言可执行（回答 arm64 unsigned 是否可启动的实证问题）。这**不是** Apple Developer ID / 公证。
+- macOS CI 会在打包后执行 **launch smoke**：`codesign -dv` 审计 + 用 `ELECTRON_RUN_AS_NODE=1` 对 `.app` 主二进制做可执行探测（带 30s watchdog，避免 GUI 主进程挂起）。若 as-packaged（当前 clean-unsigned 契约）无法执行，流水线会对产物做最小 **ad-hoc** `codesign --sign -` 并重写 DMG，再二次断言可执行。这**不是** Apple Developer ID / 公证。
+- **arm64 实证（CI macos-15）**：post-rename StockPulse 包在 `codesign` 报告 `code object is not signed at all` 时，`ELECTRON_RUN_AS_NODE` 探测仍可 `launches_as_packaged`（x64 同结论）。用户本机仍可能受 Gatekeeper/quarantine 拦截，见下文。
 
 ### macOS 提示“应用已损坏，无法打开”
 
