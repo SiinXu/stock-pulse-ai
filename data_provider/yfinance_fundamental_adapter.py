@@ -263,6 +263,46 @@ class YfinanceFundamentalAdapter:
             "currency": financial_currency,
         }
         if any(v is not None and v != "" for v in financial_report.values()):
+            # Additive sufficiency / recency metadata (issue #235 honesty contract).
+            try:
+                from src.services.financial_reports_service import build_financial_report_payload
+
+                yf_periods = []
+                if any(
+                    v is not None
+                    for v in (revenue_latest, net_profit_latest, operating_cash_flow_latest, report_date)
+                ):
+                    yf_periods.append(
+                        {
+                            "report_date": report_date,
+                            "revenue": revenue_latest,
+                            "net_profit_parent": net_profit_latest,
+                            "operating_cash_flow": operating_cash_flow_latest,
+                            "roe": growth_payload.get("roe"),
+                        }
+                    )
+                financial_report = build_financial_report_payload(
+                    periods=yf_periods,
+                    seed_summary=financial_report,
+                    sources=["earnings.financial_report:yfinance"],
+                    currency=financial_currency or "USD",
+                )
+            except Exception as exc:
+                result["errors"].append(f"financial_report_enrich:{type(exc).__name__}")
+                financial_report["sufficiency"] = {
+                    "level": "partial" if any(
+                        financial_report.get(k) is not None
+                        for k in ("revenue", "net_profit_parent", "operating_cash_flow")
+                    ) else "insufficient",
+                    "message": "partial fundamentals: enrichment unavailable",
+                    "core_fields_present": [
+                        k for k in ("report_date", "revenue", "net_profit_parent", "operating_cash_flow")
+                        if financial_report.get(k) is not None
+                    ],
+                    "missing_fields": [],
+                    "period_count": 0,
+                    "has_multi_period_history": False,
+                }
             result.setdefault("earnings", {})["financial_report"] = financial_report
             result["source_chain"].append("earnings.financial_report:yfinance")
 

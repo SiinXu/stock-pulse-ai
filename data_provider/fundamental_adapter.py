@@ -302,10 +302,14 @@ class AkshareFundamentalAdapter:
             "errors": [],
         }
 
-        # Financial indicators
+        # Financial indicators + multi-period statements (issue #235, A-share first).
+        # Extends the existing fundamental path; never invents silent zeros.
+        seed_summary: Dict[str, Any] = {}
         fin_df, fin_source, fin_errors = self._call_df_candidates([
             ("stock_financial_abstract", {"symbol": stock_code}),
             ("stock_financial_analysis_indicator", {"symbol": stock_code}),
+            ("stock_financial_analysis_indicator_em", {"symbol": f"{stock_code}.SH"}),
+            ("stock_financial_analysis_indicator_em", {"symbol": f"{stock_code}.SZ"}),
             ("stock_financial_analysis_indicator", {}),
         ])
         result["errors"].extend(fin_errors)
@@ -328,16 +332,67 @@ class AkshareFundamentalAdapter:
                     "roe": roe,
                     "gross_margin": gross_margin,
                 }
-                financial_report_payload = {
+                seed_summary = {
                     "report_date": report_date,
                     "revenue": revenue,
                     "net_profit_parent": net_profit_parent,
                     "operating_cash_flow": operating_cash_flow,
                     "roe": roe,
+                    "gross_margin": gross_margin,
                 }
-                if any(v is not None for v in financial_report_payload.values()):
-                    result["earnings"]["financial_report"] = financial_report_payload
                 result["source_chain"].append(f"growth:{fin_source}")
+
+        # Multi-period statement enrichment (additive fields on financial_report).
+        try:
+            report_payload, statement_sources, statement_errors = self._build_financial_report_from_statements(
+                stock_code,
+                seed_summary=seed_summary,
+                abstract_df=fin_df,
+                abstract_source=fin_source,
+            )
+            result["errors"].extend(statement_errors)
+            if report_payload:
+                result["earnings"]["financial_report"] = report_payload
+                for src in statement_sources:
+                    if src and src not in result["source_chain"]:
+                        result["source_chain"].append(src)
+                # Prefer statement-derived YoY when provider growth is empty.
+                metrics = report_payload.get("metrics") if isinstance(report_payload.get("metrics"), dict) else {}
+                growth = result.get("growth") if isinstance(result.get("growth"), dict) else {}
+                for key in ("revenue_yoy", "net_profit_yoy", "gross_margin", "roe"):
+                    if growth.get(key) is not None:
+                        continue
+                    metric = metrics.get(key)
+                    value = metric.get("value") if isinstance(metric, dict) else None
+                    if value is not None:
+                        growth[key] = value
+                if growth:
+                    result["growth"] = growth
+            elif any(v is not None for v in seed_summary.values()):
+                # Fallback: keep legacy single-period summary + explicit sufficiency.
+                from src.services.financial_reports_service import build_financial_report_payload
+
+                result["earnings"]["financial_report"] = build_financial_report_payload(
+                    periods=[],
+                    seed_summary=seed_summary,
+                    sources=[f"growth:{fin_source}"] if fin_source else [],
+                    currency="CNY",
+                )
+        except Exception as exc:  # fail-open: never break the fundamental bundle
+            result["errors"].append(f"financial_statements:{type(exc).__name__}")
+            if any(v is not None for v in seed_summary.values()):
+                result["earnings"]["financial_report"] = {
+                    **seed_summary,
+                    "currency": "CNY",
+                    "sufficiency": {
+                        "level": "partial",
+                        "message": "partial fundamentals: statement enrichment failed; summary only",
+                        "core_fields_present": [k for k, v in seed_summary.items() if v is not None],
+                        "missing_fields": [],
+                        "period_count": 0,
+                        "has_multi_period_history": False,
+                    },
+                }
 
         # Earnings forecast
         forecast_df, forecast_source, forecast_errors = self._call_df_candidates([
@@ -412,6 +467,151 @@ class AkshareFundamentalAdapter:
         has_content = bool(result["growth"] or result["earnings"] or result["institution"])
         result["status"] = "partial" if has_content else "not_supported"
         return result
+
+    def _build_financial_report_from_statements(
+        self,
+        stock_code: str,
+        *,
+        seed_summary: Optional[Dict[str, Any]] = None,
+        abstract_df: Optional[pd.DataFrame] = None,
+        abstract_source: Optional[str] = None,
+        max_periods: int = 8,
+    ) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Fetch and normalize multi-period A-share statements into financial_report.
+
+        Prefer reusing the already-fetched financial abstract. When multi-period
+        history or balance-sheet fields are missing, best-effort Eastmoney
+        report-period endpoints are tried (symbol form ``SH600519``). Fail-open:
+        any provider error is recorded and never raised.
+        """
+        from src.services.financial_reports_service import (
+            build_financial_report_payload,
+            extract_periods_from_wide_or_long,
+            merge_period_lists,
+            to_eastmoney_report_symbol,
+        )
+
+        errors: List[str] = []
+        sources: List[str] = []
+        statement_coverage: Dict[str, Any] = {
+            "income": {"available": False, "period_count": 0, "source": None},
+            "balance": {"available": False, "period_count": 0, "source": None},
+            "cash_flow": {"available": False, "period_count": 0, "source": None},
+            "abstract": {"available": False, "period_count": 0, "source": abstract_source},
+        }
+
+        abstract_periods: List[Dict[str, Any]] = []
+        if abstract_df is not None:
+            abstract_periods = extract_periods_from_wide_or_long(abstract_df, max_periods=max_periods)
+            statement_coverage["abstract"] = {
+                "available": bool(abstract_periods),
+                "period_count": len(abstract_periods),
+                "source": abstract_source,
+            }
+            if abstract_source and abstract_periods:
+                sources.append(f"statements.abstract:{abstract_source}")
+
+        em_symbol = to_eastmoney_report_symbol(stock_code)
+        income_periods: List[Dict[str, Any]] = []
+        balance_periods: List[Dict[str, Any]] = []
+        cashflow_periods: List[Dict[str, Any]] = []
+
+        has_multi = len(abstract_periods) >= 2
+        has_ocf = any(p.get("operating_cash_flow") is not None for p in abstract_periods)
+        has_balance = any(p.get("total_assets") is not None for p in abstract_periods)
+        # Skip extra network only when abstract already provides multi-period + OCF + balance.
+        need_statements = not (has_multi and has_ocf and has_balance)
+
+        if em_symbol and need_statements:
+            # Income statement (multi-period)
+            income_df, income_source, income_errors = self._call_df_candidates([
+                ("stock_profit_sheet_by_report_em", {"symbol": em_symbol}),
+                ("stock_financial_benefit_ths", {"symbol": stock_code}),
+                ("stock_financial_benefit_new_ths", {"symbol": stock_code}),
+            ])
+            errors.extend(income_errors)
+            if income_df is not None:
+                income_periods = extract_periods_from_wide_or_long(income_df, max_periods=max_periods)
+                statement_coverage["income"] = {
+                    "available": bool(income_periods),
+                    "period_count": len(income_periods),
+                    "source": income_source,
+                }
+                if income_source and income_periods:
+                    sources.append(f"statements.income:{income_source}")
+
+            # Balance sheet
+            balance_df, balance_source, balance_errors = self._call_df_candidates([
+                ("stock_balance_sheet_by_report_em", {"symbol": em_symbol}),
+                ("stock_financial_debt_ths", {"symbol": stock_code}),
+                ("stock_financial_debt_new_ths", {"symbol": stock_code}),
+            ])
+            errors.extend(balance_errors)
+            if balance_df is not None:
+                balance_periods = extract_periods_from_wide_or_long(balance_df, max_periods=max_periods)
+                statement_coverage["balance"] = {
+                    "available": bool(balance_periods),
+                    "period_count": len(balance_periods),
+                    "source": balance_source,
+                }
+                if balance_source and balance_periods:
+                    sources.append(f"statements.balance:{balance_source}")
+
+            # Cash flow
+            cashflow_df, cashflow_source, cashflow_errors = self._call_df_candidates([
+                ("stock_cash_flow_sheet_by_report_em", {"symbol": em_symbol}),
+                ("stock_financial_cash_ths", {"symbol": stock_code}),
+                ("stock_financial_cash_new_ths", {"symbol": stock_code}),
+            ])
+            errors.extend(cashflow_errors)
+            if cashflow_df is not None:
+                cashflow_periods = extract_periods_from_wide_or_long(cashflow_df, max_periods=max_periods)
+                statement_coverage["cash_flow"] = {
+                    "available": bool(cashflow_periods),
+                    "period_count": len(cashflow_periods),
+                    "source": cashflow_source,
+                }
+                if cashflow_source and cashflow_periods:
+                    sources.append(f"statements.cash_flow:{cashflow_source}")
+        elif not em_symbol:
+            errors.append("statements:non_a_share_symbol_skipped")
+
+        periods = merge_period_lists(
+            income_periods,
+            balance_periods,
+            cashflow_periods,
+            abstract_periods,
+            max_periods=max_periods,
+        )
+
+        # If abstract alone had periods and statements were skipped, still mark income-like coverage.
+        if periods and not statement_coverage["income"]["available"] and abstract_periods:
+            statement_coverage["income"] = {
+                "available": True,
+                "period_count": len(abstract_periods),
+                "source": abstract_source,
+            }
+
+        if not periods and not (seed_summary and any(v is not None for v in seed_summary.values())):
+            # Explicit insufficient payload so consumers never see silent empty dicts
+            # masquerading as zeros.
+            payload = build_financial_report_payload(
+                periods=[],
+                statement_coverage=statement_coverage,
+                sources=sources,
+                currency="CNY",
+                seed_summary=seed_summary or {},
+            )
+            return payload, sources, errors
+
+        payload = build_financial_report_payload(
+            periods=periods,
+            statement_coverage=statement_coverage,
+            sources=sources,
+            currency="CNY",
+            seed_summary=seed_summary or {},
+        )
+        return payload, sources, errors
 
     def get_capital_flow(self, stock_code: str, top_n: int = 5) -> Dict[str, Any]:
         """

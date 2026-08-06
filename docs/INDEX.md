@@ -33,6 +33,7 @@
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
 | [持久安全审计 Phase 1（英文）](security-audit.md) | 事件合同、代表性特权路径、管理员查询、保留、失败语义与回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
+| [财务报表接入基本面分析](financial-reports-integration.md) | A 股优先的多期财报归一化、派生指标公式、充分性（insufficient fundamentals）与既有 fundamental_context 扩展 |
 | [更新日志](CHANGELOG.md) | 版本变化、能力调整和迁移说明 |
 
 ## 配置
