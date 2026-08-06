@@ -240,19 +240,15 @@ class _ConfigLoadingMethods:
             os.getenv('ANSPIRE_LLM_BASE_URL') or ANSPIRE_LLM_BASE_URL_DEFAULT
         ).strip()
         _anspire_llm_model_env = os.getenv('ANSPIRE_LLM_MODEL', '').strip()
-        anspire_channel_disabled = False
+        anspire_channel_declared = False
         for _raw_channel in os.getenv('LLM_CHANNELS', '').split(','):
             if _raw_channel.strip().lower() != "anspire":
                 continue
-            _channel_enabled_raw = os.getenv('LLM_ANSPIRE_ENABLED')
-            if _channel_enabled_raw is not None and _channel_enabled_raw.strip():
-                anspire_channel_disabled = not parse_env_bool(_channel_enabled_raw, default=True)
-            else:
-                anspire_channel_disabled = not anspire_llm_enabled
+            anspire_channel_declared = True
             break
         using_anspire_llm_legacy = bool(
             anspire_llm_enabled
-            and not anspire_channel_disabled
+            and not anspire_channel_declared
             and anspire_api_keys
             and not openai_api_keys
         )

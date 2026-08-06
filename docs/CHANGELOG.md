@@ -9,10 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
 - [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
 - [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
+- [Added] Personal investment framework editor shows a live analysis-context preview and injects a bounded decision-tree summary into the stock-analysis read-only prompt (no-op when no framework is active).
+- [Fixed] `refreshStockBar` sets `isLoadingStockBar` while in flight; history list accepts AbortSignal for stable workspace refreshes.
+- [Added] Config-driven LLM channel `API_SURFACE` routing (`chat_completions` default, opt-in `responses` → `openai/responses/<model>` wire models) with validation, registry key, and parity tests.
+
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
@@ -32,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extended the mypy ratchet to `api/v1/schemas` (kept `follow_imports=skip`; documented next-package order).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 - [Chore] Upgraded the Electron desktop stack (Electron 43.3.0, electron-builder 26.15.7, electron-updater 6.8.9, tar override 7.5.22) and added ESLint flat config with // @ts-check for main.js.
+- [Chore] Extracted Portfolio page sections into a feature workspace and portfolio hooks without changing ledger or idempotency behavior.
 - [Fixed] AlphaSift hotspot detail search is response-only (never written to the shared detail cache), bounded by a 12s timeout and concurrency slots, reports `news_search_status` (`available`/`no_results`/`unavailable`), and supports `include_search` (default true for Web compatibility). Ported-from: e430fcfe.
 - [Tests] Added fixed-seed property-style invariant coverage for portfolio ledger money math (conservation, scoped idempotency, FX isolation, projection-after-write).
 
