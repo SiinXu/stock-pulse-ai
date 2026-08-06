@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.app import create_app
@@ -160,7 +161,10 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
         content="ok",
         error=None,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -182,9 +186,140 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
     kwargs = executor.chat.call_args.kwargs
     assert kwargs["message"] == "如果不考虑 TTM 呢"
     assert kwargs["session_id"] == "s1"
-    assert kwargs["context"]["stock_code"] == "600519"
-    assert kwargs["context"]["stock_name"] == "匿名标的"
+    assert kwargs["context"] == {
+        "stock_code": "600519",
+        "stock_name": "匿名标的",
+        "report_language": "en",
+    }
     assert "agent_runtime" not in response.json()
+
+
+def test_agent_chat_preserves_explicit_report_language(tmp_path: Path) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+    )
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={
+                        "message": "분석해 주세요",
+                        "session_id": "explicit-language",
+                        "context": {"report_language": "ko"},
+                    },
+                )
+
+    assert response.status_code == 200
+    assert executor.chat.call_args.kwargs["context"]["report_language"] == "ko"
+
+
+@pytest.mark.parametrize("provided_language", [None, "", "   "])
+def test_agent_chat_treats_null_or_blank_report_language_as_missing(
+    tmp_path: Path,
+    provided_language,
+) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+    )
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={
+                        "message": "analyze",
+                        "session_id": "default-language",
+                        "context": {"report_language": provided_language},
+                    },
+                )
+
+    assert response.status_code == 200
+    assert executor.chat.call_args.kwargs["context"]["report_language"] == "en"
+
+
+@pytest.mark.parametrize("provided_language", [None, "", "   "])
+def test_agent_chat_stream_treats_null_or_blank_report_language_as_missing(
+    tmp_path: Path,
+    provided_language,
+) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        total_steps=1,
+    )
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={
+                        "message": "analyze",
+                        "session_id": "stream-default-language",
+                        "context": {"report_language": provided_language},
+                    },
+                )
+
+    assert response.status_code == 200
+    assert '"type": "done"' in response.text
+    assert executor.chat.call_args.kwargs["context"]["report_language"] == "en"
+
+
+@pytest.mark.parametrize(
+    "provided_language, expected_language",
+    [
+        (None, "en"),
+        ("", "en"),
+        ("   ", "en"),
+        ("ko", "ko"),
+    ],
+)
+def test_build_agent_chat_context_normalizes_default_report_language(
+    provided_language,
+    expected_language,
+) -> None:
+    from api.v1.endpoints import agent as agent_endpoint
+
+    request = agent_endpoint.ChatRequest(
+        message="question",
+        context=(
+            {"report_language": provided_language}
+            if provided_language is not None
+            else {"report_language": None}
+        ),
+    )
+    context = agent_endpoint._build_agent_chat_context(
+        request,
+        SimpleNamespace(report_language="en"),
+        skills=None,
+    )
+    assert context["report_language"] == expected_language
 
 
 def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> None:
@@ -197,7 +332,7 @@ def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> No
             compose_agent_soul_prompt("Chat API verified prompt")
         ),
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -220,7 +355,7 @@ def test_agent_chat_omits_direct_unverified_runtime_facts(tmp_path: Path) -> Non
         error=None,
         runtime_facts=AgentRuntimeFacts(),
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -253,7 +388,7 @@ def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, cap
         content=SENSITIVE_PROVIDER_ERROR,
         error=SENSITIVE_PROVIDER_ERROR,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
     caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
@@ -283,7 +418,7 @@ def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
 ) -> None:
     executor = MagicMock()
     executor.chat.return_value = _build_all_unavailable_comparison_result()
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -311,6 +446,7 @@ def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
 def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) -> None:
     config = SimpleNamespace(
         is_agent_available=lambda: True,
+        report_language="zh",
         agent_deep_research_budget=30000,
         agent_deep_research_timeout=180,
     )
@@ -350,6 +486,7 @@ def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) 
 def test_agent_research_timeout_does_not_expose_internal_result(tmp_path: Path) -> None:
     config = SimpleNamespace(
         is_agent_available=lambda: True,
+        report_language="zh",
         agent_deep_research_budget=30000,
         agent_deep_research_timeout=180,
     )
@@ -394,7 +531,10 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
         error=None,
         total_steps=1,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -419,6 +559,7 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["session_id"] == "s1"
     assert kwargs["context"]["stock_code"] == "600519"
     assert kwargs["context"]["stock_name"] == "匿名标的"
+    assert kwargs["context"]["report_language"] == "zh"
 
 
 def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
@@ -432,7 +573,7 @@ def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
         error=None,
         total_steps=1,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -470,7 +611,7 @@ def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Pa
         error=SENSITIVE_PROVIDER_ERROR,
         total_steps=1,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
     caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
@@ -498,7 +639,7 @@ def test_agent_chat_stream_keeps_all_unavailable_failure_content_empty(
 ) -> None:
     executor = MagicMock()
     executor.chat.return_value = _build_all_unavailable_comparison_result()
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -540,7 +681,7 @@ def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: 
         )
 
     executor.chat.side_effect = fail_with_callback
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -577,7 +718,7 @@ def test_agent_chat_stream_callback_error_redacts_secret_shaped_trace_id(
         )
 
     executor.chat.side_effect = fail_with_callback
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -600,7 +741,7 @@ def test_agent_chat_stream_callback_error_redacts_secret_shaped_trace_id(
 def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: Path, caplog) -> None:
     executor = MagicMock()
     executor.chat.side_effect = RuntimeError(SENSITIVE_PROVIDER_ERROR)
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
     caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):

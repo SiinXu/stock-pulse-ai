@@ -1291,7 +1291,7 @@ class _ConfigLoadingMethods:
         raw = (value or "").strip()
         if raw and not is_supported_report_language_value(raw):
             logging.getLogger(__name__).warning(
-                "REPORT_LANGUAGE '%s' invalid, fallback to 'zh' (valid: zh/en)",
+                "REPORT_LANGUAGE '%s' invalid, fallback to 'zh' (valid: zh/en/ko)",
                 value,
             )
         return normalized
