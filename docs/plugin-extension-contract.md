@@ -7,6 +7,80 @@ first supported extension boundaries and the signatures that implementation
 work must converge on. Runnable code remains authoritative while a listed
 integration is not yet wired.
 
+## V1 Surface Freeze
+
+**Surface version:** `PLUGIN_EXTENSION_SURFACE_VERSION = 1` in
+[`src/plugins/surface.py`](../src/plugins/surface.py) (re-exported from
+`src.plugins`).
+
+Version 1 of the plugin extension surface is **frozen**. Contributors and
+operators may treat the items below as the stable external contract. Anything
+not listed here is an **internal** host detail and may change without a surface
+major bump.
+
+### Frozen extension points (exactly six)
+
+| Point | Registration key | Author-facing types (package root) |
+| --- | --- | --- |
+| `data_provider` | `DataProviderRegistration.provider_id` | `Plugin` / `PluginContext` plus `data_provider.DataProvider` / `DataProviderRegistration` |
+| `analysis_strategy` | strategy `name` | `AnalysisStrategyDefinition` |
+| `agent_tool` | tool `name` | Tool definitions remain ToolSurface-owned; default process adapter is wired with fail-closed policy validation |
+| `notification_channel` | `channel_id` | `NotificationChannelAdapter`, `NotificationChannelFactory`, `NotificationRequest`, `NotificationAdapterResult` |
+| `report_template` | `template_id` | `ReportTemplate`, `ReportRenderRequest`, `ReportPlatform` |
+| `event_hook` | `hook_id` | `EventHook`, `EventHookRegistration`, `PluginEvent`, `EVENT_HOOK_NAMES` |
+
+The ordered identity is also exposed as `PLUGIN_EXTENSION_SURFACE_V1_POINT_ORDER`
+and must stay identical to runtime `EXTENSION_POINTS`.
+
+### Frozen author import surface
+
+External plugins should import only from:
+
+- the `src.plugins` package root names in `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS`
+- the `data_provider` package for provider registrations (`DataProvider`,
+  `DataProviderRegistration`)
+
+Lifecycle hooks remain `Plugin.onload` / `Plugin.onunload` with
+`PluginContext.register(...)` using one of the six points above. Manifest fields
+(`id`, `name`, `version`, `minAppVersion`, `description`, `author`,
+`permissions`, `apiVersion`, `entrypoint`) stay as defined in
+[Package And Manifest](#package-and-manifest).
+
+### Explicitly internal (not part of surface v1)
+
+The following are host-only and **must not** be treated as a stable plugin API:
+
+- `PluginManager`, `ExternalPluginLoader`, composition roots, and native backends
+- private modules under `src.plugins.*` beyond the package-root author exports
+- any seventh extension point name (for example UI, Settings, marketplace,
+  custom commands, connector/MCP)
+
+Registering an unsupported extension point fails closed with
+`PluginRegistryError("extension_point_unsupported")`. Using a closed
+`PluginContext` after `onload` fails with
+`PluginContextClosedError("plugin_context_closed")`.
+
+### Freeze policy
+
+- **No new extension points** without a new ADR (or an explicit ADR-007
+  amendment) **and** a surface major bump.
+- **No remote marketplace**, hot reload, dependency installer, or enforced
+  permission sandbox in surface v1 (trusted in-process code only).
+- Additive optional fields and event names may stay within major `1`; removals,
+  renames, type changes, or semantic changes require a new contract major.
+
+### Runnable reference packages
+
+| Package | Point | Role |
+| --- | --- | --- |
+| [`examples/plugins/example-provider`](../examples/plugins/example-provider/) | `data_provider` | Network-free daily-data fixture; requires a manager-bound registry |
+| [`examples/plugins/example-notification-channel`](../examples/plugins/example-notification-channel/) | `notification_channel` | Full lifecycle log-sink channel on the default process root |
+| [`docs/examples/report-template-plugin`](examples/report-template-plugin/) | `report_template` | Minimal Markdown template illustration |
+
+Point `PLUGINS_DIR` at the parent of the package directory (for example
+`examples/plugins`), never at a single plugin folder. Each package README
+includes the process-equivalent trust warning.
+
 ## Choosing An Extension Mechanism
 
 Choose the smallest extension mechanism that matches the capability. A feature

@@ -1312,6 +1312,28 @@
             ],
             "title": "Name"
           },
+          "news_search_requested": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Search Requested"
+          },
+          "news_search_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Search Status"
+          },
           "provider": {
             "title": "Provider",
             "type": "string"
@@ -1713,6 +1735,17 @@
               }
             ],
             "title": "Published At"
+          },
+          "search_result": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Result"
           },
           "source": {
             "anyOf": [
@@ -20353,6 +20386,18 @@
             "schema": {
               "default": false,
               "title": "Refresh",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "When true (default), auto-attach bounded news-search catalysts if the structured route has no external event. Search is response-only and is never written to the shared hotspot detail cache.",
+            "in": "query",
+            "name": "include_search",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "When true (default), auto-attach bounded news-search catalysts if the structured route has no external event. Search is response-only and is never written to the shared hotspot detail cache.",
+              "title": "Include Search",
               "type": "boolean"
             }
           }

@@ -3,7 +3,8 @@ export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | '
 export type ApprovalDecision = 'approved' | 'rejected' | 'cancelled';
 
 export interface ApprovalContext {
-  stockCode: string;
+  /** Optional in OpenAPI ApprovalContext (default ""). */
+  stockCode?: string;
   originalSignal: 'buy' | 'hold' | 'sell';
   conservativeSignal: 'buy' | 'hold' | 'sell';
   riskSource: ApprovalRiskSource;
@@ -12,12 +13,13 @@ export interface ApprovalContext {
 
 export interface ApprovalRule {
   owner: string;
-  action: 'risk_control_bypass';
+  /** Optional in OpenAPI ApprovalRule. */
+  action?: 'risk_control_bypass' | string;
   enabled: boolean;
   riskSources: ApprovalRiskSource[];
   expiresInSeconds: number;
   version: number;
-  updatedAt: string | null;
+  updatedAt?: string | null;
 }
 
 export interface ApprovalProposal {
@@ -26,7 +28,7 @@ export interface ApprovalProposal {
   status: ApprovalStatus;
   version: number;
   expiresAt: string;
-  consumedAt: string | null;
+  consumedAt?: string | null;
   context: ApprovalContext;
 }
 
