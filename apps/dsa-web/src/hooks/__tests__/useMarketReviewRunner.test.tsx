@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
 import type { HistoryListResponse } from '../../types/analysis';
@@ -9,6 +11,20 @@ import {
   MARKET_REVIEW_POLL_MAX_ATTEMPTS,
   useMarketReviewRunner,
 } from '../useMarketReviewRunner';
+
+
+function createWrapper() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+}
+
 
 vi.mock('../../api/analysis', async () => {
   const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
@@ -82,7 +98,7 @@ describe('useMarketReviewRunner', () => {
       refreshMarketReviewHistory,
       onPersistedReport,
       onFeedback,
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -129,7 +145,7 @@ describe('useMarketReviewRunner', () => {
       notify: false,
       refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
       onPersistedReport,
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -164,7 +180,7 @@ describe('useMarketReviewRunner', () => {
       refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
       onPersistedReport: vi.fn(),
       onFeedback,
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -198,7 +214,7 @@ describe('useMarketReviewRunner', () => {
       notify: false,
       refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
       onPersistedReport: vi.fn(),
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -228,7 +244,7 @@ describe('useMarketReviewRunner', () => {
       notify: false,
       refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
       onPersistedReport: vi.fn(),
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -252,7 +268,7 @@ describe('useMarketReviewRunner', () => {
       notify: true,
       refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
       onPersistedReport: vi.fn(),
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -298,7 +314,7 @@ describe('useMarketReviewRunner', () => {
       notify: true,
       refreshMarketReviewHistory,
       onPersistedReport,
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
@@ -337,7 +353,7 @@ describe('useMarketReviewRunner', () => {
       notify: true,
       refreshMarketReviewHistory,
       onPersistedReport,
-    }));
+    }), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.triggerMarketReview();
