@@ -705,51 +705,9 @@ def probe_llm_connectivity(
     if _is_present(env, "DEEPSEEK_API_KEY") and not _is_malformed_secret(env, "DEEPSEEK_API_KEY"):
         base = _env_get(env, "DEEPSEEK_BASE_URL") or "https://api.deepseek.com/v1"
         candidates.append(("deepseek", base, "DEEPSEEK_API_KEY"))
-    if _is_present(env, "GEMINI_API_KEY") and not _is_malformed_secret(env, "GEMINI_API_KEY"):
-        key = _env_get(env, "GEMINI_API_KEY")
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models"
-            f"?key={key}&pageSize=1"
-        )
-        try:
-            req = Request(url, method="GET", headers={"User-Agent": "stock-pulse-config-check/1"})
-            with urlopen(req, timeout=timeout_seconds) as resp:  # noqa: S310
-                status = getattr(resp, "status", None) or resp.getcode()
-            return CheckItem(
-                code="config.llm.probe.ok",
-                severity=CheckSeverity.PASS,
-                label_en="LLM connectivity probe",
-                label_zh="大模型连通性探测",
-                detail_en=f"Gemini models endpoint reachable (HTTP {status}).",
-                detail_zh=f"Gemini models 接口可达（HTTP {status}）。",
-                field="GEMINI_API_KEY",
-            )
-        except HTTPError as exc:
-            return CheckItem(
-                code="config.llm.probe.http_error",
-                severity=CheckSeverity.WARN,
-                label_en="LLM connectivity probe",
-                label_zh="大模型连通性探测",
-                detail_en=f"Gemini probe HTTP {exc.code} (key present; check quota/network).",
-                detail_zh=f"Gemini 探测 HTTP {exc.code}（Key 已配置；请检查配额/网络）。",
-                field="GEMINI_API_KEY",
-            )
-        except (URLError, TimeoutError, OSError) as exc:
-            return CheckItem(
-                code="config.llm.probe.network_error",
-                severity=CheckSeverity.WARN,
-                label_en="LLM connectivity probe",
-                label_zh="大模型连通性探测",
-                detail_en=(
-                    "Gemini probe network error: "
-                    f"{_sanitize_probe_error(type(exc).__name__, env)}."
-                ),
-                detail_zh=(
-                    "Gemini 探测网络错误："
-                    f"{_sanitize_probe_error(type(exc).__name__, env)}。"
-                ),
-                field="GEMINI_API_KEY",
-            )
+    # Do not probe Gemini via ?key= URL query: that pattern can leak the secret
+    # into exception/proxy logs. Optional probe uses Bearer-style /models only.
+
 
     for label, base, key_name in candidates:
         api_key = _env_get(env, key_name)

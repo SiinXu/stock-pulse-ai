@@ -9,7 +9,6 @@ import pytest
 import yaml
 
 from src.services.actions_config_check import (
-    CheckSeverity,
     env_from_mapping,
     format_report_markdown,
     format_report_text,
