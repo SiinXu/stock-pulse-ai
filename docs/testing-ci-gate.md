@@ -148,6 +148,49 @@ Current benchmark-marked wall-clock cases:
 - `tests/security/test_sensitive_redaction.py::test_field_scanner_checks_one_public_boundary_per_whitespace_run` (`elapsed < 0.5`)
 - `tests/data_provider/test_hk_stock_name_fallback.py::test_parallel_cold_lookups_share_one_em_request` (4-thread barrier / sleep; relocated from the blocking gate)
 
+## Time determinism (fake clock, phase 1)
+
+Wall-clock-sensitive offline tests should prefer the repo-local seam in
+[`tests/time_determinism.py`](../tests/time_determinism.py) over real
+`time.sleep` or live `datetime.now()` anchors.
+
+| Piece | Role |
+| --- | --- |
+| `FakeClock` | Explicit `time()` / `monotonic()` / `tick()` / optional non-blocking `sleep()` |
+| `install_fake_clock(monkeypatch, ...)` | Pytest install (reverts automatically) |
+| `frozen_time(...)` | Context manager for `unittest.TestCase` |
+| `fake_clock` fixture | Default freeze at `DEFAULT_FAKE_NOW` (2026-06-15 12:00 UTC) |
+
+**Why not freezegun (phase 1):** freezegun is not in the dependency lock.
+Adding it requires the reviewed lock-refresh path
+(`scripts/check_dependency_locks.py --update` + supply-chain review). A
+monkeypatch fixture covers the first converted suites without expanding the
+lock surface. Revisit freezegun only through that process if a later phase
+needs broader auto-patching.
+
+**Scope notes:**
+
+* Rebind module-level `datetime` names when code uses
+  `from datetime import datetime` (pass `datetime_modules=[...]`).
+* Leave `patch_sleep=False` when a test still needs real short sleeps (for
+  example worker-drain loops). Prefer explicit `clock.tick(...)` for TTL /
+  cooldown advances.
+* OS-level waits (`concurrent.futures` timeouts, subprocess, thread joins)
+  are **not** controlled by the fake clock.
+
+* Pytest assertion rewriting may keep a separate globals dict for test methods.
+  Rebinding ``datetime`` only on ``sys.modules[name]`` will not affect bare
+  ``datetime.now()`` inside rewritten tests; also rebind the test method
+  globals (see the news-freshness suite) or call ``clock.now()`` explicitly.
+
+
+Phase-1 converted modules: `tests/search/test_search_news_freshness.py`,
+`tests/data_provider/test_realtime_types.py`,
+`tests/services/test_market_structure_service.py` (TTL / retry-delay cases).
+
+There is no separate Chinese twin of this guide; keep time-determinism notes
+here only until a bilingual testing guide pair is introduced.
+
 ## Parallelism (`pytest-xdist`)
 
 `pytest-xdist` is **not** enabled in the gate by default. Global monkeypatches in `tests/conftest.py` (asyncio/anyio/TestClient rebinding) are process-global and may not be safe under multi-process collection. Re-evaluate with two clean `pytest -n auto -m "not network and not benchmark"` runs before enabling in `ci_gate.sh`.

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Tests] Introduced a repo-local fake clock (`tests/time_determinism.py`) and converted the news-freshness, realtime circuit-breaker, and market-structure hotspot suites off wall-clock sleeps/date anchors.
 - [Added] Added a Research skill-outcome performance page with sufficiency-gated buckets, explicit offline evaluation, and empty-state guidance that recording is default-off.
 - [Changed] Disclose CLI backend generation-only limits in the first-run wizard and settings, and add `AGENT_FEATURES_ACKNOWLEDGED_OFF` so CLI-only users can settle the Agent readiness check without needing an API model.
 - [Fixed] Admin-configured loopback Ollama (`LLM_OLLAMA_BASE_URL` on 127.0.0.0/8, ::1, or localhost) is reachable without hand-editing `OUTBOUND_HTTP_ALLOWLIST`; non-loopback targets and redirect escapes stay fail-closed.
