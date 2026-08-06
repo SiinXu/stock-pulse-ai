@@ -27,7 +27,6 @@ if TYPE_CHECKING:
         _alphasift_hotspot_history_path,
         _alphasift_runtime_env,
         _attach_cached_hotspot_details,
-        _build_hotspot_event_routes_from_search,
         _call_alphasift_screen,
         _classify_hotspot_source_errors,
         _empty_alphasift_hotspot_payload,
@@ -45,7 +44,6 @@ if TYPE_CHECKING:
         _get_alphasift_status_snapshot,
         _get_dsa_adapter,
         _has_degraded_eastmoney_hotspot_failure,
-        _hotspot_route_has_external_event,
         _hotspot_rows_are_thin,
         _hotspot_topic_from_row,
         _import_alphasift_hotspot,
@@ -64,8 +62,10 @@ if TYPE_CHECKING:
         _resolve_hotspot_provider,
         _sanitize_public_alphasift_diagnostics,
         _should_return_eastmoney_hotspot_unavailable,
+        _strip_hotspot_search_augmentation,
         _to_plain,
         _topic_log_context,
+        _with_hotspot_search_augmentation,
         _write_alphasift_hotspot_cache,
         _write_alphasift_hotspot_detail_cache,
         log_safe_exception,
@@ -279,7 +279,14 @@ class AlphaSiftService:
             if not topic or (topic in details and not refresh):
                 continue
             try:
-                details[topic] = self.hotspot_detail(topic=topic, provider=provider, refresh=refresh)
+                # Prefetch structured detail only; do not stampede news search
+                # workers for every list row (Ported-from: e430fcfe).
+                details[topic] = self.hotspot_detail(
+                    topic=topic,
+                    provider=provider,
+                    refresh=refresh,
+                    include_search=False,
+                )
             except HTTPException as exc:
                 source_errors.append(DSA_ALPHASIFT_HOTSPOT_DETAIL_PREFETCH_FAILED_CODE)
                 log_safe_exception(
@@ -307,7 +314,14 @@ class AlphaSiftService:
             attached["source_errors"] = source_errors
         return _sanitize_public_alphasift_diagnostics(attached)
 
-    def hotspot_detail(self, *, topic: str, provider: str = "", refresh: bool = False) -> Dict[str, Any]:
+    def hotspot_detail(
+        self,
+        *,
+        topic: str,
+        provider: str = "",
+        refresh: bool = False,
+        include_search: bool = True,
+    ) -> Dict[str, Any]:
         _ensure_alphasift_enabled(self.config)
         _ensure_alphasift_available_for_use()
         topic_text = _env_text(topic)
@@ -319,9 +333,20 @@ class AlphaSiftService:
         provider_name, provider_arg = _resolve_hotspot_provider(provider)
         if not isinstance(provider_arg, DsaEastMoneyHotspotProvider):
             provider_arg = DsaEastMoneyHotspotProvider()
+        # Auto-search remains the fork default for Web detail loads; callers can
+        # pass include_search=false for structured-only detail (Ported-from: e430fcfe).
+        want_search = bool(include_search)
         cached = None if refresh else _load_alphasift_hotspot_detail_cache(provider=provider_name, topic=topic_text)
         if cached is not None:
-            return cached
+            base = _strip_hotspot_search_augmentation(dict(cached))
+            return _sanitize_public_alphasift_diagnostics(
+                _with_hotspot_search_augmentation(
+                    base,
+                    topic=topic_text,
+                    config=self.config,
+                    include_search=want_search,
+                )
+            )
         normalized: Dict[str, Any] = {}
         hotspot_helper_failed = False
         try:
@@ -386,7 +411,17 @@ class AlphaSiftService:
                 source_errors.append(DSA_ALPHASIFT_HOTSPOT_DETAIL_STALE_CACHE_CODE)
                 stale_cached["source_errors"] = source_errors
                 stale_cached["fallback_used"] = True
-                return _sanitize_public_alphasift_diagnostics(stale_cached)
+                base = _strip_hotspot_search_augmentation(
+                    _sanitize_public_alphasift_diagnostics(stale_cached)
+                )
+                return _sanitize_public_alphasift_diagnostics(
+                    _with_hotspot_search_augmentation(
+                        base,
+                        topic=topic_text,
+                        config=self.config,
+                        include_search=want_search,
+                    )
+                )
             raise HTTPException(
                 status_code=424,
                 detail={
@@ -400,11 +435,6 @@ class AlphaSiftService:
             normalized["source_errors"] = source_errors
             normalized["fallback_used"] = True
             normalized["provider"] = provider_name
-        if not _hotspot_route_has_external_event(normalized.get("route")):
-            search_routes = _build_hotspot_event_routes_from_search(topic_text, self.config)
-            if search_routes:
-                route = normalized.get("route")
-                normalized["route"] = search_routes + (route if isinstance(route, list) else [])
         normalized = _ensure_hotspot_detail_compat_fields(normalized)
         normalized["enabled"] = True
         normalized["provider"] = provider_name
@@ -413,8 +443,21 @@ class AlphaSiftService:
             fallback_code=DSA_ALPHASIFT_HOTSPOT_DETAIL_SOURCE_ERROR_CODE,
         )
         cleaned = _sanitize_public_alphasift_diagnostics(_remove_non_finite_json_values(normalized))
-        _write_alphasift_hotspot_detail_cache(provider=provider_name, topic=topic_text, payload=cleaned)
-        return cleaned
+        # Persist only structured base detail; search is response-scoped.
+        base_for_cache = _strip_hotspot_search_augmentation(cleaned)
+        _write_alphasift_hotspot_detail_cache(
+            provider=provider_name,
+            topic=topic_text,
+            payload=base_for_cache,
+        )
+        return _sanitize_public_alphasift_diagnostics(
+            _with_hotspot_search_augmentation(
+                base_for_cache,
+                topic=topic_text,
+                config=self.config,
+                include_search=want_search,
+            )
+        )
 
     def screen(self, *, strategy: str, market: str, max_results: int) -> Dict[str, Any]:
         _ensure_alphasift_enabled(self.config)

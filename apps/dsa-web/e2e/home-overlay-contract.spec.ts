@@ -179,6 +179,8 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     checks: [],
   }));
   await page.route('**/api/v1/stocks/watchlist', (route) => fulfillJson(route, {
+    // OpenAPI WatchlistResponse requires message.
+    message: 'ok',
     stock_codes: options.watchlistCodes ?? [],
   }));
   await page.route('**/api/v1/agent/skills', (route) => fulfillJson(route, {

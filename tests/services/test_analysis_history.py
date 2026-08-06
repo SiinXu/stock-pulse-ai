@@ -2305,8 +2305,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 "BEGIN SELECT RAISE(ABORT, 'forced history delete failure'); END"
             ))
 
-        with self.assertRaises(DatabaseError):
+        from src.repositories.base import RepositoryError
+
+        with self.assertRaises(RepositoryError) as raised:
             HistoryService(self.db).delete_history_by_code("600519")
+        self.assertIsInstance(raised.exception.__cause__, DatabaseError)
 
         with self.db.get_session() as session:
             self.assertIsNotNone(
