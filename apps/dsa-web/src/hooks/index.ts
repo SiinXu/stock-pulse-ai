@@ -51,6 +51,21 @@ export {
   useAlertTriggersQuery,
 } from './useAlertWorkspaceQueries';
 export type { AlertRulesQueryKeyInput } from './useAlertWorkspaceQueries';
+export {
+  APPROVALS_PROPOSALS_REFETCH_INTERVAL_MS,
+  APPROVALS_WORKSPACE_QUERY_KEY_ROOT,
+  buildApprovalsWorkspaceQueryKey,
+  useApprovalsWorkspaceQuery,
+} from './useApprovalsWorkspaceQuery';
+export type { ApprovalsWorkspaceQueryResult } from './useApprovalsWorkspaceQuery';
+export {
+  buildStockDetailsHistoryQueryKey,
+  buildStockDetailsQuoteQueryKey,
+  STOCK_DETAILS_HISTORY_QUERY_KEY_ROOT,
+  STOCK_DETAILS_QUOTE_QUERY_KEY_ROOT,
+  useStockDetailsHistoryQuery,
+  useStockDetailsQuoteQuery,
+} from './useStockDetailsQueries';
 export { useMarketReviewState } from './useMarketReviewState';
 export { useRunFlowSnapshot } from './useRunFlowSnapshot';
 export { useTaskStream } from './useTaskStream';

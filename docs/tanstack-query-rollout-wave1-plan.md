@@ -24,6 +24,8 @@ Do not merge this PR into `main` until pilot **#788** is merged; rebase onto mai
 | Status update | page-owned `updateStatus` (deferred) | Keeps in-flight double-click guard; not migrated to `useMutation` in wave 1 to preserve parity tests |
 | Alerts rules/triggers/notifications | `useAlertWorkspaceQueries` | No poll/focus; create/update/delete stay page-owned; transport still `api/alerts` |
 | Skill Outcomes performance | `useSkillOutcomesQuery` | reloadToken initial loads; icon refresh stays page-owned `load('refresh')` |
+| Approvals workspace | `useApprovalsWorkspaceQuery` | First full load; 5s proposal poll; poll off when auth-blocked |
+| Stock Details quote/history | `useStockDetailsQueries` | Keyed by code/days; no poll/focus |
 
 ## Open-PR exclusions (later waves)
 
