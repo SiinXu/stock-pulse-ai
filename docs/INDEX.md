@@ -84,6 +84,7 @@
 | [业务架构](business-architecture.md) | 利益相关者、业务能力、结果与从证据获取到通知的价值流 |
 | [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流 |
 | [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
+| [上游一致性检查](upstream-parity_CN.md) | 每周漂移报告、有意分叉路径白名单、`Ported-from` trailer 与分诊流程（[English](upstream-parity.md)） |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [OpenAPI Web 类型与运行时校验（英文）](openapi-web-types.md) | 从 OpenAPI 生成 Web 类型、CI 漂移门禁与 stocks 运行时校验试点 |
