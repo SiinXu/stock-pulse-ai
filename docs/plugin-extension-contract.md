@@ -1000,7 +1000,10 @@ Operators must review and trust external plugin code and dependencies. Keeping
 `PLUGINS_DIR` unset or blank is the safe default and loads no external code.
 Setting it is a startup-time trust decision and requires a process restart.
 There is no remote marketplace, automatic update, dependency installation,
-signature verification, sandbox, subprocess boundary, or hot reload in scope.
+signature verification, sandbox, or subprocess boundary in scope. Basic
+in-process hot-reload for external packages is described in
+[Lifecycle Controls](#lifecycle-controls-enable--disable--hot-reload);
+it never fetches remote code or auto-enables new packages.
 
 ## Deferred Surfaces
 
@@ -1009,3 +1012,60 @@ candidates. This batch defines no registration names, payloads, frontend bundle
 format, command parser, permission behavior, or implementation plan for them.
 They require a separate design that accounts for Web/Desktop compatibility,
 authentication, localization, and frontend supply-chain risk.
+
+## Lifecycle Controls (Enable / Disable / Hot-Reload)
+
+Version 1 of the extension **surface** remains frozen. Lifecycle **controls**
+operate on the existing manager contract without adding author-facing export
+names.
+
+### Persisted enable / disable
+
+- Operator intent is stored as a denylist of disabled plugin IDs in a JSON file
+  resolved by `PLUGIN_STATE_PATH` (default:
+  `<dir-of-DATABASE_PATH>/plugin_lifecycle_state.json`).
+- Missing IDs default to **enabled**, matching historical `load_all` behavior for
+  reviewed plugins already trusted via built-ins or `PLUGINS_DIR`.
+- On `load` / `load_all`, a disabled plugin transitions to `disabled` **without**
+  calling `onload`, so it never registers implementations for any extension
+  point (`data_provider`, `analysis_strategy`, `agent_tool`,
+  `notification_channel`, `report_template`, `event_hook`) and is never
+  selected by `enabled_registrations*`.
+- `enable` / `disable` update runtime state and the denylist. Process shutdown
+  unload does **not** rewrite operator intent.
+- Clear log lines record skip-load and disable outcomes.
+
+### Basic hot-reload
+
+- `PluginManager.reload(plugin_id)` re-imports **one** external package from its
+  recorded package root, then re-registers and optionally reloads it.
+- **Never** remote-fetches code, installs dependencies, or auto-enables a
+  plugin that is persisted as disabled.
+- **Never** scans `PLUGINS_DIR` for newly added sibling packages during reload
+  (no auto-enable of new files).
+- Built-in plugins always return `restart_required=true` because their code is
+  part of the application package.
+- If unload / cleanup cannot fully release registrations, the result is an
+  honest `restart_required` rather than a silent partial swap.
+
+### HTTP API (PLUG-02 contract)
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/plugins` | List registered plugins + lifecycle fields |
+| `POST` | `/api/v1/plugins/{plugin_id}/lifecycle` | Body `{ "action": "enable" \| "disable" \| "reload" }` |
+
+Auth follows neighbors: global admin-session middleware when
+`ADMIN_AUTH_ENABLED=true`. Response models live in
+`api/v1/schemas/plugins.py`.
+
+### Security reasoning
+
+Lifecycle controls do not weaken the trusted-plugin model:
+
+1. Code still executes only from built-ins or an operator-configured local
+   `PLUGINS_DIR` (no marketplace / remote fetch).
+2. Persistence records only enable/disable intent for already-registered IDs.
+3. Hot-reload re-imports an already-known package root; new directories are not
+   discovered or auto-enabled by the reload path.
+
