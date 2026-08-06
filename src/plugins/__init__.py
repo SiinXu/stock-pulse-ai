@@ -18,6 +18,12 @@ from .analysis_strategies import (
 )
 from .constants import PLUGIN_APPLICATION_VERSION
 from .errors import PluginContextClosedError, PluginError, PluginRegistryError
+from .surface import (
+    PLUGIN_EXTENSION_SURFACE_VERSION,
+    PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS,
+    PLUGIN_EXTENSION_SURFACE_V1_POINT_ORDER,
+    PLUGIN_EXTENSION_SURFACE_V1_POINTS,
+)
 from .event_hooks import (
     EVENT_HOOK_NAMES,
     EVENT_HOOK_SCHEMA_VERSION,
@@ -101,6 +107,10 @@ __all__ = [
     "Plugin",
     "PluginEvent",
     "PLUGIN_APPLICATION_VERSION",
+    "PLUGIN_EXTENSION_SURFACE_VERSION",
+    "PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS",
+    "PLUGIN_EXTENSION_SURFACE_V1_POINT_ORDER",
+    "PLUGIN_EXTENSION_SURFACE_V1_POINTS",
     "PluginContext",
     "PluginContextClosedError",
     "PluginError",
