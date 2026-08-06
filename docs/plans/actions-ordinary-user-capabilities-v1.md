@@ -1,61 +1,61 @@
-# Actions 普通用户能力拆分（v1）
+# Actions regular-user capability split (v1)
 
-> 订阅层（路径 A）体验差异化计划。已建 Issue：https://github.com/SiinXu/stock-pulse-ai/issues/847
+> Subscription-layer (path A) experience differentiation plan. Existing issue: https://github.com/SiinXu/stock-pulse-ai/issues/847
 
-关联：#797 #796 #795 #624 #241
+Related: #797 #796 #795 #624 #241
 
-## 总表
+## Overview
 
-| 优先级 | 主题 | 状态 |
-|--------|------|------|
+| Priority | Theme | Status |
+|----------|-------|--------|
 | P0 | Config Check | #847 |
-| P0 | 失败/跳过人话 Summary + 短错误通知 | 待建 |
-| P0 | Actions 三行预设文档 | 待建 |
-| P1 | 无 IM：GitHub Issue 日报收件箱 | 待建 |
-| P1 | simple 报告诚实分层 + 决策结构 | 待建 |
-| P1 | alert-only 异动才推 | 待建 |
-| P2 | 周复盘 workflow | 待建 |
+| P0 | Failure/skip plain-language Summary + short error notification | To create |
+| P0 | Actions three-line preset docs | To create |
+| P1 | No IM: GitHub Issue daily report inbox | To create |
+| P1 | Simple report honesty layers + decision structure | To create |
+| P1 | alert-only: notify only on notable moves | To create |
+| P2 | Weekly digest workflow | To create |
 
-## Issue 2 — 失败人话 Summary
+## Issue 2 — Failure plain-language Summary
 
-标题：`[Feature] Actions：Daily Analysis 失败/跳过人话 Summary + 短错误通知`
+Title: `[Feature] Actions: Daily Analysis failure/skip plain-language Summary + short error notification`
 
-方案：00-daily-analysis.yml 末尾 always/failure；run_status.json；GITHUB_STEP_SUMMARY；系统错误短通知。
-枚举：missing_llm / missing_watchlist / non_trading_day / data_source / timeout / unknown
-用户路径：跑分析 → Summary 看原因 → 可选 IM → 改配置或 #847
-配置：NOTIFICATION_SYSTEM_ERROR_CHANNELS；可选 FAILURE_NOTIFY_ENABLED；无新 Web 页
+Plan: always/failure step at end of `00-daily-analysis.yml`; `run_status.json`; `GITHUB_STEP_SUMMARY`; short system-error notification.
+Cause codes: `missing_llm` / `missing_watchlist` / `non_trading_day` / `data_source` / `timeout` / `unknown`
+User path: run analysis → read cause in Summary → optional IM → fix config or use #847
+Config: `NOTIFICATION_SYSTEM_ERROR_CHANNELS`; optional `FAILURE_NOTIFY_ENABLED`; no new Web page
 
-## Issue 3 — 三行预设文档
+## Issue 3 — Three-line preset docs
 
-标题：`[Docs] Actions 普通用户三行预设`
+Title: `[Docs] Actions regular-user three-line preset`
 
-最小：LLM_ZHIPU_API_KEY 或 LLM_SILICONFLOW_API_KEY 或 GEMINI_API_KEY；STOCK_LIST；可选 Webhook
-路径：Fork → 填 2-3 项 → Config Check → Daily Analysis → IM/Artifact
+Minimum: `LLM_ZHIPU_API_KEY` or `LLM_SILICONFLOW_API_KEY` or `GEMINI_API_KEY`; `STOCK_LIST`; optional webhook
+Path: Fork → fill 2–3 items → Config Check → Daily Analysis → IM/Artifact
 
-## Issue 4 — Issue 收件箱
+## Issue 4 — Issue inbox
 
-标题：`[Feature] Actions：GitHub Issue 日报收件箱`
+Title: `[Feature] Actions: GitHub Issue daily report inbox`
 
-REPORT_ISSUE_INBOX_ENABLED（默认 false）；upsert 单条 Daily analysis inbox；参考 upstream-parity；公开仓隐私说明
+`REPORT_ISSUE_INBOX_ENABLED` (default false); upsert a single Daily analysis inbox issue; follow upstream-parity patterns; public-repo privacy notes
 
-## Issue 5 — 报告诚实分层
+## Issue 5 — Report honesty layers
 
-标题：`[Feature] 报告 simple：事实/缺口/推断 + 决策结构`
+Title: `[Feature] simple report: facts / gaps / inference + decision structure`
 
-默认 simple 固定：事实、数据缺口、推断、观察框架；脚注模型与数据源；REPORT_HONESTY_LAYERS 默认 true
+Default simple layout fixed sections: facts, data gaps, inference, observation framework; footnotes for model and data sources; `REPORT_HONESTY_LAYERS` default true
 
 ## Issue 6 — alert-only
 
-标题：`[Feature] alert-only 模式`
+Title: `[Feature] alert-only mode`
 
-mode=alert-only；复用 #241 规则；无触发不刷屏；Web 扩展现有 Alerts UI
+`mode=alert-only`; reuse #241 rules; no spam when nothing triggers; Web extends existing Alerts UI
 
-## Issue 7 — 周复盘
+## Issue 7 — Weekly digest
 
-标题：`[Feature] Actions 周复盘 Weekly Digest`
+Title: `[Feature] Actions weekly digest`
 
-01-weekly-digest.yml；汇总近 5 日非全量重跑；样本不足诚实说明
+`01-weekly-digest.yml`; summarize last ~5 days without a full re-run; honest note when sample is insufficient
 
-## 顺序
+## Order
 
-847 → 失败 Summary → 三行文档 → 收件箱 → 分层 → alert-only → 周复盘
+847 → failure Summary → three-line docs → inbox → honesty layers → alert-only → weekly digest
