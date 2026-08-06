@@ -135,3 +135,45 @@ temporary pending rows do not dilute permanent metadata failures.
   `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` (default off). Decision-profile
   outcome calibration remains deferred to
   [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715).
+
+The migration is additive. Code rollback does not remove either table, so
+collected facts remain available if the feature is reintroduced.
+
+## Operator walkthrough: enable → accumulate/backfill → observe weights
+
+This path is intentionally opt-in and offline with respect to market data.
+
+1. **Accumulate samples (live path)**  
+   Set `SKILL_OPINION_RECORDING_ENABLED=true` and run multi-skill analyses.  
+   Samples are written after aggregation when `analysis_history_id` is bound, and
+   can also materialize from saved reports. Leave
+   `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED=false` during accumulation so analysis
+   output stays byte-identical.
+
+2. **Backfill historical reports (optional)**  
+   Histories whose `raw_result` already contains structured
+   `strategy_synthesis.supporting_skills` / `opposing_skills` (canonical signal +
+   confidence) can seed samples idempotently:
+
+   ```bash
+   python scripts/backfill_skill_opinion_samples.py --dry-run --limit 200
+   python scripts/backfill_skill_opinion_samples.py --limit 200
+   python scripts/backfill_skill_opinion_samples.py --limit 200 --evaluate
+   ```
+
+   Limitations: rows without structured synthesis create no samples; evaluation
+   needs local `stock_daily` bars and a persisted effective daily-bar date; the
+   script never fetches network prices.
+
+3. **Evaluate pending outcomes**  
+   Call `POST /api/v1/skill-outcomes/run` (or the backfill `--evaluate` flag)
+   once local bars exist. Inspect buckets via `GET /api/v1/skill-outcomes/stats`.
+   A bucket needs at least 30 `evaluated` rows before rates or weights unlock.
+
+4. **Observe / enable weights**  
+   Weight math (symmetric `Beta(15,15)` prior, terminal unable penalty,
+   evidence-strength averaging, multiplicative bounds `[1/1.2, 1.2]`) can be
+   verified against stats offline. When buckets look sufficient, set
+   `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED=true`. Cold start (zero samples)
+   remains fail-neutral (`1.0`). Disable the flag to restore the prior
+   aggregation path immediately.
