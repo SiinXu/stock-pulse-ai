@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Actions Config Check workflow and `scripts/actions_config_check.py` validate Secrets/Variables (watchlist, LLM keys, notifications, data paths) without running analysis; Step Summary is bilingual and never prints secret values (#847).
 - [Changed] Desktop release workflow: `workflow_dispatch` is artifacts-only (no GitHub Release publish), builds the workflow ref by default (optional `rebuild_from_tag`), and adds macOS `codesign` + `--version` launch smoke with ad-hoc sign fallback when unsigned binaries do not execute.
 - [Fixed] Desktop PyInstaller freeze excludes `pkg_resources` so frozen backends start under setuptools>=82 (which removed that module and broke `pyi_rth_pkgres`).
 - [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
