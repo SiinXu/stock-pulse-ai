@@ -78,6 +78,14 @@
 {% endif %}
 {% endif %}
 
+{% set committee = dashboard.get('committee_deliberation') if dashboard else none %}
+{% if committee and committee.get('members') %}
+🏛 **{{ labels.committee_deliberation_heading }}**
+{% for member in (committee.get('members') or [])[:3] %}
+- {{ member.get('display_name') or member.get('persona_id') }}: {{ localize_strategy_signal(member.get('signal') or 'N/A', report_language) }}{% if member.get('invalid') %} ({{ member.get('invalid_reason') or 'invalid' }}){% endif %}
+{% endfor %}
+{% endif %}
+
 {% set checklist = battle.get('action_checklist', []) if battle else [] %}
 {% set fc = failed_checks(checklist) %}
 {% if fc %}

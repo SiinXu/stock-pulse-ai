@@ -114,6 +114,7 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'agent_orchestrator_mode',
     'agent_orchestrator_timeout_s',
     'agent_critic_enabled',
+    'agent_investment_committee_mode',
     'skill_opinion_recording_enabled',
     'agent_technical_agent_timeout_s',
     'agent_intel_agent_timeout_s',
