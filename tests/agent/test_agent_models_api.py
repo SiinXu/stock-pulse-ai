@@ -343,7 +343,10 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
         )
 
     def test_chat_request_empty_skills_clears_context_without_triggering_activate_all(self) -> None:
-        config = SimpleNamespace(is_agent_available=lambda: True)
+        config = SimpleNamespace(
+            is_agent_available=lambda: True,
+            report_language="zh",
+        )
         executor = MagicMock()
         executor.chat.return_value = SimpleNamespace(success=True, content="ok", error=None)
         request = agent.ChatRequest(message="hello", skills=[], context={"skills": ["old_skill"]})
@@ -370,6 +373,10 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
         mock_build_executor.assert_called_once_with(config, None)
         executor.chat.assert_called_once()
         self.assertEqual(executor.chat.call_args.kwargs["context"]["skills"], [])
+        self.assertEqual(
+            executor.chat.call_args.kwargs["context"]["report_language"],
+            "zh",
+        )
         self.assertEqual(payload["content"], "ok")
 class AgentModelsSourceDetectionTestCase(unittest.TestCase):
     @patch("src.config.setup_env")

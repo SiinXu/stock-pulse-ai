@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { securityAuditApi } from '../securityAudit';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -90,4 +91,26 @@ describe('securityAuditApi', () => {
       },
     });
   });
+
+  it('preserves extra keys on valid payloads (byte-identical toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: { items: [], page: 1, page_size: 10, total: 0, unexpected_server_field: 'keep-me' },
+    });
+    const page = await securityAuditApi.list();
+    expect(page).toEqual({
+      items: [], page: 1, pageSize: 10, total: 0, unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({ data: { page: 1, page_size: 10, total: 0 } });
+    await expect(securityAuditApi.list()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('SecurityAuditEventPage');
+      return true;
+    });
+  });
+
 });

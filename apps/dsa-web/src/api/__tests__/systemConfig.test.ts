@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { systemConfigApi } from '../systemConfig';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const get = vi.hoisted(() => vi.fn());
 const post = vi.hoisted(() => vi.fn());
@@ -560,4 +561,27 @@ describe('systemConfigApi', () => {
     expect(result.success).toBe(true);
     expect(result.status.healthStatus).toBe('passed');
   });
+
+  it('preserves extra keys on valid config payloads (byte-identical toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: { config_version: 'v1', mask_token: '******', items: [], unexpected_server_field: 'keep-me' },
+    });
+    const result = await systemConfigApi.getConfig(false);
+    expect(result).toEqual({
+      configVersion: 'v1', maskToken: '******', items: [], unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces SystemConfigResponse shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({ data: { mask_token: '******', items: [] } });
+    await expect(systemConfigApi.getConfig()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('SystemConfigResponse');
+      expect(parsed.params).toMatchObject({ label: 'SystemConfigResponse' });
+      return true;
+    });
+  });
+
 });
