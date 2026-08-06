@@ -157,6 +157,8 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search (structured search results) | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `RSS_NEWS_FEED_URLS` | Optional RSS/Atom feed URLs (comma-separated) as a free on-demand news search supplement; empty keeps the feature inert. See Search Service Configuration and [Outbound HTTP Security Policy](security-outbound-policy.md) | Optional |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | Per-feed timeout seconds for on-demand RSS/Atom search (default 8) | Optional |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) token | Optional |
 | `TUSHARE_HTTP_URL` | Tushare Pro API endpoint (default `http://api.tushare.pro`), configurable in Web Settings or `.env`, for self-hosted nodes, proxies, or internal mirrors. Leaving it empty keeps default behavior; private/internal hosts must also be added to `OUTBOUND_HTTP_ALLOWLIST`, see [docs/security-outbound-policy.md](./security-outbound-policy.md). | Optional |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key for optional A-share daily K-lines, realtime quotes, stock list/name lookup, and CN market review enhancement; permission or entitlement failures fall back to existing providers | Optional |
@@ -323,8 +325,12 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API endpoint (default `https://api.adanos.org`) | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `RSS_NEWS_FEED_URLS` | Optional comma-separated RSS/Atom feed URLs used as a free **supplement** in the on-demand news search pipeline (not a replacement for SearXNG or paid search, and distinct from the local intelligence pool `NEWS_INTEL_*`). Empty keeps the feature inert. Feed fetching uses the fail-closed outbound policy; public feeds need no allowlist entry, while private/loopback hosts require an exact `OUTBOUND_HTTP_ALLOWLIST` entry. See [Outbound HTTP Security Policy](security-outbound-policy.md) | Optional |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | Per-feed timeout in seconds for on-demand RSS/Atom news search (1–30; default `8`). Independent of `NEWS_INTEL_FETCH_TIMEOUT_SEC` | Optional |
 
 > Behavior note: Search and social sentiment are optional enhancement services. If either service fails to initialize, the system logs a warning and degrades gracefully by skipping that stage without blocking the core analysis flow.
+
+> RSS/Atom note: Feed entries join the same dedup, freshness filter, relevance ranking, and run-diagnostics path as other search providers. Per-feed failure is logged and recorded in diagnostics without aborting the search run. Source attribution is preserved on each result's `source` field for reports.
 
 > Foreign-stock English news: mapped U.S./Hong Kong forms such as `AAPL.US`, `HK00700`, and `00700.HK` are canonicalized before search. Even when the display name is Chinese, news, event/comprehensive-intelligence queries, and relevance scoring use the shared English company aliases. Unmapped tickers retain the existing fallback behavior.
 

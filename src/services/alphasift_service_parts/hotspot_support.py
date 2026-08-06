@@ -326,6 +326,7 @@ def _has_configured_hotspot_news_source(config: Config) -> bool:
         "serpapi_api_keys",
         "minimax_api_keys",
         "searxng_base_urls",
+        "rss_news_feed_urls",
     )
     return any(bool(getattr(config, field, None)) for field in fields)
 
@@ -399,6 +400,8 @@ def _run_hotspot_topic_news_search(topic: str, config: Config) -> Any:
         minimax_keys=getattr(config, "minimax_api_keys", None),
         searxng_base_urls=getattr(config, "searxng_base_urls", None),
         searxng_public_instances_enabled=False,
+        rss_news_feed_urls=getattr(config, "rss_news_feed_urls", None),
+        rss_news_fetch_timeout_sec=getattr(config, "rss_news_fetch_timeout_sec", 8.0),
         news_max_age_days=int(getattr(config, "news_max_age_days", 3) or 3),
         news_strategy_profile=getattr(config, "news_strategy_profile", "short"),
     )
