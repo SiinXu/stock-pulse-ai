@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Tests] Stabilize Analysis Workbench e2e Analyze clicks with shared readiness waits on the controlled stock-search value / Analyze enabled state, and add an empty `@quarantine` Playwright lane (tracking-issue required) for non-blocking flake isolation.
 - [Fixed] Replaced the Backtest page's separate start and end date fields with a single date-range picker.
 - [Added] Actions Config Check workflow and `scripts/actions_config_check.py` validate Secrets/Variables (watchlist, LLM keys, notifications, data paths) without running analysis; Step Summary is bilingual and never prints secret values (#847).
 - [Changed] Desktop release workflow: `workflow_dispatch` is artifacts-only (no GitHub Release publish), builds the workflow ref by default (optional `rebuild_from_tag`), and adds macOS `codesign` + `--version` launch smoke with ad-hoc sign fallback when unsigned binaries do not execute.
