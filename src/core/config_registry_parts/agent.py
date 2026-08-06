@@ -707,4 +707,44 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["legacy_json_only_basic_rules"],
     },
+    "VALUATION_AGENT_TOOL_ENABLED": {
+        "title": "Enable Valuation Agent Tool",
+        "description": (
+            "Opt-in DCF and relative-valuation Agent Tool. Default is off. When enabled, "
+            "Agents may call estimate_stock_valuation after a process restart. Every "
+            "estimate includes explicit assumptions and a sensitivity range; missing "
+            "fundamentals return insufficient_fundamentals rather than a fabricated number. "
+            "See docs/valuation-models_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 76,
+        "help_key": "settings.agent.VALUATION_AGENT_TOOL_ENABLED",
+        "examples": [
+            "VALUATION_AGENT_TOOL_ENABLED=false",
+            "VALUATION_AGENT_TOOL_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Valuation models guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/valuation-models_EN.md",
+            },
+            {
+                "label": "估值模型说明（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/valuation-models.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
 }

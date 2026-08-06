@@ -1067,6 +1067,20 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响后台告警检测和通知推送。'],
     notes: ['该字段为 Legacy 配置方式，高级规则请使用告警中心。'],
   },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: '启用估值 Agent Tool',
+    summary: '可选的 DCF 与相对估值 Agent Tool，默认关闭，结果附带显式假设与敏感性区间。',
+    usage: '默认安装请保持关闭。仅在需要 Agent 调用 estimate_stock_valuation 时开启，并在保存后重启进程以完成注册。',
+    valueNotes: [
+      '默认关闭；启用并重启前，进程工具目录不包含该工具。',
+      '每条估值结果都包含假设与敏感性区间；基本面不足时返回 insufficient_fundamentals，绝不编造数字。',
+    ],
+    impact: ['仅影响可选 Agent 工具可用性；关闭时默认分析报告路径不变。'],
+    notes: [
+      '契约与回滚见 docs/valuation-models.md。',
+      '报告/Prompt 投影刻意留到后续阶段。',
+    ],
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------

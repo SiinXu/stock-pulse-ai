@@ -86,6 +86,9 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
+    # === Optional DCF / relative valuation Agent Tool (issue #238) ===
+    valuation_agent_tool_enabled: bool = False
+
     # === Historical decision memory & reflection (Issue #118) ===
     decision_memory_enabled: bool = True
     decision_memory_lookback: int = 5

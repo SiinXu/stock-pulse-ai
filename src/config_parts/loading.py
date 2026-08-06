@@ -1093,6 +1093,9 @@ class _ConfigLoadingMethods:
                 or _KRONOS_MODEL_SIZE_DEFAULT
             ),
             kronos_weights_dir=os.getenv('KRONOS_WEIGHTS_DIR', '').strip() or None,
+            valuation_agent_tool_enabled=parse_env_bool(
+                os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
+            ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0

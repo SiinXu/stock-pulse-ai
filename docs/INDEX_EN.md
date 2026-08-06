@@ -61,6 +61,7 @@ This is the entry point for project documentation. The README covers the project
 | [Kronos Local Finance Model](kronos-local-model_EN.md) | Install optional deps, explicit weight download, Web settings and status diagnostics, desktop limitations ([Chinese](kronos-local-model.md)) |
 | [Kronos K-line Forecasting Agent Tool](kronos-agent-tool.md) | Optional local model setup, registration gates, output contract, limitations, verification, and rollback |
 | [Community Intelligence Agent Tool](community-intel-tool.md) | Default-off Phase A stock-scoped evidence contract, public citation boundary, deterministic degradation, and verification |
+| [Valuation Models & DCF/Relative Agent Tool](valuation-models_EN.md) | Phase 1 DCF/relative valuation, transparent assumptions, sensitivity ranges, default-off tool, insufficient-fundamentals honesty ([Chinese](valuation-models.md)) |
 | [Agent Soul Contract](agent-soul.md) | Version/hash rules, Single/Multi/Chat assembly, Soul/Persona/Skill precedence, run metadata, and rollback |
 | [Bot Platform Docs](bot/) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Feishu, DingTalk, Discord, and related Bot configuration screenshots and notes |
 | [Real-Time Alert Center](alerts.md) <sub><sub>![P4 Badge](https://img.shields.io/badge/P4-yellow?style=flat)</sub></sub> (Chinese-only) | EventMonitor baseline, Web rule management, notification attempts, cooldown state, and phase boundaries |

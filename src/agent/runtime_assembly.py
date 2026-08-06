@@ -201,6 +201,23 @@ def get_tool_registry():
     for tool_fn in ALL_DATA_TOOLS + ALL_ANALYSIS_TOOLS + ALL_SEARCH_TOOLS + ALL_MARKET_TOOLS + ALL_BACKTEST_TOOLS:
         registry.register(tool_fn)
 
+    # Optional valuation tool (issue #238): default-off, registered only when enabled.
+    try:
+        from src.agent.tools.valuation_tools import build_valuation_tool
+        from src.config import get_config
+
+        valuation_tool = build_valuation_tool(get_config())
+        if valuation_tool is not None:
+            registry.register(valuation_tool)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
+        log_safe_exception(
+            logger,
+            "Optional valuation tool registration skipped",
+            exc,
+            error_code="valuation_tool_registration_failed",
+            level=logging.WARNING,
+        )
+
     _TOOL_REGISTRY = registry
     logger.info("[AgentFactory] ToolRegistry cached (%d tools)", len(registry._tools) if hasattr(registry, "_tools") else -1)
     return _TOOL_REGISTRY
