@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "provider": "tushare",
+    "api_name": "daily",
+    "ts_code": "600519.SH",
+    "recorded_note": "Tushare Pro HTTP response body shape consumed by _TushareHttpClient.query (fields + items). Token never stored."
+  },
+  "response": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "fields": [
+        "ts_code",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "change",
+        "pct_chg",
+        "vol",
+        "amount"
+      ],
+      "items": [
+        ["600519.SH", "20260506", 1680.0, 1702.0, 1675.0, 1695.5, 1680.0, 15.5, 0.92, 24567.89, 4156789.012],
+        ["600519.SH", "20260507", 1696.0, 1718.0, 1690.0, 1710.0, 1695.5, 14.5, 0.86, 30123.45, 5123456.789],
+        ["600519.SH", "20260508", 1710.0, 1715.0, 1698.0, 1702.5, 1710.0, -7.5, -0.44, 22110.0, 3765432.1]
+      ]
+    }
+  }
+}
