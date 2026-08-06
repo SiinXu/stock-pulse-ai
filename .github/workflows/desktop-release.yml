@@ -263,7 +263,7 @@ jobs:
           test -d "${APP}"
           test -x "${BIN}"
 
-          echo "=== codesign -dv --verbose=4 ==="
+          echo "=== codesign -dv --verbose=4 (app bundle only; full-tree audit already ran in build) ==="
           set +e
           codesign_out="$(codesign -dv --verbose=4 "${APP}" 2>&1)"
           codesign_rc=$?
@@ -279,20 +279,30 @@ jobs:
             echo "codesign: code object is not signed at all (current unsigned packaging contract)."
           fi
 
-          if [[ -f apps/dsa-desktop/scripts/macos-signature-audit.sh ]]; then
-            bash apps/dsa-desktop/scripts/macos-signature-audit.sh check "${APP}"
-          fi
+          # Bound launch probes: Electron can hang if the app main process runs instead of
+          # exiting on --version. Prefer a hard timeout over a stalled job.
+          run_with_timeout() {
+            local seconds="$1"
+            shift
+            perl -e 'alarm shift; exec @ARGV' "${seconds}" "$@"
+          }
 
           attempt_version_launch() {
             local binary="$1"
             local label="$2"
-            echo "=== launch attempt (${label}): ${binary} --version ==="
+            echo "=== launch attempt (${label}): ${binary} --version (30s timeout) ==="
             set +e
-            # Electron exits after printing version; keep env minimal for headless CI.
-            launch_out="$("${binary}" --version 2>&1)"
+            launch_out="$(
+              run_with_timeout 30 env ELECTRON_ENABLE_LOGGING=0 "${binary}" --version 2>&1
+            )"
             launch_rc=$?
             set -e
             printf '%s\n' "${launch_out}"
+            # timeout/alarm yields 142 (128+14 SIGALRM) on hang
+            if [[ ${launch_rc} -eq 142 ]]; then
+              echo "launch timed out after 30s (${label})"
+              return 1
+            fi
             return "${launch_rc}"
           }
 
@@ -301,7 +311,7 @@ jobs:
             exit 0
           fi
 
-          echo "As-packaged launch failed on arch=${{ matrix.arch }}; trying ad-hoc codesign on a disposable copy."
+          echo "As-packaged launch failed/hung on arch=${{ matrix.arch }}; trying ad-hoc codesign on a disposable copy."
           smoke_root="$(mktemp -d "${TMPDIR:-/tmp}/desktop-launch-smoke.XXXXXX")"
           cleanup_smoke() {
             rm -rf "${smoke_root}"
@@ -310,18 +320,17 @@ jobs:
           ditto "${APP}" "${smoke_root}/${PRODUCT_NAME}.app"
           SMOKE_APP="${smoke_root}/${PRODUCT_NAME}.app"
           SMOKE_BIN="${SMOKE_APP}/Contents/MacOS/${PRODUCT_NAME}"
-          codesign --force --deep --sign - "${SMOKE_APP}"
+          # Sign only the main executable + app bundle identity (avoid multi-minute --deep on full backend tree).
+          codesign --force --sign - "${SMOKE_BIN}"
+          codesign --force --sign - "${SMOKE_APP}"
           echo "=== codesign -dv after ad-hoc ==="
           codesign -dv --verbose=4 "${SMOKE_APP}" 2>&1 || true
 
           if attempt_version_launch "${SMOKE_BIN}" "ad-hoc-signed-copy"; then
             echo "LAUNCH_VERDICT arch=${{ matrix.arch }}: requires_adhoc_sign"
-            # Make the shipped unpacked app + DMG launchable on this arch by applying
-            # the same ad-hoc signature used in the successful smoke copy, then
-            # regenerating the DMG from the signed app. build-desktop-macos.sh already
-            # verified the clean-unsigned contract before this step.
             echo "Applying ad-hoc signature to packaging outputs for launchability..."
-            codesign --force --deep --sign - "${APP}"
+            codesign --force --sign - "${BIN}"
+            codesign --force --sign - "${APP}"
             shopt -s nullglob
             dmg_candidates=(apps/dsa-desktop/dist/*.dmg)
             shopt -u nullglob
@@ -331,7 +340,6 @@ jobs:
             fi
             old_dmg="${dmg_candidates[0]}"
             signed_stage="$(mktemp -d "${TMPDIR:-/tmp}/desktop-adhoc-dmg.XXXXXX")"
-            # hdiutil create from a folder containing the .app
             cp -R "${APP}" "${signed_stage}/${PRODUCT_NAME}.app"
             rm -f "${old_dmg}"
             hdiutil create -volname "${PRODUCT_NAME}" -srcfolder "${signed_stage}" -ov -format UDZO "${old_dmg}"
@@ -368,8 +376,8 @@ jobs:
           test -x "$mounted_bin"
           echo "=== DMG-mounted codesign -dv ==="
           codesign -dv --verbose=4 "$app_bundle" 2>&1 || true
-          echo "=== DMG-mounted --version ==="
-          "$mounted_bin" --version
+          echo "=== DMG-mounted --version (30s timeout) ==="
+          perl -e 'alarm shift; exec @ARGV' 30 "$mounted_bin" --version
           hdiutil detach "$mount_dir" >/dev/null
           rmdir "$mount_dir"
           trap - EXIT
