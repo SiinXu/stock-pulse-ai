@@ -7,6 +7,7 @@ import { LAYOUT_DASHBOARD_SCENARIOS } from './layoutDashboardScenarios';
 import { SETTINGS_SCENARIOS } from './settingsScenarios';
 import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
+import { SCREENING_SCENARIOS } from './screeningScenarios';
 
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
@@ -16,6 +17,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...SKILL_OUTCOME_SCENARIOS,
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
+  ...SCREENING_SCENARIOS,
 };
 
 export function getPlaygroundRenderer(componentId: string): PlaygroundScenarioRenderer | undefined {

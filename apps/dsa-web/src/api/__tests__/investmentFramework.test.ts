@@ -3,6 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { investmentFrameworkApi } from '../investmentFramework';
+import { getParsedApiError } from '../error';
 
 const put = vi.hoisted(() => vi.fn());
 
@@ -124,6 +125,57 @@ describe('investmentFrameworkApi', () => {
       code: 'validation_error',
       details,
       traceId: 'trace-framework-422',
+    });
+  });
+
+  it('preserves extra keys on valid framework payloads (toCamelCase pass-through)', async () => {
+    put.mockResolvedValueOnce({
+      data: {
+        framework_id: 1,
+        scope: 'local',
+        version: 2,
+        active_version: 2,
+        revision: 2,
+        is_active: true,
+        content: { title: 'Framework', free_form_rules: 'Rule' },
+        created_at: '2026-07-26T00:00:00Z',
+        updated_at: '2026-07-26T00:00:00Z',
+        version_created_at: '2026-07-26T00:00:00Z',
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const updated = await investmentFrameworkApi.update({
+      expectedRevision: 1,
+      content: { title: 'Framework', freeFormRules: 'Rule' },
+    });
+    expect(updated).toEqual(expect.objectContaining({
+      frameworkId: 1,
+      unexpectedServerField: 'keep-me',
+      content: expect.objectContaining({ title: 'Framework', freeFormRules: 'Rule' }),
+    }));
+  });
+
+  it('surfaces framework shape mismatches through ParsedApiError', async () => {
+    put.mockResolvedValueOnce({
+      data: {
+        framework_id: 1,
+        version: 2,
+        revision: 2,
+        is_active: true,
+        content: { title: 'Framework' },
+        created_at: '2026-07-26T00:00:00Z',
+        updated_at: '2026-07-26T00:00:00Z',
+        version_created_at: '2026-07-26T00:00:00Z',
+      },
+    });
+    await expect(investmentFrameworkApi.update({
+      expectedRevision: 1,
+      content: { title: 'Framework' },
+    })).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(String(parsed.message || '') + String(parsed.params || '')).toContain('InvestmentFrameworkResponse');
+      return true;
     });
   });
 });
