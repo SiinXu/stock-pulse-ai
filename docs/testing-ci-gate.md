@@ -1,8 +1,8 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-05
-- Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
+- Last verified: 2026-08-06
+- Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/ci_select_tests.py`, `scripts/ci_test_shard.py`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
 
@@ -10,11 +10,28 @@ The backend CI gate (`./scripts/ci_gate.sh`) must:
 
 1. Fail hangs with an attributed test name (per-test timeout).
 2. Dump thread stacks when a single test is silent for too long (`faulthandler_timeout`).
-3. Measure and enforce a **measured** line-coverage floor for production packages.
+3. Measure and enforce a **measured** line-coverage floor for production packages (**merge-group / full tier only**).
 4. Fail collection on unknown pytest markers (`--strict-markers`).
 5. Keep wall-clock / throughput assertions out of the default offline gate so noisy runners do not redden CI.
 6. Refuse a working-tree coverage floor lower than `origin/main` (anti-lowering).
 7. Require the offline suite's `--cov=` scopes to match `baseline.packages` exactly, and require measured files under every package prefix.
+
+## Two-tier hosted CI (throughput)
+
+| Event | Backend tier | What runs |
+| --- | --- | --- |
+| `pull_request` / `push` | **Fast** | `syntax` + `flake8` + `deterministic` + **selective** offline pytest via `scripts/ci_select_tests.py` (falls back to full suite when mapping is uncertain: config, conftest, CI scripts, etc.) |
+| `merge_group` (Merge Queue) | **Full** | 4 sharded offline suites (`scripts/ci_test_shard.py`) + **one** combined coverage floor check |
+
+`python-minimum` (3.10): PR/push runs `python-min-smoke` (imports + small offline subset). Merge Queue runs the full offline suite once so 3.10 coverage stays real without doubling the PR wall-clock.
+
+Local full gate remains:
+
+```bash
+./scripts/ci_gate.sh
+# or
+./scripts/ci_gate.sh offline-tests
+```
 
 ## Default offline selection
 

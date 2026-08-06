@@ -7,8 +7,12 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Merge Queue: full-tier gates run here once per queued merge, not on every
+  # PR resync. Required check *names* must still report for merge_group events.
+  merge_group:
 
-# PRs share a group by PR number; pushes to main share ci-refs/heads/main.
+# PRs share a group by PR number; pushes to main share ci-refs/heads/main;
+# merge_group uses the merge ref so queued merges do not cancel each other.
 # cancel-in-progress drops superseded runs (merge-burst on main or force-push-like
 # rapid PR updates) so only the newest revision keeps consuming runners.
 concurrency:
@@ -24,13 +28,16 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
-      web_e2e: ${{ steps.filter.outputs.web_e2e }}
+      frontend: ${{ steps.flags.outputs.frontend }}
+      web_e2e: ${{ steps.flags.outputs.web_e2e }}
+      # force_full: merge_group always exercises the full matrix
+      force_full: ${{ steps.flags.outputs.force_full }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: 🧭 Filter paths
         id: filter
+        if: github.event_name != 'merge_group'
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         with:
           filters: |
@@ -50,6 +57,21 @@ jobs:
               - 'requirements.txt'
               - '.github/requirements-ci.txt'
               - '.github/workflows/ci.yml'
+      - name: 🏷️ Export path flags
+        id: flags
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            # Queue-time: treat ALL paths as changed so the full matrix runs once.
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            echo "web_e2e=true" >> "$GITHUB_OUTPUT"
+            echo "force_full=true" >> "$GITHUB_OUTPUT"
+            echo "merge_group: forcing full path matrix"
+          else
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+            echo "web_e2e=${{ steps.filter.outputs.web_e2e }}" >> "$GITHUB_OUTPUT"
+            echo "force_full=false" >> "$GITHUB_OUTPUT"
+          fi
 
   ai-governance:
     name: ai-governance
@@ -67,16 +89,23 @@ jobs:
       - name: 🤖 Check AI governance assets
         run: python scripts/check_ai_assets.py
 
-  backend-gate:
+  # ---------------------------------------------------------------------------
+  # PR / push tier: fast backend-gate (selective pytest; full suite on uncertain
+  # path maps). Required check name: backend-gate
+  # ---------------------------------------------------------------------------
+  backend-gate-pr:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [ai-governance]
+    if: github.event_name != 'merge_group'
     permissions:
       contents: read
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - name: 🐍 Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -126,19 +155,168 @@ jobs:
         run: ./scripts/ci_gate.sh flake8
       - name: ✅ Local deterministic checks
         run: ./scripts/ci_gate.sh deterministic
-      - name: ✅ Offline test suite
-        run: ./scripts/ci_gate.sh offline-tests
+      - name: ✅ Selective offline tests (PR tier)
+        env:
+          CI_SELECT_BASE: origin/main
+        run: |
+          git fetch --no-tags --depth=1 origin main 2>/dev/null || true
+          ./scripts/ci_gate.sh offline-tests-selective
 
+  # ---------------------------------------------------------------------------
+  # Merge-queue tier: sharded full offline suite. Coverage floor runs once after
+  # combine. Required check name still: backend-gate (summary job below).
+  # ---------------------------------------------------------------------------
+  backend-tests:
+    name: backend-tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [ai-governance]
+    if: github.event_name == 'merge_group'
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+            build-constraints.txt
+            .github/requirements-ci.txt
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade --constraint constraints.txt pip
+          for attempt in 1 2 3; do
+            if python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Dependency install failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+            echo "Dependency install attempt ${attempt} failed, retrying in 15s..." >&2
+            sleep 15
+          done
+          python -m pip check
+      - name: 🔐 Verify dependency supply chain
+        if: matrix.shard == 1
+        run: |
+          python scripts/check_dependency_locks.py --verify-generated
+          python scripts/check_dependency_vulnerabilities.py --self-test
+          python scripts/check_dependency_vulnerabilities.py
+      - name: 🧭 Native runtime isolation (no PydanticAI)
+        if: matrix.shard == 1
+        run: |
+          python -c "
+          import importlib.util
+          assert importlib.util.find_spec('pydantic_ai') is None, \
+              'pydantic_ai must not be present in the native gate'
+          from src.agent.runtime.pydantic_ai_adapter import is_pydantic_ai_available
+          assert is_pydantic_ai_available() is False
+          print('✅ native gate has no pydantic-ai dependency')
+          "
+      - name: ✅ Python syntax check
+        if: matrix.shard == 1
+        run: ./scripts/ci_gate.sh syntax
+      - name: ✅ Flake8 critical checks
+        if: matrix.shard == 1
+        run: ./scripts/ci_gate.sh flake8
+      - name: ✅ Local deterministic checks
+        if: matrix.shard == 1
+        run: ./scripts/ci_gate.sh deterministic
+      - name: ✅ Offline test suite shard ${{ matrix.shard }}/4
+        env:
+          PYTEST_SPLITS: '4'
+          PYTEST_GROUP: ${{ matrix.shard }}
+          PYTEST_FIRST_SHARD_OVERHEAD: '30'
+          COVERAGE_SHARD_DIR: ${{ runner.temp }}/cov
+        run: |
+          mkdir -p "${COVERAGE_SHARD_DIR}"
+          ./scripts/ci_gate.sh offline-tests-shard
+      - name: 📤 Upload shard coverage data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/cov/.coverage.shard${{ matrix.shard }}
+            ${{ runner.temp }}/cov/coverage-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+          retention-days: 3
+
+  backend-gate-mq:
+    name: backend-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [ai-governance, backend-tests]
+    if: always() && github.event_name == 'merge_group'
+    permissions:
+      contents: read
+    steps:
+      - name: ✅ Require shard success
+        env:
+          AI_RESULT: ${{ needs.ai-governance.result }}
+          TESTS_RESULT: ${{ needs.backend-tests.result }}
+        run: |
+          set -euo pipefail
+          if [ "${AI_RESULT}" != "success" ]; then
+            echo "ai-governance failed: ${AI_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${TESTS_RESULT}" != "success" ]; then
+            echo "backend-tests shards failed: ${TESTS_RESULT}" >&2
+            exit 1
+          fi
+          echo "all backend shards passed"
+      - name: 📥 Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+            build-constraints.txt
+            .github/requirements-ci.txt
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade --constraint constraints.txt pip
+          python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+          python -m pip check
+      - name: 📥 Download shard coverage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: ${{ runner.temp }}/cov-in
+          pattern: coverage-shard-*
+          merge-multiple: true
+      - name: ✅ Combine coverage + floor
+        env:
+          COVERAGE_SHARD_DIR: ${{ runner.temp }}/cov-in
+        run: ./scripts/ci_gate.sh offline-tests-combine
+
+  # PR tier: 3.10 smoke (not a second full suite). Merge-group: full offline
+  # suite on 3.10 so the floor runtime stays real on the declared Python floor.
   python-minimum:
     name: python-minimum
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     needs: [ai-governance]
     permissions:
       contents: read
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - name: 🐍 Setup minimum Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -164,8 +342,12 @@ jobs:
             sleep 15
           done
           python -m pip check
-      - name: ✅ Minimum Python backend gate
-        run: ./scripts/ci_gate.sh
+      - name: ✅ Minimum Python smoke (PR / push)
+        if: github.event_name != 'merge_group'
+        run: ./scripts/ci_gate.sh python-min-smoke
+      - name: ✅ Minimum Python full offline suite (merge_group)
+        if: github.event_name == 'merge_group'
+        run: ./scripts/ci_gate.sh offline-tests
 
   pydanticai-installed:
     name: pydanticai-installed

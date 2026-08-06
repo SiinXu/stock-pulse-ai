@@ -157,10 +157,11 @@ The current repository CI mainly contains:
 
 | Check | Source | Description | Blocking? |
 | --- | --- | --- | --- |
-| `changes` | `.github/workflows/ci.yml` | Path-filter job that sets the `frontend` output used to decide whether `web-gate` / `web-e2e` run | Yes (always runs; drives triggered jobs) |
+| `changes` | `.github/workflows/ci.yml` | Path-filter job for `web-gate` / `web-e2e`. On `merge_group`, forces the full path matrix | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
-| `backend-gate` | `.github/workflows/ci.yml` | Executes `./scripts/ci_gate.sh` | Yes |
-| `python-minimum` | `.github/workflows/ci.yml` | Installs the locked CI dependencies and executes `./scripts/ci_gate.sh` on Python 3.10 | Yes |
+| `backend-gate` | `.github/workflows/ci.yml` | **Two-tier:** on `pull_request`/`push` runs syntax+flake8+deterministic+**selective** offline pytest (full suite when path mapping is uncertain). On `merge_group` is the summary job after **4 sharded** full offline suites with **combined** coverage floor | Yes |
+| `backend-tests` | `.github/workflows/ci.yml` | Merge-queue only: matrix-sharded full offline pytest (`scripts/ci_test_shard.py`) uploading per-shard coverage data | Yes on `merge_group` (feeds `backend-gate`) |
+| `python-minimum` | `.github/workflows/ci.yml` | Python 3.10: **PR/push** runs `python-min-smoke` (imports + small offline subset). **merge_group** runs the full offline suite so 3.10 coverage remains real once per merge | Yes |
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
@@ -168,6 +169,8 @@ The current repository CI mainly contains:
 | `web-e2e` | `.github/workflows/ci.yml` | For frontend changes, starts a real backend, Vite, and local fake model endpoint with an isolated temporary `ENV_FILE`, then runs `npm run test:smoke` (Playwright) | Yes (when triggered) |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
 | `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, auxiliary item |
+
+**Event model:** PR feedback uses the fast tier (selective pytest). Merge Queue (`merge_group`) runs the full offline suite once with shards + combined coverage. Prefer enabling GitHub Merge Queue on `main` so full rigor runs at queue time instead of on every PR resync.
 
 If there is a corresponding CI result on the existing PR, you can directly quote the CI conclusion; if the CI does not cover the changes or the local environment differs significantly from the CI environment, supplement local verification and gaps.
 

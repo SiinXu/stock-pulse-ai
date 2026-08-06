@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "notes": "Optional duration weights for scripts/ci_test_shard.py. Unknown modules use the median of known weights (or 1.0s). Update opportunistically from --durations output; empty durations object is valid.",
+  "durations": {}
+}
