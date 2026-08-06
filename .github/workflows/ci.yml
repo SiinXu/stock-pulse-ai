@@ -116,6 +116,9 @@ jobs:
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Selective offline tests need merge-base vs origin/main on pull_request.
+          fetch-depth: 0
       - name: 🐍 Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -165,7 +168,17 @@ jobs:
         run: ./scripts/ci_gate.sh flake8
       - name: ✅ Local deterministic checks
         run: ./scripts/ci_gate.sh deterministic
-      - name: ✅ Offline test suite
+      # PR tier: path-mapped pytest (FULL fallback when infrastructure is touched).
+      # Push-to-main: full offline suite + coverage floor.
+      - name: ✅ Selective offline tests (PR tier)
+        if: github.event_name == 'pull_request'
+        env:
+          CI_SELECT_BASE: origin/main
+        run: |
+          git fetch --no-tags --depth=1 origin main 2>/dev/null || true
+          ./scripts/ci_gate.sh offline-tests-selective
+      - name: ✅ Offline test suite (push-to-main)
+        if: github.event_name != 'pull_request'
         run: ./scripts/ci_gate.sh offline-tests
 
   python-minimum:
@@ -204,8 +217,14 @@ jobs:
             sleep 15
           done
           python -m pip check
-      - name: ✅ Minimum Python backend gate
-        run: ./scripts/ci_gate.sh
+      # PR tier: 3.10 import/schema smoke (not a second full offline suite).
+      # Push-to-main: full offline suite on the declared Python floor.
+      - name: ✅ Minimum Python smoke (PR tier)
+        if: github.event_name == 'pull_request'
+        run: ./scripts/ci_gate.sh python-min-smoke
+      - name: ✅ Minimum Python full offline suite (push-to-main)
+        if: github.event_name != 'pull_request'
+        run: ./scripts/ci_gate.sh offline-tests
 
   pydanticai-installed:
     name: pydanticai-installed

@@ -25,6 +25,7 @@ import {
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import InvestmentFrameworkStructuredEditor from './InvestmentFrameworkStructuredEditor';
+import InvestmentFrameworkPromptPreview from './InvestmentFrameworkPromptPreview';
 import LineListTextarea from './LineListTextarea';
 import {
   cloneInvestmentFrameworkContent,
@@ -556,6 +557,17 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 onChange={setContent}
                 formatIssue={formatValidationIssue}
                 t={t}
+              />
+
+              <InvestmentFrameworkPromptPreview
+                content={content}
+                frameworkId={framework?.frameworkId ?? null}
+                frameworkVersion={framework?.version ?? null}
+                draft
+                reportLanguage={language === 'en' ? 'en' : 'zh'}
+                title={t('settings.frameworkPreviewTitle')}
+                description={t('settings.frameworkPreviewDescription')}
+                emptyLabel={t('settings.frameworkPreviewEmpty')}
               />
 
               <label className="block space-y-1" htmlFor="investment-framework-change-summary">

@@ -369,3 +369,12 @@ export function buildSettingsHref(search: SettingsRouteSearch = {}): string {
 export function buildSettingsSectionHref(section: string): string {
   return buildSettingsHref({ section });
 }
+
+/** Deep link to Settings → Agent Behavior → Investment Framework editor. */
+export function buildInvestmentFrameworkSettingsHref(): string {
+  return buildSettingsHref({
+    section: 'agent_behavior',
+    view: 'investment_framework',
+  });
+}
+
