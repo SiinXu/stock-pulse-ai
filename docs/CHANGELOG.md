@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Desktop release workflow: `workflow_dispatch` is artifacts-only (no GitHub Release publish), builds the workflow ref by default (optional `rebuild_from_tag`), and adds macOS `codesign` + `--version` launch smoke with ad-hoc sign fallback when unsigned binaries do not execute.
 - [Fixed] Desktop PyInstaller freeze excludes `pkg_resources` so frozen backends start under setuptools>=82 (which removed that module and broke `pyi_rth_pkgres`).
 - [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
+- [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
+- [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
@@ -33,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extended the mypy ratchet to `api/v1/schemas` (kept `follow_imports=skip`; documented next-package order).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 - [Chore] Upgraded the Electron desktop stack (Electron 43.3.0, electron-builder 26.15.7, electron-updater 6.8.9, tar override 7.5.22) and added ESLint flat config with // @ts-check for main.js.
+- [Chore] Extracted Portfolio page sections into a feature workspace and portfolio hooks without changing ledger or idempotency behavior.
 - [Fixed] AlphaSift hotspot detail search is response-only (never written to the shared detail cache), bounded by a 12s timeout and concurrency slots, reports `news_search_status` (`available`/`no_results`/`unavailable`), and supports `include_search` (default true for Web compatibility). Ported-from: e430fcfe.
 - [Tests] Added fixed-seed property-style invariant coverage for portfolio ledger money math (conservation, scoped idempotency, FX isolation, projection-after-write).
 
