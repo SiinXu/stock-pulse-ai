@@ -7,7 +7,7 @@ import logging
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.config import Config, get_config
+from src.config import Config
 from src.repositories.portfolio_repo import PortfolioRepository
 from src.services.decision_signal_service import DecisionSignalService
 from src.services.decision_signal_summary import summarize_decision_signal
@@ -33,7 +33,12 @@ class PortfolioRiskService:
         self.repo = repo or PortfolioRepository()
         self.portfolio_service = portfolio_service or PortfolioService(repo=self.repo)
         self.decision_signal_service = decision_signal_service or DecisionSignalService(portfolio_repo=self.repo)
-        self.config = config or get_config()
+        if config is not None:
+            self.config = config
+        else:
+            from src.application_services import get_application_services
+
+            self.config = get_application_services().config
         self._data_manager = None
         self._data_manager_init_error = ""
 
