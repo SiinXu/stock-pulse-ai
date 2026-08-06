@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
