@@ -14,6 +14,7 @@ from concurrent.futures import (
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import ToolCall
+from src.agent.observability import emit_tool_end, emit_tool_start
 from src.agent.runtime.guards import log_runtime_guard_event
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stream_events import stream_event
@@ -104,12 +105,19 @@ def _execute_tools(
 
     if len(tool_calls) == 1:
         tc = tool_calls[0]
+        tool_name = _safe_tool_trace_name(tc.name)
         if progress_callback:
             progress_callback(stream_event(
                 "tool_start",
                 step=step,
-                tool=_safe_tool_trace_name(tc.name),
+                tool=tool_name,
             ))
+        start_event = emit_tool_start(
+            tool_name,
+            step=step,
+            payload={"arguments": _safe_tool_trace_arguments(tc.arguments)},
+        )
+        tool_span_id = start_event.span_id if start_event is not None else None
         timeout_triggered = False
         if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0:
             pool = ThreadPoolExecutor(max_workers=1)
@@ -146,13 +154,28 @@ def _execute_tools(
             progress_callback(stream_event(
                 "tool_done",
                 step=step,
-                tool=_safe_tool_trace_name(tc.name),
+                tool=tool_name,
                 success=success,
                 duration=dur,
             ))
+        duration_ms = None
+        try:
+            if dur is not None:
+                duration_ms = max(0, int(float(dur) * 1000))
+        except (TypeError, ValueError):
+            duration_ms = None
+        emit_tool_end(
+            tool_name,
+            success=bool(success),
+            duration_ms=duration_ms,
+            step=step,
+            span_id=tool_span_id,
+            attrs={"cached": cached, "result_length": len(result_str)},
+            payload={"result_preview": result_str[:200] if isinstance(result_str, str) else None},
+        )
         log_entry = {
             "step": step,
-            "tool": _safe_tool_trace_name(tc.name),
+            "tool": tool_name,
             "arguments": _safe_tool_trace_arguments(tc.arguments),
             "success": success, "duration": dur, "result_length": len(result_str),
             "cached": cached,
@@ -173,20 +196,36 @@ def _execute_tools(
         tool_calls_log.append(log_entry)
         results.append({"tc": tc, "result_str": result_str})
     else:
-        def _record_parallel_result(execution_result, *, timed_out=False):
+        def _record_parallel_result(execution_result, *, timed_out=False, span_id=None):
             """Record one accepted parallel result in the existing output shape."""
             tc_item, result_str, success, dur, cached, guard_result = execution_result
+            tool_name = _safe_tool_trace_name(tc_item.name)
             if progress_callback:
                 progress_callback(stream_event(
                     "tool_done",
                     step=step,
-                    tool=_safe_tool_trace_name(tc_item.name),
+                    tool=tool_name,
                     success=success,
                     duration=dur,
                 ))
+            duration_ms = None
+            try:
+                if dur is not None:
+                    duration_ms = max(0, int(float(dur) * 1000))
+            except (TypeError, ValueError):
+                duration_ms = None
+            emit_tool_end(
+                tool_name,
+                success=bool(success),
+                duration_ms=duration_ms,
+                step=step,
+                span_id=span_id,
+                attrs={"cached": cached, "result_length": len(result_str), "timed_out": timed_out},
+                payload={"result_preview": result_str[:200] if isinstance(result_str, str) else None},
+            )
             log_entry = {
                 "step": step,
-                "tool": _safe_tool_trace_name(tc_item.name),
+                "tool": tool_name,
                 "arguments": _safe_tool_trace_arguments(tc_item.arguments),
                 "success": success,
                 "duration": dur,
@@ -205,13 +244,23 @@ def _execute_tools(
             tool_calls_log.append(log_entry)
             results.append({"tc": tc_item, "result_str": result_str})
 
+        tool_span_by_id: Dict[str, Optional[str]] = {}
         for tc in tool_calls:
+            tool_name = _safe_tool_trace_name(tc.name)
             if progress_callback:
                 progress_callback(stream_event(
                     "tool_start",
                     step=step,
-                    tool=_safe_tool_trace_name(tc.name),
+                    tool=tool_name,
                 ))
+            start_event = emit_tool_start(
+                tool_name,
+                step=step,
+                payload={"arguments": _safe_tool_trace_arguments(tc.arguments)},
+            )
+            tool_span_by_id[str(tc.id)] = (
+                start_event.span_id if start_event is not None else None
+            )
 
         pool = ThreadPoolExecutor(max_workers=min(len(tool_calls), 5))
         timeout_triggered = False
@@ -238,26 +287,31 @@ def _execute_tools(
                 pending.discard(future)
                 tc_item, completion_fence = futures[future]
                 execution_result = future.result()
+                span_id = tool_span_by_id.get(str(tc_item.id))
                 if completion_fence is not None and completion_fence.timed_out:
                     timeout_triggered = True
                     execution_result = _build_timeout_execution_result(tc_item)
-                    _record_parallel_result(execution_result, timed_out=True)
+                    _record_parallel_result(
+                        execution_result, timed_out=True, span_id=span_id
+                    )
                 else:
-                    _record_parallel_result(execution_result)
+                    _record_parallel_result(execution_result, span_id=span_id)
         except FuturesTimeoutError:
             for future, (tc_item, completion_fence) in futures.items():
                 if future in pending:
+                    span_id = tool_span_by_id.get(str(tc_item.id))
                     if (
                         completion_fence is not None
                         and not completion_fence.mark_timed_out()
                     ):
-                        _record_parallel_result(future.result())
+                        _record_parallel_result(future.result(), span_id=span_id)
                         continue
                     timeout_triggered = True
                     future.cancel()
                     _record_parallel_result(
                         _build_timeout_execution_result(tc_item),
                         timed_out=True,
+                        span_id=span_id,
                     )
         finally:
             pool.shutdown(wait=not timeout_triggered, cancel_futures=timeout_triggered)

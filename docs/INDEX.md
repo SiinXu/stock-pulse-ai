@@ -110,3 +110,5 @@
 | [简体中文 README](README_CN.md) | Chinese project overview |
 | [繁中 README](README_CHT.md) | 繁體中文項目概覽與快速開始 |
 | [UI manual (English)](ui-manual/README_EN.md) | Modular Web/desktop UI guide |
+
+- [Agent 可观测性 L0](agent-observability.md)

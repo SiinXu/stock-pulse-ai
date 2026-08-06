@@ -921,6 +921,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.runFlow.loadingDescription": "正在讀取任務快照、執行診斷和事件鏈路。",
   "i18n.uiText.UI_TEXT.runFlow.loadingTitle": "正在載入執行流",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attemptList": "執行嘗試",
+  "i18n.uiText.UI_TEXT.runFlow.nodeDetails.toolSequence": '工具呼叫序列',
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attempts": "嘗試次數",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.blockScores": "資料塊評分",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.close": "關閉節點詳情",

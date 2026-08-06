@@ -921,6 +921,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.runFlow.loadingDescription": "タスクスナップショット、実行診断、イベント経路を読み込んでいます。",
   "i18n.uiText.UI_TEXT.runFlow.loadingTitle": "実行フローを読み込み中",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attemptList": "実行試行",
+  "i18n.uiText.UI_TEXT.runFlow.nodeDetails.toolSequence": 'ツール呼び出し順序',
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attempts": "試行",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.blockScores": "ブロックスコア",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.close": "ノード詳細を閉じる",

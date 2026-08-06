@@ -921,6 +921,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.runFlow.loadingDescription": "Se están leyendo instantáneas de tareas, diagnósticos y cadenas de eventos.",
   "i18n.uiText.UI_TEXT.runFlow.loadingTitle": "Cargando el flujo de ejecución",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attemptList": "Intentos de ejecución",
+  "i18n.uiText.UI_TEXT.runFlow.nodeDetails.toolSequence": 'Secuencia de herramientas',
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attempts": "Intentos",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.blockScores": "Puntuaciones de bloques",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.close": "Detalles de los nodos cerrados",
