@@ -541,3 +541,7 @@ Afraid you got the config wrong? Type the following commands in your terminal to
 | **Ollama returns 404, `Could not get model info`, or `api/generate/api/show`** | Using `OPENAI_BASE_URL` for Ollama makes the system concatenate URLs incorrectly | Use `OLLAMA_API_BASE=http://localhost:11434` or channel mode (`LLM_CHANNELS=ollama` + `LLM_OLLAMA_BASE_URL`) instead |
 
 *Veteran's Tip: If you enable **Agent Mode (Deep-thinking & web-search)**, experience shows you should use a stronger model like `deepseek-v4-pro`. Trying to save money by using weak mini-models for agents will likely result in infinite loops or missed objectives.*
+
+## Recommended presets and profile YAML
+
+For official recommended presets and secret-free `stockpulse-profile` import/export, see [Config Presets & Profiles](./config-presets-profiles_EN.md).

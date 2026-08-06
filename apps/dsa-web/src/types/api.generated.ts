@@ -832,6 +832,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config-profiles/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export stockpulse-profile YAML
+         * @description Export non-secret configuration as stockpulse-profile v1 YAML. Secret keys (API keys, tokens, passwords, extra headers) are never included.
+         */
+        get: operations["export_config_profile_api_v1_config_profiles_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/import/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply stockpulse-profile YAML import
+         * @description Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply.
+         */
+        post: operations["apply_config_profile_import_api_v1_config_profiles_import_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview stockpulse-profile YAML import
+         * @description Validate profile YAML (schema + no secrets) and return a non-secret diff. Does not write configuration.
+         */
+        post: operations["preview_config_profile_import_api_v1_config_profiles_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List recommended configuration presets
+         * @description Return official named presets with local-first recommendation ranking. Detection prefers healthy Ollama / Model Pack, then CLI backends, then cloud.
+         */
+        get: operations["list_config_presets_api_v1_config_profiles_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/presets/{preset_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a configuration preset
+         * @description Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm.
+         */
+        post: operations["apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/presets/{preset_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview applying a configuration preset */
+        post: operations["preview_config_preset_api_v1_config_profiles_presets__preset_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decision-signals": {
         parameters: {
             query?: never;
@@ -4591,6 +4708,274 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+        };
+        /**
+         * ConfigPresetApplyRequest
+         * @description Apply or preview an official preset against the current config version.
+         */
+        ConfigPresetApplyRequest: {
+            /** Config Version */
+            config_version: string;
+            /**
+             * Reload Now
+             * @default true
+             */
+            reload_now: boolean;
+        };
+        /**
+         * ConfigPresetApplyResponse
+         * @description Result of applying an official preset.
+         */
+        ConfigPresetApplyResponse: {
+            /** Applied */
+            applied: boolean;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /** Display Name */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /** New Config Version */
+            new_config_version: string;
+            /** Preset Id */
+            preset_id: string;
+            /** Updated Keys */
+            updated_keys?: string[];
+        };
+        /**
+         * ConfigPresetItem
+         * @description One official recommended configuration preset.
+         */
+        ConfigPresetItem: {
+            /** Config Values */
+            config_values?: {
+                [key: string]: string;
+            };
+            /** Description */
+            description: string;
+            /** Display Name */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: string;
+            /**
+             * Meets Requirements
+             * @default true
+             */
+            meets_requirements: boolean;
+            /** Preference Order */
+            preference_order?: string[];
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /** Requirements */
+            requirements?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** Strategies */
+            strategies?: {
+                [key: string]: unknown;
+            };
+            /** Tags */
+            tags?: string[];
+        };
+        /**
+         * ConfigPresetListResponse
+         * @description Official presets with recommendation ranking.
+         */
+        ConfigPresetListResponse: {
+            detection?: components["schemas"]["ConfigProfileDetection"];
+            /** Presets */
+            presets?: components["schemas"]["ConfigPresetItem"][];
+            /** Recommended Preset Id */
+            recommended_preset_id?: string | null;
+        };
+        /**
+         * ConfigPresetPreviewResponse
+         * @description Preview of applying an official preset.
+         */
+        ConfigPresetPreviewResponse: {
+            /**
+             * Change Count
+             * @default 0
+             */
+            change_count: number;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /** Display Name */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Preset Id */
+            preset_id: string;
+        };
+        /**
+         * ConfigProfileChange
+         * @description One non-secret configuration key change.
+         */
+        ConfigProfileChange: {
+            /**
+             * From Value
+             * @description Previous non-secret value
+             */
+            from_value: string;
+            /** Key */
+            key: string;
+            /**
+             * To
+             * @description Next non-secret value
+             */
+            to: string;
+        };
+        /**
+         * ConfigProfileDetection
+         * @description Local-first detection signals used for preset ranking.
+         */
+        ConfigProfileDetection: {
+            /** Cli Detected */
+            cli_detected?: string[];
+            /**
+             * Cloud Ready
+             * @default false
+             */
+            cloud_ready: boolean;
+            /**
+             * Model Pack Present
+             * @default false
+             */
+            model_pack_present: boolean;
+            /**
+             * Ollama Healthy
+             * @default false
+             */
+            ollama_healthy: boolean;
+        };
+        /**
+         * ConfigProfileExportResponse
+         * @description Exported stockpulse-profile YAML (secrets stripped).
+         */
+        ConfigProfileExportResponse: {
+            /** Config Version */
+            config_version: string;
+            /** Content */
+            content: string;
+            /** Filename */
+            filename: string;
+            /** Keys Exported */
+            keys_exported?: string[];
+            /**
+             * Keys Redacted
+             * @default 0
+             */
+            keys_redacted: number;
+        };
+        /**
+         * ConfigProfileImportApplyResponse
+         * @description Result of applying an imported stockpulse-profile YAML.
+         */
+        ConfigProfileImportApplyResponse: {
+            /** Applied */
+            applied: boolean;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** New Config Version */
+            new_config_version: string;
+            /** Updated Keys */
+            updated_keys?: string[];
+        };
+        /**
+         * ConfigProfileImportPreviewResponse
+         * @description Validated profile import preview with non-secret diff.
+         */
+        ConfigProfileImportPreviewResponse: {
+            /**
+             * Change Count
+             * @default 0
+             */
+            change_count: number;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Issues */
+            issues?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /**
+         * ConfigProfileImportRequest
+         * @description Import or preview a stockpulse-profile YAML document.
+         */
+        ConfigProfileImportRequest: {
+            /** Config Version */
+            config_version: string;
+            /** Content */
+            content: string;
+            /**
+             * Reload Now
+             * @default true
+             */
+            reload_now: boolean;
         };
         /**
          * ConfigValidationIssue
@@ -12482,6 +12867,335 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_config_profile_api_v1_config_profiles_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigProfileExportResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_config_profile_import_api_v1_config_profiles_import_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigProfileImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigProfileImportApplyResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_config_profile_import_api_v1_config_profiles_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigProfileImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigProfileImportPreviewResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_config_presets_api_v1_config_profiles_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigPresetListResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigPresetApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigPresetApplyResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_config_preset_api_v1_config_profiles_presets__preset_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigPresetApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigPresetPreviewResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;

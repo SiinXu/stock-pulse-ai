@@ -110,3 +110,4 @@
 | [简体中文 README](README_CN.md) | Chinese project overview |
 | [繁中 README](README_CHT.md) | 繁體中文項目概覽與快速開始 |
 | [UI manual (English)](ui-manual/README_EN.md) | Modular Web/desktop UI guide |
+| [推荐配置预设与配置档案](config-presets-profiles.md) | 官方预设、不含密钥的 stockpulse-profile YAML 导入导出、本地优先排序 |
