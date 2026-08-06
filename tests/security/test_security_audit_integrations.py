@@ -21,7 +21,11 @@ from api.v1.endpoints import auth as auth_endpoint
 from api.v1.endpoints import security_audit as security_audit_endpoint
 from api.v1.endpoints import system_config as system_config_endpoint
 from api.v1.schemas.analysis import AnalyzeRequest
-from api.v1.schemas.system_config import UpdateSystemConfigRequest
+from api.v1.schemas.system_config import (
+    ImportSystemConfigRequest,
+    RollbackSystemConfigRequest,
+    UpdateSystemConfigRequest,
+)
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy, ToolRegistry
 from src.config import Config
@@ -717,3 +721,237 @@ def test_query_explicitly_denies_when_auth_is_disabled() -> None:
             )
     assert exc_info.value.status_code == 403
     service.list_events.assert_not_called()
+
+
+def test_auth_policy_update_records_correlated_success_without_passwords() -> None:
+    audit = _RecordingAudit()
+    with patch.object(auth_endpoint, "is_auth_enabled", return_value=False), patch.object(
+        auth_endpoint, "has_stored_password", return_value=False
+    ), patch.object(auth_endpoint, "set_initial_password", return_value=None), patch.object(
+        auth_endpoint, "_apply_auth_enabled", return_value=True
+    ), patch.object(auth_endpoint, "rotate_session_secret", return_value=True), patch.object(
+        auth_endpoint, "create_session", return_value="session-value"
+    ), patch.object(
+        auth_endpoint,
+        "_get_auth_status_dict",
+        return_value={
+            "authEnabled": True,
+            "loggedIn": True,
+            "passwordSet": True,
+            "passwordChangeable": True,
+            "setupState": "enabled",
+        },
+    ):
+        response = asyncio.run(
+            auth_endpoint.auth_update_settings(
+                _request(),
+                auth_endpoint.AuthSettingsRequest(
+                    authEnabled=True,
+                    password="secret-password",
+                    passwordConfirm="secret-password",
+                ),
+                security_audit=audit,
+            )
+        )
+
+    assert response.status_code == 200
+    assert audit.attempts[0]["event_type"] == "auth.policy"
+    assert audit.completions[0]["reason_code"] == "auth_policy_updated"
+    assert audit.attempts[0]["correlation_id"] == audit.completions[0]["correlation_id"]
+    assert audit.completions[0]["metadata"]["target_enabled"] is True
+    assert "secret-password" not in repr((audit.attempts, audit.completions))
+
+
+def test_auth_policy_attempt_failure_blocks_toggle() -> None:
+    audit = _RecordingAudit(fail_attempt=True)
+    with patch.object(auth_endpoint, "is_auth_enabled", return_value=True), patch.object(
+        auth_endpoint, "_apply_auth_enabled"
+    ) as apply_auth:
+        response = asyncio.run(
+            auth_endpoint.auth_update_settings(
+                _request(),
+                auth_endpoint.AuthSettingsRequest(
+                    authEnabled=False,
+                    currentPassword="secret-password",
+                ),
+                security_audit=audit,
+            )
+        )
+
+    assert response.status_code == 503
+    apply_auth.assert_not_called()
+
+
+def test_logout_records_session_invalidation() -> None:
+    audit = _RecordingAudit()
+    with patch.object(auth_endpoint, "is_auth_enabled", return_value=True), patch.object(
+        auth_endpoint, "rotate_session_secret", return_value=True
+    ):
+        response = asyncio.run(
+            auth_endpoint.auth_logout(_request(), security_audit=audit)
+        )
+
+    assert response.status_code == 204
+    assert audit.attempts[0]["event_type"] == "auth.logout"
+    assert audit.completions[0]["reason_code"] == "session_invalidated"
+    assert audit.attempts[0]["correlation_id"] == audit.completions[0]["correlation_id"]
+
+
+def test_password_change_success_and_denial_are_audited() -> None:
+    success_audit = _RecordingAudit()
+    with patch.object(auth_endpoint, "is_password_changeable", return_value=True), patch.object(
+        auth_endpoint, "change_password", return_value=None
+    ):
+        success = asyncio.run(
+            auth_endpoint.auth_change_password(
+                _request(),
+                auth_endpoint.ChangePasswordRequest(
+                    currentPassword="old-secret",
+                    newPassword="new-secret",
+                    newPasswordConfirm="new-secret",
+                ),
+                security_audit=success_audit,
+            )
+        )
+
+    deny_audit = _RecordingAudit()
+    with patch.object(auth_endpoint, "is_password_changeable", return_value=True), patch.object(
+        auth_endpoint, "change_password", return_value="current password is incorrect"
+    ):
+        denied = asyncio.run(
+            auth_endpoint.auth_change_password(
+                _request(),
+                auth_endpoint.ChangePasswordRequest(
+                    currentPassword="wrong-secret",
+                    newPassword="new-secret",
+                    newPasswordConfirm="new-secret",
+                ),
+                security_audit=deny_audit,
+            )
+        )
+
+    assert success.status_code == 204
+    assert success_audit.completions[0]["event_type"] == "auth.password_change"
+    assert success_audit.completions[0]["reason_code"] == "password_changed"
+    assert denied.status_code == 400
+    assert deny_audit.completions[0]["outcome"] == "denied"
+    assert deny_audit.completions[0]["reason_code"] == "invalid_password"
+    assert "old-secret" not in repr((success_audit.attempts, success_audit.completions))
+    assert "wrong-secret" not in repr((deny_audit.attempts, deny_audit.completions))
+
+
+def test_config_export_records_success_without_env_content() -> None:
+    audit = _RecordingAudit()
+    config_service = MagicMock()
+    config_service.export_env.return_value = {
+        "content": "GEMINI_API_KEY=must-not-audit\n",
+        "config_version": "version-1",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    with patch.object(system_config_endpoint, "_allow_env_backup_access"):
+        response = system_config_endpoint.export_system_config(
+            request=_request(),
+            service=config_service,
+            security_audit=audit,
+        )
+
+    assert response.config_version == "version-1"
+    assert audit.attempts[0]["event_type"] == "system_config.export"
+    assert audit.completions[0]["reason_code"] == "config_exported"
+    assert audit.completions[0]["metadata"]["content_byte_length"] == len(
+        "GEMINI_API_KEY=must-not-audit\n".encode("utf-8")
+    )
+    assert "must-not-audit" not in repr((audit.attempts, audit.completions))
+
+
+def test_config_export_access_denial_is_audited() -> None:
+    audit = _RecordingAudit()
+    config_service = MagicMock()
+    with patch.object(
+        system_config_endpoint,
+        "_allow_env_backup_access",
+        side_effect=system_config_endpoint.EnvBackupAccessDenied(
+            status_code=403,
+            message="System config backup is disabled; enable admin authentication first",
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            system_config_endpoint.export_system_config(
+                request=_request(),
+                service=config_service,
+                security_audit=audit,
+            )
+
+    assert exc_info.value.status_code == 403
+    config_service.export_env.assert_not_called()
+    assert audit.completions[0]["outcome"] == "denied"
+    assert audit.completions[0]["reason_code"] == "env_backup_access_denied"
+
+
+def test_config_import_records_success_without_backup_body() -> None:
+    audit = _RecordingAudit()
+    config_service = MagicMock()
+    config_service.import_env.return_value = {
+        "success": True,
+        "config_version": "version-2",
+        "applied_count": 1,
+        "skipped_masked_count": 0,
+        "reload_triggered": False,
+        "updated_keys": ["STOCK_LIST"],
+        "warnings": [],
+    }
+    with patch.object(system_config_endpoint, "_allow_env_backup_access"):
+        response = system_config_endpoint.import_system_config(
+            request=ImportSystemConfigRequest(
+                config_version="version-1",
+                content="STOCK_LIST=600519\nGEMINI_API_KEY=must-not-audit\n",
+                reload_now=False,
+            ),
+            request_obj=_request(),
+            service=config_service,
+            security_audit=audit,
+        )
+
+    assert response.success is True
+    assert audit.attempts[0]["event_type"] == "system_config.import"
+    assert audit.completions[0]["reason_code"] == "config_imported"
+    assert "must-not-audit" not in repr((audit.attempts, audit.completions))
+
+
+def test_config_rollback_attempt_failure_blocks_restore() -> None:
+    audit = _RecordingAudit(fail_attempt=True)
+    config_service = MagicMock()
+    with pytest.raises(HTTPException) as exc_info:
+        system_config_endpoint.rollback_system_config(
+            request=RollbackSystemConfigRequest(config_version="version-1"),
+            service=config_service,
+            security_audit=audit,
+        )
+
+    assert exc_info.value.status_code == 503
+    config_service.restore_last_good_config.assert_not_called()
+
+
+def test_config_rollback_success_is_audited() -> None:
+    audit = _RecordingAudit()
+    config_service = MagicMock()
+    config_service.restore_last_good_config.return_value = {
+        "success": True,
+        "config_version": "version-0",
+        "applied_count": 0,
+        "skipped_masked_count": 0,
+        "reload_triggered": True,
+        "updated_keys": [],
+        "warnings": [],
+    }
+    response = system_config_endpoint.rollback_system_config(
+        request=RollbackSystemConfigRequest(config_version="version-1"),
+        service=config_service,
+        security_audit=audit,
+    )
+
+    assert response.success is True
+    assert audit.attempts[0]["event_type"] == "system_config.rollback"
+    assert audit.completions[0]["reason_code"] == "config_rolled_back"
+    assert audit.attempts[0]["correlation_id"] == audit.completions[0]["correlation_id"]
+
