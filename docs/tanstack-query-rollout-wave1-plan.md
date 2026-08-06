@@ -22,6 +22,8 @@ Do not merge this PR into `main` until pilot **#788** is merged; rebase onto mai
 | Outcome stats | `useDecisionSignalOutcomeStatsQuery` | Mount load; no focus/poll |
 | Detail outcomes + feedback | `useDecisionSignalDetailQueries` | Selection-gated; independent queries; `retry: false` |
 | Status update | page-owned `updateStatus` (deferred) | Keeps in-flight double-click guard; not migrated to `useMutation` in wave 1 to preserve parity tests |
+| Alerts rules/triggers/notifications | `useAlertWorkspaceQueries` | No poll/focus; create/update/delete stay page-owned; transport still `api/alerts` |
+| Skill Outcomes performance | `useSkillOutcomesQuery` | reloadToken initial loads; icon refresh stays page-owned `load('refresh')` |
 
 ## Open-PR exclusions (later waves)
 

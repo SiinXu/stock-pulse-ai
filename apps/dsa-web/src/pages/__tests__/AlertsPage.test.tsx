@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
 import { createDeferred, chooseOption } from '../../test-utils';
@@ -6,6 +8,20 @@ import { createDeferred, chooseOption } from '../../test-utils';
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
+function renderAlertsPage(ui: ReactNode = <AlertsPage />) {
+  return render(wrapWithQueryClient(<>{ui}</>));
 }
 
 const {
@@ -115,7 +131,7 @@ beforeEach(() => {
 
 describe('AlertsPage rule editing', () => {
   it('loads the current rule on edit and PATCHes an updated payload', async () => {
-    render(<AlertsPage />);
+    renderAlertsPage();
     await waitFor(() => expect(listRules).toHaveBeenCalled());
 
     fireEvent.click(await screen.findByRole('button', { name: '编辑 茅台价格突破' }));
@@ -139,7 +155,7 @@ describe('AlertsPage rule editing', () => {
     const deferredA = createDeferred<typeof rule>();
     getRule.mockImplementation((id: number) => (id === 1 ? deferredA.promise : Promise.resolve(ruleB)));
 
-    render(<AlertsPage />);
+    renderAlertsPage();
     await waitFor(() => expect(listRules).toHaveBeenCalled());
 
     fireEvent.click(await screen.findByRole('button', { name: '编辑 茅台价格突破' }));
@@ -163,7 +179,7 @@ describe('AlertsPage rule editing', () => {
 
 describe('AlertsPage', () => {
   it('loads rules, trigger history, and notification empty state', async () => {
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     expect(screen.getByText('管理事件告警、日线技术指标、自选股、持仓/账户联动和大盘红绿灯规则，执行一次性测试，并查看后台评估任务记录的触发历史。')).toBeInTheDocument();
     expect(await screen.findByText('茅台价格突破')).toBeInTheDocument();
@@ -187,7 +203,7 @@ describe('AlertsPage', () => {
   });
 
   it('filters notification attempts by channel and delivery status', async () => {
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     await screen.findByText('茅台价格突破');
     fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
@@ -209,7 +225,7 @@ describe('AlertsPage', () => {
 
   it('runs a dry-run test and renders only declared response fields', async () => {
     listTriggers.mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 20 });
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     fireEvent.click(await screen.findByRole('button', { name: '测试' }));
 
@@ -255,7 +271,7 @@ describe('AlertsPage', () => {
         },
       ],
     });
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     fireEvent.click(await screen.findByRole('button', { name: '测试' }));
 
@@ -276,7 +292,7 @@ describe('AlertsPage', () => {
       .mockResolvedValueOnce({ items: [rule], total: 1, page: 1, pageSize: 20 })
       .mockResolvedValueOnce({ items: [rule, createdRule], total: 2, page: 1, pageSize: 20 });
     createRule.mockResolvedValueOnce(createdRule);
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     await screen.findByText('茅台价格突破');
     fireEvent.click(screen.getByRole('button', { name: '创建告警规则' }));
@@ -302,7 +318,7 @@ describe('AlertsPage', () => {
 
   it('keeps create form values when create API fails', async () => {
     createRule.mockRejectedValueOnce({ parsedError });
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     await screen.findByText('茅台价格突破');
     fireEvent.click(screen.getByRole('button', { name: '创建告警规则' }));
@@ -329,7 +345,7 @@ describe('AlertsPage', () => {
     disableRule.mockReturnValueOnce(disableRequest.promise);
     testRule.mockReturnValueOnce(testRequest.promise);
 
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     const firstRow = (await screen.findByText('茅台价格突破')).closest('tr') as HTMLElement;
     const secondRow = screen.getByText('苹果价格突破').closest('tr') as HTMLElement;
@@ -364,7 +380,7 @@ describe('AlertsPage', () => {
       .mockResolvedValueOnce({ items: [], total: 20, page: 2, pageSize: 20 })
       .mockResolvedValue({ items: [rule], total: 20, page: 1, pageSize: 20 });
 
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     expect(await screen.findByText('茅台价格突破')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '2' }));
@@ -394,7 +410,7 @@ describe('AlertsPage', () => {
       .mockReturnValueOnce(initialRequest.promise)
       .mockReturnValueOnce(filteredRequest.promise);
 
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     chooseOption(screen.getByLabelText('启停状态'), 'disabled');
     await waitFor(() => expect(listRules).toHaveBeenCalledTimes(2));
@@ -410,7 +426,7 @@ describe('AlertsPage', () => {
   it('renders API errors through ApiErrorAlert', async () => {
     listRules.mockRejectedValueOnce({ parsedError });
 
-    render(<AlertsPage />);
+    renderAlertsPage();
 
     expect(await screen.findByText('加载失败')).toBeInTheDocument();
     expect(screen.getByText('告警 API 不可用')).toBeInTheDocument();

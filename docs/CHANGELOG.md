@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Changed] Migrated Decision Signals feed list/detail/stats loads and status updates to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
-- [Docs] Documented TanStack Query wave-1 Decision Signals migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
+- [Changed] Migrated Decision Signals feed list/detail/stats loads, Alerts workspace list loads, and Skill Outcomes performance loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
+- [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
 - [Docs] Fix broken relative links in bot-command docs (`config.py` → `src/config.py`).
 - [Docs] Added macOS quarantine troubleshooting for the desktop app to FAQ (EN/CN) and the desktop packaging guide open step.

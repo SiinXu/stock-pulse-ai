@@ -152,6 +152,8 @@ than a line-count-driven file split.
 | `DecisionSignalsPage` list feed | `hooks/useDecisionSignalListQuery.ts` | No interval poll; no focus refetch (`refetchOnWindowFocus: false`); key includes filters/page/scope/watchlist readiness; list reducer remains error/loading owner; `retry: false` | Wave 1 |
 | `DecisionSignalsPage` outcome stats | `hooks/useDecisionSignalOutcomeStatsQuery.ts` | Mount load only; no focus/poll; existing stats error surface; `retry: false` | Wave 1 |
 | `DecisionSignalsPage` detail outcomes + feedback | `hooks/useDecisionSignalDetailQueries.ts` | Selection-gated; independent queries; no focus/poll; `retry: false` | Wave 1 |
+| Alerts rules / triggers / notifications | `hooks/useAlertWorkspaceQueries.ts` + `AlertsWorkspace` | No poll; no focus refetch; page-owned create/update/delete mutations; `retry: false` | Wave 1 |
+| `SkillOutcomesPage` performance load | `hooks/useSkillOutcomesQuery.ts` | reloadToken-driven initial load; manual refresh stays page-owned; no focus/poll; `retry: false` | Wave 1 |
 
 ### Rollout rules for the next pages
 

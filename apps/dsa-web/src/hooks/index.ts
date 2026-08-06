@@ -33,6 +33,24 @@ export {
   useDecisionSignalDetailQueries,
 } from './useDecisionSignalDetailQueries';
 export type { DecisionSignalDetailQueryView } from './useDecisionSignalDetailQueries';
+export {
+  buildSkillOutcomesQueryKey,
+  SKILL_OUTCOMES_QUERY_KEY_ROOT,
+  useSkillOutcomesQuery,
+} from './useSkillOutcomesQuery';
+export type { SkillOutcomesQueryResult } from './useSkillOutcomesQuery';
+export {
+  ALERT_NOTIFICATIONS_QUERY_KEY_ROOT,
+  ALERT_RULES_QUERY_KEY_ROOT,
+  ALERT_TRIGGERS_QUERY_KEY_ROOT,
+  buildAlertNotificationsQueryKey,
+  buildAlertRulesQueryKey,
+  buildAlertTriggersQueryKey,
+  useAlertNotificationsQuery,
+  useAlertRulesQuery,
+  useAlertTriggersQuery,
+} from './useAlertWorkspaceQueries';
+export type { AlertRulesQueryKeyInput } from './useAlertWorkspaceQueries';
 export { useMarketReviewState } from './useMarketReviewState';
 export { useRunFlowSnapshot } from './useRunFlowSnapshot';
 export { useTaskStream } from './useTaskStream';
