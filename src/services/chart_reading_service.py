@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
 
-from src.config import Config, get_config
+from src.config import Config
 from src.llm.errors import guard_litellm_outbound_call
 from src.llm.hermes import route_has_hermes
 from src.services.image_stock_extractor import (
@@ -190,16 +190,26 @@ def _parse_chart_json(text: str) -> dict[str, Any]:
     }
 
 
+def _resolve_process_config(cfg: Optional[Config] = None) -> Config:
+    """Prefer an injected config; otherwise use the composition root."""
+    if cfg is not None:
+        return cfg
+    from src.application_services import get_application_services
+
+    return get_application_services().config
+
+
 def _call_litellm_chart_vision(
     image_b64: str,
     mime_type: str,
     *,
     api_key: Optional[str] = None,
     prompt: str = CHART_READ_PROMPT,
+    config: Optional[Config] = None,
 ) -> Tuple[str, str]:
     """Call LiteLLM vision with the chart prompt. Returns (raw_text, model)."""
     global litellm
-    cfg = get_config()
+    cfg = _resolve_process_config(config)
     model_list = getattr(cfg, "llm_model_list", []) or []
     model = _resolve_vision_model()
     if not model:
@@ -263,7 +273,7 @@ def _call_litellm_chart_vision(
 
 def assess_vision_readiness(cfg: Optional[Config] = None) -> dict[str, Any]:
     """Return whether chart vision can run with the current config."""
-    cfg = cfg or get_config()
+    cfg = _resolve_process_config(cfg)
     model = _resolve_vision_model()
     if not model:
         return {"ready": False, "reason": "vision_model_unavailable", "model": ""}

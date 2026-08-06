@@ -79,8 +79,12 @@ def test_read_chart_degrades_without_vision_model() -> None:
         openai_model=None,
         llm_model_list=[],
     )
-    with patch("src.services.chart_reading_service.get_config", return_value=cfg), patch(
+    with patch(
+        "src.services.chart_reading_service._resolve_process_config", return_value=cfg
+    ), patch(
         "src.services.image_stock_extractor.get_config", return_value=cfg
+    ), patch(
+        "src.services.image_stock_extractor._resolve_vision_model", return_value=""
     ):
         readiness = assess_vision_readiness(cfg)
         assert readiness["ready"] is False
@@ -132,8 +136,13 @@ def test_litellm_completion_patch_target_for_chart_vision() -> None:
     response = MagicMock()
     response.choices = [choice]
 
-    with patch("src.services.chart_reading_service.get_config", return_value=cfg), patch(
+    with patch(
+        "src.services.chart_reading_service._resolve_process_config", return_value=cfg
+    ), patch(
         "src.services.image_stock_extractor.get_config", return_value=cfg
+    ), patch(
+        "src.services.image_stock_extractor._resolve_vision_model",
+        return_value="openai/gpt-4o-mini",
     ), patch(
         "src.services.chart_reading_service.litellm.completion",
         return_value=response,

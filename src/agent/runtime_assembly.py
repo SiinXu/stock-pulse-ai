@@ -204,9 +204,9 @@ def get_tool_registry():
     # Optional multimodal PDF/chart tools (issue #253): default-off.
     try:
         from src.agent.tools.multimodal_tools import build_multimodal_tools
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        multimodal_tools = build_multimodal_tools(get_config())
+        multimodal_tools = build_multimodal_tools(get_application_services().config)
         if multimodal_tools:
             for tool_def in multimodal_tools:
                 registry.register(tool_def)
