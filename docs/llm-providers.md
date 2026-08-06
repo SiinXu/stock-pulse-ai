@@ -142,6 +142,7 @@ OpenAI-compatible Base URL 只填到服务商兼容入口，不额外拼接 `/ch
 | `LLM_CHANNELS` | Variables 或 Secrets | 逗号分隔渠道名，例如 `deepseek,minimax,volcengine`。 |
 | `LLM_<CHANNEL>_PROVIDER` | Variables 或 Secrets | Provider Catalog ID；与可重命名的连接名分离，新配置应显式填写。 |
 | `LLM_<CHANNEL>_PROTOCOL` | Variables 或 Secrets | 非敏感，通常为 `openai`、`deepseek`、`gemini`、`anthropic` 或 `ollama`。 |
+| `LLM_<CHANNEL>_API_SURFACE` | Variables 或 Secrets | 可选。`chat_completions`（默认）或 `responses`。`responses` 仅支持 `PROTOCOL=openai`，且模型不能使用 anthropic/gemini/xai 等 LiteLLM 直连前缀；公开路由别名保持不变，wire model 使用 `openai/responses/<model>`。 |
 | `LLM_<CHANNEL>_BASE_URL` | Variables 或 Secrets | 非敏感时优先放 Variables；私有网关地址可放 Secrets。 |
 | `LLM_<CHANNEL>_MODELS` | Variables 或 Secrets | 非敏感模型列表，逗号分隔。 |
 | `LLM_<CHANNEL>_ENABLED` | Variables 或 Secrets | 可选，未配置时默认启用；设为 `false` 可跳过该渠道。 |
