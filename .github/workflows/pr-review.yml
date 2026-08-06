@@ -1,6 +1,9 @@
 # Automated pull request review with syntax checks and advisory AI reporting.
 #
-# Security model (pull_request, fork-safe):
+# Default-off for PR throughput: not in the main ruleset required checks and no longer
+# auto-runs on pull_request. Maintainers opt in via workflow_dispatch on a PR branch.
+#
+# Security model when dispatched (fork-safe if ever re-enabled on pull_request):
 # - Fork PRs: read-only static checks only. Repository secrets and write jobs are skipped.
 # - Same-repo PRs targeting the default branch: static checks + AI review + labels/comments.
 # - AI review runs trusted scripts from the PR base commit only; the PR tree is analysis data.
@@ -13,27 +16,7 @@ name: PR Review
 permissions: {}
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - '**.py'
-      - '**.md'
-      - '**.ts'
-      - '**.tsx'
-      - 'docs/**'
-      - 'README.md'
-      - 'AGENTS.md'
-      - 'apps/dsa-web/**'
-      - 'requirements.txt'
-      - '.github/requirements-ci.txt'
-      - 'pyproject.toml'
-      - 'setup.cfg'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
-      - '.github/workflows/**'
-      - '.github/scripts/**'
-      - 'docker/Dockerfile'
-      - 'docker-compose.yml'
-  # Allow maintainers to rerun the review manually.
+  # Opt-in only — do not auto-run on every PR (runner/cost contention with required CI).
   workflow_dispatch:
 
 # Avoid duplicate comments when the same pull request triggers multiple runs.

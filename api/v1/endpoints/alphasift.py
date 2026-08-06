@@ -119,15 +119,29 @@ def alphasift_hotspot_detail(
     topic: str,
     provider: str = Query("", max_length=32),
     refresh: bool = Query(False),
+    include_search: bool = Query(
+        True,
+        description=(
+            "When true (default), auto-attach bounded news-search catalysts if the "
+            "structured route has no external event. Search is response-only and is "
+            "never written to the shared hotspot detail cache."
+        ),
+    ),
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
     refresh_value = refresh if isinstance(refresh, bool) else bool(getattr(refresh, "default", False))
+    include_search_value = (
+        include_search
+        if isinstance(include_search, bool)
+        else bool(getattr(include_search, "default", True))
+    )
     return _validated_payload(
         AlphaSiftHotspotDetailResponse,
         _service(config).hotspot_detail(
             topic=topic,
             provider=provider,
             refresh=refresh_value,
+            include_search=include_search_value,
         ),
     )
 

@@ -364,9 +364,32 @@ User input, stock and company names, original news, model IDs, third-party text,
 
 ---
 
+## Desktop App
+
+### Q15: macOS says the desktop app is damaged or cannot be opened?
+
+**Cause**: The current macOS DMG is not signed and notarized with an Apple Developer certificate. After a browser download, macOS Gatekeeper may attach the quarantine attribute and block startup.
+
+**Solution**:
+
+1. Download only from the project's [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases), and select the package matching your Mac architecture: Apple silicon uses `stockpulse-macos-arm64-<tag>.dmg`, Intel uses `stockpulse-macos-x64-<tag>.dmg`. Do not bypass Gatekeeper for third-party copies or files from an untrusted source.
+2. Drag `StockPulse` into Applications, then first try **System Settings → Privacy & Security → Open Anyway**.
+3. If it still does not start and you have verified that it came from the official project Release, remove quarantine only from this app and launch it:
+
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/StockPulse.app"
+   open "/Applications/StockPulse.app"
+   ```
+
+Replace the path if the app is not in `/Applications`. Never run `xattr` against the entire `/Applications` directory. This is a temporary way to allow a trusted unsigned app; it is not a substitute for signing or notarization. See the [desktop packaging guide](desktop-package.md#macos-提示应用已损坏无法打开) for the complete troubleshooting notes.
+
+> Related upstream issue: [ZhuLinsen/daily_stock_analysis#2113](https://github.com/ZhuLinsen/daily_stock_analysis/issues/2113)
+
+---
+
 ## Other Issues
 
-### Q15: How to run only market review, without stock analysis?
+### Q16: How to run only market review, without stock analysis?
 
 **Method**:
 ```bash
@@ -379,7 +402,7 @@ python main.py --market-only
 
 ---
 
-### Q16: Buy/Hold/Sell counts in analysis results are incorrect?
+### Q17: Buy/Hold/Sell counts in analysis results are incorrect?
 
 **Cause**: Earlier versions used regex matching for statistics, may not match actual recommendations.
 
@@ -396,4 +419,4 @@ If the above content doesn't solve your issue, welcome to:
 
 ---
 
-*Last updated: 2026-04-20*
+*Last updated: 2026-08-06*

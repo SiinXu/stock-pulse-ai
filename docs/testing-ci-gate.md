@@ -214,7 +214,7 @@ STOCKPULSE_TEST_THREADLESS=0 \
   python -m pytest tests/api -m "not network and not benchmark"
 ```
 
-The `api-real-client` job in `.github/workflows/ci.yml` is **not** a required branch-ruleset check. It always runs on PR and push-to-main (after `ai-governance`) so real-client regressions surface without blocking merges while the inventory stabilizes.
+The `api-real-client` job in `.github/workflows/ci.yml` is **not** a required branch-ruleset check. It runs **only on push-to-main** (after `ai-governance`), not on pull requests, so real-client regressions still surface post-merge without consuming PR runners.
 
 ## CI path filters (`web-gate` vs `web-e2e`)
 
@@ -222,10 +222,10 @@ The `changes` job in `.github/workflows/ci.yml` emits two independent filters:
 
 | Output | Consumed by | Paths (summary) |
 | --- | --- | --- |
-| `frontend` | `web-gate` (lint / i18n / unit / build) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
-| `web_e2e` | `web-e2e` (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
+| `frontend` | `web-gate` on PR and push (lint / i18n / unit / build) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
+| `web_e2e` | `web-e2e` on **push-to-main only** (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
 
-Pure backend changes under `src/**` / `data_provider/**` / `bot/**` therefore re-run the e2e stack that boots the real app, without paying for frontend lint/unit/build. Pure frontend changes still run both jobs.
+PR runs keep the ruleset-required backend/docker/openapi gates (plus path-filtered `web-gate` for frontend). `web-e2e` and `api-real-client` are observation jobs after merge. The auxiliary `PR Review` workflow is opt-in via `workflow_dispatch` and does not auto-run on every PR.
 
 ## Push-to-main CI
 

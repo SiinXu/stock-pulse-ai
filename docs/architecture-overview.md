@@ -96,7 +96,7 @@ path-filter, container-smoke, and reference-update coverage.
 
 | Area | Owns | Does not own |
 | --- | --- | --- |
-| `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection | Full dependency injection for every caller; adoption is currently incremental. |
+| `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection. New/touched code should prefer constructor injection or `get_application_services().config` over bare `get_config()`; growth is ratcheted by [config-access ratchet](config-access-ratchet.md) / [ADR-011](adr/ADR-011-config-access-ratchet.md). | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
 | `src/core/pipeline.py` and `src/core/stages/` | Analysis orchestration, typed stage outcomes, analysis stages, rendering, and dispatch sequencing | Transport lifecycle or persistent query APIs. |
 | `data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control | Product task lifecycle or report presentation. |
@@ -358,7 +358,8 @@ separately owned contract.
 
 - The [composition root](adr/ADR-003-application-services-composition-root.md)
   is a compatibility-preserving seam, not proof that every dependency is already
-  injected through one object.
+  injected through one object. Bare `get_config()` growth is blocked by the
+  [config-access ratchet](config-access-ratchet.md) ([ADR-011](adr/ADR-011-config-access-ratchet.md)).
 - The task authority is process-local. Durable recovery or multi-worker state
   requires a new decision and implementation.
 - Scheduled-task definitions and occurrence audit are durable, but their
@@ -398,6 +399,8 @@ separately owned contract.
 - [API specification artifact](architecture/api_spec.json)
 - [Behavior-preserving decomposition method](adr/ADR-006-behavior-preserving-module-decomposition.md)
 - [Legacy facade import policy and inventory](legacy-facade-import-policy.md)
+- [Config-access ratchet](config-access-ratchet.md)
+- [Import-cycle ratchet](import-cycle-ratchet.md)
 
 ## Keeping This Overview Current
 

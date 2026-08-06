@@ -233,7 +233,7 @@ async function installApiMocks(page: Page): Promise<void> {
       return fulfillJson(setupStatusMock);
     }
     if (pathname === '/api/v1/stocks/watchlist') {
-      return fulfillJson({ stock_codes: [] });
+      return fulfillJson({ message: 'ok', stock_codes: [] });
     }
     if (pathname === '/api/v1/history/stocks') {
       return fulfillJson({ total: 0, items: [] });
