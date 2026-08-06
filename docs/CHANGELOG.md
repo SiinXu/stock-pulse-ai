@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Optional default-off DCF and relative valuation estimation (`valuation_service` + `estimate_stock_valuation` Agent Tool) with explicit assumptions, sensitivity ranges, and honest insufficient-fundamentals handling (issue #238 phase 1).
+- [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
 - [Docs] Fix broken relative links in bot-command docs (`config.py` → `src/config.py`).
