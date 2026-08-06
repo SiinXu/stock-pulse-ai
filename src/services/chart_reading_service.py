@@ -140,7 +140,7 @@ def _parse_chart_json(text: str) -> dict[str, Any]:
             from json_repair import repair_json
 
             data = repair_json(cleaned, return_objects=True)
-        except Exception:
+        except (ImportError, TypeError, ValueError, json.JSONDecodeError):
             data = None
     if not isinstance(data, dict):
         raise ValueError("invalid_chart_json")

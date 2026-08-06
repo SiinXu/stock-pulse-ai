@@ -16,6 +16,8 @@ import zlib
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 PDF_SCHEMA_VERSION = "pdf-parse-v1"
@@ -158,10 +160,8 @@ def _extract_streams(data: bytes) -> list[str]:
         header_window = data[max(0, stream_start - 400) : stream_start]
         raw = match.group(1)
         decoded = _maybe_decompress_stream(raw, header_window)
-        try:
-            content = decoded.decode("latin-1", errors="replace")
-        except Exception:  # broad-exception: fallback_recorded - skip undecodable streams.
-            continue
+        # latin-1 with replace never fails; keep decode explicit for binary streams.
+        content = decoded.decode("latin-1", errors="replace")
         # Only keep streams that look like content operators.
         if "Tj" not in content and "TJ" not in content and "BT" not in content:
             continue
@@ -175,24 +175,39 @@ def _extract_streams(data: bytes) -> list[str]:
 def _try_pypdf(data: bytes) -> list[str]:
     try:
         from pypdf import PdfReader  # type: ignore
-    except Exception:
+    except ImportError:
         try:
             from PyPDF2 import PdfReader  # type: ignore
-        except Exception:
+        except ImportError:
             return []
 
     import io
 
     try:
         reader = PdfReader(io.BytesIO(data))
-    except Exception:  # broad-exception: fallback_recorded - fall back to built-in extractor.
+    except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+        log_safe_exception(
+            logger,
+            "Optional pypdf reader failed; using built-in stream extractor",
+            exc,
+            error_code="pdf_pypdf_reader_failed",
+            level=logging.DEBUG,
+        )
         return []
 
     pages: list[str] = []
     for index, page in enumerate(reader.pages[:MAX_PDF_PAGES]):
         try:
             text = page.extract_text() or ""
-        except Exception:  # broad-exception: fallback_recorded - skip one page, keep others.
+        except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+            log_safe_exception(
+                logger,
+                "Optional pypdf page extract failed; skipping page",
+                exc,
+                error_code="pdf_pypdf_page_failed",
+                level=logging.DEBUG,
+                context={"page_index": index},
+            )
             text = ""
         cleaned = _WHITESPACE_RE.sub(" ", str(text)).strip()
         if cleaned:
