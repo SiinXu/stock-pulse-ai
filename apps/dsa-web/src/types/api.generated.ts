@@ -3274,6 +3274,10 @@ export interface components {
             missing_fields?: string[] | null;
             /** Name */
             name?: string | null;
+            /** News Search Requested */
+            news_search_requested?: boolean | null;
+            /** News Search Status */
+            news_search_status?: string | null;
             /** Provider */
             provider: string;
             /** Quality Status */
@@ -3368,6 +3372,8 @@ export interface components {
             description: string;
             /** Published At */
             published_at?: string | null;
+            /** Search Result */
+            search_result?: boolean | null;
             /** Source */
             source?: string | null;
             /** Time */
@@ -11255,6 +11261,8 @@ export interface operations {
             query?: {
                 provider?: string;
                 refresh?: boolean;
+                /** @description When true (default), auto-attach bounded news-search catalysts if the structured route has no external event. Search is response-only and is never written to the shared hotspot detail cache. */
+                include_search?: boolean;
             };
             header?: never;
             path: {
