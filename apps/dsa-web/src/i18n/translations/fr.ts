@@ -4498,6 +4498,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.completed": "Mission accomplie",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.failed": "Tâche échouée",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted": "Tâche interrompue",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.recovered.requeued": "Task recovered after restart and re-queued",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted.process_restart": "Task interrupted by process restart and cannot be safely resumed",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.market_review.queued": "Examen de marché en file d’attente",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.processing": "Tâche en cours",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.queued": "Tâche en file d’attente",

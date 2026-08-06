@@ -9000,6 +9000,8 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.completed": "Task completed",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.failed": "Task failed",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted": "Task interrupted",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.recovered.requeued": "Task recovered after restart and re-queued",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted.process_restart": "Task interrupted by process restart and cannot be safely resumed",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.market_review.queued": "Market review queued",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.processing": "Task in progress",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.queued": "Task queued",
