@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
 - [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
+- [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
 - [Changed] Unified baostock/pytdx/longbridge retry and request-timeout policy via `data_provider/retry_policy.py` (BaseFetcher-level enforcement deferred).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
