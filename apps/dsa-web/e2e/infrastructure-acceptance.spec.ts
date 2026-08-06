@@ -467,6 +467,9 @@ async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
     strategies,
   }));
   await page.route('**/api/v1/alphasift/hotspots**', (route) => fulfillJson(route, {
+    enabled: true,
+    provider: 'akshare',
+    hotspot_count: 0,
     hotspots: [],
     details: {},
     cached_at: null,
@@ -476,6 +479,8 @@ async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
 
 function screeningResult(marker: string) {
   return {
+    enabled: true,
+    candidate_count: 1,
     run_id: `run-${marker}`,
     strategy: 'bull_trend',
     market: 'cn',
@@ -1309,6 +1314,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       }
       await fulfillJson(route, {
         task_id: 'failing-task',
+        trace_id: 'failing-task',
         status: 'pending',
         message: 'accepted',
         message_code: 'task_pending',

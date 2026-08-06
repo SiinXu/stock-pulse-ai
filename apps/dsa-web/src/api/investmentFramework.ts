@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { z } from 'zod';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
 import { getParsedApiError } from './error';
-import { toCamelCase } from './utils';
 import type {
   InvestmentFrameworkCreateRequest,
   InvestmentFrameworkDeactivateRequest,
@@ -11,6 +13,48 @@ import type {
   InvestmentFrameworkResponse,
   InvestmentFrameworkUpdateRequest,
 } from '../types/investmentFramework';
+
+type OpenApiInvestmentFrameworkResponse = components['schemas']['InvestmentFrameworkResponse'];
+type OpenApiInvestmentFrameworkDeleteResponse = components['schemas']['InvestmentFrameworkDeleteResponse'];
+type OpenApiInvestmentFrameworkHistoryResponse = components['schemas']['InvestmentFrameworkHistoryResponse'];
+type _AssertResponse = keyof OpenApiInvestmentFrameworkResponse;
+type _AssertDelete = keyof OpenApiInvestmentFrameworkDeleteResponse;
+type _AssertHistory = keyof OpenApiInvestmentFrameworkHistoryResponse;
+const _responseAnchor: _AssertResponse = 'framework_id';
+const _deleteAnchor: _AssertDelete = 'deleted_through_version';
+const _historyAnchor: _AssertHistory = 'latest_version';
+void _responseAnchor;
+void _deleteAnchor;
+void _historyAnchor;
+
+const investmentFrameworkResponseSchema = z.object({
+  activeVersion: z.number().nullable().optional(),
+  changeSummary: z.string().nullable().optional(),
+  content: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
+  frameworkId: z.number(),
+  isActive: z.boolean(),
+  revision: z.number(),
+  scope: z.string(),
+  updatedAt: z.string(),
+  version: z.number(),
+  versionCreatedAt: z.string(),
+}).passthrough();
+
+const investmentFrameworkDeleteResponseSchema = z.object({
+  deleted: z.boolean(),
+  deletedThroughVersion: z.number(),
+  frameworkId: z.number(),
+}).passthrough();
+
+const investmentFrameworkHistoryResponseSchema = z.object({
+  activeVersion: z.number().nullable().optional(),
+  frameworkId: z.number(),
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  latestVersion: z.number(),
+  revision: z.number(),
+  total: z.number(),
+}).passthrough();
 
 const BASE_PATH = '/api/v1/investment-framework';
 
@@ -88,7 +132,12 @@ export const investmentFrameworkApi = {
   async get(): Promise<InvestmentFrameworkResponse> {
     try {
       const response = await apiClient.get(BASE_PATH);
-      return toCamelCase<InvestmentFrameworkResponse>(response.data);
+      return parseCamelCasePayload<InvestmentFrameworkResponse>(
+      response.data,
+      investmentFrameworkResponseSchema,
+      'InvestmentFrameworkResponse',
+      'investmentFramework',
+    );
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -100,7 +149,12 @@ export const investmentFrameworkApi = {
         content: toSnakeContent(payload.content),
         change_summary: payload.changeSummary ?? null,
       });
-      return toCamelCase<InvestmentFrameworkResponse>(response.data);
+      return parseCamelCasePayload<InvestmentFrameworkResponse>(
+      response.data,
+      investmentFrameworkResponseSchema,
+      'InvestmentFrameworkResponse',
+      'investmentFramework',
+    );
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -113,7 +167,12 @@ export const investmentFrameworkApi = {
         content: toSnakeContent(payload.content),
         change_summary: payload.changeSummary ?? null,
       });
-      return toCamelCase<InvestmentFrameworkResponse>(response.data);
+      return parseCamelCasePayload<InvestmentFrameworkResponse>(
+      response.data,
+      investmentFrameworkResponseSchema,
+      'InvestmentFrameworkResponse',
+      'investmentFramework',
+    );
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -126,7 +185,12 @@ export const investmentFrameworkApi = {
       const response = await apiClient.post(`${BASE_PATH}/deactivate`, {
         expected_revision: payload.expectedRevision,
       });
-      return toCamelCase<InvestmentFrameworkResponse>(response.data);
+      return parseCamelCasePayload<InvestmentFrameworkResponse>(
+      response.data,
+      investmentFrameworkResponseSchema,
+      'InvestmentFrameworkResponse',
+      'investmentFramework',
+    );
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -137,7 +201,12 @@ export const investmentFrameworkApi = {
       const response = await apiClient.delete(BASE_PATH, {
         params: { expected_revision: expectedRevision },
       });
-      return toCamelCase<InvestmentFrameworkDeleteResponse>(response.data);
+      return parseCamelCasePayload<InvestmentFrameworkDeleteResponse>(
+      response.data,
+      investmentFrameworkDeleteResponseSchema,
+      'InvestmentFrameworkDeleteResponse',
+      'investmentFramework',
+    );
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -146,7 +215,16 @@ export const investmentFrameworkApi = {
   async history(): Promise<InvestmentFrameworkHistoryResponse> {
     try {
       const response = await apiClient.get(`${BASE_PATH}/history`);
-      return toCamelCase<InvestmentFrameworkHistoryResponse>(response.data);
+      const parsed = parseCamelCasePayload<InvestmentFrameworkHistoryResponse>(
+        response.data,
+        investmentFrameworkHistoryResponseSchema,
+        'InvestmentFrameworkHistoryResponse',
+        'investmentFramework',
+      );
+      if (!Array.isArray(parsed.items)) {
+        return { ...parsed, items: [] };
+      }
+      return parsed;
     } catch (error) {
       throw getParsedApiError(error);
     }

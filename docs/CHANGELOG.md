@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
 - [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
+- [Changed] Migrated integrations-cluster Web API modules (alerts, alphasift, intelligence, investmentFramework, localModels, modelPacks) to OpenAPI-generated types with Zod boundary validation.
 - [Changed] Piloted TanStack Query on the market review page (history list poll + trigger mutation) with an inert app-root QueryClientProvider and behavior parity for cadence and error surfaces.
 - [Changed] Repository query/persistence failures raise ``RepositoryError`` instead of returning ``None``/empty/0; history API keeps not-found as 404 and maps repository failures to 500.
 - [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
