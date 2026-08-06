@@ -151,7 +151,7 @@ def has_any_llm_secret(environ: Mapping[str, str]) -> bool:
         from src.services.actions_config_check import discover_llm_key_names
         if discover_llm_key_names(environ):
             return True
-    except Exception:
+    except Exception:  # broad-exception: cleanup - optional Config Check import when #847 is absent
         pass
     for key in LLM_SECRET_ENV_KEYS:
         if env_value_present(environ.get(key)):

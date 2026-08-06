@@ -590,7 +590,7 @@ def append_github_step_summary(markdown: str, *, summary_path: Optional[Path] = 
         )
         try:
             print(markdown)
-        except Exception:
+        except Exception:  # broad-exception: cleanup - best-effort stdout fallback after summary write failure
             pass
         return False
 
@@ -674,7 +674,7 @@ def build_and_emit_summary(
     if log_path is not None and Path(log_path).is_file():
         try:
             log_text = Path(log_path).read_text(encoding="utf-8", errors="replace")[-40_000:]
-        except Exception:
+        except Exception:  # broad-exception: cleanup - optional log read is fallback classification only
             log_text = ""
     else:
         log_text = _read_latest_log_tail()
@@ -789,7 +789,7 @@ def _read_latest_log_tail() -> str:
         if not candidates:
             return ""
         return candidates[0].read_text(encoding="utf-8", errors="replace")[-40_000:]
-    except Exception:
+    except Exception:  # broad-exception: cleanup - optional latest-log tail only
         return ""
 
 
