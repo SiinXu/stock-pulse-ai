@@ -15,14 +15,23 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     job = workflow["jobs"]["python-minimum"]
     backend_job = workflow["jobs"]["backend-gate"]
+    changes_job = workflow["jobs"]["changes"]
 
     assert job["name"] == "python-minimum"
-    assert job["needs"] == ["ai-governance"]
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == "needs.changes.outputs.backend == 'true'"
     assert job["permissions"] == {"contents": "read"}
-    assert "if" not in job
     assert job.get("continue-on-error", False) is False
     assert all(
         step.get("continue-on-error", False) is False for step in job["steps"]
+    )
+
+    assert backend_job["needs"] == ["changes", "ai-governance"]
+    assert backend_job["if"] == "needs.changes.outputs.backend == 'true'"
+    assert "backend" in changes_job["outputs"]
+    assert "docker" in changes_job["outputs"]
+    assert changes_job["outputs"]["backend"].startswith(
+        "${{ steps.backend-filter.outputs.backend_non_web == 'true'"
     )
 
     setup_steps = [
@@ -56,3 +65,21 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
     ]
     assert len(gate_steps) == 1
     assert "if" not in gate_steps[0]
+
+
+def test_docker_build_skips_when_docker_paths_unchanged():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    job = workflow["jobs"]["docker-build"]
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == "needs.changes.outputs.docker == 'true'"
+
+
+def test_ci_gate_offline_suite_emits_slow_test_durations():
+    script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
+    assert "--durations=30" in script
+    assert "--durations-min=0.5" in script
+
+
+def test_pytest_testpaths_scopes_to_tests_package():
+    setup_cfg = (REPOSITORY_ROOT / "setup.cfg").read_text(encoding="utf-8")
+    assert "testpaths = tests" in setup_cfg
