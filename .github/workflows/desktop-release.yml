@@ -9,9 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Existing release tag in semver format, e.g. v3.2.12'
+        description: 'Semver tag used to stamp desktop package version and artifact names, e.g. v3.26.3 or v0.1.0'
         required: true
         type: string
+      rebuild_from_tag:
+        description: 'Checkout release_tag source for a historical rebuild (default false: build the workflow ref; required for post-rename StockPulse packaging verification)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: desktop-release-${{ github.ref }}
@@ -24,6 +29,7 @@ jobs:
       contents: read
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+      REBUILD_FROM_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.rebuild_from_tag || false }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,11 +38,20 @@ jobs:
       - name: Resolve release ref
         shell: bash
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-            git fetch --tags --force
-            git rev-parse "${RELEASE_TAG}" >/dev/null
+          set -euo pipefail
+          [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
+            echo "Tag-push build at $(git rev-parse --short HEAD) for ${RELEASE_TAG}"
+            exit 0
+          fi
+          git fetch --tags --force
+          git rev-parse "${RELEASE_TAG}" >/dev/null
+          if [[ "${REBUILD_FROM_TAG}" == "true" ]]; then
+            echo "Historical rebuild: checking out ${RELEASE_TAG}"
             git checkout "${RELEASE_TAG}"
+          else
+            echo "Verification build: workflow ref $(git rev-parse --short HEAD) stamped as ${RELEASE_TAG}"
+            echo "Set rebuild_from_tag=true only to rebuild pre-rename tag source (not StockPulse packaging)."
           fi
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -81,6 +96,8 @@ jobs:
           $installerPath = Join-Path 'apps/dsa-desktop/dist' $expectedInstallerName
           $installerExe = Get-Item -Path $installerPath -ErrorAction SilentlyContinue
           if (-not $installerExe) {
+            Write-Host 'Available dist files:'
+            Get-ChildItem -Path 'apps/dsa-desktop/dist' -File -ErrorAction SilentlyContinue | Sort-Object Name | Format-Table Name, Length
             throw "No expected NSIS installer found under apps/dsa-desktop/dist: $expectedInstallerName"
           }
           $winUnpacked = 'apps/dsa-desktop/dist/win-unpacked'
@@ -158,6 +175,7 @@ jobs:
       contents: read
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+      REBUILD_FROM_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.rebuild_from_tag || false }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -166,11 +184,20 @@ jobs:
       - name: Resolve release ref
         shell: bash
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-            git fetch --tags --force
-            git rev-parse "${RELEASE_TAG}" >/dev/null
+          set -euo pipefail
+          [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
+            echo "Tag-push build at $(git rev-parse --short HEAD) for ${RELEASE_TAG}"
+            exit 0
+          fi
+          git fetch --tags --force
+          git rev-parse "${RELEASE_TAG}" >/dev/null
+          if [[ "${REBUILD_FROM_TAG}" == "true" ]]; then
+            echo "Historical rebuild: checking out ${RELEASE_TAG}"
             git checkout "${RELEASE_TAG}"
+          else
+            echo "Verification build: workflow ref $(git rev-parse --short HEAD) stamped as ${RELEASE_TAG}"
+            echo "Set rebuild_from_tag=true only to rebuild pre-rename tag source (not StockPulse packaging)."
           fi
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -217,10 +244,110 @@ jobs:
           DSA_MAC_ARCH: ${{ matrix.arch }}
         run: bash scripts/build-all-macos.sh
 
+      - name: macOS launch smoke (codesign audit + binary exec)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRODUCT_NAME="$(node -p 'require("./apps/dsa-desktop/package.json").build.productName')"
+          shopt -s nullglob
+          app_candidates=(apps/dsa-desktop/dist/mac*/"${PRODUCT_NAME}.app")
+          shopt -u nullglob
+          if [[ "${#app_candidates[@]}" -ne 1 ]]; then
+            echo "ERROR: expected one unpacked macOS app for launch smoke, found ${#app_candidates[@]}." >&2
+            ls -la apps/dsa-desktop/dist || true
+            exit 1
+          fi
+          APP="${app_candidates[0]}"
+          BIN="${APP}/Contents/MacOS/${PRODUCT_NAME}"
+          echo "Launch-smoke target arch=${{ matrix.arch }}: ${APP}"
+          test -d "${APP}"
+          test -x "${BIN}"
+
+          echo "=== codesign -dv --verbose=4 ==="
+          set +e
+          codesign_out="$(codesign -dv --verbose=4 "${APP}" 2>&1)"
+          codesign_rc=$?
+          set -e
+          printf '%s\n' "${codesign_out}"
+          if [[ ${codesign_rc} -eq 0 ]]; then
+            echo "codesign: signature present (inspect output above)."
+          else
+            if [[ "${codesign_out}" != *"code object is not signed at all"* ]]; then
+              echo "ERROR: unreadable or broken signature state (not clean unsigned)." >&2
+              exit 1
+            fi
+            echo "codesign: code object is not signed at all (current unsigned packaging contract)."
+          fi
+
+          if [[ -f apps/dsa-desktop/scripts/macos-signature-audit.sh ]]; then
+            bash apps/dsa-desktop/scripts/macos-signature-audit.sh check "${APP}"
+          fi
+
+          attempt_version_launch() {
+            local binary="$1"
+            local label="$2"
+            echo "=== launch attempt (${label}): ${binary} --version ==="
+            set +e
+            # Electron exits after printing version; keep env minimal for headless CI.
+            launch_out="$("${binary}" --version 2>&1)"
+            launch_rc=$?
+            set -e
+            printf '%s\n' "${launch_out}"
+            return "${launch_rc}"
+          }
+
+          if attempt_version_launch "${BIN}" "as-packaged"; then
+            echo "LAUNCH_VERDICT arch=${{ matrix.arch }}: launches_as_packaged"
+            exit 0
+          fi
+
+          echo "As-packaged launch failed on arch=${{ matrix.arch }}; trying ad-hoc codesign on a disposable copy."
+          smoke_root="$(mktemp -d "${TMPDIR:-/tmp}/desktop-launch-smoke.XXXXXX")"
+          cleanup_smoke() {
+            rm -rf "${smoke_root}"
+          }
+          trap cleanup_smoke EXIT
+          ditto "${APP}" "${smoke_root}/${PRODUCT_NAME}.app"
+          SMOKE_APP="${smoke_root}/${PRODUCT_NAME}.app"
+          SMOKE_BIN="${SMOKE_APP}/Contents/MacOS/${PRODUCT_NAME}"
+          codesign --force --deep --sign - "${SMOKE_APP}"
+          echo "=== codesign -dv after ad-hoc ==="
+          codesign -dv --verbose=4 "${SMOKE_APP}" 2>&1 || true
+
+          if attempt_version_launch "${SMOKE_BIN}" "ad-hoc-signed-copy"; then
+            echo "LAUNCH_VERDICT arch=${{ matrix.arch }}: requires_adhoc_sign"
+            # Make the shipped unpacked app + DMG launchable on this arch by applying
+            # the same ad-hoc signature used in the successful smoke copy, then
+            # regenerating the DMG from the signed app. build-desktop-macos.sh already
+            # verified the clean-unsigned contract before this step.
+            echo "Applying ad-hoc signature to packaging outputs for launchability..."
+            codesign --force --deep --sign - "${APP}"
+            shopt -s nullglob
+            dmg_candidates=(apps/dsa-desktop/dist/*.dmg)
+            shopt -u nullglob
+            if [[ "${#dmg_candidates[@]}" -ne 1 ]]; then
+              echo "ERROR: expected one DMG to rewrite after ad-hoc sign, found ${#dmg_candidates[@]}." >&2
+              exit 1
+            fi
+            old_dmg="${dmg_candidates[0]}"
+            signed_stage="$(mktemp -d "${TMPDIR:-/tmp}/desktop-adhoc-dmg.XXXXXX")"
+            # hdiutil create from a folder containing the .app
+            cp -R "${APP}" "${signed_stage}/${PRODUCT_NAME}.app"
+            rm -f "${old_dmg}"
+            hdiutil create -volname "${PRODUCT_NAME}" -srcfolder "${signed_stage}" -ov -format UDZO "${old_dmg}"
+            rm -rf "${signed_stage}"
+            echo "Rewrote DMG with ad-hoc-signed app: ${old_dmg}"
+            exit 0
+          fi
+
+          echo "LAUNCH_VERDICT arch=${{ matrix.arch }}: launch_failed_even_with_adhoc" >&2
+          exit 1
+
       - name: Prepare release artifact (macOS)
         shell: bash
         run: |
           set -euo pipefail
+          PRODUCT_NAME="$(node -p 'require("./apps/dsa-desktop/package.json").build.productName')"
           dmg_file="$(ls -t apps/dsa-desktop/dist/*${{ matrix.arch }}*.dmg 2>/dev/null | head -n 1 || true)"
           if [[ -z "${dmg_file}" ]]; then
             dmg_file="$(ls -t apps/dsa-desktop/dist/*.dmg | head -n 1)"
@@ -229,17 +356,26 @@ jobs:
           mount_dir="$(mktemp -d)"
           hdiutil attach "$dmg_file" -nobrowse -readonly -mountpoint "$mount_dir" >/dev/null
           trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true; rmdir "$mount_dir" >/dev/null 2>&1 || true' EXIT
-          app_bundle="$mount_dir/StockPulse.app"
+          app_bundle="$mount_dir/${PRODUCT_NAME}.app"
+          test -d "$app_bundle"
           test -x "$app_bundle/Contents/Resources/ollama/ollama"
           test -f "$app_bundle/Contents/Resources/ollama/llama-server"
           test -f "$app_bundle/Contents/Resources/ollama/runtime-manifest.json"
           test -f "$app_bundle/Contents/Resources/THIRD_PARTY_NOTICES"
           node -e 'const p=require("./scripts/prepare-embedded-ollama"); p.verifyPreparedOllama({platform:"darwin",arch:process.argv[2],outputDir:process.argv[1]}).then(m=>console.log("verified embedded Ollama",m.version,m.platform,m.architecture)).catch(e=>{console.error(e);process.exit(1)})' "$app_bundle/Contents/Resources/ollama" '${{ matrix.arch }}'
+          # Final launchability check against the DMG-mounted bundle (post any ad-hoc rewrite).
+          mounted_bin="$app_bundle/Contents/MacOS/${PRODUCT_NAME}"
+          test -x "$mounted_bin"
+          echo "=== DMG-mounted codesign -dv ==="
+          codesign -dv --verbose=4 "$app_bundle" 2>&1 || true
+          echo "=== DMG-mounted --version ==="
+          "$mounted_bin" --version
           hdiutil detach "$mount_dir" >/dev/null
           rmdir "$mount_dir"
           trap - EXIT
           mkdir -p dist/release-assets
           cp "$dmg_file" "dist/release-assets/stockpulse-macos-${{ matrix.arch }}-${RELEASE_TAG}.dmg"
+          ls -lah dist/release-assets
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
