@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Web navigation mechanical IA hygiene: Research child labels use `layout.nav.*`, command palette indexes Home/Research/Analysis Workbench/Approvals with aligned labels, and deep links allow `/research/skill-outcomes` (no route renames).
+- [Docs] Added bilingual Navigation IA proposal with current-state route audit and DECISION NEEDED target options for issue #368.
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
