@@ -465,6 +465,10 @@ stock-pulse-ai/
 | `STOCK_LIST` | 自选股代码（逗号分隔） | - |
 | `ADMIN_AUTH_ENABLED` | Web 登录：设为 `true` 启用密码保护；首次访问在网页设置初始密码，可在「系统设置 > 修改密码」修改；忘记密码执行 `python -m src.auth reset_password`。关闭已启用的认证必须再次提交当前密码，有效 session Cookie 不能替代该校验。通用系统配置保存或 `.env` 导入只允许保留该键的当前值；切换状态必须使用认证专用入口，且配置键必须符合标准环境变量名格式 `[A-Za-z_][A-Za-z0-9_]*`。Web 的 `.env` 备份导入导出仅在开启该开关后可用（桌面端不受此限制）。 | `false` |
 | `TRUST_X_FORWARDED_FOR` | 单层可信反向代理部署时设为 `true`，取 `X-Forwarded-For` 最右值作为真实客户端 IP（用于登录限流等）；直连公网时保持 `false` 防伪造。多级代理/CDN 场景下限流 key 可能退化为边缘代理 IP，需额外评估 | `false` |
+| `USE_PROXY` | 是否启用本地代理（将 `PROXY_HOST`/`PROXY_PORT` 映射为进程 `http_proxy`/`https_proxy`）；可在 Web 设置 → 系统与安全 → 服务与日志 中编辑；GitHub Actions 跳过；完整生效通常需重启 | `false` |
+| `PROXY_HOST` | 代理主机（可能嵌入凭据，设置页脱敏）；仅 `USE_PROXY=true` 时生效 | `127.0.0.1` |
+| `PROXY_PORT` | 代理端口；仅 `USE_PROXY=true` 时生效 | `10809` |
+| `HTTP_PROXY` | 标准 HTTP 代理 URL；需要完整 URL/凭据时优先于 `USE_PROXY` | 空 |
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | 将当日大盘环境摘要注入个股分析 Prompt，并在高风险/退潮环境下软化激进买入建议；默认开启，设为 `false` 后仍可运行大盘复盘 | `true` |

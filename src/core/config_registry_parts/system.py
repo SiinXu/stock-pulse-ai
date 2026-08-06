@@ -338,6 +338,33 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
         ),
     },
+    "LOCAL_ONLY_MODE": {
+        "title": "Local Only Mode",
+        "description": (
+            "When enabled, the outbound HTTP policy fails closed for every non-loopback "
+            "destination (public cloud APIs, private LAN hosts, and allowlisted remote "
+            "services). Only pure loopback targets remain reachable. Blocked calls raise "
+            "coded errors that name LOCAL_ONLY_MODE; they never silently fall through."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 40,
+        "help_key": "settings.system.LOCAL_ONLY_MODE",
+        "examples": ["LOCAL_ONLY_MODE=false", "LOCAL_ONLY_MODE=true"],
+        "docs": [
+            {"label": "Local Only mode (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-only-mode_EN.md"},
+            {"label": "本地专用模式", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-only-mode.md"},
+            {"label": "Outbound HTTP security policy", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md"},
+        ],
+        "warning_codes": ["restart_required", "network_scope", "local_only_blocks_cloud"],
+    },
     "ADMIN_AUTH_ENABLED": {
         "title": "Admin Auth Enabled",
         "description": "Enable password protection for Web UI. The first visit initializes the admin password.",

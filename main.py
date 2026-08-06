@@ -36,17 +36,9 @@ from dotenv import dotenv_values
 from src.config import setup_env
 
 _INITIAL_PROCESS_ENV = dict(os.environ)
+# setup_env also applies USE_PROXY/PROXY_HOST/PROXY_PORT onto process http(s)_proxy
+# (skipped under GitHub Actions). Full disable still requires process restart.
 setup_env()
-
-# Proxy configuration - Controlled by the USE_PROXY environment variable, default is disabled
-# GitHub Actions automatically skips proxy configuration
-if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
-    # Local development environment, enable proxy (can be configured in .env with PROXY_HOST and PROXY_PORT).
-    proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
-    proxy_port = os.getenv("PROXY_PORT", "10809")
-    proxy_url = f"http://{proxy_host}:{proxy_port}"
-    os.environ["http_proxy"] = proxy_url
-    os.environ["https_proxy"] = proxy_url
 
 _packaged_import_probe = os.getenv("DSA_PACKAGED_IMPORT_PROBE")
 if _packaged_import_probe:
@@ -152,14 +144,8 @@ def _bootstrap_environment() -> None:
 
     from src.config import setup_env
 
+    # setup_env re-applies USE_PROXY → http_proxy/https_proxy for API/bot paths.
     setup_env()
-
-    if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
-        proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
-        proxy_port = os.getenv("PROXY_PORT", "10809")
-        proxy_url = f"http://{proxy_host}:{proxy_port}"
-        os.environ["http_proxy"] = proxy_url
-        os.environ["https_proxy"] = proxy_url
 
     _env_bootstrapped = True
 

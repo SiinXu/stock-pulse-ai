@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Exposed `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` in Web Settings (system network group) with restart help, sensitive host masking, and setup_env re-application on config reload.
+
+- [Added] Added fail-closed `LOCAL_ONLY_MODE` outbound gate with redacted outbound-activity API/panel and bilingual local-only threat-model docs (issue #218).
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
