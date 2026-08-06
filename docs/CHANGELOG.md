@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Web Settings plugin management panel: list/enable/disable/hot-reload against `/api/v1/plugins`, trusted-plugin honesty banner, and restart-required rendering.
 - [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.

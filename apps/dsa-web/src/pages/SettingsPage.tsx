@@ -20,7 +20,6 @@ import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import {
-  AuthSettingsCard,
   InvestmentFrameworkSettingsCard,
   ChangePasswordCard,
   GenerationBackendStatusPanel,
@@ -101,7 +100,7 @@ import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSou
 import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
-import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
+import SystemSecurityPanels from '../components/settings/SystemSecurityPanels';
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
@@ -1603,14 +1602,11 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {activeCategory === 'system' && activeView === 'security' ? (
-              <>
-                <AuthSettingsCard />
-                <SecurityAuditPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-              </>
+              <SystemSecurityPanels
+                disabled={isSaving || isLoading}
+                t={t}
+                language={uiLanguage}
+              />
             ) : null}
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
             {activeCategory === 'system' && activeView === 'runtime' ? (
