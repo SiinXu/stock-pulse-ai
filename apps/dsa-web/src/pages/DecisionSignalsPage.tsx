@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   PlusCircle,
@@ -83,15 +84,20 @@ import { useDecisionSignalReassessState } from '../components/decision-signals/u
 import { useDecisionSignalTimelineState } from '../components/decision-signals/useDecisionSignalTimelineState';
 import { AlertsWorkspace, type AlertsView } from '../components/alerts/AlertsWorkspace';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import {
+  buildDecisionSignalFeedbackQueryKey,
+  buildDecisionSignalListQueryKey,
+  useDecisionSignalDetailQueries,
+  useDecisionSignalListQuery,
+  useDecisionSignalOutcomeStatsQuery,
+} from '../hooks';
 import { useStockIndex } from '../hooks/useStockIndex';
 import { useWatchlist } from '../hooks/useWatchlist';
 import type {
-  DecisionSignalFeedbackItem,
   DecisionSignalFeedbackValue,
   DecisionSignalItem,
   DecisionSignalListResponse,
   DecisionSignalMutationResponse,
-  DecisionSignalOutcomeItem,
   DecisionSignalOutcomeStatsResponse,
 } from '../types/decisionSignals';
 import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
@@ -261,13 +267,14 @@ const DecisionSignalsPage: React.FC = () => {
     applyFilters,
     setPage,
   } = useDecisionSignalListState();
+  const queryClient = useQueryClient();
   const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
   const [selected, setSelected] = useState<SelectedSignal | null>(null);
   const [pendingStatus, setPendingStatus] = useState<PendingStatusChange | null>(null);
-  const [statusUpdating, setStatusUpdating] = useState(false);
   const [outcomeStats, setOutcomeStats] = useState<DecisionSignalOutcomeStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<ParsedApiError | null>(null);
+  const [feedbackWriteError, setFeedbackWriteError] = useState<ParsedApiError | null>(null);
   const [outcomeExplorerRefreshKey, setOutcomeExplorerRefreshKey] = useState(0);
   const [stockDraft, setStockDraft] = useState('');
   const [stockContextModalOpen, setStockContextModalOpen] = useState(false);
@@ -294,13 +301,16 @@ const DecisionSignalsPage: React.FC = () => {
     reset: resetTimelineState,
     setItems: setTimelineItems,
   } = useDecisionSignalTimelineState();
-  const [selectedOutcomes, setSelectedOutcomes] = useState<DecisionSignalOutcomeItem[]>([]);
-  const [selectedOutcomesLoading, setSelectedOutcomesLoading] = useState(false);
-  const [selectedOutcomesError, setSelectedOutcomesError] = useState<ParsedApiError | null>(null);
-  const [selectedFeedback, setSelectedFeedback] = useState<DecisionSignalFeedbackItem | null>(null);
-  const [selectedFeedbackLoading, setSelectedFeedbackLoading] = useState(false);
-  const [selectedFeedbackError, setSelectedFeedbackError] = useState<ParsedApiError | null>(null);
   const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const {
+    selectedOutcomes,
+    selectedOutcomesLoading,
+    selectedOutcomesError,
+    selectedFeedback,
+    selectedFeedbackLoading,
+    selectedFeedbackError: selectedFeedbackLoadError,
+  } = useDecisionSignalDetailQueries(selected?.item.id ?? null);
+  const selectedFeedbackError = feedbackWriteError ?? selectedFeedbackLoadError;
   const {
     profile: reassessProfile,
     response: reassessResponse,
@@ -320,7 +330,6 @@ const DecisionSignalsPage: React.FC = () => {
   const statsRequestIdRef = useRef(0);
   const latestRequestIdRef = useRef(0);
   const timelineRequestIdRef = useRef(0);
-  const detailRequestIdRef = useRef(0);
   const reassessRequestIdRef = useRef(0);
   const selectedSignalIdRef = useRef<number | null>(null);
   const pendingSelectedSignalIdRef = useRef<number | null>(getInitialSelectedSignalId());
@@ -641,19 +650,36 @@ const DecisionSignalsPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    void loadSignals();
-    return () => {
-      requestIdRef.current += 1;
-    };
-  }, [loadSignals]);
+  const listQueryKey = useMemo(() => buildDecisionSignalListQueryKey({
+    scope: signalCenterScope,
+    page,
+    appliedFilters,
+    watchlistLoading: watchlistState.isLoading,
+    watchlistCodes: watchlistState.watchlistCodes,
+    watchlistErrorMessage: watchlistState.loadError?.message ?? null,
+  }), [
+    appliedFilters,
+    page,
+    signalCenterScope,
+    watchlistState.isLoading,
+    watchlistState.loadError?.message,
+    watchlistState.watchlistCodes,
+  ]);
 
-  useEffect(() => {
-    void loadOutcomeStats();
-    return () => {
+  useDecisionSignalListQuery({
+    queryKey: listQueryKey,
+    loadSignals,
+    onCancelInFlight: () => {
+      requestIdRef.current += 1;
+    },
+  });
+
+  useDecisionSignalOutcomeStatsQuery({
+    loadOutcomeStats,
+    onCancelInFlight: () => {
       statsRequestIdRef.current += 1;
-    };
-  }, [loadOutcomeStats]);
+    },
+  });
 
   useEffect(() => () => {
     latestRequestIdRef.current += 1;
@@ -667,7 +693,6 @@ const DecisionSignalsPage: React.FC = () => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      detailRequestIdRef.current += 1;
       reassessRequestIdRef.current += 1;
       selectedSignalIdRef.current = null;
     };
@@ -681,56 +706,8 @@ const DecisionSignalsPage: React.FC = () => {
 
   useEffect(() => {
     selectedSignalIdRef.current = selected?.item.id ?? null;
-    if (!selected) {
-      detailRequestIdRef.current += 1;
-      setSelectedOutcomes([]);
-      setSelectedOutcomesError(null);
-      setSelectedFeedback(null);
-      setSelectedFeedbackError(null);
-      setSelectedOutcomesLoading(false);
-      setSelectedFeedbackLoading(false);
-      return;
-    }
-
-    const requestId = detailRequestIdRef.current + 1;
-    detailRequestIdRef.current = requestId;
-    setSelectedOutcomesLoading(true);
-    setSelectedFeedbackLoading(true);
-    setSelectedOutcomesError(null);
-    setSelectedFeedbackError(null);
-
-    void decisionSignalsApi.getSignalOutcomes(selected.item.id)
-      .then((response) => {
-        if (detailRequestIdRef.current !== requestId) return;
-        setSelectedOutcomes(response.items);
-      })
-      .catch((err) => {
-        if (detailRequestIdRef.current !== requestId) return;
-        setSelectedOutcomes([]);
-        setSelectedOutcomesError(getParsedApiError(err));
-      })
-      .finally(() => {
-        if (detailRequestIdRef.current === requestId) {
-          setSelectedOutcomesLoading(false);
-        }
-      });
-
-    void decisionSignalsApi.getFeedback(selected.item.id)
-      .then((response) => {
-        if (detailRequestIdRef.current !== requestId) return;
-        setSelectedFeedback(response);
-      })
-      .catch((err) => {
-        if (detailRequestIdRef.current !== requestId) return;
-        setSelectedFeedback(null);
-        setSelectedFeedbackError(getParsedApiError(err));
-      })
-      .finally(() => {
-        if (detailRequestIdRef.current === requestId) {
-          setSelectedFeedbackLoading(false);
-        }
-      });
-  }, [selected]);
+    setFeedbackWriteError(null);
+  }, [selected?.item.id]);
 
   const appliedSourceReportId = parseSourceReportId(appliedFilters.sourceReportId);
   const selectedSourceReportId = selected?.item.sourceReportId ?? undefined;
@@ -1068,12 +1045,18 @@ const DecisionSignalsPage: React.FC = () => {
     void loadTimelineForContext(activeStockContext, timelineFilters);
   }, [activeStockContext, loadTimelineForContext, timelineFilters]);
 
+  const [statusUpdating, setStatusUpdating] = useState(false);
+
   const handleStatusUpdate = async () => {
     if (!pendingStatus || statusUpdateInFlightRef.current) return;
     statusUpdateInFlightRef.current = true;
     setStatusUpdating(true);
     setStatusError(null);
     try {
+      // Status write stays a single-shot page-owned call: the deferred double-click
+      // guard and in-flight ref must stay byte-identical to the prior contract.
+      // List/detail/stats already use TanStack Query; status can graduate once a
+      // shared mutation helper preserves that guard without isPending races.
       const updated = await decisionSignalsApi.updateStatus(pendingStatus.item.id, {
         status: pendingStatus.status,
       });
@@ -1129,15 +1112,15 @@ const DecisionSignalsPage: React.FC = () => {
         source: 'web',
       });
       if (!mountedRef.current || selectedSignalIdRef.current !== signalId) return;
-      setSelectedFeedback(updated);
-      setSelectedFeedbackError(null);
+      queryClient.setQueryData(buildDecisionSignalFeedbackQueryKey(signalId), updated);
+      setFeedbackWriteError(null);
     } catch (err) {
       if (!mountedRef.current || selectedSignalIdRef.current !== signalId) return;
-      setSelectedFeedbackError(getParsedApiError(err));
+      setFeedbackWriteError(getParsedApiError(err));
     } finally {
       if (mountedRef.current) setFeedbackSaving(false);
     }
-  }, [feedbackSaving, selected]);
+  }, [feedbackSaving, queryClient, selected]);
 
   const handleManualSignalCreated = useCallback((result: DecisionSignalMutationResponse) => {
     void loadSignalsForPage(page);

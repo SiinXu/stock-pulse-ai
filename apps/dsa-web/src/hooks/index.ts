@@ -11,6 +11,28 @@ export {
   useMarketReviewHistoryQuery,
 } from './useMarketReviewHistoryQuery';
 export type { MarketReviewHistoryQueryResult } from './useMarketReviewHistoryQuery';
+export {
+  buildDecisionSignalListQueryKey,
+  DECISION_SIGNAL_LIST_QUERY_KEY_ROOT,
+  useDecisionSignalListQuery,
+} from './useDecisionSignalListQuery';
+export type {
+  DecisionSignalListQueryKeyInput,
+  DecisionSignalListQueryResult,
+} from './useDecisionSignalListQuery';
+export {
+  DECISION_SIGNAL_OUTCOME_STATS_QUERY_KEY,
+  useDecisionSignalOutcomeStatsQuery,
+} from './useDecisionSignalOutcomeStatsQuery';
+export type { DecisionSignalOutcomeStatsQueryResult } from './useDecisionSignalOutcomeStatsQuery';
+export {
+  buildDecisionSignalFeedbackQueryKey,
+  buildDecisionSignalOutcomesQueryKey,
+  DECISION_SIGNAL_FEEDBACK_QUERY_KEY_ROOT,
+  DECISION_SIGNAL_OUTCOMES_QUERY_KEY_ROOT,
+  useDecisionSignalDetailQueries,
+} from './useDecisionSignalDetailQueries';
+export type { DecisionSignalDetailQueryView } from './useDecisionSignalDetailQueries';
 export { useMarketReviewState } from './useMarketReviewState';
 export { useRunFlowSnapshot } from './useRunFlowSnapshot';
 export { useTaskStream } from './useTaskStream';

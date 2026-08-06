@@ -144,6 +144,15 @@ than a line-count-driven file split.
 | `MarketReviewPage` history list | `hooks/useMarketReviewHistoryQuery.ts` | `useQuery` with `refetchInterval: 30_000`, `refetchOnWindowFocus: true`, `retry: false`. First fetch uses the store's non-silent load; later refetches use silent refresh. Errors still land on the existing store / `ApiErrorAlert` surfaces. |
 | Market review trigger | `hooks/useMarketReviewRunner.ts` | `useMutation` for `triggerMarketReview`. Task-status polling stays custom (domain notices, 2s cadence, 120-attempt cap) so completion/timeout copy is unchanged. |
 
+### Migration ledger (graduated pages)
+
+| Surface | Ownership | Behavior parity notes | Status |
+| --- | --- | --- | --- |
+| `MarketReviewPage` history + trigger | `hooks/useMarketReviewHistoryQuery.ts`, `hooks/useMarketReviewRunner.ts` | See pilot consumer above | Pilot (#788) |
+| `DecisionSignalsPage` list feed | `hooks/useDecisionSignalListQuery.ts` | No interval poll; no focus refetch (`refetchOnWindowFocus: false`); key includes filters/page/scope/watchlist readiness; list reducer remains error/loading owner; `retry: false` | Wave 1 |
+| `DecisionSignalsPage` outcome stats | `hooks/useDecisionSignalOutcomeStatsQuery.ts` | Mount load only; no focus/poll; existing stats error surface; `retry: false` | Wave 1 |
+| `DecisionSignalsPage` detail outcomes + feedback | `hooks/useDecisionSignalDetailQueries.ts` | Selection-gated; independent queries; no focus/poll; `retry: false` | Wave 1 |
+
 ### Rollout rules for the next pages
 
 1. Keep transport in `api/*` and UI loading/error presentation on existing surfaces; do not invent a
@@ -156,9 +165,9 @@ than a line-count-driven file split.
    until a later dedicated slice.
 6. Tests that render a Query consumer must wrap with a test `QueryClientProvider` (`retry: false`).
 
-Suggested migration order (follow-up issue): Home history lifecycle → Decision Signals feed →
-Portfolio projection session → Alerts rules list → Settings system-config loads → Chat/agent
-status surfaces that still hand-roll polling.
+Suggested remaining migration order (issue #789): Home history lifecycle → Portfolio projection
+session → Alerts rules list → Settings system-config loads → Chat/agent status surfaces that still
+hand-roll polling. Defer pages owned by concurrent open PRs (see wave-1 plan).
 
 ## Change Checklist
 
