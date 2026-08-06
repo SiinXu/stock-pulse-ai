@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Market structure service regression tests."""
+"""Market structure service regression tests.
+
+Time control: cache TTL and ranking retry-delay advances use
+``tests.time_determinism.install_fake_clock`` (explicit ``tick``) so the suite
+does not depend on wall-clock sleeps. Real Future join timeouts remain real
+time — the fake clock is not installed on those cases.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +18,7 @@ from src.services.market_hotspot_service import (
     MarketHotspotService,
 )
 from src.services.market_structure_service import MarketStructureService
+from tests.time_determinism import install_fake_clock
 
 
 class _FakeFetcherManager:
@@ -342,7 +349,8 @@ def test_market_hotspot_service_caches_rankings_per_instance() -> None:
     assert fetcher.concept_calls == 1
 
 
-def test_market_hotspot_service_refreshes_cached_ok_after_ttl() -> None:
+def test_market_hotspot_service_refreshes_cached_ok_after_ttl(monkeypatch) -> None:
+    clock = install_fake_clock(monkeypatch, patch_sleep=False)
     fetcher = _FakeFetcherManager()
     service = MarketHotspotService(
         fetcher_manager=fetcher,
@@ -350,7 +358,7 @@ def test_market_hotspot_service_refreshes_cached_ok_after_ttl() -> None:
     )
 
     service.get_hotspots(market="cn", trade_date="2026-07-04")
-    time.sleep(0.05)
+    clock.tick(0.05)
     service.get_hotspots(market="cn", trade_date="2026-07-04")
 
     assert fetcher.sector_calls == 2
@@ -446,7 +454,10 @@ def test_market_hotspot_service_scopes_inflight_fetches_to_manager_instance() ->
     assert second_fetcher.sector_calls == 1
 
 
-def test_market_hotspot_service_retries_after_ranking_timeout_cooldown() -> None:
+def test_market_hotspot_service_retries_after_ranking_timeout_cooldown(monkeypatch) -> None:
+    # patch_sleep=False: worker drain still uses real short sleeps; only advance
+    # monotonic/time via tick for the ranking retry-after gate.
+    clock = install_fake_clock(monkeypatch, patch_sleep=False)
     fetcher = _RecoveringTimeoutRankingFetcherManager()
     service = MarketHotspotService(
         fetcher_manager=fetcher,
@@ -466,7 +477,7 @@ def test_market_hotspot_service_retries_after_ranking_timeout_cooldown() -> None
             for error in first["data_quality"]["errors"]
         )
 
-        time.sleep(RANKING_FETCH_TIMEOUT_RETRY_DELAY_SECONDS + 0.05)
+        clock.tick(RANKING_FETCH_TIMEOUT_RETRY_DELAY_SECONDS + 0.05)
         recovered = service.get_hotspots(market="cn", trade_date="2026-07-04")
     finally:
         fetcher.release_first_sector.set()
@@ -520,7 +531,8 @@ def test_market_hotspot_service_drops_stale_timeout_future_before_retry() -> Non
         )
 
 
-def test_market_hotspot_service_keeps_permanent_timeouts_under_worker_cap() -> None:
+def test_market_hotspot_service_keeps_permanent_timeouts_under_worker_cap(monkeypatch) -> None:
+    clock = install_fake_clock(monkeypatch, patch_sleep=False)
     fetcher = _PermanentlyBlockingRankingFetcherManager(block=True)
     service = MarketHotspotService(
         fetcher_manager=fetcher,
@@ -536,10 +548,10 @@ def test_market_hotspot_service_keeps_permanent_timeouts_under_worker_cap() -> N
         assert fetcher.sector_started.wait(timeout=0.2)
         assert fetcher.concept_started.wait(timeout=0.2)
 
-        time.sleep(RANKING_FETCH_TIMEOUT_RETRY_DELAY_SECONDS + 0.05)
+        clock.tick(RANKING_FETCH_TIMEOUT_RETRY_DELAY_SECONDS + 0.05)
         second = service.get_hotspots(market="cn", trade_date="2026-07-04")
 
-        time.sleep(RANKING_FETCH_TIMEOUT_RETRY_DELAY_SECONDS + 0.05)
+        clock.tick(RANKING_FETCH_TIMEOUT_RETRY_DELAY_SECONDS + 0.05)
         third = service.get_hotspots(market="cn", trade_date="2026-07-04")
     finally:
         fetcher.release.set()
