@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
+- [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
