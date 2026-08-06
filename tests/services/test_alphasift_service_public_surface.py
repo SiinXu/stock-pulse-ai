@@ -14,16 +14,16 @@ import src.services.alphasift_service as service_module
 
 
 EXPECTED_MODULE_SURFACE_SHA256 = (
-    "1c16832aa5f830786eb3283af9d30ce4caf4fccbab65187a8e7685aef9b58e04"
+    "d78a89baf6548ad790b49e443df4f1929cff4028c69de63159772aa8f9e9ca38"
 )
 EXPECTED_PUBLIC_SURFACE_SHA256 = (
-    "b7dad5b936167792f32db7d3ce553c0e59cf729ba19388d29c7c8b3157d0cdb5"
+    "5a9644d70d0581e36d43e0ba144b1f5052e5765791b71b588cc4a2707377392f"
 )
 EXPECTED_TOP_LEVEL_FUNCTION_NAMES_SHA256 = (
-    "9e1d3ca12377f3655df4ae3663000a93b5f9d94066ef8349f1e7c83bf88c7f08"
+    "ae539dc1a107bed98264ef26da80e9665185771d6fb412945787f720d894e38e"
 )
 EXPECTED_TOP_LEVEL_FUNCTION_METADATA_SHA256 = (
-    "40eb90f0646befb06997c18b403c1c68bcdfda81ed522c9661386c80b144c902"
+    "b0cc9118aed184cef3db925ccae330426c4313686581d710aa94fc0fd9b46810"
 )
 EXPECTED_MODULE_ANNOTATIONS = {
     "_DSA_FETCHER_MANAGER": "Any",
@@ -42,13 +42,13 @@ EXPECTED_SERVICE_SURFACE = (
     "screen",
 )
 EXPECTED_SERVICE_METHOD_METADATA_SHA256 = (
-    "59fe497d1cb6108972453543476f6e47abc535c2eeab3f4ec9cffbf5cbc95baf"
+    "6745c2819e1a28dfb5cb49b1e56fea03b82ca2b71acbd284645d9e067968f227"
 )
 EXPECTED_SERVICE_METHOD_AST_SHA256 = (
-    "691fc2e8765cddee2c2a088f51f2da633b1f92ad7ea5ada07d58ec7a5b3975d5"
+    "2db532952ff47a2a3b560d9a0075109074b17fa2609b806a9d670a5890117e28"
 )
 EXPECTED_HOTSPOT_SUPPORT_FUNCTION_AST_SHA256 = (
-    "73977f1171ee78ffcc14859fd31ce83ef56c64580c88c9615bbc147609b6903b"
+    "10d19e5e15d4f587d26315b09c99721a57e59a1c98bef6ee9cec0310c5c513cf"
 )
 EXPECTED_RUNTIME_SUPPORT_FUNCTION_AST_SHA256 = (
     "4b285813707352259acaa8ee395823b2a0b91b8d2d47ffd54416d6106b3257bd"
@@ -165,8 +165,8 @@ def test_alphasift_service_module_surface_is_stable():
     public_names = tuple(
         name for name in vars(service_module) if not name.startswith("_")
     )
-    assert len(module_names) == 219
-    assert len(public_names) == 85
+    assert len(module_names) == 225
+    assert len(public_names) == 87
     assert _digest(module_names) == EXPECTED_MODULE_SURFACE_SHA256
     assert _digest(public_names) == EXPECTED_PUBLIC_SURFACE_SHA256
     assert service_module.__annotations__ == EXPECTED_MODULE_ANNOTATIONS
@@ -187,7 +187,7 @@ def test_alphasift_top_level_function_metadata_is_stable():
                 value.__globals__ is service_module.__dict__,
             )
         )
-    assert len(metadata) == 128
+    assert len(metadata) == 131
     assert _digest(tuple(item[0] for item in metadata)) == (
         EXPECTED_TOP_LEVEL_FUNCTION_NAMES_SHA256
     )
@@ -228,7 +228,7 @@ def test_alphasift_hotspot_support_function_ast_is_unchanged():
         _stable_ast_dump(function)
         for function in functions
     ).encode()
-    assert len(functions) == 52
+    assert len(functions) == 55
     assert hashlib.sha256(payload).hexdigest() == (
         EXPECTED_HOTSPOT_SUPPORT_FUNCTION_AST_SHA256
     )
