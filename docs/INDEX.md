@@ -33,6 +33,7 @@
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
 | [持久安全审计 Phase 1（英文）](security-audit.md) | 事件合同、代表性特权路径、管理员查询、保留、失败语义与回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
+| [Futu OpenD 组合持仓导入](futu-opend-portfolio-import.md) | OpenD 配置、FUTU_* 设置项、实盘持仓导入 API、降级语义与本地网关网络策略 |
 | [更新日志](CHANGELOG.md) | 版本变化、能力调整和迁移说明 |
 
 ## 配置

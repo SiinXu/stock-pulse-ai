@@ -25,6 +25,7 @@ from api.v1.schemas.portfolio import (
     PortfolioCorporateActionCreateRequest,
     PortfolioDeleteResponse,
     PortfolioEventCreatedResponse,
+    PortfolioFutuImportRequest,
     PortfolioFxRefreshResponse,
     PortfolioImportBrokerListResponse,
     PortfolioImportCommitResponse,
@@ -38,6 +39,7 @@ from api.v1.schemas.portfolio import (
     PaperTradeCreateRequest,
     PaperTradeCreatedResponse,
 )
+from data_provider.futu_position_fetcher import FutuPositionFetchError
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import PortfolioImportService
 from src.services.portfolio_risk_service import PortfolioRiskService
@@ -785,6 +787,82 @@ def commit_csv_import(
         raise _bad_request(exc)
     except Exception as exc:
         raise _internal_error("Commit CSV import failed", exc)
+
+
+
+@router.post(
+    "/imports/futu/preview",
+    response_model=PortfolioImportParseResponse,
+    responses={400: {"model": ErrorResponse}, 503: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="Preview Futu OpenD real positions as import trade records",
+)
+def preview_futu_import(
+    as_of: Optional[date] = Query(None, description="Synthetic buy trade date; default today"),
+) -> PortfolioImportParseResponse:
+    importer = PortfolioImportService()
+    try:
+        parsed = importer.preview_futu_positions(as_of=as_of)
+        return PortfolioImportParseResponse(
+            broker=parsed["broker"],
+            record_count=parsed["record_count"],
+            skipped_count=parsed["skipped_count"],
+            error_count=parsed["error_count"],
+            records=[_serialize_import_record(item) for item in parsed.get("records", [])],
+            errors=list(parsed.get("errors", [])),
+        )
+    except FutuPositionFetchError as exc:
+        raise api_error(503, "futu_opend_unavailable", str(exc))
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:
+        raise _internal_error("Preview Futu import failed", exc)
+
+
+@router.post(
+    "/imports/futu",
+    response_model=PortfolioImportCommitResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    summary="Import Futu OpenD real positions into a portfolio account",
+)
+def commit_futu_import(
+    body: PortfolioFutuImportRequest,
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
+) -> PortfolioImportCommitResponse:
+    """Import live Futu positions via the shared trade-record commit path.
+
+    Portfolio Web UI for this action is a follow-up; this endpoint is the backend
+    seam for API clients and future UI wiring.
+    """
+    importer = PortfolioImportService()
+    try:
+        result = importer.import_futu_positions(
+            account_id=body.account_id,
+            dry_run=body.dry_run,
+            operation_id=_resolve_operation_id(body.operation_id, idempotency_key),
+            as_of=body.as_of,
+        )
+        return PortfolioImportCommitResponse(**result)
+    except FutuPositionFetchError as exc:
+        raise api_error(503, "futu_opend_unavailable", str(exc))
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
+    except PortfolioBusyError as exc:
+        raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:
+        raise _internal_error("Commit Futu import failed", exc)
 
 
 @router.post(

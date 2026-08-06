@@ -13,6 +13,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from data_provider.base import canonical_stock_code
+from data_provider.futu_position_fetcher import (
+    FutuPositionFetchError,
+    fetch_futu_positions,
+    positions_to_import_records,
+)
 from src.repositories.portfolio_repo import PortfolioRepository
 from src.services.portfolio_service import (
     PortfolioBusyError,
@@ -22,6 +27,11 @@ from src.services.portfolio_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Live broker sources that feed commit_trade_records without a CSV parser.
+LIVE_POSITION_IMPORT_SOURCES: Dict[str, str] = {
+    "futu": "Futu OpenD",
+}
 
 @dataclass(frozen=True)
 class CsvParserSpec:
@@ -140,13 +150,56 @@ class PortfolioImportService:
             )
         return items
 
+    def preview_futu_positions(
+        self,
+        *,
+        as_of: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """Fetch Futu OpenD positions and map them to import trade records."""
+        try:
+            positions = fetch_futu_positions()
+        except FutuPositionFetchError:
+            raise
+        records = positions_to_import_records(positions, as_of=as_of)
+        return {
+            "broker": "futu",
+            "record_count": len(records),
+            "skipped_count": 0,
+            "error_count": 0,
+            "records": records,
+            "errors": [],
+        }
+
+    def import_futu_positions(
+        self,
+        *,
+        account_id: int,
+        dry_run: bool = False,
+        operation_id: Optional[str] = None,
+        as_of: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """Import Futu real positions through the existing trade-record commit path.
+
+        Mapping uses synthetic buys at cost price with stable ``trade_uid`` values so
+        identical re-imports are idempotent. OpenD failures raise
+        :class:`FutuPositionFetchError` and never write partial ledger state.
+        """
+        preview = self.preview_futu_positions(as_of=as_of)
+        return self.commit_trade_records(
+            account_id=account_id,
+            broker="futu",
+            records=list(preview.get("records") or []),
+            dry_run=dry_run,
+            operation_id=operation_id,
+        )
+
     def parse_trade_csv(
         self,
         *,
         broker: str,
         content: bytes,
     ) -> Dict[str, Any]:
-        broker_norm = self._normalize_broker(broker)
+        broker_norm = self._normalize_broker(broker, allow_live_sources=False)
         parser_spec = self._parser_registry[broker_norm]
         df = self._read_csv(content)
 
@@ -188,7 +241,12 @@ class PortfolioImportService:
         dry_run: bool = False,
         operation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        broker_norm = self._normalize_broker(broker)
+        broker_norm = self._normalize_broker(broker, allow_live_sources=True)
+        is_live_source = broker_norm in LIVE_POSITION_IMPORT_SOURCES
+        operation_type = (
+            f"{broker_norm}_import.commit" if is_live_source else "csv_import.commit"
+        )
+        note_prefix = f"{broker_norm}_import" if is_live_source else f"csv_import:{broker_norm}"
         operation_payload = {
             "account_id": int(account_id),
             "broker": broker_norm,
@@ -200,7 +258,7 @@ class PortfolioImportService:
             replay = self.portfolio_service.replay_operation_in_session(
                 session=session,
                 operation_id=operation_id,
-                operation_type="csv_import.commit",
+                operation_type=operation_type,
                 scope_account_id=account_id,
                 payload=operation_payload,
             )
@@ -272,7 +330,7 @@ class PortfolioImportService:
                             currency=record.get("currency"),
                             trade_uid=trade_uid,
                             dedup_hash=dedup_hash_to_use,
-                            note=(record.get("note") or "").strip() or f"csv_import:{broker_norm}",
+                            note=(record.get("note") or "").strip() or note_prefix,
                         )
                     inserted_count += 1
                 except PortfolioConflictError:
@@ -299,20 +357,25 @@ class PortfolioImportService:
             self.portfolio_service.store_operation_result_in_session(
                 session=session,
                 operation_id=operation_id,
-                operation_type="csv_import.commit",
+                operation_type=operation_type,
                 scope_account_id=account_id,
                 payload=operation_payload,
                 response=result,
             )
             return result
 
-    def _normalize_broker(self, value: str) -> str:
+    def _normalize_broker(self, value: str, *, allow_live_sources: bool = True) -> str:
         broker = (value or "").strip().lower()
         broker = self._broker_alias_map.get(broker, broker)
-        if broker not in self._parser_registry:
-            supported = ", ".join(sorted(self._parser_registry.keys()))
-            raise ValueError(f"broker must be one of: {supported}")
-        return broker
+        if broker in self._parser_registry:
+            return broker
+        if allow_live_sources and broker in LIVE_POSITION_IMPORT_SOURCES:
+            return broker
+        supported = sorted(
+            set(self._parser_registry.keys())
+            | (set(LIVE_POSITION_IMPORT_SOURCES) if allow_live_sources else set())
+        )
+        raise ValueError(f"broker must be one of: {', '.join(supported)}")
 
     @staticmethod
     def _read_csv(content: bytes) -> pd.DataFrame:

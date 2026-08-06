@@ -1899,6 +1899,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/imports/futu": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Futu OpenD real positions into a portfolio account
+         * @description Import live Futu positions via the shared trade-record commit path.
+         *
+         *     Portfolio Web UI for this action is a follow-up; this endpoint is the backend
+         *     seam for API clients and future UI wiring.
+         */
+        post: operations["commit_futu_import_api_v1_portfolio_imports_futu_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/imports/futu/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Futu OpenD real positions as import trade records */
+        post: operations["preview_futu_import_api_v1_portfolio_imports_futu_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/positions/{symbol}/analysis": {
         parameters: {
             query?: never;
@@ -7449,6 +7489,30 @@ export interface components {
         PortfolioEventCreatedResponse: {
             /** Id */
             id: number;
+        };
+        /** PortfolioFutuImportRequest */
+        PortfolioFutuImportRequest: {
+            /**
+             * Account Id
+             * @description Target portfolio account id
+             */
+            account_id: number;
+            /**
+             * As Of
+             * @description Synthetic buy trade date for imported positions; defaults to today
+             */
+            as_of?: string | null;
+            /**
+             * Dry Run
+             * @description Preview insert counts without writing trades
+             * @default false
+             */
+            dry_run: boolean;
+            /**
+             * Operation Id
+             * @description Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).
+             */
+            operation_id?: string | null;
         };
         /** PortfolioFxRefreshResponse */
         PortfolioFxRefreshResponse: {
@@ -15951,6 +16015,137 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    commit_futu_import_api_v1_portfolio_imports_futu_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default). */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioFutuImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioImportCommitResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_futu_import_api_v1_portfolio_imports_futu_preview_post: {
+        parameters: {
+            query?: {
+                /** @description Synthetic buy trade date; default today */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioImportParseResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
