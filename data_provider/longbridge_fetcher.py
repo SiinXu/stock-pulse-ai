@@ -38,6 +38,11 @@ from src.security.outbound_policy import validate_outbound_url
 
 from .base import BaseFetcher, STANDARD_COLUMNS
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource, safe_float
+from data_provider.retry_policy import (
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    call_with_timeout,
+    provider_retry,
+)
 from .us_index_mapping import is_us_stock_code, is_us_index_code
 
 logger = logging.getLogger(__name__)
@@ -476,7 +481,7 @@ class LongbridgeFetcher(BaseFetcher):
 
     _CONNECTION_ERRORS = ("client is closed", "context closed", "connection closed")
 
-    def __init__(self):
+    def __init__(self, request_timeout_seconds: Optional[float] = None):
         self._ctx = None
         self._config = None
         self._ctx_lock = threading.Lock()
@@ -485,6 +490,13 @@ class LongbridgeFetcher(BaseFetcher):
         # {symbol: (StaticInfo, timestamp)}
         self._static_cache: Dict[str, Any] = {}
         self._static_cache_lock = threading.Lock()
+        # Explicit request timeout for SDK calls that otherwise lean only on the
+        # manager outer budget (previously: neither timeout nor retry here).
+        self._request_timeout_seconds = (
+            DEFAULT_REQUEST_TIMEOUT_SECONDS
+            if request_timeout_seconds is None
+            else float(request_timeout_seconds)
+        )
 
     def _is_connection_error(self, exc: Exception) -> bool:
         msg = str(exc).lower()
@@ -959,6 +971,14 @@ class LongbridgeFetcher(BaseFetcher):
     # BaseFetcher abstract methods (historical daily data)
     # ------------------------------------------------------------------
 
+    @provider_retry(
+        # Intentional deviation: connection errors enter reconnect cooldown and must
+        # not thrash retries; only request timeouts are retried.
+        retryable=(TimeoutError,),
+        target_logger=logger,
+        event="Longbridge daily data retry scheduled",
+        error_code="longbridge_daily_data_retry",
+    )
     def _fetch_raw_data(
         self, stock_code: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
@@ -980,12 +1000,15 @@ class LongbridgeFetcher(BaseFetcher):
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
 
         try:
-            candles = ctx.history_candlesticks_by_date(
+            candles = call_with_timeout(
+                ctx.history_candlesticks_by_date,
                 symbol,
                 Period.Day,
                 AdjustType.ForwardAdjust,
                 start_dt,
                 end_dt,
+                timeout=self._request_timeout_seconds,
+                call_name="longbridge.history_candlesticks_by_date",
             )
         except Exception as e:
             if self._is_connection_error(e):
