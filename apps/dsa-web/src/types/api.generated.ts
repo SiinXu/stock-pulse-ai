@@ -2136,11 +2136,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List privileged-operation security audit events
-         * @description Return a bounded page only to an authenticated administrator session.
-         */
+        /** List privileged-operation security audit events */
         get: operations["list_security_audit_events_api_v1_security_audit_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/local-only": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read LOCAL_ONLY_MODE enforcement status */
+        get: operations["get_local_only_mode_status_api_v1_security_local_only_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/outbound-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent outbound HTTP policy decisions */
+        get: operations["list_outbound_activity_api_v1_security_outbound_activity_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6716,6 +6747,28 @@ export interface components {
             /** Revision */
             revision: string;
         };
+        /** LocalOnlyModeStatus */
+        LocalOnlyModeStatus: {
+            /** Allowed Destination Classes */
+            allowed_destination_classes?: string[];
+            /**
+             * Blocked Error Reason
+             * @default local_only_mode_blocked
+             */
+            blocked_error_reason: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Env Key
+             * @default LOCAL_ONLY_MODE
+             */
+            env_key: string;
+            /**
+             * Policy
+             * @default non_loopback_denied
+             */
+            policy: string;
+        };
         /**
          * LoginRequest
          * @description Login request body. For first-time setup use password + password_confirm.
@@ -7073,6 +7126,43 @@ export interface components {
             success: boolean;
             /** Target */
             target?: string | null;
+        };
+        /** OutboundActivityItem */
+        OutboundActivityItem: {
+            /** Allowlisted */
+            allowlisted: boolean;
+            /** Correlation Id */
+            correlation_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "allowed" | "blocked";
+            /** Destination Class */
+            destination_class: string;
+            /** Host Type */
+            host_type: string;
+            /** Local Only Mode */
+            local_only_mode: boolean;
+            /** Occurred At */
+            occurred_at: string;
+            /** Reason */
+            reason: string;
+            /** Scheme */
+            scheme: string;
+        };
+        /** OutboundActivityPage */
+        OutboundActivityPage: {
+            /** Items */
+            items?: components["schemas"]["OutboundActivityItem"][];
+            /** Limit */
+            limit: number;
+            /** Local Only Mode */
+            local_only_mode: boolean;
+            /** Max Retained */
+            max_retained: number;
+            /** Returned */
+            returned: number;
         };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
@@ -16788,6 +16878,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_local_only_mode_status_api_v1_security_local_only_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalOnlyModeStatus"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_outbound_activity_api_v1_security_outbound_activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundActivityPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
