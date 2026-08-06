@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Desktop release workflow: `workflow_dispatch` is artifacts-only (no GitHub Release publish), builds the workflow ref by default (optional `rebuild_from_tag`), and adds macOS `codesign` + `--version` launch smoke with ad-hoc sign fallback when unsigned binaries do not execute.
+- [Fixed] Desktop PyInstaller freeze excludes `pkg_resources` so frozen backends start under setuptools>=82 (which removed that module and broke `pyi_rth_pkgres`).
+- [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
 - [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
 - [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
 - [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
