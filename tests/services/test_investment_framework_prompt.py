@@ -44,6 +44,57 @@ def test_format_prompt_section_includes_title_and_rules() -> None:
     assert "Cap single-name size at 10%" in section
 
 
+def test_format_prompt_section_includes_decision_tree() -> None:
+    content = InvestmentFrameworkContent.model_validate(
+        {
+            "title": "Tree driven",
+            "root_node_id": "root",
+            "decision_tree": [
+                {
+                    "node_id": "root",
+                    "question": "Is the moat durable?",
+                    "branches": [
+                        {
+                            "condition": "Yes",
+                            "target_node_id": "valuation",
+                            "outcome": None,
+                        },
+                        {
+                            "condition": "No",
+                            "target_node_id": None,
+                            "outcome": "Pass",
+                        },
+                    ],
+                },
+                {
+                    "node_id": "valuation",
+                    "question": "Is valuation attractive?",
+                    "branches": [
+                        {
+                            "condition": "Yes",
+                            "target_node_id": None,
+                            "outcome": "Track",
+                        },
+                    ],
+                },
+            ],
+        }
+    )
+    ctx = InvestmentFrameworkAnalysisContext(
+        framework_id=9,
+        framework_version=2,
+        content=content,
+        updated_at=datetime(2026, 8, 6, tzinfo=timezone.utc),
+    )
+    section = format_investment_framework_prompt_section(ctx, report_language="en")
+    assert "### Decision tree" in section
+    assert "Root: root" in section
+    assert "[root] Is the moat durable?" in section
+    assert "if Yes: → valuation" in section
+    assert "if No: ⇒ Pass" in section
+
+
+
 def test_inject_framework_into_analysis_context_when_active() -> None:
     with patch(
         "src.services.investment_framework_prompt.load_active_framework_context_soft",

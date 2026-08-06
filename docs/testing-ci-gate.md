@@ -274,6 +274,17 @@ The `changes` job in `.github/workflows/ci.yml` emits two independent filters:
 
 PR runs keep the ruleset-required backend/docker/openapi gates (plus path-filtered `web-gate` for frontend). `web-e2e` and `api-real-client` are observation jobs after merge. The auxiliary `PR Review` workflow is opt-in via `workflow_dispatch` and does not auto-run on every PR.
 
+### PR-tier backend throughput
+
+To avoid a doubled full offline suite on every PR:
+
+| Job | PR tier | Push-to-main |
+| --- | --- | --- |
+| `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `FULL` / `NONE` / path targets) | `./scripts/ci_gate.sh offline-tests` (coverage floor) |
+| `python-minimum` | `./scripts/ci_gate.sh python-min-smoke` (3.10 import + small contract suite) | `./scripts/ci_gate.sh offline-tests` |
+
+Selective mapping falls back to the full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config).
+
 ## Push-to-main CI
 
 `ci.yml` triggers on `pull_request` **and** `push` to `main`. Concurrency group is `ci-${{ github.event.pull_request.number || github.ref }}` with `cancel-in-progress: true`, so a merge burst cancels the superseded `ci-refs/heads/main` run and keeps only the newest main revision.
