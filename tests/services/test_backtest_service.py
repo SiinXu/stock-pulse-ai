@@ -2023,6 +2023,15 @@ class BacktestServiceTestCase(unittest.TestCase):
         self.assertEqual(stats["insufficient"], 1)
         self.assertEqual(stats["diagnostics"]["empty_reason"], "insufficient_daily_data")
         self.assertIn("可用日线行情不足", stats["message"])
+        self.assertIn("applied_config", stats)
+        self.assertEqual(stats["applied_config"]["eval_window_days"], 3)
+        with self.db.get_session() as session:
+            result = session.query(BacktestResult).filter(BacktestResult.code == "000002").one()
+            notes = getattr(result, "resolution_notes", None) or ""
+            self.assertTrue(
+                "missing_daily_bars" in notes or "insufficient_forward_bars" in notes,
+                msg=f"expected insufficient reason marker in resolution_notes, got {notes!r}",
+            )
 
     def _run_and_get_result(self) -> BacktestResult:
         """Helper: run backtest and return the single BacktestResult row."""
@@ -2728,6 +2737,96 @@ class BacktestServiceTestCase(unittest.TestCase):
                 session.query(BacktestResult).filter(BacktestResult.code == "MARKET").count(),
                 0,
             )
+
+    def test_run_backtest_echoes_applied_config_and_marks_missing_daily_bars(self) -> None:
+        """Run responses must echo the effective config and surface skip reasons."""
+        with self.db.get_session() as session:
+            session.add(
+                AnalysisHistory(
+                    query_id="q-missing-bars-config",
+                    code="600519",
+                    name="贵州茅台",
+                    report_type="simple",
+                    sentiment_score=70,
+                    operation_advice="买入",
+                    trend_prediction="看多",
+                    analysis_summary="no daily bars available",
+                    stop_loss=None,
+                    take_profit=None,
+                    created_at=datetime(2024, 1, 10, 0, 0, 0),
+                    context_snapshot=_phase_snapshot(
+                        date(2024, 1, 10),
+                        phase="postmarket",
+                        effective_date=date(2024, 1, 10),
+                    ),
+                )
+            )
+            session.commit()
+
+        service = BacktestService(self.db)
+        with patch.object(service, "_try_fill_daily_data"):
+            stats = service.run_backtest(
+                code="600519",
+                force=False,
+                eval_window_days=5,
+                min_age_days=0,
+                analysis_date_from=date(2024, 1, 10),
+                analysis_date_to=date(2024, 1, 10),
+                limit=50,
+            )
+
+        self.assertEqual(stats["processed"], 1)
+        self.assertEqual(stats["insufficient"], 1)
+        self.assertEqual(stats["completed"], 0)
+        applied = stats["applied_config"]
+        self.assertEqual(applied["eval_window_days"], 5)
+        self.assertEqual(applied["min_age_days"], 0)
+        self.assertEqual(applied["limit"], 50)
+        self.assertEqual(applied["code"], "600519")
+        self.assertFalse(applied["force"])
+        self.assertIn("engine_version", applied)
+        self.assertIn("neutral_band_pct", applied)
+        self.assertEqual(stats["diagnostics"]["skipped_count"], 1)
+        self.assertEqual(stats["diagnostics"]["insufficient"], 1)
+
+        with self.db.get_session() as session:
+            result = (
+                session.query(BacktestResult)
+                .filter(BacktestResult.code == "600519")
+                .order_by(BacktestResult.id.desc())
+                .first()
+            )
+            self.assertIsNotNone(result)
+            self.assertEqual(result.eval_status, "insufficient_data")
+            notes = getattr(result, "resolution_notes", None) or ""
+            self.assertTrue(
+                any(
+                    marker in notes
+                    for marker in (
+                        "missing_daily_bars",
+                        "insufficient_forward_bars",
+                        "prior_session_start",
+                        "legacy_analysis_date",
+                    )
+                ),
+                msg=f"expected insufficient/resolution marker, got {notes!r}",
+            )
+
+        recent = service.get_recent_evaluations(code="600519", eval_window_days=5, limit=10)
+        self.assertGreaterEqual(recent["total"], 1)
+        notes_payload = recent["items"][0].get("resolution_notes") or ""
+        self.assertTrue(
+            any(
+                marker in notes_payload
+                for marker in (
+                    "missing_daily_bars",
+                    "insufficient_forward_bars",
+                    "prior_session_start",
+                    "legacy_analysis_date",
+                )
+            ),
+            msg=f"expected notes in query payload, got {notes_payload!r}",
+        )
 
     def test_run_backtest_includes_null_report_type_records(self) -> None:
         with self.db.get_session() as session:

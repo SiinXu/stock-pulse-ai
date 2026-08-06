@@ -4177,6 +4177,58 @@ export interface components {
             /** Passwordconfirm */
             passwordConfirm?: string | null;
         };
+        /**
+         * BacktestAppliedConfig
+         * @description Echo of the effective run configuration used for evaluation honesty.
+         */
+        BacktestAppliedConfig: {
+            /**
+             * Analysis Date From
+             * @description Analysis date start filter (inclusive)
+             */
+            analysis_date_from?: string | null;
+            /**
+             * Analysis Date To
+             * @description Analysis date end filter (inclusive)
+             */
+            analysis_date_to?: string | null;
+            /**
+             * Code
+             * @description Normalized stock filter, if any
+             */
+            code?: string | null;
+            /**
+             * Engine Version
+             * @description Effective backtest engine version label
+             */
+            engine_version: string;
+            /**
+             * Eval Window Days
+             * @description Effective evaluation window in trading days
+             */
+            eval_window_days: number;
+            /**
+             * Force
+             * @description Whether force re-evaluation was requested
+             * @default false
+             */
+            force: boolean;
+            /**
+             * Limit
+             * @description Maximum candidate analysis rows processed
+             */
+            limit: number;
+            /**
+             * Min Age Days
+             * @description Effective minimum analysis age in calendar days
+             */
+            min_age_days: number;
+            /**
+             * Neutral Band Pct
+             * @description Neutral outcome band percentage
+             */
+            neutral_band_pct: number;
+        };
         /** BacktestResultItem */
         BacktestResultItem: {
             /** Action */
@@ -4309,6 +4361,8 @@ export interface components {
         };
         /** BacktestRunResponse */
         BacktestRunResponse: {
+            /** @description Echo of the effective run configuration (window, universe limit, engine, dates) */
+            applied_config?: components["schemas"]["BacktestAppliedConfig"] | null;
             /**
              * Applied Eval Window Days
              * @description 实际生效的评估窗口（交易日数）
