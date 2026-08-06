@@ -1,7 +1,7 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-05
+- Last verified: 2026-08-06
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
@@ -215,6 +215,53 @@ STOCKPULSE_TEST_THREADLESS=0 \
 ```
 
 The `api-real-client` job in `.github/workflows/ci.yml` is **not** a required branch-ruleset check. It runs **only on push-to-main** (after `ai-governance`), not on pull requests, so real-client regressions still surface post-merge without consuming PR runners.
+
+
+## Playwright flake quarantine
+
+Web e2e uses Playwright with **`retries: 0`**. Flakes must not be masked by re-runs or `waitForTimeout` sleeps. When a spec is intermittently red and the root cause cannot ship in the same PR, move it into the **quarantine lane** instead of weakening the blocking suite.
+
+### Rules
+
+1. **Tag** the test with `@quarantine` (Playwright `tag: ['@quarantine']` and/or the literal token in the title).
+2. **Tracking issue required**: every quarantined case must pass `quarantineDetails(issueUrl, reason)` from `apps/dsa-web/e2e/quarantine.ts`. The helper rejects non-GitHub issue URLs and empty reasons at load time.
+3. **Empty is healthy**: when the flake is fixed, remove the tag and details. Shipping zero quarantined specs is the default; the mechanism is the deliverable.
+4. **No product bypass**: quarantine is for test harness isolation only. A genuine UI race still needs an English issue with trace evidence; the deterministic wait belongs in e2e helpers such as `expectAnalyzeButtonReady` in `apps/dsa-web/e2e/workbench-fixture.ts`.
+
+### Example
+
+```ts
+import { test } from '@playwright/test';
+import { quarantineDetails } from './quarantine';
+
+test(
+  'flaky surface @quarantine',
+  quarantineDetails(
+    'https://github.com/SiinXu/stock-pulse-ai/issues/1234',
+    'Analyze button enable races setup-status; awaiting product fix on issue 1234.',
+  ),
+  async ({ page }) => {
+    // ...
+  },
+);
+```
+
+### Lanes
+
+| Lane | How | Role |
+| --- | --- | --- |
+| Blocking smoke | `npm run test:smoke` (default `chromium` project, `grepInvert: /@quarantine/`) | CI `web-e2e` and local default; must stay deterministic |
+| Quarantine | `npm run test:smoke:quarantine` (`DSA_WEB_E2E_QUARANTINE_LANE=1`, project `chromium-quarantine`) | Non-blocking observation; may be red without failing the main gate |
+
+`retries` stays `0` in both lanes. Quarantine is not a license to add sleeps.
+
+### Workflow note
+
+Wiring a continuous quarantine job in GitHub Actions (schedule / push-to-main observation, non-required check) is intentionally left to CI throughput PRs (`#808` / `#810` class). This repository ships the Playwright project + npm script so that wiring is a thin workflow step, not a second config design.
+
+### Related readiness helper
+
+The Analysis Workbench primary action stays disabled until `isExperienceModeReady` (setup-status request settled) and the stock query is non-empty. Specs that type a symbol and click **分析 / Analyze** must use `expectAnalyzeButtonReady` (controlled-input set + `expect(...).toBeEnabled()` on `#analysis-workbench-stock-search` and Analyze) rather than filling a still-disabled control or relying on placeholder visibility.
 
 ## CI path filters (`web-gate` vs `web-e2e`)
 
