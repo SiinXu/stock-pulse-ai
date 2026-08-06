@@ -460,6 +460,7 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         "AGENT_EVENT_MONITOR_ENABLED",
         "AGENT_EVENT_MONITOR_INTERVAL_MINUTES",
         "AGENT_EVENT_ALERT_RULES_JSON",
+        "AGENT_EVENT_IMPACT_CONTEXT_ENABLED",
         # PR3 Phase 2: Backtest
         "BACKTEST_ENABLED",
         "BACKTEST_EVAL_WINDOW_DAYS",

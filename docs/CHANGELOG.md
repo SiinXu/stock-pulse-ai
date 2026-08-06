@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Backend V0 context-aware corporate event alerts (`corporate_event`) evaluate managed intelligence items, attach holdings/watchlist impact context, and enrich alert notifications without new provider calls on the hot path (`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`).
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
