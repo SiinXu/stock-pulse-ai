@@ -25,8 +25,10 @@ export interface SecurityAuditTarget {
 
 export interface SecurityAuditEvent {
   id: number;
-  schemaVersion: 'security-audit-v1';
-  occurredAt: string;
+  /** Optional in OpenAPI SecurityAuditEvent; present on current backends. */
+  schemaVersion?: 'security-audit-v1' | string;
+  /** Optional in OpenAPI SecurityAuditEvent. */
+  occurredAt?: string;
   eventType: string;
   phase: SecurityAuditPhase;
   actor: SecurityAuditActor;
@@ -36,7 +38,8 @@ export interface SecurityAuditEvent {
   outcome: SecurityAuditOutcome;
   reasonCode: string;
   correlationId: string;
-  metadata: Record<string, unknown>;
+  /** Optional in OpenAPI SecurityAuditEvent. */
+  metadata?: Record<string, unknown>;
 }
 
 export interface SecurityAuditEventPage {

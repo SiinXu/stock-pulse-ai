@@ -57,6 +57,10 @@ DSA_ALPHASIFT_MIN_HOTSPOT_CACHE_COUNT = 3
 DSA_ALPHASIFT_HOTSPOT_DETAIL_CACHE_TTL_SECONDS = 30 * 60
 DSA_ALPHASIFT_HOTSPOT_EVENT_SUMMARY_MAX_CHARS = 90
 DSA_ALPHASIFT_HOTSPOT_PREFETCH_DETAIL_COUNT = 8
+# Ported-from: e430fcfe — bound hotspot news search end-to-end (default 12s).
+DSA_ALPHASIFT_HOTSPOT_SEARCH_TIMEOUT_SECONDS = 12.0
+DSA_ALPHASIFT_HOTSPOT_SEARCH_WORKER_LIMIT = 4
+_HOTSPOT_SEARCH_WORKER_SLOTS = threading.BoundedSemaphore(DSA_ALPHASIFT_HOTSPOT_SEARCH_WORKER_LIMIT)
 DSA_ALPHASIFT_HOTSPOT_UNAVAILABLE_CODE = "eastmoney_hotspot_unavailable"
 DSA_ALPHASIFT_HOTSPOT_UNAVAILABLE_MESSAGE = "热点源连接中断，暂无可用缓存。"
 DSA_ALPHASIFT_HOTSPOT_REFRESH_FAILED_CODE = "alphasift_hotspot_refresh_failed"
@@ -249,6 +253,9 @@ _alphasift_hotspot_support_names = (
     "_normalize_alphasift_hotspot_cache_payload",
     "_hotspot_route_has_external_event",
     "_has_configured_hotspot_news_source",
+    "_strip_hotspot_search_augmentation",
+    "_with_hotspot_search_augmentation",
+    "_run_hotspot_topic_news_search",
     "_build_hotspot_event_routes_from_search",
     "_summarize_hotspot_news_event",
     "_summarize_hotspot_news_event_locally",

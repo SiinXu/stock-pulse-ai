@@ -1,8 +1,10 @@
-# Example Notification Channel
+# Example Notification Channel (surface v1 reference)
 
-This trusted in-process plugin registers the deterministic `example_log`
-notification channel. It writes only route and payload-size metadata to the
-application log; it performs no network requests and requires no secret.
+This trusted in-process plugin is the **official notification-channel
+reference** for plugin extension surface v1 (ADR-007). It registers the
+deterministic `example_log` channel using only the frozen `src.plugins` author
+exports. It writes only route and payload-size metadata to the application log;
+it performs no network requests and requires no secret.
 
 Point `PLUGINS_DIR` at the parent examples directory and include the canonical
 channel ID in a route when you want to select it explicitly:

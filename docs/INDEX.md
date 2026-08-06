@@ -91,6 +91,7 @@
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
+| [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
 | [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |

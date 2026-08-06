@@ -467,6 +467,9 @@ async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
     strategies,
   }));
   await page.route('**/api/v1/alphasift/hotspots**', (route) => fulfillJson(route, {
+    enabled: true,
+    provider: 'akshare',
+    hotspot_count: 0,
     hotspots: [],
     details: {},
     cached_at: null,
@@ -476,6 +479,8 @@ async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
 
 function screeningResult(marker: string) {
   return {
+    enabled: true,
+    candidate_count: 1,
     run_id: `run-${marker}`,
     strategy: 'bull_trend',
     market: 'cn',
@@ -1309,6 +1314,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       }
       await fulfillJson(route, {
         task_id: 'failing-task',
+        trace_id: 'failing-task',
         status: 'pending',
         message: 'accepted',
         message_code: 'task_pending',
@@ -2065,11 +2071,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(APP_ROUTE_PATHS.researchAnalysis);
-    const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
-    await input.fill('AAPL');
-    await page.getByRole('tabpanel', { name: '发起与批量' })
-      .getByRole('button', { name: '分析', exact: true })
-      .click();
+    // Analyze stays disabled until setup/experience readiness resolves.
+    const stockSearch = page.locator('#analysis-workbench-stock-search');
+    await expect(stockSearch).toBeEnabled({ timeout: 15_000 });
+    await stockSearch.fill('AAPL');
+    const analyze = page.getByRole('tabpanel', { name: '发起与批量' })
+      .getByRole('button', { name: '分析', exact: true });
+    await expect(analyze).toBeEnabled({ timeout: 10_000 });
+    await analyze.click();
     const task = page.getByTestId('task-panel-item').filter({ hasText: 'AAPL' });
     await expect(task).toBeVisible();
     await expect(task.getByText('已完成', { exact: true })).toBeVisible({ timeout: 10_000 });

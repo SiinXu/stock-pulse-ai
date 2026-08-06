@@ -24,6 +24,11 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      # Backend suite when non-web paths change, or when web paths that are
+      # shared runtime/config contracts change (provider templates, help copy,
+      # public assets consumed outside the SPA).
+      backend: ${{ steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
+      docker: ${{ steps.filter.outputs.docker }}
       frontend: ${{ steps.filter.outputs.frontend }}
       web_e2e: ${{ steps.filter.outputs.web_e2e }}
     steps:
@@ -34,6 +39,29 @@ jobs:
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         with:
           filters: |
+            # Shared web/runtime contracts that still require backend validation.
+            backend_web_contract:
+              - 'apps/dsa-web/public/**'
+              - 'apps/dsa-web/src/components/settings/llmProviderTemplates.ts'
+              - 'apps/dsa-web/src/locales/settingsHelp.ts'
+              - 'apps/dsa-web/src/locales/settingsHelp.en.ts'
+              - 'apps/dsa-web/src/locales/settingsHelp.zh.ts'
+              - 'apps/dsa-web/src/utils/systemConfigI18n.ts'
+            docker:
+              - '*.py'
+              - 'api/**'
+              - 'bot/**'
+              - 'data_provider/**'
+              - 'src/**'
+              - 'strategies/**'
+              - 'apps/dsa-web/**'
+              - 'docker/**'
+              - 'requirements.txt'
+              - 'constraints.txt'
+              - 'build-constraints.txt'
+              - '.github/requirements-ci.txt'
+              - '.dockerignore'
+              - '.github/workflows/ci.yml'
             # web-gate only: frontend lint/unit/build (genuinely frontend-only)
             frontend:
               - 'apps/dsa-web/**'
@@ -50,6 +78,16 @@ jobs:
               - 'requirements.txt'
               - '.github/requirements-ci.txt'
               - '.github/workflows/ci.yml'
+      - name: 🧭 Filter backend-safe frontend paths
+        id: backend-filter
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          # true when any changed path is outside apps/dsa-web/**
+          predicate-quantifier: every
+          filters: |
+            backend_non_web:
+              - '**'
+              - '!apps/dsa-web/**'
 
   ai-governance:
     name: ai-governance
@@ -71,7 +109,8 @@ jobs:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [ai-governance]
+    needs: [changes, ai-governance]
+    if: needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
     steps:
@@ -133,7 +172,8 @@ jobs:
     name: python-minimum
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [ai-governance]
+    needs: [changes, ai-governance]
+    if: needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
     steps:
@@ -245,7 +285,8 @@ jobs:
     name: docker-build
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [ai-governance]
+    needs: [changes, ai-governance]
+    if: needs.changes.outputs.docker == 'true'
     permissions:
       contents: read
     steps:
@@ -456,12 +497,14 @@ jobs:
       - name: 🏗️ Build
         run: npm run build
 
+  # Observation only: not in the main ruleset required checks. Skip on pull_request
+  # so PR throughput stays on the blocking gate; still run on push-to-main when paths match.
   web-e2e:
     name: web-e2e
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [changes, ai-governance]
-    if: needs.changes.outputs.web_e2e == 'true'
+    if: github.event_name == 'push' && needs.changes.outputs.web_e2e == 'true'
     permissions:
       contents: read
     env:
@@ -548,11 +591,13 @@ jobs:
 
   # Non-required: exercise tests/api against the real Starlette TestClient.
   # Default offline suite keeps STOCKPULSE_TEST_THREADLESS=1 (threadless client).
+  # Observation only — run on push-to-main, not on pull_request.
   api-real-client:
     name: api-real-client
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [ai-governance]
+    if: github.event_name == 'push'
     permissions:
       contents: read
     steps:
