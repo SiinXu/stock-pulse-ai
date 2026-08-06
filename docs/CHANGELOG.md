@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
+- [Docs] Fix broken relative links in bot-command docs (`config.py` → `src/config.py`).
 - [Docs] Added macOS quarantine troubleshooting for the desktop app to FAQ (EN/CN) and the desktop packaging guide open step.
 - [Tests] Introduced a repo-local fake clock (`tests/time_determinism.py`) and converted the news-freshness, realtime circuit-breaker, and market-structure hotspot suites off wall-clock sleeps/date anchors.
 - [Added] Added a Research skill-outcome performance page with sufficiency-gated buckets, explicit offline evaluation, and empty-state guidance that recording is default-off.
