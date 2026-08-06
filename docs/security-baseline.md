@@ -260,7 +260,7 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | --- | --- | --- |
 | Multi-user identity, role and workspace authorization, consent, data ownership, export, deletion, and privacy audit are not implemented. | `AUTH-05`, `COMP-04` | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01`, `AUDIT-02` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
-| Backup/restore, auth-policy and session-invalidation changes, protected exports, HITL decisions, and remaining privileged boundaries are not yet connected to the Phase 1 durable security-audit contract. | `AUDIT-01` through `AUDIT-04` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) |
+| Analysis evidence-package export and any remaining non-admin privileged boundaries still need durable audit coverage beyond the connected auth/session/config-backup/HITL paths. | `AUDIT-01` through `AUDIT-04` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) |
 | Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
 | High-risk Agent actions do not yet have configurable, attributable human approval gates. | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) |
 | Product-level investment and limitation disclosures are not yet guaranteed consistently across every report, notification, Web surface, and supported language. | `COMP-01` through `COMP-03`, `COMP-05` | [#144](https://github.com/SiinXu/stock-pulse-ai/issues/144) |

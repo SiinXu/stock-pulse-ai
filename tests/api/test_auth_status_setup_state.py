@@ -13,6 +13,7 @@ from starlette.requests import Request
 
 import src.auth as auth
 from api.v1.endpoints.auth import AuthSettingsRequest, auth_status, auth_update_settings
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 def _reset_auth_globals() -> None:
@@ -126,7 +127,7 @@ class AuthStatusSetupStateTestCase(unittest.TestCase):
                                     "setupState": "enabled",
                                 }
 
-                                response = asyncio.run(auth_update_settings(request, body))
+                                response = asyncio.run(auth_update_settings(request, body, security_audit=SecurityAuditRecorderStub()))
 
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.body)

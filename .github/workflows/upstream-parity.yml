@@ -1,0 +1,189 @@
+# Weekly upstream drift report for ZhuLinsen/daily_stock_analysis.
+# Manual ports only: this workflow never merges upstream. It classifies
+# upstream-only commits, uploads a Markdown artifact, and updates one
+# tracking issue in place (idempotent; does not spam new issues).
+
+name: Upstream Parity
+
+permissions: {}
+
+on:
+  schedule:
+    # Weekly on Mondays at 04:00 UTC
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-parity-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  parity:
+    name: upstream-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Run self-test
+        run: python scripts/check_upstream_parity.py --self-test
+
+      - name: Fetch upstream and generate report
+        env:
+          UPSTREAM_URL: https://github.com/ZhuLinsen/daily_stock_analysis.git
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream "${UPSTREAM_URL}"
+          git fetch upstream --prune
+          python scripts/check_upstream_parity.py \
+            --local-ref "origin/${DEFAULT_BRANCH}" \
+            --upstream-ref upstream/main \
+            --no-fetch \
+            --output upstream-parity-report.md \
+            --issue-summary upstream-parity-issue-body.md
+
+      - name: Upload parity report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upstream-parity-report-${{ github.run_number }}
+          path: |
+            upstream-parity-report.md
+            upstream-parity-issue-body.md
+          if-no-files-found: error
+
+      - name: Publish step summary
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Upstream parity report"
+            echo ""
+            echo "Artifact: \`upstream-parity-report-${RUN_NUMBER}\`"
+            echo ""
+            head -n 80 upstream-parity-report.md
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upsert tracking issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const labelName = 'upstream-parity';
+            const title = 'Upstream parity drift report';
+            const marker = '<!-- upstream-parity-tracking-issue -->';
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const bodyPath = 'upstream-parity-issue-body.md';
+
+            let body = fs.readFileSync(bodyPath, 'utf8');
+            if (!body.includes(marker)) {
+              body = `${marker}\n\n${body}`;
+            }
+            const runFooter = [
+              '',
+              '---',
+              '',
+              `Latest workflow run: ${runUrl}`,
+              `Run number: ${context.runNumber}`,
+              '',
+            ].join('\n');
+            const maxBody = 60000;
+            let issueBody = body + runFooter;
+            if (issueBody.length > maxBody) {
+              issueBody = body.slice(0, maxBody - runFooter.length - 80)
+                + '\n\n_(truncated for issue body length; see workflow artifact.)_\n'
+                + runFooter;
+            }
+
+            async function ensureLabel() {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: labelName });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: labelName,
+                  color: '0E8A16',
+                  description: 'Automated upstream parity drift tracking',
+                });
+              }
+            }
+
+            await ensureLabel();
+
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              labels: labelName,
+              per_page: 100,
+            });
+            const tracking = openIssues.filter(
+              (item) => !item.pull_request && (
+                item.title === title
+                || (item.body && item.body.includes(marker))
+              )
+            );
+
+            if (tracking.length === 0) {
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body: issueBody,
+                labels: [labelName],
+              });
+              core.info(`Created tracking issue #${created.data.number}`);
+              return;
+            }
+
+            tracking.sort((a, b) => a.number - b.number);
+            const primary = tracking[0];
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: primary.number,
+              title,
+              body: issueBody,
+              labels: [labelName],
+            });
+            core.info(`Updated tracking issue #${primary.number}`);
+
+            for (const duplicate of tracking.slice(1)) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: duplicate.number,
+                body: [
+                  'Closing as a duplicate of the single upstream parity tracking issue',
+                  `#${primary.number}. The weekly workflow updates only one issue.`,
+                ].join(' '),
+              });
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: duplicate.number,
+                state: 'closed',
+                state_reason: 'not_planned',
+              });
+              core.warning(`Closed duplicate tracking issue #${duplicate.number}`);
+            }
