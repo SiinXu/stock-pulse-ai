@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
+- [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
 - [Docs] Fix broken relative links in bot-command docs (`config.py` → `src/config.py`).
 - [Docs] Added macOS quarantine troubleshooting for the desktop app to FAQ (EN/CN) and the desktop packaging guide open step.
 - [Tests] Introduced a repo-local fake clock (`tests/time_determinism.py`) and converted the news-freshness, realtime circuit-breaker, and market-structure hotspot suites off wall-clock sleeps/date anchors.
