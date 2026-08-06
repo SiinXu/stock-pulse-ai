@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
 - [Docs] Fix broken relative links in bot-command docs (`config.py` → `src/config.py`).
+- [Tests] Chunk the exception-log callsite production scan into bounded file groups and stabilize multi-agent budget-skip clocks so backend-gate / python-minimum no longer flake on shared runners.
 - [Docs] Added macOS quarantine troubleshooting for the desktop app to FAQ (EN/CN) and the desktop packaging guide open step.
 - [Tests] Introduced a repo-local fake clock (`tests/time_determinism.py`) and converted the news-freshness, realtime circuit-breaker, and market-structure hotspot suites off wall-clock sleeps/date anchors.
 - [Added] Added a Research skill-outcome performance page with sufficiency-gated buckets, explicit offline evaluation, and empty-state guidance that recording is default-off.
