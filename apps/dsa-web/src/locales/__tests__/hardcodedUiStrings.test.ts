@@ -103,7 +103,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'Product name in the login wordmark.',
   },
   {
-    file: 'pages/PortfolioPage.tsx',
+    file: 'components/portfolio/PortfolioWorkspace.tsx',
     text: 'CNY',
     context: 'jsx-expression',
     purpose: 'ISO 4217 fallback currency code from the portfolio data contract.',
