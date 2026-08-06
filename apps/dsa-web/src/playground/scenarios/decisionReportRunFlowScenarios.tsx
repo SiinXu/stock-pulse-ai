@@ -313,7 +313,7 @@ const DecisionSignalOutcomeStatsCardStory = () => {
 
 const DecisionSignalProfileCalibrationStory = () => {
   const { scenario } = usePlaygroundScenario();
-  if (scenario === 'insufficient') {
+  if (scenario === 'states') {
     return (
       <DecisionSignalProfileCalibration
         calibration={{
