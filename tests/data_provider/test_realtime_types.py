@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Concurrency regression tests for realtime circuit-breaker state."""
+"""Concurrency regression tests for realtime circuit-breaker state.
+
+Time control: cooldown advances use ``tests.time_determinism.FakeClock`` injected
+into ``CircuitBreaker`` (no wall-clock ``time.sleep`` for TTL waits).
+"""
 
 import threading
-import time
 import unittest
 
 from data_provider.realtime_types import CircuitBreaker, RealtimeSource, UnifiedRealtimeQuote
+from tests.time_determinism import FakeClock
 
 
 class UnifiedRealtimeQuoteMetadataTestCase(unittest.TestCase):
@@ -45,13 +49,15 @@ class UnifiedRealtimeQuoteMetadataTestCase(unittest.TestCase):
 
 class CircuitBreakerConcurrencyTestCase(unittest.TestCase):
     def test_half_open_allows_only_one_concurrent_probe(self):
+        clock = FakeClock()
         breaker = CircuitBreaker(
             failure_threshold=1,
             cooldown_seconds=0.01,
             half_open_max_calls=1,
+            clock=clock.time,
         )
         breaker.record_failure("akshare_em", "boom")
-        time.sleep(0.02)
+        clock.tick(0.02)
 
         barrier = threading.Barrier(2)
         allowed = []
@@ -119,14 +125,16 @@ class CircuitBreakerConcurrencyTestCase(unittest.TestCase):
     def test_half_open_not_stuck_after_inconclusive_probe(self):
         """Regression: a probe that returns None (no record_success/record_failure)
         must not permanently block the source in HALF_OPEN."""
+        clock = FakeClock()
         breaker = CircuitBreaker(
             failure_threshold=1,
             cooldown_seconds=0.01,
             half_open_max_calls=1,
+            clock=clock.time,
         )
         # Trip the breaker
         breaker.record_failure("src", "boom")
-        time.sleep(0.02)
+        clock.tick(0.02)
 
         # Probe goes through (OPEN -> HALF_OPEN -> slot consumed)
         self.assertTrue(breaker.is_available("src"))
@@ -137,19 +145,21 @@ class CircuitBreakerConcurrencyTestCase(unittest.TestCase):
         self.assertEqual(breaker.get_status()["src"], CircuitBreaker.OPEN)
 
         # After cooldown, source becomes available again
-        time.sleep(0.02)
+        clock.tick(0.02)
         self.assertTrue(breaker.is_available("src"))
 
     def test_half_open_self_heals_without_callback(self):
         """If neither record_success/record_failure/record_inconclusive is called,
         the HALF_OPEN state self-heals after another cooldown period."""
+        clock = FakeClock()
         breaker = CircuitBreaker(
             failure_threshold=1,
             cooldown_seconds=0.01,
             half_open_max_calls=1,
+            clock=clock.time,
         )
         breaker.record_failure("src", "boom")
-        time.sleep(0.02)
+        clock.tick(0.02)
 
         # First probe consumes the slot
         self.assertTrue(breaker.is_available("src"))
@@ -157,7 +167,7 @@ class CircuitBreakerConcurrencyTestCase(unittest.TestCase):
         self.assertFalse(breaker.is_available("src"))
 
         # After cooldown, self-healing allows another probe
-        time.sleep(0.02)
+        clock.tick(0.02)
         self.assertTrue(breaker.is_available("src"))
 
     def test_record_inconclusive_noop_in_closed(self):
