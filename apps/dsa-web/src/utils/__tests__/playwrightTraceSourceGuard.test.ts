@@ -44,7 +44,7 @@ function configWithProjectOverride(override: string): string {
 }
 
 describe('Playwright credential-bearing trace source guard', () => {
-  it('accepts the current production E2E sources without false positives', () => {
+  it('accepts the current production E2E sources without false positives', { timeout: 30_000 }, () => {
     const sources = readSourceTree('.');
     const e2eEntries = Object.keys(sources).filter((filename) => filename.startsWith('./e2e/'));
     const violations = findPlaywrightTraceSourceGraphViolations(

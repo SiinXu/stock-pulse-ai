@@ -1,3 +1,4 @@
+// @ts-check
 const {
   app,
   BrowserWindow,
@@ -135,7 +136,7 @@ const DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE = Object.freeze({
   EXTERNAL_SERVICE: 'external-service',
   UNAVAILABLE: 'unavailable',
 });
-const DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
+const _DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
 const DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE = '/settings?section=ai_models&view=local_models';
 // The checked-in catalog is the only allowlist authority. Arbitrary
 // user-provided model names are never downloaded by the desktop shell.
