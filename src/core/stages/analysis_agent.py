@@ -480,6 +480,39 @@ class _AgentAnalysisStageMixin:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                if getattr(self.config, "agent_multi_strategy_deliberation", False):
+                    runtime_facts = getattr(agent_result, "runtime_facts", None)
+                    from src.schemas.decision_action import normalize_decision_action
+                    from src.agent.deliberation_final_explanation import (
+                        build_pipeline_final_explanation,
+                    )
+                    final_action = normalize_decision_action(getattr(result, "action", None))
+                    start_action = final_action
+                    if runtime_facts is not None and final_action is not None and start_action is not None:
+                        try:
+                            if not isinstance(result.dashboard, dict):
+                                result.dashboard = {}
+                            result.dashboard.pop("agent_disagreement_explanation", None)
+                            pipeline_start_signal = getattr(result, "decision_type", "hold")
+                            risk_application = getattr(runtime_facts, "risk_override_application", None)
+                            if risk_application is not None:
+                                pipeline_start_signal = risk_application.post_risk_signal.value
+                            result.dashboard["agent_disagreement_explanation"] = (
+                                build_pipeline_final_explanation(
+                                    runtime_facts=runtime_facts,
+                                    pipeline_start_signal=pipeline_start_signal,
+                                    pipeline_start_action=start_action,
+                                    final_action=final_action,
+                                    pipeline_adjustments=(),
+                                    data_quality=(
+                                        analysis_context_pack_overview.get("data_quality")
+                                        if isinstance(analysis_context_pack_overview, dict)
+                                        else None
+                                    ),
+                                )
+                            )
+                        except Exception as exc:  # broad-exception: fallback_recorded - Final explanation is optional and fail-closed.
+                            logger.warning("[deliberation] final explanation skipped for %s: %s", code, exc)
 
             agent_analysis_succeeded = bool(
                 result and getattr(result, "success", True)
