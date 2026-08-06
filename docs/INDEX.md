@@ -14,6 +14,7 @@
 | 配置推送通知 | [通知能力基线](notifications.md) | [完整配置与部署指南](full-guide.md) |
 | 部署到服务器或云平台 | [部署指南](DEPLOY.md) | [云端 WebUI 部署](deploy-webui-cloud.md)、[Zeabur 部署](docker/zeabur-deployment.md) |
 | **公网 / 非本机暴露前先确认安全边界** | [安全基线 · 运维安全边界（英文专节）](security-baseline.md#operator-security-boundaries) | [部署指南](DEPLOY.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
+| [本地专用模式](local-only-mode.md)（[EN](local-only-mode_EN.md)） | 失败即关闭的非回环出站闸门、威胁模型与核验面（#218） |
 | 理解插件信任模型（非应用商店沙箱） | [插件扩展契约（英文）](plugin-extension-contract.md) | [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries) |
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |

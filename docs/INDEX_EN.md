@@ -17,6 +17,7 @@ This is the entry point for project documentation. The README covers the project
 | Configure notifications | [Notification Baseline](notifications.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | [Full Guide (EN)](full-guide_EN.md) |
 | Deploy to a server or cloud platform | [Deploy Guide (EN)](DEPLOY_EN.md) | [Cloud WebUI Deployment](deploy-webui-cloud.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only), [Zeabur Deployment](docker/zeabur-deployment.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | **Confirm security boundaries before a public or non-local bind** | [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) | [Deploy Guide (EN)](DEPLOY_EN.md), [Outbound HTTP Policy](security-outbound-policy.md) |
+| [Local Only Mode](local-only-mode_EN.md) | Fail-closed non-loopback egress gate, threat model, and verification surfaces (#218) |
 | Understand the plugin trust model (not a marketplace sandbox) | [Plugin extension contract](plugin-extension-contract.md) | [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) |
 | Use Bot / IM integrations | [Bot Commands (EN)](bot-command_EN.md) | [Bot Platform Docs](bot/) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
