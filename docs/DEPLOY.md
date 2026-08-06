@@ -568,6 +568,9 @@ A: GitHub Actions 定时任务可能有 5-15 分钟延迟，且仅在仓库有�
 **Q: 如何查看历史报告？**
 A: Actions → 选择运行记录 → Artifacts → 下载 `analysis-reports-xxx`
 
+**Q: 任务失败了，人话原因在哪里看？**
+A: 打开同一次 Run → 顶部 **Summary**。Daily Analysis 会写入双语运行摘要（成功 / 非交易日跳过 / 部分成功 / 失败原因与下一步）。可选一句 IM 失败通知依赖 `NOTIFICATION_SYSTEM_ERROR_CHANNELS` / `FAILURE_NOTIFY_ENABLED`（详见完整指南 #850）；成功路径的报告推送逻辑不变。
+
 **Q: 免费额度够用吗？**
 A: 每次运行约 2-5 分钟，一个月 22 个工作日 = 44-110 分钟，远低于 2000 分钟限制。
 

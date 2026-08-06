@@ -542,6 +542,9 @@ A: GitHub Actions scheduled tasks may have 5-15 minute delays, and only trigger 
 **Q: How to view historical reports?**
 A: Actions → Select run record → Artifacts → Download `analysis-reports-xxx`
 
+**Q: The job failed — where is the plain-language reason?**
+A: Open the same run → top **Summary** tab. Daily Analysis writes a bilingual outcome (success / non-trading skip / partial / failure cause + next step). Optional one-line IM uses `NOTIFICATION_SYSTEM_ERROR_CHANNELS` / `FAILURE_NOTIFY_ENABLED` (see full guide #850); success-path report push is unchanged.
+
 **Q: Is the free quota enough?**
 A: Each run takes about 2-5 minutes, 22 workdays per month = 44-110 minutes, well below the 2000 minute limit.
 
