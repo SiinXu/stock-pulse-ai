@@ -2001,6 +2001,34 @@ def find_exception_log_violations(path: str, source: str) -> list[ExceptionLogVi
     return sorted(violations)
 
 
+# Per-package partitions keep the production scan attributable and bound
+# peak AST/coverage pressure. The union of these scopes must equal the full
+# production surface previously scanned by a single mega-test (which segfaulted
+# under backend-gate coverage on shared runners).
+PRODUCTION_SCAN_SCOPES = (
+    "src",
+    "data_provider",
+    "api",
+    "bot",
+    "root_entrypoints",
+)
+
+
+def _scoped_python_files_for(scope: str) -> list[Path]:
+    """Return production Python files for one scan partition."""
+
+    if scope == "root_entrypoints":
+        return sorted(SCOPED_FILES)
+    directory = REPO_ROOT / scope
+    if not directory.is_dir():
+        raise ValueError(f"unknown production scan scope: {scope!r}")
+    return sorted(
+        path
+        for path in directory.rglob("*.py")
+        if "__pycache__" not in path.parts
+    )
+
+
 def _scoped_python_files() -> list[Path]:
     files = {
         path
@@ -3059,11 +3087,34 @@ def emit(error, use_primary):
     assert find_exception_log_violations("fixture.py", source) == []
 
 
-@pytest.mark.timeout(600)
-def test_all_production_python_uses_shared_sanitized_exception_logging() -> None:
+def test_production_scan_scopes_partition_full_surface() -> None:
+    """Partitions must cover every previously scanned production file."""
+
+    partitioned = {
+        path
+        for scope in PRODUCTION_SCAN_SCOPES
+        for path in _scoped_python_files_for(scope)
+    }
+    assert partitioned == set(_scoped_python_files())
+    assert all(_scoped_python_files_for(scope) for scope in PRODUCTION_SCAN_SCOPES)
+
+
+@pytest.mark.timeout(180)
+@pytest.mark.parametrize("scope", PRODUCTION_SCAN_SCOPES)
+def test_all_production_python_uses_shared_sanitized_exception_logging(
+    scope: str,
+) -> None:
+    """Scan one package partition so failures are attributable and CI-safe.
+
+    The previous single mega-test walked every production file in one pytest
+    case under coverage and intermittently segfaulted / timed out on shared
+    runners. Same total assertions: every scoped file is still scanned; empty
+    violation list required per partition.
+    """
+
     violations = [
         violation
-        for path in _scoped_python_files()
+        for path in _scoped_python_files_for(scope)
         for violation in find_exception_log_violations(
             str(path.relative_to(REPO_ROOT)),
             path.read_text(encoding="utf-8"),
