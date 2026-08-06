@@ -832,18 +832,23 @@ export function installPlaygroundApiMock(
     ],
   }, { codes: [], items: [] }));
 
-  mock.onGet('/api/v1/stocks/watchlist').reply(() => responseFor(profile, { stockCodes: state.watchlist }, { stockCodes: [] }));
+  mock.onGet('/api/v1/stocks/watchlist').reply(() => responseFor(
+    profile,
+    { message: 'ok', stock_codes: state.watchlist },
+    { message: 'ok', stock_codes: [] },
+  ));
   mock.onPost('/api/v1/stocks/watchlist/add').reply((config) => {
     if (profile === 'error') return [503, errorPayload];
     const body = typeof config.data === 'string' ? JSON.parse(config.data) as { stock_code?: string } : {};
     if (body.stock_code && !state.watchlist.includes(body.stock_code)) state.watchlist.push(body.stock_code);
-    return [200, { stockCodes: state.watchlist }];
+    // OpenAPI WatchlistResponse requires message; stock_codes is the snake_case field set.
+    return [200, { message: 'ok', stock_codes: state.watchlist }];
   });
   mock.onPost('/api/v1/stocks/watchlist/remove').reply((config) => {
     if (profile === 'error') return [503, errorPayload];
     const body = typeof config.data === 'string' ? JSON.parse(config.data) as { stock_code?: string } : {};
     state.watchlist = state.watchlist.filter((item) => item !== body.stock_code);
-    return [200, { stockCodes: state.watchlist }];
+    return [200, { message: 'ok', stock_codes: state.watchlist }];
   });
 
   mock.onGet('/api/v1/auth/status').reply(() => responseFor(profile, state.authStatus, {
