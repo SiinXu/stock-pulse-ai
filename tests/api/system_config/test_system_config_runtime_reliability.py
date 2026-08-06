@@ -546,6 +546,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
                 system_config_api.rollback_system_config(
                     request=RollbackSystemConfigRequest(config_version="version-1"),
                     service=service,
+                    security_audit=SecurityAuditRecorderStub(),
                 )
 
         self.assertEqual(raised.exception.status_code, 409)
