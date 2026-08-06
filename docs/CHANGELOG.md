@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Desktop first-run opens the guided setup wizard on a fresh install, warms local Ollama detection, reveals the main window only after the loading page is ready, and composes runtime detect/start into one-click Model Pack import with actionable failures (no silent multi-GB downloads).
+- [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
+- [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
+- [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.
+- [Tests] Add offline recorded-fixture contract checks for AkShare (EM/Sina), Tencent, Tushare, and YFinance parse paths, plus a network-only refresh script wired into nightly network-smoke.
+- [Tests] Stabilize Analysis Workbench e2e Analyze clicks with shared readiness waits on the controlled stock-search value / Analyze enabled state, and add an empty `@quarantine` Playwright lane (tracking-issue required) for non-blocking flake isolation.
+- [Fixed] Replaced the Backtest page's separate start and end date fields with a single date-range picker.
+- [Added] Actions Config Check workflow and `scripts/actions_config_check.py` validate Secrets/Variables (watchlist, LLM keys, notifications, data paths) without running analysis; Step Summary is bilingual and never prints secret values (#847).
+- [Changed] Desktop release workflow: `workflow_dispatch` is artifacts-only (no GitHub Release publish), builds the workflow ref by default (optional `rebuild_from_tag`), and adds macOS `codesign` + `--version` launch smoke with ad-hoc sign fallback when unsigned binaries do not execute.
+- [Fixed] Desktop PyInstaller freeze excludes `pkg_resources` so frozen backends start under setuptools>=82 (which removed that module and broke `pyi_rth_pkgres`).
+- [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
+- [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
+- [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
+- [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
+- [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
+- [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
+- [Added] Personal investment framework editor shows a live analysis-context preview and injects a bounded decision-tree summary into the stock-analysis read-only prompt (no-op when no framework is active).
+- [Fixed] `refreshStockBar` sets `isLoadingStockBar` while in flight; history list accepts AbortSignal for stable workspace refreshes.
+- [Added] Config-driven LLM channel `API_SURFACE` routing (`chat_completions` default, opt-in `responses` → `openai/responses/<model>` wire models) with validation, registry key, and parity tests.
 
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
@@ -30,12 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extended the mypy ratchet to `api/v1/schemas` (kept `follow_imports=skip`; documented next-package order).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 - [Chore] Upgraded the Electron desktop stack (Electron 43.3.0, electron-builder 26.15.7, electron-updater 6.8.9, tar override 7.5.22) and added ESLint flat config with // @ts-check for main.js.
+- [Chore] Extracted Portfolio page sections into a feature workspace and portfolio hooks without changing ledger or idempotency behavior.
 - [Fixed] AlphaSift hotspot detail search is response-only (never written to the shared detail cache), bounded by a 12s timeout and concurrency slots, reports `news_search_status` (`available`/`no_results`/`unavailable`), and supports `include_search` (default true for Web compatibility). Ported-from: e430fcfe.
 - [Tests] Added fixed-seed property-style invariant coverage for portfolio ledger money math (conservation, scoped idempotency, FX isolation, projection-after-write).
 
 - [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
 - [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
+- [Changed] Migrated integrations-cluster Web API modules (alerts, alphasift, intelligence, investmentFramework, localModels, modelPacks) to OpenAPI-generated types with Zod boundary validation.
+- [Changed] Piloted TanStack Query on the market review page (history list poll + trigger mutation) with an inert app-root QueryClientProvider and behavior parity for cadence and error surfaces.
+- [Changed] Repository query/persistence failures raise ``RepositoryError`` instead of returning ``None``/empty/0; history API keeps not-found as 404 and maps repository failures to 500.
 - [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
 - [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).

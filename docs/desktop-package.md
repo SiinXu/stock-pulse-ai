@@ -13,9 +13,9 @@
 - 桌面端会自动从本机 `8000-8100` 选择可用端口，并把实际选择的端口同步给内置后端；桌面端不依赖 `.env` 里的 `WEBUI_PORT` 来决定窗口连接地址，避免用户改端口后 Electron 仍等待旧端口导致启动超时
 - 报告正文等 Markdown 中的外部 `http`/`https` 链接：主窗口导航守卫会拦截离开私有本地 Web origin 的顶层导航，并把合法外链转发到系统默认浏览器（与 `target="_blank"` 的窗口打开路径一致）。`file:`、`blob:`、`javascript:` 等非 http(s) 方案仍只拦截、不外开
 
-### 报告分享图（Web only）
+### 报告分享图（Web 与桌面运行时）
 
-报告页的「生成分享图」按钮（`ShareImageButton`）在检测到桌面运行时（`window.dsaDesktop`）时会直接隐藏，不提供等价入口。原因是分享图路径依赖浏览器侧的图片生成与系统分享/下载能力，当前桌面壳尚未接入对应 IPC 或系统分享通道；功能仍仅在纯 Web 部署中可用。后续若要在桌面端开放，需要单独设计主进程能力与回退策略，不属于启动/导航守卫链路。
+报告页的「生成分享图」按钮（`ShareImageButton`）在纯 Web 与桌面运行时（`window.dsaDesktop`）均展示。生成仍走后端 `GET /api/v1/history/{id}/share-image`，且仅在用户点击时请求（无页面加载预取）。桌面 WebView 通常没有 `navigator.share` 文件分享能力，因此会回退到与 `.env` 备份导出相同的 DOM 挂载 `a[download]` + blob 下载路径；主窗口导航守卫已保留该下载路径（`blob:` 等非外链方案只拦截、不外开）。若内置后端缺少转图引擎，失败态展示稳定错误码指引（例如 `share_image_unavailable`），而不是在入口层静默隐藏。原生系统分享 IPC 仍非本路径依赖。
 
 ## 版本号重启与自动更新说明（0.1.0）
 
@@ -215,14 +215,17 @@ powershell -ExecutionPolicy Bypass -File scripts\build-all.ps1
 
 - 工作流：`.github/workflows/desktop-release.yml`
 - 触发方式：
-  - 推送语义化 tag（如 `v3.2.12`）后自动触发
-  - 在 Actions 页面手动触发并指定 `release_tag`
-- 产物：
-  - Windows 安装包：Release 附件和本地 `apps/dsa-desktop/dist/` 中统一为 `stockpulse-windows-installer-<tag>.exe`
+  - 推送语义化 tag（如 `v0.1.0`）后自动构建并**发布**到 GitHub Release
+  - 在 Actions 页面手动 `workflow_dispatch` 并指定 `release_tag`：只构建并上传 **Actions artifacts**，**不会**创建或修改 GitHub Release（用于流水线验证与 dry-run）
+  - `workflow_dispatch` 默认从**触发时选中的分支/ref**打包，仅用 `release_tag` 打版本号与产物文件名；需要重建历史 tag 源码时再勾选 `rebuild_from_tag`（pre-rename 的 `v3.x` tag 不包含 StockPulse 打包契约，不应用于产品验证）
+- 产物命名（与 `apps/dsa-desktop/package.json` 的 `artifactName` / 工作流 `Prepare release artifact` 对齐）：
+  - Windows 安装包：`stockpulse-windows-installer-<tag>.exe`（例如 `stockpulse-windows-installer-v0.1.0.exe`）
   - Windows 自动更新元数据：Release 附件会额外保留 `latest.yml` 和 `*.blockmap`，供安装版桌面端后台下载与校验更新；普通用户无需手动下载这些元数据。下载完成后用户确认“重启安装”时，桌面端会先停止桌面托管的 Ollama 与内置后端、备份运行时文件（包括内嵌模型库），并以静默模式执行安装器。
   - Windows 免安装包：`stockpulse-windows-noinstall-<tag>.zip`
   - macOS Intel：`stockpulse-macos-x64-<tag>.dmg`
   - macOS Apple Silicon：`stockpulse-macos-arm64-<tag>.dmg`
+- macOS CI 会在打包后执行 **launch smoke**：`codesign -dv` 审计 + 用 `ELECTRON_RUN_AS_NODE=1` 对 `.app` 主二进制做可执行探测（带 30s watchdog，避免 GUI 主进程挂起）。若 as-packaged（当前 clean-unsigned 契约）无法执行，流水线会对产物做最小 **ad-hoc** `codesign --sign -` 并重写 DMG，再二次断言可执行。这**不是** Apple Developer ID / 公证。
+- **arm64 实证（CI macos-15）**：post-rename StockPulse 包在 `codesign` 报告 `code object is not signed at all` 时，`ELECTRON_RUN_AS_NODE` 探测仍可 `launches_as_packaged`（x64 同结论）。用户本机仍可能受 Gatekeeper/quarantine 拦截，见下文。
 
 ### macOS 提示“应用已损坏，无法打开”
 
@@ -250,11 +253,26 @@ spctl --assess --type execute --verbose=4 "/Applications/StockPulse.app"
 
 当前 unsigned 产物的 `codesign -d` 预期包含 `code object is not signed at all`，`spctl` 预期拒绝；如果输出 `code has no resources but signature indicates they must be present` 或其他签名损坏信息，应视为发布阻断。
 
-建议发布流程：
+### 维护者：首次 StockPulse 桌面 `v0.1.0` 发布步骤
+
+在 `v0.1.0` 产品 tag 尚未由维护者创建前，可用已有 tag（例如 `v3.26.3`）对**当前分支**做 `workflow_dispatch` 验证（artifacts only）。真正切第一刀时：
+
+1. 确认 `main` 已包含目标桌面代码，且本地/CI 对 `apps/dsa-desktop` 的测试与 Web 构建通过。
+2. **不要**用 `rebuild_from_tag` 指向 pre-rename 的 `v3.x` 源码；产品包必须从 post-rename 树构建。
+3. 由维护者创建并推送 **annotated** tag `v0.1.0`（或仓库约定的自动打 tag 流程；本工作流本身**不**创建 tag）。
+4. tag push 自动触发 `desktop-release`：Windows + macOS (x64/arm64) 构建 → 校验嵌入式 Ollama / updater 元数据 → macOS launch smoke → `publish-release` 将产物附加到 GitHub Release `v0.1.0`。
+5. 发布后人工抽检：
+   - Release 附件名与上文产物命名一致；
+   - Windows：`latest.yml` 的 `version` / `path` 与安装包一致；
+   - macOS：对应芯片下载 DMG，按上文 Gatekeeper 指引打开；`codesign -d` 无残缺签名缺陷。
+6. 回滚：删除有问题的 Release 附件或整页 Release（保留 tag 与否由维护者决定）；用户侧卸载后改下已知良好版本。勿对历史 `v3.x` 桌面安装包依赖 auto-update 升到 `0.x`（见文首版本号说明）。
+
+建议日常发布流程：
 
 1. 合并代码到 `main`
-2. 由自动打 tag 工作流生成版本（或手动创建 tag）
-3. `desktop-release` 工作流自动构建并把两个平台安装包附加到对应 GitHub Release
+2. 由自动打 tag 工作流生成版本（或维护者手动创建 annotated tag）
+3. tag push 触发 `desktop-release` 构建并把两个平台安装包附加到对应 GitHub Release
+4. 需要仅验证流水线时：Actions → Desktop Release → Run workflow → 填写已有 `release_tag`、保持 `rebuild_from_tag=false` → 只收集 artifacts
 
 ## 发版前可复现验证（桌面更新链路）
 
