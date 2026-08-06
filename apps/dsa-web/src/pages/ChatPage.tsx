@@ -1,32 +1,28 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import {
-  Check,
-  ChevronDown,
-  Copy,
-  Download,
   History,
-  RefreshCw,
-  SlidersHorizontal,
-  Trash2,
 } from 'lucide-react';
-import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, IconButton, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
-import { Pressable } from '../components/common/Pressable';
+import { Button, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
-import { ChatEmptyMessages } from '../components/chat/ChatEmptyMessages';
+import { ChatComposer } from '../components/chat/ChatComposer';
+import { ChatMessageList } from '../components/chat/ChatMessageList';
+import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
+import {
+  resolveActiveStockContextFromMessage,
+  restoreActiveStockContextFromMessages,
+  type ActiveStockContext,
+} from '../components/chat/chatActiveStock';
+import { getMessageSkillLabel } from '../components/chat/chatMessageMeta';
+import { useChatPageUiState } from '../components/chat/useChatPageUiState';
 import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
-import { DashboardStateBlock } from '../components/dashboard';
 import {
   useAgentChatStore,
   type Message,
-  type ProgressStep,
 } from '../stores/agentChatStore';
 import { downloadSession, formatSessionAsMarkdown } from '../utils/chatExport';
 import type { ChatFollowUpContext } from '../utils/chatFollowUp';
@@ -39,11 +35,10 @@ import {
 } from '../utils/chatFollowUp';
 import { isNearBottom } from '../utils/chatScroll';
 import { getReportText } from '../utils/reportLanguage';
-import { extractStockCodesFromMessage } from '../utils/chatStockCode';
-import { findMatchingStockCode, includesStockCode, normalizeStockCode } from '../utils/stockCode';
+import { findMatchingStockCode, includesStockCode } from '../utils/stockCode';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiTextKey } from '../i18n/uiText';
-import { formatUiDateTime, getUiListSeparator } from '../utils/uiLocale';
+import { getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
 import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
@@ -64,132 +59,6 @@ const CHAT_SESSION_QUERY_KEY = 'session';
 const CHAT_CONTEXT_STATE_QUERY_KEY = 'context';
 const CHAT_ACTIVE_CONTEXT_STATE = 'active';
 const CHAT_DESKTOP_RAIL_QUERY = '(min-width: 1280px)';
-const STRONG_COMPARE_STOCK_MESSAGE_RE = /比较|对比|\bvs\b|和[^，。,.!?！？]{0,40}比/i;
-const WEAK_COMPARE_STOCK_MESSAGE_RE = /差异(?!化)|区别|不同|相比|对照|比一比/;
-const CHOICE_COMPARE_STOCK_MESSAGE_RE = /哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一/;
-const LINKED_COMPARE_STOCK_MESSAGE_RE = /(?:和|与|跟|同)[^，。,.!?！？]{0,40}(?:差异(?!化)|区别|不同|相比|对照|比一比)/;
-const SWITCH_STOCK_MESSAGE_RE = /换成|改看|分析|看看|研究|诊断/;
-
-type ActiveStockContext = Pick<ChatFollowUpContext, 'stock_code' | 'stock_name'>;
-type ActiveStockResolution = {
-  context: ActiveStockContext;
-  useForCurrentSend: boolean;
-};
-
-const getMessageSkillNames = (msg: Message): string[] => {
-  if (msg.skillNames?.length) return msg.skillNames;
-  if (msg.skillName) return [msg.skillName];
-  if (msg.skills?.length) return msg.skills;
-  if (msg.skill) return [msg.skill];
-  return [];
-};
-
-const getMessageSkillLabel = (msg: Message): string => getMessageSkillNames(msg).join('、');
-
-const isStageDoneSuccessful = (status?: string): boolean => {
-  if (!status) return true;
-  const normalized = status.trim().toLowerCase();
-  return ['completed', 'success', 'succeeded', 'done'].includes(normalized);
-};
-
-const getStageDoneLabel = (step: ProgressStep): string => {
-  const stage = step.stage || 'stage';
-  if (step.message) return step.message;
-  if (isStageDoneSuccessful(step.status)) return `${stage} completed`;
-  return `${stage} ${step.status || 'finished'}`;
-};
-
-const getPipelineBudgetSkippedLabel = (step: ProgressStep): string => {
-  if (step.message) return step.message;
-  return `${step.stage || 'pipeline'} skipped: insufficient budget`;
-};
-
-const isCompareStockMessage = (
-  message: string,
-  stockCodes: string[],
-  currentStockCode?: string | null,
-): boolean => {
-  if (STRONG_COMPARE_STOCK_MESSAGE_RE.test(message)) {
-    return true;
-  }
-  const current = currentStockCode ? normalizeStockCode(currentStockCode) : null;
-  const newStockCodes = current
-    ? stockCodes.filter((code) => code !== current)
-    : stockCodes;
-  if (newStockCodes.length >= 2) {
-    return true;
-  }
-  if (CHOICE_COMPARE_STOCK_MESSAGE_RE.test(message) && stockCodes.length >= 2) {
-    return true;
-  }
-  if (!WEAK_COMPARE_STOCK_MESSAGE_RE.test(message)) {
-    return false;
-  }
-  if (stockCodes.length >= 2) {
-    return true;
-  }
-  if (!currentStockCode) {
-    return false;
-  }
-  const hasNewStock = stockCodes.some((code) => code !== current);
-  return hasNewStock && LINKED_COMPARE_STOCK_MESSAGE_RE.test(message);
-};
-
-const resolveActiveStockContextFromMessage = (
-  message: string,
-  currentContext: ActiveStockContext | null,
-): ActiveStockResolution | null => {
-  const stockCodes = extractStockCodesFromMessage(message);
-  const stockCode = stockCodes[0] ?? null;
-  if (!stockCode) {
-    return null;
-  }
-
-  const isCompare = isCompareStockMessage(message, stockCodes, currentContext?.stock_code);
-  const isSwitch = SWITCH_STOCK_MESSAGE_RE.test(message);
-  const currentStockCode = currentContext?.stock_code
-    ? normalizeStockCode(currentContext.stock_code)
-    : null;
-  const newStockCodes = currentStockCode
-    ? stockCodes.filter((code) => code !== currentStockCode)
-    : stockCodes;
-  // Explicit switches can mention the old stock; use the single new code when present.
-  const targetStockCode = isSwitch && newStockCodes.length === 1
-    ? newStockCodes[0]
-    : stockCode;
-  const isDifferentStock = currentStockCode !== targetStockCode;
-
-  // Compare messages and implicit follow-ups must not rewrite the active stock context.
-  if (isCompare || (currentContext && !isSwitch)) {
-    return null;
-  }
-
-  return {
-    context: {
-      stock_code: targetStockCode,
-      stock_name: currentContext && !isDifferentStock
-        ? currentContext.stock_name
-        : null,
-    },
-    // Only explicit switches should affect the context sent with the current request.
-    useForCurrentSend: isSwitch && isDifferentStock,
-  };
-};
-
-const restoreActiveStockContextFromMessages = (messages: Message[]): ActiveStockContext | null => {
-  let restoredContext: ActiveStockContext | null = null;
-  for (const message of messages) {
-    if (message.role !== 'user') {
-      continue;
-    }
-    const resolution = resolveActiveStockContextFromMessage(message.content, restoredContext);
-    if (resolution) {
-      restoredContext = resolution.context;
-    }
-  }
-  return restoredContext;
-};
-
 const ChatPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -199,23 +68,64 @@ const ChatPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [isSkillsLoading, setIsSkillsLoading] = useState(true);
-  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
-  const [showSkillDesc, setShowSkillDesc] = useState<string | null>(null);
-  const [mobileSkillPickerOpen, setMobileSkillPickerOpen] = useState(false);
-  const [sessionSearch, setSessionSearch] = useState('');
-  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [defaultSkillIds, setDefaultSkillIds] = useState<string[]>([]);
+  const [uiState, dispatchUi] = useChatPageUiState();
+  const {
+    showSkillDesc,
+    mobileSkillPickerOpen,
+    sessionSearch,
+    expandedThinking,
+    deleteConfirmId,
+    deleteLoading,
+    deleteError,
+    sidebarOpen,
+    sending,
+    chatMode,
+    showJumpToBottom,
+  } = uiState;
+  const setShowSkillDesc = useCallback(
+    (skillId: string | null) => dispatchUi({ type: 'setShowSkillDesc', skillId }),
+    [dispatchUi],
+  );
+  const setMobileSkillPickerOpen = useCallback(
+    (open: boolean) => dispatchUi({ type: 'setMobileSkillPickerOpen', open }),
+    [dispatchUi],
+  );
+  const setSessionSearch = useCallback(
+    (value: string) => dispatchUi({ type: 'setSessionSearch', value }),
+    [dispatchUi],
+  );
+  const setDeleteConfirmId = useCallback(
+    (sessionId: string | null) => dispatchUi({ type: 'setDeleteConfirmId', sessionId }),
+    [dispatchUi],
+  );
+  const setDeleteLoading = useCallback(
+    (loading: boolean) => dispatchUi({ type: 'setDeleteLoading', loading }),
+    [dispatchUi],
+  );
+  const setDeleteError = useCallback(
+    (error: string | null) => dispatchUi({ type: 'setDeleteError', error }),
+    [dispatchUi],
+  );
+  const setSending = useCallback(
+    (next: boolean) => dispatchUi({ type: 'setSending', sending: next }),
+    [dispatchUi],
+  );
+  const setChatMode = useCallback(
+    (mode: 'chat' | 'research') => dispatchUi({ type: 'setChatMode', mode }),
+    [dispatchUi],
+  );
+  const setShowJumpToBottom = useCallback(
+    (show: boolean) => dispatchUi({ type: 'setShowJumpToBottom', show }),
+    [dispatchUi],
+  );
   const sidebarOpenRef = useRef(false);
   const desktopSessionRailRef = useRef<HTMLDivElement>(null);
   const setSidebarPresentationOpen = useCallback((open: boolean) => {
     sidebarOpenRef.current = open;
-    setSidebarOpen(open);
-  }, []);
+    dispatchUi({ type: 'setSidebarOpen', open });
+  }, [dispatchUi]);
   const closeSidebar = useCallback(() => setSidebarPresentationOpen(false), [setSidebarPresentationOpen]);
-  const [sending, setSending] = useState(false);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
   const [sendToast, setSendToast] = useState<{
     type: 'success' | 'error';
@@ -230,13 +140,11 @@ const ChatPage: React.FC = () => {
   const agentUnavailable = useAgentSetupAvailability();
   const [copiedMessages, setCopiedMessages] = useState<Set<string>>(new Set());
   const { copyText } = useClipboard();
-  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [watchlistCodes, setWatchlistCodes] = useState<string[]>([]);
   const [isWatchlistActioning, setIsWatchlistActioning] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const [activeStockCode, setActiveStockCode] = useState<string | null>(null);
   const [activeStockContext, setActiveStockContext] = useState<ActiveStockContext | null>(null);
-  const [chatMode, setChatMode] = useState<'chat' | 'research'>('chat');
   const activeStockContextRef = useRef<ActiveStockContext | null>(null);
   const watchlistMessageTimerRef = useRef<number | null>(null);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
@@ -262,7 +170,7 @@ const ChatPage: React.FC = () => {
     };
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [mobileSkillPickerOpen]);
+  }, [mobileSkillPickerOpen, setMobileSkillPickerOpen]);
 
   const text = getReportText(language);
 
@@ -382,6 +290,7 @@ const ChatPage: React.FC = () => {
 
   const {
     messages,
+    selectedSkillIds: sessionSelectedSkillIds,
     loading,
     progressSteps,
     sessionId,
@@ -393,6 +302,7 @@ const ChatPage: React.FC = () => {
     hasInitialLoad,
     chatError,
     lastFailedRequest,
+    setSelectedSkillIds,
     loadSessions,
     loadInitialSession,
     switchSession,
@@ -401,6 +311,7 @@ const ChatPage: React.FC = () => {
     stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
+  const selectedSkillIds = sessionSelectedSkillIds ?? defaultSkillIds;
 
   const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
@@ -483,8 +394,10 @@ const ChatPage: React.FC = () => {
       scrollHeight: viewport.scrollHeight,
     });
     shouldStickToBottomRef.current = nearBottom;
-    setShowJumpToBottom((prev) => (nearBottom ? false : prev));
-  }, []);
+    if (nearBottom) {
+      setShowJumpToBottom(false);
+    }
+  }, [setShowJumpToBottom]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -494,7 +407,7 @@ const ChatPage: React.FC = () => {
     shouldStickToBottomRef.current = true;
     pendingScrollBehaviorRef.current = behavior;
     setShowJumpToBottom(false);
-  }, []);
+  }, [setShowJumpToBottom]);
 
   const handleMessagesScroll = useCallback(() => {
     syncScrollState();
@@ -520,7 +433,7 @@ const ChatPage: React.FC = () => {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, progressSteps, loading, sessionId, scrollToBottom]);
+  }, [messages, progressSteps, loading, sessionId, scrollToBottom, setShowJumpToBottom]);
 
   useEffect(() => {
     if (!loading) {
@@ -549,7 +462,7 @@ const ChatPage: React.FC = () => {
           res.default_skill_id ||
           res.skills[0]?.id ||
           '';
-        setSelectedSkillIds(defaultId ? [defaultId] : []);
+        setDefaultSkillIds(defaultId ? [defaultId] : []);
       })
       .catch((error) => {
         if (active) {
@@ -667,16 +580,14 @@ const ChatPage: React.FC = () => {
   }, []);
 
   const toggleSkillSelection = useCallback((skillId: string) => {
-    setSelectedSkillIds((prev) => {
-      if (prev.includes(skillId)) {
-        return prev.filter((id) => id !== skillId);
-      }
-      if (prev.length >= MAX_SELECTED_SKILLS) {
-        return prev;
-      }
-      return [...prev, skillId];
-    });
-  }, []);
+    if (selectedSkillIds.includes(skillId)) {
+      setSelectedSkillIds(selectedSkillIds.filter((id) => id !== skillId));
+      return;
+    }
+    if (selectedSkillIds.length < MAX_SELECTED_SKILLS) {
+      setSelectedSkillIds([...selectedSkillIds, skillId]);
+    }
+  }, [selectedSkillIds, setSelectedSkillIds]);
 
   const handleStartNewChat = useCallback(() => {
     followUpContextRef.current = null;
@@ -722,7 +633,7 @@ const ChatPage: React.FC = () => {
     } finally {
       setDeleteLoading(false);
     }
-  }, [deleteConfirmId, deleteLoading, handleStartNewChat, language, loadSessions, sessionId]);
+  }, [deleteConfirmId, deleteLoading, handleStartNewChat, language, loadSessions, sessionId, setDeleteConfirmId, setDeleteError, setDeleteLoading]);
 
   // Handle report-page follow-up URLs such as `?stock=600519&name=贵州茅台&recordId=xxx`.
   useEffect(() => {
@@ -785,7 +696,10 @@ const ChatPage: React.FC = () => {
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
       if (!msgText || loading || sessionLoading || isFollowUpContextLoading || isSkillsLoading) return;
-      const usedSkillIds = normalizeSelectedSkillIds(overrideSkillIds ?? selectedSkillIds);
+      const requestedSkillIds = overrideSkillIds ?? sessionSelectedSkillIds;
+      const usedSkillIds = normalizeSelectedSkillIds(
+        requestedSkillIds ?? selectedSkillIds,
+      );
       const usedSkillNames = usedSkillIds.length > 0 ? getSkillNames(usedSkillIds) : [t('chat.general')];
 
       let nextActiveStockContext = activeStockContextRef.current;
@@ -805,7 +719,9 @@ const ChatPage: React.FC = () => {
       const payload = {
         message: msgText,
         session_id: sessionId,
-        ...(usedSkillIds.length > 0 ? { skills: usedSkillIds } : {}),
+        ...(requestedSkillIds !== null
+          ? { skills: normalizeSelectedSkillIds(requestedSkillIds) }
+          : {}),
         context: contextForSend ?? undefined,
       };
       followUpHydrationTokenRef.current += 1;
@@ -821,7 +737,7 @@ const ChatPage: React.FC = () => {
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -854,12 +770,7 @@ const ChatPage: React.FC = () => {
   }, []);
 
   const toggleThinking = (msgId: string) => {
-    setExpandedThinking((prev) => {
-      const next = new Set(prev);
-      if (next.has(msgId)) next.delete(msgId);
-      else next.add(msgId);
-      return next;
-    });
+    dispatchUi({ type: 'toggleThinking', messageId: msgId });
   };
 
   const copyMessageToClipboard = async (msgId: string, content: string) => {
@@ -899,249 +810,8 @@ const ChatPage: React.FC = () => {
     URL.revokeObjectURL(url);
   }, [language, t]);
 
-  const getCurrentStage = (steps: ProgressStep[]): string => {
-    if (steps.length === 0) return t('chat.connecting');
-    const last = steps[steps.length - 1];
-    if (last.type === 'thinking') return last.message || t('chat.thinking');
-    if (last.type === 'tool_start')
-      return `${last.display_name || last.tool}...`;
-    if (last.type === 'tool_done')
-      return t('chat.completed', { name: last.display_name || last.tool || '' });
-    if (last.type === 'stage_start')
-      return last.message || `Starting ${last.stage || 'stage'}...`;
-    if (last.type === 'stage_done')
-      return getStageDoneLabel(last);
-    if (last.type === 'pipeline_timeout')
-      return last.message || `${last.stage || 'pipeline'} timed out`;
-    if (last.type === 'pipeline_budget_skipped')
-      return getPipelineBudgetSkippedLabel(last);
-    if (last.type === 'generating')
-      return last.message || t('chat.generating');
-    return t('chat.processing');
-  };
-
-  const renderThinkingBlock = (msg: Message) => {
-    if (!msg.thinkingSteps || msg.thinkingSteps.length === 0) return null;
-    const isExpanded = expandedThinking.has(msg.id);
-    const toolSteps = msg.thinkingSteps.filter((s) => s.type === 'tool_done');
-    const totalDuration = toolSteps.reduce(
-      (sum, s) => sum + (s.duration || 0),
-      0,
-    );
-    const summary = t('chat.toolCalls', { count: toolSteps.length, duration: totalDuration.toFixed(1) });
-
-    return (
-      <button
-        onClick={() => toggleThinking(msg.id)}
-        className="flex items-center gap-2 text-xs text-muted-text hover:text-secondary-text transition-colors mb-2 w-full text-left"
-      >
-        <svg
-          className={`w-3 h-3 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
-        <span className="flex items-center gap-1.5">
-          <span className="opacity-60">{t('chat.thinkingProcess')}</span>
-          <span className="text-muted-text/50">·</span>
-          <span className="opacity-50">{summary}</span>
-        </span>
-      </button>
-    );
-  };
-
-  const renderThinkingDetails = (steps: ProgressStep[]) => (
-    <div className="mb-3 pl-5 border-l border-border/40 space-y-1.5 animate-fade-in">
-      {steps.map((step, idx) => {
-        let statusClass = 'chat-progress-item-muted';
-        let iconClass = 'chat-progress-dot-muted';
-        let text = '';
-        if (step.type === 'thinking') {
-          text = step.message || t('chat.thinkingStep', { step: step.step || '' });
-          statusClass = 'chat-progress-item-thinking';
-          iconClass = 'chat-progress-dot-thinking';
-        } else if (step.type === 'tool_start') {
-          text = `${step.display_name || step.tool}...`;
-          statusClass = 'chat-progress-item-tool';
-          iconClass = 'chat-progress-dot-tool';
-        } else if (step.type === 'tool_done') {
-          text = `${step.display_name || step.tool} (${step.duration}s)`;
-          statusClass = step.success ? 'chat-progress-item-success' : 'chat-progress-item-danger';
-          iconClass = step.success ? 'chat-progress-dot-success' : 'chat-progress-dot-danger';
-        } else if (step.type === 'stage_start') {
-          text = step.message || `Starting ${step.stage || 'stage'}...`;
-          statusClass = 'chat-progress-item-thinking';
-          iconClass = 'chat-progress-dot-thinking';
-        } else if (step.type === 'stage_done') {
-          const isSuccess = isStageDoneSuccessful(step.status);
-          text = getStageDoneLabel(step);
-          statusClass = isSuccess ? 'chat-progress-item-success' : 'chat-progress-item-danger';
-          iconClass = isSuccess ? 'chat-progress-dot-success' : 'chat-progress-dot-danger';
-        } else if (step.type === 'pipeline_timeout') {
-          text = step.message || `${step.stage || 'pipeline'} timed out`;
-          statusClass = 'chat-progress-item-danger';
-          iconClass = 'chat-progress-dot-danger';
-        } else if (step.type === 'pipeline_budget_skipped') {
-          text = getPipelineBudgetSkippedLabel(step);
-          statusClass = 'chat-progress-item-muted';
-          iconClass = 'chat-progress-dot-muted';
-        } else if (step.type === 'generating') {
-          text = step.message || t('chat.generateAnalysis');
-          statusClass = 'chat-progress-item-generating';
-          iconClass = 'chat-progress-dot-generating';
-        } else {
-          text = step.message || step.type;
-        }
-        return (
-          <div
-            key={idx}
-            className={cn('chat-progress-item', statusClass)}
-          >
-            <span className={cn('chat-progress-dot', iconClass)} />
-            <span className="leading-relaxed">{text}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  const filteredSessions = useMemo(
-    () => sessions.filter((session) => session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase())),
-    [sessions, sessionSearch],
-  );
-
-  const sidebarContent = (
-    <>
-      <div className="flex items-center justify-between border-b border-subtle bg-subtle-soft p-3.5">
-        <h2 className="hidden items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-primary xl:flex">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {t('chat.history')}
-        </h2>
-        <div className="flex items-center">
-          <IconButton
-            onClick={handleStartNewChat}
-            size="navigation"
-            tooltip={false}
-            aria-label={t('chat.newConversation')}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-          </IconButton>
-        </div>
-      </div>
-      <div className="px-3 pt-3">
-        <SearchInput
-          value={sessionSearch}
-          onChange={(event) => setSessionSearch(event.target.value)}
-          aria-label={t('layout.search')}
-          placeholder={t('common.searchPlaceholder')}
-          wrapperClassName="w-full shadow-none"
-        />
-      </div>
-      <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
-        {sessionsLoading ? (
-          <DashboardStateBlock
-            loading
-            compact
-            title={t('chat.loadingSessions')}
-          />
-        ) : sessionsError ? (
-          <div className="relative [&_details]:border-t-0 [&_details]:pt-0">
-            <ApiErrorAlert
-              error={sessionsError}
-              className="pr-10"
-            />
-            <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
-              <IconButton
-                variant="danger"
-                size="compact"
-                tooltip={false}
-                aria-label={t('common.retry')}
-                onClick={() => void loadSessions()}
-              >
-                <RefreshCw aria-hidden="true" />
-              </IconButton>
-            </Tooltip>
-          </div>
-        ) : sessions.length === 0 ? (
-          <DashboardStateBlock
-            compact
-            title={t('chat.emptySessionsTitle')}
-            description={t('chat.emptySessionsDescription')}
-          />
-        ) : filteredSessions.length === 0 ? (
-          <DashboardStateBlock
-            compact
-            title={t('common.noMatches')}
-          />
-        ) : (
-          <div className="space-y-2">
-            {filteredSessions.map((s) => (
-              <div key={s.session_id} className="session-item-row">
-                <Pressable
-                  onClick={() => void handleSwitchSession(s.session_id)}
-                  disabled={sessionLoading}
-                  className={`session-item ${s.session_id === sessionId ? 'active' : ''}`}
-                  aria-label={t('chat.switchSession', { title: s.title })}
-                  aria-current={s.session_id === sessionId ? 'page' : undefined}
-                >
-                  <div className="content">
-                    <span className="title">{s.title}</span>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <span className="meta">
-                        {t('chat.sessionMessages', { count: s.message_count })}
-                      </span>
-                      {s.last_active && (
-                        <>
-                          <span className="separator" />
-                          <span className="meta">
-                            {formatUiDateTime(s.last_active, language, { month: 'short', day: 'numeric' })}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </Pressable>
-                <IconButton
-                  variant="danger"
-                  size="navigation"
-                  tooltip={false}
-                  className="delete-btn"
-                  onClick={() => {
-                    setDeleteConfirmId(s.session_id);
-                    setDeleteError(null);
-                  }}
-                  disabled={sessionLoading}
-                  aria-label={t('chat.deleteSession', { title: s.title })}
-                >
-                  <Trash2 aria-hidden="true" />
-                </IconButton>
-              </div>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-    </>
+  const filteredSessions = sessions.filter((session) =>
+    session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase()),
   );
 
   const selectedSkillSummary = selectedSkillIds.length > 0
@@ -1160,7 +830,25 @@ const ChatPage: React.FC = () => {
         className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden xl:flex"
         data-testid="chat-session-rail"
       >
-        {sidebarContent}
+        <ChatSessionSidebar
+          language={language}
+          t={t}
+          sessionSearch={sessionSearch}
+          onSessionSearchChange={setSessionSearch}
+          sessions={sessions}
+          filteredSessions={filteredSessions}
+          sessionsLoading={sessionsLoading}
+          sessionsError={sessionsError}
+          sessionLoading={sessionLoading}
+          sessionId={sessionId}
+          onNewChat={handleStartNewChat}
+          onRetryLoadSessions={() => void loadSessions()}
+          onSwitchSession={(id) => void handleSwitchSession(id)}
+          onRequestDelete={(id) => {
+            setDeleteConfirmId(id);
+            setDeleteError(null);
+          }}
+        />
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -1170,7 +858,25 @@ const ChatPage: React.FC = () => {
         title={t('chat.history')}
         variant="navigation"
       >
-        {sidebarContent}
+        <ChatSessionSidebar
+          language={language}
+          t={t}
+          sessionSearch={sessionSearch}
+          onSessionSearchChange={setSessionSearch}
+          sessions={sessions}
+          filteredSessions={filteredSessions}
+          sessionsLoading={sessionsLoading}
+          sessionsError={sessionsError}
+          sessionLoading={sessionLoading}
+          sessionId={sessionId}
+          onNewChat={handleStartNewChat}
+          onRetryLoadSessions={() => void loadSessions()}
+          onSwitchSession={(id) => void handleSwitchSession(id)}
+          onRequestDelete={(id) => {
+            setDeleteConfirmId(id);
+            setDeleteError(null);
+          }}
+        />
       </Drawer>
 
       {/* Delete confirmation dialog */}
@@ -1231,18 +937,8 @@ const ChatPage: React.FC = () => {
                       onClick={() => downloadSession(messages, language)}
                       aria-label={t('chat.exportSession')}
                     >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                       {t('chat.exportSessionButton')}
                     </Button>
@@ -1275,38 +971,13 @@ const ChatPage: React.FC = () => {
                       aria-label={t('chat.notify')}
                     >
                       {sending ? (
-                        <svg
-                          className="w-4 h-4 animate-spin"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                          />
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
                       ) : (
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                          />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                       )}
                       {t('chat.send')}
@@ -1322,7 +993,7 @@ const ChatPage: React.FC = () => {
           <div className="mt-1">
             <SegmentedControl
               value={chatMode}
-              onChange={(value) => setChatMode(value)}
+              onChange={(value) => setChatMode(value as 'chat' | 'research')}
               ariaLabel={t('research.modeLabel')}
               semantics="single-select"
               className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
@@ -1349,153 +1020,26 @@ const ChatPage: React.FC = () => {
           </Surface>
         ) : null}
         <Surface level="canvas" className={chatMode === 'research' ? 'hidden' : 'z-10 flex min-h-0 flex-1 flex-col overflow-hidden'}>
-          {/* Messages */}
-          <ScrollArea
-            className="relative z-10 flex-1"
-            viewportRef={messagesViewportRef}
+          <ChatMessageList
+            language={language}
+            t={t}
+            text={text}
+            messages={messages}
+            loading={loading}
+            progressSteps={progressSteps}
+            agentUnavailable={agentUnavailable}
+            quickQuestions={quickQuestions}
+            onQuickQuestion={handleQuickQuestion}
+            quickQuestionsDisabled={isSkillsLoading || loading || sessionLoading}
+            expandedThinking={expandedThinking}
+            onToggleThinking={toggleThinking}
+            copiedMessages={copiedMessages}
+            onCopyMessage={(id, content) => void copyMessageToClipboard(id, content)}
+            onDownloadMessage={downloadMessageAsMarkdown}
+            messagesViewportRef={messagesViewportRef}
+            messagesEndRef={messagesEndRef}
             onScroll={handleMessagesScroll}
-            viewportClassName="space-y-6 p-4 md:p-6"
-            testId="chat-message-scroll"
-          >
-            {messages.length === 0 && !loading ? (
-              <ChatEmptyMessages
-                agentUnavailable={agentUnavailable}
-                agentUnavailableTitle={t('chat.agentUnavailableTitle')}
-                agentUnavailableDescription={t('chat.agentUnavailableDescription')}
-                agentUnavailableAction={t('chat.agentUnavailableAction')}
-                emptyTitle={t('chat.emptyTitle')}
-                emptyDescription={t('chat.emptyDescription')}
-                quickQuestions={quickQuestions}
-                onQuickQuestion={handleQuickQuestion}
-                quickQuestionsDisabled={isSkillsLoading || loading || sessionLoading}
-              />
-            ) : (
-              messages.map((msg) => {
-                const skillLabel = getMessageSkillLabel(msg);
-                const displayContent = getChatMessageDisplayContent(msg, language);
-                return (
-                <div
-                  key={msg.id}
-                  className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-                >
-                  <div
-                    className={cn(
-                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm transition-all',
-                      msg.role === 'user' ? 'chat-avatar-user' : 'chat-avatar-ai'
-                    )}
-                  >
-                    {msg.role === 'user' ? 'U' : 'AI'}
-                  </div>
-                  <div
-                    className={cn(
-                      'group/message min-w-0 w-fit max-w-[min(100%,48rem)] overflow-hidden px-5 py-3.5 transition-colors',
-                      msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'
-                    )}
-                  >
-                    {msg.role === 'assistant' && skillLabel && (
-                      <div className="mb-2">
-                        <Badge variant="info" className="chat-skill-badge shadow-none" aria-label={t('chat.skill', { name: skillLabel })}>
-                          <svg
-                            className="w-3 h-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13 10V3L4 14h7v7l9-11h-7z"
-                            />
-                          </svg>
-                          {skillLabel}
-                        </Badge>
-                      </div>
-                    )}
-                    {msg.role === 'assistant' && renderThinkingBlock(msg)}
-                    {msg.role === 'assistant' &&
-                      expandedThinking.has(msg.id) &&
-                      msg.thinkingSteps &&
-                      renderThinkingDetails(msg.thinkingSteps)}
-                    {msg.role === 'assistant' ? (
-                      <div>
-                        <div className="chat-prose">
-                          <Markdown remarkPlugins={[remarkGfm]}>
-                            {displayContent}
-                          </Markdown>
-                        </div>
-                        <div className="chat-message-actions">
-                          <span
-                            data-slot="chat-message-action"
-                            className="flex h-11 w-11 items-center justify-center"
-                          >
-                            <IconButton
-                              size="compact"
-                              tooltip={false}
-                              onClick={() => copyMessageToClipboard(msg.id, displayContent)}
-                              aria-label={copiedMessages.has(msg.id) ? text.copied : text.copy}
-                            >
-                              {copiedMessages.has(msg.id) ? (
-                                <Check className="text-success" aria-hidden="true" />
-                              ) : (
-                                <Copy aria-hidden="true" />
-                              )}
-                            </IconButton>
-                          </span>
-                          <span
-                            data-slot="chat-message-action"
-                            className="flex h-11 w-11 items-center justify-center"
-                          >
-                            <IconButton
-                              size="compact"
-                              tooltip={false}
-                              onClick={() => downloadMessageAsMarkdown(msg)}
-                              aria-label={t('chat.exportMessage')}
-                            >
-                              <Download aria-hidden="true" />
-                            </IconButton>
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      msg.content
-                        .split('\n')
-                        .map((line, i) => (
-                          <p
-                            key={i}
-                            className="mb-1 last:mb-0 leading-relaxed"
-                          >
-                            {line || '\u00A0'}
-                          </p>
-                        ))
-                    )}
-                  </div>
-                </div>
-                );
-              })
-            )}
-
-            {loading && (
-              <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-elevated text-foreground flex items-center justify-center flex-shrink-0 text-xs font-bold">
-                  AI
-                </div>
-                <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-subtle bg-card/72 px-5 py-4">
-                  <div className="flex items-center gap-2.5 text-sm text-secondary-text">
-                    <div className="relative w-4 h-4 flex-shrink-0">
-                      <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
-                      <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                    </div>
-                    <span className="text-secondary-text">
-                      {getCurrentStage(progressSteps)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </ScrollArea>
+          />
 
           {showJumpToBottom && (
             <div className="pointer-events-none absolute bottom-[5.75rem] right-4 z-20 md:bottom-24 md:right-6">
@@ -1508,237 +1052,55 @@ const ChatPage: React.FC = () => {
                 }}
                 aria-label={t('chat.latestMessages')}
               >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                  />
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                 </svg>
                 {t('chat.newMessages')}
               </button>
             </div>
           )}
 
-          {/* Input area */}
-          <div className="relative z-20 border-t border-subtle bg-card/88 p-4 md:p-6">
-            <div className="space-y-3">
-              {sessionError ? (
-                <ApiErrorAlert error={sessionError} />
-              ) : null}
-              {sessionLoading ? (
-                <InlineAlert
-                  variant="info"
-                  size="compact"
-                  title={t('chat.loadingSessions')}
-                  message={t('common.loading')}
-                />
-              ) : null}
-              {chatError ? (
-                <div className="relative">
-                  <ApiErrorAlert
-                    error={chatError}
-                    className={cn(
-                      '[&>div>div]:w-full [&_details]:w-full',
-                      lastFailedRequest && 'pr-12',
-                    )}
-                  />
-                  {lastFailedRequest ? (
-                    <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
-                      <IconButton
-                        variant="danger"
-                        size="compact"
-                        tooltip={false}
-                        aria-label={t('common.retry')}
-                        onClick={() => void retryLastStream()}
-                      >
-                        <RefreshCw aria-hidden="true" />
-                      </IconButton>
-                    </Tooltip>
-                  ) : null}
-                </div>
-              ) : null}
-              {isFollowUpContextLoading ? (
-                <InlineAlert
-                  variant="info"
-                  size="compact"
-                  title={t('chat.followUpLoadingTitle')}
-                  message={t('chat.followUpLoadingMessage')}
-                />
-              ) : null}
-              <div data-testid="context-compression-settings" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-1">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">{t('chat.contextCompression')}</span>
-                  <span className="ml-2 text-xs text-muted-text">{t('chat.contextCompressionDescription')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {contextCompressionSaving ? (
-                    <span className="text-xs text-muted-text">{t('chat.saving')}</span>
-                  ) : null}
-                  <Switch
-                    checked={contextCompressionEnabled}
-                    onCheckedChange={(next) => void updateContextCompressionEnabled(next)}
-                    aria-label={t('chat.contextCompression')}
-                    disabled={!contextCompressionLoaded || contextCompressionSaving}
-                    visualTestId="context-compression-switch-visual"
-                  />
-                </div>
-              </div>
-              {contextCompressionError ? (
-                <InlineAlert
-                  variant="danger"
-                  size="compact"
-                  title={t('chat.contextCompressionUnsaved')}
-                  message={contextCompressionError}
-                />
-              ) : null}
-              {skills.length > 0 && (
-                <div className="relative space-y-2" ref={skillPickerRef}>
-                  <button
-                    type="button"
-                    className="home-surface-button flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs text-foreground !shadow-none"
-                    aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
-                    aria-expanded={mobileSkillPickerOpen}
-                    aria-controls="chat-skill-picker-panel"
-                    onClick={() => setMobileSkillPickerOpen((open) => !open)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                      <span className="flex-shrink-0 font-medium">{t('chat.strategy')}</span>
-                      <span className="truncate text-xs text-muted-text">{selectedSkillSummary}</span>
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        'h-4 w-4 flex-shrink-0 text-muted-text transition-transform',
-                        mobileSkillPickerOpen ? 'rotate-180' : '',
-                      )}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <div
-                    id="chat-skill-picker-panel"
-                    data-testid="chat-skill-picker-panel"
-                    className={cn(
-                      mobileSkillPickerOpen ? 'flex' : 'hidden',
-                      'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
-                    )}
-                  >
-                    <Checkbox
-                      name="general-analysis"
-                      value=""
-                      checked={selectedSkillIds.length === 0}
-                      onChange={() => setSelectedSkillIds([])}
-                      containerClassName="group min-h-8 gap-1.5 text-sm"
-                      label={(
-                        <span
-                          className={`text-sm transition-colors ${selectedSkillIds.length === 0 ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
-                        >
-                          {t('chat.generalAnalysis')}
-                        </span>
-                      )}
-                    />
-                    {skills.map((s) => {
-                      const checked = selectedSkillIdSet.has(s.id);
-                      const disabled = !checked && skillLimitReached;
-                      const display = getStrategyDisplay(s, language);
-                      return (
-                        <div
-                          key={s.id}
-                          className={`flex min-h-8 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                          onMouseEnter={() => setShowSkillDesc(s.id)}
-                          onMouseLeave={() => setShowSkillDesc(null)}
-                        >
-                          <Checkbox
-                            name="skills"
-                            value={s.id}
-                            checked={checked}
-                            disabled={disabled}
-                            onChange={() => toggleSkillSelection(s.id)}
-                            containerClassName="min-h-8 gap-1.5"
-                            label={(
-                              <span
-                                className={`text-sm transition-colors ${checked ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
-                              >
-                                {display.name}
-                              </span>
-                            )}
-                          />
-                          {showSkillDesc === s.id && s.description && (
-                            <div className="skill-desc-tooltip">
-                              <p className="skill-title">{display.name}</p>
-                              <p>{display.description}</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-            {activeStockCode && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-text font-mono">{activeStockCode}</span>
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  isLoading={isWatchlistActioning}
-                  onClick={() => void handleToggleWatchlist(activeStockCode)}
-                  className="text-xs"
-                >
-                  {stockInWatchlist(activeStockCode) ? t('chat.removeWatchlist') : t('chat.addWatchlist')}
-                </Button>
-                {watchlistMessage && (
-                  <span className="text-xs text-secondary-text animate-in fade-in">{watchlistMessage}</span>
-                )}
-              </div>
-            )}
-
-              <div className="flex items-end gap-3">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  aria-label={t('chat.messageInput')}
-                  placeholder={t('chat.inputPlaceholder')}
-                  disabled={loading || sessionLoading}
-                  rows={1}
-                  className="flex-1 min-h-11 max-h-50 rounded-sm border border-border bg-transparent px-3 py-2 text-base placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-                  style={{ height: 'auto' }}
-                  onInput={(e) => {
-                    const t = e.target as HTMLTextAreaElement;
-                    t.style.height = 'auto';
-                    t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
-                  }}
-                />
-                {loading ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => stopStream()}
-                    aria-label={t('chat.stop')}
-                    className="flex-shrink-0"
-                  >
-                    {t('chat.stop')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    onClick={() => handleSend()}
-                    disabled={!input.trim() || isFollowUpContextLoading || isSkillsLoading || sessionLoading}
-                    className="btn-primary flex-shrink-0"
-                  >
-                    {t('chat.send')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+          <ChatComposer
+            language={language}
+            t={t}
+            sessionError={sessionError}
+            sessionLoading={sessionLoading}
+            chatError={chatError}
+            lastFailedRequest={lastFailedRequest}
+            onRetryLastStream={() => void retryLastStream()}
+            isFollowUpContextLoading={isFollowUpContextLoading}
+            contextCompressionEnabled={contextCompressionEnabled}
+            contextCompressionLoaded={contextCompressionLoaded}
+            contextCompressionSaving={contextCompressionSaving}
+            contextCompressionError={contextCompressionError}
+            onContextCompressionChange={(next) => void updateContextCompressionEnabled(next)}
+            skills={skills}
+            selectedSkillIds={selectedSkillIds}
+            selectedSkillIdSet={selectedSkillIdSet}
+            skillLimitReached={skillLimitReached}
+            selectedSkillSummary={selectedSkillSummary}
+            mobileSkillPickerOpen={mobileSkillPickerOpen}
+            onMobileSkillPickerOpenChange={setMobileSkillPickerOpen}
+            skillPickerRef={skillPickerRef}
+            showSkillDesc={showSkillDesc}
+            onShowSkillDesc={setShowSkillDesc}
+            onToggleSkill={toggleSkillSelection}
+            onClearSkills={() => setSelectedSkillIds([])}
+            activeStockCode={activeStockCode}
+            stockInWatchlist={Boolean(activeStockCode && stockInWatchlist(activeStockCode))}
+            isWatchlistActioning={isWatchlistActioning}
+            watchlistMessage={watchlistMessage}
+            onToggleWatchlist={() => {
+              if (activeStockCode) void handleToggleWatchlist(activeStockCode);
+            }}
+            input={input}
+            onInputChange={setInput}
+            onKeyDown={handleKeyDown}
+            loading={loading}
+            isSkillsLoading={isSkillsLoading}
+            onStop={() => stopStream()}
+            onSend={() => handleSend()}
+          />
         </Surface>
       </div>
     </div>
