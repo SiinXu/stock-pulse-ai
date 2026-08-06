@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
+- [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.
 - [Tests] Add offline recorded-fixture contract checks for AkShare (EM/Sina), Tencent, Tushare, and YFinance parse paths, plus a network-only refresh script wired into nightly network-smoke.
 - [Tests] Stabilize Analysis Workbench e2e Analyze clicks with shared readiness waits on the controlled stock-search value / Analyze enabled state, and add an empty `@quarantine` Playwright lane (tracking-issue required) for non-blocking flake isolation.
 - [Fixed] Replaced the Backtest page's separate start and end date fields with a single date-range picker.
