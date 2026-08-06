@@ -619,6 +619,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
     title: 'Web Login Protection',
     summary: 'Enables admin password protection for WebUI.',
     usage: 'Use the WebUI auth settings entry to enable or disable this. Reset with python -m src.auth reset_password if needed.',

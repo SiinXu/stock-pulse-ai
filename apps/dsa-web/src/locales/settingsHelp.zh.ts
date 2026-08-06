@@ -662,6 +662,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
     title: 'Web 登录保护',
     summary: '启用 WebUI 管理员密码保护。',
     usage: '请通过 WebUI 的认证设置入口启用或关闭；忘记密码可运行 python -m src.auth reset_password。',
