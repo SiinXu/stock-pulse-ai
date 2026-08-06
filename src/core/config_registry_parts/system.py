@@ -77,9 +77,125 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
         ),
     },
+    "USE_PROXY": {
+        "title": "Enable Local Proxy",
+        "description": (
+            "Mainland-friendly toggle that maps PROXY_HOST and PROXY_PORT onto "
+            "process http_proxy/https_proxy at env bootstrap and config reload. "
+            "GitHub Actions always skips this regardless of the value. "
+            "A process restart is required for a full, reliable effect "
+            "(including disabling a previously applied proxy and any long-lived "
+            "HTTP clients that cached proxy settings)."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 17,
+        "help_key": "settings.system.USE_PROXY",
+        "examples": [
+            "USE_PROXY=false",
+            "USE_PROXY=true",
+            "PROXY_HOST=127.0.0.1",
+            "PROXY_PORT=10809",
+        ],
+        "docs": [
+            {
+                "label": "FAQ: configure proxy for Gemini/OpenAI",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/FAQ_EN.md#q7-how-to-configure-proxy-to-access-geminiopenai-api",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": ["restart_required", "network_scope"],
+    },
+    "PROXY_HOST": {
+        "title": "Proxy Host",
+        "description": (
+            "Host (or user:pass@host) used when USE_PROXY=true to build "
+            "http://{PROXY_HOST}:{PROXY_PORT}. May embed credentials; values are "
+            "masked in Settings and redacted in diagnostics. Prefer host-only "
+            "values when credentials are not required. Inside containers, "
+            "127.0.0.1 points at the container, not the host machine. "
+            "Requires process restart for full effect with USE_PROXY."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "127.0.0.1",
+        "options": [],
+        "validation": {},
+        "display_order": 18,
+        "help_key": "settings.system.PROXY_HOST",
+        "examples": [
+            "PROXY_HOST=127.0.0.1",
+            "PROXY_HOST=host.docker.internal",
+        ],
+        "docs": [
+            {
+                "label": "FAQ: configure proxy for Gemini/OpenAI",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/FAQ_EN.md#q7-how-to-configure-proxy-to-access-geminiopenai-api",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": ["restart_required", "secret_value", "network_scope"],
+    },
+    "PROXY_PORT": {
+        "title": "Proxy Port",
+        "description": (
+            "Port used when USE_PROXY=true to build "
+            "http://{PROXY_HOST}:{PROXY_PORT} (default 10809). "
+            "Requires process restart for full effect with USE_PROXY."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10809",
+        "options": [],
+        "validation": {"min": 1, "max": 65535},
+        "display_order": 19,
+        "help_key": "settings.system.PROXY_PORT",
+        "examples": [
+            "PROXY_PORT=10809",
+            "PROXY_PORT=7890",
+        ],
+        "docs": [
+            {
+                "label": "FAQ: configure proxy for Gemini/OpenAI",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/FAQ_EN.md#q7-how-to-configure-proxy-to-access-geminiopenai-api",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": ["restart_required", "network_scope"],
+    },
     "HTTP_PROXY": {
         "title": "HTTP Proxy",
-        "description": "Optional HTTP proxy endpoint.",
+        "description": (
+            "Optional standard HTTP proxy URL for outbound requests "
+            "(data sources, LLM, search, notifications). Prefer this over "
+            "USE_PROXY/PROXY_HOST/PROXY_PORT when libraries honor HTTP_PROXY. "
+            "URL userinfo credentials are redacted in diagnostics; do not share "
+            "export dumps that include them."
+        ),
         "category": "system",
         "data_type": "string",
         "ui_control": "text",
@@ -337,33 +453,6 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "replacement": (
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
         ),
-    },
-    "LOCAL_ONLY_MODE": {
-        "title": "Local Only Mode",
-        "description": (
-            "When enabled, the outbound HTTP policy fails closed for every non-loopback "
-            "destination (public cloud APIs, private LAN hosts, and allowlisted remote "
-            "services). Only pure loopback targets remain reachable. Blocked calls raise "
-            "coded errors that name LOCAL_ONLY_MODE; they never silently fall through."
-        ),
-        "category": "system",
-        "data_type": "boolean",
-        "ui_control": "switch",
-        "is_sensitive": False,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": "false",
-        "options": [],
-        "validation": {},
-        "display_order": 40,
-        "help_key": "settings.system.LOCAL_ONLY_MODE",
-        "examples": ["LOCAL_ONLY_MODE=false", "LOCAL_ONLY_MODE=true"],
-        "docs": [
-            {"label": "Local Only mode (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-only-mode_EN.md"},
-            {"label": "本地专用模式", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-only-mode.md"},
-            {"label": "Outbound HTTP security policy", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md"},
-        ],
-        "warning_codes": ["restart_required", "network_scope", "local_only_blocks_cloud"],
     },
     "ADMIN_AUTH_ENABLED": {
         "title": "Admin Auth Enabled",
