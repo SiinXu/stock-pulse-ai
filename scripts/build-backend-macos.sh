@@ -122,7 +122,10 @@ for module in "${hidden_imports[@]}"; do
 done
 
 pushd "${ROOT_DIR}" >/dev/null
-cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --add-data "static:static" --add-data "strategies:strategies" --add-data "src/llm/local_model_catalog.json:src/llm" --add-data "src/migrations/versions/*.py:src/migrations/versions" --add-data "constraints.txt:." --add-data "build-constraints.txt:." --collect-data litellm --collect-data tiktoken --collect-data akshare)
+# setuptools>=82 removed pkg_resources; PyInstaller's pyi_rth_pkgres still expects
+# NullProvider and crashes the frozen backend at startup. Exclude the module so the
+# obsolete runtime hook is not collected (app code uses importlib, not pkg_resources).
+cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --exclude-module pkg_resources --add-data "static:static" --add-data "strategies:strategies" --add-data "src/llm/local_model_catalog.json:src/llm" --add-data "src/migrations/versions/*.py:src/migrations/versions" --add-data "constraints.txt:." --add-data "build-constraints.txt:." --collect-data litellm --collect-data tiktoken --collect-data akshare)
 cmd+=("--collect-all" "alphasift")
 cmd+=("${hidden_import_args[@]}" "main.py")
 
