@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
 - [Docs] Fix broken relative links in bot-command docs (`config.py` → `src/config.py`).
 - [Tests] Chunk the exception-log callsite production scan into bounded file groups and stabilize multi-agent budget-skip clocks so backend-gate / python-minimum no longer flake on shared runners.
