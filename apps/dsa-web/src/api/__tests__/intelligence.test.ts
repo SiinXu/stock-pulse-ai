@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { intelligenceApi } from '../intelligence';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 
@@ -115,5 +116,43 @@ describe('intelligenceApi', () => {
       params: { source_id: undefined, scope_type: undefined, market: undefined, page: 1, page_size: 20 },
     });
     expect(result.items[0]).toMatchObject({ sourceType: 'rss', publishedAt: '2026-07-19', sourceName: 'A' });
+  });
+
+  it('preserves extra keys on valid source payloads (toCamelCase pass-through)', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        id: 7,
+        name: 'B',
+        source_type: 'rss',
+        url: 'https://b',
+        enabled: true,
+        scope_type: 'market',
+        market: 'cn',
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const created = await intelligenceApi.createSource({ name: 'B', url: 'https://b' });
+    expect(created).toEqual(expect.objectContaining({
+      id: 7,
+      sourceType: 'rss',
+      unexpectedServerField: 'keep-me',
+    }));
+  });
+
+  it('surfaces source list shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        items: [],
+        page: 1,
+        page_size: 20,
+      },
+    });
+    await expect(intelligenceApi.listSources()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('IntelligenceSourceListResponse');
+      return true;
+    });
   });
 });

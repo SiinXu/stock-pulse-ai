@@ -9,8 +9,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 
 
-def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
-    """Keep a blocking full backend gate on the declared Python floor."""
+def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
+    """PR uses 3.10 smoke; push-to-main keeps a full offline suite on the floor."""
 
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     job = workflow["jobs"]["python-minimum"]
@@ -58,13 +58,38 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
     )
     assert any("-r .github/requirements-ci.txt" in command for command in run_commands)
     assert any("python -m pip check" in command for command in run_commands)
-    gate_steps = [
+
+    smoke_steps = [
         step
         for step in job["steps"]
-        if step.get("run", "").strip() == "./scripts/ci_gate.sh"
+        if step.get("run", "").strip() == "./scripts/ci_gate.sh python-min-smoke"
     ]
-    assert len(gate_steps) == 1
-    assert "if" not in gate_steps[0]
+    assert len(smoke_steps) == 1
+    assert smoke_steps[0]["if"] == "github.event_name == 'pull_request'"
+
+    full_steps = [
+        step
+        for step in job["steps"]
+        if step.get("run", "").strip() == "./scripts/ci_gate.sh offline-tests"
+    ]
+    assert len(full_steps) == 1
+    assert full_steps[0]["if"] == "github.event_name != 'pull_request'"
+
+    selective_backend = [
+        step
+        for step in backend_job["steps"]
+        if "offline-tests-selective" in step.get("run", "")
+    ]
+    assert len(selective_backend) == 1
+    assert selective_backend[0]["if"] == "github.event_name == 'pull_request'"
+
+    full_backend = [
+        step
+        for step in backend_job["steps"]
+        if step.get("run", "").strip() == "./scripts/ci_gate.sh offline-tests"
+    ]
+    assert len(full_backend) == 1
+    assert full_backend[0]["if"] == "github.event_name != 'pull_request'"
 
 
 def test_docker_build_skips_when_docker_paths_unchanged():
