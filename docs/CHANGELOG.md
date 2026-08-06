@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
+- [Docs] Added macOS quarantine troubleshooting for the desktop app to FAQ (EN/CN) and the desktop packaging guide open step.
 - [Tests] Introduced a repo-local fake clock (`tests/time_determinism.py`) and converted the news-freshness, realtime circuit-breaker, and market-structure hotspot suites off wall-clock sleeps/date anchors.
 - [Added] Added a Research skill-outcome performance page with sufficiency-gated buckets, explicit offline evaluation, and empty-state guidance that recording is default-off.
 - [Changed] Disclose CLI backend generation-only limits in the first-run wizard and settings, and add `AGENT_FEATURES_ACKNOWLEDGED_OFF` so CLI-only users can settle the Agent readiness check without needing an API model.
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
 - [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
+- [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
 - [Changed] Unified baostock/pytdx/longbridge retry and request-timeout policy via `data_provider/retry_policy.py` (BaseFetcher-level enforcement deferred).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
