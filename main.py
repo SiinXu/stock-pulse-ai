@@ -54,8 +54,7 @@ if _packaged_import_probe:
             ]
             if not migration_ids or migration_ids[-1] != target_version:
                 raise RuntimeError("Migration registry target is inconsistent")
-    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
-        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
+    except Exception as exc:  # broad-exception: optional_metadata - package import probe stays dependency-light
         print(
             f"ERROR: packaged import failed for {_packaged_import_probe}: {exc}",
             file=sys.stderr,
