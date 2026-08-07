@@ -546,7 +546,8 @@ class GeminiAnalyzer:
                     financial_report,
                     language=prompt_lang,
                 )
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 report_date = financial_report.get("report_date", "N/A")
                 prompt += f"""
 ### 财报与分红（价值投资口径）

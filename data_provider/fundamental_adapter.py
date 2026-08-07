@@ -74,13 +74,15 @@ def _safe_datetime(value: Any) -> Optional[datetime]:
         return None
     try:
         parsed = pd.to_datetime(value)
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
         return None
     if pd.isna(parsed):
         return None
     try:
         return parsed.to_pydatetime()
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
         return None
 
 
@@ -156,7 +158,8 @@ def _filter_rows_by_code(df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
             filtered = df[series == target]
             if not filtered.empty:
                 return filtered
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             continue
     return pd.DataFrame()
 
@@ -254,7 +257,8 @@ def _extract_latest_row(df: pd.DataFrame, stock_code: str) -> Optional[pd.Series
                 matched = df[series == target]
                 if not matched.empty:
                     return matched.iloc[0]
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 continue
         return None
 
@@ -272,7 +276,8 @@ class AkshareFundamentalAdapter:
         errors: List[str] = []
         try:
             import akshare as ak
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             return None, None, [f"import_akshare:{type(exc).__name__}"]
 
         for func_name, kwargs in candidates:
@@ -285,7 +290,8 @@ class AkshareFundamentalAdapter:
                     df = df.to_frame().T
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     return df, func_name, errors
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 errors.append(f"{func_name}:{type(exc).__name__}")
                 continue
         return None, None, errors
@@ -705,7 +711,8 @@ class AkshareFundamentalAdapter:
                 if not cur.empty:
                     matched = cur
                     break
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 continue
         if matched.empty:
             result["source_chain"].append(f"dragon_tiger:{source}")
@@ -718,7 +725,8 @@ class AkshareFundamentalAdapter:
             for val in matched[date_col].astype(str).tolist():
                 try:
                     parsed_dates.append(pd.to_datetime(val).to_pydatetime())
-                except Exception:
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                    log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                     continue
         now = datetime.now()
         start = now - timedelta(days=max(1, lookback_days))

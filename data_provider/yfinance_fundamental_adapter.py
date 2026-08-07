@@ -158,7 +158,8 @@ class YfinanceFundamentalAdapter:
 
         try:
             import yfinance as yf
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"import_yfinance:{type(exc).__name__}")
             return result
 
@@ -173,7 +174,8 @@ class YfinanceFundamentalAdapter:
             info = ticker.get_info() if hasattr(ticker, "get_info") else (ticker.info or {})
             if not isinstance(info, dict):
                 info = {}
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"info:{type(exc).__name__}:{exc}")
             info = {}
 
@@ -205,7 +207,8 @@ class YfinanceFundamentalAdapter:
 
         try:
             income_df = ticker.quarterly_income_stmt
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"quarterly_income_stmt:{type(exc).__name__}")
             income_df = None
         if income_df is not None and not income_df.empty:
@@ -216,7 +219,8 @@ class YfinanceFundamentalAdapter:
                 ts = pd.to_datetime(first_col, errors="coerce")
                 if pd.notna(ts):
                     report_date = ts.date().isoformat()
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 pass
             revenue_row = _pick_row(income_df, _INCOME_REVENUE_KEYS)
             net_profit_row = _pick_row(income_df, _INCOME_NET_PROFIT_KEYS)
@@ -225,7 +229,8 @@ class YfinanceFundamentalAdapter:
 
         try:
             cashflow_df = ticker.quarterly_cashflow
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"quarterly_cashflow:{type(exc).__name__}")
             cashflow_df = None
         if cashflow_df is not None and not cashflow_df.empty:
@@ -312,7 +317,8 @@ class YfinanceFundamentalAdapter:
         events: List[Dict[str, Any]] = []
         try:
             div_series = ticker.dividends
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"dividends:{type(exc).__name__}")
             div_series = None
         if div_series is not None and not div_series.empty:
@@ -331,7 +337,8 @@ class YfinanceFundamentalAdapter:
                         continue
                     try:
                         event_date = pd.Timestamp(ts).date().isoformat()
-                    except Exception:
+                    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                         continue
                     events.append({
                         "event_date": event_date,
@@ -345,11 +352,13 @@ class YfinanceFundamentalAdapter:
                 for item in events:
                     try:
                         event_ts = pd.Timestamp(item["event_date"]).tz_localize(div_series.index.tz)
-                    except Exception:
+                    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                         continue
                     if event_ts >= cutoff:
                         ttm_events.append(item)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 result["errors"].append(f"dividend_window:{type(exc).__name__}")
                 ttm_events = []
         else:

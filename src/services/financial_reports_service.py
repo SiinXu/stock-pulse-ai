@@ -1,3 +1,7 @@
+import logging
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """Financial report normalization and derived-metric helpers (issue #235).
 
@@ -147,13 +151,15 @@ def normalize_report_date(value: Any) -> Optional[str]:
         return None
     try:
         parsed = pd.to_datetime(value, errors="coerce")
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
         return None
     if pd.isna(parsed):
         return None
     try:
         return parsed.date().isoformat()
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
         text = safe_str(value)
         match = re.match(r"(\d{4})[-/]?(\d{2})[-/]?(\d{2})", text)
         if match:
@@ -232,7 +238,8 @@ def _period_type_from_date(report_date: Optional[str]) -> str:
         return "unknown"
     try:
         month_day = report_date[5:]
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
         return "unknown"
     if month_day == "12-31":
         return "annual"
