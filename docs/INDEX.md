@@ -62,7 +62,8 @@
 | [估值模型与 DCF/相对估值 Agent Tool](valuation-models.md) | Phase 1 DCF/相对估值、假设透明、敏感性区间、默认关闭工具与不足 fundamentals 语义（[英文](valuation-models_EN.md)） |
 | [Agent Soul 行为宪章（英文）](agent-soul.md) | 版本/hash 规则、Single/Multi/Chat 装配、Soul/Persona/Skill 优先级、运行元数据与回滚 |
 | [Bot 平台配置](bot/) | 飞书、钉钉、Discord 等 Bot 配置截图和补充说明 |
-| [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界 |
+| [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界（含 #241 企业事件/影响上下文） |
+| [Alert Center English companion](alerts_EN.md) | Issue #241 后端 V0 英文摘要（企业事件告警与 impact context） |
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |

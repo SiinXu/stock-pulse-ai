@@ -231,6 +231,10 @@ Defaults and framing:
 - Latest status is loaded via `GET /scheduled-tasks/{id}/status` after list refresh (fail-soft per item). Expanding **Run history** lazily calls `GET /scheduled-tasks/{id}/runs?limit=10`; refresh repeats the current limit, while **Load more** increases the real API limit by 10 (up to the server maximum) rather than presenting a fake cursor.
 - Each history row shows explicit text status, scheduled/start/end/next-attempt times, attempt and dispatch-failure counts, run/execution IDs, result references, error code, notification status/channels, and failed notification channels. Optional fields omitted by older records render as `—`. Result references are shown as opaque IDs because this endpoint does not guarantee a resolvable Web route.
 - Execution remains process-local through `AnalysisTaskQueue` / ADR-008.
+- On process start, task-queue restart recovery runs before scheduled-task
+  reconciliation so restored in-flight analysis task ids remain visible to
+  occurrence fences (no false `scheduled_task_execution_state_lost` and no
+  double claim of the same due slot).
 - Research brief and risk-check schedules are research-only aids, not investment advice.
 - Daily stock-list scheduler env (`SCHEDULE_*`) remains the separate **legacy** system-config card on the same Settings view; it is not the versioned definitions list.
 

@@ -801,6 +801,10 @@ class _ConfigLoadingMethods:
                 minimum=1,
             ),
             agent_event_alert_rules_json=os.getenv('AGENT_EVENT_ALERT_RULES_JSON', ''),
+            agent_event_impact_context_enabled=os.getenv(
+                'AGENT_EVENT_IMPACT_CONTEXT_ENABLED',
+                'true',
+            ).lower() == 'true',
             wechat_webhook_url=os.getenv('WECHAT_WEBHOOK_URL'),
             feishu_webhook_url=os.getenv('FEISHU_WEBHOOK_URL'),
             feishu_webhook_secret=os.getenv('FEISHU_WEBHOOK_SECRET'),

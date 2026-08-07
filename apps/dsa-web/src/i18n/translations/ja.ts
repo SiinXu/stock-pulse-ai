@@ -3962,6 +3962,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.completed": "任務完了",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.failed": "任務は失敗した",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted": "タスクが中断されました",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.recovered.requeued": "Task recovered after restart and re-queued",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted.process_restart": "Task interrupted by process restart and cannot be safely resumed",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.market_review.queued": "市場レビュー待ち",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.processing": "進行中の課題",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.queued": "タスクはキューで待機中",

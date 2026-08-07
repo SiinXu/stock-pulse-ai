@@ -34,6 +34,7 @@ from src.migrations.registry import (
     SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
     SCHEDULED_TASK_SCHEMA_MIGRATION,
     BACKTEST_RESOLUTION_NOTES_MIGRATION,
+    TASK_QUEUE_INFLIGHT_MIGRATION,
     TARGET_VERSION,
     get_migrations,
 )
@@ -203,6 +204,7 @@ def test_pending_cli_subprocess_is_read_only(
         APPROVAL_GATE_SCHEMA_MIGRATION.id,
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
+        TASK_QUEUE_INFLIGHT_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -271,6 +273,7 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         APPROVAL_GATE_SCHEMA_MIGRATION.id,
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
+        TASK_QUEUE_INFLIGHT_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}
