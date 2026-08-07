@@ -728,7 +728,9 @@ python main.py --workers 5            # Specify concurrency
 
 When selected, the live scope overrides both `--stocks` and `STOCK_LIST`. A successfully read empty portfolio remains an empty list and never falls back to the static watchlist. Account discovery, position queries, security classification, and code-conversion failures fail the run explicitly instead of analyzing a partial untrusted scope. Scheduled mode queries OpenD on every actual execution rather than caching startup holdings. Existing behavior is unchanged when `--portfolio` is omitted.
 
-The endpoint defaults to `127.0.0.1:11111` and can be changed with `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT`. `FUTU_ACC_ID` selects one eligible live account; when empty, all eligible accounts are merged. `FUTU_SECURITY_FIRM=NONE` uses SDK auto-detection. Inside Docker, `127.0.0.1` refers to the container itself, so configure a trusted OpenD host reachable from the container network. The integration only calls account-list, position-list, and security-basic-information queries; it never unlocks trading or places, modifies, or cancels orders. This first phase does not write live positions into portfolio management.
+The endpoint defaults to `127.0.0.1:11111` and can be changed with `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT`. `FUTU_ACC_ID` selects one eligible live account; when empty, all eligible accounts are merged. `FUTU_SECURITY_FIRM=NONE` uses SDK auto-detection. Inside Docker, `127.0.0.1` refers to the container itself, so configure a trusted OpenD host reachable from the container network. The integration only calls account-list, position-list, and security-basic-information queries; it never unlocks trading or places, modifies, or cancels orders.
+
+Live positions can also be imported into portfolio management through `POST /api/v1/portfolio/imports/futu` (preview: `/imports/futu/preview`), which maps eligible long stocks to synthetic buys on the shared trade-import path. See [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md).
 
 ---
 
