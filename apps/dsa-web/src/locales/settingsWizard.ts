@@ -73,6 +73,7 @@ const zh = {
   none: '未设置',
   viewRouting: '查看任务路由',
   done: '完成',
+  continueAgentOnboarding: '继续助手引导配置',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -145,6 +146,7 @@ const en: Record<keyof typeof zh, string> = {
   none: 'Not set',
   viewRouting: 'View Task Routing',
   done: 'Done',
+  continueAgentOnboarding: 'Continue agent-guided setup',
 };
 
 export const SETTINGS_WIZARD_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsWizard.SETTINGS_WIZARD_TEXT", { zh, en });
