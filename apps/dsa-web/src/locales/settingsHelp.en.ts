@@ -743,11 +743,59 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.USE_PROXY': {
+    title: 'Enable Local Proxy',
+    summary:
+      'Mainland-friendly switch that maps PROXY_HOST and PROXY_PORT onto process http_proxy/https_proxy.',
+    usage:
+      'Turn on when local outbound traffic must go through a local proxy (for example Gemini/OpenAI from mainland China). Set PROXY_HOST and PROXY_PORT together. GitHub Actions always ignores this switch.',
+    valueNotes: [
+      'Previously hidden as a low-frequency ops key because proxy env is applied at process bootstrap; Settings now exposes it with an honest restart requirement.',
+      'Saving reloads setup_env and re-applies USE_PROXY for libraries that re-read process env; a full process restart is still required to drop a previously applied proxy or refresh long-lived HTTP clients.',
+    ],
+    impact: ['Affects outbound data-source, LLM, search, and notification HTTP calls that honor process proxy env.'],
+    notes: [
+      'Prefer HTTP_PROXY when you need a full proxy URL with credentials or when libraries only honor standard HTTP_PROXY/HTTPS_PROXY.',
+      'Inside containers, 127.0.0.1 points to the container, not the host machine (use host.docker.internal or the host LAN IP).',
+    ],
+    examples: ['USE_PROXY=true', 'PROXY_HOST=127.0.0.1', 'PROXY_PORT=10809'],
+  },
+  'settings.system.PROXY_HOST': {
+    title: 'Proxy Host',
+    summary: 'Host used with USE_PROXY to build http://{PROXY_HOST}:{PROXY_PORT}.',
+    usage:
+      'Enter a hostname or IP. Values may embed credentials as user:pass@host; Settings masks this field because of that risk.',
+    valueNotes: [
+      'Default is 127.0.0.1. Only used when USE_PROXY is enabled.',
+      'Requires process restart for full, reliable effect together with USE_PROXY.',
+    ],
+    impact: ['Changes the proxy endpoint applied to process http_proxy/https_proxy when USE_PROXY is on.'],
+    notes: [
+      'Do not paste proxy credentials into screenshots, logs, issues, or shared profile exports.',
+      'Inside containers, 127.0.0.1 is the container itself.',
+    ],
+    examples: ['PROXY_HOST=127.0.0.1', 'PROXY_HOST=host.docker.internal'],
+  },
+  'settings.system.PROXY_PORT': {
+    title: 'Proxy Port',
+    summary: 'Port used with USE_PROXY to build http://{PROXY_HOST}:{PROXY_PORT}.',
+    usage: 'Enter a port from 1 to 65535. Default is 10809. Only used when USE_PROXY is enabled.',
+    valueNotes: [
+      'Requires process restart for full, reliable effect together with USE_PROXY.',
+    ],
+    impact: ['Changes the proxy endpoint applied to process http_proxy/https_proxy when USE_PROXY is on.'],
+    notes: ['Common local proxy ports include 10809, 7890, and 1080.'],
+    examples: ['PROXY_PORT=10809', 'PROXY_PORT=7890'],
+  },
   'settings.system.HTTP_PROXY': {
     title: 'Network Proxy',
-    summary: 'Sets a proxy for external API, model, or search requests.',
-    usage: 'Use http://host:port format. HTTPS_PROXY can be used for HTTPS proxying.',
-    valueNotes: ['Whether it applies depends on the underlying library and environment handling.'],
+    summary: 'Sets a standard HTTP proxy URL for external API, model, or search requests.',
+    usage:
+      'Use http://host:port format. HTTPS_PROXY can be used for HTTPS proxying. Prefer this over USE_PROXY when you need a full URL (including credentials) or library-standard env vars.',
+    valueNotes: [
+      'Whether it applies depends on the underlying library and environment handling.',
+      'URL userinfo credentials are redacted in diagnostics; do not share unredacted export dumps.',
+    ],
     impact: ['Affects data sources, LLM, search, and notification network calls.'],
     notes: ['Inside containers, 127.0.0.1 points to the container, not the host machine.'],
   },
