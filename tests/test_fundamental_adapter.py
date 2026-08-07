@@ -106,6 +106,10 @@ class TestFundamentalAdapter(unittest.TestCase):
             "_call_df_candidates",
             side_effect=[
                 (fin_df, "stock_financial_abstract", []),
+                # Optional multi-period statement enrichment (income / balance / cashflow)
+                (None, None, []),
+                (None, None, []),
+                (None, None, []),
                 (forecast_df, "stock_yjyg_em", []),
                 (quick_df, "stock_yjkb_em", []),
                 (dividend_df, "stock_fhps_detail_em", []),
@@ -121,6 +125,10 @@ class TestFundamentalAdapter(unittest.TestCase):
         self.assertEqual(financial_report.get("net_profit_parent"), 300.0)
         self.assertEqual(financial_report.get("operating_cash_flow"), 500.0)
         self.assertEqual(financial_report.get("roe"), 18.2)
+        # Issue #235: additive sufficiency / never silent zeros
+        sufficiency = financial_report.get("sufficiency") or {}
+        self.assertIn(sufficiency.get("level"), ("rich", "partial", "insufficient"))
+        self.assertIsInstance(financial_report.get("metrics"), dict)
 
         dividend_payload = result["earnings"].get("dividend", {})
         events = dividend_payload.get("events", [])
