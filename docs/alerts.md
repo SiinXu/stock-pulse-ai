@@ -440,6 +440,69 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 - P6：持仓与自选股联动。
 - P7：大盘红绿灯与市场联动。
 - P8：文档、迁移与收口。
+- P9 / #241 V0：上下文感知的事件驱动告警（后端）。
+
+## P9 智能事件告警与影响上下文（Issue #241 Backend V0）
+
+P9 在现有 Alert API、worker 与通知链路上扩展**企业事件规则**和**影响上下文**，不替换既有 price/volume/技术指标/持仓/大盘规则模型。
+
+### 目标与边界
+
+- 目标：对托管情报中的重要企业事件（财报、股东变动、并购、监管、分析师评级）触发告警，并在通知中说明发生了什么、为何重要、是否落在自选/持仓。
+- 数据源：只读已沉淀的 `intelligence_items`、持仓快照（`include_realtime=False`）、近期 `analysis_history`；**告警热路径不新增阻塞性行情/新闻 provider 调用**。
+- 配置：`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`（默认 `true`）控制是否把影响上下文写入触发 diagnostics 与通知正文；关闭后仍可评估 `corporate_event` 规则，只是不组装 impact block。
+- 不扩展 legacy `AGENT_EVENT_ALERT_RULES_JSON`；企业事件规则仅通过 Alert API 创建。
+- 本波次为后端 V0：不改 Web 告警表单 / `apps/dsa-web/src/api/alerts.ts`（该文件属 integrations OpenAPI 切片，另起 follow-up）。
+
+### `corporate_event` 规则
+
+| 字段 | 说明 |
+| --- | --- |
+| `alert_type` | `corporate_event` |
+| `target_scope` | `single_symbol` / `watchlist` / `portfolio_holdings`（与其他 symbol 规则相同展开语义） |
+| `parameters.event_categories` | `earnings` / `shareholder` / `mna` / `regulatory` / `analyst` 子集；默认全部 |
+| `parameters.lookback_hours` | 回看窗口小时数，默认 `24`，范围 `[1,168]` |
+| `parameters.min_items` | 最少匹配条数，默认 `1`，范围 `[1,50]` |
+
+评估语义：
+
+1. 按 `scope_type=symbol` 读取托管 `intelligence_items`，再按 `lookback_hours` 过滤。
+2. 对 title/summary 做双语关键词分类；命中所选 `event_categories` 的条目计入匹配。
+3. 匹配数 ≥ `min_items` 时 `triggered`；无托管情报记 `skipped`；查询异常记 `failed` / `evaluation_error`。
+4. `data_source=intelligence_items`；`data_timestamp` 取主匹配条目的 `published_at`/`fetched_at`；`observed_value` 为匹配条数，`threshold` 为 `min_items`。
+5. 触发时 diagnostics 写入 `event_context`（what_happened / why_it_matters / category / matched items 摘要）。
+
+### 影响上下文（impact_context）
+
+当 `AGENT_EVENT_IMPACT_CONTEXT_ENABLED=true` 且规则真实 `triggered` 时，worker 在发送通知前 best-effort 组装 `diagnostics.impact_context`：
+
+| 字段 | 来源 |
+| --- | --- |
+| `what_happened` | 企业事件 title，或通用规则 reason |
+| `why_it_matters` | 事件类别解释，或最近分析摘要降级 |
+| `affected.in_watchlist` | 当前 `STOCK_LIST`（托管配置） |
+| `affected.in_portfolio` / `weight_pct` | `PortfolioService.get_portfolio_snapshot(include_realtime=False)` |
+| `related_analysis` | 近 30 天 analysis history 的短摘要 |
+| `degraded` | 任一托管数据读取失败时为 true，通知仍发送 |
+
+通知正文在现有 phase / decision-signal 摘要之后追加 impact excerpt。单渠道失败仍只记 attempt，**不中断**同轮其他规则或主分析流程。缺失上下文时通知降级为原 reason，不伪造事件。
+
+### 实现落点
+
+- `src/services/event_alerts.py`：分类、评估、impact 组装与通知 excerpt。
+- `src/services/alert_service.py`：`corporate_event` 纳入 `SUPPORTED_ALERT_TYPES` 与 runtime payload。
+- `src/services/alert_worker.py`：触发后挂载 impact_context，并 enrich 通知。
+- 配置：`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`（registry + `.env.example`）。
+
+### P9 不做
+
+- 不做 Web 创建表单/筛选扩展（#241 follow-up）。
+- 不做 live 新闻抓取或在告警热路径调用新的 blocking provider。
+- 不做 push/digest 双模式（digest 另期）。
+- 不做 LLM 即时影响分析。
+- 不新增表或 migration。
+
+English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 
 ## P0 不做
 
