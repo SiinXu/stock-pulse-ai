@@ -776,11 +776,58 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.USE_PROXY': {
+    title: '启用本地代理',
+    summary: '大陆用户友好开关：将 PROXY_HOST 与 PROXY_PORT 映射为进程级 http_proxy/https_proxy。',
+    usage:
+      '本地出站需要走代理（例如在大陆访问 Gemini/OpenAI）时开启，并同时设置 PROXY_HOST 与 PROXY_PORT。GitHub Actions 会忽略该开关。',
+    valueNotes: [
+      '此前作为低频运维项隐藏，因代理环境变量在进程启动时应用；现已在设置页展示，并如实标注需要重启。',
+      '保存后会重载 setup_env 并对会重新读取进程环境的库重新应用 USE_PROXY；彻底关闭此前已应用的代理，或刷新已缓存代理的长连接客户端，仍需重启进程。',
+    ],
+    impact: ['影响遵循进程代理环境变量的数据源、LLM、搜索和通知等出站 HTTP 请求。'],
+    notes: [
+      '需要完整代理 URL（含凭据）或仅识别标准 HTTP_PROXY/HTTPS_PROXY 时，优先使用 HTTP_PROXY。',
+      '容器内 127.0.0.1 指向容器自身，应使用 host.docker.internal 或宿主机局域网 IP。',
+    ],
+    examples: ['USE_PROXY=true', 'PROXY_HOST=127.0.0.1', 'PROXY_PORT=10809'],
+  },
+  'settings.system.PROXY_HOST': {
+    title: '代理主机',
+    summary: '与 USE_PROXY 一起用于构建 http://{PROXY_HOST}:{PROXY_PORT} 的主机名。',
+    usage:
+      '填写主机名或 IP。可写成 user:pass@host 嵌入凭据；因存在凭据风险，设置页对该字段脱敏显示。',
+    valueNotes: [
+      '默认 127.0.0.1。仅在 USE_PROXY 开启时生效。',
+      '与 USE_PROXY 一起使用时，完整可靠生效通常需要重启进程。',
+    ],
+    impact: ['在 USE_PROXY 开启时，改变写入进程 http_proxy/https_proxy 的代理端点。'],
+    notes: [
+      '不要把代理凭据贴进截图、日志、Issue 或共享配置导出。',
+      '容器内 127.0.0.1 指向容器自身。',
+    ],
+    examples: ['PROXY_HOST=127.0.0.1', 'PROXY_HOST=host.docker.internal'],
+  },
+  'settings.system.PROXY_PORT': {
+    title: '代理端口',
+    summary: '与 USE_PROXY 一起用于构建 http://{PROXY_HOST}:{PROXY_PORT} 的端口。',
+    usage: '填写 1–65535 之间的端口，默认 10809。仅在 USE_PROXY 开启时生效。',
+    valueNotes: [
+      '与 USE_PROXY 一起使用时，完整可靠生效通常需要重启进程。',
+    ],
+    impact: ['在 USE_PROXY 开启时，改变写入进程 http_proxy/https_proxy 的代理端点。'],
+    notes: ['常见本地代理端口包括 10809、7890、1080。'],
+    examples: ['PROXY_PORT=10809', 'PROXY_PORT=7890'],
+  },
   'settings.system.HTTP_PROXY': {
     title: '网络代理',
-    summary: '为外部 API、模型服务或搜索请求配置代理地址。',
-    usage: '填写 http://host:port 形式；HTTPS_PROXY 可用于 HTTPS 请求代理。',
-    valueNotes: ['代理是否生效取决于底层库和运行环境变量读取方式。'],
+    summary: '为外部 API、模型服务或搜索请求配置标准 HTTP 代理 URL。',
+    usage:
+      '填写 http://host:port 形式；HTTPS_PROXY 可用于 HTTPS 请求代理。需要完整 URL（含凭据）或库仅识别标准环境变量时，优先于 USE_PROXY。',
+    valueNotes: [
+      '代理是否生效取决于底层库和运行环境变量读取方式。',
+      'URL 中的用户名密码会在诊断信息中脱敏；不要分享未脱敏的导出内容。',
+    ],
     impact: ['影响数据源、LLM、搜索和通知等外部网络请求。'],
     notes: ['不要把代理地址写成只在本机可见但容器不可达的 127.0.0.1。'],
   },
