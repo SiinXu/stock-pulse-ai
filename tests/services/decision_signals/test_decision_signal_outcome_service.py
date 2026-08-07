@@ -132,6 +132,30 @@ def test_run_outcomes_evaluates_supported_horizons_and_stats(isolated_db) -> Non
     assert stats["hit"] == 4
     assert stats["breakdowns"]["action"][0]["value"] == "buy"
     assert stats["breakdowns"]["holding_state"][0]["value"] == "holding"
+    assert "profile_calibration" not in stats
+
+
+def test_profile_calibration_gate_parity(isolated_db, monkeypatch) -> None:
+    signal_id = _add_signal(isolated_db, action="buy", horizon="3d")
+    _seed_bars(isolated_db, closes=[103, 104, 105])
+    service = DecisionSignalOutcomeService(db_manager=isolated_db)
+    service.run_outcomes(signal_id=signal_id, horizons=["3d"])
+
+    off_stats = service.get_stats(horizons=["3d"])
+    assert "profile_calibration" not in off_stats
+    off_keys = set(off_stats.keys())
+
+    monkeypatch.setenv("DECISION_PROFILE_CALIBRATION_ENABLED", "true")
+    Config.reset_instance()
+    on_stats = service.get_stats(horizons=["3d"])
+    assert set(on_stats.keys()) - off_keys == {"profile_calibration"}
+    calibration = on_stats["profile_calibration"]
+    assert calibration["minimum_completed_sample_size"] == 30
+    assert calibration["breakdowns"]["decision_profile"]
+    assert calibration["breakdowns"]["decision_profile"][0]["sample_sufficient"] is False
+
+    monkeypatch.delenv("DECISION_PROFILE_CALIBRATION_ENABLED", raising=False)
+    Config.reset_instance()
 
 
 def test_stats_default_statuses_exclude_archived(isolated_db) -> None:
