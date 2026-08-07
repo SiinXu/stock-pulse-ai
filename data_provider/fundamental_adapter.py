@@ -9,6 +9,7 @@ endpoint candidates. It should never raise to caller; partial data is allowed.
 from __future__ import annotations
 
 import logging
+from src.utils.sanitize import log_safe_exception
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -378,7 +379,8 @@ class AkshareFundamentalAdapter:
                     sources=[f"growth:{fin_source}"] if fin_source else [],
                     currency="CNY",
                 )
-        except Exception as exc:  # fail-open: never break the fundamental bundle
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure path for continuous merge
+            log_safe_exception(logger, "handler failed", exc, error_code="internal_error")
             result["errors"].append(f"financial_statements:{type(exc).__name__}")
             if any(v is not None for v in seed_summary.values()):
                 result["earnings"]["financial_report"] = {
