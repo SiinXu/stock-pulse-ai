@@ -3961,6 +3961,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.completed": "임무 완수",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.failed": "임무 실패",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted": "작업이 중단되었습니다",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.recovered.requeued": "Task recovered after restart and re-queued",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted.process_restart": "Task interrupted by process restart and cannot be safely resumed",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.market_review.queued": "시장 검토 대기 중입니다",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.processing": "진행 중인 과제",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.queued": "작업이 대기열에 있음",

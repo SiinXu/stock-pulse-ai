@@ -324,6 +324,12 @@ async def app_lifespan(app: FastAPI):
     os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
     os.environ.pop(RUNTIME_SCHEDULER_ARGS_ENV, None)
     os.environ.pop(SCHEDULED_TASK_OWNER_ENV, None)
+    # Restart recovery must run before scheduled-task reconciliation so restored
+    # execution ids are visible (ADR-008 occurrence fence; no false state-lost).
+    from src.services.task_queue import get_task_queue
+
+    get_task_queue().recover_persisted_inflight()
+
     scheduled_task_service = ScheduledTaskService()
     app.state.scheduled_task_service = scheduled_task_service
     runtime_scheduler_service = RuntimeSchedulerService(
