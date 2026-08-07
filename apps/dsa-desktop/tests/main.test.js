@@ -1,3 +1,4 @@
+/* ci-retrigger: ensure Actions pull_request event for #816 */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
