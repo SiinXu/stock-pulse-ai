@@ -1420,4 +1420,4 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
 };
 
-export default settingsHelpZhCN;,
+export default settingsHelpZhCN;

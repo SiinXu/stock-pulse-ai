@@ -1378,4 +1378,4 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
 };
 
-export default settingsHelpEnUS;,
+export default settingsHelpEnUS;
