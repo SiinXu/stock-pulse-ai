@@ -417,6 +417,48 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响使用 Pytdx 数据源时的行情连接目标和可用性。'],
     notes: ['服务器不可达时应依赖数据源 fallback，不建议只配置单个不稳定地址。'],
   },
+
+  'settings.data_source.FUTU_OPEND_HOST': {
+    title: 'Futu OpenD 主机',
+    summary: '本地 Futu OpenD 网关 IPv4 地址，用于分析范围与组合持仓导入。',
+    usage: '本机 OpenD 保持 127.0.0.1；OpenD 在其他机器时填写受信局域网 IP。',
+    valueNotes: [
+      'OpenD 使用本地 TCP 协议而非 HTTP，因此不受 OUTBOUND_HTTP_ALLOWLIST 约束。',
+      '当前内置 Futu SDK 需要 IPv4 或可解析到 IPv4 的主机名。',
+    ],
+    impact: ['影响 --portfolio futu 分析范围与 POST /api/v1/portfolio/imports/futu。'],
+    notes: [
+      'Docker 中 127.0.0.1 指向容器自身，需配置容器网络可达的 OpenD 主机。',
+      '详见 docs/futu-opend-portfolio-import.md。',
+    ],
+    examples: ['127.0.0.1', '192.168.1.20'],
+  },
+  'settings.data_source.FUTU_OPEND_PORT': {
+    title: 'Futu OpenD 端口',
+    summary: 'Futu OpenD 网关 TCP 端口。',
+    usage: '与 OpenD 监听端口保持一致，默认 11111。',
+    valueNotes: ['有效范围为 1–65535。'],
+    impact: ['影响分析范围与组合导入对 OpenD 的连接。'],
+    notes: ['修改端口后需同步调整 OpenD 配置。'],
+    examples: ['11111'],
+  },
+  'settings.data_source.FUTU_ACC_ID': {
+    title: 'Futu 账户 ID',
+    summary: '可选的真实证券账户过滤条件。',
+    usage: '留空则合并符合条件的 ACTIVE REAL NORMAL/MASTER 账户；也可填写单一账户 ID。',
+    valueNotes: ['填写时必须为正整数。'],
+    impact: ['控制哪些 Futu 真实账户参与分析范围与持仓导入。'],
+    notes: ['模拟/纸交易账户不会被导入。'],
+  },
+  'settings.data_source.FUTU_SECURITY_FIRM': {
+    title: 'Futu 券商主体',
+    summary: '打开 OpenD 交易上下文时使用的 SecurityFirm 枚举名。',
+    usage: '一般使用 NONE 让 SDK 自动识别；仅在需要时填写明确主体。',
+    valueNotes: ['常见取值包括 NONE、FUTUSECURITIES、FUTUSG。'],
+    impact: ['在存在多个 Futu 主体时影响账户发现结果。'],
+    notes: ['不支持的枚举名会在写入任何持仓前给出明确配置错误。'],
+    examples: ['NONE', 'FUTUSECURITIES'],
+  },
   'settings.data_source.news_window': {
     title: '新闻时间窗口',
     summary: '控制纳入分析上下文的新闻时效范围。',
