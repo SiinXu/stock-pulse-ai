@@ -87,7 +87,11 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     Config.reset_instance()
     db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'trace.db'}")
     session_id = "api-trace-hidden"
-    user_id = db.save_conversation_message(session_id, "user", "visible question")
+    user_id = db.save_conversation_user_turn(
+        session_id,
+        "visible question",
+        ["technical"],
+    )
     assistant_id = db.save_conversation_message(session_id, "assistant", "visible answer")
     db.save_conversation_message(
         session_id,
@@ -141,6 +145,9 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
     ]
+    assert payload["session_state"] == {
+        "selected_skill_ids": ["technical"],
+    }
     assert "error" not in payload["messages"][0]
     assert "params" not in payload["messages"][0]
     assert "error" not in payload["messages"][1]
@@ -764,3 +771,116 @@ def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: P
     assert "super-secret" not in caplog.text
     assert "private.example" not in caplog.text
     assert SENSITIVE_STREAM_SESSION_ID not in caplog.text
+
+
+
+def test_chat_session_messages_returns_null_when_state_is_missing(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'default-state.db'}")
+    db.save_conversation_message("legacy-session", "user", "legacy question")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).get(
+            "/api/v1/agent/chat/sessions/legacy-session"
+        )
+
+    assert response.status_code == 200
+    assert response.json()["session_state"] == {
+        "selected_skill_ids": None,
+    }
+
+
+def test_agent_chat_inherits_saved_skills_without_rewriting_session_state(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'inherit.db'}")
+    db.save_conversation_user_turn("saved-session", "first", ["technical"])
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=None,
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat",
+            json={
+                "message": "follow up",
+                "session_id": "saved-session",
+                "context": {
+                    "stock_code": "600519",
+                    "skills": ["old_skill"],
+                    "strategies": ["older_strategy"],
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    build_executor.assert_called_once_with(config, ["technical"])
+    context = executor.chat.call_args.kwargs["context"]
+    assert context["stock_code"] == "600519"
+    assert context["skills"] == ["technical"]
+    assert "strategies" not in context
+    assert executor.chat.call_args.kwargs["selected_skill_ids"] is None
+
+
+def test_agent_chat_all_invalid_skills_inherit_without_clearing_state(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'all-invalid.db'}")
+    db.save_conversation_user_turn("saved-session", "first", ["technical"])
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=None,
+    )
+    skill_manager = MagicMock()
+    skill_manager.list_skills.return_value = [SimpleNamespace(name="technical")]
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("src.agent.factory.get_skill_manager", return_value=skill_manager), \
+         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat",
+            json={
+                "message": "follow up",
+                "session_id": "saved-session",
+                "skills": ["old_technical"],
+            },
+        )
+
+    assert response.status_code == 200
+    build_executor.assert_called_once_with(config, ["technical"])
+    assert executor.chat.call_args.kwargs["context"]["skills"] == ["technical"]
+    assert executor.chat.call_args.kwargs["selected_skill_ids"] is None
+    assert db.get_conversation_session_selected_skill_ids("saved-session") == [
+        "technical"
+    ]
+
+
+def test_requested_skill_normalization_reuses_agent_factory_catalog_rules() -> None:
+    from src.agent.factory import normalize_requested_skill_ids
+
+    skill_manager = MagicMock()
+    skill_manager.list_skills.return_value = [
+        SimpleNamespace(name="technical"),
+        SimpleNamespace(name="risk"),
+    ]
+
+    with patch("src.agent.factory.get_skill_manager", return_value=skill_manager):
+        normalized = normalize_requested_skill_ids(
+            SimpleNamespace(),
+            [" technical ", "technical", "unknown", "risk"],
+        )
+
+    assert normalized == ["technical", "risk"]

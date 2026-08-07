@@ -85,6 +85,7 @@ class _ChatMethods:
         progress_callback: Optional[Callable] = None,
         context: Optional[Dict[str, Any]] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
+        selected_skill_ids: Optional[List[str]] = None,
     ) -> "AgentResult":
         """Run the pipeline in chat mode (free-form answer, no dashboard parse)."""
         from src.agent.executor import AgentResult
@@ -112,10 +113,10 @@ class _ChatMethods:
             ),
         )
 
-        user_message_id = conversation_manager.add_message(
+        user_message_id = conversation_manager.add_user_message(
             session_id,
-            "user",
             message,
+            selected_skill_ids,
         )
         session.update_market_context(
             scope_resolution.effective_context,
