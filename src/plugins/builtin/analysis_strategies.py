@@ -186,7 +186,7 @@ def list_builtin_analysis_strategy_names(
     )
     try:
         skills = load_skills_from_directory(directory)
-    except Exception:
+    except Exception:  # broad-exception: fallback_recorded - missing/invalid strategy YAML should not break plugin discovery.
         return ()
     return tuple(sorted({skill.name for skill in skills if skill.name}))
 
