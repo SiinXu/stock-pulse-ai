@@ -33,7 +33,8 @@ class TestMarketAnalyzerStrategyPrompt(unittest.TestCase):
     """Validate strategy section is injected into prompt/report."""
 
     def test_cn_prompt_contains_strategy_plan_section(self):
-        analyzer = MarketAnalyzer(region="cn")
+        with patch("src.market_analyzer.get_config", return_value=SimpleNamespace(report_language="zh")):
+            analyzer = MarketAnalyzer(region="cn")
         prompt = analyzer._build_review_prompt(MarketOverview(date="2026-02-24"), [])
 
         self.assertIn("明日交易计划", prompt)

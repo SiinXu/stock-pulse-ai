@@ -10137,6 +10137,12 @@ export interface components {
             messages: components["schemas"]["SessionMessage"][];
             /** Session Id */
             session_id: string;
+            session_state: components["schemas"]["SessionStateResponse"];
+        };
+        /** SessionStateResponse */
+        SessionStateResponse: {
+            /** Selected Skill Ids */
+            selected_skill_ids: string[] | null;
         };
         /** SessionsResponse */
         SessionsResponse: {
