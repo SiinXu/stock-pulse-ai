@@ -1379,4 +1379,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
 };
 
+  daily_brief: {
+    title: "Daily Brief",
+    summary: "Historical accuracy review brief.",
+    usage: "Enable under system settings.",
+    impact: [],
+    notes: [],
+    valueNotes: [],
+  },
 export default settingsHelpEnUS;

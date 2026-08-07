@@ -253,6 +253,7 @@ const fieldTitleMapZh = {
   FEISHU_CHAT_ID: '飞书会话 ID',
   FEISHU_RECEIVE_ID_TYPE: '飞书接收 ID 类型',
   FEISHU_DOMAIN: '飞书 API 域名',
+  DAILY_BRIEF_LOOKBACK_DAYS: '每日简报回看天数',
 } as const;
 
 type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
@@ -465,6 +466,7 @@ const fieldTitleMapEn = {
   FEISHU_CHAT_ID: 'Feishu Chat ID',
   FEISHU_RECEIVE_ID_TYPE: 'Feishu Receive ID Type',
   FEISHU_DOMAIN: 'Feishu Domain',
+  DAILY_BRIEF_LOOKBACK_DAYS: 'Daily Brief Lookback Days',
 } satisfies Record<SystemConfigFieldTitleKey, string>;
 
 const fieldTitleMaps: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord(
