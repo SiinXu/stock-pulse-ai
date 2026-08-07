@@ -179,7 +179,7 @@ export const AgentOnboardingWizard: React.FC<AgentOnboardingWizardProps> = ({
         <p className="text-sm text-secondary-text">{t('onboarding.subtitle')}</p>
 
         {errorMessage ? (
-          <InlineAlert variant="error" title={t('onboarding.errorTitle')} message={errorMessage} />
+          <InlineAlert variant="danger" title={t('onboarding.errorTitle')} message={errorMessage} />
         ) : null}
 
         {step === 'intake' ? (

@@ -52,7 +52,7 @@ import type {
   ScheduledTaskOccurrenceStatus,
   ScheduledTaskTodayItem,
 } from '../types/scheduledTasks';
-import type { SetupStatusResponse } from '../types/systemConfig';
+import type { SetupStatusCheck, SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { buildDeepLink } from '../utils/deepLink';
@@ -61,6 +61,7 @@ import {
   dismissOnboarding,
   readOnboardingDismissed,
 } from '../utils/onboardingPreferences';
+import { getUiListSeparator } from '../utils/uiLocale';
 
 export const HOME_CONFIGURABLE_STORAGE_KEY = 'dsa.home.configurable.expanded';
 
@@ -81,6 +82,25 @@ function writeHomeConfigurableExpanded(expanded: boolean): void {
     // Persistence is best-effort; the in-memory disclosure state remains usable.
   }
 }
+
+
+const SETUP_CHECK_LABEL_KEYS: Record<string, string> = {
+  llm_primary: 'home.setupCheck.llm_primary',
+  llm_agent: 'home.setupCheck.llm_agent',
+  stock_list: 'home.setupCheck.stock_list',
+  notification: 'home.setupCheck.notification',
+  storage: 'home.setupCheck.storage',
+};
+
+/** Map setup-status check keys to localized labels; unknown keys fall back to backend title. */
+function resolveSetupCheckLabel(
+  check: Pick<SetupStatusCheck, 'key' | 'title'>,
+  t: (key: any, params?: Record<string, string | number>) => string,
+): string {
+  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
+  return textKey ? t(textKey) : check.title;
+}
+
 
 const SIGNAL_PAGE_SIZE = 12;
 const FOCUS_ITEM_LIMIT = 3;
@@ -361,6 +381,12 @@ const HomePage: React.FC = () => {
         : undefined,
     };
   }, [availability.recentAnalyses, data.recentAnalyses, isLoading, language, t]);
+  const setupMissingLabels = useMemo(() => setupStatus?.checks
+    .filter((check) => check.required && check.status === 'needs_action')
+    .map((check) => resolveSetupCheckLabel(check, t))
+    .slice(0, 3)
+    .join(getUiListSeparator(language)) ?? '', [language, setupStatus, t]);
+
 
   const toggleConfigurable = useCallback(() => {
     setConfigurableExpanded((expanded) => {
