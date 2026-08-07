@@ -549,8 +549,10 @@ def test_orchestrator_chat_cancel_skips_failure_sentinel():
     ):
         result = orch.chat("hi", session_id="s-1")
 
-    roles = [call.args[1] for call in conv.add_message.call_args_list]
-    assert roles == ["user"]  # only the user turn persisted, no failure sentinel
+    assert conv.add_user_message.call_count == 1
+    assert conv.add_user_message.call_args.args[0] == "s-1"
+    assert conv.add_user_message.call_args.args[1] == "hi"
+    assert conv.add_message.call_count == 0  # no failure sentinel
     assert result.cancelled is True
     assert result.success is False
 
@@ -582,8 +584,10 @@ def test_executor_chat_cancel_skips_sentinel_and_provider_trace():
     ) as persist_trace:
         result = executor.chat("hi", session_id="s-1")
 
-    roles = [call.args[1] for call in conv.add_message.call_args_list]
-    assert roles == ["user"]  # no failure sentinel appended
+    assert conv.add_user_message.call_count == 1
+    assert conv.add_user_message.call_args.args[0] == "s-1"
+    assert conv.add_user_message.call_args.args[1] == "hi"
+    assert conv.add_message.call_count == 0  # no failure sentinel
     persist_trace.assert_not_called()
     assert result.cancelled is True
 

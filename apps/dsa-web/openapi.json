@@ -17573,13 +17573,40 @@
           "session_id": {
             "title": "Session Id",
             "type": "string"
+          },
+          "session_state": {
+            "$ref": "#/components/schemas/SessionStateResponse"
           }
         },
         "required": [
           "session_id",
-          "messages"
+          "messages",
+          "session_state"
         ],
         "title": "SessionMessagesResponse",
+        "type": "object"
+      },
+      "SessionStateResponse": {
+        "properties": {
+          "selected_skill_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Skill Ids"
+          }
+        },
+        "required": [
+          "selected_skill_ids"
+        ],
+        "title": "SessionStateResponse",
         "type": "object"
       },
       "SessionsResponse": {
