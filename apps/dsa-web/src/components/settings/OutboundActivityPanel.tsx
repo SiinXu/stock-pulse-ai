@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
-import { RefreshCw, Shield } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { outboundActivityApi } from '../../api/outboundActivity';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
@@ -63,7 +63,6 @@ const OutboundActivityPanel: React.FC<OutboundActivityPanelProps> = ({ disabled 
     <SettingsSectionCard
       title={t('settings.outboundActivityTitle')}
       description={t('settings.outboundActivityDescription')}
-      icon={<Shield size={18} aria-hidden />}
       actions={(
         <IconButton
           aria-label={t('settings.outboundActivityRefresh')}
@@ -86,7 +85,7 @@ const OutboundActivityPanel: React.FC<OutboundActivityPanelProps> = ({ disabled 
       ) : null}
       {loadError ? <ApiErrorAlert error={loadError} className="mb-3" /> : null}
       {isLoading ? (
-        <StatePanel tone="loading" title={t('common.loading')} />
+        <StatePanel state="loading" title={t('common.loading')} />
       ) : items.length === 0 ? (
         <EmptyState title={t('settings.outboundActivityEmptyTitle')} description={t('settings.outboundActivityEmptyDescription')} />
       ) : (
