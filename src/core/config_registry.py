@@ -180,7 +180,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|API_SURFACE|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
 )
 
 
