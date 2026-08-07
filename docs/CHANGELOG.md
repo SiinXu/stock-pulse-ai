@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Zero-config first success: loopback Ollama auto-detect for setup readiness, data-only dry-run guidance when no model is configured, and LOCAL_RUNTIME_AUTO_DETECT* settings.
+- [Added] Optional default-off DCF and relative valuation estimation (`valuation_service` + `estimate_stock_valuation` Agent Tool) with explicit assumptions, sensitivity ranges, and honest insufficient-fundamentals handling (issue #238 phase 1).
 - [Added] Agent observability L0: structured phase/tool/model/decision events with trace/span ids, persisted via run-diagnostics and shown in the existing run-flow view (deep payload capture remains default-off).
 - [Added] Config-gated daily brief with historical accuracy review from existing decision-signal, backtest, and skill-outcome stores (honesty-first; default off).
 - [Added] Recover process-local in-flight task-queue work across restarts: idempotent stock analyses requeue with a recovery marker; non-resumable kinds surface as explicit `interrupted` with `task.interrupted.process_restart` (no silent drop, no fake completion).
