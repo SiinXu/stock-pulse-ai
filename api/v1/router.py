@@ -19,6 +19,7 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    config_profiles,
     decision_signals,
     health,
     history,
@@ -181,6 +182,12 @@ router.include_router(
     tags=["Plugins"],
 )
 
+
+router.include_router(
+    config_profiles.router,
+    prefix="/config-profiles",
+    tags=["ConfigProfiles"],
+)
 
 router.include_router(
     health.router,
