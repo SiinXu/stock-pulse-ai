@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Integrate A-share multi-period financial statements into the existing fundamental pipeline (`financial_report.periods` / `metrics` with formulas / `sufficiency`), with explicit insufficient-fundamentals honesty in analysis prompts and report rendering (issue #235).
+- [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
 - [Fixed] Reduced the screening availability status surface to a compact size.
 - [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.
 - [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.
