@@ -390,6 +390,48 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects quote connectivity and availability when the Pytdx data source is used.'],
     notes: ['If a server is unreachable, rely on data-source fallback and avoid a single unstable endpoint.'],
   },
+
+  'settings.data_source.FUTU_OPEND_HOST': {
+    title: 'Futu OpenD Host',
+    summary: 'IPv4 host for the local Futu OpenD gateway used by analysis scope and portfolio position import.',
+    usage: 'Keep 127.0.0.1 for a local OpenD process, or set a trusted LAN IP when OpenD runs on another machine.',
+    valueNotes: [
+      'OpenD uses a local TCP protocol, not HTTP, so OUTBOUND_HTTP_ALLOWLIST does not apply.',
+      'The bundled Futu SDK requires IPv4 or an IPv4-resolving hostname.',
+    ],
+    impact: ['Affects --portfolio futu analysis scope and POST /api/v1/portfolio/imports/futu.'],
+    notes: [
+      'Inside Docker, 127.0.0.1 is the container itself; point at a reachable host on the container network.',
+      'See docs/futu-opend-portfolio-import_EN.md.',
+    ],
+    examples: ['127.0.0.1', '192.168.1.20'],
+  },
+  'settings.data_source.FUTU_OPEND_PORT': {
+    title: 'Futu OpenD Port',
+    summary: 'TCP port for the Futu OpenD gateway.',
+    usage: 'Match the port configured in OpenD. Default is 11111.',
+    valueNotes: ['Valid range is 1–65535.'],
+    impact: ['Affects Futu OpenD connectivity for analysis scope and portfolio import.'],
+    notes: ['Changing the port requires OpenD to listen on the same value.'],
+    examples: ['11111'],
+  },
+  'settings.data_source.FUTU_ACC_ID': {
+    title: 'Futu Account ID',
+    summary: 'Optional live securities account filter for OpenD position queries.',
+    usage: 'Leave empty to merge eligible ACTIVE REAL NORMAL/MASTER accounts, or set one account id.',
+    valueNotes: ['Must be a positive integer when set.'],
+    impact: ['Controls which Futu real accounts contribute positions to analysis and import.'],
+    notes: ['Simulate/paper accounts are never imported.'],
+  },
+  'settings.data_source.FUTU_SECURITY_FIRM': {
+    title: 'Futu Security Firm',
+    summary: 'Futu SecurityFirm enum used when opening the OpenD trade context.',
+    usage: 'Use NONE for SDK auto-detection unless your brokerage requires an explicit firm.',
+    valueNotes: ['Common values include NONE, FUTUSECURITIES, and FUTUSG.'],
+    impact: ['Affects account discovery when multiple Futu security firms are present.'],
+    notes: ['Unsupported enum names fail with a clear configuration error before any import write.'],
+    examples: ['NONE', 'FUTUSECURITIES'],
+  },
   'settings.data_source.news_window': {
     title: 'News Window',
     summary: 'Controls how old news can be before it is excluded from analysis context.',

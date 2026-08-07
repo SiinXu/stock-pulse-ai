@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Exposed `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` in Web Settings (system network group) with restart help, sensitive host masking, and setup_env re-application on config reload.
 
 - [Added] Added fail-closed `LOCAL_ONLY_MODE` outbound gate with redacted outbound-activity API/panel and bilingual local-only threat-model docs (issue #218).
+- [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
 - [Fixed] Reduced the screening availability status surface to a compact size.
 - [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.
 - [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.

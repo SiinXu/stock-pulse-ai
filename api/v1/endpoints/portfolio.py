@@ -25,6 +25,7 @@ from api.v1.schemas.portfolio import (
     PortfolioCorporateActionCreateRequest,
     PortfolioDeleteResponse,
     PortfolioEventCreatedResponse,
+    PortfolioFutuImportRequest,
     PortfolioFxRefreshResponse,
     PortfolioImportBrokerListResponse,
     PortfolioImportCommitResponse,
@@ -38,6 +39,7 @@ from api.v1.schemas.portfolio import (
     PaperTradeCreateRequest,
     PaperTradeCreatedResponse,
 )
+from data_provider.futu_position_fetcher import FutuPositionFetchError
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import PortfolioImportService
 from src.services.portfolio_risk_service import PortfolioRiskService
@@ -151,7 +153,8 @@ def list_accounts(
     try:
         rows = service.list_accounts(include_inactive=include_inactive)
         return PortfolioAccountListResponse(accounts=[PortfolioAccountItem(**item) for item in rows])
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("List accounts failed", exc)
 
 
@@ -180,7 +183,8 @@ def update_account(account_id: int, request: PortfolioAccountUpdateRequest) -> P
         raise
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Update account failed", exc)
 
 
@@ -198,7 +202,8 @@ def delete_account(account_id: int):
         return {"deleted": 1}
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Deactivate account failed", exc)
 
 
@@ -246,7 +251,8 @@ def create_trade(
         raise
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Create trade failed", exc)
 
 
@@ -335,7 +341,8 @@ def list_trades(
         return PortfolioTradeListResponse(**data)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("List trade events failed", exc)
 
 
@@ -356,7 +363,8 @@ def delete_trade(trade_id: int) -> PortfolioDeleteResponse:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Delete trade event failed", exc)
 
 
@@ -394,7 +402,8 @@ def create_cash_ledger(
         raise
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Create cash ledger event failed", exc)
 
 
@@ -425,7 +434,8 @@ def list_cash_ledger(
         return PortfolioCashLedgerListResponse(**data)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("List cash ledger events failed", exc)
 
 
@@ -446,7 +456,8 @@ def delete_cash_ledger(entry_id: int) -> PortfolioDeleteResponse:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Delete cash ledger event failed", exc)
 
 
@@ -487,7 +498,8 @@ def create_corporate_action(
         raise
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Create corporate action event failed", exc)
 
 
@@ -520,7 +532,8 @@ def list_corporate_actions(
         return PortfolioCorporateActionListResponse(**data)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("List corporate action events failed", exc)
 
 
@@ -541,7 +554,8 @@ def delete_corporate_action(action_id: int) -> PortfolioDeleteResponse:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Delete corporate action event failed", exc)
 
 
@@ -571,7 +585,8 @@ def get_snapshot(
         return PortfolioSnapshotResponse(**data)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Get snapshot failed", exc)
 
 
@@ -590,7 +605,8 @@ def analyze_position(symbol: str, request: PortfolioPositionAnalysisRequest) -> 
         raise
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Resolve portfolio position failed", exc)
 
     queue = get_task_queue()
@@ -724,7 +740,8 @@ def parse_csv_import(
         )
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Parse CSV import failed", exc)
 
 
@@ -738,7 +755,8 @@ def list_csv_brokers() -> PortfolioImportBrokerListResponse:
     importer = PortfolioImportService()
     try:
         return PortfolioImportBrokerListResponse(brokers=importer.list_supported_brokers())
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("List CSV brokers failed", exc)
 
 
@@ -783,8 +801,87 @@ def commit_csv_import(
         raise
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Commit CSV import failed", exc)
+
+
+
+@router.post(
+    "/imports/futu/preview",
+    response_model=PortfolioImportParseResponse,
+    responses={400: {"model": ErrorResponse}, 503: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="Preview Futu OpenD real positions as import trade records",
+)
+def preview_futu_import(
+    as_of: Optional[date] = Query(None, description="Synthetic buy trade date; default today"),
+) -> PortfolioImportParseResponse:
+    importer = PortfolioImportService()
+    try:
+        parsed = importer.preview_futu_positions(as_of=as_of)
+        return PortfolioImportParseResponse(
+            broker=parsed["broker"],
+            record_count=parsed["record_count"],
+            skipped_count=parsed["skipped_count"],
+            error_count=parsed["error_count"],
+            records=[_serialize_import_record(item) for item in parsed.get("records", [])],
+            errors=list(parsed.get("errors", [])),
+        )
+    except FutuPositionFetchError as exc:
+        raise api_error(503, "futu_opend_unavailable", str(exc))
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
+        raise _internal_error("Preview Futu import failed", exc)
+
+
+@router.post(
+    "/imports/futu",
+    response_model=PortfolioImportCommitResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    summary="Import Futu OpenD real positions into a portfolio account",
+)
+def commit_futu_import(
+    body: PortfolioFutuImportRequest,
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
+) -> PortfolioImportCommitResponse:
+    """Import live Futu positions via the shared trade-record commit path.
+
+    Portfolio Web UI for this action is a follow-up; this endpoint is the backend
+    seam for API clients and future UI wiring.
+    """
+    importer = PortfolioImportService()
+    try:
+        result = importer.import_futu_positions(
+            account_id=body.account_id,
+            dry_run=body.dry_run,
+            operation_id=_resolve_operation_id(body.operation_id, idempotency_key),
+            as_of=body.as_of,
+        )
+        return PortfolioImportCommitResponse(**result)
+    except FutuPositionFetchError as exc:
+        raise api_error(503, "futu_opend_unavailable", str(exc))
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
+    except PortfolioBusyError as exc:
+        raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
+        raise _internal_error("Commit Futu import failed", exc)
 
 
 @router.post(
@@ -803,7 +900,8 @@ def refresh_fx_rates(
         return PortfolioFxRefreshResponse(**data)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Refresh FX rates failed", exc)
 
 
@@ -833,5 +931,6 @@ def get_risk_report(
         return PortfolioRiskResponse(**data)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Get risk report failed", exc)
