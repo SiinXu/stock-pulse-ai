@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
 - [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
+- [Added] Default-off Bayesian skill outcome weights at aggregation, plus an opt-in historical sample backfill script.
 - [Changed] Unified baostock/pytdx/longbridge retry and request-timeout policy via `data_provider/retry_policy.py` (BaseFetcher-level enforcement deferred).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.

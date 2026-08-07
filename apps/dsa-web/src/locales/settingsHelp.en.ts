@@ -1018,6 +1018,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: 'Skill Opinion Outcome Weights',
+    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
+    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
+      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
+    ],
+    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
+    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
     summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
