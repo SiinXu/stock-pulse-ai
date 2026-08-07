@@ -73,6 +73,7 @@ EXPECTED_PIPELINE_METHODS = (
     "_build_specialist_agents",
     "_build_skill_agents",
     "_build_strategy_agents",
+    "_skill_aggregator_for_weights",
     "_aggregate_skill_opinions",
     "_aggregate_strategy_opinions",
     "_run_strategy_engine",
@@ -108,7 +109,7 @@ EXPECTED_DASHBOARD_METHODS = (
 EXPECTED_AST_HASHES = {
     "_ExecutionMethods": "353d048051f1e3c3459a836a41481d45d35c0b3c064c06f459670209414c28e6",
     "_ChatMethods": "d4ea52031305b07db97efc6b1dab61e558c3afb3d7e82bb966274116028f478d",
-    "_PipelineMethods": "81a49c6e565dfa4fb33519639a79eba433333d83f57c2868f9e9bb3b8d69b518",
+    "_PipelineMethods": "6e10755890c212c3cb3cf2598b39ed19e20fa7be897cd4cfeefab121409d772b",
     "_DashboardMethods": "095aa23fecba4620e07e25f2b7dc3f6836fb4786dbdc239a1543311d707060f8",
 }
 
