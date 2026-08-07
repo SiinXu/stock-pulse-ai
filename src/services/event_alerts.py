@@ -232,7 +232,8 @@ def evaluate_corporate_event_alert(
             intelligence_repo=intelligence_repo,
             now=now,
         )
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         return _result(
             rule,
             triggered=False,
@@ -354,7 +355,8 @@ def build_impact_context(
     symbol = ""
     try:
         symbol = normalize_stock_code(stock_code) if stock_code else ""
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         symbol = str(stock_code or "").strip()
 
     in_watchlist = False
@@ -363,7 +365,7 @@ def build_impact_context(
         try:
             symbols = _watchlist_symbols(config)
             in_watchlist = symbol in symbols or str(stock_code).strip() in symbols
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             watchlist_error = sanitize_diagnostic_text(str(exc) or "watchlist lookup failed")
             log_safe_exception(
                 logger,
@@ -515,7 +517,7 @@ def _watchlist_symbols(config: Any) -> Set[str]:
     if callable(refresh):
         try:
             refresh()
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert impact watchlist refresh failed",
@@ -531,7 +533,8 @@ def _watchlist_symbols(config: Any) -> Set[str]:
         symbols.add(text)
         try:
             symbols.add(normalize_stock_code(text))
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             continue
     return symbols
 
@@ -554,7 +557,7 @@ def _portfolio_holding_context(
             cost_method="fifo",
             include_realtime=False,
         )
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Alert impact portfolio lookup failed",
@@ -580,7 +583,8 @@ def _portfolio_holding_context(
             pos_symbol = str(position.get("symbol") or "").strip()
             try:
                 pos_norm = normalize_stock_code(pos_symbol) if pos_symbol else ""
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 pos_norm = pos_symbol
             if pos_norm != symbol and pos_symbol != symbol:
                 continue
@@ -681,7 +685,8 @@ def _item_datetime(item: Any, field_name: str) -> Optional[datetime]:
         try:
             parsed = raw.to_pydatetime()
             return parsed.replace(tzinfo=None) if parsed.tzinfo is not None else parsed
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return None
     return _parse_iso(raw)
 

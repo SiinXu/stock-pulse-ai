@@ -133,7 +133,7 @@ class AlertWorker:
 
         try:
             config = self.config_provider()
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert worker runtime configuration lookup failed",
@@ -162,7 +162,8 @@ class AlertWorker:
             stats["evaluated"] += 1
             try:
                 result = asyncio.run(self.service._evaluate_rule(runtime_rule.rule, monitor, daily_cache=daily_cache))
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 result = {
                     "rule_id": self.service._runtime_rule_id(runtime_rule.rule),
                     "record_status": "failed",
@@ -262,7 +263,7 @@ class AlertWorker:
                     seen_keys.add(payload.key)
                 if len(runtime_rules) >= ALERT_WORKER_RULE_LIMIT:
                     break
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
                 log_safe_exception(
                     logger,
                     "Invalid persisted alert rule skipped",
@@ -285,7 +286,7 @@ class AlertWorker:
         raw_rules = getattr(config, "agent_event_alert_rules_json", "")
         try:
             parsed_rules = parse_event_alert_rules(raw_rules)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Legacy alert rule parsing failed",
@@ -327,7 +328,7 @@ class AlertWorker:
                 else:
                     raise ValueError(f"unsupported alert_type: {alert_type}")
                 legacy_rules.append((key, rule))
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
                 log_safe_exception(
                     logger,
                     "Invalid legacy alert rule skipped",
@@ -376,7 +377,7 @@ class AlertWorker:
     ) -> TriggerWriteResult:
         try:
             return self._record_trigger(runtime_rule, result, status)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert trigger persistence failed",
@@ -457,7 +458,7 @@ class AlertWorker:
             payload = self._diagnostics_payload(result.get("diagnostics"))
             payload["decision_signal_summary"] = summary
             result["diagnostics"] = payload
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert decision signal summary unavailable",
@@ -493,7 +494,7 @@ class AlertWorker:
                         context[key] = event_context.get(key)
             payload["impact_context"] = context
             result["diagnostics"] = payload
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert impact context unavailable",
@@ -545,7 +546,7 @@ class AlertWorker:
                 key=lambda item: getattr(item, "created_at", None) or datetime.min,
                 reverse=True,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert impact analysis history lookup failed",
@@ -734,7 +735,7 @@ class AlertWorker:
             )
             payload = context.to_dict() if hasattr(context, "to_dict") else context
             return render_market_phase_summary(payload)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert market phase summary unavailable",
@@ -778,7 +779,7 @@ class AlertWorker:
             records = sorted(records, key=lambda item: getattr(item, "created_at", None) or datetime.min, reverse=True)
             if records:
                 overview = extract_analysis_context_pack_overview(getattr(records[0], "context_snapshot", None))
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert recent history overview unavailable",
@@ -878,7 +879,7 @@ class AlertWorker:
                 result,
                 report_language=report_language,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             from src.notification import ChannelAttemptResult, NotificationDispatchResult
 
             sanitized = sanitize_exception_chain(exc) or "notification failed"
@@ -913,7 +914,7 @@ class AlertWorker:
     ) -> int:
         try:
             return self._record_notification_attempts(trigger_id, dispatch)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert notification attempt persistence failed",
@@ -1006,7 +1007,7 @@ class AlertWorker:
                 severity=runtime_rule.severity,
                 now=now_dt,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert cooldown lookup failed",
@@ -1094,7 +1095,7 @@ class AlertWorker:
                 cooldown_until=now_dt + timedelta(seconds=cooldown_seconds),
                 reason=self.service._sanitize_text(result.get("reason") or result.get("message")),
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert cooldown update failed",

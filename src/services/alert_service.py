@@ -190,7 +190,8 @@ class AlertService:
                 return self._dry_run_response_for_single(payloads[0], result, target_scope=row.target_scope)
             results = asyncio.run(self._evaluate_runtime_payloads(payloads, monitor))
             return aggregate_dry_run_results(rule_id, row.target_scope, results)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             sanitized_message = self._sanitize_text(str(exc) or "Alert evaluation failed")
             return {
                 "rule_id": rule_id,
@@ -263,7 +264,8 @@ class AlertService:
                         "reason": "dry-run evaluation timed out",
                         "message": "dry-run evaluation timed out",
                     }
-                except Exception as exc:
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                    log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                     sanitized_message = self._sanitize_text(str(exc) or "Alert evaluation failed")
                     result = {
                         "rule_id": self._runtime_rule_id(payload.rule),
@@ -322,7 +324,8 @@ class AlertService:
         threshold = float(rule.price)
         try:
             quote = await monitor._get_realtime_quote(rule.stock_code)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(
                 rule,
                 exc,
@@ -386,7 +389,8 @@ class AlertService:
         threshold = abs(float(rule.change_pct))
         try:
             quote = await monitor._get_realtime_quote(rule.stock_code)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(
                 rule,
                 exc,
@@ -452,7 +456,8 @@ class AlertService:
 
         try:
             result = await asyncio.to_thread(_fetch_daily_data)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(rule, exc, data_source="daily_data")
         if result is None:
             return self._not_triggered(
@@ -552,7 +557,8 @@ class AlertService:
                 result = await asyncio.to_thread(_fetch_daily_data)
                 if daily_cache is not None:
                     daily_cache[cache_key] = result
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(rule, exc, data_source="daily_data")
 
         if result is None:
@@ -594,7 +600,8 @@ class AlertService:
                 data_source="daily_data",
                 data_timestamp=self._extract_daily_timestamp(df),
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(
                 rule,
                 exc,
@@ -761,7 +768,8 @@ class AlertService:
         if hasattr(quote, "to_dict"):
             try:
                 return quote.to_dict().get(field_name)
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 return None
         return None
 
@@ -774,7 +782,8 @@ class AlertService:
             if field_name in getattr(df, "columns", []):
                 try:
                     parsed = cls._coerce_datetime(df[field_name].iloc[-1])
-                except Exception:
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                    log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                     parsed = None
                 if parsed is not None:
                     return parsed
@@ -784,7 +793,8 @@ class AlertService:
             if isinstance(index_value, (int, float)):
                 return None
             return cls._coerce_datetime(index_value)
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return None
 
     @staticmethod
@@ -799,7 +809,8 @@ class AlertService:
             try:
                 parsed = value.to_pydatetime()
                 return parsed.replace(tzinfo=None) if parsed.tzinfo is not None else parsed
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 return None
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             try:
@@ -1056,7 +1067,8 @@ class AlertService:
                     target=data["target"],
                     config=config,
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 return [
                     make_static_payload(
                         parent_key=parent_key,
@@ -1227,7 +1239,7 @@ class AlertService:
                 target=cooldown_target,
                 severity=str(row.severity) if row.severity else None,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert cooldown summary lookup failed",
