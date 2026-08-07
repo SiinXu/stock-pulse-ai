@@ -49,6 +49,13 @@ export const DATA_PROVIDERS: DataProvider[] = [
     configuredKeys: ['PYTDX_HOST', 'PYTDX_SERVERS'],
   },
   {
+    id: 'futu',
+    label: 'Futu OpenD',
+    group: 'quote',
+    keys: ['FUTU_OPEND_HOST', 'FUTU_OPEND_PORT', 'FUTU_ACC_ID', 'FUTU_SECURITY_FIRM'],
+    configuredKeys: ['FUTU_OPEND_HOST', 'FUTU_ACC_ID'],
+  },
+  {
     id: 'tavily',
     label: 'Tavily',
     group: 'search',
