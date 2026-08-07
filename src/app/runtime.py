@@ -477,6 +477,11 @@ def _run_schedule_mode(
     background_tasks = []
     from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
     from src.services.scheduled_task_service import ScheduledTaskService
+    from src.services.task_queue import get_task_queue
+
+    # CLI schedule mode has no FastAPI lifespan: recover in-flight tasks once
+    # before the first scheduled_task_tick so occurrence fences stay sound.
+    get_task_queue().recover_persisted_inflight()
 
     scheduled_task_service = None
 
