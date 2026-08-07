@@ -1121,6 +1121,27 @@ class _ConfigLoadingMethods:
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
             ),
+            daily_brief_enabled=parse_env_bool(
+                os.getenv('DAILY_BRIEF_ENABLED'), default=False
+            ),
+            daily_brief_schedule_time=(
+                os.getenv('DAILY_BRIEF_SCHEDULE_TIME', '08:30').strip() or '08:30'
+            ),
+            daily_brief_timezone=(
+                os.getenv('DAILY_BRIEF_TIMEZONE', 'Asia/Shanghai').strip() or 'Asia/Shanghai'
+            ),
+            daily_brief_min_samples=parse_env_int(
+                os.getenv('DAILY_BRIEF_MIN_SAMPLES'), 10, field_name='DAILY_BRIEF_MIN_SAMPLES', minimum=1
+            ),
+            daily_brief_notify=parse_env_bool(
+                os.getenv('DAILY_BRIEF_NOTIFY'), default=True
+            ),
+            daily_brief_persist_history=parse_env_bool(
+                os.getenv('DAILY_BRIEF_PERSIST_HISTORY'), default=True
+            ),
+            daily_brief_save_report_file=parse_env_bool(
+                os.getenv('DAILY_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
             paper_portfolio_initial_cash=parse_env_float(
                 os.getenv('PAPER_PORTFOLIO_INITIAL_CASH'), 1_000_000.0, field_name='PAPER_PORTFOLIO_INITIAL_CASH', minimum=0.0
             ),
