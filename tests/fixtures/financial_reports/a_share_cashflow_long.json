@@ -1,0 +1,13 @@
+{
+  "description": "Recorded-style Eastmoney cash-flow sheet (long) for A-share parsing tests. Offline only.",
+  "rows": [
+    {
+      "REPORT_DATE": "2024-12-31",
+      "NETCASH_OPERATE": 80000000000.0
+    },
+    {
+      "REPORT_DATE": "2023-12-31",
+      "NETCASH_OPERATE": 65000000000.0
+    }
+  ]
+}
