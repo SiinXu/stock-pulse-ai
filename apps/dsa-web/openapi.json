@@ -4591,6 +4591,460 @@
         "title": "ChatResponse",
         "type": "object"
       },
+      "ConfigPresetApplyRequest": {
+        "description": "Apply or preview an official preset against the current config version.",
+        "properties": {
+          "config_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Version",
+            "type": "string"
+          },
+          "reload_now": {
+            "default": true,
+            "title": "Reload Now",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "config_version"
+        ],
+        "title": "ConfigPresetApplyRequest",
+        "type": "object"
+      },
+      "ConfigPresetApplyResponse": {
+        "description": "Result of applying an official preset.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "new_config_version": {
+            "title": "New Config Version",
+            "type": "string"
+          },
+          "preset_id": {
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "updated_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Updated Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "preset_id",
+          "display_name",
+          "applied",
+          "config_version",
+          "new_config_version"
+        ],
+        "title": "ConfigPresetApplyResponse",
+        "type": "object"
+      },
+      "ConfigPresetItem": {
+        "description": "One official recommended configuration preset.",
+        "properties": {
+          "config_values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Config Values",
+            "type": "object"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "meets_requirements": {
+            "default": true,
+            "title": "Meets Requirements",
+            "type": "boolean"
+          },
+          "preference_order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preference Order",
+            "type": "array"
+          },
+          "recommended": {
+            "default": false,
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "requirements": {
+            "additionalProperties": true,
+            "title": "Requirements",
+            "type": "object"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "strategies": {
+            "additionalProperties": true,
+            "title": "Strategies",
+            "type": "object"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "description"
+        ],
+        "title": "ConfigPresetItem",
+        "type": "object"
+      },
+      "ConfigPresetListResponse": {
+        "description": "Official presets with recommendation ranking.",
+        "properties": {
+          "detection": {
+            "$ref": "#/components/schemas/ConfigProfileDetection"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigPresetItem"
+            },
+            "title": "Presets",
+            "type": "array"
+          },
+          "recommended_preset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Preset Id"
+          }
+        },
+        "title": "ConfigPresetListResponse",
+        "type": "object"
+      },
+      "ConfigPresetPreviewResponse": {
+        "description": "Preview of applying an official preset.",
+        "properties": {
+          "change_count": {
+            "default": 0,
+            "title": "Change Count",
+            "type": "integer"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "preset_id": {
+            "title": "Preset Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preset_id",
+          "display_name",
+          "config_version"
+        ],
+        "title": "ConfigPresetPreviewResponse",
+        "type": "object"
+      },
+      "ConfigProfileChange": {
+        "description": "One non-secret configuration key change.",
+        "properties": {
+          "from_value": {
+            "description": "Previous non-secret value",
+            "title": "From Value",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "to": {
+            "description": "Next non-secret value",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "from_value",
+          "to"
+        ],
+        "title": "ConfigProfileChange",
+        "type": "object"
+      },
+      "ConfigProfileDetection": {
+        "description": "Local-first detection signals used for preset ranking.",
+        "properties": {
+          "cli_detected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cli Detected",
+            "type": "array"
+          },
+          "cloud_ready": {
+            "default": false,
+            "title": "Cloud Ready",
+            "type": "boolean"
+          },
+          "model_pack_present": {
+            "default": false,
+            "title": "Model Pack Present",
+            "type": "boolean"
+          },
+          "ollama_healthy": {
+            "default": false,
+            "title": "Ollama Healthy",
+            "type": "boolean"
+          }
+        },
+        "title": "ConfigProfileDetection",
+        "type": "object"
+      },
+      "ConfigProfileExportResponse": {
+        "description": "Exported stockpulse-profile YAML (secrets stripped).",
+        "properties": {
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "keys_exported": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys Exported",
+            "type": "array"
+          },
+          "keys_redacted": {
+            "default": 0,
+            "title": "Keys Redacted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "content",
+          "config_version",
+          "filename"
+        ],
+        "title": "ConfigProfileExportResponse",
+        "type": "object"
+      },
+      "ConfigProfileImportApplyResponse": {
+        "description": "Result of applying an imported stockpulse-profile YAML.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "new_config_version": {
+            "title": "New Config Version",
+            "type": "string"
+          },
+          "updated_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Updated Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied",
+          "config_version",
+          "new_config_version"
+        ],
+        "title": "ConfigProfileImportApplyResponse",
+        "type": "object"
+      },
+      "ConfigProfileImportPreviewResponse": {
+        "description": "Validated profile import preview with non-secret diff.",
+        "properties": {
+          "change_count": {
+            "default": 0,
+            "title": "Change Count",
+            "type": "integer"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "issues": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "config_version"
+        ],
+        "title": "ConfigProfileImportPreviewResponse",
+        "type": "object"
+      },
+      "ConfigProfileImportRequest": {
+        "description": "Import or preview a stockpulse-profile YAML document.",
+        "properties": {
+          "config_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Version",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 262144,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "reload_now": {
+            "default": true,
+            "title": "Reload Now",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "config_version",
+          "content"
+        ],
+        "title": "ConfigProfileImportRequest",
+        "type": "object"
+      },
       "ConfigValidationIssue": {
         "description": "Validation issue details.",
         "properties": {
@@ -22859,6 +23313,409 @@
         "summary": "触发回测",
         "tags": [
           "Backtest"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/export": {
+      "get": {
+        "description": "Export non-secret configuration as stockpulse-profile v1 YAML. Secret keys (API keys, tokens, passwords, extra headers) are never included.",
+        "operationId": "export_config_profile_api_v1_config_profiles_export_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Export stockpulse-profile YAML",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/import/apply": {
+      "post": {
+        "description": "Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply.",
+        "operationId": "apply_config_profile_import_api_v1_config_profiles_import_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigProfileImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileImportApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Apply stockpulse-profile YAML import",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/import/preview": {
+      "post": {
+        "description": "Validate profile YAML (schema + no secrets) and return a non-secret diff. Does not write configuration.",
+        "operationId": "preview_config_profile_import_api_v1_config_profiles_import_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigProfileImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileImportPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Preview stockpulse-profile YAML import",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/presets": {
+      "get": {
+        "description": "Return official named presets with local-first recommendation ranking. Detection prefers healthy Ollama / Model Pack, then CLI backends, then cloud.",
+        "operationId": "list_config_presets_api_v1_config_profiles_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List recommended configuration presets",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/presets/{preset_id}/apply": {
+      "post": {
+        "description": "Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm.",
+        "operationId": "apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPresetApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Apply a configuration preset",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/presets/{preset_id}/preview": {
+      "post": {
+        "operationId": "preview_config_preset_api_v1_config_profiles_presets__preset_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPresetApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Preview applying a configuration preset",
+        "tags": [
+          "ConfigProfiles"
         ]
       }
     },
