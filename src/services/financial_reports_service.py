@@ -1,7 +1,3 @@
-import logging
-from src.utils.sanitize import log_safe_exception
-
-logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """Financial report normalization and derived-metric helpers (issue #235).
 
@@ -23,11 +19,16 @@ Formulas used by :func:`compute_statement_metrics` (document once, reuse):
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
+
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 # Core fields required for a "rich" latest-period summary.
 _CORE_SUMMARY_FIELDS = (
