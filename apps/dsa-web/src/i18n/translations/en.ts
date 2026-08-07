@@ -8180,8 +8180,6 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.notes.0": "Full reports can be long and may be split by some platforms.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.summary": "Controls notification detail level, default output language, and template output.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.title": "Report Output",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.usage": "REPORT_TYPE supports simple/full/brief. REPORT_LANGUAGE supports zh/en/ko. Agent Chat inherits this default only when context.report_language is omitted.",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.valueNotes.0": "Report language affects default templates, notification text, and Agent Chat replies that do not explicitly set a language; it does not change the Web UI language.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.usage": "REPORT_TYPE supports simple/full/brief. REPORT_LANGUAGE supports zh/en.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.report_output.valueNotes.0": "Report language affects default report and notification text, not the Web UI language.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.SHARE_IMAGE_MAX_CHARS.impact.0": "Affects Web one-click share image generation for history reports.",
