@@ -1013,6 +1013,25 @@ class _PipelineMethods:
     # Skill aggregation
     # -----------------------------------------------------------------
 
+    @staticmethod
+    def _skill_aggregator_for_weights(config=None):
+        """Return the aggregator used at the weight-application seam.
+
+        Default-off Bayesian outcome weights replace the unattributable
+        backtest/memory path only when explicitly enabled. Gate-off keeps the
+        stock ``SkillAggregator`` so aggregation stays byte-identical.
+        """
+        from src.services.skill_opinion_weight_service import (
+            build_outcome_weight_aggregator,
+            is_skill_opinion_outcome_weights_enabled,
+        )
+
+        if is_skill_opinion_outcome_weights_enabled(config):
+            return build_outcome_weight_aggregator()
+        from src.agent.skills.aggregator import SkillAggregator
+
+        return SkillAggregator()
+
     def _aggregate_skill_opinions(self, ctx: AgentContext) -> None:
         """Run SkillAggregator to produce a consensus opinion.
 
@@ -1020,8 +1039,7 @@ class _PipelineMethods:
         consensus and stores it in context so the decision agent can use it.
         """
         try:
-            from src.agent.skills.aggregator import SkillAggregator
-            aggregator = SkillAggregator()
+            aggregator = _PipelineMethods._skill_aggregator_for_weights(getattr(self, "config", None))
             consensus = aggregator.aggregate(ctx)
             if consensus:
                 ctx.opinions.append(consensus)
@@ -1056,8 +1074,17 @@ class _PipelineMethods:
         it partitions valid/invalid skill opinions, moves invalid ones to
         ``ctx.meta["invalid_opinions"]`` (Diagnostics only), and rebuilds
         ``ctx.opinions`` as non-skill evidence + valid skills + consensus.
+
+        When Bayesian outcome weights are enabled, temporarily installs an
+        outcome-aware aggregator on the strategy engine for this call only.
         """
-        result = self.strategy_engine.process(ctx.opinions)
+        previous_aggregator = getattr(self.strategy_engine, "aggregator", None)
+        try:
+            self.strategy_engine.aggregator = _PipelineMethods._skill_aggregator_for_weights(getattr(self, "config", None))
+            result = self.strategy_engine.process(ctx.opinions)
+        finally:
+            if previous_aggregator is not None:
+                self.strategy_engine.aggregator = previous_aggregator
 
         ctx.meta["invalid_opinions"] = list(result.invalid_records)
         ctx.opinions = list(result.non_skill_opinions) + list(result.valid_skill_opinions)
