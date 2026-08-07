@@ -1378,4 +1378,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
 };
 
+  LOCAL_ONLY_MODE: {
+    title: "Local Only Mode",
+    summary: "Block non-loopback outbound HTTP when enabled.",
+    usage: "Enable for offline verification.",
+    impact: [],
+    notes: [],
+    valueNotes: [],
+  },
 export default settingsHelpEnUS;

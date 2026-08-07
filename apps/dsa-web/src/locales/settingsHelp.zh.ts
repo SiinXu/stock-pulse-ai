@@ -1421,4 +1421,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
 };
 
+  LOCAL_ONLY_MODE: {
+    title: "\u4ec5\u672c\u5730\u6a21\u5f0f",
+    summary: "\u542f\u7528\u540e\u62e6\u622a\u975e\u73af\u56de\u51fa\u7ad9 HTTP\u3002",
+    usage: "\u7528\u4e8e\u79bb\u7ebf\u53ef\u9a8c\u8bc1\u6a21\u5f0f\u3002",
+    impact: [],
+    notes: [],
+    valueNotes: [],
+  },
 export default settingsHelpZhCN;
