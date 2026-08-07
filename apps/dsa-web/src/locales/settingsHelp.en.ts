@@ -970,6 +970,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: 'Multi-Strategy Deliberation',
+    summary: 'Enable concurrent multi-strategy specialist scheduling with a final disagreement explanation.',
+    usage: 'Default off. When true, Native Multi can schedule strategy specialists and surface disagreement explanations without changing the Phase-1 synthesis path when off.',
+    valueNotes: [
+      'Off preserves the previous synthesis behavior byte-for-byte.',
+      'On enables multi-strategy deliberation and final disagreement explanation.',
+    ],
+    impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
+    notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',

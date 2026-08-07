@@ -20,11 +20,11 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL AGENT_CHAT_FAILURE_MESSAGE
     AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT AgentContext
-    AgentOrchestrator AgentRunStats AgentRuntimeFacts Any Callable
+    AgentOrchestrator AgentRunStats AgentRuntimeFacts AgentSkillScheduler Any Callable
     DegradationBoundary DegradedEvent Dict ExecutionState FuturesTimeoutError
     LLMToolAdapter List NON_CRITICAL_BASE_STAGES Optional OrchestratorResult
     PipelineTerminationFact RiskOverrideApplication RuntimeGuardPolicy
-    StageFailurePolicy StageFailureReason StageResult StageStatus StockScope
+    SkillBatchResult StageFailurePolicy StageFailureReason StageResult StageStatus StockScope
     StrategyEngine StrategyResultStatus TYPE_CHECKING ThreadPoolExecutor
     ToolRegistry VALID_MODES annotations build_agent_chat_market_context
     build_agent_chat_tool_registry build_agent_disagreement_summary
@@ -70,6 +70,8 @@ EXPECTED_PIPELINE_METHODS = (
     "_tool_registry_for_context",
     "_trim_agent_tool_names",
     "_build_agent_chain",
+    "_run_specialist_agent_batch",
+    "_skill_batch_timeout_slice",
     "_build_specialist_agents",
     "_build_skill_agents",
     "_build_strategy_agents",
@@ -108,7 +110,7 @@ EXPECTED_DASHBOARD_METHODS = (
 EXPECTED_AST_HASHES = {
     "_ExecutionMethods": "353d048051f1e3c3459a836a41481d45d35c0b3c064c06f459670209414c28e6",
     "_ChatMethods": "d4ea52031305b07db97efc6b1dab61e558c3afb3d7e82bb966274116028f478d",
-    "_PipelineMethods": "81a49c6e565dfa4fb33519639a79eba433333d83f57c2868f9e9bb3b8d69b518",
+    "_PipelineMethods": "e970244d35d90403d004f525f81dade55f7b78fca03f1fa43754584ae668d8aa",
     "_DashboardMethods": "ec6082c24dbd1c11d983af00bd950d877d5ca1741216c6341160124e9b61a603",
 }
 

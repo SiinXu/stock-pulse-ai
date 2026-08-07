@@ -1013,6 +1013,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略合议',
+    summary: '启用并发多策略专家调度，并生成最终分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并输出分歧说明；关闭时保持 Phase-1 合成路径不变。',
+    valueNotes: [
+      '关闭时保持既有合成行为字节级一致。',
+      '开启后启用多策略合议与最终分歧说明。',
+    ],
+    impact: ['影响 Agent 流水线专家调度和分歧说明字段。'],
+    notes: ['多策略约定见 docs/multi-strategy-contract.md。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',

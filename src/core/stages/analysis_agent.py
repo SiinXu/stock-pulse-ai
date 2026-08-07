@@ -512,7 +512,14 @@ class _AgentAnalysisStageMixin:
                                 )
                             )
                         except Exception as exc:  # broad-exception: fallback_recorded - Final explanation is optional and fail-closed.
-                            logger.warning("[deliberation] final explanation skipped for %s: %s", code, exc)
+                            log_safe_exception(
+                                logger,
+                                "Agent deliberation final explanation skipped",
+                                exc,
+                                error_code="pipeline_agent_deliberation_explanation_skipped",
+                                level=logging.WARNING,
+                                context={"stock_code": code},
+                            )
 
             agent_analysis_succeeded = bool(
                 result and getattr(result, "success", True)
