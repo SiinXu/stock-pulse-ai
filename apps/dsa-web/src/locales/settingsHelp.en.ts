@@ -1378,4 +1378,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
 };
 
+  VALUATION_AGENT_TOOL_ENABLED: {
+    title: "Enable Valuation Agent Tool",
+    summary: "Opt-in DCF/relative valuation Agent Tool.",
+    usage: "Leave disabled by default.",
+    impact: [],
+    notes: [],
+    valueNotes: [],
+  },
 export default settingsHelpEnUS;
