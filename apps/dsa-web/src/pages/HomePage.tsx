@@ -33,7 +33,13 @@ import {
   StatePanel,
   WorkspacePage,
 } from '../components/common';
-import { HomeReadinessCard } from '../components/home';
+import {
+  HomeReadinessCard,
+  getBrowserTimezone,
+  getScheduledTaskStatusPresentation,
+  getScheduledTaskTypeLabel,
+  resolveSetupCheckLabel,
+} from '../components/home';
 import { HomeOnboardingSection } from '../components/onboarding/HomeOnboardingSection';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -49,10 +55,9 @@ import {
 import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
 import type {
-  ScheduledTaskOccurrenceStatus,
   ScheduledTaskTodayItem,
 } from '../types/scheduledTasks';
-import type { SetupStatusCheck, SetupStatusResponse } from '../types/systemConfig';
+import type { SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { buildDeepLink } from '../utils/deepLink';
@@ -84,22 +89,6 @@ function writeHomeConfigurableExpanded(expanded: boolean): void {
 }
 
 
-const SETUP_CHECK_LABEL_KEYS: Record<string, string> = {
-  llm_primary: 'home.setupCheck.llm_primary',
-  llm_agent: 'home.setupCheck.llm_agent',
-  stock_list: 'home.setupCheck.stock_list',
-  notification: 'home.setupCheck.notification',
-  storage: 'home.setupCheck.storage',
-};
-
-/** Map setup-status check keys to localized labels; unknown keys fall back to backend title. */
-function resolveSetupCheckLabel(
-  check: Pick<SetupStatusCheck, 'key' | 'title'>,
-  t: (key: any, params?: Record<string, string | number>) => string,
-): string {
-  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
-  return textKey ? t(textKey) : check.title;
-}
 
 
 const SIGNAL_PAGE_SIZE = 12;
@@ -152,56 +141,6 @@ const EMPTY_ATTENTION_AVAILABILITY: HomeAttentionAvailability = {
   scheduledTasks: false,
 };
 
-type UiTranslator = ReturnType<typeof useUiLanguage>['t'];
-type ScheduledTaskBadgeVariant =
-  | 'default'
-  | 'info'
-  | 'success'
-  | 'warning'
-  | 'danger';
-
-function getBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
-}
-
-function getScheduledTaskTypeLabel(
-  taskType: string | undefined,
-  t: UiTranslator,
-): string {
-  if (taskType === 'stock_analysis') return t('home.scheduledTaskTypeAnalysis');
-  if (taskType === 'research_brief') return t('home.scheduledTaskTypeResearchBrief');
-  if (taskType === 'risk_check') return t('home.scheduledTaskTypeRiskCheck');
-  return t('home.scheduledTaskTypeUnknown');
-}
-
-function getScheduledTaskStatusPresentation(
-  status: ScheduledTaskOccurrenceStatus,
-  t: UiTranslator,
-): { label: string; variant: ScheduledTaskBadgeVariant } {
-  if (status === 'succeeded') {
-    return { label: t('taskPanel.completed'), variant: 'success' };
-  }
-  if (status === 'failed') {
-    return { label: t('taskPanel.failed'), variant: 'danger' };
-  }
-  if (status === 'interrupted') {
-    return { label: t('taskPanel.interrupted'), variant: 'warning' };
-  }
-  if (status === 'skipped') {
-    return { label: t('home.scheduledTaskSkipped'), variant: 'default' };
-  }
-  if (status === 'running' || status === 'dispatching') {
-    return { label: t('taskPanel.processing'), variant: 'info' };
-  }
-  if (status === 'retry_wait') {
-    return { label: t('home.scheduledTaskRetryWait'), variant: 'warning' };
-  }
-  return { label: t('taskPanel.pending'), variant: 'default' };
-}
 
 async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
   const reassessmentCutoff = new Date(Date.now() + REASSESSMENT_WINDOW_MS).toISOString();
