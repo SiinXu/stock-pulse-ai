@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
 - [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
 - [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
+- [Added] Backtest phase-1 platform honesty: run responses echo `applied_config` (window, min age, candidate limit, engine, neutral band, force, dates), validation failures use stable error codes, insufficient rows persist resolution notes (`missing_daily_bars` / `insufficient_forward_bars`), and the Web backtest page surfaces notes, summary integrity counts, and advanced run options.
 - [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.

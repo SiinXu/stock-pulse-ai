@@ -25,6 +25,7 @@ import {
   BACKTEST_OUTCOME_LABELS,
   BACKTEST_PHASE_FILTER_OPTIONS,
   BACKTEST_PHASE_LABELS,
+  BACKTEST_RESOLUTION_NOTE_LABELS,
   BACKTEST_STATUS_LABELS,
   BACKTEST_TEXT,
   BACKTEST_VALIDATION_TEXT,
@@ -88,6 +89,28 @@ function parseEvalWindowDays(value: string): number | undefined {
   }
 
   return parsed;
+}
+
+function parseBoundedInteger(value: string, min: number, max: number): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function formatResolutionNotes(notes: string | null | undefined, language: UiLanguage): string[] {
+  if (!notes) return [];
+  const labels = BACKTEST_RESOLUTION_NOTE_LABELS[language];
+  return notes
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => labels[part] ?? part);
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -214,10 +237,31 @@ function phaseBreakdownText(metrics: PerformanceMetrics, language: UiLanguage): 
 const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; language: UiLanguage }> = ({ metrics, title, language }) => {
   const text = BACKTEST_TEXT[language];
   const phaseText = phaseBreakdownText(metrics, language);
+  const completed = Number(metrics.completedCount);
+  const insufficient = Number(metrics.insufficientCount);
+  const total = Number(metrics.totalEvaluations);
+  const skipped = Math.max(total - completed, insufficient);
   return (
     <Card variant="gradient" padding="md" className="animate-fade-in">
       <div className="mb-3">
         <span className="label-uppercase">{title}</span>
+      </div>
+      <div
+        data-testid="backtest-summary-integrity"
+        className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-subtle bg-background/40 p-2"
+      >
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase tracking-wide text-muted-text">{text.completedCount}</span>
+          <span className="font-mono text-sm text-success">{completed}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase tracking-wide text-muted-text">{text.insufficientCount}</span>
+          <span className="font-mono text-sm text-warning">{insufficient}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase tracking-wide text-muted-text">{text.evaluationCount}</span>
+          <span className="font-mono text-sm text-secondary-text">{total}</span>
+        </div>
       </div>
       <MetricRow label={text.directionAccuracy} value={pct(metrics.directionAccuracyPct)} accent />
       <MetricRow label={text.winRate} value={pct(metrics.winRatePct)} accent />
@@ -227,10 +271,8 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
       <MetricRow label={text.takeProfitTriggerRate} value={pct(metrics.takeProfitTriggerRate)} />
       <MetricRow label={text.avgDaysToFirstHit} value={metrics.avgDaysToFirstHit != null ? metrics.avgDaysToFirstHit.toFixed(1) : '--'} />
       <div className="backtest-metric-footer">
-        <span className="text-xs text-muted-text">{text.evaluationCount}</span>
-        <span className="text-xs text-secondary-text font-mono">
-          {Number(metrics.completedCount)} / {Number(metrics.totalEvaluations)}
-        </span>
+        <span className="text-xs text-muted-text">{text.skippedCount}</span>
+        <span className="text-xs text-secondary-text font-mono">{skipped}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-text">{text.outcomeSummary}</span>
@@ -242,6 +284,11 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
           <span className="text-warning">{metrics.neutralCount}</span>
         </span>
       </div>
+      {metrics.engineVersion ? (
+        <div className="mt-2 text-xs text-muted-text">
+          {text.engineVersion}: <span className="font-mono text-secondary-text">{metrics.engineVersion}</span>
+        </div>
+      ) : null}
       {phaseText ? (
         <div className="mt-3 border-t border-subtle pt-2 text-xs text-muted-text">
           {formatUiText(text.phaseDistribution, { text: phaseText })}
@@ -255,14 +302,32 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
 
 const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> = ({ data, language }) => {
   const text = BACKTEST_TEXT[language];
+  const config = data.appliedConfig;
+  const configParts: string[] = [];
+  if (config) {
+    configParts.push(formatUiText(text.dayWindow, { days: String(config.evalWindowDays) }));
+    configParts.push(`${text.minAge} ${config.minAgeDays}`);
+    configParts.push(`${text.candidateLimit} ${config.limit}`);
+    configParts.push(`${text.engineVersion} ${config.engineVersion}`);
+    configParts.push(`${text.neutralBand} ${config.neutralBandPct}%`);
+    configParts.push(config.force ? text.forceOn : text.forceOff);
+    if (config.code) configParts.push(String(config.code));
+    if (config.analysisDateFrom) configParts.push(formatUiText(text.fromDate, { date: config.analysisDateFrom }));
+    if (config.analysisDateTo) configParts.push(formatUiText(text.toDate, { date: config.analysisDateTo }));
+  }
   return (
-  <div className="backtest-summary animate-fade-in">
+  <div data-testid="backtest-run-summary" className="backtest-summary animate-fade-in">
     <span className="label">{text.processed} <span className="value">{data.processed}</span></span>
     <span className="label">{text.saved} <span className="value primary">{data.saved}</span></span>
     <span className="label">{text.completed} <span className="value success">{data.completed}</span></span>
     <span className="label">{text.insufficient} <span className="value warning">{data.insufficient}</span></span>
     {data.errors > 0 && (
       <span className="label">{text.errors} <span className="value danger">{data.errors}</span></span>
+    )}
+    {configParts.length > 0 && (
+      <span data-testid="backtest-applied-config" className="label message">
+        {text.appliedConfig}: {configParts.join(' · ')}
+      </span>
     )}
     {data.message && (
       <span className="label message">{data.message}</span>
@@ -302,6 +367,10 @@ const BacktestPage: React.FC = () => {
   const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>(initialFilters.phase);
   const [evalDays, setEvalDays] = useState(initialFilters.windowDays ? String(initialFilters.windowDays) : '');
   const [evalDaysError, setEvalDaysError] = useState('');
+  const [minAgeDays, setMinAgeDays] = useState('');
+  const [minAgeError, setMinAgeError] = useState('');
+  const [candidateLimit, setCandidateLimit] = useState('200');
+  const [candidateLimitError, setCandidateLimitError] = useState('');
   const [dateFromError, setDateFromError] = useState('');
   const [dateToError, setDateToError] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<BacktestFilterSnapshot>(initialFilters);
@@ -333,6 +402,26 @@ const BacktestPage: React.FC = () => {
   const lastRegularWindowRef = useRef(
     initialFilters.windowDays && initialFilters.windowDays > 1 ? initialFilters.windowDays : 10,
   );
+
+  const validateRunOptions = (): { minAgeDays?: number; limit: number } | null => {
+    const parsedMinAge = minAgeDays.trim()
+      ? parseBoundedInteger(minAgeDays, 0, 365)
+      : undefined;
+    const invalidMinAge = Boolean(minAgeDays.trim()) && parsedMinAge === undefined;
+    const parsedLimit = parseBoundedInteger(candidateLimit, 1, 2000);
+    const invalidLimit = parsedLimit === undefined;
+
+    setMinAgeError(invalidMinAge ? validationText.minAge : '');
+    setCandidateLimitError(invalidLimit ? validationText.candidateLimit : '');
+    if (invalidMinAge || invalidLimit) {
+      document.getElementById(invalidMinAge ? 'backtest-min-age' : 'backtest-candidate-limit')?.focus();
+      return null;
+    }
+    return {
+      minAgeDays: parsedMinAge,
+      limit: parsedLimit ?? 200,
+    };
+  };
 
   const validateDraftFilters = (windowOverride?: number, codeOverride?: string): BacktestFilterSnapshot | null => {
     const windowDays = windowOverride ?? parseEvalWindowDays(evalDays);
@@ -471,7 +560,11 @@ const BacktestPage: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Run backtest
-  const runBacktest = async (validatedFilters: BacktestFilterSnapshot, force: boolean) => {
+  const runBacktest = async (
+    validatedFilters: BacktestFilterSnapshot,
+    force: boolean,
+    runOptions: { minAgeDays?: number; limit: number },
+  ) => {
     setAppliedFilters(validatedFilters);
     const requestGeneration = runRequestGenerationRef.current + 1;
     runRequestGenerationRef.current = requestGeneration;
@@ -487,21 +580,29 @@ const BacktestPage: React.FC = () => {
       const response = await backtestApi.run({
         code,
         force: force || undefined,
-        minAgeDays: force ? 0 : undefined,
+        minAgeDays: force ? 0 : runOptions.minAgeDays,
         evalWindowDays: requestedEvalWindowDays,
         analysisDateFrom: dateFrom,
         analysisDateTo: dateTo,
+        limit: runOptions.limit,
       });
       if (!isLatestRequest()) return;
       setRunResult(response);
       const effectiveEvalWindowDays =
-        response.appliedEvalWindowDays
+        response.appliedConfig?.evalWindowDays
+        ?? response.appliedEvalWindowDays
         ?? requestedEvalWindowDays
         ?? parseEvalWindowDays(evalDays)
         ?? overallPerf?.evalWindowDays;
       if (effectiveEvalWindowDays != null) {
         if (effectiveEvalWindowDays > 1) lastRegularWindowRef.current = effectiveEvalWindowDays;
         setEvalDays(String(effectiveEvalWindowDays));
+      }
+      if (response.appliedConfig?.minAgeDays != null && !force) {
+        setMinAgeDays(String(response.appliedConfig.minAgeDays));
+      }
+      if (response.appliedConfig?.limit != null) {
+        setCandidateLimit(String(response.appliedConfig.limit));
       }
       syncBacktestFiltersToUrl({
         code: code ?? '',
@@ -511,7 +612,6 @@ const BacktestPage: React.FC = () => {
         phase: validatedFilters.phase,
         page: 1,
       });
-      // Refresh data with same eval_window_days
       const nextAppliedFilters = { ...validatedFilters, windowDays: effectiveEvalWindowDays, page: 1 };
       setAppliedFilters(nextAppliedFilters);
       void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
@@ -526,11 +626,13 @@ const BacktestPage: React.FC = () => {
   const handleRun = () => {
     const validatedFilters = validateDraftFilters();
     if (!validatedFilters) return;
+    const runOptions = validateRunOptions();
+    if (!runOptions) return;
     if (forceRerun) {
       setPendingForceRun(validatedFilters);
       return;
     }
-    void runBacktest(validatedFilters, false);
+    void runBacktest(validatedFilters, false, runOptions);
   };
 
   // Phase is a result-only filter (backtestApi.run never receives it), so apply
@@ -678,6 +780,31 @@ const BacktestPage: React.FC = () => {
       header: text.status,
       cell: (row) => statusBadge(row.evalStatus, language),
     },
+    {
+      id: 'notes',
+      header: text.notes,
+      cell: (row) => {
+        const notes = formatResolutionNotes(row.resolutionNotes, language);
+        if (!notes.length) {
+          const isInsufficient = row.evalStatus === 'insufficient' || row.evalStatus === 'insufficient_data';
+          return isInsufficient
+            ? <span className="text-xs text-warning">{text.insufficientCount}</span>
+            : <span className="text-muted-text">--</span>;
+        }
+        const content = notes.join(' · ');
+        return (
+          <Tooltip content={content} focusable>
+            <span
+              data-testid="backtest-resolution-notes"
+              className="block max-w-48 truncate text-xs text-secondary-text"
+              title={content}
+            >
+              {content}
+            </span>
+          </Tooltip>
+        );
+      },
+    },
   ];
 
   return (
@@ -765,6 +892,58 @@ const BacktestPage: React.FC = () => {
             semantics="single-select"
             className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
           />
+          <Tooltip content={text.minAgeDescription}>
+            <Input
+              id="backtest-min-age"
+              label={text.minAge}
+              type="number"
+              size="default"
+              min={0}
+              max={365}
+              value={minAgeDays}
+              onChange={(e) => {
+                setMinAgeDays(e.target.value);
+                setMinAgeError('');
+              }}
+              placeholder="14"
+              disabled={isRunning}
+              fieldClassName="w-24"
+              aria-invalid={minAgeError ? true : undefined}
+              aria-describedby={minAgeError ? 'backtest-min-age-error' : undefined}
+              className={`text-center tabular-nums ${minAgeError ? 'border-danger/40 focus:border-danger' : ''}`}
+            />
+          </Tooltip>
+          {minAgeError ? (
+            <span id="backtest-min-age-error" role="alert" className="sr-only">
+              {minAgeError}
+            </span>
+          ) : null}
+          <Tooltip content={text.candidateLimitDescription}>
+            <Input
+              id="backtest-candidate-limit"
+              label={text.candidateLimit}
+              type="number"
+              size="default"
+              min={1}
+              max={2000}
+              value={candidateLimit}
+              onChange={(e) => {
+                setCandidateLimit(e.target.value);
+                setCandidateLimitError('');
+              }}
+              placeholder="200"
+              disabled={isRunning}
+              fieldClassName="w-24"
+              aria-invalid={candidateLimitError ? true : undefined}
+              aria-describedby={candidateLimitError ? 'backtest-candidate-limit-error' : undefined}
+              className={`text-center tabular-nums ${candidateLimitError ? 'border-danger/40 focus:border-danger' : ''}`}
+            />
+          </Tooltip>
+          {candidateLimitError ? (
+            <span id="backtest-candidate-limit-error" role="alert" className="sr-only">
+              {candidateLimitError}
+            </span>
+          ) : null}
           <div className="flex h-8 items-center gap-1.5">
             <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
             <Tooltip content={text.forceRerunDescription}>
@@ -970,7 +1149,10 @@ const BacktestPage: React.FC = () => {
         onConfirm={() => {
           const filters = pendingForceRun;
           setPendingForceRun(null);
-          if (filters) void runBacktest(filters, true);
+          if (!filters) return;
+          const runOptions = validateRunOptions();
+          if (!runOptions) return;
+          void runBacktest(filters, true, runOptions);
         }}
         onCancel={() => setPendingForceRun(null)}
       />
