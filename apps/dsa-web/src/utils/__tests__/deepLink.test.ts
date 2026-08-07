@@ -192,6 +192,9 @@ describe('deepLink', () => {
   it('rejects external and unsupported destinations', () => {
     expect(parseDeepLink('https://example.com/chat').issues).toEqual([{ code: 'external_origin' }]);
     expect(parseDeepLink('/admin').issues).toEqual([{ code: 'unsupported_route' }]);
+    expect(parseDeepLink(APP_ROUTE_PATHS.researchSkillOutcomes).issues).toEqual([]);
+    expect(parseDeepLink(APP_ROUTE_PATHS.researchSkillOutcomes).normalizedHref)
+      .toBe(APP_ROUTE_PATHS.researchSkillOutcomes);
   });
 
   it('accepts canonical and legacy Research routes without rewriting their state', () => {
