@@ -408,7 +408,7 @@ describe('PortfolioPage FX refresh', () => {
     expect(positionsSection).not.toBe(overview);
   });
 
-  it('removes the details divider from the page-level portfolio error', async () => {
+  it('shows the page-level portfolio error in a toast', async () => {
     getSnapshot.mockRejectedValueOnce(
       createApiError(
         createParsedApiError({
@@ -423,7 +423,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     const alert = (await screen.findByText('持仓加载失败')).closest('[role="alert"]');
-    expect(alert?.parentElement).toHaveClass('[&_details]:border-t-0', '[&_details]:pt-0');
+    expect(alert?.closest('[data-overlay-root="toast"]')).not.toBeNull();
   });
 
   it('restores selected account from the URL and keeps Back navigation in sync', async () => {
@@ -1701,9 +1701,12 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.change(within(dialog).getByLabelText('成交价'), { target: { value: '100' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
 
-    expect(await within(dialog).findByText(
+    expect(await screen.findByText(
       '模拟现金不足。请减少买入数量或填写更低的有效成交价。',
     )).toBeInTheDocument();
+    expect(within(dialog).queryByText(
+      '模拟现金不足。请减少买入数量或填写更低的有效成交价。',
+    )).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText('股票代码')).toHaveValue('AAPL');
     expect(within(dialog).getByLabelText('数量')).toHaveValue(100);
   });
@@ -1764,7 +1767,8 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.change(within(dialog).getByLabelText('成交价'), { target: { value: '205' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
 
-    expect(await within(dialog).findByText('纸上交易失败')).toBeInTheDocument();
+    expect(await screen.findByText('纸上交易失败')).toBeInTheDocument();
+    expect(within(dialog).queryByText('纸上交易失败')).not.toBeInTheDocument();
     const accountOneOperationId = createPaperTrade.mock.calls[0][1].operationId;
 
     chooseOption(accountSelect, '2');

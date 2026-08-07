@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Optional RSS/Atom market-news feeds (`RSS_NEWS_FEED_URLS`) as a free supplement in the on-demand search pipeline; empty config stays inert, per-feed failures degrade without aborting the run, and fetch uses the fail-closed outbound policy.
+- [Fixed] Reduced the screening availability status surface to a compact size.
+- [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.
+- [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.
+- [Fixed] Tightened history metadata, task-count, chat-history, scheduler-status, and Market Review sentiment/share controls to match their intended visual hierarchy.
+- [Fixed] Removed the redundant Backtest Filter action, aligned its Stock field, and clarified the relationship between window days and next-day validation.
 - [Added] Offline financial agent evaluation benchmark (V0): structural metrics over frozen agent_runtime replays, deterministic runner, committed baseline, and bilingual docs (#252).
 - [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
 - [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
@@ -2715,4 +2720,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 [1.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/4df277e109c38604e31e2184fcff36f561f8ffa5
 [1.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/5d5c095be55ff8cc2b0ed219ea35a9135536de38
 [1.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v1.0.0
-

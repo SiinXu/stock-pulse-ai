@@ -8,7 +8,6 @@ import {
   Copy,
   Download,
   History,
-  RefreshCw,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
@@ -1019,7 +1018,7 @@ const ChatPage: React.FC = () => {
 
   const sidebarContent = (
     <>
-      <div className="flex items-center justify-between border-b border-subtle bg-subtle-soft p-3.5">
+      <div className="flex items-center justify-between rounded-lg bg-subtle-soft p-3.5">
         <h2 className="hidden items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-primary xl:flex">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1066,23 +1065,11 @@ const ChatPage: React.FC = () => {
             title={t('chat.loadingSessions')}
           />
         ) : sessionsError ? (
-          <div className="relative [&_details]:border-t-0 [&_details]:pt-0">
-            <ApiErrorAlert
-              error={sessionsError}
-              className="pr-10"
-            />
-            <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
-              <IconButton
-                variant="danger"
-                size="compact"
-                tooltip={false}
-                aria-label={t('common.retry')}
-                onClick={() => void loadSessions()}
-              >
-                <RefreshCw aria-hidden="true" />
-              </IconButton>
-            </Tooltip>
-          </div>
+          <ApiErrorAlert
+            error={sessionsError}
+            actionLabel={t('common.retry')}
+            onAction={() => void loadSessions()}
+          />
         ) : sessions.length === 0 ? (
           <DashboardStateBlock
             compact
@@ -1541,28 +1528,11 @@ const ChatPage: React.FC = () => {
                 />
               ) : null}
               {chatError ? (
-                <div className="relative">
-                  <ApiErrorAlert
-                    error={chatError}
-                    className={cn(
-                      '[&>div>div]:w-full [&_details]:w-full',
-                      lastFailedRequest && 'pr-12',
-                    )}
-                  />
-                  {lastFailedRequest ? (
-                    <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
-                      <IconButton
-                        variant="danger"
-                        size="compact"
-                        tooltip={false}
-                        aria-label={t('common.retry')}
-                        onClick={() => void retryLastStream()}
-                      >
-                        <RefreshCw aria-hidden="true" />
-                      </IconButton>
-                    </Tooltip>
-                  ) : null}
-                </div>
+                <ApiErrorAlert
+                  error={chatError}
+                  actionLabel={lastFailedRequest ? t('common.retry') : undefined}
+                  onAction={lastFailedRequest ? () => void retryLastStream() : undefined}
+                />
               ) : null}
               {isFollowUpContextLoading ? (
                 <InlineAlert

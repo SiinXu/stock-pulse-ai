@@ -53,6 +53,9 @@ describe('SignalScorecardPanel', () => {
       />,
     );
 
+    const descriptionNote = screen.getByText(UI_TEXT.en['settings.scorecardDescription']);
+    expect(descriptionNote).toHaveClass('text-xs', 'text-muted-text');
+    expect(descriptionNote.closest('header')).toBeNull();
     expect(await screen.findByText('Public scorecard is disabled')).toBeInTheDocument();
     expect(screen.getByText(/Turn on Public Signal Scorecard/i)).toBeInTheDocument();
     expect(screen.getByText('Disabled (public route returns 404)')).toBeInTheDocument();
