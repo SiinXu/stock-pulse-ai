@@ -1324,6 +1324,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: 'Enable Valuation Agent Tool',
+    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
+    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
+    notes: [
+      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
+      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
+      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
+    ],
+  },
 };
 
 export default settingsHelpEnUS;,
