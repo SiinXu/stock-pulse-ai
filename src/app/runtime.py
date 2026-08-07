@@ -515,6 +515,15 @@ def _run_schedule_mode(
             "run_immediately": True,
             "name": "agent_event_monitor",
         })
+    if getattr(config, "daily_brief_enabled", False):
+        from src.services.daily_brief_service import build_daily_brief_background_tasks
+
+        background_tasks.extend(
+            build_daily_brief_background_tasks(
+                config,
+                config_provider=_reload_runtime_config,
+            )
+        )
 
     schedule_kwargs = {
         "task": scheduled_task,

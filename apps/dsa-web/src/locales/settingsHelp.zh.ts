@@ -1378,6 +1378,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响分析总耗时。'],
     notes: ['总耗时 ≈ 股票数 × 单股耗时 + (股票数-1) × ANALYSIS_DELAY。'],
   },
+  'settings.system.daily_brief': {
+    title: '每日简报',
+    summary: '按计划生成每日简报，并回顾历史简报准确率。',
+    usage: 'DAILY_BRIEF_ENABLED 控制开关；DAILY_BRIEF_SCHEDULE_TIME 与 DAILY_BRIEF_TIMEZONE 控制计划时间；DAILY_BRIEF_MIN_SAMPLES 控制展示准确率前的最小样本数。',
+    valueNotes: [
+      '默认关闭，不影响既有计划任务。',
+      '准确率回顾仅供参考，不会自动交易。',
+    ],
+    impact: ['影响计划简报生成与准确率回顾展示。'],
+    notes: ['定时投递需要 schedule 模式。'],
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: '保存分析上下文快照',
     summary: '控制是否将分析历史的整份 context_snapshot 持久化到数据库。',
