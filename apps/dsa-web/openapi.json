@@ -13137,6 +13137,51 @@
         "title": "PortfolioEventCreatedResponse",
         "type": "object"
       },
+      "PortfolioFutuImportRequest": {
+        "properties": {
+          "account_id": {
+            "description": "Target portfolio account id",
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Synthetic buy trade date for imported positions; defaults to today",
+            "title": "As Of"
+          },
+          "dry_run": {
+            "default": false,
+            "description": "Preview insert counts without writing trades",
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).",
+            "title": "Operation Id"
+          }
+        },
+        "required": [
+          "account_id"
+        ],
+        "title": "PortfolioFutuImportRequest",
+        "type": "object"
+      },
       "PortfolioFxRefreshResponse": {
         "properties": {
           "account_count": {
@@ -29302,6 +29347,190 @@
           }
         },
         "summary": "Parse broker CSV into normalized trade records",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/imports/futu": {
+      "post": {
+        "description": "Import live Futu positions via the shared trade-record commit path.\n\nPortfolio Web UI for this action is a follow-up; this endpoint is the backend\nseam for API clients and future UI wiring.",
+        "operationId": "commit_futu_import_api_v1_portfolio_imports_futu_post",
+        "parameters": [
+          {
+            "description": "Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioFutuImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioImportCommitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Import Futu OpenD real positions into a portfolio account",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/imports/futu/preview": {
+      "post": {
+        "operationId": "preview_futu_import_api_v1_portfolio_imports_futu_preview_post",
+        "parameters": [
+          {
+            "description": "Synthetic buy trade date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Synthetic buy trade date; default today",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioImportParseResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Preview Futu OpenD real positions as import trade records",
         "tags": [
           "Portfolio"
         ]
