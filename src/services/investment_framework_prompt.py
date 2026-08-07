@@ -8,7 +8,10 @@ import logging
 from typing import Any, Dict, Optional
 
 from src.report_language import normalize_report_language
-from src.schemas.investment_framework import InvestmentFrameworkAnalysisContext
+from src.schemas.investment_framework import (
+    InvestmentFrameworkAnalysisContext,
+    InvestmentFrameworkContent,
+)
 from src.schemas.report_strata import (
     FrameworkAlignment,
     default_framework_not_configured_summary,
@@ -26,6 +29,9 @@ _PROMPT_FREE_FORM_MAX_CHARS = 2500
 _PROMPT_LIST_MAX_ITEMS = 20
 _PROMPT_LIST_ITEM_MAX_CHARS = 400
 _PROMPT_DIMENSION_MAX_ITEMS = 15
+_PROMPT_TREE_MAX_NODES = 12
+_PROMPT_TREE_MAX_BRANCHES = 8
+_PROMPT_TREE_FIELD_MAX_CHARS = 200
 
 
 def _clip_text(value: str, limit: int) -> str:
@@ -42,6 +48,64 @@ def _clip_rule_list(values: list[str]) -> list[str]:
         if cleaned:
             clipped.append(cleaned)
     return clipped
+
+
+
+def _format_decision_tree_lines(
+    content: InvestmentFrameworkContent,
+    *,
+    english: bool,
+) -> list[str]:
+    """Render a bounded decision-tree summary for the analysis prompt."""
+    nodes = list(content.decision_tree or [])
+    if not nodes:
+        return []
+    root_node_id = content.root_node_id
+    lines: list[str] = [
+        "### Decision tree" if english else "### 决策树",
+    ]
+    if root_node_id:
+        root = _clip_text(str(root_node_id), _PROMPT_TREE_FIELD_MAX_CHARS)
+        lines.append(
+            f"- Root: {root}" if english else f"- 根节点：{root}"
+        )
+    for node in nodes[:_PROMPT_TREE_MAX_NODES]:
+        node_id = _clip_text(str(node.node_id or ""), _PROMPT_TREE_FIELD_MAX_CHARS)
+        question = _clip_text(str(node.question or ""), _PROMPT_TREE_FIELD_MAX_CHARS)
+        if not node_id and not question:
+            continue
+        label = f"[{node_id}] {question}".strip() if node_id else question
+        lines.append(f"- {label}")
+        for branch in list(node.branches or [])[:_PROMPT_TREE_MAX_BRANCHES]:
+            condition = _clip_text(
+                str(branch.condition or ""),
+                _PROMPT_TREE_FIELD_MAX_CHARS,
+            )
+            target = branch.target_node_id
+            outcome = branch.outcome
+            if target:
+                dest = f"→ {_clip_text(str(target), _PROMPT_TREE_FIELD_MAX_CHARS)}"
+            elif outcome:
+                dest = f"⇒ {_clip_text(str(outcome), _PROMPT_TREE_FIELD_MAX_CHARS)}"
+            else:
+                dest = "→ ?" if english else "→ ？"
+            if condition:
+                lines.append(
+                    f"  - if {condition}: {dest}"
+                    if english
+                    else f"  - 若 {condition}：{dest}"
+                )
+            else:
+                lines.append(f"  - {dest}")
+    if len(nodes) > _PROMPT_TREE_MAX_NODES:
+        omitted = len(nodes) - _PROMPT_TREE_MAX_NODES
+        lines.append(
+            f"- … and {omitted} more node(s)"
+            if english
+            else f"- … 另有 {omitted} 个节点未展开"
+        )
+    lines.append("")
+    return lines
 
 
 def format_investment_framework_prompt_section(
@@ -98,6 +162,7 @@ def format_investment_framework_prompt_section(
                     + (f": {criteria}" if criteria else "")
                 )
             lines.append("")
+        lines.extend(_format_decision_tree_lines(content, english=True))
         return "\n".join(lines)
 
     lines = [
@@ -131,6 +196,7 @@ def format_investment_framework_prompt_section(
                 + (f"：{criteria}" if criteria else "")
             )
         lines.append("")
+    lines.extend(_format_decision_tree_lines(content, english=False))
     return "\n".join(lines)
 
 

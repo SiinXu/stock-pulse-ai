@@ -33,6 +33,8 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'kronos_enabled',
     'kronos_model_size',
     'kronos_weights_dir',
+    'multimodal_agent_tools_enabled',
+    'multimodal_file_root',
     'decision_memory_enabled',
     'decision_memory_lookback',
     'decision_memory_min_age_days',

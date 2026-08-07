@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from dataclasses import dataclass, field
 from types import FunctionType
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
@@ -577,6 +578,26 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
                         "All markets relevant to the review are closed today; skipping the run. "
                         "Use --force-run to override."
                     )
+                    try:
+                        from src.services.actions_daily_run_summary import (
+                            build_status_for_non_trading_day,
+                            write_run_status,
+                        )
+
+                        write_run_status(
+                            build_status_for_non_trading_day(
+                                mode="market-only",
+                                force_run=bool(getattr(args, "force_run", False)),
+                            )
+                        )
+                    except Exception as status_exc:  # broad-exception: fallback_recorded - status write must not fail CLI
+                        log_safe_exception(
+                            logger,
+                            "Actions run status write failed for market-review non-trading skip",
+                            status_exc,
+                            error_code="actions_run_status_write_failed",
+                            level=logging.WARNING,
+                        )
                     return 0
 
             logger.info("Mode: market review only")

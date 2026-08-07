@@ -31,7 +31,7 @@ type ResearchDestination = {
 const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
   {
     key: 'market',
-    titleKey: 'home.marketReview',
+    titleKey: 'layout.nav.marketReview',
     descriptionKey: 'researchOverview.marketDescription',
     to: APP_ROUTE_PATHS.researchMarket,
     icon: BarChart3,
@@ -45,7 +45,7 @@ const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
   },
   {
     key: 'analysis',
-    titleKey: 'analysisWorkbench.title',
+    titleKey: 'layout.nav.analysis',
     descriptionKey: 'researchOverview.analysisDescription',
     to: APP_ROUTE_PATHS.researchAnalysis,
     icon: FlaskConical,

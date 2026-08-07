@@ -1,0 +1,14 @@
+{
+  "meta": {
+    "provider": "yfinance",
+    "ticker": "AAPL",
+    "recorded_note": "Yahoo history columns after download (flat Title Case). MultiIndex first level is also accepted by YfinanceFetcher._normalize_data."
+  },
+  "index_name": "Date",
+  "columns": ["Open", "High", "Low", "Close", "Volume"],
+  "rows": [
+    {"Date": "2026-05-06", "Open": 189.5, "High": 191.2, "Low": 188.8, "Close": 190.4, "Volume": 45231000},
+    {"Date": "2026-05-07", "Open": 190.5, "High": 192.0, "Low": 189.9, "Close": 191.1, "Volume": 40122000},
+    {"Date": "2026-05-08", "Open": 191.0, "High": 191.8, "Low": 189.5, "Close": 190.0, "Volume": 38890000}
+  ]
+}
