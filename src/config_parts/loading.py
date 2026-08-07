@@ -1092,9 +1092,10 @@ class _ConfigLoadingMethods:
             multimodal_agent_tools_enabled=parse_env_bool(
                 os.getenv('MULTIMODAL_AGENT_TOOLS_ENABLED'), default=False
             ),
-            multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
             valuation_agent_tool_enabled=parse_env_bool(
                 os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
+            ),
+            multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
