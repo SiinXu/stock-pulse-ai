@@ -99,4 +99,10 @@ def get_portfolio_risk_metrics(
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - map risk metrics failures to a sanitized API error
-        raise _internal_error("Get portfolio risk metrics failed", exc)
+        log_safe_exception(
+            logger,
+            "Get portfolio risk metrics failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise api_error(500, "internal_error", "Get portfolio risk metrics failed") from exc
