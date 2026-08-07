@@ -19,6 +19,7 @@ from src.agent.committee_presets import (
     default_committee_persona_ids,
 )
 from src.agent.protocols import AgentContext
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +90,13 @@ def _available_id_set(
             for skill in skill_manager.list_skills()
             if getattr(skill, "name", None)
         }
-    except Exception:  # broad-exception: fallback_recorded - Catalog lookup failures fall open to id-only validation.
-        logger.debug(
+    except Exception as exc:  # broad-exception: fallback_recorded - Catalog lookup failures fall open to id-only validation.
+        log_safe_exception(
+            logger,
             "[committee] skill catalog unavailable; resolving personas without catalog filter",
-            exc_info=True,
+            exc,
+            error_code="agent_committee_skill_catalog_unavailable",
+            level=logging.DEBUG,
         )
         return None
 
