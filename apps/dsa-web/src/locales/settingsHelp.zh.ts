@@ -1420,12 +1420,4 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
 };
 
-  VALUATION_AGENT_TOOL_ENABLED: {
-    title: "\u542f\u7528\u4f30\u503c Agent Tool",
-    summary: "\u53ef\u9009\u7684 DCF/\u76f8\u5bf9\u4f30\u503c Agent Tool\u3002",
-    usage: "\u9ed8\u8ba4\u5173\u95ed\u3002",
-    impact: [],
-    notes: [],
-    valueNotes: [],
-  },
 export default settingsHelpZhCN;
