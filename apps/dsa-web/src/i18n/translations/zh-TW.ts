@@ -3953,6 +3953,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.completed": "任務執行完成",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.failed": "任務執行失敗",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted": "任務已中斷",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.recovered.requeued": "任务已从进程重启中恢复并重新排队",
+  "utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted.process_restart": "任务因进程重启中断，无法安全恢复",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.market_review.queued": "大盤覆盤任務已提交",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.processing": "任務執行中",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.queued": "任務已加入佇列",
