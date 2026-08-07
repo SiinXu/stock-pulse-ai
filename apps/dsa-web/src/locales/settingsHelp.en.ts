@@ -1073,6 +1073,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'It only affects visible ask-stock history compression; it does not change LLM provider, model, Base URL, save cleanup, or runtime priority semantics.',
     ],
   },
+  'settings.agent.observability': {
+    title: 'Agent Observability',
+    summary: 'Lightweight structured agent run events with trace/span ids for the run-flow view.',
+    usage: 'AGENT_OBSERVABILITY_ENABLED toggles lightweight events (default on). AGENT_OBSERVABILITY_DEEP_PAYLOAD optionally captures sanitized tool argument/result previews (default off).',
+    valueNotes: [
+      'Events persist through run diagnostics and appear in the existing run-flow panel.',
+      'Deep payloads remain redacted for prompts, keys, and secrets.',
+    ],
+    impact: ['Adds low-overhead agent timeline detail for debugging multi-step runs.'],
+    notes: ['See docs/agent-observability_EN.md for privacy and overhead notes.'],
+  },
   'settings.agent.event_monitor': {
     title: 'Event Monitor',
     summary: 'Enables background event monitoring in schedule mode with periodic rule polling.',

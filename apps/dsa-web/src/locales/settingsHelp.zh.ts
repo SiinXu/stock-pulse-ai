@@ -1116,6 +1116,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '该配置只影响问股可见历史压缩，不改变 LLM provider、模型、Base URL、保存清理或运行时优先级语义。',
     ],
   },
+  'settings.agent.observability': {
+    title: 'Agent 可观测性',
+    summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',
+    usage: 'AGENT_OBSERVABILITY_ENABLED 控制轻量事件（默认开启）。AGENT_OBSERVABILITY_DEEP_PAYLOAD 可选记录脱敏后的工具参数/结果预览（默认关闭）。',
+    valueNotes: [
+      '事件写入运行诊断，并展示在既有运行流面板中。',
+      '深度 payload 仍会脱敏 prompt、密钥与敏感字段。',
+    ],
+    impact: ['为多步骤 Agent 排障提供低开销时间线细节。'],
+    notes: ['隐私与开销说明见 docs/agent-observability.md。'],
+  },
   'settings.agent.event_monitor': {
     title: '事件监控',
     summary: '在定时模式下启用后台事件监控，定期轮询告警规则。',
