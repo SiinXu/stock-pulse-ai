@@ -136,7 +136,14 @@ def is_agent_observability_enabled() -> bool:
 
         config = get_config()
         return bool(getattr(config, "agent_observability_enabled", True))
-    except Exception:  # broad-exception: fallback_recorded - Config lookup must not block analysis.
+    except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block analysis.
+        log_safe_exception(
+            logger,
+            "Agent observability enabled flag lookup failed; defaulting on",
+            exc,
+            error_code="agent_observability_enabled_lookup_failed",
+            level=logging.DEBUG,
+        )
         return True
 
 
@@ -147,7 +154,14 @@ def is_deep_payload_enabled() -> bool:
 
         config = get_config()
         return bool(getattr(config, "agent_observability_deep_payload", False))
-    except Exception:  # broad-exception: fallback_recorded - Config lookup must not block analysis.
+    except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block analysis.
+        log_safe_exception(
+            logger,
+            "Agent observability deep payload flag lookup failed; defaulting off",
+            exc,
+            error_code="agent_observability_deep_payload_lookup_failed",
+            level=logging.DEBUG,
+        )
         return False
 
 
