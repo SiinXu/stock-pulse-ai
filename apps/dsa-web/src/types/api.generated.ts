@@ -1826,7 +1826,6 @@ export interface paths {
         trace?: never;
     };
     "/api/v1/plugins": {
-    "/api/v1/onboarding/apply": {
         parameters: {
             query?: never;
             header?: never;
@@ -1861,18 +1860,6 @@ export interface paths {
          */
         post: operations["updatePluginLifecycle"];
         delete?: never;
-         * Apply non-secret onboarding config recommendations
-         * @description Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.
-        post: operations["apply_onboarding_plan_api_v1_onboarding_apply_post"];
-    "/api/v1/onboarding/plan": {
-         * Generate an agent-guided onboarding plan
-         * @description Rule-based plan generation is the default. When prefer_llm is true but no model is available, the response stays engine=rules with an honest llm_note (no fake AI).
-        post: operations["generate_onboarding_plan_api_v1_onboarding_plan_post"];
-    "/api/v1/onboarding/state": {
-        /** Get persisted onboarding profile and last plan */
-        get: operations["get_onboarding_state_api_v1_onboarding_state_get"];
-        /** Reset persisted onboarding profile (keeps already written config) */
-        delete: operations["reset_onboarding_state_api_v1_onboarding_state_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7586,215 +7573,6 @@ export interface components {
             /** Target */
             target?: string | null;
         };
-        /**
-         * OnboardingApplyRequest
-         * @description Apply non-secret recommended config after explicit user confirmation.
-         */
-        OnboardingApplyRequest: {
-            /** Config Version */
-            config_version: string;
-            /**
-             * Confirm
-             * @description Must be true to apply.
-             * @default true
-             */
-            confirm: boolean;
-            /**
-             * Model Available
-             * @default false
-             */
-            model_available: boolean;
-            /**
-             * Prefer Llm
-             * @default false
-             */
-            prefer_llm: boolean;
-            profile?: components["schemas"]["UserOnboardingProfile"];
-        };
-        /** OnboardingApplyResponse */
-        OnboardingApplyResponse: {
-            /**
-             * Applied Count
-             * @default 0
-             */
-            applied_count: number;
-            /** Applied Keys */
-            applied_keys?: string[];
-            /** Config Version */
-            config_version: string;
-            /** Message */
-            message: string;
-            plan: components["schemas"]["OnboardingPlanResponse"];
-            /** Profile */
-            profile: {
-                [key: string]: unknown;
-            };
-            /** Success */
-            success: boolean;
-            /** Update */
-            update?: {
-                [key: string]: unknown;
-            };
-        };
-        /** OnboardingConfigItem */
-        OnboardingConfigItem: {
-            /** Key */
-            key: string;
-            /** Value */
-            value: string;
-        };
-        /** OnboardingFeaturePath */
-        OnboardingFeaturePath: {
-            /** Defer */
-            defer?: string[];
-            /** Emphasize */
-            emphasize?: string[];
-            /** Label */
-            label: string;
-            /** Primary Path */
-            primary_path?: string[];
-            /** Stage */
-            stage: string;
-        };
-        /**
-         * OnboardingPlanRequest
-         * @description Generate a rule-based (optionally LLM-refined) onboarding plan.
-         */
-        OnboardingPlanRequest: {
-            /**
-             * Model Available
-             * @description Whether a usable model is already configured (client-reported or server-known).
-             * @default false
-             */
-            model_available: boolean;
-            /**
-             * Prefer Llm
-             * @description Request LLM refinement when a model is available. When false or when no model is available, the engine stays rule-based honestly.
-             * @default false
-             */
-            prefer_llm: boolean;
-            profile?: components["schemas"]["UserOnboardingProfile"];
-        };
-        /** OnboardingPlanResponse */
-        OnboardingPlanResponse: {
-            /**
-             * Beginner Mode Recommended
-             * @default true
-             */
-            beginner_mode_recommended: boolean;
-            /** Config Changes */
-            config_changes?: {
-                [key: string]: unknown;
-            }[];
-            /** Config Items */
-            config_items?: components["schemas"]["OnboardingConfigItem"][];
-            /** Disclaimer */
-            disclaimer: string;
-            /** Engine */
-            engine: string;
-            feature_path: components["schemas"]["OnboardingFeaturePath"];
-            /** Feature Stage */
-            feature_stage: string;
-            /** Generated At */
-            generated_at: string;
-            /** Llm Note */
-            llm_note: string;
-            /**
-             * Model Available
-             * @default false
-             */
-            model_available: boolean;
-            /**
-             * Prefer Llm
-             * @default false
-             */
-            prefer_llm: boolean;
-            /** Profile */
-            profile: {
-                [key: string]: unknown;
-            };
-            /** Recommended Preset Id */
-            recommended_preset_id: string;
-            /** Recommended Preset Name */
-            recommended_preset_name: string;
-            /** Schema Version */
-            schema_version: number;
-            /** Today Plan */
-            today_plan?: components["schemas"]["OnboardingPlanStep"][];
-            /** Todos */
-            todos?: components["schemas"]["OnboardingTodoItem"][];
-            /** Week Plan */
-            week_plan?: components["schemas"]["OnboardingWeekStep"][];
-        };
-        /** OnboardingPlanStep */
-        OnboardingPlanStep: {
-            /** Detail */
-            detail: string;
-            /** Id */
-            id: string;
-            /** Title */
-            title: string;
-        };
-        /** OnboardingResetResponse */
-        OnboardingResetResponse: {
-            /** Message */
-            message: string;
-            /** Reset */
-            reset: boolean;
-            /** Success */
-            success: boolean;
-        };
-        /**
-         * OnboardingStateResponse
-         * @description Persisted profile + last plan (may be null fields when unset).
-         */
-        OnboardingStateResponse: {
-            /** Applied At */
-            applied_at?: string | null;
-            /** Applied Keys */
-            applied_keys?: string[];
-            /** Config Version */
-            config_version?: string | null;
-            /** Exists */
-            exists: boolean;
-            plan?: components["schemas"]["OnboardingPlanResponse"] | null;
-            /** Profile */
-            profile?: {
-                [key: string]: unknown;
-            } | null;
-            /** Status */
-            status?: string | null;
-        };
-        /** OnboardingTodoItem */
-        OnboardingTodoItem: {
-            /** Description */
-            description: string;
-            /** Href */
-            href?: string | null;
-            /** Id */
-            id: string;
-            /**
-             * Kind
-             * @default setup
-             */
-            kind: string;
-            /**
-             * Priority
-             * @default 1
-             */
-            priority: number;
-            /** Title */
-            title: string;
-        };
-        /** OnboardingWeekStep */
-        OnboardingWeekStep: {
-            /** Day */
-            day: string;
-            /** Detail */
-            detail: string;
-            /** Title */
-            title: string;
-        };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
             /** Note */
@@ -11374,60 +11152,6 @@ export interface components {
             total_prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
-        };
-        /**
-         * UserOnboardingProfile
-         * @description Versioned structured intake profile (not free-form chat memory).
-         */
-        UserOnboardingProfile: {
-            /**
-             * Experience Stage
-             * @description beginner | report_reader | has_system
-             * @default beginner
-             */
-            experience_stage: string;
-            /** Goals */
-            goals?: string[];
-            /**
-             * Holdings
-             * @description none | watchlist | bookkeeping
-             * @default none
-             */
-            holdings: string;
-            /**
-             * Infrastructure
-             * @description cloud_key | local_models | free_only
-             * @default cloud_key
-             */
-            infrastructure: string;
-            /**
-             * Interaction
-             * @description push | web | chat
-             * @default web
-             */
-            interaction: string;
-            /**
-             * Markets
-             * @description cn | hk | us (multi-select)
-             */
-            markets?: string[];
-            /**
-             * Report Language
-             * @description zh | en | ko | ja
-             * @default zh
-             */
-            report_language: string;
-            /**
-             * Risk Tone
-             * @description conservative | balanced | assertive (tone only, not advice)
-             * @default balanced
-             */
-            risk_tone: string;
-            /**
-             * Schema Version
-             * @default 1
-             */
-            schema_version: number;
         };
         /**
          * ValidateSystemConfigRequest
@@ -16532,7 +16256,6 @@ export interface operations {
         };
     };
     listPlugins: {
-    apply_onboarding_plan_api_v1_onboarding_apply_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -16573,7 +16296,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PluginLifecycleRequest"];
-                "application/json": components["schemas"]["OnboardingApplyRequest"];
             };
         };
         responses: {
@@ -16587,8 +16309,6 @@ export interface operations {
                 };
             };
             /** @description Invalid lifecycle request */
-                    "application/json": components["schemas"]["OnboardingApplyResponse"];
-            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -16608,8 +16328,6 @@ export interface operations {
             };
             /** @description Plugin not found */
             404: {
-            /** @description Conflict */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -16627,41 +16345,6 @@ export interface operations {
                 };
             };
             /** @description Lifecycle operation failed unexpectedly */
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-    };
-    generate_onboarding_plan_api_v1_onboarding_plan_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OnboardingPlanRequest"];
-        responses: {
-            /** @description Successful Response */
-            200: {
-                    "application/json": components["schemas"]["OnboardingPlanResponse"];
-            /** @description Bad Request */
-            400: {
-            /** @description Conflict */
-            409: {
-            /** @description Validation Error */
-            422: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-    get_onboarding_state_api_v1_onboarding_state_get: {
-        requestBody?: never;
-                    "application/json": components["schemas"]["OnboardingStateResponse"];
-    reset_onboarding_state_api_v1_onboarding_state_delete: {
-                    "application/json": components["schemas"]["OnboardingResetResponse"];
             500: {
                 headers: {
                     [name: string]: unknown;
