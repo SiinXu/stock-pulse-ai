@@ -248,6 +248,8 @@ class Config:
     agent_context_compression_profile: str = AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE
     agent_context_compression_trigger_tokens: int = 12000
     agent_context_protected_turns: int = 4
+    agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
+    agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules

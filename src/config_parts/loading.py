@@ -801,6 +801,8 @@ class _ConfigLoadingMethods:
             agent_context_compression_profile=agent_context_compression_profile,
             agent_context_compression_trigger_tokens=agent_context_compression_trigger_tokens,
             agent_context_protected_turns=agent_context_protected_turns,
+            agent_observability_enabled=os.getenv('AGENT_OBSERVABILITY_ENABLED', 'true').lower() == 'true',
+            agent_observability_deep_payload=os.getenv('AGENT_OBSERVABILITY_DEEP_PAYLOAD', 'false').lower() == 'true',
             agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_interval_minutes=parse_env_int(
                 os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES'),

@@ -509,8 +509,11 @@ class RunDiagnosticContext:
     notification_runs: List[NotificationRun] = field(default_factory=list)
     history_runs: List[HistoryRun] = field(default_factory=list)
     pipeline_stage_runs: List[PipelineStageRun] = field(default_factory=list)
+    agent_events: List[Dict[str, Any]] = field(default_factory=list)
     event_sink: Optional[Callable[[Dict[str, Any]], None]] = None
     flow_event_index: int = 0
+    agent_event_index: int = 0
+    agent_tool_index: int = 0
     provider_attempt_index_by_type: Dict[str, int] = field(default_factory=dict)
     provider_pending_attempt_index_by_key: Dict[str, List[int]] = field(default_factory=dict)
     llm_attempt_index_by_type: Dict[str, int] = field(default_factory=dict)
@@ -646,6 +649,21 @@ class RunDiagnosticContext:
         """Append a Pipeline stage without changing existing Run Flow events."""
         self.pipeline_stage_runs.append(stage_run)
 
+    def record_agent_event(self, event: Mapping[str, Any]) -> None:
+        """Append one sanitized agent observability event and mirror it to run-flow."""
+        payload = dict(event) if isinstance(event, Mapping) else {}
+        if not payload:
+            return
+        sanitized = sanitize_diagnostic_metadata(payload)
+        if not isinstance(sanitized, Mapping):
+            return
+        entry = dict(sanitized)
+        self.agent_events.append(entry)
+        max_events = 200
+        if len(self.agent_events) > max_events:
+            del self.agent_events[: len(self.agent_events) - max_events]
+        self._emit_flow_event(_agent_flow_event(self, entry))
+
     def _emit_flow_event(self, event: Dict[str, Any]) -> None:
         if self.event_sink is None:
             return
@@ -678,6 +696,7 @@ class RunDiagnosticContext:
             "notification_runs": [run.to_dict() for run in self.notification_runs],
             "history_runs": [run.to_dict() for run in self.history_runs],
             "pipeline_stage_runs": [run.to_dict() for run in self.pipeline_stage_runs],
+            "agent_events": list(self.agent_events),
         }
         return _redact_diagnostic_payload(payload)
 
@@ -927,6 +946,154 @@ def _started_at_from_end_and_duration(end: Any, duration_ms: Optional[int]) -> O
     else:
         return None
     return (parsed - timedelta(milliseconds=duration_ms)).isoformat()
+
+
+
+def _agent_flow_event(
+    context: "RunDiagnosticContext",
+    event: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Map one agent observability event into a run-flow event payload."""
+    event_type = _safe_event_key(event.get("event_type")) or "agent_event"
+    name = sanitize_diagnostic_text(event.get("name"), max_length=80) or "agent"
+    phase = sanitize_diagnostic_text(event.get("phase"), max_length=64)
+    status = sanitize_diagnostic_text(event.get("status"), max_length=32) or "unknown"
+    duration_ms = event.get("duration_ms")
+    try:
+        duration_ms_int = int(duration_ms) if duration_ms is not None else None
+    except (TypeError, ValueError):
+        duration_ms_int = None
+    if duration_ms_int is not None and duration_ms_int < 0:
+        duration_ms_int = 0
+    step = event.get("step")
+    try:
+        step_int = int(step) if step is not None else None
+    except (TypeError, ValueError):
+        step_int = None
+
+    is_tool = event_type in {"agent_tool_start", "agent_tool_end"}
+    is_model = event_type in {"agent_model_start", "agent_model_end"}
+    is_phase = event_type in {"agent_phase_start", "agent_phase_end"}
+    is_start = event_type.endswith("_start")
+    span_key = _safe_event_key(event.get("span_id")) or ""
+
+    if is_tool:
+        if is_start:
+            context.agent_tool_index += 1
+        tool_index = max(1, context.agent_tool_index)
+        node_id = (
+            f"agent_tool_{span_key}"
+            if span_key
+            else f"agent_tool_{_safe_event_key(name) or 'tool'}_{tool_index}"
+        )
+        label = f"工具 · {name}"
+        lane = "analysis"
+        kind = "analysis"
+        title = f"工具开始: {name}" if is_start else f"工具完成: {name}"
+    elif is_model:
+        node_id = (
+            f"agent_model_{span_key}"
+            if span_key
+            else f"agent_model_{_safe_event_key(name) or 'model'}"
+        )
+        label = f"模型 · {name}"
+        lane = "analysis"
+        kind = "model"
+        title = f"模型开始: {name}" if is_start else f"模型完成: {name}"
+    elif is_phase:
+        node_id = (
+            f"agent_phase_{span_key}"
+            if span_key
+            else f"agent_phase_{_safe_event_key(name) or 'phase'}"
+        )
+        label = f"阶段 · {name}"
+        lane = "analysis"
+        kind = "analysis"
+        title = f"阶段开始: {name}" if is_start else f"阶段结束: {name}"
+    else:
+        node_id = (
+            f"agent_{span_key}"
+            if span_key
+            else f"agent_{event_type}_{_safe_event_key(name) or 'event'}"
+        )
+        label = f"Agent · {name}"
+        lane = "analysis"
+        kind = "analysis"
+        title = f"Agent: {name}"
+
+    flow_status = "running" if is_start else _agent_status_to_flow(status)
+    severity = "info" if is_start else (
+        "success" if flow_status in {"success", "fallback"} else (
+            "danger" if flow_status == "failed" else "warning"
+        )
+    )
+    timestamp = sanitize_diagnostic_text(event.get("timestamp"), max_length=64) or datetime.now().isoformat()
+    started_at = timestamp if is_start else _started_at_from_end_and_duration(timestamp, duration_ms_int)
+    ended_at = None if is_start else timestamp
+    message_bits = [name]
+    if phase and phase != name:
+        message_bits.append(f"phase={phase}")
+    if step_int is not None:
+        message_bits.append(f"step={step_int}")
+    if duration_ms_int is not None and not is_start:
+        message_bits.append(f"{duration_ms_int}ms")
+    if status and not is_start:
+        message_bits.append(status)
+    message = sanitize_diagnostic_text(" · ".join(message_bits), max_length=220)
+
+    attrs = event.get("attrs") if isinstance(event.get("attrs"), Mapping) else {}
+    metadata = _clean_metadata(
+        {
+            "trace_id": event.get("trace_id") or context.trace_id,
+            "span_id": event.get("span_id"),
+            "parent_span_id": event.get("parent_span_id"),
+            "event_type": event.get("event_type") or event_type,
+            "phase": phase,
+            "step": step_int,
+            "duration_ms": duration_ms_int,
+            "status": status,
+            "tool": name if is_tool else None,
+            "model": name if is_model else None,
+            "success": attrs.get("success") if isinstance(attrs, Mapping) else None,
+            "attrs": sanitize_diagnostic_metadata(attrs) if attrs else None,
+            "node": {
+                "id": node_id,
+                "lane": lane,
+                "kind": kind,
+                "label": label,
+                "status": flow_status,
+                "provider": name if (is_tool or is_model) else None,
+                "started_at": started_at,
+                "ended_at": ended_at,
+                "duration_ms": duration_ms_int,
+                "message": message,
+            },
+        }
+    )
+    return {
+        "timestamp": timestamp,
+        "severity": severity,
+        "type": event_type if event_type.startswith("agent_") else f"agent_{event_type}",
+        "node_id": node_id,
+        "title": sanitize_diagnostic_text(title, max_length=100) or "Agent 事件",
+        "message": message,
+        "metadata": metadata,
+    }
+
+
+def _agent_status_to_flow(status: Optional[str]) -> str:
+    normalized = (status or "").strip().lower()
+    if normalized in {"success", "ok", "completed", "done"}:
+        return "success"
+    if normalized in {"failed", "error", "fail"}:
+        return "failed"
+    if normalized in {"running", "started", "in_progress"}:
+        return "running"
+    if normalized in {"cancelled", "cancel_requested", "timeout", "skipped", "degraded", "fallback"}:
+        return normalized
+    if normalized:
+        return "degraded"
+    return "unknown"
 
 
 def _provider_started_flow_event(
