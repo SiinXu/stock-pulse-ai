@@ -8,10 +8,6 @@ import { getReportText, normalizeReportLanguage } from '../../utils/reportLangua
 import { ApiErrorAlert } from '../common/ApiErrorAlert';
 import { Tooltip } from '../common/Tooltip';
 
-type DesktopWindow = Window & {
-  dsaDesktop?: unknown;
-};
-
 type ShareState = 'idle' | 'loading' | 'ready' | 'success' | 'error';
 
 interface ShareImageButtonProps {
@@ -26,7 +22,7 @@ const safeFilenamePart = (value: string): string => {
   return normalized.slice(0, 72) || 'report';
 };
 
-/** DOM-attached synchronous download (matches chatExport / Settings patterns for Firefox/Safari). */
+/** DOM-attached synchronous download (matches chatExport / Settings / ConfigBackup patterns for Firefox/Safari and desktop WebView). */
 const downloadBlob = (blob: Blob, filename: string): void => {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -44,26 +40,28 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
   reportLanguage = 'zh',
   className = '',
 }) => {
-  const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as DesktopWindow).dsaDesktop);
-  const activeRecordId = isDesktopRuntime ? undefined : recordId;
+  // Desktop (window.dsaDesktop) uses the same on-click path as pure Web: no mount-time
+  // prefetch. When navigator.share/canShare is absent (typical Electron WebView), the
+  // existing downloadBlob helper falls back to a[download] + blob, which the desktop
+  // navigation guard already preserves.
   const text = getReportText(normalizeReportLanguage(reportLanguage));
   const [stateSnapshot, setStateSnapshot] = useState<{
     recordId?: number;
     state: ShareState;
     error: ParsedApiError | null;
   }>(() => ({
-    recordId: activeRecordId,
+    recordId,
     state: 'idle',
     error: null,
   }));
   const resetTimerRef = useRef<number | null>(null);
   const loadTokenRef = useRef(0);
   const cachedImageRef = useRef<{ recordId: number; blob: Blob } | null>(null);
-  const state = stateSnapshot.recordId === activeRecordId ? stateSnapshot.state : 'idle';
-  const shareError = stateSnapshot.recordId === activeRecordId ? stateSnapshot.error : null;
+  const state = stateSnapshot.recordId === recordId ? stateSnapshot.state : 'idle';
+  const shareError = stateSnapshot.recordId === recordId ? stateSnapshot.error : null;
   const setState = useCallback((nextState: ShareState, nextError: ParsedApiError | null = null) => {
-    setStateSnapshot({ recordId: activeRecordId, state: nextState, error: nextError });
-  }, [activeRecordId]);
+    setStateSnapshot({ recordId, state: nextState, error: nextError });
+  }, [recordId]);
   const clearResetTimer = useCallback(() => {
     if (resetTimerRef.current !== null) {
       window.clearTimeout(resetTimerRef.current);
@@ -73,7 +71,7 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
 
   const scheduleReset = useCallback(() => {
     clearResetTimer();
-    const scheduledRecordId = activeRecordId;
+    const scheduledRecordId = recordId;
     resetTimerRef.current = window.setTimeout(() => {
       setStateSnapshot((current) => (
         current.recordId === scheduledRecordId
@@ -81,7 +79,7 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
           : current
       ));
     }, 2200);
-  }, [activeRecordId, clearResetTimer]);
+  }, [recordId, clearResetTimer]);
 
   useEffect(() => {
     clearResetTimer();
@@ -92,13 +90,13 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
       clearResetTimer();
       loadTokenRef.current += 1;
     };
-  }, [activeRecordId, clearResetTimer]);
+  }, [recordId, clearResetTimer]);
 
   const handleShare = useCallback(async () => {
-    if (activeRecordId === undefined || state === 'loading') return;
+    if (recordId === undefined || state === 'loading') return;
     clearResetTimer();
 
-    let blob = cachedImageRef.current?.recordId === activeRecordId
+    let blob = cachedImageRef.current?.recordId === recordId
       ? cachedImageRef.current.blob
       : null;
     let generatedNow = false;
@@ -108,7 +106,7 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
       loadTokenRef.current = loadToken;
       setState('loading');
       try {
-        blob = await historyApi.getShareImage(activeRecordId);
+        blob = await historyApi.getShareImage(recordId);
       } catch (error) {
         if (loadTokenRef.current !== loadToken) return;
         console.error('Generate share image failed:', error);
@@ -116,11 +114,11 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
         return;
       }
       if (loadTokenRef.current !== loadToken) return;
-      cachedImageRef.current = { recordId: activeRecordId, blob };
+      cachedImageRef.current = { recordId, blob };
       generatedNow = true;
     }
 
-    const filename = `${safeFilenamePart(reportTitle)}-${activeRecordId}.png`;
+    const filename = `${safeFilenamePart(reportTitle)}-${recordId}.png`;
     const file = new File([blob], filename, { type: 'image/png' });
     const canShareFile = typeof navigator.share === 'function'
       && typeof navigator.canShare === 'function'
@@ -160,9 +158,9 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
       console.error('Generate share image failed:', error);
       setState('error', getParsedApiError(error));
     }
-  }, [activeRecordId, clearResetTimer, reportTitle, scheduleReset, setState, state]);
+  }, [recordId, clearResetTimer, reportTitle, scheduleReset, setState, state]);
 
-  if (activeRecordId === undefined) return null;
+  if (recordId === undefined) return null;
 
   const tooltipText = state === 'loading'
     ? text.generatingShareImage

@@ -134,10 +134,18 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     expect(await screen.findByLabelText('框架名称')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('investment-framework-prompt-preview')).toBeInTheDocument();
+    expect(screen.getByTestId('investment-framework-prompt-preview-empty')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('框架名称'), { target: { value: 'My rules' } });
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Prefer quality businesses' },
     });
+    expect(await screen.findByTestId('investment-framework-prompt-preview-body')).toHaveTextContent(
+      '个人投资框架（只读）',
+    );
+    expect(screen.getByTestId('investment-framework-prompt-preview-body')).toHaveTextContent(
+      'Prefer quality businesses',
+    );
     fireEvent.click(screen.getByRole('button', { name: '创建框架' }));
 
     await waitFor(() => {
@@ -151,6 +159,21 @@ describe('InvestmentFrameworkSettingsCard', () => {
       );
     });
     expect(await screen.findByText('个人投资框架已创建并激活')).toBeInTheDocument();
+  });
+
+  it('previews decision-tree criteria phrasing in the analysis context panel', async () => {
+    getFramework.mockResolvedValue(structuredFrameworkResponse());
+
+    render(<InvestmentFrameworkSettingsCard />);
+
+    expect(await screen.findByDisplayValue('Structured')).toBeInTheDocument();
+    const preview = await screen.findByTestId('investment-framework-prompt-preview-body');
+    expect(preview).toHaveTextContent('### 决策树');
+    expect(preview).toHaveTextContent('根节点：root');
+    expect(preview).toHaveTextContent('[root] Start?');
+    expect(preview).toHaveTextContent('若 Continue');
+    expect(preview).toHaveTextContent('Moat');
+    expect(preview).toHaveTextContent('Limit position size');
   });
 
   it('keeps a failed framework read distinct from a missing framework', async () => {
