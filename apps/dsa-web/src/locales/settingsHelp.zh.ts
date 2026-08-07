@@ -1013,6 +1013,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
+    title: '决策风格后验校准',
+    summary: '在决策信号后验统计中追加决策风格校准分组。',
+    usage: '默认关闭以保持接口兼容。仅在运营需要查看风格、动作、周期、市场阶段、数据质量与 profile_source 校准分组时开启（GET /api/v1/decision-signals/outcomes/stats）。',
+    valueNotes: [
+      '默认关闭；关闭时 stats 响应不包含 profile_calibration。',
+      '每个精确 bucket 至少 30 个已完成样本后才发布比率或最大不利波动。',
+      '只使用已持久化价格，不会触发行情读取。',
+    ],
+    impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
+    notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',

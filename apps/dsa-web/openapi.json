@@ -6832,6 +6832,16 @@
             "title": "Neutral",
             "type": "integer"
           },
+          "profile_calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionSignalProfileCalibration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statuses": {
             "items": {
               "type": "string"
@@ -7078,6 +7088,177 @@
           "metadata"
         ],
         "title": "DecisionSignalPreview",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibration": {
+        "properties": {
+          "breakdowns": {
+            "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBreakdowns"
+          },
+          "minimum_completed_sample_size": {
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minimum_completed_sample_size",
+          "breakdowns"
+        ],
+        "title": "DecisionSignalProfileCalibration",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibrationBreakdowns": {
+        "properties": {
+          "decision_profile": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile",
+            "type": "array"
+          },
+          "decision_profile_action": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Action",
+            "type": "array"
+          },
+          "decision_profile_data_quality_level": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Data Quality Level",
+            "type": "array"
+          },
+          "decision_profile_horizon": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Horizon",
+            "type": "array"
+          },
+          "decision_profile_market_phase": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Market Phase",
+            "type": "array"
+          },
+          "profile_source": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Profile Source",
+            "type": "array"
+          }
+        },
+        "title": "DecisionSignalProfileCalibrationBreakdowns",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibrationBucket": {
+        "properties": {
+          "avg_stock_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Stock Return Pct"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "hit": {
+            "title": "Hit",
+            "type": "integer"
+          },
+          "hit_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate Pct"
+          },
+          "max_adverse_excursion_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Adverse Excursion Pct"
+          },
+          "miss": {
+            "title": "Miss",
+            "type": "integer"
+          },
+          "miss_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Miss Rate Pct"
+          },
+          "neutral": {
+            "title": "Neutral",
+            "type": "integer"
+          },
+          "sample_sufficient": {
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "unable": {
+            "title": "Unable",
+            "type": "integer"
+          },
+          "unable_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unable Rate Pct"
+          }
+        },
+        "required": [
+          "total",
+          "completed",
+          "unable",
+          "hit",
+          "miss",
+          "neutral",
+          "sample_sufficient"
+        ],
+        "title": "DecisionSignalProfileCalibrationBucket",
         "type": "object"
       },
       "DecisionSignalReassessErrorResponse": {
