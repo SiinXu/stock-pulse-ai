@@ -707,9 +707,16 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["legacy_json_only_basic_rules"],
     },
+    "MULTIMODAL_AGENT_TOOLS_ENABLED": {
+        "title": "Enable Multimodal Agent Tools",
+        "description": (
+            "Opt-in PDF parsing and chart-reading Agent Tools (issue #253 phase 1). "
+            "Default is off. When enabled with MULTIMODAL_FILE_ROOT, Agents may call "
+            "parse_financial_pdf and read_price_chart after a process restart. "
+            "PDF parsing is local-first; chart reading uses VISION_MODEL and degrades "
+            "honestly when vision is unavailable. See docs/multimodal-parsing_EN.md."
     "AGENT_EVENT_IMPACT_CONTEXT_ENABLED": {
         "title": "Alert Impact Context",
-        "description": (
             "When enabled, triggered alert notifications include a managed-data impact "
             "context block: what happened, why it matters, and whether the symbol is on "
             "the watchlist or in portfolio holdings. Uses intelligence items, portfolio "
@@ -721,21 +728,71 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "true",
+        "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 72,
-        "help_key": "settings.agent.event_impact_context",
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 77,
+        "help_key": "settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED",
         "examples": [
-            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=true",
-            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=false",
+            "MULTIMODAL_AGENT_TOOLS_ENABLED=false",
+            "MULTIMODAL_AGENT_TOOLS_ENABLED=true",
         ],
         "docs": [
             {
-                "label": "告警中心文档",
-                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+                "label": "Multimodal parsing guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing_EN.md",
+            },
+            {
+                "label": "多模态解析说明（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing.md",
             },
         ],
+        "warning_codes": ["restart_required"],
+    },
+    "MULTIMODAL_FILE_ROOT": {
+        "title": "Multimodal File Root",
+        "description": (
+            "Local directory that may contain user-provided PDF and chart files for "
+            "multimodal Agent Tools. Paths are sandboxed to this root; URLs and path "
+            "traversal are rejected. Required when MULTIMODAL_AGENT_TOOLS_ENABLED=true."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 78,
+        "help_key": "settings.agent.MULTIMODAL_FILE_ROOT",
+        "examples": [
+            "MULTIMODAL_FILE_ROOT=",
+            "MULTIMODAL_FILE_ROOT=/var/stockpulse/multimodal",
+        ],
+        "docs": [
+            {
+                "label": "Multimodal parsing guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "default_value": "true",
+        "display_order": 72,
+        "help_key": "settings.agent.event_impact_context",
+            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=true",
+            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=false",
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
         "warning_codes": [],
     },
 }

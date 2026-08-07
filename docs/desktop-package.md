@@ -13,9 +13,9 @@
 - 桌面端会自动从本机 `8000-8100` 选择可用端口，并把实际选择的端口同步给内置后端；桌面端不依赖 `.env` 里的 `WEBUI_PORT` 来决定窗口连接地址，避免用户改端口后 Electron 仍等待旧端口导致启动超时
 - 报告正文等 Markdown 中的外部 `http`/`https` 链接：主窗口导航守卫会拦截离开私有本地 Web origin 的顶层导航，并把合法外链转发到系统默认浏览器（与 `target="_blank"` 的窗口打开路径一致）。`file:`、`blob:`、`javascript:` 等非 http(s) 方案仍只拦截、不外开
 
-### 报告分享图（Web only）
+### 报告分享图（Web 与桌面运行时）
 
-报告页的「生成分享图」按钮（`ShareImageButton`）在检测到桌面运行时（`window.dsaDesktop`）时会直接隐藏，不提供等价入口。原因是分享图路径依赖浏览器侧的图片生成与系统分享/下载能力，当前桌面壳尚未接入对应 IPC 或系统分享通道；功能仍仅在纯 Web 部署中可用。后续若要在桌面端开放，需要单独设计主进程能力与回退策略，不属于启动/导航守卫链路。
+报告页的「生成分享图」按钮（`ShareImageButton`）在纯 Web 与桌面运行时（`window.dsaDesktop`）均展示。生成仍走后端 `GET /api/v1/history/{id}/share-image`，且仅在用户点击时请求（无页面加载预取）。桌面 WebView 通常没有 `navigator.share` 文件分享能力，因此会回退到与 `.env` 备份导出相同的 DOM 挂载 `a[download]` + blob 下载路径；主窗口导航守卫已保留该下载路径（`blob:` 等非外链方案只拦截、不外开）。若内置后端缺少转图引擎，失败态展示稳定错误码指引（例如 `share_image_unavailable`），而不是在入口层静默隐藏。原生系统分享 IPC 仍非本路径依赖。
 
 ## 版本号重启与自动更新说明（0.1.0）
 
@@ -141,6 +141,25 @@ Desktop 启动后会在系统 tray / macOS 菜单栏创建 StockPulse 图标。�
 
 助手使用独立 preload，保持 `contextIsolation: true`、`nodeIntegration: false` 和 `sandbox: true`。renderer 没有任意 URL、网络、Node 或 shell 权限；主进程拒绝新窗口、同窗导航和重定向，IPC handler 还会校验调用方必须是当前助手窗口。electron-builder 会把现有 StockPulse 32px 品牌 PNG 复制为 `assistant-tray.png`，无需依赖 Web 构建产物提供 tray 图标。
 
+## 首次启动与一键本地安装
+
+首次在运行时目录生成 `.env` 时（真正的 fresh install），主窗口在后端 `/api/health` 就绪后会打开既有 Web **首次配置向导**路由：
+
+`/settings?section=overview&view=readiness&from=onboarding`
+
+该路由复用 `FirstRunWizard`（云 API / 本地模型 / CLI），不会另起第二套桌面 UI。已有协议深链（`stockpulse://…`）优先；返回用户若配置仍不完整，继续依赖 Home 上的引导横幅，而不是每次启动强制弹窗。
+
+窗口状态：主 `BrowserWindow` 以 `show: false` 创建，加载页（或错误页）就绪后再 `show`/`focus`，避免首次启动白屏闪烁。后端就绪后会非阻塞地探测系统/内嵌 Ollama，使向导内的本地模型面板尽早显示 runtime 状态。
+
+**一键本地安装**复用既有 Model Pack + Ollama 路径，不新增第二套下载通道：
+
+1. 用户在本地模型面板点击 **Import Model Pack**（或向导本地模型步骤中的同一控件）——必须显式选择 `.modelpack` / `.zip` 或解压目录，**从不静默下载多 GB 权重**。
+2. 主进程依次：探测 runtime → 若为 `stopped` 则启动系统或内嵌 Ollama → 校验并导入 pack，进度合并到同一条 progress 条。
+3. 失败返回可操作文案与稳定错误码（如 `ollama_unavailable`、`insufficient_disk_space`、`hash_mismatch`），不把 Python/Node traceback 暴露给 UI。
+4. Catalog 推荐模型的 Ollama pull 仍须用户点选，且仅允许 allowlist 内 pullable 条目；Kronos 权重继续走显式 `scripts/download_kronos_weights.py` / 源码环境，预构建桌面包不包含 PyTorch 或 Kronos 权重（见 [Kronos 本地模型](kronos-local-model.md)）。
+
+与 go-stock / FinRobot Desktop 的定位对齐点：一键安装包 + 清晰首次路径 + 本地模型优先选项 + 诚实标注离线能力边界（云 LLM / 行情 API 仍可能需要）。本仓库**不**在首次打开时消耗云 token。
+
 ## 桌面本地模型
 
 **设置 -> AI 与模型 -> 本地模型** 是 Desktop 与 Web 共用、全系统唯一的模型下载管理入口。tray 的 `Local Models…` 会显示并聚焦主窗口，然后定位到 `/settings?section=ai_models&view=local_models`；旧的 520x640 独立窗口、renderer 和 `model-preload.js` 已退役，不保留第二套界面。
@@ -148,6 +167,7 @@ Desktop 启动后会在系统 tray / macOS 菜单栏创建 StockPulse 图标。�
 - 发现与状态：先探测 `LLM_OLLAMA_BASE_URL`（默认 `http://127.0.0.1:11434`）的 `/api/tags`；已有健康服务时直接复用。端点不可用时，先以固定参数 `ollama --version` 解析系统安装，再验证安装包内 `resources/ollama/runtime-manifest.json`、完整运行时文件集合和内嵌二进制；两者都不可用时显示安装引导。状态分为 `running` / `stopped` / `not-installed` / `starting` / `error`。Electron 还通过 `os.totalmem()` 向共享面板提供本机内存，用于推荐档高亮。
 - 下载：只允许下载权威 catalog 中标记为 pullable 的推荐模型；loopback HTTP `POST /api/pull` 流式展示进度。任意自定义名称和 guided-only 金融模型不会被下载。流式响应同时受单事件大小、未完成缓冲区和 30 分钟绝对截止时间约束，持续发送小事件也不能无限占用操作锁。
 - 启停：`Start service` 以解析后的系统或内嵌二进制加固定参数数组 `['serve']` 拉起受管进程并轮询健康；`Stop` 只结束桌面自己拉起的进程。内嵌服务只接受 loopback HTTP 地址，并把 `OLLAMA_HOST` 对齐到 `LLM_OLLAMA_BASE_URL`。
+- 一键导入：`Import Model Pack` 在用户选定 pack 后自动 detect/start runtime 再导入（见上一节）；runtime 未安装时返回安装引导，不会静默拉起下载。
 - 装完即用：下载完成后由后端 `SystemConfigService` 追加 `LLM_OLLAMA_MODELS`、确保 Ollama channel 存在并热加载；只有没有主模型时才自动选为主模型。Desktop 在下载前记录后端配置版本，主进程返回实际运行时规范化地址的 SHA-256 身份摘要；激活请求不携带目标 URL，后端从服务端配置重算摘要和目标，任一快照值变化都拒绝跨运行时激活。主模型切换与 Agent 模型指定均为面板内独立显式操作。配置写入不在 Electron 中重复实现。
 - 删除：共享面板先取得同一配置版本和运行时身份摘要，再调用后端取消注册或预留未注册模型；后端阻止删除被主模型、Agent、Vision、fallback 或有效隐式主 channel 引用的模型，主进程也会在请求前重算摘要确认自身运行时未变化，并对 plain route 和 connection-aware ModelRef 做同等复核。后端对已注册模型和仅存在于 Ollama 的未注册模型都签发绑定模型、原运行时与预留后配置版本的短时一次性恢复 token，并在 token 待处理期间阻止同一模型经本地模型服务并发下载或重新注册。预约存续期间，所有经 `SystemConfigService` 发起的配置写入（包括任务模型分配）也会暂时返回版本冲突，避免在取消注册后、删除权重前重新引用该模型；确认删除、完成恢复或短 TTL 到期后解除。若 IPC 删除失败，恢复通道只在原运行时仍报告对应权重时写回已移除的 catalog 注册；运行时停止、不可达或权重缺失都会拒绝恢复。未注册模型只释放预留，不创建注册。若 Desktop 保守判断权重仍在、但后端随后的原运行时探测确认权重已缺失，共享面板会按删除完成收敛并保持取消注册状态。若权重删除成功，Web 端会重试一次幂等 token 撤销；网络或状态响应导致撤销无法确认时返回非破坏性的 `local_model_delete_finalize_unconfirmed` 警告，不会把已完成的删除误报为失败。token 不能恢复已缺失的权重，并会按短 TTL 过期；后端未收到最终确认时，配置写入可能在 TTL 剩余时间内继续返回冲突，刷新后重试即可。
 
@@ -195,14 +215,17 @@ powershell -ExecutionPolicy Bypass -File scripts\build-all.ps1
 
 - 工作流：`.github/workflows/desktop-release.yml`
 - 触发方式：
-  - 推送语义化 tag（如 `v3.2.12`）后自动触发
-  - 在 Actions 页面手动触发并指定 `release_tag`
-- 产物：
-  - Windows 安装包：Release 附件和本地 `apps/dsa-desktop/dist/` 中统一为 `stockpulse-windows-installer-<tag>.exe`
+  - 推送语义化 tag（如 `v0.1.0`）后自动构建并**发布**到 GitHub Release
+  - 在 Actions 页面手动 `workflow_dispatch` 并指定 `release_tag`：只构建并上传 **Actions artifacts**，**不会**创建或修改 GitHub Release（用于流水线验证与 dry-run）
+  - `workflow_dispatch` 默认从**触发时选中的分支/ref**打包，仅用 `release_tag` 打版本号与产物文件名；需要重建历史 tag 源码时再勾选 `rebuild_from_tag`（pre-rename 的 `v3.x` tag 不包含 StockPulse 打包契约，不应用于产品验证）
+- 产物命名（与 `apps/dsa-desktop/package.json` 的 `artifactName` / 工作流 `Prepare release artifact` 对齐）：
+  - Windows 安装包：`stockpulse-windows-installer-<tag>.exe`（例如 `stockpulse-windows-installer-v0.1.0.exe`）
   - Windows 自动更新元数据：Release 附件会额外保留 `latest.yml` 和 `*.blockmap`，供安装版桌面端后台下载与校验更新；普通用户无需手动下载这些元数据。下载完成后用户确认“重启安装”时，桌面端会先停止桌面托管的 Ollama 与内置后端、备份运行时文件（包括内嵌模型库），并以静默模式执行安装器。
   - Windows 免安装包：`stockpulse-windows-noinstall-<tag>.zip`
   - macOS Intel：`stockpulse-macos-x64-<tag>.dmg`
   - macOS Apple Silicon：`stockpulse-macos-arm64-<tag>.dmg`
+- macOS CI 会在打包后执行 **launch smoke**：`codesign -dv` 审计 + 用 `ELECTRON_RUN_AS_NODE=1` 对 `.app` 主二进制做可执行探测（带 30s watchdog，避免 GUI 主进程挂起）。若 as-packaged（当前 clean-unsigned 契约）无法执行，流水线会对产物做最小 **ad-hoc** `codesign --sign -` 并重写 DMG，再二次断言可执行。这**不是** Apple Developer ID / 公证。
+- **arm64 实证（CI macos-15）**：post-rename StockPulse 包在 `codesign` 报告 `code object is not signed at all` 时，`ELECTRON_RUN_AS_NODE` 探测仍可 `launches_as_packaged`（x64 同结论）。用户本机仍可能受 Gatekeeper/quarantine 拦截，见下文。
 
 ### macOS 提示“应用已损坏，无法打开”
 
@@ -230,11 +253,26 @@ spctl --assess --type execute --verbose=4 "/Applications/StockPulse.app"
 
 当前 unsigned 产物的 `codesign -d` 预期包含 `code object is not signed at all`，`spctl` 预期拒绝；如果输出 `code has no resources but signature indicates they must be present` 或其他签名损坏信息，应视为发布阻断。
 
-建议发布流程：
+### 维护者：首次 StockPulse 桌面 `v0.1.0` 发布步骤
+
+在 `v0.1.0` 产品 tag 尚未由维护者创建前，可用已有 tag（例如 `v3.26.3`）对**当前分支**做 `workflow_dispatch` 验证（artifacts only）。真正切第一刀时：
+
+1. 确认 `main` 已包含目标桌面代码，且本地/CI 对 `apps/dsa-desktop` 的测试与 Web 构建通过。
+2. **不要**用 `rebuild_from_tag` 指向 pre-rename 的 `v3.x` 源码；产品包必须从 post-rename 树构建。
+3. 由维护者创建并推送 **annotated** tag `v0.1.0`（或仓库约定的自动打 tag 流程；本工作流本身**不**创建 tag）。
+4. tag push 自动触发 `desktop-release`：Windows + macOS (x64/arm64) 构建 → 校验嵌入式 Ollama / updater 元数据 → macOS launch smoke → `publish-release` 将产物附加到 GitHub Release `v0.1.0`。
+5. 发布后人工抽检：
+   - Release 附件名与上文产物命名一致；
+   - Windows：`latest.yml` 的 `version` / `path` 与安装包一致；
+   - macOS：对应芯片下载 DMG，按上文 Gatekeeper 指引打开；`codesign -d` 无残缺签名缺陷。
+6. 回滚：删除有问题的 Release 附件或整页 Release（保留 tag 与否由维护者决定）；用户侧卸载后改下已知良好版本。勿对历史 `v3.x` 桌面安装包依赖 auto-update 升到 `0.x`（见文首版本号说明）。
+
+建议日常发布流程：
 
 1. 合并代码到 `main`
-2. 由自动打 tag 工作流生成版本（或手动创建 tag）
-3. `desktop-release` 工作流自动构建并把两个平台安装包附加到对应 GitHub Release
+2. 由自动打 tag 工作流生成版本（或维护者手动创建 annotated tag）
+3. tag push 触发 `desktop-release` 构建并把两个平台安装包附加到对应 GitHub Release
+4. 需要仅验证流水线时：Actions → Desktop Release → Run workflow → 填写已有 `release_tag`、保持 `rebuild_from_tag=false` → 只收集 artifacts
 
 ## 发版前可复现验证（桌面更新链路）
 
