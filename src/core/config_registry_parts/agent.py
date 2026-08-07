@@ -314,6 +314,40 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+
+    "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED": {
+        "title": "Skill Opinion Outcome Weights",
+        "description": (
+            "When enabled, conservatively weight strategy-skill opinions from "
+            "sufficient attributable Outcome samples (Beta(15,15) prior, terminal "
+            "unable penalty, evidence-strength averaging, multiplicative bounds "
+            "[1/1.2, 1.2]). Default off keeps the aggregation path byte-identical "
+            "to the prior backtest/memory weighting behavior. Fail-neutral (1.0) "
+            "for missing, insufficient, malformed, or mismatched-version buckets."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 62,
+        "help_key": "settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED",
+        "examples": [
+            "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED=false",
+            "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Skill Opinion Outcome Evaluation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/skill-opinion-outcome-evaluation.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "DECISION_PROFILE_CALIBRATION_ENABLED": {
         "title": "Decision Profile Outcome Calibration",
         "description": (
@@ -333,7 +367,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 62,
+        "display_order": 63,
         "help_key": "settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED",
         "examples": [
             "DECISION_PROFILE_CALIBRATION_ENABLED=false",
