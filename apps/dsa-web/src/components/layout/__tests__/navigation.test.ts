@@ -41,13 +41,20 @@ describe('application navigation descriptor', () => {
       exact: true,
     }));
     expect(APPLICATION_NAVIGATION_ITEMS[0]?.children?.map(({ key, to }) => [key, to]) ?? []).toEqual([]);
-    expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to }) => [key, to])).toEqual([
-      ['research-market', APP_ROUTE_PATHS.researchMarket],
-      ['research-discover', APP_ROUTE_PATHS.researchDiscover],
-      ['research-analysis', APP_ROUTE_PATHS.researchAnalysis],
-      ['research-backtest', APP_ROUTE_PATHS.researchBacktest],
-      ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes],
+    expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to, labelKey }) => [key, to, labelKey])).toEqual([
+      ['research-market', APP_ROUTE_PATHS.researchMarket, 'layout.nav.marketReview'],
+      ['research-discover', APP_ROUTE_PATHS.researchDiscover, 'layout.nav.discover'],
+      ['research-analysis', APP_ROUTE_PATHS.researchAnalysis, 'layout.nav.analysis'],
+      ['research-backtest', APP_ROUTE_PATHS.researchBacktest, 'layout.nav.backtest'],
+      ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes, 'layout.nav.skillOutcomes'],
     ]);
+  });
+
+  it('uses layout.nav label keys for every primary and Research child entry', () => {
+    const entries = APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [item, ...(item.children ?? [])]);
+    for (const entry of entries) {
+      expect(entry.labelKey.startsWith('layout.nav.')).toBe(true);
+    }
   });
 
   it('has unique descriptor keys and no legacy or dead utility targets', () => {

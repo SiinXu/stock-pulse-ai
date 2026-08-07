@@ -212,6 +212,29 @@ ALPHAVANTAGE_API_KEY=your_alphavantage_key
 
 Configured Longbridge credentials make it preferred for supported non-A-share realtime quotes and for U.S. stock daily bars. Hong Kong daily placement still follows numeric priority. YFinance remains the broad baseline; Finnhub and Alpha Vantage participate only when configured. U.S. indexes still prefer YFinance because Longbridge does not provide that index route.
 
+## Offline provider contract tests (recorded fixtures)
+
+Vendor field drift that only surfaces in the non-blocking nightly `network-smoke` run is too late for users. The repository now ships **blocking offline** parse-path checks on recorded raw payloads for the main providers:
+
+| Path | Role |
+| --- | --- |
+| Fixture directory | `tests/fixtures/provider_contracts/` (daily / realtime raw payloads; no tokens) |
+| Offline tests | `tests/data_provider/test_provider_contracts.py` (feeds each fetcher normalize / parse path; asserts the `STANDARD_COLUMNS` and `UnifiedRealtimeQuote` shape analysis consumes) |
+| Refresh script | `scripts/refresh_provider_fixtures.py` (**network**; manual or nightly only — **not** in the offline gate) |
+| Nightly wiring | `.github/workflows/network-smoke.yml` re-captures fixtures into a non-blocking artifact after `pytest -m network` so maintainers can review drift |
+
+Refresh examples:
+
+```bash
+# Write into the checked-in fixture directory (review shape diffs before commit)
+python scripts/refresh_provider_fixtures.py --write
+
+# Write to a separate directory (matches the nightly workflow)
+python scripts/refresh_provider_fixtures.py --output-dir /tmp/provider_contracts_refresh --skip-unavailable
+```
+
+Contract tests lock **fields, types, and market routing**, not live prices. Do not weaken assertions to make a fixture pass. Runtime cost is a few seconds of offline parsing.
+
 ## Troubleshooting
 
 | Symptom | Check | Action |

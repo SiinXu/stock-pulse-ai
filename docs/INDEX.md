@@ -14,7 +14,8 @@
 | 配置推送通知 | [通知能力基线](notifications.md) | [完整配置与部署指南](full-guide.md) |
 | 部署到服务器或云平台 | [部署指南](DEPLOY.md) | [云端 WebUI 部署](deploy-webui-cloud.md)、[Zeabur 部署](docker/zeabur-deployment.md) |
 | **公网 / 非本机暴露前先确认安全边界** | [安全基线 · 运维安全边界（英文专节）](security-baseline.md#operator-security-boundaries) | [部署指南](DEPLOY.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
-| 理解插件信任模型（非应用商店沙箱） | [插件扩展契约（英文）](plugin-extension-contract.md) | [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries) |
+| 理解插件信任模型（非应用商店沙箱） | [插件扩展契约（英文）](plugin-extension-contract.md) | [插件开发指南](plugin-development-guide_zh.md)（[EN](plugin-development-guide.md)）、[安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries) |
+| **编写或加载系统插件** | [插件开发指南](plugin-development-guide_zh.md)（[EN](plugin-development-guide.md)） | [插件扩展契约（英文）](plugin-extension-contract.md)、[examples/plugins](../examples/plugins/) |
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
@@ -62,6 +63,7 @@
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
+| [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |
 | [分析上下文包契约、运行态消费与可见性](analysis-context-pack.md) | AnalysisContextPack 首版范围、字段质量状态、P1/P2 内部契约、P3 Prompt 摘要消费、P4 历史/API/Web 低敏可见性、P5 数据质量评分、P6 迁移回滚与源码锚点；完整指南补充 #1386 阶段感知分析、迁移与回滚入口 |
@@ -75,7 +77,7 @@
 | [部署指南](DEPLOY.md) | 服务器部署、Docker、systemd、Supervisor 等部署方式 |
 | [云端 WebUI 部署](deploy-webui-cloud.md) | 云服务器访问 WebUI 的部署说明 |
 | [Zeabur 部署](docker/zeabur-deployment.md) | Zeabur 平台部署说明 |
-| [桌面端打包说明](desktop-package.md) | Electron 桌面端和 Web 构建产物打包说明 |
+| [桌面端打包说明](desktop-package.md)（[EN](desktop-package_EN.md)） | Electron 桌面端首次启动、本地模型与打包说明 |
 
 ## 参考与开发
 
@@ -91,11 +93,14 @@
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
+| [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
+| [插件开发指南](plugin-development-guide_zh.md) | 六个扩展点的统一入口：是什么/为什么、信任模型、10 分钟 quickstart、官方示例与专题链接（[English](plugin-development-guide.md)） |
 | [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |
 | [Web UI 基础控件契约](web-ui-foundation.md) | Button、IconButton、Input、Field、Textarea 的语义、尺寸、命中区、守卫和迁移边界 |
+| [导航信息架构提案](navigation-ia-proposal_zh.md) | 路由/导航现状审计、遗留重定向、孤儿项与 #368 目标选项（**需要决策**；[English](navigation-ia-proposal.md)） |
 | [多语言金融术语指导](financial-terminology-guide.md) | 十语言 UI 金融术语单一治理源：语义边界、术语表、已知译文漂移、风险表达、格式化与审查流程 |
 | [高风险 i18n 语义审计](high-risk-i18n-audit.md) | 交易动作、风险、认证、Credential、错误与免责声明的来源、审查状态、code/display 边界和机器快照 |
 | [Web 国际化开发约定](web-i18n.md) | 界面语言与报告语言边界、翻译文件结构、错误/格式化、Overlay 与验证 |

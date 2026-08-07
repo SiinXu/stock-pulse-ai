@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "provider": "akshare",
+    "api": "stock_zh_a_daily",
+    "symbol": "sz000001",
+    "adjust": "qfq",
+    "recorded_note": "Sina daily English column layout before AkshareFetcher._fetch_stock_data_sina renames into Chinese headers for _normalize_data."
+  },
+  "columns": [
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+    "outstanding_share",
+    "turnover"
+  ],
+  "rows": [
+    ["2026-05-06", 10.0, 10.8, 9.9, 10.5, 1234500, 12962250.0, 19400000000, 0.0064],
+    ["2026-05-07", 10.5, 10.9, 10.3, 10.7, 2234500, 23909350.0, 19400000000, 0.0115],
+    ["2026-05-08", 10.7, 10.85, 10.4, 10.6, 1890000, 20034000.0, 19400000000, 0.0097]
+  ]
+}

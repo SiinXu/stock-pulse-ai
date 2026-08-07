@@ -104,9 +104,9 @@ class AlertWorker:
 
     @staticmethod
     def _default_config_provider():
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        return get_config()
+        return get_application_services().config
 
     def run_once(self) -> Dict[str, int]:
         """Run one alert worker cycle.
