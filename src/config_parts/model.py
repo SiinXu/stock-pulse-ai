@@ -223,6 +223,7 @@ class Config:
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
+    skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
     agent_technical_agent_timeout_s: float = 0
     agent_intel_agent_timeout_s: float = 0
