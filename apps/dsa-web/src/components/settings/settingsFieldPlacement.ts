@@ -109,7 +109,7 @@ export function placementForKey(category: string, key: string): SectionViewTarge
     if (SCHEDULER_SETTING_KEYS.has(upper)) {
       return SYSTEM_RUNTIME_TARGET;
     }
-    if (upper === 'ADMIN_AUTH_ENABLED') {
+    if (upper === 'ADMIN_AUTH_ENABLED' || upper === 'LOCAL_ONLY_MODE') {
       return SYSTEM_SECURITY_TARGET;
     }
     const groupId = getCategoryFieldGroupId('system', upper);

@@ -25,6 +25,14 @@ The policy is enabled without configuration. A default installation can reach pu
 Numeric and alternate IP forms are normalized before classification. Decimal, octal, hexadecimal IPv4 forms and IPv4-mapped IPv6 therefore do not bypass the policy.
 Percent encoding in a URL hostname is rejected so policy preflight and the HTTP transport cannot interpret different destinations.
 
+## Local Only Mode
+
+Set `LOCAL_ONLY_MODE=true` to deny **all non-loopback** destinations at this same
+policy boundary. Public HTTPS, private LAN hosts, and `OUTBOUND_HTTP_ALLOWLIST`
+entries outside pure loopback are blocked with reason `local_only_mode_blocked`.
+Pure loopback remains allowed for local models. See
+[Local Only Mode](local-only-mode_EN.md) for the threat model and verification surfaces.
+
 ## Allow A Trusted Self-Hosted Service
 
 Set `OUTBOUND_HTTP_ALLOWLIST` only when the process must reach a trusted non-public HTTP service:

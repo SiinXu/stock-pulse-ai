@@ -660,7 +660,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Before disabling it in Docker or packages, make sure the built assets are already included.',
     ],
   },
+  'settings.system.LOCAL_ONLY_MODE': {
+    title: 'Local Only Mode',
+    summary: 'Fail-closed privacy mode that blocks every non-loopback outbound HTTP destination.',
+    usage: 'Enable only when you intentionally run with local models and cached data. Cloud LLM, search, news, remote data providers, and notification webhooks are denied with coded LOCAL_ONLY_MODE errors. Pure loopback remains allowed.',
+    valueNotes: ['Default is false.', 'OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.', 'Blocked calls never silently fall through.'],
+    impact: ['Remote-dependent analysis fails visibly unless local backends and cache cover the path.'],
+    notes: ['Restart after changing. See docs/local-only-mode_EN.md.'],
+  },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
+
     title: 'Web Login Protection',
     summary: 'Enables admin password protection for WebUI.',
     usage: 'Use the WebUI auth settings entry to enable or disable this. Reset with python -m src.auth reset_password if needed.',

@@ -703,7 +703,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '在 Docker 或发布包中关闭前，请确认构建产物已经随镜像或安装包提供。',
     ],
   },
+  'settings.system.LOCAL_ONLY_MODE': {
+    title: '本地专用模式',
+    summary: '失败即关闭的隐私模式：拦截所有非回环出站 HTTP 目标。',
+    usage: '仅在明确使用本地模型与缓存时启用。云端 LLM/搜索/新闻/远程数据源/通知以 LOCAL_ONLY_MODE 编码错误拒绝。纯回环仍可用。',
+    valueNotes: ['默认 false。', '开启后 allowlist 不能扩到回环以外。', '拦截不会静默放行。'],
+    impact: ['依赖远程的分析会显式失败，除非本地后端与缓存覆盖。'],
+    notes: ['修改后重启。见 docs/local-only-mode.md。'],
+  },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
+
     title: 'Web 登录保护',
     summary: '启用 WebUI 管理员密码保护。',
     usage: '请通过 WebUI 的认证设置入口启用或关闭；忘记密码可运行 python -m src.auth reset_password。',
