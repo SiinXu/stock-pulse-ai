@@ -15,6 +15,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { DecisionSignalOutcomeStatsResponse } from '../../types/decisionSignals';
 import { DecisionSignalOutcomeExplorer } from './DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from './DecisionSignalOutcomeRunPanel';
+import { DecisionSignalProfileCalibration } from './DecisionSignalProfileCalibration';
 import { formatStatPercent } from './decisionSignalsPageModel';
 
 export type DecisionSignalReviewSectionProps = {
@@ -58,28 +59,33 @@ const DecisionSignalReviewSection: React.FC<DecisionSignalReviewSectionProps> = 
         ) : loading ? (
           <Loading />
         ) : stats && stats.total > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label={t('decisionSignals.statsTotal')} value={stats.total} />
-            <StatCard
-              tone="success"
-              label={t('decisionSignals.statsHitRate')}
-              value={<span className="text-success">{formatStatPercent(stats.hitRatePct)}</span>}
-            />
-            <StatCard
-              tone="success"
-              label={t('decisionSignals.outcome.hit')}
-              value={<span className="text-success">{stats.hit}</span>}
-            />
-            <StatCard
-              tone="danger"
-              label={t('decisionSignals.outcome.miss')}
-              value={<span className="text-danger">{stats.miss}</span>}
-            />
-            <StatCard
-              tone="warning"
-              label={t('decisionSignals.outcome.unable')}
-              value={<span className="text-warning">{stats.unable}</span>}
-            />
+          <div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <StatCard label={t('decisionSignals.statsTotal')} value={stats.total} />
+              <StatCard
+                tone="success"
+                label={t('decisionSignals.statsHitRate')}
+                value={<span className="text-success">{formatStatPercent(stats.hitRatePct)}</span>}
+              />
+              <StatCard
+                tone="success"
+                label={t('decisionSignals.outcome.hit')}
+                value={<span className="text-success">{stats.hit}</span>}
+              />
+              <StatCard
+                tone="danger"
+                label={t('decisionSignals.outcome.miss')}
+                value={<span className="text-danger">{stats.miss}</span>}
+              />
+              <StatCard
+                tone="warning"
+                label={t('decisionSignals.outcome.unable')}
+                value={<span className="text-warning">{stats.unable}</span>}
+              />
+            </div>
+            {stats.profileCalibration ? (
+              <DecisionSignalProfileCalibration calibration={stats.profileCalibration} />
+            ) : null}
           </div>
         ) : (
           <EmptyState
