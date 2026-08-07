@@ -1,0 +1,28 @@
+apiVersion: stockpulse/v1
+kind: Profile
+metadata:
+  name: local-first-ollama
+  displayName: Local-first (Ollama)
+  description: Prefer local Ollama models; never embeds secrets
+  version: "1.0.0"
+  tags: [local, privacy, offline-capable]
+spec:
+  llm:
+    preferenceOrder: [ollama, model_pack, cli, cloud]
+    config:
+      GENERATION_BACKEND: litellm
+      GENERATION_FALLBACK_BACKEND: litellm
+      LLM_CONFIG_MODE: channels
+      LLM_CHANNELS: ollama
+      LLM_OLLAMA_PROVIDER: ollama
+      LLM_OLLAMA_PROTOCOL: ollama
+      LLM_OLLAMA_ENABLED: "true"
+      LLM_OLLAMA_DISPLAY_NAME: Ollama (local)
+      AGENT_GENERATION_BACKEND: auto
+  strategies:
+    enabled: [bull_trend]
+  features:
+    beginnerMode: true
+  requirements:
+    minRamGb: 8
+    needsOllama: true
