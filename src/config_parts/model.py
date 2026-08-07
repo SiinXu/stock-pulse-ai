@@ -86,6 +86,10 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
+    # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
+    multimodal_agent_tools_enabled: bool = False
+    multimodal_file_root: Optional[str] = None
+
     # === Historical decision memory & reflection (Issue #118) ===
     decision_memory_enabled: bool = True
     decision_memory_lookback: int = 5

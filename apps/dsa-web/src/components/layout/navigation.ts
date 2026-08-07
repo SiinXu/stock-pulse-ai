@@ -76,9 +76,10 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
     overviewLabelKey: 'researchOverview.overviewLabel',
     icon: Search,
     children: [
-      { kind: 'link', key: 'research-market', labelKey: 'home.marketReview', to: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
+      // Order follows Research IA: Market → Discover → Analysis → Backtest → Skill outcomes.
+      { kind: 'link', key: 'research-market', labelKey: 'layout.nav.marketReview', to: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
       { kind: 'link', key: 'research-discover', labelKey: 'layout.nav.discover', to: APP_ROUTE_PATHS.researchDiscover, icon: Search },
-      { kind: 'link', key: 'research-analysis', labelKey: 'analysisWorkbench.title', to: APP_ROUTE_PATHS.researchAnalysis, icon: FlaskConical },
+      { kind: 'link', key: 'research-analysis', labelKey: 'layout.nav.analysis', to: APP_ROUTE_PATHS.researchAnalysis, icon: FlaskConical },
       { kind: 'link', key: 'research-backtest', labelKey: 'layout.nav.backtest', to: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
       { kind: 'link', key: 'research-skill-outcomes', labelKey: 'layout.nav.skillOutcomes', to: APP_ROUTE_PATHS.researchSkillOutcomes, icon: Gauge },
     ],

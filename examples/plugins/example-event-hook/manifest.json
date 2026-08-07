@@ -1,0 +1,11 @@
+{
+  "id": "example-event-hook",
+  "name": "Example Event Hook",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Observational log sink for analysis lifecycle events.",
+  "author": "StockPulse Contributors",
+  "permissions": [],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}
