@@ -309,6 +309,19 @@ class PortfolioImportBrokerListResponse(BaseModel):
     brokers: List[PortfolioImportBrokerItem] = Field(default_factory=list)
 
 
+class PortfolioFutuImportRequest(BaseModel):
+    account_id: int = Field(..., description="Target portfolio account id")
+    dry_run: bool = Field(False, description="Preview insert counts without writing trades")
+    operation_id: Optional[str] = Field(
+        None,
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    )
+    as_of: Optional[date] = Field(
+        None,
+        description="Synthetic buy trade date for imported positions; defaults to today",
+    )
+
+
 class PortfolioFxRefreshResponse(BaseModel):
     as_of: str
     account_count: int
