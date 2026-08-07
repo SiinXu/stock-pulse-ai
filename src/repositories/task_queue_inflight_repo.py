@@ -104,13 +104,19 @@ class TaskQueueInflightRepository(BaseRepository):
                     row.created_at = created_at
                 session.commit()
         except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            self._log_and_raise(
+            context = {"task_id": task_id}
+            log_safe_exception(
                 logger,
                 "Task queue inflight checkpoint upsert failed",
                 exc,
                 error_code="task_queue_inflight_upsert_failed",
-                context={"task_id": task_id},
+                context=context,
             )
+            raise RepositoryError(
+                "Task queue inflight checkpoint upsert failed",
+                error_code="task_queue_inflight_upsert_failed",
+                context=context,
+            ) from exc
 
     def delete(self, task_id: str) -> None:
         """Remove a checkpoint after a terminal transition or rollback."""
@@ -126,13 +132,19 @@ class TaskQueueInflightRepository(BaseRepository):
                 )
                 session.commit()
         except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            self._log_and_raise(
+            context = {"task_id": canonical}
+            log_safe_exception(
                 logger,
                 "Task queue inflight checkpoint delete failed",
                 exc,
                 error_code="task_queue_inflight_delete_failed",
-                context={"task_id": canonical},
+                context=context,
             )
+            raise RepositoryError(
+                "Task queue inflight checkpoint delete failed",
+                error_code="task_queue_inflight_delete_failed",
+                context=context,
+            ) from exc
 
     def list_inflight(self) -> List[TaskQueueInflightCheckpoint]:
         """Return all checkpoints left by a previous process."""
@@ -145,12 +157,16 @@ class TaskQueueInflightRepository(BaseRepository):
                 ).scalars().all()
                 return [self._row_to_checkpoint(row) for row in rows]
         except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            self._log_and_raise(
+            log_safe_exception(
                 logger,
                 "Task queue inflight checkpoint list failed",
                 exc,
                 error_code="task_queue_inflight_list_failed",
             )
+            raise RepositoryError(
+                "Task queue inflight checkpoint list failed",
+                error_code="task_queue_inflight_list_failed",
+            ) from exc
 
     def try_upsert(self, fields: Dict[str, Any]) -> bool:
         """Best-effort upsert that never aborts live execution."""
