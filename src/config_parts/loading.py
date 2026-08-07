@@ -240,19 +240,15 @@ class _ConfigLoadingMethods:
             os.getenv('ANSPIRE_LLM_BASE_URL') or ANSPIRE_LLM_BASE_URL_DEFAULT
         ).strip()
         _anspire_llm_model_env = os.getenv('ANSPIRE_LLM_MODEL', '').strip()
-        anspire_channel_disabled = False
+        anspire_channel_declared = False
         for _raw_channel in os.getenv('LLM_CHANNELS', '').split(','):
             if _raw_channel.strip().lower() != "anspire":
                 continue
-            _channel_enabled_raw = os.getenv('LLM_ANSPIRE_ENABLED')
-            if _channel_enabled_raw is not None and _channel_enabled_raw.strip():
-                anspire_channel_disabled = not parse_env_bool(_channel_enabled_raw, default=True)
-            else:
-                anspire_channel_disabled = not anspire_llm_enabled
+            anspire_channel_declared = True
             break
         using_anspire_llm_legacy = bool(
             anspire_llm_enabled
-            and not anspire_channel_disabled
+            and not anspire_channel_declared
             and anspire_api_keys
             and not openai_api_keys
         )
@@ -1093,6 +1089,10 @@ class _ConfigLoadingMethods:
                 or _KRONOS_MODEL_SIZE_DEFAULT
             ),
             kronos_weights_dir=os.getenv('KRONOS_WEIGHTS_DIR', '').strip() or None,
+            multimodal_agent_tools_enabled=parse_env_bool(
+                os.getenv('MULTIMODAL_AGENT_TOOLS_ENABLED'), default=False
+            ),
+            multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0

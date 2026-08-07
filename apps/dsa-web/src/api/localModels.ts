@@ -1,5 +1,7 @@
+import { z } from 'zod';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
-import { toCamelCase } from './utils';
 import type {
   LocalModelAssignment,
   LocalModelCatalogResponse,
@@ -11,6 +13,99 @@ import type {
   LocalModelUnregistrationResponse,
 } from '../types/localModels';
 
+type OpenApiLocalModelCatalogResponse = components['schemas']['LocalModelCatalogResponse'];
+type OpenApiLocalModelRuntimeResponse = components['schemas']['LocalModelRuntimeResponse'];
+type OpenApiLocalModelPullAccepted = components['schemas']['LocalModelPullAccepted'];
+type OpenApiLocalModelMutationResponse = components['schemas']['LocalModelMutationResponse'];
+type _AssertCatalog = keyof OpenApiLocalModelCatalogResponse;
+type _AssertRuntime = keyof OpenApiLocalModelRuntimeResponse;
+type _AssertPull = keyof OpenApiLocalModelPullAccepted;
+type _AssertMutation = keyof OpenApiLocalModelMutationResponse;
+const _catalogAnchor: _AssertCatalog = 'schema_version';
+const _runtimeAnchor: _AssertRuntime = 'configuration';
+const _pullAnchor: _AssertPull = 'task_id';
+const _mutationAnchor: _AssertMutation = 'model_id';
+void _catalogAnchor;
+void _runtimeAnchor;
+void _pullAnchor;
+void _mutationAnchor;
+
+const localModelCatalogResponseSchema = z.object({
+  models: z.array(z.record(z.string(), z.unknown())),
+  schemaVersion: z.number(),
+  verifiedAt: z.string(),
+}).passthrough();
+
+const localModelRuntimeStateSchema = z.object({
+  configuration: z.record(z.string(), z.unknown()),
+  installedModels: z.array(z.string()).optional(),
+  localInstallPlatform: z.string().nullable().optional(),
+  manualPullSupported: z.boolean().optional(),
+  runtime: z.string().optional(),
+  status: z.string(),
+}).passthrough();
+
+const localModelConfigurationSchema = z.object({
+  agentModel: z.string().optional(),
+  configVersion: z.string(),
+  importedModels: z.array(z.record(z.string(), z.unknown())).optional(),
+  primaryModel: z.string().optional(),
+  registeredModels: z.array(z.string()).optional(),
+}).passthrough();
+
+const localModelPullAcceptedSchema = z.object({
+  modelId: z.string(),
+  status: z.string(),
+  taskId: z.string(),
+  traceId: z.string(),
+}).passthrough();
+
+const localModelPullStatusSchema = z.object({
+  error: z.string().nullable().optional(),
+  modelId: z.string(),
+  progress: z.number().optional(),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  status: z.string(),
+  taskId: z.string(),
+}).passthrough();
+
+const localModelMutationResponseSchema = z.object({
+  agentModel: z.string().optional(),
+  appliedCount: z.number().optional(),
+  configVersion: z.string(),
+  deleted: z.boolean().optional(),
+  importedModels: z.array(z.record(z.string(), z.unknown())).optional(),
+  modelId: z.string(),
+  primaryModel: z.string().optional(),
+  registeredModels: z.array(z.string()).optional(),
+  reloadTriggered: z.boolean().optional(),
+  selectedAgent: z.boolean().optional(),
+  selectedPrimary: z.boolean().optional(),
+  skippedMaskedCount: z.number().optional(),
+  success: z.boolean().optional(),
+  updatedKeys: z.array(z.string()).optional(),
+  warnings: z.array(z.string()).optional(),
+}).passthrough();
+
+const localModelUnregistrationResponseSchema = z.object({
+  agentModel: z.string().optional(),
+  appliedCount: z.number().optional(),
+  configVersion: z.string(),
+  deleted: z.boolean().optional(),
+  importedModels: z.array(z.record(z.string(), z.unknown())).optional(),
+  modelId: z.string(),
+  primaryModel: z.string().optional(),
+  recoveryToken: z.string(),
+  registeredModels: z.array(z.string()).optional(),
+  reloadTriggered: z.boolean().optional(),
+  selectedAgent: z.boolean().optional(),
+  selectedPrimary: z.boolean().optional(),
+  skippedMaskedCount: z.number().optional(),
+  success: z.boolean().optional(),
+  updatedKeys: z.array(z.string()).optional(),
+  warnings: z.array(z.string()).optional(),
+}).passthrough();
+
 
 const modelPayload = (modelId: string) => ({ model_id: modelId });
 
@@ -19,19 +114,34 @@ export const localModelsApi = {
     const response = await apiClient.get<Record<string, unknown>>(
       '/api/v1/system/config/llm/local-models',
     );
-    return toCamelCase<LocalModelCatalogResponse>(response.data);
+    return parseCamelCasePayload<LocalModelCatalogResponse>(
+      response.data,
+      localModelCatalogResponseSchema,
+      'LocalModelCatalogResponse',
+      'localModels',
+    );
   },
 
   async getRuntime(): Promise<LocalModelRuntimeState> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/local-models/runtime');
-    return toCamelCase<LocalModelRuntimeState>(response.data);
+    return parseCamelCasePayload<LocalModelRuntimeState>(
+      response.data,
+      localModelRuntimeStateSchema,
+      'LocalModelRuntimeResponse',
+      'localModels',
+    );
   },
 
   async getConfiguration(): Promise<LocalModelConfiguration> {
     const response = await apiClient.get<Record<string, unknown>>(
       '/api/v1/local-models/configuration',
     );
-    return toCamelCase<LocalModelConfiguration>(response.data);
+    return parseCamelCasePayload<LocalModelConfiguration>(
+      response.data,
+      localModelConfigurationSchema,
+      'LocalModelConfigurationResponse',
+      'localModels',
+    );
   },
 
   async startPull(modelId: string): Promise<LocalModelPullAccepted> {
@@ -39,14 +149,24 @@ export const localModelsApi = {
       '/api/v1/local-models/pulls',
       modelPayload(modelId),
     );
-    return toCamelCase<LocalModelPullAccepted>(response.data);
+    return parseCamelCasePayload<LocalModelPullAccepted>(
+      response.data,
+      localModelPullAcceptedSchema,
+      'LocalModelPullAccepted',
+      'localModels',
+    );
   },
 
   async getPull(taskId: string): Promise<LocalModelPullStatus> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/local-models/pulls/${encodeURIComponent(taskId)}`,
     );
-    return toCamelCase<LocalModelPullStatus>(response.data);
+    return parseCamelCasePayload<LocalModelPullStatus>(
+      response.data,
+      localModelPullStatusSchema,
+      'LocalModelPullStatus',
+      'localModels',
+    );
   },
 
   async assign(modelId: string, assignment: LocalModelAssignment): Promise<LocalModelMutationResponse> {
@@ -54,7 +174,12 @@ export const localModelsApi = {
       '/api/v1/local-models/assignments',
       { ...modelPayload(modelId), assignment },
     );
-    return toCamelCase<LocalModelMutationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelMutationResponse>(
+      response.data,
+      localModelMutationResponseSchema,
+      'LocalModelMutationResponse',
+      'localModels',
+    );
   },
 
   async activateDesktop(
@@ -70,7 +195,12 @@ export const localModelsApi = {
         expected_runtime_identity: expectedRuntimeIdentity,
       },
     );
-    return toCamelCase<LocalModelMutationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelMutationResponse>(
+      response.data,
+      localModelMutationResponseSchema,
+      'LocalModelMutationResponse',
+      'localModels',
+    );
   },
 
   async deleteModel(modelId: string): Promise<LocalModelMutationResponse> {
@@ -78,7 +208,12 @@ export const localModelsApi = {
       '/api/v1/local-models/models',
       { data: modelPayload(modelId) },
     );
-    return toCamelCase<LocalModelMutationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelMutationResponse>(
+      response.data,
+      localModelMutationResponseSchema,
+      'LocalModelMutationResponse',
+      'localModels',
+    );
   },
 
   async unregister(
@@ -96,7 +231,12 @@ export const localModelsApi = {
         },
       },
     );
-    return toCamelCase<LocalModelUnregistrationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelUnregistrationResponse>(
+      response.data,
+      localModelUnregistrationResponseSchema,
+      'LocalModelUnregistrationResponse',
+      'localModels',
+    );
   },
 
   async restoreRegistration(
@@ -107,7 +247,12 @@ export const localModelsApi = {
       '/api/v1/local-models/registrations',
       { ...modelPayload(modelId), recovery_token: recoveryToken },
     );
-    return toCamelCase<LocalModelMutationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelMutationResponse>(
+      response.data,
+      localModelMutationResponseSchema,
+      'LocalModelMutationResponse',
+      'localModels',
+    );
   },
 
   async finalizeUnregistration(
@@ -118,6 +263,11 @@ export const localModelsApi = {
       '/api/v1/local-models/registration-recoveries/finalize',
       { ...modelPayload(modelId), recovery_token: recoveryToken },
     );
-    return toCamelCase<LocalModelMutationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelMutationResponse>(
+      response.data,
+      localModelMutationResponseSchema,
+      'LocalModelMutationResponse',
+      'localModels',
+    );
   },
 };

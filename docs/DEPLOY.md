@@ -513,7 +513,20 @@ git commit -m "Add GitHub Actions workflow"
 git push
 ```
 
-#### 4. 手动测试运行
+#### 4. 先跑 Config Check（推荐）
+
+在跑完整日推前，先验证 Secrets/Variables 是否齐备（**不**跑分析、**不**消耗明显 Token、**不**打印 Secret 值）：
+
+1. 打开 **Actions** → **Config Check** → **Run workflow**
+2. 可选输入：
+   - `strict_notify`：缺通知渠道时也标红失败（默认仅警告）
+   - `probe_llm`：对第一个可识别提供商做一次廉价连通性探测（默认关闭）
+3. 约 1 分钟内在 Job Summary 查看 ✅/❌/⚠️ 清单；缺 LLM Key 或 `STOCK_LIST` 会失败并提示到 Settings 补齐
+4. 本地等价命令：`python scripts/actions_config_check.py`（可选 `--strict-notify` / `--probe-llm`）
+
+通过后再执行下一步日推分析。
+
+#### 5. 手动测试运行（Daily Analysis）
 
 1. 打开仓库页面 → **Actions** 标签
 2. 选择 **"StockPulse Daily Analysis"** workflow
@@ -524,7 +537,7 @@ git push
    - `stocks-only` - 仅股票分析
 5. 点击绿色 **"Run workflow"** 按钮
 
-#### 5. 查看执行日志
+#### 6. 查看执行日志
 
 - Actions 页面可以看到运行历史
 - 点击具体的运行记录查看详细日志
@@ -567,6 +580,9 @@ A: GitHub Actions 定时任务可能有 5-15 分钟延迟，且仅在仓库有�
 
 **Q: 如何查看历史报告？**
 A: Actions → 选择运行记录 → Artifacts → 下载 `analysis-reports-xxx`
+
+**Q: 任务失败了，人话原因在哪里看？**
+A: 打开同一次 Run → 顶部 **Summary**。Daily Analysis 会写入双语运行摘要（成功 / 非交易日跳过 / 部分成功 / 失败原因与下一步）。可选一句 IM 失败通知依赖 `NOTIFICATION_SYSTEM_ERROR_CHANNELS` / `FAILURE_NOTIFY_ENABLED`（详见完整指南 #850）；成功路径的报告推送逻辑不变。
 
 **Q: 免费额度够用吗？**
 A: 每次运行约 2-5 分钟，一个月 22 个工作日 = 44-110 分钟，远低于 2000 分钟限制。

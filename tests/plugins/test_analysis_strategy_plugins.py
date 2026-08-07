@@ -328,7 +328,12 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
         "test.analysis-duplicate",
         (_skill("plugin-duplicate"),),
     )
-    builtin_collision = _StrategyPlugin(
+    # Built-ins are first-class plugins; a second plugin claiming the same
+    # strategy name collides with the packaged built-in registration.
+    from src.plugins.builtin import get_builtin_analysis_strategy_plugins
+
+    packaged_builtins = get_builtin_analysis_strategy_plugins()
+    external_builtin_name_collision = _StrategyPlugin(
         "test.analysis-builtin-collision",
         (_skill("bull_trend"),),
     )
@@ -352,9 +357,10 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
     services = ApplicationServices(
         config=_config(agent_skill_dir=str(custom_dir)),
         builtin_plugins=(
+            *packaged_builtins,
             first,
             duplicate,
-            builtin_collision,
+            external_builtin_name_collision,
             persona_collision,
             custom_collision,
             invalid,
@@ -373,10 +379,10 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
         "extension_registration_conflict"
     )
     assert results["test.analysis-builtin-collision"].error_code == (
-        "native_registration_conflict"
+        "extension_registration_conflict"
     )
     assert results["test.analysis-persona-collision"].error_code == (
-        "native_registration_conflict"
+        "extension_registration_conflict"
     )
     assert results["test.analysis-custom-collision"].error_code == (
         "native_registration_conflict"
@@ -422,6 +428,8 @@ def test_external_directory_load_and_root_close_remove_strategy(tmp_path):
     )
     services = ApplicationServices(
         config=_config(),
+        # Isolate from packaged built-ins so this test owns only the external.
+        builtin_plugins=(),
         plugins_dir=tmp_path,
     )
     set_application_services(services)
@@ -738,5 +746,115 @@ def test_analysis_strategy_documentation_matches_runtime_ownership_contract():
     assert "it never creates a second, silently disconnected" in author_guide
     assert "custom-directory value, application-root" in author_guide
     assert "strategies/personas/" in author_guide
+    assert "first-class" in author_guide.lower() or "first-class plugins" in contract.lower()
     assert "Enabled analysis_strategy plugins" in architecture
     assert "Analysis Strategy 插件作者指南" in strategy_readme
+    assert "legacy" in strategy_readme.lower() or "兼容" in strategy_readme
+
+
+def test_each_builtin_strategy_loads_via_plugin_path():
+    from src.plugins.builtin import (
+        builtin_analysis_strategy_plugin_id,
+        get_builtin_analysis_strategy_plugins,
+    )
+
+    plugins = get_builtin_analysis_strategy_plugins()
+    assert len(plugins) >= 20
+    services = ApplicationServices(
+        config=_config(),
+        plugins_dir="",
+    )
+    set_application_services(services)
+
+    assert all(result.success for result in services.plugin_load_results)
+    catalog = runtime_assembly.get_skill_manager()
+    for plugin in plugins:
+        skill = catalog.get(plugin.skill_name)
+        assert skill is not None, plugin.skill_name
+        assert skill.source == "builtin"
+        assert plugin.manifest.id == builtin_analysis_strategy_plugin_id(
+            plugin.skill_name
+        )
+
+
+def test_disable_builtin_strategy_plugin_removes_skill_from_catalog():
+    from src.plugins.builtin import builtin_analysis_strategy_plugin_id
+
+    services = ApplicationServices(
+        config=_config(),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    plugin_id = builtin_analysis_strategy_plugin_id("bull_trend")
+    assert runtime_assembly.get_skill_manager().get("bull_trend") is not None
+
+    disable_result = services.plugin_manager.disable(plugin_id)
+    assert disable_result.success is True
+    assert runtime_assembly.get_skill_manager().get("bull_trend") is None
+
+    enable_result = services.plugin_manager.enable(plugin_id)
+    assert enable_result.success is True
+    restored = runtime_assembly.get_skill_manager().get("bull_trend")
+    assert restored is not None
+    assert restored.source == "builtin"
+    assert restored.default_active is True
+
+
+def test_legacy_yaml_shim_and_plugin_catalog_are_definition_parity():
+    """Golden parity: legacy strategies/ load vs plugin catalog field equality."""
+    from src.agent.skills.base import SkillManager
+
+    services = ApplicationServices(
+        config=_config(),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    plugin_catalog = runtime_assembly.get_skill_manager()
+
+    legacy = SkillManager()
+    loaded = legacy.load_builtin_skills()
+    assert loaded == len(plugin_catalog.list_skills())
+
+    parity_fields = (
+        "name",
+        "display_name",
+        "description",
+        "instructions",
+        "category",
+        "core_rules",
+        "required_tools",
+        "allowed_tools",
+        "aliases",
+        "default_active",
+        "default_router",
+        "default_priority",
+        "market_regimes",
+        "execution_context",
+        "subagent_type",
+        "preferred_model",
+        "disable_model_invocation",
+        "user_invocable",
+    )
+    legacy_names = sorted(skill.name for skill in legacy.list_skills())
+    plugin_names = sorted(skill.name for skill in plugin_catalog.list_skills())
+    assert legacy_names == plugin_names
+
+    for name in legacy_names:
+        left = legacy.get(name)
+        right = plugin_catalog.get(name)
+        assert left is not None and right is not None
+        for field in parity_fields:
+            assert getattr(left, field) == getattr(right, field), (name, field)
+        assert left.source == "builtin"
+        assert right.source == "builtin"
+
+
+def test_legacy_load_builtin_skills_shim_still_works_without_plugins():
+    from src.agent.skills.base import SkillManager
+
+    manager = SkillManager()
+    count = manager.load_builtin_skills()
+    assert count >= 20
+    assert manager.get("bull_trend") is not None
+    assert manager.get("bull_trend").source == "builtin"
+    assert manager.get("persona_value_moat") is not None

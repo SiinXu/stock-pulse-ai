@@ -596,6 +596,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       LEGACY_ROUTE_PATHS.alerts,
       APP_ROUTE_PATHS.approvals,
       APP_ROUTE_PATHS.research,
+      APP_ROUTE_PATHS.researchSkillOutcomes,
       APP_ROUTE_PATHS.settings,
       LEGACY_ROUTE_PATHS.usage,
     ]).has(url.pathname)) {
