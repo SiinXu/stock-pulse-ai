@@ -400,7 +400,6 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
   return (
     <SettingsSectionCard
       title={t('settings.scheduledTasksTitle')}
-      description={t('settings.scheduledTasksDescription')}
       contentBordered
       actions={(
         <div className="flex items-center gap-2">
@@ -429,6 +428,9 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
         </div>
       )}
     >
+      <p className="mb-1 text-xs leading-5 text-muted-text">
+        {t('settings.scheduledTasksDescription')}
+      </p>
       <p className="mb-3 text-xs leading-5 text-secondary-text">
         {t('settings.scheduledTasksProcessLocalNote')}
       </p>
