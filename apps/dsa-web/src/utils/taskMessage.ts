@@ -18,6 +18,8 @@ const TASK_MESSAGE_TEXT: Record<string, LocalizedTaskMessage> = {
   'task.completed': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.completed", { zh: '任务执行完成', en: 'Task completed' }),
   'task.failed': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.failed", { zh: '任务执行失败', en: 'Task failed' }),
   'task.interrupted': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted", { zh: '任务已中断', en: 'Task interrupted' }),
+  'task.recovered.requeued': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.recovered.requeued", { zh: '任务已从进程重启中恢复并重新排队', en: 'Task recovered after restart and re-queued' }),
+  'task.interrupted.process_restart': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.interrupted.process_restart", { zh: '任务因进程重启中断，无法安全恢复', en: 'Task interrupted by process restart and cannot be safely resumed' }),
   'task.analysis.preparing': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.analysis.preparing", { zh: '{subject}正在准备分析任务', en: 'Preparing analysis for {subject}' }),
   'task.analysis.market_data': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.analysis.market_data", { zh: '{subject}正在获取行情与筹码数据', en: 'Loading market and position data for {subject}' }),
   'task.analysis.market_data_ready': createUiLanguageRecord("utils.taskMessage.TASK_MESSAGE_TEXT.task.analysis.market_data_ready", { zh: '{subject}行情数据准备完成', en: 'Market data is ready for {subject}' }),
