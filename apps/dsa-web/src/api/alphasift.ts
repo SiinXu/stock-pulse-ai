@@ -1,7 +1,143 @@
+import { z } from 'zod';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
 import { systemConfigApi } from './systemConfig';
-import { toCamelCase } from './utils';
 
+
+
+type OpenApiAlphaSiftStatus = components['schemas']['AlphaSiftStatusResponse'];
+type OpenApiAlphaSiftScreen = components['schemas']['AlphaSiftScreenResponse'];
+type OpenApiAlphaSiftHotspots = components['schemas']['AlphaSiftHotspotsResponse'];
+type OpenApiAlphaSiftStrategies = components['schemas']['AlphaSiftStrategiesResponse'];
+type _AssertStatus = keyof OpenApiAlphaSiftStatus;
+type _AssertScreen = keyof OpenApiAlphaSiftScreen;
+type _AssertHotspots = keyof OpenApiAlphaSiftHotspots;
+type _AssertStrategies = keyof OpenApiAlphaSiftStrategies;
+const _statusAnchor: _AssertStatus = 'install_spec_is_default';
+const _screenAnchor: _AssertScreen = 'candidate_count';
+const _hotspotsAnchor: _AssertHotspots = 'hotspot_count';
+const _strategiesAnchor: _AssertStrategies = 'strategy_count';
+void _statusAnchor;
+void _screenAnchor;
+void _hotspotsAnchor;
+void _strategiesAnchor;
+
+const alphaSiftStatusSchema = z.object({
+  available: z.boolean(),
+  contractVersion: z.string().nullable().optional(),
+  diagnostics: z.record(z.string(), z.unknown()).nullable().optional(),
+  enabled: z.boolean(),
+  installSpecIsDefault: z.boolean(),
+  sourceHealth: z.record(z.string(), z.unknown()).nullable().optional(),
+  strategyCount: z.number().nullable().optional(),
+  version: z.string().nullable().optional(),
+}).passthrough();
+
+const alphaSiftInstallResponseSchema = z.object({
+  alreadyInstalled: z.boolean(),
+  installSpecIsDefault: z.boolean(),
+  installed: z.boolean(),
+}).passthrough();
+
+const alphaSiftStrategiesResponseSchema = z.object({
+  enabled: z.boolean(),
+  strategies: z.array(z.record(z.string(), z.unknown())).optional(),
+  strategyCount: z.number(),
+}).passthrough();
+
+const alphaSiftScreenResponseSchema = z.object({
+  afterFilterCount: z.number().nullable().optional(),
+  candidateCount: z.number(),
+  candidates: z.array(z.record(z.string(), z.unknown())).optional(),
+  dailyEnrichCount: z.number().nullable().optional(),
+  dailyEnriched: z.boolean().nullable().optional(),
+  deepAnalysisRequested: z.boolean().nullable().optional(),
+  dsaEnrichment: z.record(z.string(), z.unknown()).nullable().optional(),
+  enabled: z.boolean(),
+  llmCoverage: z.number().nullable().optional(),
+  llmMarketView: z.string().nullable().optional(),
+  llmParseErrors: z.array(z.string()).optional(),
+  llmPortfolioRisk: z.string().nullable().optional(),
+  llmRanked: z.boolean().nullable().optional(),
+  llmSelectionLogic: z.string().nullable().optional(),
+  market: z.string().nullable().optional(),
+  portfolioConcentrationNotes: z.array(z.string()).optional(),
+  portfolioDiversityEnabled: z.boolean().nullable().optional(),
+  postAnalyzers: z.array(z.string()).optional(),
+  riskEnabled: z.boolean().nullable().optional(),
+  runId: z.string().nullable().optional(),
+  snapshotCount: z.number().nullable().optional(),
+  snapshotSource: z.string().nullable().optional(),
+  sourceErrors: z.array(z.string()).optional(),
+  strategy: z.string().nullable().optional(),
+  warnings: z.array(z.string()).optional(),
+}).passthrough();
+
+const alphaSiftScreenAcceptedSchema = z.object({
+  market: z.string(),
+  maxResults: z.number(),
+  message: z.string(),
+  messageCode: z.string().optional(),
+  messageParams: z.record(z.string(), z.unknown()).optional(),
+  status: z.string().optional(),
+  strategy: z.string(),
+  taskId: z.string(),
+  traceId: z.string(),
+}).passthrough();
+
+const alphaSiftScreenTaskStatusSchema = z.object({
+  error: z.string().nullable().optional(),
+  message: z.string().nullable().optional(),
+  messageCode: z.string().optional(),
+  messageParams: z.record(z.string(), z.unknown()).optional(),
+  progress: z.number().optional(),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  status: z.string(),
+  taskId: z.string(),
+  traceId: z.string().nullable().optional(),
+}).passthrough();
+
+const alphaSiftHotspotsResponseSchema = z.object({
+  cacheUsed: z.boolean().nullable().optional(),
+  cachedAt: z.string().nullable().optional(),
+  details: z.record(z.string(), z.unknown()).nullable().optional(),
+  enabled: z.boolean(),
+  fallbackUsed: z.boolean().nullable().optional(),
+  hotspotCount: z.number(),
+  hotspots: z.array(z.record(z.string(), z.unknown())).optional(),
+  message: z.string().nullable().optional(),
+  provider: z.string(),
+  providerUsed: z.string().nullable().optional(),
+  sourceErrors: z.array(z.string()).nullable().optional(),
+  stale: z.boolean().nullable().optional(),
+  staleAgeHours: z.number().nullable().optional(),
+}).passthrough();
+
+const alphaSiftHotspotDetailSchema = z.object({
+  aliases: z.array(z.string()).nullable().optional(),
+  cacheUsed: z.boolean().nullable().optional(),
+  cachedAt: z.string().nullable().optional(),
+  canonicalTopic: z.string().nullable().optional(),
+  enabled: z.boolean(),
+  fallbackUsed: z.boolean().nullable().optional(),
+  leaderStocks: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
+  missingFields: z.array(z.string()).nullable().optional(),
+  name: z.string().nullable().optional(),
+  provider: z.string(),
+  qualityStatus: z.string().nullable().optional(),
+  resolverCandidates: z.array(z.unknown()).nullable().optional(),
+  route: z.array(z.record(z.string(), z.unknown())).optional(),
+  sourceErrors: z.array(z.string()).nullable().optional(),
+  stale: z.boolean().nullable().optional(),
+  staleAgeHours: z.number().nullable().optional(),
+  stockCount: z.number(),
+  stocks: z.array(z.record(z.string(), z.unknown())),
+  summary: z.unknown().nullable().optional(),
+  summaryDetail: z.record(z.string(), z.unknown()).nullable().optional(),
+  timeline: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
+  topic: z.string(),
+}).passthrough();
 const ALPHASIFT_SCREEN_TIMEOUT_MS = 180000;
 const ALPHASIFT_INSTALL_TIMEOUT_MS = 300000;
 const REPRODUCIBLE_SOURCE_INSTALL_GUIDANCE = [
@@ -276,7 +412,12 @@ async function setAlphaSiftEnabled(value: 'true' | 'false'): Promise<void> {
 export const alphasiftApi = {
   async getStatus(): Promise<AlphaSiftStatus> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/alphasift/status');
-    return toCamelCase<AlphaSiftStatus>(response.data);
+    return parseCamelCasePayload<AlphaSiftStatus>(
+      response.data,
+      alphaSiftStatusSchema,
+      'AlphaSiftStatusResponse',
+      'alphasift',
+    );
   },
 
   async screen(payload: { market: string; strategy: string; maxResults: number }): Promise<AlphaSiftScreenResponse> {
@@ -285,7 +426,16 @@ export const alphasiftApi = {
       strategy: payload.strategy,
       max_results: payload.maxResults,
     }, { timeout: ALPHASIFT_SCREEN_TIMEOUT_MS });
-    return toCamelCase<AlphaSiftScreenResponse>(response.data);
+    const parsed = parseCamelCasePayload<AlphaSiftScreenResponse>(
+      response.data,
+      alphaSiftScreenResponseSchema,
+      'AlphaSiftScreenResponse',
+      'alphasift',
+    );
+    if (!Array.isArray(parsed.candidates)) {
+      return { ...parsed, candidates: [] };
+    }
+    return parsed;
   },
 
   async startScreen(payload: { market: string; strategy: string; maxResults: number }): Promise<AlphaSiftScreenAccepted> {
@@ -294,17 +444,40 @@ export const alphasiftApi = {
       strategy: payload.strategy,
       max_results: payload.maxResults,
     });
-    return toCamelCase<AlphaSiftScreenAccepted>(response.data);
+    return parseCamelCasePayload<AlphaSiftScreenAccepted>(
+      response.data,
+      alphaSiftScreenAcceptedSchema,
+      'AlphaSiftScreenAccepted',
+      'alphasift',
+    );
   },
 
   async getScreenTask(taskId: string): Promise<AlphaSiftScreenTaskStatus> {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/alphasift/screen/tasks/${encodeURIComponent(taskId)}`);
-    return toCamelCase<AlphaSiftScreenTaskStatus>(response.data);
+    const parsed = parseCamelCasePayload<AlphaSiftScreenTaskStatus>(
+      response.data,
+      alphaSiftScreenTaskStatusSchema,
+      'AlphaSiftScreenTaskStatus',
+      'alphasift',
+    );
+    if (parsed.result && !Array.isArray(parsed.result.candidates)) {
+      parsed.result = { ...parsed.result, candidates: [] };
+    }
+    return parsed;
   },
 
   async getStrategies(): Promise<AlphaSiftStrategiesResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/alphasift/strategies', { timeout: ALPHASIFT_INSTALL_TIMEOUT_MS });
-    return toCamelCase<AlphaSiftStrategiesResponse>(response.data);
+    const parsed = parseCamelCasePayload<AlphaSiftStrategiesResponse>(
+      response.data,
+      alphaSiftStrategiesResponseSchema,
+      'AlphaSiftStrategiesResponse',
+      'alphasift',
+    );
+    if (!Array.isArray(parsed.strategies)) {
+      return { ...parsed, strategies: [] };
+    }
+    return parsed;
   },
 
   async getHotspots(payload: { provider?: string; top?: number; refresh?: boolean; includeDetails?: boolean } = {}): Promise<AlphaSiftHotspotsResponse> {
@@ -317,7 +490,15 @@ export const alphasiftApi = {
       },
       timeout: ALPHASIFT_INSTALL_TIMEOUT_MS,
     });
-    const normalized = toCamelCase<AlphaSiftHotspotsResponse>(response.data);
+    const normalized = parseCamelCasePayload<AlphaSiftHotspotsResponse>(
+      response.data,
+      alphaSiftHotspotsResponseSchema,
+      'AlphaSiftHotspotsResponse',
+      'alphasift',
+    );
+    if (!Array.isArray(normalized.hotspots)) {
+      normalized.hotspots = [];
+    }
     if (normalized.details) {
       const detailsByTopic: Record<string, AlphaSiftHotspotDetail> = {};
       Object.values(normalized.details).forEach((detail) => {
@@ -338,12 +519,26 @@ export const alphasiftApi = {
         timeout: ALPHASIFT_INSTALL_TIMEOUT_MS,
       },
     );
-    return toCamelCase<AlphaSiftHotspotDetail>(response.data);
+    const detail = parseCamelCasePayload<AlphaSiftHotspotDetail>(
+      response.data,
+      alphaSiftHotspotDetailSchema,
+      'AlphaSiftHotspotDetailResponse',
+      'alphasift',
+    );
+    if (!Array.isArray(detail.route)) {
+      return { ...detail, route: [] };
+    }
+    return detail;
   },
 
   async install(): Promise<AlphaSiftInstallResponse> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/alphasift/install', {}, { timeout: ALPHASIFT_INSTALL_TIMEOUT_MS });
-    return toCamelCase<AlphaSiftInstallResponse>(response.data);
+    return parseCamelCasePayload<AlphaSiftInstallResponse>(
+      response.data,
+      alphaSiftInstallResponseSchema,
+      'AlphaSiftInstallResponse',
+      'alphasift',
+    );
   },
 
   async enable(): Promise<void> {

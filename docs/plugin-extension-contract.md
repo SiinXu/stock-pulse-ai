@@ -89,7 +89,7 @@ right boundary.
 
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
-| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use top-level YAML under `strategies/` plus the reserved `strategies/personas/` YAML collection; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
+| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-in content lives as YAML under `strategies/` (plus reserved `strategies/personas/`) and is published as first-class `analysis_strategy` plugins; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
 | Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact point authority described by the implementation-status table | Trusted in-process code; the default process binds Analysis Strategies, Agent Tools, Report Templates, and the other implemented points listed below, while every unbound or contract-only point remains unavailable at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
@@ -634,15 +634,20 @@ adapter validates and detaches the mutable `Skill`, pins plugin provenance, and
 publishes it through the same generation-aware catalog used by Single-Agent
 prompt assembly, Multi-Agent routing, and `SkillAgent` construction.
 
-Built-ins still load through `SkillManager.load_builtin_skills()`. A configured
-`AGENT_SKILL_DIR` preserves top-level YAML/YML plus nested `SKILL.md` discovery,
-and a custom definition may still replace a built-in with the same name. A
-plugin may not replace a built-in, custom definition, or another plugin: initial
-collisions reject registration, while a later custom-directory collision keeps
-the custom definition and excludes the enabled plugin definition until the
-conflict is removed. Load, disable, enable, custom-directory changes, and root
-replacement invalidate the next catalog clone by root identity and generation.
-An in-flight clone remains stable.
+Built-in strategies are first-class plugins: each `strategies/` root YAML and
+each reserved `strategies/personas/` YAML is registered as
+`builtin.analysis-strategy.<name>` through the Analysis Strategy adapter at
+startup. YAML remains the definition source; plugin lifecycle owns enable,
+disable, and catalog publication. `SkillManager.load_builtin_skills()` is retained
+only as a legacy YAML shim for offline tools and tests (it does not double-load
+into the process reserved-name set). A configured `AGENT_SKILL_DIR` preserves
+top-level YAML/YML plus nested `SKILL.md` discovery, and a custom definition may
+still replace a built-in with the same name. A plugin may not replace a custom
+definition or another plugin: initial collisions reject registration, while a
+later custom-directory collision keeps the custom definition and excludes the
+enabled plugin definition until the conflict is removed. Load, disable, enable,
+custom-directory changes, and root replacement invalidate the next catalog clone
+by root identity and generation. An in-flight clone remains stable.
 
 The default `ApplicationServices` root owns the paired native adapter and unified
 `PluginManager`. A caller supplying a custom manager must bind the exact
@@ -692,7 +697,7 @@ capability declarations and is also published as `capabilities` in the public
 descriptor. Every Agent Tool must declare one or more of the currently
 supported capabilities: `analysis_context:read`, `backtest:read`,
 `community_intel:read`, `intel:read`, `local_model:execute`,
-`market_data:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
+`market_data:read`, `multimodal:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
 empty, or execution-ungranted declarations fail closed before the handler.
 The `agent_tool` registration contract remains major version `1`: syntactically
 valid v1 definitions can still register, while the existing ToolSurface policy
