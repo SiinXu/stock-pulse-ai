@@ -95,7 +95,8 @@ def _load_futu_api() -> _FutuApi:
             "Futu OpenAPI SDK is unavailable; install project requirements "
             "(futu-api) before importing Futu positions"
         ) from exc
-    except Exception as exc:  # broad-exception: SDK import initializes file logger
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise FutuPositionFetchError(
             f"Futu OpenAPI SDK initialization failed: {exc}"
         ) from exc
@@ -131,7 +132,7 @@ def _close(context: Any) -> None:
         return
     try:
         context.close()
-    except Exception as exc:  # broad-exception: close must not mask primary result
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Futu OpenD context close failed",
@@ -227,7 +228,8 @@ def _discover_accounts(api: _FutuApi, host: str, port: int) -> List[_Account]:
             accounts.append(_Account(account_id, returned_firm))
     except FutuPositionFetchError:
         raise
-    except Exception as exc:  # broad-exception: translate SDK/network to typed boundary
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise FutuPositionFetchError(
             "Futu OpenD is unreachable or rejected the account query; "
             f"verify OpenD is running at the configured host/port ({exc})"
@@ -382,7 +384,8 @@ def _load_raw_long_positions(
                 )
         except FutuPositionFetchError:
             raise
-        except Exception as exc:  # broad-exception: translate SDK/network to typed boundary
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             raise FutuPositionFetchError(
                 "Futu OpenD is unreachable or rejected the position query; "
                 f"verify OpenD is running and logged in ({exc})"
@@ -451,7 +454,8 @@ def _confirm_stock_codes(
                         confirmed_stocks.add(code)
     except FutuPositionFetchError:
         raise
-    except Exception as exc:  # broad-exception: translate SDK/network to typed boundary
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise FutuPositionFetchError(
             f"Futu security-type query failed: {exc}"
         ) from exc

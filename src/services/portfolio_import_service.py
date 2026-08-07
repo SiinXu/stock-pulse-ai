@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from src.utils.sanitize import log_safe_exception
+
 import hashlib
 import io
 import logging
@@ -219,7 +221,8 @@ class PortfolioImportService:
                 normalized["_source_line_number"] = int(idx) + 2
                 normalized["dedup_hash"] = self._build_dedup_hash(normalized)
                 records.append(normalized)
-            except Exception as exc:  # pragma: no cover - defensive path
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 skipped += 1
                 errors.append(f"row={idx + 1}: {exc}")
 
@@ -341,7 +344,8 @@ class PortfolioImportService:
                 except PortfolioBusyError as exc:
                     failed_count += 1
                     errors.append(f"idx={i}: portfolio_busy: {exc}")
-                except Exception as exc:
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                    log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                     failed_count += 1
                     errors.append(f"idx={i}: {exc}")
 
