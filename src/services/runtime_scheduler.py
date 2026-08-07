@@ -81,7 +81,7 @@ def build_agent_event_monitor_background_tasks(
     interval_seconds = _agent_event_monitor_interval_seconds(config)
     try:
         alert_worker = AlertWorker(config_provider=config_provider)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Event monitor alert worker initialization failed",
@@ -120,7 +120,7 @@ def build_daily_brief_scheduler_background_tasks(
             config,
             config_provider=config_provider,
         )
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Daily brief background task initialization failed",
@@ -227,7 +227,7 @@ class RuntimeSchedulerService:
                 raise RuntimeError("runtime scheduled analysis reported failure")
             self._last_success_at = datetime.now().isoformat()
             self._last_error = None
-        except Exception as exc:  # noqa: BLE001 - scheduled runs must not kill API process.
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             self._last_error = sanitize_exception_chain(exc)
             log_safe_exception(
                 logger,
@@ -367,7 +367,8 @@ class RuntimeSchedulerService:
         try:
             _thread.start_new_thread(target, ())
             return
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             # Best-effort fallback for environments where the low-level thread API
             # is unavailable or restricted.
             thread = threading.Thread(target=target, daemon=True)
@@ -495,7 +496,8 @@ class RuntimeSchedulerService:
         )
         try:
             worker.start()
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             self._run_lock.release()
             raise
         return {"accepted": True, "running": True}
@@ -511,7 +513,8 @@ class RuntimeSchedulerService:
         else:
             try:
                 schedule_times = self._current_times()
-            except Exception:  # pragma: no cover - defensive status fallback
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 schedule_times = []
         running = self._run_lock.locked()
         return {

@@ -144,7 +144,8 @@ def _templates_dir() -> Path:
         from src.config import get_config
 
         configured = Path(getattr(get_config(), "report_templates_dir", "templates") or "templates")
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         configured = Path("templates")
     if configured.is_absolute():
         return configured
@@ -329,7 +330,7 @@ class DailyBriefService:
                 try:
                     filename = f"daily_brief_{local_date.replace('-', '')}.md"
                     self.notifier.save_report_to_file(markdown, filename)
-                except Exception as exc:  # broad-exception: fallback_recorded
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
                     log_safe_exception(
                         logger,
                         "Daily brief report file save failed; continuing",
@@ -437,7 +438,7 @@ class DailyBriefService:
             template = env.get_template("daily_brief.j2")
             labels = self._labels(str(payload.get("report_language") or "zh"))
             return str(template.render(brief=payload, labels=labels)).strip() + "\n"
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief template render failed; using fallback markdown",
@@ -479,7 +480,7 @@ class DailyBriefService:
         """Load analyses whose local calendar day is *yesterday*."""
         try:
             rows = self.analysis_repo.get_list(code=None, days=3, limit=200)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief yesterday analysis load failed",
@@ -648,7 +649,7 @@ class DailyBriefService:
                 "notable_misses": notable_misses,
                 "message": None,
             }
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief decision-signal accuracy read failed",
@@ -694,7 +695,8 @@ class DailyBriefService:
         for signal_id in signal_ids:
             try:
                 signal = self.decision_signal_repo.get(signal_id)
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 signal = None
             if signal is not None:
                 signal_map[signal_id] = signal
@@ -728,7 +730,7 @@ class DailyBriefService:
     def _backtest_accuracy(self, *, min_samples: int) -> Dict[str, Any]:
         try:
             summary = self.backtest_service.get_summary(scope="overall", code=None)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief backtest accuracy read failed",
@@ -783,7 +785,7 @@ class DailyBriefService:
         """Consume the merged skill-opinion **performance** read API only."""
         try:
             stats = self.skill_performance_service.get_stats()
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief skill-outcome accuracy read failed",
@@ -849,7 +851,8 @@ class DailyBriefService:
                 days=3,
                 limit=20,
             )
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return False
         target = date.fromisoformat(local_date)
         for row in rows:
@@ -925,7 +928,7 @@ class DailyBriefService:
                 )
                 or 0
             )
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief history persistence failed; notifications may still proceed",
@@ -950,7 +953,7 @@ class DailyBriefService:
             # send() may return False when some channels fail; treat partial
             # success as degraded rather than aborting the workflow.
             return ("ok" if success else "degraded"), success
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Daily brief notification dispatch failed; brief generation continues",
