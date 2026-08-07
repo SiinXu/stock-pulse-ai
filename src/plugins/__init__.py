@@ -39,10 +39,12 @@ from .loader import ExternalPluginLoader, ExternalPluginResult
 from .manager import (
     PluginManager,
     PluginOperationResult,
+    PluginReloadResult,
     PluginSnapshot,
     PluginSource,
     PluginState,
 )
+from .state_store import PluginLifecycleStateStore
 from .manifest import PluginManifest
 from .notification_channels import (
     NotificationAdapterResult,
@@ -117,6 +119,8 @@ __all__ = [
     "PluginManager",
     "PluginManifest",
     "PluginOperationResult",
+    "PluginReloadResult",
+    "PluginLifecycleStateStore",
     "PluginRegistryError",
     "PluginSnapshot",
     "PluginSource",

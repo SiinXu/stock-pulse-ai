@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
+- [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
+- [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
+- [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
+- [Changed] Web navigation mechanical IA hygiene: Research child labels use `layout.nav.*`, command palette indexes Home/Research/Analysis Workbench/Approvals with aligned labels, and deep links allow `/research/skill-outcomes` (no route renames).
+- [Docs] Added bilingual Navigation IA proposal with current-state route audit and DECISION NEEDED target options for issue #368.
+- [Added] Portfolio risk metrics service and read-only `GET /api/v1/portfolio/risk-metrics` (historical VaR, correlation, concentration/diversification) from stored daily data with explicit insufficient-history handling (issue #239 V0).
+- [Changed] Built-in strategies under `strategies/` (including `personas/`) are published as first-class `analysis_strategy` plugins (`builtin.analysis-strategy.<name>`); YAML remains the definition source, `SkillManager.load_builtin_skills()` is a legacy shim, and `AGENT_SKILL_DIR` custom overrides keep working without migration.
+- [Added] Desktop first-run opens the guided setup wizard on a fresh install, warms local Ollama detection, reveals the main window only after the loading page is ready, and composes runtime detect/start into one-click Model Pack import with actionable failures (no silent multi-GB downloads).
+- [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
+- [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
+- [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.
 - [Tests] Add offline recorded-fixture contract checks for AkShare (EM/Sina), Tencent, Tushare, and YFinance parse paths, plus a network-only refresh script wired into nightly network-smoke.
 - [Tests] Stabilize Analysis Workbench e2e Analyze clicks with shared readiness waits on the controlled stock-search value / Analyze enabled state, and add an empty `@quarantine` Playwright lane (tracking-issue required) for non-blocking flake isolation.
 - [Fixed] Replaced the Backtest page's separate start and end date fields with a single date-range picker.
