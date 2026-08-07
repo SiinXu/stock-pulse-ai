@@ -77,9 +77,9 @@ class DailyBriefBuildResult:
 def resolve_daily_brief_config(config: Any = None) -> DailyBriefConfigView:
     """Read config-gated daily brief knobs with safe defaults (off)."""
     if config is None:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        config = get_config()
+        config = get_application_services().config
 
     schedule_time = str(
         getattr(config, "daily_brief_schedule_time", None) or "08:30"
@@ -141,9 +141,9 @@ def _local_now(timezone_name: str, *, clock: Optional[Callable[[], datetime]] = 
 def _templates_dir() -> Path:
     base = Path(__file__).resolve().parent.parent.parent
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        configured = Path(getattr(get_config(), "report_templates_dir", "templates") or "templates")
+        configured = Path(getattr(get_application_services().config, "report_templates_dir", "templates") or "templates")
     except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         configured = Path("templates")
@@ -185,9 +185,9 @@ class DailyBriefService:
     def _config(self) -> Any:
         if self._config_provider is not None:
             return self._config_provider()
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        return get_config()
+        return get_application_services().config
 
     @property
     def analysis_repo(self) -> Any:
