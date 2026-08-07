@@ -100,6 +100,15 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Daily brief with historical accuracy review (Issue #466) ===
+    daily_brief_enabled: bool = False
+    daily_brief_schedule_time: str = "08:30"
+    daily_brief_timezone: str = "Asia/Shanghai"
+    daily_brief_min_samples: int = 10
+    daily_brief_notify: bool = True
+    daily_brief_persist_history: bool = True
+    daily_brief_save_report_file: bool = True
+
     # === Paper trading portfolio (Issue #370) ===
     paper_portfolio_initial_cash: float = 1_000_000.0
 
