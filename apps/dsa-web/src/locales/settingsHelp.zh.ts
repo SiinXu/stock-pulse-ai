@@ -1398,8 +1398,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['决定 KRONOS_WEIGHTS_DIR 下需要存在哪些子目录。'],
     notes: ['更换规格后需配套权重并重启。'],
   },
-  'settings.ai_model.KRONOS_WEIGHTS_DIR': {,
-  'settings.agent.event_impact_context': '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+  'settings.ai_model.KRONOS_WEIGHTS_DIR': {
     title: 'Kronos 权重目录',
     summary: '包含所选模型与 tokenizer 子目录的本地绝对路径根目录。',
     usage: '使用 scripts/download_kronos_weights.py 准备，或手动拷贝官方 Hugging Face 产物。',
@@ -1409,6 +1408,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['决定 Kronos Agent Tool 能否注册并做本地推理。'],
     notes: ['示例：/absolute/path/to/kronos-weights，内含 Kronos-mini/ 与 Kronos-Tokenizer-2k/。'],
+  },
+  'settings.agent.event_impact_context': {
+    title: '告警影响上下文',
+    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
+    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
   },
 };
 

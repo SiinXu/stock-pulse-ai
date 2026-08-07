@@ -1355,8 +1355,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Determines which local directories under KRONOS_WEIGHTS_DIR must be present.'],
     notes: ['Changing size after download requires matching weights and a restart.'],
   },
-  'settings.ai_model.KRONOS_WEIGHTS_DIR': {,
-  'settings.agent.event_impact_context': 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+  'settings.ai_model.KRONOS_WEIGHTS_DIR': {
     title: 'Kronos Weights Directory',
     summary: 'Absolute local root that contains the selected model and tokenizer folders.',
     usage: 'Point to a directory prepared with scripts/download_kronos_weights.py or a manual official HF snapshot copy.',
@@ -1366,6 +1365,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
+  },
+  'settings.agent.event_impact_context': {
+    title: 'Alert Impact Context',
+    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
+    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
   },
 };
 
