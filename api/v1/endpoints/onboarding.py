@@ -83,7 +83,7 @@ def generate_onboarding_plan(
         ) from exc
     except OnboardingPlanError as exc:
         raise api_error(400, exc.error_code, str(exc)) from exc
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Onboarding plan generation failed",
@@ -145,7 +145,7 @@ def apply_onboarding_plan(
         ) from exc
     except OnboardingPlanError as exc:
         raise api_error(400, exc.error_code, str(exc)) from exc
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Onboarding plan apply failed",
@@ -179,7 +179,7 @@ def get_onboarding_state(
             applied_keys=list(state.get("applied_keys") or []),
             config_version=state.get("config_version"),
         )
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Onboarding state load failed",
@@ -204,7 +204,7 @@ def reset_onboarding_state(
         return OnboardingResetResponse.model_validate(payload)
     except OnboardingPlanError as exc:
         raise api_error(500, exc.error_code, str(exc)) from exc
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Onboarding state reset failed",

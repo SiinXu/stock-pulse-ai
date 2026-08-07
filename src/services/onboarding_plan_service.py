@@ -772,7 +772,7 @@ class OnboardingPlanService:
         if existed:
             try:
                 self._state_path.unlink()
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
                 log_safe_exception(
                     logger,
                     "Failed to delete onboarding state",
