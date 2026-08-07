@@ -752,11 +752,7 @@ const PortfolioWorkspace: React.FC = () => {
         />
       </section>
 
-      {error ? (
-        <div className="[&_details]:border-t-0 [&_details]:pt-0">
-          <ApiErrorAlert error={error} onDismiss={() => setError(null)} />
-        </div>
-      ) : null}
+      {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
       {accountCreateSuccess ? (
         <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
       ) : null}

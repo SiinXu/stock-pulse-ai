@@ -2108,7 +2108,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.backtest.BACKTEST_TEXT.endDate": "Enddatum",
   "locales.backtest.BACKTEST_TEXT.endDateAria": "Enddatum der Analyse",
   "locales.backtest.BACKTEST_TEXT.errors": "Fehler:",
-  "locales.backtest.BACKTEST_TEXT.evalWindow": "Bewertungsfenster",
+  "locales.backtest.BACKTEST_TEXT.evalWindow": "Fenstertage",
   "locales.backtest.BACKTEST_TEXT.evaluationCount": "Bewertungen",
   "locales.backtest.BACKTEST_TEXT.filter": "Filter",
   "locales.backtest.BACKTEST_TEXT.filteredStock": "Gefiltert {code}",

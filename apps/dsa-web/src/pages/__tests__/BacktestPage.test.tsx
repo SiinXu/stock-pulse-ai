@@ -167,7 +167,10 @@ describe('BacktestPage', () => {
     expect(filterInput).toHaveAttribute('aria-autocomplete', 'none');
     expect(windowInput).toHaveAttribute('data-control', 'input');
     expect(windowInput).toHaveAttribute('data-size', 'default');
-    expect(screen.getByRole('button', { name: '筛选' })).toHaveAttribute('data-size', 'primary');
+    expect(windowInput).toHaveAccessibleName('窗口天数');
+    expect(screen.queryByRole('button', { name: '筛选' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('backtest-stock-filter')).toHaveClass('flex', 'flex-col', '[&>div]:h-8');
+    expect(screen.getByText('股票', { selector: 'label' })).toHaveAttribute('for', 'backtest-stock-filter');
     expect(screen.getByRole('button', { name: '运行回测' })).toHaveAttribute('data-size', 'primary');
     expect(dateRangeInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(dateRangeInput).toHaveAttribute('aria-expanded', 'false');
@@ -195,7 +198,7 @@ describe('BacktestPage', () => {
     expect(screen.getAllByLabelText('是').length).toBeGreaterThan(0);
     expect(screen.getByText('方向准确率')).toBeInTheDocument();
     expect(screen.getByText('平均模拟收益')).toBeInTheDocument();
-    expect(screen.getByRole('toolbar', { name: '回测结果工具栏' })).toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: '回测结果工具栏' })).toHaveClass('border-y-0');
   });
 
   it('renders one page-level empty state before any backtest data exists', async () => {
@@ -311,7 +314,7 @@ describe('BacktestPage', () => {
 
     expect(await screen.findByRole('combobox', { name: 'Filter by stock code (leave empty for all)' }))
       .toHaveAttribute('aria-autocomplete', 'none');
-    expect(screen.getByRole('radio', { name: 'Evaluation window' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '10-day window' })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
 
@@ -327,7 +330,7 @@ describe('BacktestPage', () => {
     expect(screen.queryByText('窗口收益')).not.toBeInTheDocument();
   });
 
-  it('filters results with stock code, window, phase, and analysis date range when clicking Filter', async () => {
+  it('filters results with stock code, window, phase, and analysis date range when submitting the stock filter', async () => {
     const initialSearch = new URLSearchParams({
       ref: 'dashboard',
       [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
@@ -349,14 +352,14 @@ describe('BacktestPage', () => {
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
     fireEvent.change(windowInput, { target: { value: '20' } });
     chooseOption(phaseSelect, 'intraday');
-    // Phase applies immediately; wait for that fetch to settle so the Filter
-    // button (disabled while results load) re-enables before we click it.
+    // Phase applies immediately; wait for that fetch to settle before submitting
+    // the stock filter with the remaining draft values.
     await waitFor(() =>
       expect(mockGetResults).toHaveBeenCalledWith(expect.objectContaining({ analysisPhase: 'intraday' })),
     );
     expect(dateRangeInput).toHaveAttribute('data-start-value', '2026-03-01');
     expect(dateRangeInput).toHaveAttribute('data-end-value', '2026-03-31');
-    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+    fireEvent.keyDown(filterInput, { key: 'Enter' });
 
     await waitFor(() => {
       expect(mockGetResults).toHaveBeenCalledWith({
@@ -386,7 +389,7 @@ describe('BacktestPage', () => {
     const { from, to } = chooseVisibleDateRange('分析开始日期 – 分析结束日期');
     mockGetResults.mockClear();
     mockGetOverallPerformance.mockClear();
-    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+    fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
     await waitFor(() => {
       expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -404,11 +407,11 @@ describe('BacktestPage', () => {
     const clearedRange = screen.getByLabelText('分析开始日期 – 分析结束日期');
     expect(clearedRange).toHaveAttribute('data-start-value', '');
     expect(clearedRange).toHaveAttribute('data-end-value', '');
-    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: '运行回测' })).toBeEnabled());
 
     mockGetResults.mockClear();
     mockGetOverallPerformance.mockClear();
-    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+    fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
     await waitFor(() => {
       expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -612,7 +615,7 @@ describe('BacktestPage', () => {
     });
     const progress = await screen.findByRole('progressbar', { name: '回测中...' });
     expect(progress).not.toHaveAttribute('aria-valuenow');
-    expect(screen.getByRole('button', { name: '筛选' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '筛选' })).not.toBeInTheDocument();
 
     await act(async () => {
       pendingRun.resolve({
@@ -671,7 +674,7 @@ describe('BacktestPage', () => {
         analysisPhase: 'intraday',
       }));
     });
-    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).not.toBeDisabled());
+    expect(screen.queryByRole('button', { name: '筛选' })).not.toBeInTheDocument();
 
     mockRun.mockClear();
     mockGetResults.mockClear();
@@ -734,17 +737,15 @@ describe('BacktestPage', () => {
     renderPage();
 
     await screen.findByText('600519');
-    const oneDayButton = screen.getByRole('radio', { name: '1 日验证' });
-    expect(screen.getByRole('radiogroup', { name: '评估窗口' })).toHaveClass(
+    const oneDayButton = screen.getByRole('radio', { name: '次日验证' });
+    expect(screen.getByRole('radiogroup', { name: '窗口天数 / 次日验证' })).toHaveClass(
       '[&_.segmented-control-tab]:font-medium',
       'dark:!bg-foreground/10',
       'dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground',
       'dark:[&_.segmented-control-tab[aria-checked=true]]:text-background',
       'dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70',
     );
-    expect(screen.getByRole('button', { name: '筛选' }).parentElement).toHaveClass(
-      'w-full',
-    );
+    expect(screen.getByTestId('backtest-stock-filter')).toHaveClass('flex', 'flex-col');
     expect(oneDayButton).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: '强制重跑' })).toHaveAttribute('aria-checked', 'false');
     const nextDayResults = createDeferred<{
@@ -797,24 +798,21 @@ describe('BacktestPage', () => {
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
     expect(oneDayButton).toHaveAttribute('aria-checked', 'true');
 
-    fireEvent.click(screen.getByRole('radio', { name: '评估窗口' }));
+    fireEvent.click(screen.getByRole('radio', { name: '10 日窗口' }));
     await waitFor(() => expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
       evalWindowDays: 10,
     })));
     expect(screen.getByPlaceholderText('10')).toHaveValue(10);
   });
 
-  it('explains that Filter refreshes results without running a backtest', async () => {
+  it('does not render a redundant Filter action beside Run Backtest', async () => {
     renderPage();
-    const filterButton = await screen.findByRole('button', { name: '筛选' });
+    await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
 
-    fireEvent.mouseEnter(filterButton.parentElement as HTMLElement);
-
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('仅筛选下方结果，不会重跑回测');
-    expect(mockRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '筛选' })).not.toBeInTheDocument();
   });
 
-  it('keeps expandable run-error diagnostics within the responsive alert width', async () => {
+  it('shows a compact run-error toast without changing the header layout', async () => {
     mockRun.mockRejectedValueOnce({
       title: '股票代码无效',
       message: '请输入有效的股票代码。',
@@ -826,15 +824,11 @@ describe('BacktestPage', () => {
     fireEvent.change(filterInput, { target: { value: '11' } });
     fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
-    const runError = await screen.findByTestId('backtest-run-error');
-    expect(runError).toHaveClass(
-      '[&_details]:w-full',
-      '[&_details]:max-w-full',
-      '[&_pre]:max-w-full',
-      '[&_pre]:overflow-x-auto',
-    );
-    expect(within(runError).getByText('查看详情')).toBeInTheDocument();
-    expect(within(runError).getByText(/trace_id: test-trace/)).toBeInTheDocument();
+    const errorToast = await screen.findByRole('alert');
+    expect(screen.queryByTestId('backtest-run-error')).not.toBeInTheDocument();
+    expect(errorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(within(errorToast).queryByText('查看详情')).not.toBeInTheDocument();
+    expect(within(errorToast).queryByText(/trace_id: test-trace/)).not.toBeInTheDocument();
   });
 
   it('restores applied filters and pagination from the URL', async () => {

@@ -108,6 +108,9 @@ describe('ScheduledTasksPanel', () => {
 
     render(<ScheduledTasksPanel t={t} language="en" />);
 
+    const descriptionNote = screen.getByText(UI_TEXT.en['settings.scheduledTasksDescription']);
+    expect(descriptionNote).toHaveClass('text-xs', 'text-muted-text');
+    expect(descriptionNote.closest('header')).toBeNull();
     expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
     const toggle = screen.getByRole('switch', { name: /Enable or disable AAPL risk check/i });
     expect(toggle).toBeChecked();

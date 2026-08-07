@@ -123,6 +123,10 @@ They are independent: English menus + Chinese reports is a valid combination.
 
 Theme and UI language use the same compact dropdown treatment in the Profile menu, with a neutral selected state. On wide screens, both menus open to the right of their setting; on narrow screens, they adapt their direction and height to stay within the viewport.
 
+## Global error notifications
+
+API and external-service failures appear in a compact, top-centered Toast overlay instead of entering the page content flow, so they do not resize tables, reports, or forms. Error Toasts remain until dismissed. When recovery is available, the retry action appears on the right.
+
 ---
 
 ## Login

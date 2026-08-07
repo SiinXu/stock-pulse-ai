@@ -687,8 +687,11 @@ const BacktestPage: React.FC = () => {
         <div className="flex flex-wrap items-end gap-1.5">
           <div
             data-testid="backtest-stock-filter"
-            className="relative w-64 min-w-0 shrink-0 [&>div>p]:sr-only"
+            className="relative flex w-64 min-w-0 shrink-0 flex-col [&>div]:h-8 [&>div>p]:sr-only"
           >
+            <label htmlFor="backtest-stock-filter" className="mb-1.5 text-xs font-medium text-secondary-text">
+              {text.stock}
+            </label>
             <StockAutocomplete
               id="backtest-stock-filter"
               value={codeFilter}
@@ -703,22 +706,6 @@ const BacktestPage: React.FC = () => {
               suggestionDensity="compact"
               className="h-8 min-h-8 min-w-0 sm:h-8 sm:min-h-8 sm:min-w-0"
             />
-          </div>
-          <div className="w-[5.25rem] shrink-0 [&>span]:w-full [&>span>button]:w-full">
-            <Tooltip content={text.resultPhaseHint} className="w-full">
-              <Button
-                type="button"
-                onClick={() => handleFilter()}
-                disabled={isRunning || isLoadingResults}
-                variant="secondary"
-                size="primary"
-                isLoading={isLoadingResults}
-                loadingText={text.filter}
-                className="whitespace-nowrap text-xs"
-              >
-                {text.filter}
-              </Button>
-            </Tooltip>
           </div>
           <Input
             id="backtest-eval-window"
@@ -770,11 +757,11 @@ const BacktestPage: React.FC = () => {
           <SegmentedControl
             value={isNextDayValidation ? 'oneDay' : 'window'}
             options={[
-              { value: 'window', label: text.evalWindow, disabled: isRunning },
-              { value: 'oneDay', label: text.oneDayValidation, disabled: isRunning },
+              { value: 'window', label: formatUiText(text.dayWindow, { days: lastRegularWindowRef.current }), disabled: isRunning },
+              { value: 'oneDay', label: text.nextDayValidation, disabled: isRunning },
             ]}
             onChange={handleValidationModeChange}
-            ariaLabel={text.evalWindow}
+            ariaLabel={`${text.evalWindow} / ${text.nextDayValidation}`}
             semantics="single-select"
             className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
           />
@@ -806,14 +793,7 @@ const BacktestPage: React.FC = () => {
             <RunSummary data={runResult} language={language} />
           </div>
         )}
-        {runError && (
-          <div
-            data-testid="backtest-run-error"
-            className="mt-2 max-w-4xl [&_details]:w-full [&_details]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto"
-          >
-            <ApiErrorAlert error={runError} />
-          </div>
-        )}
+        {runError ? <ApiErrorAlert error={runError} /> : null}
         <p className="mt-2 text-xs text-muted-text">
           {isNextDayValidation
             ? text.oneDayModeDescription
@@ -895,7 +875,7 @@ const BacktestPage: React.FC = () => {
         <section className="min-h-0 flex-1 overflow-y-auto">
           <Toolbar
             aria-label={text.resultToolbarLabel}
-            className="mb-3"
+            className="mb-3 border-y-0"
             left={(
               <>
                 <Select

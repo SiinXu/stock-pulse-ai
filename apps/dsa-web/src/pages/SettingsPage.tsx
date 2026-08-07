@@ -1485,7 +1485,7 @@ const SettingsPage: React.FC = () => {
       {isLoading && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <SettingsLoading />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-4 lg:self-start space-y-3">
             <SettingsSectionNav
               activeSection={activeSection}

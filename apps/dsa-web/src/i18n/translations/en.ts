@@ -6631,7 +6631,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "locales.backtest.BACKTEST_TEXT.endDateAria": "Analysis end date",
   "locales.backtest.BACKTEST_TEXT.errors": "Errors:",
   "locales.backtest.BACKTEST_TEXT.evaluationCount": "Evaluations",
-  "locales.backtest.BACKTEST_TEXT.evalWindow": "Evaluation window",
+  "locales.backtest.BACKTEST_TEXT.evalWindow": "Window days",
   "locales.backtest.BACKTEST_TEXT.filter": "Filter",
   "locales.backtest.BACKTEST_TEXT.filteredStock": "Filtered {code}",
   "locales.backtest.BACKTEST_TEXT.forceRerun": "Force rerun",

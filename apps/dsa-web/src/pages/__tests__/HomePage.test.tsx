@@ -209,8 +209,9 @@ describe('HomePage attention hub', () => {
       .toHaveAttribute('data-surface-level', 'interactive');
     expect(todos).toHaveAttribute('data-surface-level', 'interactive');
     expect(signalSummary).toHaveAttribute('data-surface-level', 'interactive');
-    expect(screen.getByRole('button', { name: 'Start analysis' }))
-      .toHaveAttribute('data-size', 'primary');
+    const startAnalysis = screen.getByRole('button', { name: 'Start analysis' });
+    expect(startAnalysis).toHaveAttribute('data-size', 'primary');
+    expect(startAnalysis.querySelector('.lucide-circle-play')).toHaveClass('h-4', 'w-4');
 
     expect(screen.getByTestId('home-attention-hub').querySelector('[data-slot="workspace-content"]'))
       .toHaveClass('rounded-xl', 'border', 'border-border', 'p-5');
@@ -273,16 +274,9 @@ describe('HomePage attention hub', () => {
     expect(within(recentAnalyses).getByText('Apple')).toBeInTheDocument();
     expect(recentAnalyses.querySelector(':scope > header .lucide-history')).toBeInTheDocument();
     const scheduled = screen.getByRole('region', { name: 'Versioned scheduled tasks today' });
-    expect(scheduled.parentElement).toHaveClass(
-      '[&>section>header]:rounded-lg',
-      '[&>section>header]:border',
-      '[&>section>header]:border-border',
-      '[&>section>header]:p-3',
-    );
-    expect(scheduled.parentElement).not.toHaveClass(
-      '[&>section>header]:!flex-col',
-      '[&>section>header]:!items-stretch',
-    );
+    expect(scheduled).toHaveAttribute('data-surface-level', 'interactive');
+    expect(scheduled).toHaveClass('border', 'border-border');
+    expect(scheduled.querySelector(':scope > header')).not.toHaveClass('border', 'border-border', 'p-3');
     expect(within(scheduled).getByText('AAPL downside review')).toBeInTheDocument();
     expect(within(scheduled).getByText('Risk check', { exact: false })).toBeInTheDocument();
     expect(within(scheduled).getByText('Waiting to retry')).toBeInTheDocument();
