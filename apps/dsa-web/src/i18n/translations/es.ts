@@ -2133,7 +2133,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.backtest.BACKTEST_TEXT.endDate": "Fecha de finalización",
   "locales.backtest.BACKTEST_TEXT.endDateAria": "Fecha de finalización del análisis",
   "locales.backtest.BACKTEST_TEXT.errors": "Errores:",
-  "locales.backtest.BACKTEST_TEXT.evalWindow": "Ventana de evaluación",
+  "locales.backtest.BACKTEST_TEXT.evalWindow": "Días de ventana",
   "locales.backtest.BACKTEST_TEXT.evaluationCount": "Evaluaciones",
   "locales.backtest.BACKTEST_TEXT.filter": "Filtro",
   "locales.backtest.BACKTEST_TEXT.filteredStock": "Filtrado {code}",

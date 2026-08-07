@@ -90,6 +90,8 @@ The selected phase applies consistently to single-symbol, batch, watchlist, smar
 | Completed | Report ready | Open History |
 | Failed | Error | Read the reason, then retry |
 
+The Tasks tab shows a compact count badge only while tasks are running, without increasing the tab-row height.
+
 The selector offers **Auto, Premarket, Intraday, and Postmarket**. Auto is the default and preserves the pre-existing market/session inference behavior; a manual choice overrides only the current request.
 
 The task list shows the **requested phase**, so you can confirm whether Auto or an explicit phase was submitted. The report page shows the **final phase** used after analysis and remains authoritative. These are intentionally distinct.
@@ -98,7 +100,7 @@ The task list shows the **requested phase**, so you can confirm whether Auto or 
 
 1. Open a record for full Markdown/report UI.  
 2. Use history trend for the **same** symbol.  
-3. Multi-delete requires confirmation.  
+3. After multi-selecting records, use the trash icon to delete them; confirmation is still required.
 4. Market-review history is separate from single-stock history.
 
 ## Beginner vs Professional

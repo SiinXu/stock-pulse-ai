@@ -218,7 +218,6 @@ const SignalScorecardPanel: React.FC<SignalScorecardPanelProps> = ({
   return (
     <SettingsSectionCard
       title={t('settings.scorecardTitle')}
-      description={t('settings.scorecardDescription')}
       actions={(
         <IconButton
           type="button"
@@ -234,6 +233,9 @@ const SignalScorecardPanel: React.FC<SignalScorecardPanelProps> = ({
       contentBordered
     >
       <div className="space-y-4">
+        <p className="text-xs leading-5 text-muted-text">
+          {t('settings.scorecardDescription')}
+        </p>
         <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
