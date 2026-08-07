@@ -344,10 +344,7 @@ def get_skill_manager(config: Optional[Config] = None):
         _SKILL_MANAGER_CUSTOM_DIR = current_custom_dir
         _SKILL_MANAGER_CATALOG_TOKEN = plugin_snapshot.catalog_token
         _SKILL_MANAGER_CATALOG_GENERATION = plugin_snapshot.generation
-        logger.info(
-            "[AgentFactory] SkillManager prototype cached (%d skills)",
-            len(skill_manager._skills),
-        )
+        logger.info("[AgentFactory] SkillManager prototype cached")
         return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
 
 
