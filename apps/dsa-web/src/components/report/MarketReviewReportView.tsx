@@ -22,7 +22,7 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, Spinner, useClipboard } from '../common';
+import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, ScoreGauge, Spinner, useClipboard } from '../common';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 import { ShareImageButton } from './ShareImageButton';
@@ -443,6 +443,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
               recordId={recordId}
               reportTitle={displayTitle}
               reportLanguage={reportLanguage}
+              className="[&_.home-surface-button]:!shadow-none"
             />
             {canOpenRunFlow ? (
               <IconButton
@@ -498,10 +499,28 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="label-uppercase">{label}</p>
                   <p className="mt-2 line-clamp-4 text-sm leading-6 text-foreground">{value}</p>
                 </div>
+                {Icon === Gauge && typeof summary.sentimentScore === 'number' ? (
+                  <div
+                    role="meter"
+                    aria-label={label}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={summary.sentimentScore}
+                    aria-valuetext={value}
+                    className="ml-auto shrink-0"
+                  >
+                    <ScoreGauge
+                      score={summary.sentimentScore}
+                      size="sm"
+                      showLabel={false}
+                      language={normalizedReportLanguage}
+                    />
+                  </div>
+                ) : null}
               </div>
             </Card>
           ))}
