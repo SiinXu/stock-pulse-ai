@@ -217,7 +217,7 @@ def setup_env(override: bool = False):
     load_dotenv(dotenv_path=env_path, override=override)
     try:
         raw_env_values = dotenv_values(env_path, interpolate=False)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Raw environment file read failed",

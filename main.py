@@ -54,7 +54,8 @@ if _packaged_import_probe:
             ]
             if not migration_ids or migration_ids[-1] != target_version:
                 raise RuntimeError("Migration registry target is inconsistent")
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         print(
             f"ERROR: packaged import failed for {_packaged_import_probe}: {exc}",
             file=sys.stderr,
@@ -105,7 +106,7 @@ def _read_active_env_values() -> Optional[Dict[str, str]]:
 
     try:
         values = dotenv_values(env_path)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Environment file read failed; keeping current process environment",
@@ -458,7 +459,7 @@ def main() -> int:
     # Initialize bootstrap logs before loading, ensuring early failures are logged.
     try:
         _setup_bootstrap_logging(debug=args.debug)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         logging.basicConfig(
             level=logging.DEBUG if getattr(args, "debug", False) else logging.INFO,
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -481,7 +482,7 @@ def main() -> int:
     # Load configuration (execute after bootstrap logging, ensure exceptions are logged)
     try:
         config = get_config()
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Configuration loading failed",
@@ -497,7 +498,7 @@ def main() -> int:
     # Configure logging (output to console and file)
     try:
         _setup_runtime_logging(config.log_dir, debug=args.debug)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Configured runtime logging setup failed",
