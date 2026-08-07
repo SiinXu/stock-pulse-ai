@@ -314,6 +314,39 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "DECISION_PROFILE_CALIBRATION_ENABLED": {
+        "title": "Decision Profile Outcome Calibration",
+        "description": (
+            "When enabled, GET /api/v1/decision-signals/outcomes/stats includes "
+            "profile_calibration breakdowns (profile, action, horizon, market "
+            "phase, data quality, profile source) with a 30-completed-sample "
+            "gate per exact bucket. Default off keeps the stats response "
+            "compatible with pre-calibration clients and does not change "
+            "evaluation or persistence."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 62,
+        "help_key": "settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED",
+        "examples": [
+            "DECISION_PROFILE_CALIBRATION_ENABLED=false",
+            "DECISION_PROFILE_CALIBRATION_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "DecisionSignal documentation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/decision-signals.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_CRITIC_ENABLED": {
         "title": "Bounded Multi-Agent Critic",
         "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request at most one retry of an already-entered intelligence or catalog-backed skill stage.",
