@@ -225,18 +225,28 @@ def get_tool_registry():
 
 
 def build_declarative_skill_manager(config: Config):
-    """Build the existing built-in plus custom declarative Skill catalog."""
+    """Build the declarative Skill catalog used for reserved-name checks.
+
+    Built-in strategies under ``strategies/`` are first-class
+    ``analysis_strategy`` plugins (see ``src.plugins.builtin``). They are
+    **not** loaded here so plugin registration is not rejected as a native
+    collision. Custom ``AGENT_SKILL_DIR`` YAML / ``SKILL.md`` definitions remain
+    declarative and still override same-named plugin strategies at catalog
+    assembly time.
+
+    Direct callers that need the legacy on-disk built-in YAML without plugin
+    composition should use ``SkillManager.load_builtin_skills()`` (compat shim).
+    """
 
     from src.agent.skills.base import SkillManager
 
     skill_manager = SkillManager()
-    skill_manager.load_builtin_skills()
 
     custom_dir = getattr(config, "agent_skill_dir", None)
     if custom_dir:
         try:
             skill_manager.load_custom_skills(custom_dir)
-        except Exception as exc:  # broad-exception: fallback_recorded - built-in skills remain available.
+        except Exception as exc:  # broad-exception: fallback_recorded - empty declarative catalog is safe.
             log_safe_exception(
                 logger,
                 "Agent factory custom skill loading failed",

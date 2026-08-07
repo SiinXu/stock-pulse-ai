@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Built-in strategies under `strategies/` (including `personas/`) are published as first-class `analysis_strategy` plugins (`builtin.analysis-strategy.<name>`); YAML remains the definition source, `SkillManager.load_builtin_skills()` is a legacy shim, and `AGENT_SKILL_DIR` custom overrides keep working without migration.
 - [Added] Desktop first-run opens the guided setup wizard on a fresh install, warms local Ollama detection, reveals the main window only after the loading page is ready, and composes runtime detect/start into one-click Model Pack import with actionable failures (no silent multi-GB downloads).
 - [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
 - [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
