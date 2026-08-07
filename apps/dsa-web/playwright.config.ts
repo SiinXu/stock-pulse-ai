@@ -136,8 +136,24 @@ export default defineConfig({
   ],
   projects: [
     {
+      // Blocking smoke lane. Specs tagged @quarantine are excluded here.
+      // See docs/testing-ci-gate.md → "Playwright flake quarantine".
+      // retries remains 0: quarantine moves flakes out of this lane; it does
+      // not paper over them with re-runs or sleeps.
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      grepInvert: /@quarantine/,
     },
+    // Non-blocking quarantine lane. Off by default so local/CI smoke stays
+    // green. Enable with DSA_WEB_E2E_QUARANTINE_LANE=1 (npm run test:smoke:quarantine).
+    // Workflow wiring for a continuous observation job is owned by CI PRs
+    // (#808/#810 class); this config is the stable entry point when wired.
+    ...(process.env.DSA_WEB_E2E_QUARANTINE_LANE === '1'
+      ? [{
+          name: 'chromium-quarantine',
+          use: { ...devices['Desktop Chrome'] },
+          grep: /@quarantine/,
+        }]
+      : []),
   ],
 });

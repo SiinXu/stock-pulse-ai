@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { prepareInitialUiLanguage } from './i18n/prepareUiLanguage'
+import { QueryProvider } from './query/QueryProvider'
 import { applyUiLanguageToDocument, getRuntimeInitialLanguage } from './utils/uiLanguage'
 import { installApiMockIfEnabled } from './dev/apiMock/apiMockSwitch'
 
@@ -29,8 +30,10 @@ if (import.meta.env.DEV) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <App initialUiLanguage={initialUiLanguage} />
-    </ThemeProvider>
+    <QueryProvider>
+      <ThemeProvider>
+        <App initialUiLanguage={initialUiLanguage} />
+      </ThemeProvider>
+    </QueryProvider>
   </StrictMode>,
 )
