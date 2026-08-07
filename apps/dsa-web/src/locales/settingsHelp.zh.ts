@@ -1422,12 +1422,4 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
 };
 
-  daily_brief: {
-    title: "\u6bcf\u65e5\u7b80\u62a5",
-    summary: "\u5386\u53f2\u51c6\u786e\u5ea6\u56de\u987e\u7b80\u62a5\u3002",
-    usage: "\u5728\u7cfb\u7edf\u8bbe\u7f6e\u4e2d\u542f\u7528\u3002",
-    impact: [],
-    notes: [],
-    valueNotes: [],
-  },
 export default settingsHelpZhCN;
