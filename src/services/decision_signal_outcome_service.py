@@ -14,6 +14,11 @@ from src.core.backtest_engine import BacktestEngine, EvaluationConfig
 from src.repositories.decision_signal_outcome_repo import DecisionSignalOutcomeRepository
 from src.repositories.decision_signal_repo import DecisionSignalRepository
 from src.repositories.stock_repo import StockRepository
+from src.services.decision_profile_calibration_service import (
+    build_profile_calibration,
+    is_decision_profile_calibration_enabled,
+)
+from src.services.decision_signal_data_quality import normalize_decision_signal_data_quality
 from src.services.decision_signal_service import (
     HORIZONS,
     SIGNAL_STATUSES,
@@ -310,11 +315,12 @@ class DecisionSignalOutcomeService:
             if statuses
             else list(DEFAULT_STATS_STATUSES)
         )
-        rows = self.repo.list_stats_rows(
+        stats_rows = self.repo.list_stats_rows(
             engine_version=engine_version_norm,
             horizons=horizons_norm,
             statuses=statuses_norm,
         )
+        rows = [stats_row.outcome for stats_row in stats_rows]
         dimensions = (
             "action",
             "market",
@@ -329,13 +335,18 @@ class DecisionSignalOutcomeService:
             dimension: self._breakdown(rows, dimension)
             for dimension in dimensions
         }
-        return {
+        payload: Dict[str, Any] = {
             **self._aggregate(rows),
             "engine_version": engine_version_norm,
             "horizons": horizons_norm,
             "statuses": statuses_norm,
             "breakdowns": breakdowns,
         }
+        # Default-off gate: omit profile_calibration so gate-off responses stay
+        # compatible with the pre-calibration stats contract.
+        if is_decision_profile_calibration_enabled():
+            payload["profile_calibration"] = build_profile_calibration(stats_rows)
+        return payload
 
     def get_feedback(self, signal_id: int) -> Dict[str, Any]:
         signal = self._require_existing_signal(signal_id)
@@ -502,18 +513,41 @@ class DecisionSignalOutcomeService:
         return self._parse_date(signal.created_at)
 
     def _data_quality_level(self, signal: DecisionSignalRecord) -> str:
-        value = self._json_loads(signal.data_quality_summary_json)
+        raw_summary = signal.data_quality_summary_json
+        if raw_summary and raw_summary.strip():
+            try:
+                summary = json.loads(raw_summary)
+            except json.JSONDecodeError as exc:
+                log_safe_exception(
+                    logger,
+                    "Invalid decision signal data quality summary JSON",
+                    exc,
+                    error_code="decision_signal_data_quality_json_invalid",
+                    level=logging.WARNING,
+                )
+                return "unknown"
+            explicit_level = self._explicit_data_quality_level(summary)
+            if explicit_level is not None:
+                return self._short_label(explicit_level)
+        metadata = self._json_loads(signal.metadata_json)
+        if isinstance(metadata, dict):
+            return normalize_decision_signal_data_quality(metadata.get("data_quality_level"))
+        return "unknown"
+
+    @staticmethod
+    def _explicit_data_quality_level(value: Any) -> Optional[Any]:
         if isinstance(value, dict):
             for key in ("level", "quality_level"):
                 level = value.get(key)
                 if level not in (None, ""):
-                    return self._short_label(level)
+                    return level
             nested = value.get("data_quality")
             if isinstance(nested, dict) and nested.get("level") not in (None, ""):
-                return self._short_label(nested.get("level"))
+                return nested.get("level")
+            return None
         if isinstance(value, str) and value.strip():
-            return self._short_label(value)
-        return "unknown"
+            return value
+        return None
 
     def _holding_state(self, signal: DecisionSignalRecord) -> str:
         metadata = self._json_loads(signal.metadata_json)
