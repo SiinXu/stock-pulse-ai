@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import logging
+
+from src.utils.sanitize import log_safe_exception
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -318,8 +320,14 @@ class LLMDeliberationMediator:
             if result is None:
                 return baseline
             return result
-        except Exception as exc:
-            logger.warning("[StrategyDeliberation] LLM mediator failed; falling back to mediator_v0: %s", exc)
+        except Exception as exc:  # broad-exception: fallback_recorded - LLM mediator fails open to baseline
+            log_safe_exception(
+                logger,
+                "Strategy deliberation LLM mediator failed; falling back to mediator_v0",
+                exc,
+                error_code="strategy_deliberation_llm_mediator_failed",
+                level=logging.WARNING,
+            )
             return baseline
 
     @staticmethod
@@ -645,8 +653,14 @@ class StrategySelfReviewMediator:
                 responses=responses,
                 summary=summary,
             )
-        except Exception as exc:
-            logger.warning("[StrategyDeliberation] self-review mediator failed; falling back: %s", exc)
+        except Exception as exc:  # broad-exception: fallback_recorded - self-review fails open to baseline
+            log_safe_exception(
+                logger,
+                "Strategy deliberation self-review mediator failed; falling back",
+                exc,
+                error_code="strategy_deliberation_self_review_failed",
+                level=logging.WARNING,
+            )
             return baseline
 
     @staticmethod
@@ -772,8 +786,14 @@ class MultiRoundDeliberationMediator:
                 })
                 if self.stop_when_stable and changed_count == 0:
                     break
-        except Exception as exc:
-            logger.warning("[StrategyDeliberation] multi-round mediator failed; using last valid round: %s", exc)
+        except Exception as exc:  # broad-exception: fallback_recorded - multi-round fails open to last valid
+            log_safe_exception(
+                logger,
+                "Strategy deliberation multi-round mediator failed; using last valid round",
+                exc,
+                error_code="strategy_deliberation_multi_round_failed",
+                level=logging.WARNING,
+            )
 
         if accepted_rounds == 0:
             return current

@@ -6,6 +6,8 @@ Concurrent scheduler for specialist strategy-skill agents.
 from __future__ import annotations
 
 import logging
+
+from src.utils.sanitize import log_safe_exception
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import copy_context
 from dataclasses import dataclass, field
@@ -70,8 +72,15 @@ class AgentSkillScheduler:
                 index, agent = futures[future]
                 try:
                     result, opinions = future.result()
-                except Exception as exc:
-                    logger.warning("[AgentSkillScheduler] skill '%s' failed: %s", agent.agent_name, exc)
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate skill failure
+                    log_safe_exception(
+                        logger,
+                        "Agent skill scheduler skill failed",
+                        exc,
+                        error_code="agent_skill_scheduler_skill_failed",
+                        level=logging.WARNING,
+                        context={"agent_name": getattr(agent, "agent_name", "")},
+                    )
                     result = StageResult(
                         stage_name=getattr(agent, "agent_name", ""),
                         status=StageStatus.FAILED,
