@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { modelPacksApi } from '../modelPacks';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 
 const RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
@@ -47,10 +48,25 @@ describe('modelPacksApi', () => {
         task_id: 'pack-1',
         status: 'completed',
         progress: 100,
-        result: { model_id: 'licensed/finance:q4', activated: true },
+        result: {
+          model_id: 'licensed/finance:q4',
+          display_name: 'Licensed Finance Q4',
+          minimum_memory_gb: 16,
+          license_id: 'LicenseRef-Finance',
+          activated: true,
+          selected_primary: false,
+          warnings: [],
+        },
       },
     });
-    post.mockResolvedValue({ data: { success: true, selected_primary: false } });
+    post.mockResolvedValue({
+      data: {
+        success: true,
+        selected_primary: false,
+        config_version: 'config-1',
+        model_id: 'licensed/finance:q4',
+      },
+    });
 
     await expect(modelPacksApi.getImport('pack/1')).resolves.toMatchObject({
       taskId: 'pack-1',
@@ -79,5 +95,43 @@ describe('modelPacksApi', () => {
       desktop_attestation: 'desktop-attestation',
     });
     expect(JSON.stringify(post.mock.calls[0][1])).not.toContain('url');
+  });
+
+  it('preserves extra keys on valid import accepted payloads (toCamelCase pass-through)', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        status: 'accepted',
+        task_id: 'pack-2',
+        message: 'queued',
+        message_code: 'local_model.import.queued',
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const file = new File(['pack'], 'finance.modelpack', { type: 'application/zip' });
+    const accepted = await modelPacksApi.startImport(file);
+    expect(accepted).toEqual({
+      status: 'accepted',
+      taskId: 'pack-2',
+      message: 'queued',
+      messageCode: 'local_model.import.queued',
+      unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces import accepted shape mismatches through ParsedApiError', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        status: 'accepted',
+        message: 'queued',
+      },
+    });
+    const file = new File(['pack'], 'finance.modelpack', { type: 'application/zip' });
+    await expect(modelPacksApi.startImport(file)).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('ModelPackImportAccepted');
+      return true;
+    });
   });
 });

@@ -14,7 +14,8 @@
 | 配置推送通知 | [通知能力基线](notifications.md) | [完整配置与部署指南](full-guide.md) |
 | 部署到服务器或云平台 | [部署指南](DEPLOY.md) | [云端 WebUI 部署](deploy-webui-cloud.md)、[Zeabur 部署](docker/zeabur-deployment.md) |
 | **公网 / 非本机暴露前先确认安全边界** | [安全基线 · 运维安全边界（英文专节）](security-baseline.md#operator-security-boundaries) | [部署指南](DEPLOY.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
-| 理解插件信任模型（非应用商店沙箱） | [插件扩展契约（英文）](plugin-extension-contract.md) | [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries) |
+| 理解插件信任模型（非应用商店沙箱） | [插件扩展契约（英文）](plugin-extension-contract.md) | [插件开发指南](plugin-development-guide_zh.md)（[EN](plugin-development-guide.md)）、[安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries) |
+| **编写或加载系统插件** | [插件开发指南](plugin-development-guide_zh.md)（[EN](plugin-development-guide.md)） | [插件扩展契约（英文）](plugin-extension-contract.md)、[examples/plugins](../examples/plugins/) |
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
@@ -76,7 +77,7 @@
 | [部署指南](DEPLOY.md) | 服务器部署、Docker、systemd、Supervisor 等部署方式 |
 | [云端 WebUI 部署](deploy-webui-cloud.md) | 云服务器访问 WebUI 的部署说明 |
 | [Zeabur 部署](docker/zeabur-deployment.md) | Zeabur 平台部署说明 |
-| [桌面端打包说明](desktop-package.md) | Electron 桌面端和 Web 构建产物打包说明 |
+| [桌面端打包说明](desktop-package.md)（[EN](desktop-package_EN.md)） | Electron 桌面端首次启动、本地模型与打包说明 |
 
 ## 参考与开发
 
@@ -94,6 +95,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
+| [插件开发指南](plugin-development-guide_zh.md) | 六个扩展点的统一入口：是什么/为什么、信任模型、10 分钟 quickstart、官方示例与专题链接（[English](plugin-development-guide.md)） |
 | [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |

@@ -1,0 +1,11 @@
+{
+  "id": "example-report-template",
+  "name": "Example Report Template",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Deterministic Markdown report template for plugin authors.",
+  "author": "StockPulse Contributors",
+  "permissions": [],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}

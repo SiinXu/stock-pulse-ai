@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DateRangePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
 import { Progress } from '../components/common/Progress';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -351,9 +351,7 @@ const BacktestPage: React.FC = () => {
     if (invalidWindow || invalidStart || invalidEnd || invalidRange) {
       const firstInvalidId = invalidWindow
         ? 'backtest-eval-window'
-        : invalidStart || invalidRange
-          ? 'backtest-date-from'
-          : 'backtest-date-to';
+        : 'backtest-date-range';
       document.getElementById(firstInvalidId)?.focus();
       return null;
     }
@@ -751,35 +749,23 @@ const BacktestPage: React.FC = () => {
               {evalDaysError}
             </span>
           ) : null}
-          <DatePicker
-            id="backtest-date-from"
+          <DateRangePicker
+            id="backtest-date-range"
             size="compact"
-            label={text.startDate}
-            ariaLabel={text.startDateAria}
-            value={analysisDateFrom}
-            onChange={(value) => {
-              setAnalysisDateFrom(value);
+            label={text.analysisDate}
+            ariaLabel={`${text.startDateAria} – ${text.endDateAria}`}
+            placeholder={`${text.startDate} – ${text.endDate}`}
+            value={{ start: analysisDateFrom, end: analysisDateTo }}
+            onChange={({ start, end }) => {
+              setAnalysisDateFrom(start);
+              setAnalysisDateTo(end);
               setDateFromError('');
-            }}
-            error={dateFromError}
-            disabled={isRunning}
-            className="w-40 whitespace-nowrap"
-            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
-          />
-          <DatePicker
-            id="backtest-date-to"
-            size="compact"
-            label={text.endDate}
-            ariaLabel={text.endDateAria}
-            value={analysisDateTo}
-            onChange={(value) => {
-              setAnalysisDateTo(value);
               setDateToError('');
             }}
-            error={dateToError}
+            error={dateFromError || dateToError}
             disabled={isRunning}
-            className="w-40 whitespace-nowrap"
-            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
+            className="w-64 whitespace-nowrap"
+            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-64 !rounded-xl text-center tabular-nums`}
           />
           <SegmentedControl
             value={isNextDayValidation ? 'oneDay' : 'window'}

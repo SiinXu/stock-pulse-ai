@@ -21,7 +21,10 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
-# Built-in skill YAML directory (project_root/strategies/ kept for compatibility)
+# Built-in skill YAML directory (project_root/strategies/).
+# Runtime catalog publication loads these through first-class analysis_strategy
+# plugins (src.plugins.builtin). load_builtin_skills() remains a legacy shim for
+# direct SkillManager callers, offline tools, and golden parity checks.
 _BUILTIN_SKILLS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "strategies"
 _BUILTIN_YAML_SUBDIRECTORIES = ("personas",)
 
@@ -329,6 +332,15 @@ class SkillManager:
         logger.debug(f"Registered skill: {skill.name} ({skill.display_name})")
 
     def load_builtin_skills(self) -> int:
+        """Legacy YAML shim for built-in strategies under ``strategies/``.
+
+        Process composition publishes the same YAML definitions through
+        first-class ``analysis_strategy`` plugins. Prefer
+        ``get_skill_manager()`` / ApplicationServices for the live catalog.
+        This method remains so offline tools, unit tests, and migration
+        callers can still load the on-disk YAML without plugin composition.
+        """
+
         skills_dir = _BUILTIN_SKILLS_DIR
         if not skills_dir.is_dir():
             logger.warning(f"Built-in skill directory not found: {skills_dir}")
@@ -339,7 +351,11 @@ class SkillManager:
             skill.source = "builtin"
             self.register(skill)
 
-        logger.info(f"Loaded {len(skills)} built-in skills from {skills_dir}")
+        logger.info(
+            "Loaded %d built-in skills from legacy YAML shim at %s",
+            len(skills),
+            skills_dir,
+        )
         return len(skills)
 
     def load_custom_skills(self, directory: Union[str, Path, None]) -> int:
