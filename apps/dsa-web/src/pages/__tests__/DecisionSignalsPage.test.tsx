@@ -726,7 +726,8 @@ describe('DecisionSignalsPage', () => {
 
     const feedPanel = screen.getByRole('tabpanel', { name: '全部信号' });
     expect(await within(feedPanel).findByText('贵州茅台')).toBeInTheDocument();
-    expect(within(feedPanel).getByText('决策信号加载失败')).toBeInTheDocument();
+    expect(await screen.findByText('决策信号加载失败')).toBeInTheDocument();
+    expect(within(feedPanel).queryByText('决策信号加载失败')).not.toBeInTheDocument();
     expect(decisionSignalsApi.list).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: 'AAPL',
     }));
@@ -1872,7 +1873,9 @@ describe('DecisionSignalsPage', () => {
     vi.mocked(decisionSignalsApi.getLatest).mockRejectedValueOnce(new Error('latest down'));
     submitCurrentStock('600519');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('latest down');
+    const latestErrorToast = await screen.findByRole('alert');
+    expect(latestErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(latestErrorToast).not.toHaveTextContent('latest down');
   });
 
   it('does not request the timeline before a current stock is selected', async () => {
@@ -2209,7 +2212,9 @@ describe('DecisionSignalsPage', () => {
     vi.mocked(decisionSignalsApi.list).mockRejectedValueOnce(new Error('boom'));
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
+    const listErrorToast = await screen.findByRole('alert');
+    expect(listErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(listErrorToast).not.toHaveTextContent('boom');
   });
 
   it('clears stale list data when refresh fails after leaving list details', async () => {
@@ -2225,7 +2230,9 @@ describe('DecisionSignalsPage', () => {
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('filter failed');
+    const filterErrorToast = await screen.findByRole('alert');
+    expect(filterErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(filterErrorToast).not.toHaveTextContent('filter failed');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).not.toBeInTheDocument();
     expect(screen.getByText('共 0 条信号')).toBeInTheDocument();
@@ -2415,7 +2422,9 @@ describe('DecisionSignalsPage', () => {
 
     submitCurrentStock('MSFT');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('latest failed');
+    const latestErrorToast = await screen.findByRole('alert');
+    expect(latestErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(latestErrorToast).not.toHaveTextContent('latest failed');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
@@ -2502,8 +2511,9 @@ describe('DecisionSignalsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '确定' }));
 
-    const errorMessage = await screen.findByText('status update failed');
-    expect(errorMessage.closest('[role="alert"]')).toBeInTheDocument();
+    const statusConfirmDialog = screen.getByRole('dialog', { name: '更新信号状态' });
+    const statusError = await within(statusConfirmDialog).findByRole('alert');
+    expect(statusError).not.toHaveTextContent('status update failed');
     expect(screen.getByRole('heading', { name: '更新信号状态' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
     expect(within(dialog).getByText('有效')).toBeInTheDocument();
