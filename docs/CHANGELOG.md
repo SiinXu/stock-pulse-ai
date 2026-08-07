@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Optional RSS/Atom market-news feeds (`RSS_NEWS_FEED_URLS`) as a free supplement in the on-demand search pipeline; empty config stays inert, per-feed failures degrade without aborting the run, and fetch uses the fail-closed outbound policy.
+- [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
 - [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
 - [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
 - [Fixed] Reduced the screening availability status surface to a compact size.
