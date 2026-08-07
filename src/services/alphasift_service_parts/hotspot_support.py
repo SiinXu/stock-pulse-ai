@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -18,7 +19,9 @@ if TYPE_CHECKING:
         DSA_ALPHASIFT_HOTSPOT_EVENT_SUMMARY_MAX_CHARS,
         DSA_ALPHASIFT_HOTSPOT_HISTORY_PATH,
         DSA_ALPHASIFT_HOTSPOT_PREFETCH_DETAIL_COUNT,
+        DSA_ALPHASIFT_HOTSPOT_SEARCH_TIMEOUT_SECONDS,
         DSA_ALPHASIFT_HOTSPOT_SOURCE_ERROR_CODE,
+        _HOTSPOT_SEARCH_WORKER_SLOTS,
         DSA_ALPHASIFT_HOTSPOT_UNAVAILABLE_CODE,
         DSA_ALPHASIFT_MIN_HOTSPOT_CACHE_COUNT,
         Dict,
@@ -327,31 +330,135 @@ def _has_configured_hotspot_news_source(config: Config) -> bool:
     return any(bool(getattr(config, field, None)) for field in fields)
 
 
-def _build_hotspot_event_routes_from_search(topic: str, config: Config) -> List[Dict[str, Any]]:
+def _strip_hotspot_search_augmentation(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the cacheable hotspot detail without request-scoped search data.
+
+    Ported-from: e430fcfe — search enhancement must not write or renew the shared
+    hotspot detail cache; only structured base detail is persisted.
+    """
+    base = dict(payload)
+    for field in ("route", "timeline"):
+        items = base.get(field)
+        if not isinstance(items, list):
+            continue
+        base[field] = [
+            item
+            for item in items
+            if not (isinstance(item, dict) and bool(item.get("search_result")))
+        ]
+    base.pop("news_search_requested", None)
+    base.pop("news_search_status", None)
+    return base
+
+
+def _with_hotspot_search_augmentation(
+    payload: Dict[str, Any],
+    *,
+    topic: str,
+    config: Config,
+    include_search: bool,
+) -> Dict[str, Any]:
+    """Attach opt-in/auto search results without mutating the cacheable base.
+
+    Ported-from: e430fcfe — search is response-only; status distinguishes
+    available / no_results / unavailable.
+    """
+    base = _strip_hotspot_search_augmentation(payload)
+    if not include_search:
+        return base
+    if _hotspot_route_has_external_event(base.get("route")):
+        # Preserve prior fork behavior: skip search when the route already has a
+        # real external event.
+        return base
+
+    search_result = _build_hotspot_event_routes_from_search(topic, config)
+    routes = list(search_result.get("routes") or [])
+    status = str(search_result.get("status") or "unavailable")
+    if routes:
+        existing_routes = base.get("route") if isinstance(base.get("route"), list) else []
+        existing_timeline = base.get("timeline") if isinstance(base.get("timeline"), list) else []
+        # Search is additive. Keep raw timeline and display route separate from
+        # any pre-existing structural events (Ported-from: e430fcfe).
+        base["route"] = [*routes, *existing_routes]
+        base["timeline"] = [*routes, *existing_timeline]
+    base["news_search_requested"] = True
+    base["news_search_status"] = status
+    return base
+
+
+def _run_hotspot_topic_news_search(topic: str, config: Config) -> Any:
+    """Execute the provider portion of a hotspot topic news search."""
+    from src.search_service import SearchService
+
+    service = SearchService(
+        bocha_keys=getattr(config, "bocha_api_keys", None),
+        tavily_keys=getattr(config, "tavily_api_keys", None),
+        anspire_keys=getattr(config, "anspire_api_keys", None),
+        brave_keys=getattr(config, "brave_api_keys", None),
+        serpapi_keys=getattr(config, "serpapi_api_keys", None),
+        minimax_keys=getattr(config, "minimax_api_keys", None),
+        searxng_base_urls=getattr(config, "searxng_base_urls", None),
+        searxng_public_instances_enabled=False,
+        news_max_age_days=int(getattr(config, "news_max_age_days", 3) or 3),
+        news_strategy_profile=getattr(config, "news_strategy_profile", "short"),
+    )
+    # Topic search reuses SearchService with topic identity + focus keywords so
+    # existing filtering still returns topic-relevant news without rewriting the
+    # modular search public-surface ratchets.
+    return service.search_stock_news(
+        topic,
+        topic,
+        max_results=3,
+        focus_keywords=[topic, "A股", "题材", "催化", "涨价"],
+    )
+
+
+def _build_hotspot_event_routes_from_search(topic: str, config: Config) -> Dict[str, Any]:
+    """Build search-backed hotspot routes with bounded concurrency and timeout.
+
+    Ported-from: e430fcfe — capacity slot + hard deadline; returns status so the
+    API can distinguish empty success from timeout/capacity/provider failure.
+    """
+    # Import inside the function: facade-bound methods only see facade globals.
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
     topic_text = _env_text(topic)
     if not topic_text or not _has_configured_hotspot_news_source(config):
-        return []
-    try:
-        from src.search_service import SearchService
+        return {"routes": [], "status": "unavailable"}
 
-        service = SearchService(
-            bocha_keys=getattr(config, "bocha_api_keys", None),
-            tavily_keys=getattr(config, "tavily_api_keys", None),
-            anspire_keys=getattr(config, "anspire_api_keys", None),
-            brave_keys=getattr(config, "brave_api_keys", None),
-            serpapi_keys=getattr(config, "serpapi_api_keys", None),
-            minimax_keys=getattr(config, "minimax_api_keys", None),
-            searxng_base_urls=getattr(config, "searxng_base_urls", None),
-            searxng_public_instances_enabled=False,
-            news_max_age_days=int(getattr(config, "news_max_age_days", 3) or 3),
-            news_strategy_profile=getattr(config, "news_strategy_profile", "short"),
+    timeout_seconds = float(DSA_ALPHASIFT_HOTSPOT_SEARCH_TIMEOUT_SECONDS)
+    if not _HOTSPOT_SEARCH_WORKER_SLOTS.acquire(blocking=False):
+        log_safe_exception(
+            logger,
+            "AlphaSift hotspot event search capacity full",
+            RuntimeError("hotspot search concurrency full"),
+            error_code="alphasift_hotspot_event_search_capacity_full",
+            level=logging.INFO,
+            context=_topic_log_context(topic_text, source="configured_search"),
         )
-        response = service.search_stock_news(
-            topic_text,
-            topic_text,
-            max_results=3,
-            focus_keywords=[topic_text, "A股", "题材", "催化", "涨价"],
-        )
+        return {"routes": [], "status": "unavailable"}
+
+    response: Any = None
+    try:
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="alphasift-hotspot-search") as pool:
+            future = pool.submit(_run_hotspot_topic_news_search, topic_text, config)
+            try:
+                response = future.result(timeout=timeout_seconds)
+            except FuturesTimeoutError as exc:
+                future.cancel()
+                log_safe_exception(
+                    logger,
+                    "AlphaSift hotspot event search timed out",
+                    exc,
+                    error_code="alphasift_hotspot_event_search_timeout",
+                    level=logging.INFO,
+                    context=_topic_log_context(
+                        topic_text,
+                        source="configured_search",
+                        timeout_seconds=timeout_seconds,
+                    ),
+                )
+                return {"routes": [], "status": "unavailable"}
     except Exception as exc:  # broad-exception: fallback_recorded - Omit optional event routes when search fails.
         log_safe_exception(
             logger,
@@ -361,10 +468,14 @@ def _build_hotspot_event_routes_from_search(topic: str, config: Config) -> List[
             level=logging.INFO,
             context=_topic_log_context(topic_text, source="configured_search"),
         )
-        return []
+        return {"routes": [], "status": "unavailable"}
+    finally:
+        # Capacity belongs to the accepted call, not only a successful provider chain.
+        _HOTSPOT_SEARCH_WORKER_SLOTS.release()
 
     if not bool(getattr(response, "success", False)):
-        return []
+        return {"routes": [], "status": "unavailable"}
+
     today = datetime.now().date().isoformat()
     event_parts: List[str] = []
     sources: List[str] = []
@@ -380,32 +491,46 @@ def _build_hotspot_event_routes_from_search(topic: str, config: Config) -> List[
         if event_text:
             event_parts.append(event_text)
         published = _env_text(getattr(result, "published_date", ""))
-        source = _env_text(getattr(result, "source", "")) or _env_text(getattr(response, "provider", "")) or "news_search"
+        source = (
+            _env_text(getattr(result, "source", ""))
+            or _env_text(getattr(response, "provider", ""))
+            or "news_search"
+        )
         if source and source not in sources:
             sources.append(source)
-        if not first_url:
-            first_url = _env_text(getattr(result, "url", ""))
+        url = _env_text(getattr(result, "url", ""))
+        # Prefer absolute HTTP(S) links only (Ported-from: e430fcfe).
+        if not first_url and url.lower().startswith(("http://", "https://")):
+            first_url = url
         if not first_date:
             first_date = _extract_date_text(published) or _extract_date_text(event_text)
         if not first_published:
             first_published = published
     if not event_parts:
-        return []
-    description = _summarize_hotspot_news_event(
+        # Successful provider chain with no usable rows is empty, not a failure.
+        return {"routes": [], "status": "no_results"}
+
+    # Local deterministic summary only — avoid extra LLM wait on the detail path
+    # (Ported-from: e430fcfe hotspot search local compression).
+    description = _summarize_hotspot_news_event_locally(
         topic=topic_text,
-        title="",
-        snippet="；".join(event_parts),
-        config=config,
+        text="；".join(event_parts),
     )
+    if not description:
+        return {"routes": [], "status": "no_results"}
     date = first_date or _extract_date_text(description) or today
-    return [{
-        "title": "消息催化",
-        "description": description,
-        "source": ",".join(sources) if sources else "news_search",
-        "date": date,
-        "published_at": first_published or date,
-        "url": first_url,
-    }]
+    return {
+        "routes": [{
+            "title": "消息催化",
+            "description": description,
+            "source": ",".join(sources) if sources else "news_search",
+            "date": date,
+            "published_at": first_published or date,
+            "url": first_url,
+            "search_result": True,
+        }],
+        "status": "available",
+    }
 
 
 def _summarize_hotspot_news_event(*, topic: str, title: str, snippet: str, config: Config) -> str:

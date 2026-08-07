@@ -577,10 +577,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.notification.report_output': {
     title: '报告输出设置',
-    summary: '控制通知报告的详细程度、语言和模板输出。',
-    usage: 'REPORT_TYPE 可选 simple/full/brief，REPORT_LANGUAGE 可选 zh/en。',
-    valueNotes: ['报告语言影响默认模板和通知文案，不等同于前端界面语言。'],
-    impact: ['影响通知正文长度、语言和阅读体验。'],
+    summary: '控制通知报告的详细程度、默认输出语言和模板输出。',
+    usage: 'REPORT_TYPE 可选 simple/full/brief，REPORT_LANGUAGE 可选 zh/en/ko；Agent Chat 只有在未显式传入 context.report_language 时才继承这里的默认语言。',
+    valueNotes: ['报告语言会影响默认模板、通知文案，以及未单独指定语言的 Agent Chat 回复；它不等同于前端界面语言。'],
+    impact: ['影响通知正文长度、语言和未显式指定语言的 Agent Chat 阅读体验。'],
     notes: ['full 报告可能更长，部分平台可能触发分段发送。'],
   },
   'settings.system.WEBUI_HOST': {
@@ -1078,6 +1078,31 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响后台告警检测和通知推送。'],
     notes: ['该字段为 Legacy 配置方式，高级规则请使用告警中心。'],
+  },
+  'settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED': {
+    title: '启用多模态 Agent Tools',
+    summary: '可选的 PDF 解析与图表阅读 Agent Tools，配合本地文件沙箱，默认关闭。',
+    usage: '默认安装请保持关闭。仅在已设置 MULTIMODAL_FILE_ROOT 且需要 Agent 调用 parse_financial_pdf / read_price_chart 时开启，并在保存后重启进程以完成注册。',
+    valueNotes: [
+      '默认关闭；启用、配置根目录并重启前，进程工具目录不包含这些工具。',
+      'PDF 以本地文本抽取为主；图表阅读依赖 VISION_MODEL，不可用时诚实降级。',
+    ],
+    impact: ['仅影响可选 Agent 工具可用性；关闭时默认分析报告路径不变。'],
+    notes: [
+      '契约与回滚见 docs/multimodal-parsing.md。',
+      'HTTP 上传 UI 与纪要/电话会分析刻意留到后续阶段。',
+    ],
+  },
+  'settings.agent.MULTIMODAL_FILE_ROOT': {
+    title: '多模态文件根目录',
+    summary: '允许存放用户提供的 PDF 与图表文件的本地目录，作为多模态工具的路径沙箱。',
+    usage: '填写绝对本地路径。Agent 工具的 file_path 必须解析到该根目录内；拒绝 URL 与路径穿越。',
+    valueNotes: [
+      '当 MULTIMODAL_AGENT_TOOLS_ENABLED=true 时必填；根目录缺失时工具不会注册。',
+      '文件内容永不执行，仅走有界读取与解析路径。',
+    ],
+    impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
+    notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
   // ------------------------------------------------------------------
   // Backtest configuration

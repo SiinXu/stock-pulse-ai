@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 Unit tests for strict news freshness filtering and strategy window logic (Issue #697).
+
+Time control: freezes ``datetime.now`` on the search facade and this module via
+``tests.time_determinism`` so "today" / window math does not drift across midnight
+or CI runner timezones.
 """
 
 import sys
@@ -22,6 +26,7 @@ from src.services.run_diagnostics import (
     current_diagnostic_snapshot,
     reset_run_diagnostic_context,
 )
+from tests.time_determinism import DEFAULT_FAKE_NOW, frozen_time
 
 
 def _result(
@@ -52,6 +57,29 @@ def _response(results) -> SearchResponse:
 
 class SearchNewsFreshnessTestCase(unittest.TestCase):
     """Tests for strategy window and strict published_date filtering."""
+
+    def setUp(self) -> None:
+        # Freeze production filter clock. Pytest assertion rewriting keeps a
+        # separate globals dict for test methods, so also rebind ``datetime``
+        # there so fixture dates match the filter.
+        self._clock_cm = frozen_time(
+            at=DEFAULT_FAKE_NOW,
+            datetime_modules=("src.search_service",),
+            patch_sleep=False,
+        )
+        self.clock = self._clock_cm.__enter__()
+        self.addCleanup(self._clock_cm.__exit__, None, None, None)
+
+        import src.search_service as search_service_module
+
+        self._test_globals = type(self).setUp.__globals__
+        self._orig_test_datetime = self._test_globals.get("datetime")
+        self._test_globals["datetime"] = search_service_module.datetime
+        self.addCleanup(self._restore_test_datetime)
+
+    def _restore_test_datetime(self) -> None:
+        if self._orig_test_datetime is not None:
+            self._test_globals["datetime"] = self._orig_test_datetime
 
     def _create_service_with_mock_provider(
         self,

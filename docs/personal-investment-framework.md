@@ -10,9 +10,11 @@ Issue #465 以**后端**切片起步。当前 `main` 已有**部分**分析注�
 
 - 本地版本化存储、CRUD/历史 API、乐观并发
 - 稳定的 `InvestmentFrameworkContextReader` 只读 adapter
-- **Settings → Agent 行为** 结构化编辑器：创建、版本化保存、停用、删除，以及决策树、评估维度和不可变历史检查
-- **个股分析路径**注入：active 框架经 `inject_framework_into_analysis_context`（`src/core/stages/analysis_stock.py` → analyzer 的 `personal_investment_framework_prompt`）作为**只读研究上下文**
+- **Settings → Agent 行为 → 投资框架** 结构化编辑器：创建、版本化保存、停用、删除，以及决策树、评估维度、不可变历史检查，以及**分析上下文实时预览**（前端镜像 `format_investment_framework_prompt_section` 的 phrasing）
+- 深链：`buildInvestmentFrameworkSettingsHref()` → `/settings?section=agent_behavior&view=investment_framework`
+- **个股分析路径**注入：active 框架经 `inject_framework_into_analysis_context`（`src/core/stages/analysis_stock.py` → analyzer 的 `personal_investment_framework_prompt`）作为**只读研究上下文**；提示词段落包含标题、自由/风险/跟踪规则、评估维度与**有界决策树摘要**
 - 报告分层 **对齐槽位填充**：有 active 框架时由 `enrich_dashboard_framework_alignment` 写入；否则 `framework_alignment.status=not_configured` 与本地化空槽摘要
+- **无框架/已停用时默认行为不变**（parity）：inject 为 no-op，不写入 `personal_investment_framework_prompt`
 
 **未交付 / 非完整产品：**
 
@@ -85,6 +87,8 @@ Settings → **Agent 行为 → 投资框架** 横向 Tab 提供独立的页内�
 
 编辑器支持标题、说明、自由规则、按行填写的风险规则/跟踪条件，以及决策树的根节点、节点 ID、问题、条件分支、目标/终局和评估维度的名称、权重、说明、标准。保存前会检查 ID/名称唯一性、目标有效性、根节点、可达性、循环与 `0..100` 权重，并镜像后端数量边界：最多 100 个节点、每节点 20 个分支、50 个维度、每维度 30 条标准、100 条风险规则和 100 条跟踪条件。节点问题、分支条件/终局、维度标准、风险规则和跟踪条件均为每条 1–1000 字符；标题、说明、维度名称与自由规则仍分别遵守 schema 的独立上限。按行字段在输入期间保留末尾换行等编辑草稿，失焦或保存时再规范为去空白的非空列表。重命名节点会以开始编辑时的节点身份同步原有根节点和入站分支引用，即使临时输入了另一个已有 ID，也不会窃取该节点的引用；仍被根节点或入站分支引用的节点不能删除，并会显示本地化依赖。
 
+**分析上下文预览**：编辑器内联展示当前草稿如何被格式化为分析注入的只读提示词段落（实现为 `apps/dsa-web/src/components/settings/investmentFrameworkPromptPreviewModel.ts`，预算与章节顺序与 `src/services/investment_framework_prompt.py` 对齐）。预览使用草稿元数据占位（框架 ID / 版本显示为草稿/未保存）；实际注入仅在框架 **active** 时由服务端读取持久化版本完成。未配置内容时预览为空状态文案。
+
 历史列表和只读检查器都会展示版本 `created_at`；列表会独立标注 latest version 和 active version，因此停用后仍能识别最新快照。历史版本不会原地恢复或修改。“复制到当前草稿”只复制内容，后续保存仍携带当前 aggregate revision 并创建新版本。修订冲突（HTTP 409）不会自动覆盖草稿；页面明确提示冲突，只有用户选择“载入服务器最新版本”时才替换当前草稿。若显式刷新失败，页面隐藏旧草稿并显示可重试的加载错误，避免继续编辑过期内容。后端 422 校验仍是最终权威；重复节点、未知目标、循环、不可达节点和重复维度会返回稳定的 `investment_framework_*` 类型及字段级 `details.issues[].loc`，Web 将这些公开且已脱敏的位置映射到对应节点或维度，并同时保留本地化全局错误提示。未知服务端诊断只保留在错误详情中，不会作为产品主文案显示。编辑已知字段时使用对象合并，并在传输边界保留未知的未来字段，避免滚动升级期间静默丢失服务器所有内容。
 
 页面固定展示研究用途免责声明：不构成投资建议。
@@ -94,9 +98,11 @@ Settings → **Agent 行为 → 投资框架** 横向 Tab 提供独立的页内�
 股票分析 pipeline（`src/core/stages/analysis_stock.py`，Single 决策仪表盘路径）在增强上下文中：
 
 1. 调用 `inject_framework_into_analysis_context` 读取 active framework。
-2. 未配置或停用时 **fail soft**，分析行为与后端切片前一致。
-3. 已激活时写入 `personal_investment_framework_prompt` 与序列化 snapshot；`GeminiAnalyzer` prompt 格式化会追加该只读章节。
+2. 未配置或停用时 **fail soft / no-op**：不写入 `personal_investment_framework_prompt` 或 context snapshot，分析行为与无框架时一致（parity）。
+3. 已激活时写入 `personal_investment_framework_prompt` 与序列化 snapshot；`format_investment_framework_prompt_section` 生成有界只读章节（自由规则、风险/跟踪、评估维度、决策树摘要；超长字段截断）。Analyzer prompt 追加该章节。
 4. 解析成功后的 dashboard 会通过 `enrich_dashboard_framework_alignment` 填充报告 strata 的 `framework_alignment`（默认 `partial` + 框架标题/版本；若模型已给出 `aligned`/`conflict` 则保留）。
+
+兼容性：仅**追加** prompt 段落与 strata 槽位字段；不修改既有 analysis API 响应契约、不改变无框架时的 prompt 结构、不写入 `AnalysisContextPack` 通用字段。
 
 实现入口：`src/services/investment_framework_prompt.py` 与既有 `InvestmentFrameworkContextReader`。
 

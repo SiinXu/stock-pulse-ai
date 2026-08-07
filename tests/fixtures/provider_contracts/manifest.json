@@ -1,0 +1,83 @@
+{
+  "schema_version": "provider-contracts-v1",
+  "description": "Recorded raw provider payloads for offline parse-path contract tests. Shapes match production fetchers; prices are frozen samples, not live quotes.",
+  "license": "recorded-fixture-sanitized",
+  "related_docs": [
+    "docs/data-source-stability.md",
+    "docs/data-source-stability_EN.md"
+  ],
+  "refresh_script": "scripts/refresh_provider_fixtures.py",
+  "offline_tests": "tests/data_provider/test_provider_contracts.py",
+  "consumer_contract": {
+    "daily_columns": ["date", "open", "high", "low", "close", "volume", "amount", "pct_chg"],
+    "daily_why": "src/stock_analyzer.py reads close/volume for MA, MACD, volume_ratio_5d; STANDARD_COLUMNS is the manager contract",
+    "realtime_required": ["code", "price", "change_pct", "volume", "open_price", "high", "low", "pre_close"],
+    "realtime_why": "DataFetcherManager.get_realtime_quote consumers and report snapshot fields need has_basic_data() plus OHLC"
+  },
+  "fixtures": [
+    {
+      "id": "akshare_em_daily",
+      "file": "akshare_em_daily.json",
+      "provider": "akshare",
+      "path": "em_daily",
+      "symbol": "600519",
+      "market": "cn"
+    },
+    {
+      "id": "akshare_sina_daily",
+      "file": "akshare_sina_daily.json",
+      "provider": "akshare",
+      "path": "sina_daily",
+      "symbol": "000001",
+      "market": "cn"
+    },
+    {
+      "id": "tencent_daily_kline",
+      "file": "tencent_daily_kline.json",
+      "provider": "tencent",
+      "path": "daily_kline",
+      "symbol": "000001",
+      "market": "cn"
+    },
+    {
+      "id": "tushare_daily_pro",
+      "file": "tushare_daily_pro.json",
+      "provider": "tushare",
+      "path": "daily",
+      "symbol": "600519",
+      "market": "cn"
+    },
+    {
+      "id": "yfinance_daily",
+      "file": "yfinance_daily.json",
+      "provider": "yfinance",
+      "path": "daily",
+      "symbol": "AAPL",
+      "market": "us"
+    },
+    {
+      "id": "akshare_em_spot",
+      "file": "akshare_em_spot.json",
+      "provider": "akshare",
+      "path": "em_spot",
+      "symbol": "600519",
+      "market": "cn"
+    },
+    {
+      "id": "akshare_sina_realtime",
+      "file": "akshare_sina_realtime.txt",
+      "provider": "akshare",
+      "path": "sina_realtime",
+      "symbol": "600519",
+      "market": "cn"
+    },
+    {
+      "id": "akshare_tencent_realtime",
+      "file": "akshare_tencent_realtime.txt",
+      "provider": "akshare",
+      "path": "tencent_realtime",
+      "symbol": "600519",
+      "market": "cn"
+    }
+  ]
+}

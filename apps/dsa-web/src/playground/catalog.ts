@@ -208,6 +208,14 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
 
+  entry('stockSearch', 'mini-sparkline', 'MiniSparkline', 'components/screening/MiniSparkline.tsx'),
+  entry('stockSearch', 'screen-alert-message', 'ScreenAlertMessage', 'components/screening/ScreenAlertMessage.tsx'),
+  entry('stockSearch', 'screening-configuration-modal', 'ScreeningConfigurationModal', 'components/screening/ScreeningConfigurationModal.tsx', ['interactive']),
+  entry('stockSearch', 'screening-hotspots-section', 'ScreeningHotspotsSection', 'components/screening/ScreeningHotspotsSection.tsx', ['default', 'empty']),
+  entry('stockSearch', 'screening-results-section', 'ScreeningResultsSection', 'components/screening/ScreeningResultsSection.tsx', ['default', 'empty']),
+  entry('stockSearch', 'screening-run-status-card', 'ScreeningRunStatusCard', 'components/screening/ScreeningRunStatusCard.tsx', ['default', 'loading']),
+  entry('stockSearch', 'screening-strategy-bar', 'ScreeningStrategyBar', 'components/screening/ScreeningStrategyBar.tsx', ['interactive']),
+
   entry('stockSearch', 'stock-autocomplete', 'StockAutocomplete', 'components/StockAutocomplete/StockAutocomplete.tsx', ['interactive', 'states']),
   entry('stockSearch', 'suggestions-list', 'SuggestionsList', 'components/StockAutocomplete/SuggestionsList.tsx', ['default', 'empty']),
   entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),

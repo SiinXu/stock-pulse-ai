@@ -125,7 +125,25 @@ class AnalysisStrategyDefinition:
         )
 
     def to_skill(self, *, plugin_id: str) -> Skill:
-        """Create an isolated runtime ``Skill`` with pinned plugin provenance."""
+        """Create an isolated runtime ``Skill`` with pinned plugin provenance.
+
+        External plugins always pin ``source`` to ``plugin:<manifest-id>`` so
+        they cannot impersonate built-in or custom-directory definitions.
+        Packaged built-in analysis strategies (``builtin.analysis-strategy.*``)
+        keep ``source="builtin"`` so default-prompt and catalog parity with the
+        pre-plugin YAML path is preserved.
+        """
+
+        # Prefix owned by src.plugins.builtin.analysis_strategies; inlined here
+        # to avoid an import cycle through the builtin package during adapter use.
+        if (
+            type(plugin_id) is str
+            and plugin_id.startswith("builtin.analysis-strategy.")
+            and len(plugin_id) > len("builtin.analysis-strategy.")
+        ):
+            source = "builtin"
+        else:
+            source = f"plugin:{plugin_id}"
 
         return Skill(
             name=self.name,
@@ -138,7 +156,7 @@ class AnalysisStrategyDefinition:
             allowed_tools=list(self.allowed_tools),
             aliases=list(self.aliases),
             enabled=False,
-            source=f"plugin:{plugin_id}",
+            source=source,
             entrypoint="",
             bundle_dir="",
             disable_model_invocation=self.disable_model_invocation,

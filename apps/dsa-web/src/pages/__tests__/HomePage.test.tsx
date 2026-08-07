@@ -471,7 +471,8 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText('Base configuration incomplete')).toBeInTheDocument();
+    expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'System readiness' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Configurable area/ })).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
@@ -517,9 +518,10 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText('Base configuration incomplete')).toBeInTheDocument();
-    // English UI maps keys rather than injecting backend Chinese titles.
-    expect(screen.getByText(/Missing Primary model, Watchlist/i)).toBeInTheDocument();
+    expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    // Goal-language labels, not backend Chinese titles.
+    expect(screen.getByText('Model is not connected yet')).toBeInTheDocument();
+    expect(screen.getByText('Watchlist is empty')).toBeInTheDocument();
     expect(screen.queryByText(/主要模型/)).not.toBeInTheDocument();
   });
 
@@ -541,7 +543,8 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText(/Missing Future readiness item/i)).toBeInTheDocument();
+    expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    expect(screen.getByText('Future readiness item')).toBeInTheDocument();
   });
 
 

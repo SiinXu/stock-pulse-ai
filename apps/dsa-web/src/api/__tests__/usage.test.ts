@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usageApi } from '../usage';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const get = vi.hoisted(() => vi.fn());
 
@@ -91,4 +92,53 @@ describe('usageApi', () => {
       params: { period: 'month', limit: 50 },
     });
   });
+
+  it('preserves extra keys on valid payloads (byte-identical toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        period: 'today',
+        from_date: '2026-06-14',
+        to_date: '2026-06-14',
+        total_calls: 0,
+        total_tokens: 0,
+        by_call_type: [],
+        by_model: [],
+        recent_calls: [],
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const result = await usageApi.getDashboard({ period: 'today' });
+    expect(result).toEqual({
+      period: 'today',
+      fromDate: '2026-06-14',
+      toDate: '2026-06-14',
+      totalCalls: 0,
+      totalTokens: 0,
+      byCallType: [],
+      byModel: [],
+      recentCalls: [],
+      unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        period: 'today',
+        total_calls: 0,
+        total_tokens: 0,
+        by_call_type: [],
+        by_model: [],
+        recent_calls: [],
+      },
+    });
+    await expect(usageApi.getDashboard()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('UsageDashboardResponse');
+      return true;
+    });
+  });
+
 });

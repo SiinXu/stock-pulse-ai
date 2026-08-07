@@ -134,7 +134,7 @@ function withTestConnectionCoreFields(
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
   useSystemConfig: () => useSystemConfigMock(),
-  useBeginnerMode: () => ({ beginnerMode: false, setBeginnerMode: () => {} }),
+  useBeginnerMode: () => ({ beginnerMode: false, mode: 'expert' as const, setBeginnerMode: () => {}, setMode: () => {} }),
 }));
 
 vi.mock('../../api/usage', () => ({

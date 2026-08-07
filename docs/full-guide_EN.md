@@ -111,13 +111,25 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 >
 > The default `00-daily-analysis.yml` in this repository only exports fixed Secret / Variable names. Arbitrary numbered env vars such as `STOCK_GROUP_1` and `EMAIL_GROUP_1` are not auto-injected into the job, so grouped email routing is not available in the stock workflow unless you explicitly extend the workflow's `env:` mapping in your own fork. Actions now maps `CUSTOM_WEBHOOK_BODY_TEMPLATE`, `WEBHOOK_VERIFY_SSL`, `FEISHU_WEBHOOK_SECRET`, `FEISHU_WEBHOOK_KEYWORD`, `PUSHPLUS_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `GOTIFY_URL`, `GOTIFY_TOKEN`, the P3 notification route keys, and the P4 notification noise-control keys; `MARKDOWN_TO_IMAGE_CHANNELS` and `MERGE_EMAIL_NOTIFICATION` remain behavior toggles outside the default workflow mapping.
 
+#### Daily run summary and short failure notification (Issue #850)
+
+After each Daily Analysis job, the workflow always writes a plain-language bilingual **Step Summary** (Chinese primary, English secondary) from structured `data/run_status.json` when present, with exit code / job status / env readiness / log-keyword fallbacks.
+
+| Setting | Description |
+|---------|-------------|
+| `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | Optional route for a **one-line** failure IM (no secret values, no full traceback). Empty → Step Summary only under the default policy |
+| `FAILURE_NOTIFY_ENABLED` | Optional override: default enables notify when system-error channels are set; `false` forces Summary-only; `true` forces a notify attempt |
+| Success-path report push | **Unchanged** — still uses existing report routing |
+
+Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_watchlist`, `non_trading_day`, `data_source`, `timeout`, `quota`, `provider_down`, `unknown`.
+
 #### Push Behavior Configuration
 
 | Secret Name | Description | Required |
 |------------|------|:----:|
 | `SINGLE_STOCK_NOTIFY` | Single stock push mode: set to `true` to push immediately after each stock analysis | Optional |
 | `REPORT_TYPE` | Report type: `simple` (concise), `full` (complete), `brief` (3-5 sentences), Docker recommended: `full` | Optional |
-| `REPORT_LANGUAGE` | Report output language: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, and fixed copy in the Web report view. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
+| `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
 | `REPORT_RENDERER_ENABLED` | Enable Jinja2 template rendering (default `false`, zero regression) | Optional |
@@ -138,7 +150,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 > Compatibility note: `REPORT_SHOW_LLM_MODEL` keeps the previous default-visible behavior (`true`) and only changes report footer rendering. It does not alter provider/model/Base URL, LiteLLM routing, or runtime model persistence/migration/cleanup semantics. Rollback is to remove the variable or set it back to `true`.
 
-> `REPORT_LANGUAGE` only affects report text and report page fixed copy. Web UI chrome language (navigation, login, settings, shell labels, shared controls) is intentionally independent and stored in browser `localStorage` as `dsa.uiLanguage`.
+> `REPORT_LANGUAGE` affects report text, report page fixed copy, and Agent Chat replies that do not explicitly set a language. Web UI chrome language (navigation, login, settings, shell labels, shared controls) is intentionally independent and stored in browser `localStorage` as `dsa.uiLanguage`.
 > UI language resolution is: explicit localStorage value (`zh` or `en`) -> browser language (`navigator.languages` / `navigator.language`) -> default `zh`.
 
 #### Other Configuration
@@ -1471,7 +1483,7 @@ FastAPI provides RESTful API service for configuration management and triggering
 
 For this feature, the product behavior is:
 
-- UI language is independent from report language: `dsa.uiLanguage` (browser persistence) controls shell/login/settings text, while `REPORT_LANGUAGE` controls report text and report-page fixed copy (`zh`/`en`/`ko`).
+- UI language is independent from report language: `dsa.uiLanguage` (browser persistence) controls shell/login/settings text, while `REPORT_LANGUAGE` controls report text, report-page fixed copy, and Agent Chat replies without an explicit `context.report_language` (`zh`/`en`/`ko`).
 - `dsa.uiLanguage` follows local persistence -> browser language -> default `zh`.
 - This change only adds request-scope report language override parameters; it does not modify `provider`, `model`, `base_url`, or migration/cleanup behavior.
 - PR-level verification output, screenshots, and command logs are maintained in PR description, not in this usage guide.
@@ -1528,7 +1540,7 @@ For this feature, the product behavior is:
 > Note: `GET /api/v1/usage/dashboard` reuses the existing `llm_usage` audit table and adds no configuration key or database migration. It returns only persisted call counts, prompt/completion/total token aggregates, model-level usage, and recent call records; it does not infer model context windows or provider metadata.
 > Issue #1520 compatibility note: The `model`/`model_used` returned here is read-only historical snapshot metadata from each record, used only for trend drawer/history display. It does not alter runtime model/model-provider/base URL resolution, config migration, or cleanup semantics in the analysis path. Rollback is by reverting this commit; history query, API response shapes, and UI drawer consumption remain compatible.
 > Note: history detail, sync analysis responses, and completed task status responses expose a low-sensitivity input data-block overview at `report.details.analysis_context_pack_overview`; sync analysis responses depend on the just-persisted `analysis_history.context_snapshot`, so new records do not guarantee the overview when `SAVE_CONTEXT_SNAPSHOT=false`. `details.context_snapshot` strips that top-level field and does not return the full `AnalysisContextPack` or prompt summary.
-> Note: `POST /api/v1/agent/chat` and `POST /api/v1/agent/chat/stream` use the frontend-provided `context.stock_code` as the active Ask Stock baseline only after server-side stock-scope resolution. Each turn is classified as `maintain`, `switch`, or `compare`: unchanged follow-ups can call stock-scoped tools only for the current stock; explicit switches clear stale stock summaries and prefetched context; comparison prompts such as compare/vs/difference allow the explicitly mentioned codes for that turn without rewriting the current stock. If a model attempts to call a stock tool with financial abbreviations such as TTM, PE, MACD, KDJ, contextual indicator tokens such as `MA` in moving-average prompts, or exchange fragments such as SH/SZ/BJ/HK/SS, the backend returns a non-retriable `stock_scope_violation` tool result instead of executing that stock tool. Tool names are resolved only by exact registry name; provider namespaces or suffixes are not routed to existing tools.
+> Note: `POST /api/v1/agent/chat` and `POST /api/v1/agent/chat/stream` use the frontend-provided `context.stock_code` as the active Ask Stock baseline only after server-side stock-scope resolution. When `context.report_language` is missing, the endpoints fall back to global `REPORT_LANGUAGE`; an explicit caller value stays authoritative. Each turn is classified as `maintain`, `switch`, or `compare`: unchanged follow-ups can call stock-scoped tools only for the current stock; explicit switches clear stale stock summaries and prefetched context; comparison prompts such as compare/vs/difference allow the explicitly mentioned codes for that turn without rewriting the current stock. If a model attempts to call a stock tool with financial abbreviations such as TTM, PE, MACD, KDJ, contextual indicator tokens such as `MA` in moving-average prompts, or exchange fragments such as SH/SZ/BJ/HK/SS, the backend returns a non-retriable `stock_scope_violation` tool result instead of executing that stock tool. Tool names are resolved only by exact registry name; provider namespaces or suffixes are not routed to existing tools.
 > Note: `POST /api/v1/backtest/run` adds `analysis_date_from` / `analysis_date_to` (`YYYY-MM-DD`) to filter candidates by analysis date range. When `analysis_date_from > analysis_date_to`, it returns 400 `invalid_params`.
 > Note: When backtest runs successfully but yields no new persisted rows, `BacktestRunResponse.message` carries a readable diagnostic and `diagnostics` returns troubleshooting context (for example `empty_reason`, `analysis_date_from`, `analysis_date_to`, `eval_window_days`, `min_age_days`, `limit`).
 > Note: `GET /api/v1/backtest/results`, `GET /api/v1/backtest/performance`, and `GET /api/v1/backtest/performance/{code}` all support `analysis_date_from` and `analysis_date_to` consistently. Omitting them keeps historical default behavior.
