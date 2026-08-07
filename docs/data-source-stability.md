@@ -316,6 +316,29 @@ manager.invalidate_daily_cache()          # 失效全部日线缓存
 | 多个源失败但有缓存 | 实时源不可用，本次使用上一次成功缓存；结论会降低置信度。 |
 | 全部源失败且无缓存 | 当前数据不可用，请稍后重试，或配置 Tushare / TickFlow / Longbridge 等 token 型数据源。 |
 
+## 离线 Provider 契约测试（录制夹具）
+
+上游响应字段变更如果只依赖夜间非阻断的 `network-smoke`，会在用户侧先暴露。仓库现在对主要 provider 的**录制原始响应**做阻断式、离线的解析契约检查：
+
+| 路径 | 说明 |
+| --- | --- |
+| 夹具目录 | `tests/fixtures/provider_contracts/`（日线 / 实时 raw payload，不含 token） |
+| 离线测试 | `tests/data_provider/test_provider_contracts.py`（走各 fetcher 的 normalize / parse 路径，断言分析实际消费的 `STANDARD_COLUMNS` 与 `UnifiedRealtimeQuote` 形状） |
+| 刷新脚本 | `scripts/refresh_provider_fixtures.py`（**需要网络**；手动或夜间执行，**不进入** offline gate） |
+| 夜间接线 | `.github/workflows/network-smoke.yml` 在 `pytest -m network` 之后非阻断刷新夹具到 artifact，便于对照 drift |
+
+刷新示例：
+
+```bash
+# 写回仓库夹具目录（提交前请人工 diff 字段形状）
+python scripts/refresh_provider_fixtures.py --write
+
+# 写入临时目录（与夜间 workflow 一致）
+python scripts/refresh_provider_fixtures.py --output-dir /tmp/provider_contracts_refresh --skip-unavailable
+```
+
+契约测试只锁定**字段/类型/市场路由**，不锁定实时价格；断言不得为了让夹具通过而削弱。运行时开销约数秒量级（纯离线解析）。
+
 ## 后续可做的产品化增强
 
 1. 数据源 Doctor 页面：展示每个源最近成功时间、失败原因、熔断状态和下一次恢复探测时间。

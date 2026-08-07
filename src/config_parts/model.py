@@ -86,6 +86,9 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
+    # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
+    multimodal_agent_tools_enabled: bool = False
+    multimodal_file_root: Optional[str] = None
     # === Optional DCF / relative valuation Agent Tool (issue #238) ===
     valuation_agent_tool_enabled: bool = False
 

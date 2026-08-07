@@ -1067,20 +1067,39 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响后台告警检测和通知推送。'],
     notes: ['该字段为 Legacy 配置方式，高级规则请使用告警中心。'],
   },
+  'settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED': {
+    title: '启用多模态 Agent Tools',
+    summary: '可选的 PDF 解析与图表阅读 Agent Tools，配合本地文件沙箱，默认关闭。',
+    usage: '默认安装请保持关闭。仅在已设置 MULTIMODAL_FILE_ROOT 且需要 Agent 调用 parse_financial_pdf / read_price_chart 时开启，并在保存后重启进程以完成注册。',
+    valueNotes: [
+      '默认关闭；启用、配置根目录并重启前，进程工具目录不包含这些工具。',
+      'PDF 以本地文本抽取为主；图表阅读依赖 VISION_MODEL，不可用时诚实降级。',
+    ],
+    impact: ['仅影响可选 Agent 工具可用性；关闭时默认分析报告路径不变。'],
+    notes: [
+      '契约与回滚见 docs/multimodal-parsing.md。',
+      'HTTP 上传 UI 与纪要/电话会分析刻意留到后续阶段。',
+    ],
+  },
+  'settings.agent.MULTIMODAL_FILE_ROOT': {
+    title: '多模态文件根目录',
+    summary: '允许存放用户提供的 PDF 与图表文件的本地目录，作为多模态工具的路径沙箱。',
+    usage: '填写绝对本地路径。Agent 工具的 file_path 必须解析到该根目录内；拒绝 URL 与路径穿越。',
+    valueNotes: [
+      '当 MULTIMODAL_AGENT_TOOLS_ENABLED=true 时必填；根目录缺失时工具不会注册。',
+      '文件内容永不执行，仅走有界读取与解析路径。',
+    ],
+    impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
+    notes: ['示例：/var/stockpulse/multimodal-uploads'],
+  },
   'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
     title: '启用估值 Agent Tool',
     summary: '可选的 DCF 与相对估值 Agent Tool，默认关闭，结果附带显式假设与敏感性区间。',
     usage: '默认安装请保持关闭。仅在需要 Agent 调用 estimate_stock_valuation 时开启，并在保存后重启进程以完成注册。',
-    valueNotes: [
       '默认关闭；启用并重启前，进程工具目录不包含该工具。',
       '每条估值结果都包含假设与敏感性区间；基本面不足时返回 insufficient_fundamentals，绝不编造数字。',
-    ],
-    impact: ['仅影响可选 Agent 工具可用性；关闭时默认分析报告路径不变。'],
-    notes: [
       '契约与回滚见 docs/valuation-models.md。',
       '报告/Prompt 投影刻意留到后续阶段。',
-    ],
-  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------

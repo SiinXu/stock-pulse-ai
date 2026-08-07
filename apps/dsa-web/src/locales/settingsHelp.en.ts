@@ -1024,20 +1024,39 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects background alert detection and notification delivery.'],
     notes: ['This is a legacy configuration method. For advanced rules, use the alert center.'],
   },
+  'settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED': {
+    title: 'Enable Multimodal Agent Tools',
+    summary: 'Opt-in PDF parsing and chart-reading Agent Tools with a local file sandbox.',
+    usage: 'Leave disabled for default installs. Enable only with MULTIMODAL_FILE_ROOT set, then restart so parse_financial_pdf and read_price_chart can register.',
+    valueNotes: [
+      'Default is off; the process tool registry does not include the tools until enabled, rooted, and restarted.',
+      'PDF parsing is local-first; chart reading uses VISION_MODEL and degrades honestly when vision is unavailable.',
+    ],
+    impact: ['Affects optional Agent tool availability only; default analysis reports stay unchanged when disabled.'],
+    notes: [
+      'See docs/multimodal-parsing_EN.md for the phase-1 contract and rollback steps.',
+      'HTTP upload UI and transcript analysis are deferred to later phases.',
+    ],
+  },
+  'settings.agent.MULTIMODAL_FILE_ROOT': {
+    title: 'Multimodal File Root',
+    summary: 'Local directory that may contain user-provided PDF and chart files for multimodal tools.',
+    usage: 'Set an absolute local path. Agent tool file_path values must resolve inside this root; URLs and path traversal are rejected.',
+    valueNotes: [
+      'Required when MULTIMODAL_AGENT_TOOLS_ENABLED=true; missing root keeps tools unregistered.',
+      'Content is never executed; only bounded read/parse paths are used.',
+    ],
+    impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
+    notes: ['Example: /var/stockpulse/multimodal-uploads'],
+  },
   'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
     title: 'Enable Valuation Agent Tool',
     summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
     usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
-    valueNotes: [
       'Default is off; the process tool registry does not include the tool until enabled and restarted.',
       'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
-    ],
-    impact: ['Affects optional Agent tool availability only; default analysis reports stay unchanged when disabled.'],
-    notes: [
       'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
       'Report/prompt projection is intentionally deferred to a later phase.',
-    ],
-  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------

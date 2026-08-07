@@ -1,3 +1,4 @@
+/* ci-retrigger: ensure Actions pull_request event for #816 */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
@@ -428,10 +429,51 @@ test('main BrowserWindow keeps preload access sandboxed and isolated', (t) => {
   const mainModule = loadMainModule(t);
   const options = mainModule.buildMainWindowOptions();
 
+  assert.equal(options.show, false);
   assert.equal(options.webPreferences.nodeIntegration, false);
   assert.equal(options.webPreferences.contextIsolation, true);
   assert.equal(options.webPreferences.sandbox, true);
   assert.match(options.webPreferences.preload, /preload\.js$/);
+});
+
+test('revealMainWindow shows and focuses a live main window', (t) => {
+  const mainModule = loadMainModule(t);
+  const lifecycle = [];
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    show: () => lifecycle.push('show'),
+    focus: () => lifecycle.push('focus'),
+    webContents: { send: () => undefined },
+  });
+
+  assert.equal(mainModule.revealMainWindow(), true);
+  assert.deepEqual(lifecycle, ['show', 'focus']);
+});
+
+test('fresh desktop install routes to first-run wizard unless a deep link is pending', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.equal(
+    mainModule.resolveInitialDesktopPageRoute({ envFileExistedBeforeBootstrap: false }),
+    mainModule.DESKTOP_FIRST_RUN_SETTINGS_ROUTE
+  );
+  assert.equal(
+    mainModule.resolveInitialDesktopPageRoute({ envFileExistedBeforeBootstrap: true }),
+    null
+  );
+  assert.equal(
+    mainModule.resolveInitialDesktopPageRoute({
+      envFileExistedBeforeBootstrap: false,
+      pendingDeepLinkRoute: '/portfolio?account=1',
+    }),
+    '/portfolio?account=1'
+  );
+  assert.equal(
+    mainModule.parseDesktopDeepLink(
+      `stockpulse://app${mainModule.DESKTOP_FIRST_RUN_SETTINGS_ROUTE}`
+    ),
+    mainModule.DESKTOP_FIRST_RUN_SETTINGS_ROUTE
+  );
 });
 
 test('main BrowserWindow navigation guards keep navigation on its selected Web origin', (t) => {
@@ -4344,6 +4386,133 @@ test('desktop Model Pack import uses the trusted runtime snapshot without mutati
     desktopAttestation: 'desktop-attestation',
   });
   assert.equal(Object.hasOwn(result, 'source'), false);
+});
+
+test('one-click Model Pack import starts a stopped runtime before importing', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const lifecycle = [];
+  const result = await mainModule.importDesktopModelPack({
+    expectedConfigVersion: 'config-1',
+    selectSource: async () => {
+      lifecycle.push('select');
+      return '/safe/model.modelpack';
+    },
+    detectRuntime: async ({ baseUrl }) => {
+      lifecycle.push('detect');
+      return {
+        status: mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED,
+        installed: true,
+        installedModels: [],
+        managed: false,
+        baseUrl,
+        runtimeSource: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED,
+        runtimeBinary: {
+          command: '/trusted/embedded/ollama',
+          source: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED,
+          rootDir: '/trusted/embedded',
+        },
+      };
+    },
+    startRuntime: async () => {
+      lifecycle.push('start');
+      mainModule.__setLocalModelServeRuntimeForTest({
+        command: '/trusted/embedded/ollama',
+        source: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED,
+        rootDir: '/trusted/embedded',
+      });
+      return {
+        status: mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING,
+        installed: true,
+        installedModels: [],
+        managed: true,
+        baseUrl: 'http://127.0.0.1:11434',
+        runtimeSource: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED,
+        operation: null,
+        progress: null,
+        message: '',
+      };
+    },
+    importPack: async (source, options) => {
+      lifecycle.push('import');
+      assert.equal(source, '/safe/model.modelpack');
+      assert.equal(options.runtimeCommand, '/trusted/embedded/ollama');
+      options.onProgress(100, 'Model created in Ollama');
+      return {
+        modelId: 'licensed/finance:q4',
+        displayName: 'Licensed Finance Q4',
+        minimumMemoryGb: 16,
+        licenseId: 'LicenseRef-Finance',
+        warnings: [],
+      };
+    },
+    refreshState: async () => {
+      lifecycle.push('refresh');
+    },
+    createAttestation: () => 'desktop-attestation',
+  });
+
+  assert.deepEqual(lifecycle, ['select', 'detect', 'start', 'import', 'refresh']);
+  assert.equal(result.ok, true);
+  assert.equal(result.modelId, 'licensed/finance:q4');
+  assert.equal(result.error, undefined);
+});
+
+test('one-click Model Pack import fails actionably when the runtime is not installed', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  let importCalled = false;
+  const result = await mainModule.importDesktopModelPack({
+    expectedConfigVersion: 'config-1',
+    selectSource: async () => '/safe/model.modelpack',
+    detectRuntime: async ({ baseUrl }) => ({
+      status: mainModule.DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED,
+      installed: false,
+      installedModels: [],
+      managed: false,
+      baseUrl,
+      runtimeSource: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.UNAVAILABLE,
+      runtimeBinary: null,
+    }),
+    startRuntime: async () => {
+      throw new Error('start should not run when runtime is missing');
+    },
+    importPack: async () => {
+      importCalled = true;
+      throw new Error('import should not run when runtime is missing');
+    },
+    refreshState: async () => undefined,
+  });
+
+  assert.equal(importCalled, false);
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'ollama_unavailable');
+  assert.match(result.message, /not installed/i);
+  assert.equal(Object.hasOwn(result, 'stack'), false);
+  assert.doesNotMatch(String(result.message), /Error:|at /);
+});
+
+test('one-click runtime ensure never downloads without an explicit pack selection', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  let startCalled = false;
+  const result = await mainModule.importDesktopModelPack({
+    expectedConfigVersion: 'config-1',
+    selectSource: async () => null,
+    detectRuntime: async () => {
+      throw new Error('detect should wait for explicit pack selection');
+    },
+    startRuntime: async () => {
+      startCalled = true;
+      throw new Error('start should wait for explicit pack selection');
+    },
+    importPack: async () => {
+      throw new Error('import should wait for explicit pack selection');
+    },
+  });
+
+  assert.equal(startCalled, false);
+  assert.deepEqual(result, { ok: false, canceled: true });
 });
 
 test('desktop package retires the standalone model surface and keeps embedded runtime assets', () => {
