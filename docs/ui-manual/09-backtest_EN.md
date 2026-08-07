@@ -43,8 +43,8 @@ Example query string:
 ## Steps
 
 1. Open Backtest.  
-2. Optionally enter a code, name, pinyin, or alias in the compact stock field and choose a fuzzy suggestion; also set window, date range, and phase as needed. The single range picker selects the start date first and the end date second.
-3. **Filter** refreshes only the results and metrics below; **Run backtest** generates or recalculates evaluations.
+2. Optionally enter a code, name, pinyin, or alias in the compact field labeled **Stock** and choose a fuzzy suggestion; also set window, date range, and phase as needed. The single range picker selects the start date first and the end date second.
+3. Choosing a stock suggestion or pressing Enter in the stock field refreshes existing results and metrics; **Run backtest** generates or recalculates evaluations with the current settings.
 4. Read **sample count** before accuracy or win rate.  
 5. On empty results, read diagnostics (too few samples, cooling, narrow range)—do not spam-click.
 2. Optionally enter a code, name, pinyin, or alias in the compact stock field and choose a fuzzy suggestion; also set window/dates and phase as needed.
@@ -54,7 +54,9 @@ Example query string:
 6. Read **evaluated / insufficient / total** counts on the performance card before accuracy or win rate.
 7. On empty results, read diagnostics (too few samples, cooling, narrow range)—do not spam-click.
 
-An invalid evaluation window no longer changes the input row height: the field shows its error state while the reason remains available to screen readers without adding a trailing control. Validation-mode switches and filter loading also keep stable control widths to avoid toolbar shifts; the Filter tooltip reiterates that filtering does not rerun the backtest.
+An invalid evaluation window no longer changes the input row height: the field shows its error state while the reason remains available to screen readers without adding a trailing control. Stock, Window days, and Analysis date fields use aligned labels. The “10-day window / Next-day validation” switch distinguishes the modes: the window mode uses the entered day count, while next-day validation fixes it at one trading day and restores the prior count when switched back. Mode switches and result loading keep stable control widths to avoid toolbar shifts.
+
+Backtest run and result API failures, including expandable details, appear in the global Toast instead of adding content above the filters or results table.
 
 Skipped and insufficient rows stay in the results table. The **Notes** column surfaces backend `resolution_notes` such as legacy analysis-date fallback, prior-session start after a halt/gap, missing daily bars, or insufficient forward-window bars.
 

@@ -1,7 +1,8 @@
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { HistoryItem } from '../../types/analysis';
-import { Badge, Button, Checkbox, ScrollArea, Surface } from '../common';
+import { Badge, Checkbox, IconButton, ScrollArea, Surface } from '../common';
 import { Spinner } from '../common/Spinner';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
@@ -130,16 +131,16 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 containerClassName="min-h-11 flex-1 rounded-lg py-1"
                 label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
               />
-              <Button
-                variant="danger-subtle"
-                size="default"
+              <IconButton
+                variant="danger"
+                size="compact"
                 onClick={onDeleteSelected}
                 disabled={selectedCount === 0 || isDeleting}
                 isLoading={isDeleting}
-                className="disabled:!border-transparent disabled:!bg-transparent"
+                aria-label={isDeleting ? t('common.deleting') : t('common.delete')}
               >
-                {isDeleting ? t('common.deleting') : t('common.delete')}
-              </Button>
+                <Trash2 aria-hidden="true" />
+              </IconButton>
             </div>
           )}
         </div>

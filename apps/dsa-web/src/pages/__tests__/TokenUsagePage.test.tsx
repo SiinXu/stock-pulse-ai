@@ -163,7 +163,7 @@ describe('TokenUsagePage', () => {
     get.mockRejectedValueOnce(new Error('refresh unavailable'));
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
-    expect(await screen.findByRole('alert')).toHaveAttribute('data-alert-tone', 'danger');
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-toast-tone', 'danger');
     expect(container.querySelectorAll('[data-state-panel="empty"]')).toHaveLength(1);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
@@ -196,7 +196,7 @@ describe('TokenUsagePage', () => {
     expect(await screen.findByText('400')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
-    expect(await screen.findByRole('alert')).toHaveAttribute('data-alert-tone', 'danger');
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-toast-tone', 'danger');
     expect(screen.getByText('400')).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
