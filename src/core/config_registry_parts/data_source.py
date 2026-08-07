@@ -520,6 +520,12 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "examples": [
             "RSS_NEWS_FETCH_TIMEOUT_SEC=8",
         ],
+        "docs": [
+            {
+                "label": "完整指南：搜索服务配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#搜索服务配置",
+            },
+        ],
     },
     "ENABLE_REALTIME_QUOTE": {
         "title": "Enable Realtime Quote",

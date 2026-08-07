@@ -358,6 +358,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 AlphaSift 适配层来源校验和显式修复安装。'],
     notes: ['请确认来源可信；AlphaSift 是实验性质选股能力，启用前应理解相关风险。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS/Atom 订阅源，作为按需新闻检索的补充来源。',
+    usage: '使用英文逗号分隔的 http(s) 订阅源 URL；留空则功能保持关闭。抓取遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '仅作为 SearXNG 或付费搜索的补充，不是完整替代。',
+      '私有或回环地址需要 OUTBOUND_HTTP_ALLOWLIST 精确放行。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制单源超时（1-30 秒，默认 8）。',
+    ],
+    impact: ['配置后会影响按需新闻检索的覆盖面。'],
+    notes: ['单个订阅源失败不应阻断其余新闻链路。'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: '实时行情源优先级',
     summary: '配置多个实时行情源的尝试顺序。',
