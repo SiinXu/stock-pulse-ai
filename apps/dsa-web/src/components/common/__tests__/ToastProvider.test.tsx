@@ -63,6 +63,8 @@ describe('ToastProvider', () => {
     const viewport = toast.closest<HTMLElement>('[data-overlay-root="toast"]');
     expect(viewport).not.toBeNull();
     expect(viewport?.style.zIndex).toBe(String(OVERLAY_Z.toast));
+    expect(viewport).toHaveClass('top-4', 'left-1/2', '-translate-x-1/2');
+    expect(viewport).not.toHaveClass('bottom-4');
     expect(viewport).not.toHaveAttribute('inert');
     expect(viewport).not.toHaveAttribute('aria-hidden');
     expect(screen.getByRole('dialog', { name: 'Report details' })).toBeVisible();

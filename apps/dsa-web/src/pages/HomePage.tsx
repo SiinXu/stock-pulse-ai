@@ -416,7 +416,7 @@ const HomePage: React.FC = () => {
               <RefreshCw aria-hidden="true" />
             </IconButton>
             <Button variant="primary" size="primary" onClick={() => navigate(analysisHref)}>
-              <PlayCircle aria-hidden="true" />
+              <PlayCircle className="h-4 w-4" aria-hidden="true" />
               {t('home.startAnalysisTitle')}
             </Button>
           </>
@@ -749,11 +749,11 @@ const HomePage: React.FC = () => {
             )}
           </Section>
 
-          <div className="[&>section>header]:rounded-lg [&>section>header]:border [&>section>header]:border-border [&>section>header]:p-3">
+          <div>
             <Section
               title={t('home.scheduledTasksToday')}
               description={t('home.scheduledTasksTodayDescription')}
-              level="section"
+              level="interactive"
               padding="md"
               actions={(
                 <>
