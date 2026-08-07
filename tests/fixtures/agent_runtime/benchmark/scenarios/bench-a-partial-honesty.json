@@ -1,0 +1,37 @@
+{
+  "id": "bench-a-partial-honesty",
+  "title": "A-share partial data honesty",
+  "description": "Degraded path: one tool succeeds, one fails; agent must stay conservative and surface data gaps.",
+  "source_case": "financial/a-single-run-partial.json",
+  "market": "A",
+  "profile": "partial",
+  "evaluation": {
+    "financial_task_correctness": {
+      "expect_success": true,
+      "expected_signal": "hold",
+      "require_dashboard": true,
+      "required_fields": [
+        "decision_type",
+        "risk_warning",
+        "confidence_level",
+        "analysis_summary"
+      ],
+      "expected_stock_name_substrings": ["茅台"]
+    },
+    "tool_usage_discipline": {
+      "required_tools": ["get_realtime_quote", "failing_tool"],
+      "forbidden_tools": [],
+      "expected_stock_code": "600519",
+      "max_tool_calls": 4,
+      "require_tool_success": ["get_realtime_quote"],
+      "allow_failed_tools": ["failing_tool"]
+    },
+    "uncertainty_honesty": {
+      "require_risk_warning": true,
+      "allowed_confidence_levels": ["低", "low"],
+      "required_substrings": ["数据"],
+      "require_nontrivial_data_limitations": true,
+      "forbid_high_confidence": true
+    }
+  }
+}
