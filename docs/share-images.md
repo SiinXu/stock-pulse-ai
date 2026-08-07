@@ -58,7 +58,7 @@ SHARE_IMAGE_XIAOHONGSHU_QR_PATH=assets/my-xiaohongshu-qr.png
 
 失败态会展示后端稳定错误码的本地化文案（例如 `share_image_unavailable` 的引擎安装指引，或 `share_image_content_too_large` 的长度上限），而不是只显示无上下文的“重试”。浏览器对该接口使用约 90 秒的独立请求超时，避免冷启动 Playwright 渲染被全局 30 秒超时误判。
 
-Electron 桌面运行时默认不展示该按钮。当前 Windows/macOS 打包版不会随包分发 `wkhtmltoimage`、`markdown-to-file` 或 Playwright/Chromium renderer，避免桌面用户在页面加载时就命中 `share_image_unavailable` 失败态。
+Electron 桌面运行时同样展示该按钮。分享图仍由后端按需生成（点击时请求，无页面加载预取）；桌面 WebView 在缺少 `navigator.share` 时回退到与备份导出相同的 `a[download]` + blob 下载。若打包环境未提供转图引擎，点击后会显示 `share_image_unavailable` 等本地化错误，而不是在入口层静默隐藏。
 
 Web 手工生成不受 `MARKDOWN_TO_IMAGE_CHANNELS` 限制，但服务端仍需配置可用的 `MD2IMG_ENGINE`，并遵守 `SHARE_IMAGE_MAX_CHARS`。使用 Playwright 时先执行：
 

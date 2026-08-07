@@ -189,14 +189,44 @@ describe('ShareImageButton', () => {
     expect(errorRegion).toMatchSnapshot('share-image-timeout');
   });
 
-  it('does not render or prefetch share images during desktop runtime', () => {
+  it('renders in desktop runtime without mount-time prefetch, then downloads via blob on click', async () => {
     mockedGetShareImage.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
     Object.defineProperty(window, 'dsaDesktop', {
       configurable: true,
       value: { version: '1.0.0' },
     });
+    // Desktop WebView typically lacks navigator.share file support → download path.
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
+    const removeSpy = vi.spyOn(document.body, 'removeChild');
 
     renderShareButton({ recordId: 23, reportTitle: '桌面端报告' });
+
+    expect(screen.getByRole('button', { name: '分享' })).toBeInTheDocument();
+    expect(mockedGetShareImage).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    await waitFor(() => expect(mockedGetShareImage).toHaveBeenCalledWith(23));
+    await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled());
+    expect(appendSpy).toHaveBeenCalled();
+    expect(removeSpy).toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:share-image');
+    expect(screen.getByRole('button', { name: '已生成' })).toBeInTheDocument();
+  });
+
+  it('does not render when recordId is missing (web and desktop)', () => {
+    Object.defineProperty(window, 'dsaDesktop', {
+      configurable: true,
+      value: { version: '1.0.0' },
+    });
+
+    render(
+      <UiLanguageProvider initialLanguage="zh">
+        <ShareImageButton reportTitle="无记录" reportLanguage="zh" />
+      </UiLanguageProvider>,
+    );
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(mockedGetShareImage).not.toHaveBeenCalled();

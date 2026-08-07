@@ -60,13 +60,15 @@ Mac chip type: Apple menu → About This Mac. M1/M2/M3/M4 → `arm64`; Intel →
 
 Before upgrading on macOS, export a configuration backup from Settings when possible.
 
+On a **first** desktop open (fresh install), StockPulse opens the guided first-run wizard automatically. You can choose a cloud API, a **local model** path (Ollama / Model Pack import with one-click runtime start), or a local CLI backend. Opening the app does not call paid cloud models until you save a cloud path. Details: [Desktop packaging (EN)](desktop-package_EN.md).
+
 ## 3. Configure an AI model
 
-In the client open:
+If the wizard is not open, go to:
 
 **Settings → AI & Models** (path labels: **System settings → AI models** / **Model Access**)
 
-Use **one** of the plans below.
+Use **one** of the plans below (or finish the wizard's local-model / CLI path instead).
 
 > Important: after every change, click **Save**. Wait for success before leaving the page or returning to Home.
 

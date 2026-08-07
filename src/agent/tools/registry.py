@@ -27,6 +27,7 @@ SUPPORTED_AGENT_TOOL_CAPABILITIES = frozenset({
     "intel:read",
     "local_model:execute",
     "market_data:read",
+    "multimodal:read",
     "news:read",
     "portfolio:read",
 })

@@ -1,8 +1,86 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { z } from 'zod';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
-import { toCamelCase } from './utils';
 
+
+
+type OpenApiIntelligenceSourceItem = components['schemas']['IntelligenceSourceItem'];
+type OpenApiIntelligenceSourceListResponse = components['schemas']['IntelligenceSourceListResponse'];
+type OpenApiIntelligenceFetchResponse = components['schemas']['IntelligenceFetchResponse'];
+type _AssertSource = keyof OpenApiIntelligenceSourceItem;
+type _AssertSourceList = keyof OpenApiIntelligenceSourceListResponse;
+type _AssertFetch = keyof OpenApiIntelligenceFetchResponse;
+const _sourceAnchor: _AssertSource = 'source_type';
+const _sourceListAnchor: _AssertSourceList = 'page_size';
+const _fetchAnchor: _AssertFetch = 'ok';
+void _sourceAnchor;
+void _sourceListAnchor;
+void _fetchAnchor;
+
+const intelligenceSourceSchema = z.object({
+  createdAt: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  enabled: z.boolean(),
+  id: z.number(),
+  lastError: z.string().nullable().optional(),
+  lastFetchedAt: z.string().nullable().optional(),
+  lastStatus: z.string().nullable().optional(),
+  market: z.string(),
+  name: z.string(),
+  scopeType: z.string(),
+  scopeValue: z.string().nullable().optional(),
+  sourceType: z.string(),
+  updatedAt: z.string().nullable().optional(),
+  url: z.string(),
+}).passthrough();
+
+const intelligenceSourceListResponseSchema = z.object({
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+}).passthrough();
+
+const intelligenceSourceTemplateListResponseSchema = z.object({
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  total: z.number(),
+}).passthrough();
+
+const intelligenceItemListResponseSchema = z.object({
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+}).passthrough();
+
+const intelligenceDefaultSourceCreateResponseSchema = z.object({
+  createdCount: z.number(),
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  total: z.number(),
+}).passthrough();
+
+const intelligenceFetchResponseSchema = z.object({
+  dryRun: z.boolean().nullable().optional(),
+  error: z.string().nullable().optional(),
+  fetchedCount: z.number().nullable().optional(),
+  ok: z.boolean(),
+  results: z.array(z.unknown()).nullable().optional(),
+  retentionDeleted: z.number().nullable().optional(),
+  sampleItems: z.array(z.record(z.string(), z.unknown())).optional(),
+  savedCount: z.number().nullable().optional(),
+  sourceCount: z.number().nullable().optional(),
+  sourceId: z.number().nullable().optional(),
+}).passthrough();
+
+const intelligenceSourceTestResponseSchema = z.object({
+  fetchedCount: z.number(),
+  ok: z.boolean(),
+  sampleItems: z.array(z.record(z.string(), z.unknown())).optional(),
+  source: z.record(z.string(), z.unknown()),
+}).passthrough();
 const BASE = '/api/v1/intelligence';
 
 export interface IntelligenceSource {
@@ -176,7 +254,16 @@ export const intelligenceApi = {
         page_size: params.pageSize,
       },
     });
-    return toCamelCase<IntelligenceSourceListResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceSourceListResponse>(
+      response.data,
+      intelligenceSourceListResponseSchema,
+      'IntelligenceSourceListResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.items)) {
+      return { ...parsed, items: [] };
+    }
+    return parsed;
   },
 
   async createSource(request: IntelligenceSourceCreateRequest): Promise<IntelligenceSource> {
@@ -184,12 +271,26 @@ export const intelligenceApi = {
       `${BASE}/sources`,
       toSourcePayload(request),
     );
-    return toCamelCase<IntelligenceSource>(response.data);
+    return parseCamelCasePayload<IntelligenceSource>(
+      response.data,
+      intelligenceSourceSchema,
+      'IntelligenceSourceItem',
+      'intelligence',
+    );
   },
 
   async listTemplates(): Promise<IntelligenceSourceTemplateListResponse> {
     const response = await apiClient.get<Record<string, unknown>>(`${BASE}/sources/templates`);
-    return toCamelCase<IntelligenceSourceTemplateListResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceSourceTemplateListResponse>(
+      response.data,
+      intelligenceSourceTemplateListResponseSchema,
+      'IntelligenceSourceTemplateListResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.items)) {
+      return { ...parsed, items: [] };
+    }
+    return parsed;
   },
 
   async createSourceFromTemplate(
@@ -207,7 +308,12 @@ export const intelligenceApi = {
         description: request.description,
       },
     );
-    return toCamelCase<IntelligenceSource>(response.data);
+    return parseCamelCasePayload<IntelligenceSource>(
+      response.data,
+      intelligenceSourceSchema,
+      'IntelligenceSourceItem',
+      'intelligence',
+    );
   },
 
   async createDefaultSources(enabled?: boolean): Promise<IntelligenceDefaultSourceCreateResponse> {
@@ -215,7 +321,16 @@ export const intelligenceApi = {
       `${BASE}/sources/defaults`,
       { enabled },
     );
-    return toCamelCase<IntelligenceDefaultSourceCreateResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceDefaultSourceCreateResponse>(
+      response.data,
+      intelligenceDefaultSourceCreateResponseSchema,
+      'IntelligenceDefaultSourceCreateResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.items)) {
+      return { ...parsed, items: [] };
+    }
+    return parsed;
   },
 
   async testSource(request: IntelligenceSourceCreateRequest): Promise<IntelligenceSourceTestResponse> {
@@ -223,7 +338,16 @@ export const intelligenceApi = {
       `${BASE}/sources/test`,
       toSourcePayload(request),
     );
-    return toCamelCase<IntelligenceSourceTestResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceSourceTestResponse>(
+      response.data,
+      intelligenceSourceTestResponseSchema,
+      'IntelligenceSourceTestResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.sampleItems)) {
+      return { ...parsed, sampleItems: [] };
+    }
+    return parsed;
   },
 
   async fetchSource(sourceId: number, dryRun = false): Promise<IntelligenceFetchResponse> {
@@ -232,12 +356,30 @@ export const intelligenceApi = {
       null,
       { params: { dry_run: dryRun } },
     );
-    return toCamelCase<IntelligenceFetchResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceFetchResponse>(
+      response.data,
+      intelligenceFetchResponseSchema,
+      'IntelligenceFetchResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.sampleItems)) {
+      return { ...parsed, sampleItems: [] };
+    }
+    return parsed;
   },
 
   async fetchEnabledSources(): Promise<IntelligenceFetchResponse> {
     const response = await apiClient.post<Record<string, unknown>>(`${BASE}/sources/fetch-enabled`);
-    return toCamelCase<IntelligenceFetchResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceFetchResponse>(
+      response.data,
+      intelligenceFetchResponseSchema,
+      'IntelligenceFetchResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.sampleItems)) {
+      return { ...parsed, sampleItems: [] };
+    }
+    return parsed;
   },
 
   async listItems(params: ListItemsParams = {}): Promise<IntelligenceItemListResponse> {
@@ -250,6 +392,15 @@ export const intelligenceApi = {
         page_size: params.pageSize,
       },
     });
-    return toCamelCase<IntelligenceItemListResponse>(response.data);
+    const parsed = parseCamelCasePayload<IntelligenceItemListResponse>(
+      response.data,
+      intelligenceItemListResponseSchema,
+      'IntelligenceItemListResponse',
+      'intelligence',
+    );
+    if (!Array.isArray(parsed.items)) {
+      return { ...parsed, items: [] };
+    }
+    return parsed;
   },
 };
