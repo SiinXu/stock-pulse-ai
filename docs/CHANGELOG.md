@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
+- [Added] Persist Agent Chat Skill selection per session (refresh/session switch restore; tri-state `skills` omit/empty/explicit; legacy null state preserved). Ported-from: ed848da6.
+- [Changed] Split the Agent Chat page into message list, composer, session sidebar, and UI-state reducer modules under `components/chat/**` (page under the 1,200-line target).
 - [Added] Personal investment framework editor shows a live analysis-context preview and injects a bounded decision-tree summary into the stock-analysis read-only prompt (no-op when no framework is active).
 - [Fixed] `refreshStockBar` sets `isLoadingStockBar` while in flight; history list accepts AbortSignal for stable workspace refreshes.
 - [Added] Config-driven LLM channel `API_SURFACE` routing (`chat_completions` default, opt-in `responses` → `openai/responses/<model>` wire models) with validation, registry key, and parity tests.
