@@ -28,6 +28,7 @@ mark the block as ``partial`` when only some fields are populated.
 from __future__ import annotations
 
 import logging
+from src.utils.sanitize import log_safe_exception
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -287,7 +288,8 @@ class YfinanceFundamentalAdapter:
                     sources=["earnings.financial_report:yfinance"],
                     currency=financial_currency or "USD",
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure path for continuous merge
+                log_safe_exception(logger, "handler failed", exc, error_code="internal_error")
                 result["errors"].append(f"financial_report_enrich:{type(exc).__name__}")
                 financial_report["sufficiency"] = {
                     "level": "partial" if any(
