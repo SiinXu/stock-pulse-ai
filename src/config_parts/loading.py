@@ -740,6 +740,10 @@ class _ConfigLoadingMethods:
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
                 False,
             ),
+            skill_opinion_outcome_weights_enabled=parse_env_bool(
+                os.getenv('SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED'),
+                False,
+            ),
             decision_profile_calibration_enabled=parse_env_bool(
                 os.getenv('DECISION_PROFILE_CALIBRATION_ENABLED'),
                 False,
