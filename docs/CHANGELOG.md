@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Exposed `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` in Web Settings (system network group) with restart help, sensitive host masking, and setup_env re-application on config reload.
+
+- [Added] Added fail-closed `LOCAL_ONLY_MODE` outbound gate with redacted outbound-activity API/panel and bilingual local-only threat-model docs (issue #218).
 - [Added] Optional default-off DCF and relative valuation estimation (`valuation_service` + `estimate_stock_valuation` Agent Tool) with explicit assumptions, sensitivity ranges, and honest insufficient-fundamentals handling (issue #238 phase 1).
 - [Added] Agent observability L0: structured phase/tool/model/decision events with trace/span ids, persisted via run-diagnostics and shown in the existing run-flow view (deep payload capture remains default-off).
 - [Added] Config-gated daily brief with historical accuracy review from existing decision-signal, backtest, and skill-outcome stores (honesty-first; default off).

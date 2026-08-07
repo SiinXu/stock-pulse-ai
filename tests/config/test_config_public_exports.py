@@ -57,6 +57,7 @@ EXPECTED_PUBLIC_EXPORTS = {
     "TICKFLOW_KLINE_ADJUST_VALUES",
     "Tuple",
     "apply_litellm_api_surface",
+    "apply_use_proxy_env",
     "canonicalize_llm_channel_api_surface",
     "canonicalize_llm_channel_protocol",
     "channel_allows_empty_api_key",

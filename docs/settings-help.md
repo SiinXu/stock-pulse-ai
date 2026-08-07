@@ -65,7 +65,7 @@ Issue #1512 收口后，Web 设置页只展示后端配置注册表中的正式�
 
 例外：`LLM_CHANNELS` 声明的动态连接详情键（如 `LLM_DEEPSEEK_PROVIDER`、`LLM_DEEPSEEK_API_KEY`、`LLM_MY_PROXY_MODELS`）会保留在配置接口返回中，供“模型接入”编辑器读取和保存；它们不作为普通配置卡片展示，也不复用 `WEB_SETTINGS_HIDDEN_FROM_UI` 的运维隐藏语义。
 
-暂不纳入 Web 设置页展示的低频/运维类 `.env` 变量包括 `DATABASE_PATH`、`SQLITE_*`、`USE_PROXY`、`PROXY_HOST`、`PROXY_PORT` 等。若后续需要在 Web 中编辑这些字段，应先在 `src/core/config_registry.py` 中正式注册并补齐 help 元数据，而不是依赖自动推断。
+暂不纳入 Web 设置页展示的低频/运维类 `.env` 变量包括 `DATABASE_PATH`、`SQLITE_*` 等。`USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` 已在系统网络分组中注册展示（带 `restart_required` 与凭据脱敏说明）；若后续需要在 Web 中编辑其他隐藏字段，应先在配置注册表中正式注册并补齐 help 元数据，而不是依赖自动推断。
 
 ### 覆盖边界
 

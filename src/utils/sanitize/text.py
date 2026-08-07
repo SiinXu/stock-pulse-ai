@@ -58,6 +58,8 @@ _SENSITIVE_KEY_PHRASES = {
     "privatekey",
     "proxy_authorization",
     "proxyauthorization",
+    "proxy_host",
+    "proxyhost",
     "proxy_url",
     "proxyurl",
     "raw_prompt",

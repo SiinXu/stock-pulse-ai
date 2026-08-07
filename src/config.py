@@ -167,6 +167,32 @@ _config_defaults_module._bind_config_facade(globals())
 logger = logging.getLogger(__name__)
 
 
+def apply_use_proxy_env() -> Optional[str]:
+    """Apply USE_PROXY/PROXY_HOST/PROXY_PORT onto process http(s)_proxy.
+
+    Mainland-friendly convenience mapping used at process bootstrap and after
+    Settings reload (``setup_env``). GitHub Actions always skips this path.
+
+    When ``USE_PROXY`` is not true, existing ``http_proxy`` / ``https_proxy``
+    values are left unchanged (they may come from ``HTTP_PROXY`` or the host
+    environment). Disabling a previously applied USE_PROXY-derived proxy still
+    requires a process restart for a clean env.
+
+    Returns:
+        The applied proxy URL when USE_PROXY is active, otherwise None.
+    """
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        return None
+    if os.getenv("USE_PROXY", "false").lower() != "true":
+        return None
+    proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
+    proxy_port = os.getenv("PROXY_PORT", "10809")
+    proxy_url = f"http://{proxy_host}:{proxy_port}"
+    os.environ["http_proxy"] = proxy_url
+    os.environ["https_proxy"] = proxy_url
+    return proxy_url
+
+
 def setup_env(override: bool = False):
     """
     Initialize environment variables from .env file.
@@ -191,7 +217,7 @@ def setup_env(override: bool = False):
     load_dotenv(dotenv_path=env_path, override=override)
     try:
         raw_env_values = dotenv_values(env_path, interpolate=False)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Raw environment file read failed",
@@ -199,6 +225,7 @@ def setup_env(override: bool = False):
             error_code="raw_environment_file_read_failed",
             level=logging.WARNING,
         )
+        apply_use_proxy_env()
         return
 
     key = "CUSTOM_WEBHOOK_BODY_TEMPLATE"
@@ -210,6 +237,9 @@ def setup_env(override: bool = False):
             key,
             "" if raw_value is None else str(raw_value),
         )
+
+    # Re-apply USE_PROXY after dotenv load so Settings reload updates process env.
+    apply_use_proxy_env()
 
 
 for _config_part_name in (
