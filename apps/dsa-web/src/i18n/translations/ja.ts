@@ -1857,7 +1857,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.backtest.BACKTEST_TEXT.endDate": "終了日",
   "locales.backtest.BACKTEST_TEXT.endDateAria": "解析終了日",
   "locales.backtest.BACKTEST_TEXT.errors": "エラー:",
-  "locales.backtest.BACKTEST_TEXT.evalWindow": "評価ウィンドウ",
+  "locales.backtest.BACKTEST_TEXT.evalWindow": "ウィンドウ日数",
   "locales.backtest.BACKTEST_TEXT.evaluationCount": "評価",
   "locales.backtest.BACKTEST_TEXT.filter": "フィルター",
   "locales.backtest.BACKTEST_TEXT.filteredStock": "フィルター付き {code}",

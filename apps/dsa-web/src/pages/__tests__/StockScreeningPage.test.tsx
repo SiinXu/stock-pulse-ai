@@ -174,7 +174,11 @@ describe('StockScreeningPage', () => {
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    const enabledStatus = await screen.findByText('选股已开启');
+    expect(enabledStatus.closest('[data-surface-level="interactive"]')).toHaveClass(
+      'px-3',
+      'py-2',
+    );
     const emptyTitle = screen.getByText('暂无结果');
     const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
     expect(emptyPanel).not.toBeNull();
