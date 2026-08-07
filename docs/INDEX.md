@@ -29,6 +29,7 @@
 | [README（英文默认）](../README.md) | 项目定位、差异化、核心能力、快速开始（GitHub 首页） |
 | [README（简体中文）](README_CN.md) | 同上中文版 |
 | [小白客户端安装与配置](beginner-client-setup.md) | 面向不会代码用户的客户端下载、Anspire Open / AIHubMix 模型配置、新闻源配置和常见问题；[English](beginner-client-setup_EN.md) |
+| [助手引导配置](agent-guided-onboarding.md) | 画像采集、规则配置计划、非密钥应用、L0–L3 路径；[English](agent-guided-onboarding_EN.md) |
 | [界面操作手册](ui-manual/README.md) | Web / 桌面分模块界面用法（不含部署）；[English](ui-manual/README_EN.md) |
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
