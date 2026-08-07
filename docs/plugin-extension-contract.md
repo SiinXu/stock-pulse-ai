@@ -697,7 +697,7 @@ capability declarations and is also published as `capabilities` in the public
 descriptor. Every Agent Tool must declare one or more of the currently
 supported capabilities: `analysis_context:read`, `backtest:read`,
 `community_intel:read`, `intel:read`, `local_model:execute`,
-`market_data:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
+`market_data:read`, `multimodal:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
 empty, or execution-ungranted declarations fail closed before the handler.
 The `agent_tool` registration contract remains major version `1`: syntactically
 valid v1 definitions can still register, while the existing ToolSurface policy
