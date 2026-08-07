@@ -1426,6 +1426,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
+  'settings.agent.event_impact_context': {
+    title: 'Alert Impact Context',
+    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
+    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
+  },
 };
 
 export default settingsHelpEnUS;
