@@ -141,6 +141,7 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
     && value !== ''
   ));
   const attempts = readDetailItems(node, 'attempts');
+  const toolSequence = readDetailItems(node, 'tool_sequence');
   const contextBlocks = readDetailItems(node, 'context_blocks');
   const contextCounts = readNumberRecord(node.metadata?.counts || node.metadata?.context_status_counts);
   const contextStatusCounts = readNumberRecord(node.metadata?.context_status_counts);
@@ -393,6 +394,30 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
               </dl>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+
+      {toolSequence.length > 0 ? (
+        <div className="mt-4" data-testid="run-flow-tool-sequence">
+          <p className="label-uppercase">{t('runFlow.nodeDetails.toolSequence')}</p>
+          <div className="mt-2 space-y-1.5">
+            {toolSequence.map((item, index) => (
+              <div
+                key={item.id || `${item.label || 'tool'}-${index}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle px-3 py-2 text-xs"
+              >
+                <span className="font-medium text-foreground">
+                  {item.label || item.id || t('runFlow.valueUnavailable')}
+                </span>
+                <span className="text-muted-text">
+                  {typeof item.durationMs === 'number'
+                    ? formatDuration(item.durationMs, t)
+                    : t('runFlow.valueUnavailable')}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 

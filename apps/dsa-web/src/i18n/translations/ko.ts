@@ -791,6 +791,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.runFlow.loadingDescription": "작업 스냅샷, 실행 진단 및 이벤트 경로를 읽고 있습니다.",
   "i18n.uiText.UI_TEXT.runFlow.loadingTitle": "실행 흐름 불러오는 중",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attemptList": "실행 시도",
+  "i18n.uiText.UI_TEXT.runFlow.nodeDetails.toolSequence": '도구 호출 순서',
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attempts": "시도",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.blockScores": "블록 점수",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.close": "노드 세부 정보 닫기",

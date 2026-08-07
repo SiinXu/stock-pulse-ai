@@ -791,6 +791,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.runFlow.loadingDescription": "Petikan tugas, diagnostik yang sedang dijalankan dan rantaian acara sedang dibaca.",
   "i18n.uiText.UI_TEXT.runFlow.loadingTitle": "Memuatkan aliran pelaksanaan",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attemptList": "Lari dan cuba",
+  "i18n.uiText.UI_TEXT.runFlow.nodeDetails.toolSequence": 'Urutan panggilan alat',
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.attempts": "Percubaan",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.blockScores": "Blok markah",
   "i18n.uiText.UI_TEXT.runFlow.nodeDetails.close": "Tutup butiran nod",

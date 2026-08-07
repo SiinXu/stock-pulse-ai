@@ -140,3 +140,5 @@ This is the entry point for project documentation. The README covers the project
 | **WeChat Work** | Tencent enterprise messaging platform with webhook notifications |
 | **Feishu** | ByteDance enterprise collaboration platform with webhook notifications |
 | **PushPlus / ServerChan** | Chinese mobile push notification services |
+
+- [Agent observability L0](agent-observability_EN.md)
