@@ -222,9 +222,9 @@ def get_tool_registry():
     # Optional valuation tool (issue #238): default-off, registered only when enabled.
     try:
         from src.agent.tools.valuation_tools import build_valuation_tool
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        valuation_tool = build_valuation_tool(get_config())
+        valuation_tool = build_valuation_tool(get_application_services().config)
         if valuation_tool is not None:
             registry.register(valuation_tool)
     except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
