@@ -2,6 +2,7 @@
 
 **Status**: Phase A (issue [#617](https://github.com/SiinXu/stock-pulse-ai/issues/617))  
 **Related broader tracker**: [#252](https://github.com/SiinXu/stock-pulse-ai/issues/252) (financial agent evaluation framework)  
+**Agent-run offline benchmark (V0)**: [agent-eval-benchmark_EN.md](agent-eval-benchmark_EN.md) / [agent-eval-benchmark.md](agent-eval-benchmark.md)  
 **Not this work**: Agent self-improvement epics [#215](https://github.com/SiinXu/stock-pulse-ai/issues/215) / [#252](https://github.com/SiinXu/stock-pulse-ai/issues/252) beyond Phase A linkage
 
 ## Purpose
