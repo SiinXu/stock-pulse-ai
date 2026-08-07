@@ -5632,6 +5632,7 @@ export interface components {
             miss: number;
             /** Neutral */
             neutral: number;
+            profile_calibration?: components["schemas"]["DecisionSignalProfileCalibration"] | null;
             /** Statuses */
             statuses?: string[];
             /** Total */
@@ -5694,6 +5695,58 @@ export interface components {
             target_price?: number | null;
             /** Watch Conditions */
             watch_conditions?: string | null;
+        };
+        /** DecisionSignalProfileCalibration */
+        DecisionSignalProfileCalibration: {
+            breakdowns: components["schemas"]["DecisionSignalProfileCalibrationBreakdowns"];
+            /** Minimum Completed Sample Size */
+            minimum_completed_sample_size: number;
+        };
+        /** DecisionSignalProfileCalibrationBreakdowns */
+        DecisionSignalProfileCalibrationBreakdowns: {
+            /** Decision Profile */
+            decision_profile?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Action */
+            decision_profile_action?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Data Quality Level */
+            decision_profile_data_quality_level?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Horizon */
+            decision_profile_horizon?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Market Phase */
+            decision_profile_market_phase?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Profile Source */
+            profile_source?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+        };
+        /** DecisionSignalProfileCalibrationBucket */
+        DecisionSignalProfileCalibrationBucket: {
+            /** Avg Stock Return Pct */
+            avg_stock_return_pct?: number | null;
+            /** Completed */
+            completed: number;
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: string;
+            };
+            /** Hit */
+            hit: number;
+            /** Hit Rate Pct */
+            hit_rate_pct?: number | null;
+            /** Max Adverse Excursion Pct */
+            max_adverse_excursion_pct?: number | null;
+            /** Miss */
+            miss: number;
+            /** Miss Rate Pct */
+            miss_rate_pct?: number | null;
+            /** Neutral */
+            neutral: number;
+            /** Sample Sufficient */
+            sample_sufficient: boolean;
+            /** Total */
+            total: number;
+            /** Unable */
+            unable: number;
+            /** Unable Rate Pct */
+            unable_rate_pct?: number | null;
         };
         /** DecisionSignalReassessErrorResponse */
         DecisionSignalReassessErrorResponse: {

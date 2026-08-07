@@ -33,6 +33,7 @@ describe('playground catalog', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(PLAYGROUND_CATALOG).toHaveLength(170);
+    expect(PLAYGROUND_CATALOG).toHaveLength(165);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);
