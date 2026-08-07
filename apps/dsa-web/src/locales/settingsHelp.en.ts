@@ -1049,14 +1049,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
-  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
-    title: 'Enable Valuation Agent Tool',
-    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
-    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
-      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
-      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
-      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
-      'Report/prompt projection is intentionally deferred to a later phase.',
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1334,4 +1326,4 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
 };
 
-export default settingsHelpEnUS;
+export default settingsHelpEnUS;,
