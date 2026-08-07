@@ -3600,6 +3600,89 @@
         "title": "AuthSettingsRequest",
         "type": "object"
       },
+      "BacktestAppliedConfig": {
+        "description": "Echo of the effective run configuration used for evaluation honesty.",
+        "properties": {
+          "analysis_date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Analysis date start filter (inclusive)",
+            "title": "Analysis Date From"
+          },
+          "analysis_date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Analysis date end filter (inclusive)",
+            "title": "Analysis Date To"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Normalized stock filter, if any",
+            "title": "Code"
+          },
+          "engine_version": {
+            "description": "Effective backtest engine version label",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "eval_window_days": {
+            "description": "Effective evaluation window in trading days",
+            "title": "Eval Window Days",
+            "type": "integer"
+          },
+          "force": {
+            "default": false,
+            "description": "Whether force re-evaluation was requested",
+            "title": "Force",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum candidate analysis rows processed",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "min_age_days": {
+            "description": "Effective minimum analysis age in calendar days",
+            "title": "Min Age Days",
+            "type": "integer"
+          },
+          "neutral_band_pct": {
+            "description": "Neutral outcome band percentage",
+            "title": "Neutral Band Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "eval_window_days",
+          "min_age_days",
+          "limit",
+          "engine_version",
+          "neutral_band_pct"
+        ],
+        "title": "BacktestAppliedConfig",
+        "type": "object"
+      },
       "BacktestResultItem": {
         "properties": {
           "action": {
@@ -4113,6 +4196,17 @@
       },
       "BacktestRunResponse": {
         "properties": {
+          "applied_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestAppliedConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Echo of the effective run configuration (window, universe limit, engine, dates)"
+          },
           "applied_eval_window_days": {
             "anyOf": [
               {
