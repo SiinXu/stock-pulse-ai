@@ -279,7 +279,12 @@ describe('HistoryList', () => {
   it('disables delete when nothing is selected', () => {
     render(<HistoryList {...baseProps} items={items} />);
 
-    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled();
+    const deleteButton = screen.getByRole('button', { name: '删除' });
+    expect(deleteButton).toBeDisabled();
+    expect(deleteButton).toHaveAttribute('data-control', 'icon-button');
+    expect(deleteButton).toHaveAttribute('data-size', 'compact');
+    expect(deleteButton.querySelector('svg')).toBeInTheDocument();
+    expect(deleteButton).not.toHaveTextContent('删除');
   });
 
   it('truncates long stock names with trailing dot', () => {
