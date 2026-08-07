@@ -1,0 +1,11 @@
+{
+  "id": "example-analysis-strategy",
+  "name": "Example Analysis Strategy",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Declarative quality-compounder Skill published via the plugin lifecycle.",
+  "author": "StockPulse Contributors",
+  "permissions": [],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}

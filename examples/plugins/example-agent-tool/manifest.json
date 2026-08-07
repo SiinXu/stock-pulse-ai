@@ -1,0 +1,11 @@
+{
+  "id": "example-agent-tool",
+  "name": "Example Agent Tool",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Load-and-register reference ToolDefinition (not live-agent hardened).",
+  "author": "StockPulse Contributors",
+  "permissions": [],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}
