@@ -89,6 +89,8 @@ class Config:
     # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
     multimodal_agent_tools_enabled: bool = False
     multimodal_file_root: Optional[str] = None
+    # === Optional DCF / relative valuation Agent Tool (issue #238) ===
+    valuation_agent_tool_enabled: bool = False
 
     # === Historical decision memory & reflection (Issue #118) ===
     decision_memory_enabled: bool = True
