@@ -133,6 +133,18 @@ beforeEach(() => {
     completed: 1,
     insufficient: 0,
     errors: 0,
+    appliedEvalWindowDays: 10,
+    appliedConfig: {
+      code: null,
+      force: false,
+      evalWindowDays: 10,
+      minAgeDays: 14,
+      limit: 200,
+      engineVersion: 'test-engine',
+      neutralBandPct: 2,
+      analysisDateFrom: null,
+      analysisDateTo: null,
+    },
   });
 });
 
@@ -532,6 +544,7 @@ describe('BacktestPage', () => {
         evalWindowDays: 15,
         analysisDateFrom: '2026-03-01',
         analysisDateTo: '2026-03-31',
+        limit: 200,
       });
     });
 
@@ -608,6 +621,7 @@ describe('BacktestPage', () => {
         evalWindowDays: 15,
         analysisDateFrom: undefined,
         analysisDateTo: undefined,
+        limit: 200,
       });
     });
     const progress = await screen.findByRole('progressbar', { name: '回测中...' });
@@ -937,5 +951,95 @@ describe('BacktestPage', () => {
       resolvePerformance(basePerformance);
     });
     expect(mockGetResults).not.toHaveBeenCalled();
+  });
+
+  it('surfaces resolution notes, insufficient rows, and summary integrity counts', async () => {
+    mockGetResults.mockResolvedValueOnce({
+      total: 2,
+      page: 1,
+      limit: 20,
+      items: [
+        baseResultItem,
+        {
+          ...baseResultItem,
+          analysisHistoryId: 202,
+          code: '000001',
+          stockName: '平安银行',
+          evalStatus: 'insufficient_data',
+          outcome: undefined,
+          directionCorrect: null,
+          actualReturnPct: null,
+          resolutionNotes: 'missing_daily_bars,legacy_analysis_date',
+        },
+      ],
+    });
+
+    renderEnglishPage();
+
+    expect(await screen.findByTestId('backtest-summary-integrity')).toBeInTheDocument();
+    const integrity = screen.getByTestId('backtest-summary-integrity');
+    expect(within(integrity).getByText('Evaluated')).toBeInTheDocument();
+    expect(within(integrity).getByText('2')).toBeInTheDocument();
+    expect(within(integrity).getByText('Insufficient')).toBeInTheDocument();
+    expect(within(integrity).getByText('1')).toBeInTheDocument();
+
+    expect(await screen.findByText('Insufficient data')).toBeInTheDocument();
+    const notes = await screen.findAllByTestId('backtest-resolution-notes');
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes[0]).toHaveTextContent(/Missing usable daily bars/i);
+    expect(notes[0]).toHaveTextContent(/Legacy snapshot/i);
+    expect(screen.getByText('Notes')).toBeInTheDocument();
+  });
+
+  it('echoes applied run config and passes advanced universe options on run', async () => {
+    mockRun.mockResolvedValueOnce({
+      processed: 3,
+      saved: 2,
+      completed: 1,
+      insufficient: 1,
+      errors: 0,
+      appliedEvalWindowDays: 10,
+      appliedConfig: {
+        code: '600519',
+        force: false,
+        evalWindowDays: 10,
+        minAgeDays: 7,
+        limit: 50,
+        engineVersion: 'v1',
+        neutralBandPct: 2,
+        analysisDateFrom: null,
+        analysisDateTo: null,
+      },
+      message: null,
+    });
+
+    renderEnglishPage();
+
+    await screen.findByText('Win');
+    const minAgeInput = screen.getByLabelText('Min age (days)');
+    const limitInput = screen.getByLabelText('Candidate limit');
+    fireEvent.change(minAgeInput, { target: { value: '7' } });
+    fireEvent.change(limitInput, { target: { value: '50' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+
+    await waitFor(() => {
+      expect(mockRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minAgeDays: 7,
+          limit: 50,
+          evalWindowDays: 10,
+        }),
+      );
+    });
+
+    expect(await screen.findByTestId('backtest-run-summary')).toBeInTheDocument();
+    const applied = await screen.findByTestId('backtest-applied-config');
+    expect(applied).toHaveTextContent(/Applied config/i);
+    expect(applied).toHaveTextContent(/10-day window/i);
+    expect(applied).toHaveTextContent(/Min age \(days\) 7/i);
+    expect(applied).toHaveTextContent(/Candidate limit 50/i);
+    expect(applied).toHaveTextContent(/Engine v1/i);
+    expect(screen.getByText(/Insufficient:/i)).toBeInTheDocument();
   });
 });
