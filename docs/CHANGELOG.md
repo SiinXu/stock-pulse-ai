@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.
 - [Fixed] Tightened history metadata, task-count, chat-history, scheduler-status, and Market Review sentiment/share controls to match their intended visual hierarchy.
 - [Fixed] Removed the redundant Backtest Filter action, aligned its Stock field, and clarified the relationship between window days and next-day validation.
+- [Added] Offline financial agent evaluation benchmark (V0): structural metrics over frozen agent_runtime replays, deterministic runner, committed baseline, and bilingual docs (#252).
+- [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
+- [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
+- [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
+- [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
+- [Changed] Web navigation mechanical IA hygiene: Research child labels use `layout.nav.*`, command palette indexes Home/Research/Analysis Workbench/Approvals with aligned labels, and deep links allow `/research/skill-outcomes` (no route renames).
+- [Docs] Added bilingual Navigation IA proposal with current-state route audit and DECISION NEEDED target options for issue #368.
+- [Added] Portfolio risk metrics service and read-only `GET /api/v1/portfolio/risk-metrics` (historical VaR, correlation, concentration/diversification) from stored daily data with explicit insufficient-history handling (issue #239 V0).
+- [Changed] Built-in strategies under `strategies/` (including `personas/`) are published as first-class `analysis_strategy` plugins (`builtin.analysis-strategy.<name>`); YAML remains the definition source, `SkillManager.load_builtin_skills()` is a legacy shim, and `AGENT_SKILL_DIR` custom overrides keep working without migration.
+- [Added] Desktop first-run opens the guided setup wizard on a fresh install, warms local Ollama detection, reveals the main window only after the loading page is ready, and composes runtime detect/start into one-click Model Pack import with actionable failures (no silent multi-GB downloads).
 - [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
 - [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
 - [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.

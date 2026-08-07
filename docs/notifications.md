@@ -221,7 +221,7 @@ P3 新增三类通知路由配置：
 | --- | --- | --- |
 | `report` | `NOTIFICATION_REPORT_CHANNELS` | 单股推送、聚合日报、大盘复盘、合并推送、飞书文档成功链接 |
 | `alert` | `NOTIFICATION_ALERT_CHANNELS` | EventMonitor 触发通知 |
-| `system_error` | `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | 预留能力；当前不新增自动系统错误生产者 |
+| `system_error` | `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | GitHub Actions Daily Analysis 失败短通知（#850，`scripts/actions_daily_run_summary.py`）；其它路径仍可不使用 |
 
 配置值为逗号分隔渠道 ID。内置 ID 为 `wechat,feishu,dingtalk,telegram,email,pushover,ntfy,gotify,pushplus,serverchan3,custom,discord,slack,astrbot`；运行时还接受当前 enabled 插件注册的 canonical ID。
 
