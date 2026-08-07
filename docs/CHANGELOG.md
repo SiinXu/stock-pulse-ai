@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
+- [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
 - [Changed] Web navigation mechanical IA hygiene: Research child labels use `layout.nav.*`, command palette indexes Home/Research/Analysis Workbench/Approvals with aligned labels, and deep links allow `/research/skill-outcomes` (no route renames).
 - [Docs] Added bilingual Navigation IA proposal with current-state route audit and DECISION NEEDED target options for issue #368.
 - [Added] Portfolio risk metrics service and read-only `GET /api/v1/portfolio/risk-metrics` (historical VaR, correlation, concentration/diversification) from stored daily data with explicit insufficient-history handling (issue #239 V0).
