@@ -981,6 +981,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
     notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
   },
+  'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
+    title: 'Decision Profile Outcome Calibration',
+    summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
+    usage: 'Keep off for API compatibility. Enable only when operators need profile, action, horizon, market-phase, data-quality, and profile-source calibration on GET /api/v1/decision-signals/outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off stats responses omit profile_calibration.',
+      'Each exact bucket needs at least 30 completed outcomes before rates or max adverse excursion are published.',
+      'Uses only persisted outcome prices; never triggers market reads.',
+    ],
+    impact: ['Adds an optional profile_calibration object to outcome stats; Web shows the calibration card when the field is present.'],
+    notes: ['Does not change outcome evaluation, persistence, or reassessment lifecycle.'],
+  },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: 'Skill Opinion Outcome Weights',
+    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
+    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
+      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
+    ],
+    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
+    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
