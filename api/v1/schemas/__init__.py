@@ -42,6 +42,7 @@ from api.v1.schemas.stocks import (
     KLineData,
 )
 from api.v1.schemas.backtest import (
+    BacktestAppliedConfig,
     BacktestRunRequest,
     BacktestRunResponse,
     BacktestResultItem,
@@ -188,6 +189,7 @@ __all__ = [
     "StockHistoryResponse",
     "KLineData",
     # backtest
+    "BacktestAppliedConfig",
     "BacktestRunRequest",
     "BacktestRunResponse",
     "BacktestResultItem",
