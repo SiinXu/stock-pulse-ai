@@ -1708,6 +1708,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins": {
     "/api/v1/onboarding/apply": {
         parameters: {
             query?: never;
@@ -1715,50 +1716,44 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Apply non-secret onboarding config recommendations
-         * @description Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.
+         * List registered plugins and lifecycle state
+         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
          */
-        post: operations["apply_onboarding_plan_api_v1_onboarding_apply_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/onboarding/plan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Generate an agent-guided onboarding plan
-         * @description Rule-based plan generation is the default. When prefer_llm is true but no model is available, the response stays engine=rules with an honest llm_note (no fake AI).
-         */
-        post: operations["generate_onboarding_plan_api_v1_onboarding_plan_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/onboarding/state": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get persisted onboarding profile and last plan */
-        get: operations["get_onboarding_state_api_v1_onboarding_state_get"];
+        get: operations["listPlugins"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable, disable, or hot-reload one plugin
+         * @description Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.
+         */
+        post: operations["updatePluginLifecycle"];
+        delete?: never;
+         * Apply non-secret onboarding config recommendations
+         * @description Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.
+        post: operations["apply_onboarding_plan_api_v1_onboarding_apply_post"];
+    "/api/v1/onboarding/plan": {
+         * Generate an agent-guided onboarding plan
+         * @description Rule-based plan generation is the default. When prefer_llm is true but no model is available, the response stays engine=rules with an honest llm_note (no fake AI).
+        post: operations["generate_onboarding_plan_api_v1_onboarding_plan_post"];
+    "/api/v1/onboarding/state": {
+        /** Get persisted onboarding profile and last plan */
+        get: operations["get_onboarding_state_api_v1_onboarding_state_get"];
         /** Reset persisted onboarding profile (keeps already written config) */
         delete: operations["reset_onboarding_state_api_v1_onboarding_state_delete"];
         options?: never;
@@ -1983,6 +1978,26 @@ export interface paths {
         };
         /** Get portfolio risk report */
         get: operations["get_risk_report_api_v1_portfolio_risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/risk-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get portfolio risk metrics
+         * @description Historical VaR, pairwise return correlation, and concentration/diversification metrics from stored daily closes and current holdings. Never calls market data providers. Insufficient history is reported explicitly (never silent zeros).
+         */
+        get: operations["getPortfolioRiskMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7434,6 +7449,115 @@ export interface components {
             /** Win Rate Pct */
             win_rate_pct?: number | null;
         };
+        /**
+         * PluginInfo
+         * @description One registered plugin and its lifecycle state.
+         */
+        PluginInfo: {
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Desired Enabled
+             * @description Persisted operator intent (False means disabled across restarts)
+             */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /**
+             * Id
+             * @description Stable plugin id from the manifest
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Package Root
+             * @description Absolute package directory for external plugins when known
+             */
+            package_root?: string | null;
+            /**
+             * Reloadable
+             * @description True when in-process hot-reload is attempted for this plugin
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginLifecycleRequest
+         * @description POST /api/v1/plugins/{plugin_id}/lifecycle body.
+         */
+        PluginLifecycleRequest: {
+            /**
+             * Action
+             * @description enable/disable toggles runtime state and persistence; reload re-imports code
+             * @enum {string}
+             */
+            action: "enable" | "disable" | "reload";
+        };
+        /**
+         * PluginLifecycleResponse
+         * @description Result of one lifecycle action.
+         */
+        PluginLifecycleResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "enable" | "disable" | "reload";
+            /** Error Code */
+            error_code?: string | null;
+            /** Message */
+            message?: string | null;
+            plugin?: components["schemas"]["PluginInfo"] | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloaded
+             * @default false
+             */
+            reloaded: boolean;
+            /**
+             * Restart Required
+             * @default false
+             */
+            restart_required: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Success */
+            success: boolean;
+        };
+        /**
+         * PluginListResponse
+         * @description GET /api/v1/plugins response.
+         */
+        PluginListResponse: {
+            /** Items */
+            items?: components["schemas"]["PluginInfo"][];
+            /** Total */
+            total: number;
+        };
         /** PortfolioAccountCreateRequest */
         PortfolioAccountCreateRequest: {
             /**
@@ -7607,6 +7731,38 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PortfolioConcentrationBlock */
+        PortfolioConcentrationBlock: {
+            /**
+             * Diversification Score
+             * @description Normalized diversification score in [0, 1]; equal-weight → 1.0
+             */
+            diversification_score?: number | null;
+            /**
+             * Effective N
+             * @description 1 / HHI
+             */
+            effective_n?: number | null;
+            /**
+             * Hhi
+             * @description Herfindahl-Hirschman index of weights
+             */
+            hhi?: number | null;
+            /**
+             * Position Count
+             * @default 0
+             */
+            position_count: number;
+            /**
+             * Status
+             * @description 'ok' or 'empty_portfolio'
+             */
+            status: string;
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioRiskWeightItem"][];
+        };
         /** PortfolioCorporateActionCreateRequest */
         PortfolioCorporateActionCreateRequest: {
             /** Account Id */
@@ -7675,6 +7831,28 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PortfolioCorrelationBlock */
+        PortfolioCorrelationBlock: {
+            /**
+             * Matrix
+             * @description Pairwise Pearson correlation matrix aligned with symbols
+             */
+            matrix?: (number | null)[][];
+            /**
+             * Observation Count
+             * @default 0
+             */
+            observation_count: number;
+            /**
+             * Status
+             * @description 'ok', 'insufficient_history', or 'unavailable'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /** Symbols */
+            symbols?: string[];
+        };
         /** PortfolioDecisionSignalRiskBlock */
         PortfolioDecisionSignalRiskBlock: {
             /** Actions */
@@ -7735,6 +7913,39 @@ export interface components {
             stale_count: number;
             /** Updated Count */
             updated_count: number;
+        };
+        /** PortfolioHistoricalVaRBlock */
+        PortfolioHistoricalVaRBlock: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Horizon Days */
+            horizon_days?: number | null;
+            /**
+             * Observation Count
+             * @default 0
+             */
+            observation_count: number;
+            /** One Day Var Pct */
+            one_day_var_pct?: number | null;
+            /** Percentile Used */
+            percentile_used?: number | null;
+            /**
+             * Status
+             * @description 'ok', 'insufficient_history', or 'unavailable'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /**
+             * Var Pct
+             * @description Historical VaR as positive loss percentage points (e.g. 3.5 means 3.5%)
+             */
+            var_pct?: number | null;
+            /**
+             * Var Value
+             * @description Historical VaR in portfolio currency units
+             */
+            var_value?: number | null;
         };
         /** PortfolioImportBrokerItem */
         PortfolioImportBrokerItem: {
@@ -7879,6 +8090,93 @@ export interface components {
             /** Valuation Currency */
             valuation_currency: string;
         };
+        /** PortfolioRiskAssumptions */
+        PortfolioRiskAssumptions: {
+            /** Cash Excluded */
+            cash_excluded: boolean;
+            /** Concentration Metrics */
+            concentration_metrics: string;
+            /** Confidence */
+            confidence: number;
+            /** Correlation Method */
+            correlation_method: string;
+            /** Data Source */
+            data_source: string;
+            /** Distribution Assumption */
+            distribution_assumption: string;
+            /** Horizon Days */
+            horizon_days: number;
+            /** Horizon Scaling */
+            horizon_scaling: string;
+            /** Lookback Trading Days */
+            lookback_trading_days: number;
+            /** Min Correlation Observations */
+            min_correlation_observations: number;
+            /** Min Return Observations */
+            min_return_observations: number;
+            /** Portfolio Aggregation */
+            portfolio_aggregation: string;
+            /** Provider Calls On Hot Path */
+            provider_calls_on_hot_path: boolean;
+            /** Return Definition */
+            return_definition: string;
+            /** Var Method */
+            var_method: string;
+            /** Weight Basis */
+            weight_basis: string;
+        };
+        /** PortfolioRiskHistoryMeta */
+        PortfolioRiskHistoryMeta: {
+            /** Aligned End */
+            aligned_end?: string | null;
+            /** Aligned Start */
+            aligned_start?: string | null;
+            /**
+             * Aligned Trading Days
+             * @default 0
+             */
+            aligned_trading_days: number;
+            /**
+             * Lookback Trading Days Requested
+             * @default 0
+             */
+            lookback_trading_days_requested: number;
+            /** Price Series Symbols */
+            price_series_symbols?: string[];
+        };
+        /** PortfolioRiskMetricsResponse */
+        PortfolioRiskMetricsResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /** As Of */
+            as_of: string;
+            assumptions: components["schemas"]["PortfolioRiskAssumptions"];
+            concentration: components["schemas"]["PortfolioConcentrationBlock"];
+            correlation: components["schemas"]["PortfolioCorrelationBlock"];
+            /** Cost Method */
+            cost_method: string;
+            /** Currency */
+            currency: string;
+            history?: components["schemas"]["PortfolioRiskHistoryMeta"] | null;
+            /**
+             * Portfolio Value
+             * @default 0
+             */
+            portfolio_value: number;
+            /**
+             * Positions Used
+             * @default 0
+             */
+            positions_used: number;
+            /**
+             * Status
+             * @description 'ok', 'empty_portfolio', 'insufficient_history', or 'partial'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            var: components["schemas"]["PortfolioHistoricalVaRBlock"];
+        };
         /** PortfolioRiskResponse */
         PortfolioRiskResponse: {
             /** Account Id */
@@ -7910,6 +8208,13 @@ export interface components {
             thresholds?: {
                 [key: string]: unknown;
             };
+        };
+        /** PortfolioRiskWeightItem */
+        PortfolioRiskWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
         };
         /** PortfolioSnapshotResponse */
         PortfolioSnapshotResponse: {
@@ -15458,6 +15763,7 @@ export interface operations {
             };
         };
     };
+    listPlugins: {
     apply_onboarding_plan_api_v1_onboarding_apply_post: {
         parameters: {
             query?: never;
@@ -15465,8 +15771,40 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginListResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updatePluginLifecycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
         requestBody: {
             content: {
+                "application/json": components["schemas"]["PluginLifecycleRequest"];
                 "application/json": components["schemas"]["OnboardingApplyRequest"];
             };
         };
@@ -15477,9 +15815,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OnboardingApplyResponse"];
+                    "application/json": components["schemas"]["PluginLifecycleResponse"];
                 };
             };
+            /** @description Invalid lifecycle request */
+                    "application/json": components["schemas"]["OnboardingApplyResponse"];
             /** @description Bad Request */
             400: {
                 headers: {
@@ -15489,6 +15829,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
             /** @description Conflict */
             409: {
                 headers: {
@@ -15507,6 +15858,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Lifecycle operation failed unexpectedly */
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -15514,7 +15866,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
-                };
             };
         };
     };
@@ -15524,108 +15875,25 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: never;
-        };
         requestBody: {
             content: {
                 "application/json": components["schemas"]["OnboardingPlanRequest"];
-            };
-        };
         responses: {
             /** @description Successful Response */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
                     "application/json": components["schemas"]["OnboardingPlanResponse"];
-                };
-            };
             /** @description Bad Request */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
             /** @description Conflict */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
             /** @description Validation Error */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     get_onboarding_state_api_v1_onboarding_state_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
         requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
                     "application/json": components["schemas"]["OnboardingStateResponse"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     reset_onboarding_state_api_v1_onboarding_state_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
                     "application/json": components["schemas"]["OnboardingResetResponse"];
-                };
-            };
-            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -16576,6 +16844,66 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioRiskMetrics: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                /** @description Cost method: fifo or avg */
+                cost_method?: string;
+                /** @description VaR confidence level exclusive of 0.5 and 1.0 (default 0.95) */
+                confidence?: number;
+                /** @description VaR horizon in trading days (1-day base; multi-day uses sqrt-time scaling) */
+                horizon_days?: number;
+                /** @description Number of trading-day closes requested for the history window */
+                lookback_trading_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRiskMetricsResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Risk metrics computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;

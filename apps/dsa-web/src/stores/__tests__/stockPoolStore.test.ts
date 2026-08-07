@@ -1726,6 +1726,22 @@ describe('stockPoolStore', () => {
     expect(matches).toHaveLength(1);
   });
 
+  it('sets stock-bar loading true for refreshStockBar while the request is in flight', async () => {
+    const refreshStockBarRequest = createDeferred<StockBarResponse>();
+    vi.mocked(historyApi.getStockBarList).mockReturnValueOnce(refreshStockBarRequest.promise);
+
+    const refreshPromise = useStockPoolStore.getState().refreshStockBar();
+    expect(useStockPoolStore.getState().isLoadingStockBar).toBe(true);
+
+    refreshStockBarRequest.resolve({
+      total: 0,
+      items: [],
+    });
+    await refreshPromise;
+
+    expect(useStockPoolStore.getState().isLoadingStockBar).toBe(false);
+  });
+
   it('clears stock-bar loading when a refresh supersedes the initial load', async () => {
     const initialStockBarRequest = createDeferred<StockBarResponse>();
     const refreshStockBarRequest = createDeferred<StockBarResponse>();

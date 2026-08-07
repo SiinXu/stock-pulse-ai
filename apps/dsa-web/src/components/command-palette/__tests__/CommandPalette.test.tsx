@@ -73,13 +73,29 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(search).toHaveFocus());
 
     fireEvent.keyDown(search, { key: 'ArrowDown' });
-    expect(screen.getByRole('button', { name: '开始分析' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: '首页' })).toHaveFocus();
 
-    fireEvent.keyDown(screen.getByRole('button', { name: '开始分析' }), { key: 'ArrowUp' });
+    fireEvent.keyDown(screen.getByRole('button', { name: '首页' }), { key: 'ArrowUp' });
     expect(screen.getByRole('button', { name: '再评估与统计' })).toHaveFocus();
   });
 
-  it('defaults analysis commands to the canonical Workbench route', () => {
+  it('indexes Home, Research, Analysis Workbench, and Approvals with canonical routes', () => {
+    renderPalette(null);
+
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/');
+
+    fireEvent.click(screen.getByRole('button', { name: '研究' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/research');
+
+    fireEvent.click(screen.getByRole('button', { name: '分析工作台' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/research/analysis');
+
+    fireEvent.click(screen.getByRole('button', { name: '人工审批' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/approvals');
+  });
+
+  it('defaults analysis action commands to the canonical Workbench route', () => {
     renderPalette(null);
 
     fireEvent.click(screen.getByRole('button', { name: '开始分析' }));

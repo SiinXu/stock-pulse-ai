@@ -26,8 +26,10 @@ from api.v1.endpoints import (
     intelligence,
     local_models,
     model_packs,
+    plugins,
     onboarding,
     portfolio,
+    portfolio_risk_metrics,
     scheduled_tasks,
     scorecard,
     security_audit,
@@ -97,6 +99,12 @@ router.include_router(
 
 router.include_router(
     portfolio.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
+    portfolio_risk_metrics.router,
     prefix="/portfolio",
     tags=["Portfolio"]
 )
@@ -172,6 +180,14 @@ router.include_router(
     prefix="/skill-outcomes",
     tags=["SkillOutcomes"],
 )
+
+
+router.include_router(
+    plugins.router,
+    prefix="/plugins",
+    tags=["Plugins"],
+)
+
 
 router.include_router(
     health.router,

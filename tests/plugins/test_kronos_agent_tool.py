@@ -95,7 +95,13 @@ class _FakeService:
 
 
 def test_disabled_configuration_is_absent_from_builtin_catalog() -> None:
-    assert get_configured_builtin_plugins(_config(None, enabled=False)) == ()
+    plugins = get_configured_builtin_plugins(_config(None, enabled=False))
+    # Built-in analysis strategies remain; Kronos stays opt-in only.
+    assert all(not isinstance(plugin, KronosAgentToolPlugin) for plugin in plugins)
+    assert not any(
+        getattr(getattr(plugin, "manifest", None), "id", None) == "builtin.kronos"
+        for plugin in plugins
+    )
 
 
 def test_technical_agent_omits_unregistered_optional_tool_without_warning(
