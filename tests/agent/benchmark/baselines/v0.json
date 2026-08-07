@@ -1,0 +1,124 @@
+{
+  "aggregate": {
+    "by_family": {
+      "financial_task_correctness": {
+        "passed": 34,
+        "score": 1.0,
+        "total": 34
+      },
+      "tool_usage_discipline": {
+        "passed": 26,
+        "score": 1.0,
+        "total": 26
+      },
+      "uncertainty_honesty": {
+        "passed": 14,
+        "score": 1.0,
+        "total": 14
+      }
+    },
+    "checks_passed": 74,
+    "checks_total": 74,
+    "scenarios": 4,
+    "score": 1.0
+  },
+  "scenarios": [
+    {
+      "failed_checks": [],
+      "families": {
+        "financial_task_correctness": {
+          "passed": 9,
+          "score": 1.0,
+          "total": 9
+        },
+        "tool_usage_discipline": {
+          "passed": 9,
+          "score": 1.0,
+          "total": 9
+        },
+        "uncertainty_honesty": {
+          "passed": 2,
+          "score": 1.0,
+          "total": 2
+        }
+      },
+      "passed": 20,
+      "scenario_id": "bench-a-happy-path",
+      "score": 1.0,
+      "total": 20
+    },
+    {
+      "failed_checks": [],
+      "families": {
+        "financial_task_correctness": {
+          "passed": 8,
+          "score": 1.0,
+          "total": 8
+        },
+        "tool_usage_discipline": {
+          "passed": 6,
+          "score": 1.0,
+          "total": 6
+        },
+        "uncertainty_honesty": {
+          "passed": 5,
+          "score": 1.0,
+          "total": 5
+        }
+      },
+      "passed": 19,
+      "scenario_id": "bench-a-partial-honesty",
+      "score": 1.0,
+      "total": 19
+    },
+    {
+      "failed_checks": [],
+      "families": {
+        "financial_task_correctness": {
+          "passed": 9,
+          "score": 1.0,
+          "total": 9
+        },
+        "tool_usage_discipline": {
+          "passed": 7,
+          "score": 1.0,
+          "total": 7
+        },
+        "uncertainty_honesty": {
+          "passed": 2,
+          "score": 1.0,
+          "total": 2
+        }
+      },
+      "passed": 18,
+      "scenario_id": "bench-us-happy-path",
+      "score": 1.0,
+      "total": 18
+    },
+    {
+      "failed_checks": [],
+      "families": {
+        "financial_task_correctness": {
+          "passed": 8,
+          "score": 1.0,
+          "total": 8
+        },
+        "tool_usage_discipline": {
+          "passed": 4,
+          "score": 1.0,
+          "total": 4
+        },
+        "uncertainty_honesty": {
+          "passed": 5,
+          "score": 1.0,
+          "total": 5
+        }
+      },
+      "passed": 17,
+      "scenario_id": "bench-toolscope-unknown",
+      "score": 1.0,
+      "total": 17
+    }
+  ],
+  "schema_version": "agent-eval-benchmark-v0"
+}
