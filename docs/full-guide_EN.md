@@ -410,6 +410,10 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
+| `DAILY_BRIEF_ENABLED` | Opt-in daily brief with historical accuracy review (decision-signal outcomes, backtest summary, skill-opinion performance). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
+| `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
+| `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |
+| `DAILY_BRIEF_MIN_SAMPLES` | Minimum completed samples before publishing an accuracy percentage; below this the brief states insufficient history | `10` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | Initial cash seeded (as a cash-in ledger entry) when a paper portfolio is created; simulated fills use the latest available close at the trade date, fees/slippage are ignored in the MVP, and buys are validated against available cash | `1000000` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), jp (JP stocks), kr (KR stocks), both (all five markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
