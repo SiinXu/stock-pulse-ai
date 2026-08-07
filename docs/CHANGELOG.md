@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Backend V0 context-aware corporate event alerts (`corporate_event`) evaluate managed intelligence items, attach holdings/watchlist impact context, and enrich alert notifications without new provider calls on the hot path (`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`).
+- [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
 - [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
 - [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
 - [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
