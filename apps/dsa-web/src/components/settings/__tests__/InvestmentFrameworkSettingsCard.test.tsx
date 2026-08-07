@@ -86,6 +86,19 @@ function structuredFrameworkResponse() {
   };
 }
 
+async function waitForFrameworkEditor() {
+  return screen.findByRole('button', { name: '基础规则' });
+}
+
+async function openFrameworkBasics() {
+  fireEvent.click(await waitForFrameworkEditor());
+  return screen.findByRole('dialog', { name: '基础规则' });
+}
+
+function confirmFrameworkBasics(dialog: HTMLElement) {
+  fireEvent.click(within(dialog).getByRole('button', { name: '确定' }));
+}
+
 describe('InvestmentFrameworkSettingsCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -132,14 +145,18 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    expect(await screen.findByLabelText('框架名称')).toBeInTheDocument();
+    await waitForFrameworkEditor();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByTestId('investment-framework-prompt-preview')).toBeInTheDocument();
     expect(screen.getByTestId('investment-framework-prompt-preview-empty')).toBeInTheDocument();
+    const basicsDialog = await openFrameworkBasics();
+    expect(within(basicsDialog).getByLabelText('框架名称')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('框架名称'), { target: { value: 'My rules' } });
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Prefer quality businesses' },
     });
+    confirmFrameworkBasics(basicsDialog);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(await screen.findByTestId('investment-framework-prompt-preview-body')).toHaveTextContent(
       '个人投资框架（只读）',
     );
@@ -166,7 +183,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    expect(await screen.findByDisplayValue('Structured')).toBeInTheDocument();
+    await waitForFrameworkEditor();
     const preview = await screen.findByTestId('investment-framework-prompt-preview-body');
     expect(preview).toHaveTextContent('### 决策树');
     expect(preview).toHaveTextContent('根节点：root');
@@ -241,10 +258,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    await screen.findByDisplayValue('Existing');
+    const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Updated free form' },
     });
+    confirmFrameworkBasics(basicsDialog);
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     await waitFor(() => {
@@ -255,7 +273,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
         }),
       );
     });
-    expect(screen.getByLabelText('框架名称').closest('form')).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '保存新版本' }).closest('form')).toHaveAttribute(
       'aria-busy',
       'true',
     );
@@ -311,20 +329,29 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    await screen.findByDisplayValue('Existing');
+    const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'My pending conflict draft' },
     });
+    confirmFrameworkBasics(basicsDialog);
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
     expect(getFramework).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
+    const conflictDraftDialog = await openFrameworkBasics();
+    expect(within(conflictDraftDialog).getByLabelText('自由规则')).toHaveValue(
+      'My pending conflict draft',
+    );
+    fireEvent.click(within(conflictDraftDialog).getByRole('button', { name: '取消' }));
     expect(screen.getByText(/当前草稿仍被保留/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
-    expect(await screen.findByLabelText('自由规则')).toHaveValue('Latest server rules');
+    const latestBasicsDialog = await openFrameworkBasics();
+    expect(within(latestBasicsDialog).getByLabelText('自由规则')).toHaveValue(
+      'Latest server rules',
+    );
+    fireEvent.click(within(latestBasicsDialog).getByRole('button', { name: '取消' }));
     expect(screen.getByText('并发 revision：4')).toBeInTheDocument();
     expect(screen.queryByText('配置已被其他操作更新。')).not.toBeInTheDocument();
     expect(screen.queryByText(/当前草稿仍被保留/)).not.toBeInTheDocument();
@@ -377,15 +404,20 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    await screen.findByDisplayValue('Existing');
+    const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'My pending conflict draft' },
     });
+    confirmFrameworkBasics(basicsDialog);
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
     expect(getFramework).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
+    const conflictDraftDialog = await openFrameworkBasics();
+    expect(within(conflictDraftDialog).getByLabelText('自由规则')).toHaveValue(
+      'My pending conflict draft',
+    );
+    fireEvent.click(within(conflictDraftDialog).getByRole('button', { name: '取消' }));
     fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
 
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
@@ -437,10 +469,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Keep free form updated' },
     });
+    confirmFrameworkBasics(basicsDialog);
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     await waitFor(() => {
@@ -485,9 +518,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    await waitForFrameworkEditor();
 
     fireEvent.click(screen.getByRole('button', { name: '添加节点' }));
+    const nodeDialog = await screen.findByRole('dialog', { name: '添加节点' });
     fireEvent.change(screen.getByLabelText('节点 1 的问题'), {
       target: { value: 'Is quality high?' },
     });
@@ -497,7 +531,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
     fireEvent.change(screen.getByLabelText('终局'), {
       target: { value: 'Consider' },
     });
+    fireEvent.click(within(nodeDialog).getByRole('button', { name: '确定' }));
+    expect(screen.queryByRole('dialog', { name: '添加节点' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '添加维度' }));
+    const dimensionDialog = await screen.findByRole('dialog', { name: '添加维度' });
     fireEvent.change(screen.getByLabelText('维度 1 的名称'), {
       target: { value: 'Moat' },
     });
@@ -507,6 +544,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
     fireEvent.change(screen.getByLabelText('评估标准（每行一条）'), {
       target: { value: 'Durable pricing power' },
     });
+    fireEvent.click(within(dimensionDialog).getByRole('button', { name: '确定' }));
+    expect(screen.queryByRole('dialog', { name: '添加维度' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
@@ -544,7 +583,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    await waitForFrameworkEditor();
 
     const criteria = screen.getByLabelText('评估标准（每行一条）');
     fireEvent.change(criteria, { target: { value: 'Pricing power\n' } });
@@ -553,7 +592,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
       target: { value: 'Pricing power\nCapital discipline' },
     });
 
-    const riskRules = screen.getByLabelText('风险规则（每行一条）');
+    const basicsDialog = await openFrameworkBasics();
+    const riskRules = within(basicsDialog).getByLabelText('风险规则（每行一条）');
     fireEvent.change(riskRules, { target: { value: 'Limit position size\n' } });
     expect(screen.getByLabelText('风险规则（每行一条）')).toHaveValue(
       'Limit position size\n',
@@ -562,7 +602,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       target: { value: 'Limit position size\nAvoid leverage' },
     });
 
-    const tracking = screen.getByLabelText('跟踪条件（每行一条）');
+    const tracking = within(basicsDialog).getByLabelText('跟踪条件（每行一条）');
     fireEvent.change(tracking, { target: { value: 'Review guidance\n' } });
     expect(screen.getByLabelText('跟踪条件（每行一条）')).toHaveValue(
       'Review guidance\n',
@@ -570,6 +610,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     fireEvent.change(screen.getByLabelText('跟踪条件（每行一条）'), {
       target: { value: 'Review guidance\nTrack margins' },
     });
+    confirmFrameworkBasics(basicsDialog);
 
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
@@ -590,7 +631,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     getFramework.mockResolvedValue(structuredFrameworkResponse());
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    await waitForFrameworkEditor();
 
     const nodeIdInput = screen.getByLabelText('节点 1 的 ID');
     nodeIdInput.focus();
@@ -614,7 +655,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     getFramework.mockResolvedValue(structuredFrameworkResponse());
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    await waitForFrameworkEditor();
 
     const nodeIdInput = screen.getByLabelText('节点 2 的 ID');
     fireEvent.focus(nodeIdInput);
@@ -678,7 +719,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Rename safety');
+    await waitForFrameworkEditor();
 
     const renamedNodeId = screen.getByLabelText('节点 2 的 ID');
     fireEvent.focus(renamedNodeId);
@@ -731,7 +772,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Straße');
+    await waitForFrameworkEditor();
     fireEvent.change(screen.getByLabelText('维度 2 的名称'), {
       target: { value: 'STRASSE' },
     });
@@ -781,7 +822,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('\uA7CB');
+    await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
@@ -860,7 +901,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     }));
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     expect(await screen.findByText('检查输入内容后再试。')).toBeInTheDocument();
@@ -934,7 +975,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     updateFramework.mockResolvedValue({ ...current, version: 4, revision: 10 });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Current rules');
+    await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 
     const drawer = await screen.findByRole('complementary', { name: '历史版本' });
@@ -962,7 +1003,9 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(within(inspector).getByText('创建时间')).toBeInTheDocument();
     fireEvent.click(within(inspector).getByRole('button', { name: '复制到当前草稿' }));
 
-    expect(screen.getByLabelText('框架名称')).toHaveValue('Historical rules');
+    const copiedBasicsDialog = await openFrameworkBasics();
+    expect(within(copiedBasicsDialog).getByLabelText('框架名称')).toHaveValue('Historical rules');
+    fireEvent.click(within(copiedBasicsDialog).getByRole('button', { name: '取消' }));
     expect(screen.getByLabelText('变更说明（可选）')).toHaveValue('基于历史版本 v2');
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
@@ -1016,7 +1059,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Structured');
+    await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 
     const historyList = await screen.findByRole('list', { name: '框架版本历史' });
