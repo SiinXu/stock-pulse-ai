@@ -39,6 +39,7 @@ from src.report_language import normalize_report_language
 from src.services._analysis_report_projection import (
     project_persisted_analysis_report,
 )
+from src.repositories.base import RepositoryError
 from src.services.history_service import (
     HistoryService,
     HistoryValidationError,
@@ -57,6 +58,32 @@ router = APIRouter()
 # Dedicated share-image input bound. Keeps the IM notification cap
 # (MARKDOWN_TO_IMAGE_MAX_CHARS=15000) unchanged while allowing full history reports.
 _DEFAULT_SHARE_IMAGE_MAX_CHARS = 100_000
+
+
+def _http_repository_error(
+    exc: RepositoryError,
+    *,
+    event: str,
+    context: Optional[Mapping[str, Any]] = None,
+) -> HTTPException:
+    """Map repository infrastructure failures to HTTP 500 (never 404).
+
+    Missing rows remain 404; only RepositoryError maps here.
+    """
+    log_safe_exception(
+        logger,
+        event,
+        exc,
+        error_code=getattr(exc, "error_code", None) or "internal_error",
+        context=dict(context or {}),
+    )
+    return HTTPException(
+        status_code=500,
+        detail={
+            "error": "internal_error",
+            "message": str(exc) or "Repository operation failed",
+        },
+    )
 
 
 def _history_share_image_payload(result: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
@@ -227,7 +254,13 @@ def get_history_list(
             limit=limit,
             items=items
         )
-        
+
+    except RepositoryError as e:
+        raise _http_repository_error(
+            e,
+            event="History list query failed",
+            context={"stock_code": stock_code, "report_type": report_type, "page": page},
+        ) from e
     except Exception as e:
         log_safe_exception(
             logger,
@@ -269,6 +302,12 @@ def delete_history_by_code(
             status_code=400,
             detail={"error": "invalid_request", "message": str(exc)},
         )
+    except RepositoryError as exc:
+        raise _http_repository_error(
+            exc,
+            event="History deletion by stock code failed",
+            context={"stock_code": stock_code},
+        ) from exc
     except Exception as e:
         log_safe_exception(
             logger,
@@ -516,6 +555,13 @@ def get_history_detail(
         
     except HTTPException:
         raise
+    except RepositoryError as e:
+        # Query/persistence failure is never reported as 404 (missing row).
+        raise _http_repository_error(
+            e,
+            event="History detail query failed",
+            context={"record_id": record_id},
+        ) from e
     except Exception as e:
         log_safe_exception(
             logger,

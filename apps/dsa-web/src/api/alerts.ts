@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { assertCamelCasePayload, parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
 import { toCamelCase } from './utils';
 import type {
@@ -13,6 +16,89 @@ import type {
   AlertTriggerListResponse,
 } from '../types/alerts';
 
+type OpenApiAlertRuleItem = components['schemas']['AlertRuleItem'];
+type OpenApiAlertRuleListResponse = components['schemas']['AlertRuleListResponse'];
+type OpenApiAlertDeleteResponse = components['schemas']['AlertDeleteResponse'];
+type OpenApiAlertRuleTestResponse = components['schemas']['AlertRuleTestResponse'];
+type OpenApiAlertTriggerListResponse = components['schemas']['AlertTriggerListResponse'];
+type OpenApiAlertNotificationListResponse = components['schemas']['AlertNotificationListResponse'];
+type _AssertRuleItem = keyof OpenApiAlertRuleItem;
+type _AssertRuleList = keyof OpenApiAlertRuleListResponse;
+type _AssertDelete = keyof OpenApiAlertDeleteResponse;
+type _AssertTest = keyof OpenApiAlertRuleTestResponse;
+type _AssertTriggerList = keyof OpenApiAlertTriggerListResponse;
+type _AssertNotificationList = keyof OpenApiAlertNotificationListResponse;
+const _ruleItemAnchor: _AssertRuleItem = 'alert_type';
+const _ruleListAnchor: _AssertRuleList = 'page_size';
+const _deleteAnchor: _AssertDelete = 'deleted';
+const _testAnchor: _AssertTest = 'rule_id';
+const _triggerListAnchor: _AssertTriggerList = 'page_size';
+const _notificationListAnchor: _AssertNotificationList = 'page_size';
+void _ruleItemAnchor;
+void _ruleListAnchor;
+void _deleteAnchor;
+void _testAnchor;
+void _triggerListAnchor;
+void _notificationListAnchor;
+
+const alertRuleItemSchema = z.object({
+  alertType: z.string(),
+  cooldownActive: z.boolean().nullable().optional(),
+  cooldownPolicy: z.record(z.string(), z.unknown()).nullable().optional(),
+  cooldownUntil: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+  enabled: z.boolean(),
+  id: z.number(),
+  lastTriggeredAt: z.string().nullable().optional(),
+  name: z.string(),
+  notificationPolicy: z.record(z.string(), z.unknown()).nullable().optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  severity: z.string(),
+  source: z.string(),
+  target: z.string(),
+  targetScope: z.string(),
+  updatedAt: z.string().nullable().optional(),
+}).passthrough();
+
+const alertRuleListResponseSchema = z.object({
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+}).passthrough();
+
+const alertDeleteResponseSchema = z.object({
+  deleted: z.number(),
+}).passthrough();
+
+const alertRuleTestResponseSchema = z.object({
+  degradedCount: z.number().optional(),
+  evaluatedCount: z.number().optional(),
+  message: z.string(),
+  observedValue: z.unknown().nullable().optional(),
+  ruleId: z.number(),
+  skippedCount: z.number().optional(),
+  status: z.string(),
+  targetResults: z.array(z.record(z.string(), z.unknown())).optional(),
+  targetScope: z.string().nullable().optional(),
+  triggered: z.boolean(),
+  triggeredCount: z.number().optional(),
+}).passthrough();
+
+const alertTriggerListResponseSchema = z.object({
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+}).passthrough();
+
+const alertNotificationListResponseSchema = z.object({
+  items: z.array(z.record(z.string(), z.unknown())).optional(),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+}).passthrough();
+
 function toAlertRuleItem(data: Record<string, unknown>): AlertRuleItem {
   const item = toCamelCase<AlertRuleItem>(data);
   if ('cooldown_policy' in data) {
@@ -21,16 +107,25 @@ function toAlertRuleItem(data: Record<string, unknown>): AlertRuleItem {
   if ('notification_policy' in data) {
     item.notificationPolicy = data.notification_policy as AlertRuleItem['notificationPolicy'];
   }
-  return item;
+  return assertCamelCasePayload<AlertRuleItem>(item, alertRuleItemSchema, 'AlertRuleItem', 'alerts');
 }
 
 function toAlertRuleListResponse(data: Record<string, unknown>): AlertRuleListResponse {
   const response = toCamelCase<AlertRuleListResponse>(data);
-  if (!Array.isArray(data.items)) {
-    throw new Error('Alert rule list response items must be an array');
+  if (Array.isArray(data.items)) {
+    response.items = data.items.map((item) => toAlertRuleItem(item as Record<string, unknown>));
+  } else if (data.items === undefined) {
+    // OpenAPI marks items optional; consumers always expect an array.
+    response.items = [];
+  } else {
+    response.items = data.items as AlertRuleItem[];
   }
-  response.items = data.items.map((item) => toAlertRuleItem(item as Record<string, unknown>));
-  return response;
+  return assertCamelCasePayload<AlertRuleListResponse>(
+    response,
+    alertRuleListResponseSchema,
+    'AlertRuleListResponse',
+    'alerts',
+  );
 }
 
 function omitUndefined(input: Record<string, unknown>): Record<string, unknown> {
@@ -133,7 +228,12 @@ export const alertsApi = {
 
   async deleteRule(ruleId: number): Promise<AlertDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}`);
-    return toCamelCase<AlertDeleteResponse>(response.data);
+    return parseCamelCasePayload<AlertDeleteResponse>(
+      response.data,
+      alertDeleteResponseSchema,
+      'AlertDeleteResponse',
+      'alerts',
+    );
   },
 
   async enableRule(ruleId: number): Promise<AlertRuleItem> {
@@ -148,20 +248,43 @@ export const alertsApi = {
 
   async testRule(ruleId: number): Promise<AlertRuleTestResponse> {
     const response = await apiClient.post<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}/test`);
-    return toCamelCase<AlertRuleTestResponse>(response.data);
+    return parseCamelCasePayload<AlertRuleTestResponse>(
+      response.data,
+      alertRuleTestResponseSchema,
+      'AlertRuleTestResponse',
+      'alerts',
+    );
   },
 
   async listTriggers(query: AlertTriggerListQuery = {}): Promise<AlertTriggerListResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/alerts/triggers', {
       params: toTriggerListParams(query),
     });
-    return toCamelCase<AlertTriggerListResponse>(response.data);
+    const list = parseCamelCasePayload<AlertTriggerListResponse>(
+      response.data,
+      alertTriggerListResponseSchema,
+      'AlertTriggerListResponse',
+      'alerts',
+    );
+    if (!Array.isArray(list.items)) {
+      return { ...list, items: [] };
+    }
+    return list;
   },
 
   async listNotifications(query: AlertNotificationListQuery = {}): Promise<AlertNotificationListResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/alerts/notifications', {
       params: toNotificationListParams(query),
     });
-    return toCamelCase<AlertNotificationListResponse>(response.data);
+    const list = parseCamelCasePayload<AlertNotificationListResponse>(
+      response.data,
+      alertNotificationListResponseSchema,
+      'AlertNotificationListResponse',
+      'alerts',
+    );
+    if (!Array.isArray(list.items)) {
+      return { ...list, items: [] };
+    }
+    return list;
   },
 };

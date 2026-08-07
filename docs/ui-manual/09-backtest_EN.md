@@ -43,7 +43,7 @@ Example query string:
 ## Steps
 
 1. Open Backtest.  
-2. Optionally enter a code, name, pinyin, or alias in the compact stock field and choose a fuzzy suggestion; also set window/dates and phase as needed.
+2. Optionally enter a code, name, pinyin, or alias in the compact stock field and choose a fuzzy suggestion; also set window, date range, and phase as needed. The single range picker selects the start date first and the end date second.
 3. **Filter** refreshes only the results and metrics below; **Run backtest** generates or recalculates evaluations.
 4. Read **sample count** before accuracy or win rate.  
 5. On empty results, read diagnostics (too few samples, cooling, narrow range)—do not spam-click.
