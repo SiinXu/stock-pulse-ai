@@ -1335,6 +1335,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects total analysis time.'],
     notes: ['Total time ≈ stock count × per-stock time + (count-1) × ANALYSIS_DELAY.'],
   },
+  'settings.system.daily_brief': {
+    title: 'Daily Brief',
+    summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
+    usage: 'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown.',
+    valueNotes: [
+      'Default off keeps existing schedules unchanged.',
+      'Accuracy review is informational and does not auto-trade.',
+    ],
+    impact: ['Affects scheduled brief generation and accuracy review panels.'],
+    notes: ['Requires schedule mode for timed delivery.'],
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: 'Save Context Snapshot',
     summary: 'Controls whether the full analysis history context_snapshot is persisted to the database.',
