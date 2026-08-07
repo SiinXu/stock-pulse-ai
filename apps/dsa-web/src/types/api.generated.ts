@@ -1708,6 +1708,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List registered plugins and lifecycle state
+         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
+         */
+        get: operations["listPlugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable, disable, or hot-reload one plugin
+         * @description Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.
+         */
+        post: operations["updatePluginLifecycle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/accounts": {
         parameters: {
             query?: never;
@@ -7186,6 +7226,115 @@ export interface components {
             win_count: number;
             /** Win Rate Pct */
             win_rate_pct?: number | null;
+        };
+        /**
+         * PluginInfo
+         * @description One registered plugin and its lifecycle state.
+         */
+        PluginInfo: {
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Desired Enabled
+             * @description Persisted operator intent (False means disabled across restarts)
+             */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /**
+             * Id
+             * @description Stable plugin id from the manifest
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Package Root
+             * @description Absolute package directory for external plugins when known
+             */
+            package_root?: string | null;
+            /**
+             * Reloadable
+             * @description True when in-process hot-reload is attempted for this plugin
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginLifecycleRequest
+         * @description POST /api/v1/plugins/{plugin_id}/lifecycle body.
+         */
+        PluginLifecycleRequest: {
+            /**
+             * Action
+             * @description enable/disable toggles runtime state and persistence; reload re-imports code
+             * @enum {string}
+             */
+            action: "enable" | "disable" | "reload";
+        };
+        /**
+         * PluginLifecycleResponse
+         * @description Result of one lifecycle action.
+         */
+        PluginLifecycleResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "enable" | "disable" | "reload";
+            /** Error Code */
+            error_code?: string | null;
+            /** Message */
+            message?: string | null;
+            plugin?: components["schemas"]["PluginInfo"] | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloaded
+             * @default false
+             */
+            reloaded: boolean;
+            /**
+             * Restart Required
+             * @default false
+             */
+            restart_required: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Success */
+            success: boolean;
+        };
+        /**
+         * PluginListResponse
+         * @description GET /api/v1/plugins response.
+         */
+        PluginListResponse: {
+            /** Items */
+            items?: components["schemas"]["PluginInfo"][];
+            /** Total */
+            total: number;
         };
         /** PortfolioAccountCreateRequest */
         PortfolioAccountCreateRequest: {
@@ -15334,6 +15483,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listPlugins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginListResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updatePluginLifecycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginLifecycleResponse"];
+                };
+            };
+            /** @description Invalid lifecycle request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Lifecycle operation failed unexpectedly */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

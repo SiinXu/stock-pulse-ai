@@ -11393,6 +11393,220 @@
         "title": "PerformanceMetrics",
         "type": "object"
       },
+      "PluginInfo": {
+        "additionalProperties": false,
+        "description": "One registered plugin and its lifecycle state.",
+        "properties": {
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "desired_enabled": {
+            "description": "Persisted operator intent (False means disabled across restarts)",
+            "title": "Desired Enabled",
+            "type": "boolean"
+          },
+          "extension_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Extension Points",
+            "type": "array"
+          },
+          "id": {
+            "description": "Stable plugin id from the manifest",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "package_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Absolute package directory for external plugins when known",
+            "title": "Package Root"
+          },
+          "reloadable": {
+            "description": "True when in-process hot-reload is attempted for this plugin",
+            "title": "Reloadable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "builtin",
+              "external"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "source",
+          "state",
+          "desired_enabled",
+          "reloadable"
+        ],
+        "title": "PluginInfo",
+        "type": "object"
+      },
+      "PluginLifecycleRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/v1/plugins/{plugin_id}/lifecycle body.",
+        "properties": {
+          "action": {
+            "description": "enable/disable toggles runtime state and persistence; reload re-imports code",
+            "enum": [
+              "enable",
+              "disable",
+              "reload"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "PluginLifecycleRequest",
+        "type": "object"
+      },
+      "PluginLifecycleResponse": {
+        "additionalProperties": false,
+        "description": "Result of one lifecycle action.",
+        "properties": {
+          "action": {
+            "enum": [
+              "enable",
+              "disable",
+              "reload"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "plugin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "reloaded": {
+            "default": false,
+            "title": "Reloaded",
+            "type": "boolean"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "action",
+          "success",
+          "state"
+        ],
+        "title": "PluginLifecycleResponse",
+        "type": "object"
+      },
+      "PluginListResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/plugins response.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginInfo"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "PluginListResponse",
+        "type": "object"
+      },
       "PortfolioAccountCreateRequest": {
         "properties": {
           "account_type": {
@@ -26710,6 +26924,141 @@
         "summary": "Get Model Pack import status",
         "tags": [
           "ModelPacks"
+        ]
+      }
+    },
+    "/api/v1/plugins": {
+      "get": {
+        "description": "Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.",
+        "operationId": "listPlugins",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List registered plugins and lifecycle state",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{plugin_id}/lifecycle": {
+      "post": {
+        "description": "Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.",
+        "operationId": "updatePluginLifecycle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginLifecycleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid lifecycle request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Lifecycle operation failed unexpectedly"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Enable, disable, or hot-reload one plugin",
+        "tags": [
+          "Plugins"
         ]
       }
     },
