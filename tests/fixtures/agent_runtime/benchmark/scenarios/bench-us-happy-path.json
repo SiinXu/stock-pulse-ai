@@ -1,0 +1,38 @@
+{
+  "id": "bench-us-happy-path",
+  "title": "US single-run happy path",
+  "description": "US-market normal dashboard run with quote + trend tools and hold signal.",
+  "source_case": "financial/us-single-run-normal.json",
+  "market": "US",
+  "profile": "normal",
+  "evaluation": {
+    "financial_task_correctness": {
+      "expect_success": true,
+      "expected_signal": "hold",
+      "require_dashboard": true,
+      "required_fields": [
+        "decision_type",
+        "risk_warning",
+        "confidence_level",
+        "analysis_summary",
+        "stock_name"
+      ],
+      "expected_stock_name_substrings": ["Apple"]
+    },
+    "tool_usage_discipline": {
+      "required_tools": ["get_realtime_quote", "analyze_trend"],
+      "forbidden_tools": [],
+      "expected_stock_code": "AAPL",
+      "max_tool_calls": 4,
+      "require_tool_success": ["get_realtime_quote", "analyze_trend"],
+      "allow_failed_tools": []
+    },
+    "uncertainty_honesty": {
+      "require_risk_warning": true,
+      "allowed_confidence_levels": ["中", "中等", "medium", "med"],
+      "required_substrings": [],
+      "require_nontrivial_data_limitations": false,
+      "forbid_high_confidence": false
+    }
+  }
+}
