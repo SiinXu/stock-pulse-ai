@@ -397,6 +397,10 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 |--------|------|--------|
 | `STOCK_LIST` | Watchlist codes (comma-separated) | - |
 | `ADMIN_AUTH_ENABLED` | Set to `true` to protect the Web UI with an administrator password. Disabling active authentication requires the current password again; a valid session cookie is not sufficient. Generic system-configuration saves and `.env` imports may preserve the current value but cannot toggle it; use the dedicated authentication settings endpoint. Configuration keys must use canonical environment-variable syntax: `[A-Za-z_][A-Za-z0-9_]*`. | `false` |
+| `USE_PROXY` | Enable local proxy (maps `PROXY_HOST`/`PROXY_PORT` to process `http_proxy`/`https_proxy`); editable in Web Settings → System & Security → Web & Logs; skipped on GitHub Actions; full effect usually requires restart | `false` |
+| `PROXY_HOST` | Proxy host (may embed credentials; masked in Settings); only used when `USE_PROXY=true` | `127.0.0.1` |
+| `PROXY_PORT` | Proxy port; only used when `USE_PROXY=true` | `10809` |
+| `HTTP_PROXY` | Standard HTTP proxy URL; prefer over `USE_PROXY` when a full URL/credentials are needed | empty |
 | `MAX_WORKERS` | Concurrent threads | `3` |
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | Inject the daily market context into stock-analysis prompts and soften aggressive buy advice in high-risk/risk-off markets; enabled by default, and market review can still run when this is set to `false` | `true` |

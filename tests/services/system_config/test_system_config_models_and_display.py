@@ -1456,9 +1456,15 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertNotIn("DATABASE_PATH", items)
         self.assertNotIn("SQLITE_WAL_ENABLED", items)
-        self.assertNotIn("USE_PROXY", items)
-        self.assertNotIn("PROXY_HOST", items)
-        self.assertNotIn("PROXY_PORT", items)
+        # USE_PROXY family is registered for Web Settings (system network group).
+        self.assertIn("USE_PROXY", items)
+        self.assertEqual(items["USE_PROXY"]["value"], "true")
+        self.assertIn("PROXY_HOST", items)
+        self.assertTrue(items["PROXY_HOST"]["is_masked"])
+        self.assertEqual(items["PROXY_HOST"]["value"], payload["mask_token"])
+        self.assertIn("PROXY_PORT", items)
+        self.assertEqual(items["PROXY_PORT"]["value"], "10809")
+        self.assertIn("restart_required", items["USE_PROXY"]["schema"]["warning_codes"])
         self.assertIn("LOG_DIR", items)
         self.assertEqual(items["LOG_DIR"]["schema"]["help_key"], "settings.system.LOG_DIR")
 
