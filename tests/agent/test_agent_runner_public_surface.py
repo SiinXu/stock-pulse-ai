@@ -23,6 +23,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     RunLoopResult RuntimeGuardPolicy StageFailureReason StockScope
     ThreadPoolExecutor ToolCall ToolRegistry UsageRecorder annotations
     as_completed bind_runner_tool_completion_guard contextvars dataclass
+    emit_decision emit_model_end emit_model_start emit_phase_end
+    emit_phase_start emit_tool_end emit_tool_start
     execute_runner_tool_call_via_session field get_default_usage_recorder
     has_reserved_explanation_field json log_runtime_guard_event logger logging
     normalize_report_signal_attribution parse_dashboard_json
@@ -75,13 +77,13 @@ EXPECTED_GROUPS = (
         "_runner_loop",
         "_LOOP_FUNCTION_NAMES",
         ("run_agent_loop",),
-        "2d98fc27b7383e57d9fcb3cb04b37b875ad603960264f1ddf2f857a2061aeed7",
+        "383b759e37ff40e3b02fe84210dfae44fafb6a88bd67240d0055d43515954a8a",
     ),
     (
         "_runner_tools",
         "_TOOL_FUNCTION_NAMES",
         ("_execute_tools",),
-        "a4b1b9ee8d52ebdf254b9d941c6cd0bea930196164e589f753a2656ea2ef48d9",
+        "412bbf10da611c42b197601dbd989bfad1f0f0a310144dc4732c14390e8160b5",
     ),
 )
 

@@ -691,6 +691,65 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+
+    "AGENT_OBSERVABILITY_ENABLED": {
+        "title": "Agent Observability Events",
+        "description": (
+            "Emit lightweight structured agent run events (phase/tool/model/decision) "
+            "with trace and span ids into run diagnostics and the run-flow view. Default on."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 705,
+        "help_key": "settings.agent.observability",
+        "examples": [
+            "AGENT_OBSERVABILITY_ENABLED=true",
+            "AGENT_OBSERVABILITY_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Agent Observability",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_OBSERVABILITY_DEEP_PAYLOAD": {
+        "title": "Agent Observability Deep Payload",
+        "description": (
+            "When enabled, capture sanitized tool argument/result previews on agent events. "
+            "Default off. Prompts, API keys, and other secrets remain redacted."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 706,
+        "help_key": "settings.agent.observability",
+        "examples": [
+            "AGENT_OBSERVABILITY_DEEP_PAYLOAD=false",
+            "AGENT_OBSERVABILITY_DEEP_PAYLOAD=true",
+        ],
+        "docs": [
+            {
+                "label": "Agent Observability",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_EVENT_MONITOR_ENABLED": {
         "title": "Event Monitor",
         "description": "Enable background Event Monitor polling in schedule mode.",
