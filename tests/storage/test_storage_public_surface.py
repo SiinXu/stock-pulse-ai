@@ -21,7 +21,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     ApprovalProposalRecord ApprovalRuleRecord
     AlertRuleRecord AlertTriggerRecord AnalysisHistory Any BacktestResult
     BacktestSummary Base Boolean CURRENT_SCHEMA_VERSION Callable Column
-    ConversationMessage ConversationSummary DatabaseManager
+    ConversationMessage ConversationSessionState ConversationSummary DatabaseManager
     DatabaseSchemaMigration Date DateTime DecisionSignalFeedbackRecord
     DecisionSignalMemoryFlagRecord
     DecisionSignalOutcomeRecord DecisionSignalRecord Dict Float ForeignKey
@@ -72,6 +72,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "PortfolioDailySnapshot",
     "PortfolioFxRate",
     "ConversationMessage",
+    "ConversationSessionState",
     "ConversationSummary",
     "AgentProviderTurn",
     "LLMUsage",
@@ -97,7 +98,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "TaskQueueInflightRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "7f736282925460fd74e215b7b8437f7053da41ea0c097143f9d3c3c6564528d6"
+    "3cdd382279fb1112ae458e84b15951fbd14951082aa897c9afc0c6323f61dc84"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -119,6 +120,7 @@ EXPECTED_SCHEMA_MODELS = (
     "PortfolioDailySnapshot",
     "PortfolioFxRate",
     "ConversationMessage",
+    "ConversationSessionState",
     "ConversationSummary",
     "AgentProviderTurn",
     "LLMUsage",
@@ -160,6 +162,7 @@ EXPECTED_SCHEMA_TABLES = (
     "portfolio_daily_snapshots",
     "portfolio_fx_rates",
     "conversation_messages",
+    "conversation_session_states",
     "conversation_summaries",
     "agent_provider_turns",
     "llm_usage",
@@ -299,6 +302,8 @@ EXPECTED_GROUPS = (
         "_CONVERSATION_METHOD_NAMES",
         (
             "save_conversation_message",
+            "save_conversation_user_turn",
+            "get_conversation_session_selected_skill_ids",
             "get_conversation_history",
             "get_visible_conversation_messages",
             "get_conversation_summary",
@@ -311,7 +316,7 @@ EXPECTED_GROUPS = (
             "get_conversation_messages",
             "delete_conversation_session",
         ),
-        "507c839d148e0284b30d5b057c14c2167811e8cd9b736340236ea6378d3f541e",
+        "4cea1a2e30ad9cf7bc2b19ab0f7c622c5d4ca5684d63b78a7aaef666feb9ad50",
     ),
     (
         "_UsageMethods",
