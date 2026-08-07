@@ -1313,7 +1313,8 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Determines which local directories under KRONOS_WEIGHTS_DIR must be present.'],
     notes: ['Changing size after download requires matching weights and a restart.'],
   },
-  'settings.ai_model.KRONOS_WEIGHTS_DIR': {
+  'settings.ai_model.KRONOS_WEIGHTS_DIR': {,
+  'settings.agent.event_impact_context': 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
     title: 'Kronos Weights Directory',
     summary: 'Absolute local root that contains the selected model and tokenizer folders.',
     usage: 'Point to a directory prepared with scripts/download_kronos_weights.py or a manual official HF snapshot copy.',

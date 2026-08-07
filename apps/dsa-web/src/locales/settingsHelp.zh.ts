@@ -1356,7 +1356,8 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['决定 KRONOS_WEIGHTS_DIR 下需要存在哪些子目录。'],
     notes: ['更换规格后需配套权重并重启。'],
   },
-  'settings.ai_model.KRONOS_WEIGHTS_DIR': {
+  'settings.ai_model.KRONOS_WEIGHTS_DIR': {,
+  'settings.agent.event_impact_context': '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
     title: 'Kronos 权重目录',
     summary: '包含所选模型与 tokenizer 子目录的本地绝对路径根目录。',
     usage: '使用 scripts/download_kronos_weights.py 准备，或手动拷贝官方 Hugging Face 产物。',
