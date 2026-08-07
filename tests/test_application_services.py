@@ -303,7 +303,7 @@ def test_plugins_dir_registers_and_loads_external_plugins_in_order(
     _write_external_plugin(tmp_path, "02-healthy", "external.healthy")
     monkeypatch.setenv("PLUGINS_DIR", str(tmp_path))
 
-    services = ApplicationServices()
+    services = ApplicationServices(builtin_plugins=(), plugins_dir=tmp_path)
     services.start_plugins()
 
     assert [result.plugin_id for result in services.external_plugin_results] == [
@@ -331,7 +331,7 @@ def test_explicit_blank_plugins_dir_overrides_environment(tmp_path, monkeypatch)
     _write_external_plugin(tmp_path, "external", "external.disabled")
     monkeypatch.setenv("PLUGINS_DIR", str(tmp_path))
 
-    services = ApplicationServices(plugins_dir="")
+    services = ApplicationServices(builtin_plugins=(), plugins_dir="")
     services.start_plugins()
 
     assert services.external_plugin_results == ()

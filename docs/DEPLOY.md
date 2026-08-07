@@ -513,7 +513,20 @@ git commit -m "Add GitHub Actions workflow"
 git push
 ```
 
-#### 4. 手动测试运行
+#### 4. 先跑 Config Check（推荐）
+
+在跑完整日推前，先验证 Secrets/Variables 是否齐备（**不**跑分析、**不**消耗明显 Token、**不**打印 Secret 值）：
+
+1. 打开 **Actions** → **Config Check** → **Run workflow**
+2. 可选输入：
+   - `strict_notify`：缺通知渠道时也标红失败（默认仅警告）
+   - `probe_llm`：对第一个可识别提供商做一次廉价连通性探测（默认关闭）
+3. 约 1 分钟内在 Job Summary 查看 ✅/❌/⚠️ 清单；缺 LLM Key 或 `STOCK_LIST` 会失败并提示到 Settings 补齐
+4. 本地等价命令：`python scripts/actions_config_check.py`（可选 `--strict-notify` / `--probe-llm`）
+
+通过后再执行下一步日推分析。
+
+#### 5. 手动测试运行（Daily Analysis）
 
 1. 打开仓库页面 → **Actions** 标签
 2. 选择 **"StockPulse Daily Analysis"** workflow
@@ -524,7 +537,7 @@ git push
    - `stocks-only` - 仅股票分析
 5. 点击绿色 **"Run workflow"** 按钮
 
-#### 5. 查看执行日志
+#### 6. 查看执行日志
 
 - Actions 页面可以看到运行历史
 - 点击具体的运行记录查看详细日志

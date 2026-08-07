@@ -487,7 +487,20 @@ git commit -m "Add GitHub Actions workflow"
 git push
 ```
 
-#### 4. Manual Test Run
+#### 4. Run Config Check first (recommended)
+
+Before a full daily analysis, verify Secrets/Variables are ready (**no** analysis run, **no** meaningful token spend, **never** prints secret values):
+
+1. Open **Actions** → **Config Check** → **Run workflow**
+2. Optional inputs:
+   - `strict_notify`: fail when no notification channel is configured (default: warn only)
+   - `probe_llm`: one cheap connectivity call for the first detectable provider (default: off)
+3. Within about a minute, read the Job Summary checklist (✅/❌/⚠️). Missing LLM key or `STOCK_LIST` fails the job and points you to Settings.
+4. Local equivalent: `python scripts/actions_config_check.py` (optional `--strict-notify` / `--probe-llm`)
+
+Only after Config Check passes, run Daily Analysis.
+
+#### 5. Manual Test Run (Daily Analysis)
 
 1. Go to repo page → **Actions** tab
 2. Select **"StockPulse Daily Analysis"** workflow
@@ -498,7 +511,7 @@ git push
    - `stocks-only` - Stock analysis only
 5. Click green **"Run workflow"** button
 
-#### 5. View Execution Logs
+#### 6. View Execution Logs
 
 - Actions page shows run history
 - Click specific run record to view detailed logs

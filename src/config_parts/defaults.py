@@ -38,6 +38,26 @@ class ConfigIssue:
 
 _MANAGED_LITELLM_KEY_PROVIDERS = {"gemini", "vertex_ai", "anthropic", "openai", "deepseek"}
 SUPPORTED_LLM_CHANNEL_PROTOCOLS = ("openai", "anthropic", "gemini", "vertex_ai", "deepseek", "ollama")
+SUPPORTED_LLM_CHANNEL_API_SURFACES = ("chat_completions", "responses")
+_FALLBACK_LITELLM_MODEL_PROVIDERS = _MANAGED_LITELLM_KEY_PROVIDERS | set(SUPPORTED_LLM_CHANNEL_PROTOCOLS) | {
+    "minimax",
+    "cohere",
+    "huggingface",
+    "bedrock",
+    "sagemaker",
+    "azure",
+    "replicate",
+    "together_ai",
+    "palm",
+    "text-completion-openai",
+    "command-r",
+    "groq",
+    "cerebras",
+    "fireworks_ai",
+    "friendliai",
+    "openrouter",
+    "xai",
+}
 _FALSEY_ENV_VALUES = {"0", "false", "no", "off"}
 PROMPT_CACHE_DIAGNOSTICS_LEVELS = {"off", "basic", "debug"}
 TICKFLOW_KLINE_ADJUST_VALUES = {"none", "forward", "backward", "forward_additive", "backward_additive"}
