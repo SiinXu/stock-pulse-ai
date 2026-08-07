@@ -1874,13 +1874,16 @@ class TestOrchestratorExecution(unittest.TestCase):
         fake_result = OrchestratorResult(success=True, content="assistant reply")
 
         with patch.object(orch, "_execute_pipeline", return_value=fake_result):
-            with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
+            with patch(
+                "src.agent.conversation.conversation_manager.add_user_message"
+            ) as add_user_message, patch(
+                "src.agent.conversation.conversation_manager.add_message"
+            ) as add_message:
                 result = orch.chat("hello", "session-1")
 
         self.assertTrue(result.success)
-        self.assertEqual(add_message.call_count, 2)
-        add_message.assert_any_call("session-1", "user", "hello")
-        add_message.assert_any_call("session-1", "assistant", "assistant reply")
+        add_user_message.assert_called_once_with("session-1", "hello", None)
+        add_message.assert_called_once_with("session-1", "assistant", "assistant reply")
 
     def test_chat_persists_failure_message(self):
         from src.agent.orchestrator import OrchestratorResult
