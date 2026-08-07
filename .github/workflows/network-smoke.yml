@@ -43,6 +43,19 @@ jobs:
           set -o pipefail
           python -m pytest -m network -q | tee pytest-network.log
 
+      - name: 📦 Refresh provider contract fixtures (non-blocking)
+        continue-on-error: true
+        env:
+          # Optional: when set in repo secrets, also re-record Tushare Pro daily shape.
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/provider_contracts_refresh
+          python scripts/refresh_provider_fixtures.py \
+            --output-dir /tmp/provider_contracts_refresh \
+            --skip-unavailable \
+            | tee provider-fixtures-refresh.log
+
       - name: 🚀 Run quick smoke (non-blocking)
         continue-on-error: true
         run: |
@@ -57,4 +70,6 @@ jobs:
           path: |
             pytest-network.log
             quick-smoke.log
+            provider-fixtures-refresh.log
+            /tmp/provider_contracts_refresh
           if-no-files-found: ignore
