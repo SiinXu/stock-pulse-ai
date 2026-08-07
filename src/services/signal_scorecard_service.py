@@ -71,11 +71,13 @@ class SignalScorecardService:
         )
 
         threshold = max(1, int(min_samples))
-        rows = self.outcome_repo.list_stats_rows(
+        stats_rows = self.outcome_repo.list_stats_rows(
             engine_version=DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,
             horizons=None,
             statuses=None,
         )
+        # list_stats_rows returns OutcomeStatsRow (outcome + live signal fields).
+        rows = [stats_row.outcome for stats_row in stats_rows]
         completed = [
             row
             for row in rows
