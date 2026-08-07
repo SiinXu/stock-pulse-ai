@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Desktop first-run opens the guided setup wizard on a fresh install, warms local Ollama detection, reveals the main window only after the loading page is ready, and composes runtime detect/start into one-click Model Pack import with actionable failures (no silent multi-GB downloads).
 - [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
 - [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
 - [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.
