@@ -427,6 +427,7 @@ const fieldTitleMapEn = {
   AGENT_EVENT_MONITOR_ENABLED: 'Event Monitor',
   AGENT_EVENT_MONITOR_INTERVAL_MINUTES: 'Event Monitor Interval',
   AGENT_EVENT_ALERT_RULES_JSON: 'Event Alert Rules',
+  AGENT_EVENT_IMPACT_CONTEXT_ENABLED: 'Alert Impact Context',
   MULTIMODAL_AGENT_TOOLS_ENABLED: 'Enable Multimodal Agent Tools',
   MULTIMODAL_FILE_ROOT: 'Multimodal File Root',
   AGENT_CONTEXT_COMPRESSION_ENABLED: 'Agent Context Compression',
