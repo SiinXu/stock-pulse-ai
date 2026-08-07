@@ -1374,3 +1374,35 @@ class InvestmentFrameworkVersionRecord(Base):
             name='uix_investment_framework_version',
         ),
     )
+
+
+class TaskQueueInflightRecord(Base):
+    """Durable checkpoint for process-local in-flight task recovery.
+
+    Execution remains process-local (ADR-004 / ADR-008). This table only records
+    enough state for a single-process restart to requeue safe work or mark
+    non-resumable work as ``interrupted``; it is not a distributed queue.
+    """
+
+    __tablename__ = 'task_queue_inflight'
+
+    task_id = Column(String(64), primary_key=True)
+    kind = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False, index=True)
+    stock_code = Column(String(32))
+    recovery_class = Column(String(32), nullable=False, index=True)
+    dedupe_key = Column(String(128))
+    idempotency_key = Column(String(128))
+    idempotency_fingerprint = Column(String(128))
+    failure_error_code = Column(String(64))
+    none_is_success = Column(Boolean, nullable=False, default=False)
+    metadata_json = Column(Text, nullable=False, default='{}')
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=utc_naive_now,
+        onupdate=utc_naive_now,
+        nullable=False,
+        index=True,
+    )
+

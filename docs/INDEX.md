@@ -61,7 +61,8 @@
 | [Community Intel Agent Tool（英文）](community-intel-tool.md) | Phase A 股票作用域社区情报契约、降级语义、默认目录隔离与验证 |
 | [Agent Soul 行为宪章（英文）](agent-soul.md) | 版本/hash 规则、Single/Multi/Chat 装配、Soul/Persona/Skill 优先级、运行元数据与回滚 |
 | [Bot 平台配置](bot/) | 飞书、钉钉、Discord 等 Bot 配置截图和补充说明 |
-| [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界 |
+| [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界（含 #241 企业事件/影响上下文） |
+| [Alert Center English companion](alerts_EN.md) | Issue #241 后端 V0 英文摘要（企业事件告警与 impact context） |
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
 | [每日简报（历史准确率复盘）](daily-brief.md) | 配置门控的晨间简报：昨日分析、关注列表与基于既有 outcome 存储的诚实准确率复盘（[英文](daily-brief_EN.md)） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |

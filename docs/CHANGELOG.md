@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Config-gated daily brief with historical accuracy review from existing decision-signal, backtest, and skill-outcome stores (honesty-first; default off).
+- [Added] Backend V0 context-aware corporate event alerts (`corporate_event`) evaluate managed intelligence items, attach holdings/watchlist impact context, and enrich alert notifications without new provider calls on the hot path (`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`).
 - [Added] Integrate A-share multi-period financial statements into the existing fundamental pipeline (`financial_report.periods` / `metrics` with formulas / `sufficiency`), with explicit insufficient-fundamentals honesty in analysis prompts and report rendering (issue #235).
 - [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
 - [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
 - [Added] Backtest phase-1 platform honesty: run responses echo `applied_config` (window, min age, candidate limit, engine, neutral band, force, dates), validation failures use stable error codes, insufficient rows persist resolution notes (`missing_daily_bars` / `insufficient_forward_bars`), and the Web backtest page surfaces notes, summary integrity counts, and advanced run options.
 - [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
+- [Added] Recover process-local in-flight task-queue work across restarts: idempotent stock analyses requeue with a recovery marker; non-resumable kinds surface as explicit `interrupted` with `task.interrupted.process_restart` (no silent drop, no fake completion).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
 - [Added] Persist Agent Chat Skill selection per session (refresh/session switch restore; tri-state `skills` omit/empty/explicit; legacy null state preserved). Ported-from: ed848da6.

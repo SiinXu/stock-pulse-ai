@@ -249,6 +249,8 @@ class Config:
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
+    # Attach holdings/watchlist impact context to triggered alert notifications (managed data only).
+    agent_event_impact_context_enabled: bool = True
 
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)
