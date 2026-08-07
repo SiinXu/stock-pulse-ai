@@ -36,7 +36,7 @@ If you only want history, open the clean URL `/research/market` without `action=
 
 1. **Market selector** — use checkboxes for one or more markets, or restore the server default.
 2. **Trigger review** — submit a market-level task.
-3. **Feedback area** — submitting / running / done / failed / timeout.
+3. **Feedback area** — submitting / running / done; failures and timeouts use the global error Toast.
 4. **Review history** — previous market diaries; multi-select delete may be available.
 5. **Report pane** — summary and body for the selected history row.
 6. Optional **run flow** — stage breakdown for debugging.
@@ -59,6 +59,7 @@ In narrower content areas, review history and the report pane stack vertically. 
 | --- | --- | --- |
 | Major indices | Market direction | “Index up = go all-in” |
 | Breadth | Advancers vs decliners | “Breadth always continues” |
+| Market sentiment | 0–100 score with a circular gauge | “A high score means every stock is safe” |
 | Sectors / themes | Who led today | “Every name in a hot sector is chaseable” |
 | Risk summary | What to watch | “Official order ticket” |
 | Data quality | Degradation / session incompleteness | Overconfidence after ignoring it |

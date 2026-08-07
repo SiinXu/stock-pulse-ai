@@ -1,8 +1,9 @@
 import type React from 'react';
+import { useContext, useEffect, useRef } from 'react';
 import { localizeParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { Alert } from './Alert';
-import { Button } from './Button';
+import { ToastProvider } from './ToastProvider';
+import { ToastContext, useToast } from './toastContext';
 
 interface ApiErrorAlertProps {
   error: ParsedApiError;
@@ -13,57 +14,67 @@ interface ApiErrorAlertProps {
   onDismiss?: () => void;
 }
 
-export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
+const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
   error,
-  className = '',
   actionLabel,
   onAction,
   dismissLabel,
   onDismiss,
 }) => {
   const { language, t } = useUiLanguage();
+  const { showToast, dismissToast } = useToast();
   const localizedError = localizeParsedApiError(error, language);
-  const showDetails = localizedError.rawMessage.trim() && localizedError.rawMessage.trim() !== localizedError.message.trim();
+  const onActionRef = useRef(onAction);
+  const onDismissRef = useRef(onDismiss);
+  const hasAction = Boolean(actionLabel && onAction);
+  const hasDismiss = Boolean(onDismiss);
 
-  const action = actionLabel && onAction ? (
-    <Button type="button" variant="danger-subtle" size="compact" onClick={onAction}>
-      {actionLabel}
-    </Button>
-  ) : undefined;
-  const content = (
-    <>
-      <p>{localizedError.message}</p>
-      {showDetails ? (
-        <details className="mt-3 rounded-lg border border-subtle bg-surface-2 px-3 py-2">
-          <summary className="flex min-h-11 cursor-pointer items-center text-xs text-[hsl(var(--color-danger-alert-text))] opacity-90">{t('common.details')}</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-85">
-            {localizedError.rawMessage}
-          </pre>
-        </details>
-      ) : null}
-    </>
-  );
-  return onDismiss ? (
-    <Alert
-      tone="danger"
-      urgent
-      title={localizedError.title}
-      className={className}
-      action={action}
-      dismissLabel={dismissLabel ?? t('common.close')}
-      onDismiss={onDismiss}
-    >
-      {content}
-    </Alert>
+  useEffect(() => {
+    onActionRef.current = onAction;
+  }, [onAction]);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    const toastId = showToast({
+      title: localizedError.title,
+      message: localizedError.message,
+      tone: 'danger',
+      durationMs: 0,
+      closeLabel: dismissLabel ?? t('common.close'),
+      action: hasAction ? {
+        label: actionLabel as string,
+        onClick: () => onActionRef.current?.(),
+        dismissOnClick: false,
+      } : undefined,
+      onDismiss: hasDismiss ? () => onDismissRef.current?.() : undefined,
+    });
+
+    return () => dismissToast(toastId);
+  }, [
+    actionLabel,
+    dismissLabel,
+    dismissToast,
+    hasAction,
+    hasDismiss,
+    localizedError.message,
+    localizedError.title,
+    showToast,
+    t,
+  ]);
+
+  return null;
+};
+
+export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = (props) => {
+  const toastContext = useContext(ToastContext);
+  return toastContext ? (
+    <ApiErrorToast {...props} />
   ) : (
-    <Alert
-      tone="danger"
-      urgent
-      title={localizedError.title}
-      className={className}
-      action={action}
-    >
-      {content}
-    </Alert>
+    <ToastProvider>
+      <ApiErrorToast {...props} />
+    </ToastProvider>
   );
 };

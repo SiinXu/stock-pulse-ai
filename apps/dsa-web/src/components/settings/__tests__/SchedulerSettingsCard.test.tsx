@@ -69,7 +69,7 @@ describe('SchedulerSettingsCard legacy migration notice', () => {
     });
   });
 
-  it('labels the card as deprecated legacy day-batch and documents process ownership', async () => {
+  it('keeps legacy controls compact without repeating migration and ownership explanations', async () => {
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 0, items: [] });
 
     render(
@@ -89,9 +89,12 @@ describe('SchedulerSettingsCard legacy migration notice', () => {
     expect(card.querySelector(':scope > div.grid')).not.toHaveClass('xl:grid-cols-2', 'xl:items-start');
     expect(card.querySelector('dl')).toHaveClass('sm:grid-cols-3');
     expect(screen.getByText('Legacy day-batch schedule')).toBeInTheDocument();
-    expect(screen.getByTestId('scheduler-legacy-track-note')).toBeInTheDocument();
-    expect(screen.getByTestId('scheduler-owner-note')).toBeInTheDocument();
-    expect(screen.getByText(/DSA_SCHEDULED_TASK_OWNER/)).toBeInTheDocument();
+    expect(screen.queryByText(UI_TEXT.en['settings.schedulerDescription'])).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scheduler-legacy-track-note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scheduler-owner-note')).not.toBeInTheDocument();
+    const statusTitle = screen.getByText('Legacy day-batch status');
+    expect(statusTitle.parentElement).toHaveClass('flex', 'items-center', 'justify-between');
+    expect(statusTitle.parentElement).toHaveTextContent('Enabled');
     const notice = await screen.findByTestId('scheduler-migration-notice');
     expect(notice).toBeInTheDocument();
     expect(notice).toHaveTextContent(/Migrate to versioned scheduled tasks/);
