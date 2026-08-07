@@ -35,6 +35,7 @@ import {
   buildSettingsSectionHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
+import { expectAnalyzeButtonReady } from './workbench-fixture';
 
 type JsonObject = Record<string, unknown>;
 
@@ -2071,13 +2072,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(APP_ROUTE_PATHS.researchAnalysis);
-    // Analyze stays disabled until setup/experience readiness resolves.
-    const stockSearch = page.locator('#analysis-workbench-stock-search');
-    await expect(stockSearch).toBeEnabled({ timeout: 15_000 });
-    await stockSearch.fill('AAPL');
-    const analyze = page.getByRole('tabpanel', { name: '发起与批量' })
-      .getByRole('button', { name: '分析', exact: true });
-    await expect(analyze).toBeEnabled({ timeout: 10_000 });
+    // Analyze stays disabled until setup/experience readiness resolves
+    // (`isExperienceModeReady`) and query is non-empty. Shared helper waits on
+    // the real enabled state and sets the controlled input value deterministically.
+    const analyze = await expectAnalyzeButtonReady(page, 'AAPL', {
+      tabPanelName: '发起与批量',
+      buttonName: '分析',
+    });
     await analyze.click();
     const task = page.getByTestId('task-panel-item').filter({ hasText: 'AAPL' });
     await expect(task).toBeVisible();
@@ -2604,10 +2605,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
 
     await page.goto(APP_ROUTE_PATHS.researchAnalysis);
-    const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
-    await input.fill('AAPL');
-    const controls = [page.getByRole('tabpanel', { name: '发起与批量' })
-      .getByRole('button', { name: '分析', exact: true })];
+    // Same readiness + controlled-input path as test 31 before measuring layout.
+    const analyzeControl = await expectAnalyzeButtonReady(page, 'AAPL', {
+      tabPanelName: '发起与批量',
+      buttonName: '分析',
+    });
+    const controls = [analyzeControl];
     for (const control of controls) {
       await expect(control).toBeVisible();
       const box = await control.boundingBox();

@@ -17,6 +17,7 @@ import {
   LEGACY_ROUTE_PATHS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  buildInvestmentFrameworkSettingsHref,
   buildSettingsHref,
 } from '../routes';
 
@@ -75,6 +76,15 @@ describe('buildSettingsHref', () => {
       view: 'connections',
       source: 'task_routing',
     })).toBe(`${APP_ROUTE_PATHS.settings}?section=ai_models&view=connections&from=task_routing`);
+  });
+});
+
+
+describe('buildInvestmentFrameworkSettingsHref', () => {
+  it('deep-links to the Agent Behavior investment framework editor', () => {
+    expect(buildInvestmentFrameworkSettingsHref()).toBe(
+      `${APP_ROUTE_PATHS.settings}?section=agent_behavior&view=investment_framework`,
+    );
   });
 });
 

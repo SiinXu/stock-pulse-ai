@@ -314,6 +314,7 @@ GENERATION_FALLBACK_BACKEND=
 如果不方便用网页版，在 `.env` 文件中配置也非常丝滑，它能让你同时管理多个第三方平台。规则如下：
 
 1. **先声明你有几个渠道**：`LLM_CHANNELS=渠道名称1,渠道名称2`
+2. **可选 API Surface**：`LLM_{渠道名称}_API_SURFACE=chat_completions`（默认）或 `responses`。Responses 要求 `PROTOCOL=openai`，模型不得使用 anthropic/gemini/xai 等 LiteLLM 直连前缀；公开路由别名不变，wire model 使用 `openai/responses/<model>`。
 2. **给每个渠道分别填写配置**（注意全大写）：`LLM_{渠道名}_XXX`
 
 ### 示例：同时配置 DeepSeek 和某中转平台，并设置备用切换
