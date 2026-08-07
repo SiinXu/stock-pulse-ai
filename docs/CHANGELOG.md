@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
+- [Added] Offline financial agent evaluation benchmark (V0): structural metrics over frozen agent_runtime replays, deterministic runner, committed baseline, and bilingual docs (#252).
 - [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
 - [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
 - [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
