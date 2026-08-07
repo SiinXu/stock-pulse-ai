@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   History,
+  SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -810,8 +812,237 @@ const ChatPage: React.FC = () => {
     URL.revokeObjectURL(url);
   }, [language, t]);
 
-  const filteredSessions = sessions.filter((session) =>
-    session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase()),
+  const getCurrentStage = (steps: ProgressStep[]): string => {
+    if (steps.length === 0) return t('chat.connecting');
+    const last = steps[steps.length - 1];
+    if (last.type === 'thinking') return last.message || t('chat.thinking');
+    if (last.type === 'tool_start')
+      return `${last.display_name || last.tool}...`;
+    if (last.type === 'tool_done')
+      return t('chat.completed', { name: last.display_name || last.tool || '' });
+    if (last.type === 'stage_start')
+      return last.message || `Starting ${last.stage || 'stage'}...`;
+    if (last.type === 'stage_done')
+      return getStageDoneLabel(last);
+    if (last.type === 'pipeline_timeout')
+      return last.message || `${last.stage || 'pipeline'} timed out`;
+    if (last.type === 'pipeline_budget_skipped')
+      return getPipelineBudgetSkippedLabel(last);
+    if (last.type === 'generating')
+      return last.message || t('chat.generating');
+    return t('chat.processing');
+  };
+
+  const renderThinkingBlock = (msg: Message) => {
+    if (!msg.thinkingSteps || msg.thinkingSteps.length === 0) return null;
+    const isExpanded = expandedThinking.has(msg.id);
+    const toolSteps = msg.thinkingSteps.filter((s) => s.type === 'tool_done');
+    const totalDuration = toolSteps.reduce(
+      (sum, s) => sum + (s.duration || 0),
+      0,
+    );
+    const summary = t('chat.toolCalls', { count: toolSteps.length, duration: totalDuration.toFixed(1) });
+
+    return (
+      <button
+        onClick={() => toggleThinking(msg.id)}
+        className="flex items-center gap-2 text-xs text-muted-text hover:text-secondary-text transition-colors mb-2 w-full text-left"
+      >
+        <svg
+          className={`w-3 h-3 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+        <span className="flex items-center gap-1.5">
+          <span className="opacity-60">{t('chat.thinkingProcess')}</span>
+          <span className="text-muted-text/50">·</span>
+          <span className="opacity-50">{summary}</span>
+        </span>
+      </button>
+    );
+  };
+
+  const renderThinkingDetails = (steps: ProgressStep[]) => (
+    <div className="mb-3 pl-5 border-l border-border/40 space-y-1.5 animate-fade-in">
+      {steps.map((step, idx) => {
+        let statusClass = 'chat-progress-item-muted';
+        let iconClass = 'chat-progress-dot-muted';
+        let text = '';
+        if (step.type === 'thinking') {
+          text = step.message || t('chat.thinkingStep', { step: step.step || '' });
+          statusClass = 'chat-progress-item-thinking';
+          iconClass = 'chat-progress-dot-thinking';
+        } else if (step.type === 'tool_start') {
+          text = `${step.display_name || step.tool}...`;
+          statusClass = 'chat-progress-item-tool';
+          iconClass = 'chat-progress-dot-tool';
+        } else if (step.type === 'tool_done') {
+          text = `${step.display_name || step.tool} (${step.duration}s)`;
+          statusClass = step.success ? 'chat-progress-item-success' : 'chat-progress-item-danger';
+          iconClass = step.success ? 'chat-progress-dot-success' : 'chat-progress-dot-danger';
+        } else if (step.type === 'stage_start') {
+          text = step.message || `Starting ${step.stage || 'stage'}...`;
+          statusClass = 'chat-progress-item-thinking';
+          iconClass = 'chat-progress-dot-thinking';
+        } else if (step.type === 'stage_done') {
+          const isSuccess = isStageDoneSuccessful(step.status);
+          text = getStageDoneLabel(step);
+          statusClass = isSuccess ? 'chat-progress-item-success' : 'chat-progress-item-danger';
+          iconClass = isSuccess ? 'chat-progress-dot-success' : 'chat-progress-dot-danger';
+        } else if (step.type === 'pipeline_timeout') {
+          text = step.message || `${step.stage || 'pipeline'} timed out`;
+          statusClass = 'chat-progress-item-danger';
+          iconClass = 'chat-progress-dot-danger';
+        } else if (step.type === 'pipeline_budget_skipped') {
+          text = getPipelineBudgetSkippedLabel(step);
+          statusClass = 'chat-progress-item-muted';
+          iconClass = 'chat-progress-dot-muted';
+        } else if (step.type === 'generating') {
+          text = step.message || t('chat.generateAnalysis');
+          statusClass = 'chat-progress-item-generating';
+          iconClass = 'chat-progress-dot-generating';
+        } else {
+          text = step.message || step.type;
+        }
+        return (
+          <div
+            key={idx}
+            className={cn('chat-progress-item', statusClass)}
+          >
+            <span className={cn('chat-progress-dot', iconClass)} />
+            <span className="leading-relaxed">{text}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const filteredSessions = useMemo(
+    () => sessions.filter((session) => session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase())),
+    [sessions, sessionSearch],
+  );
+
+  const sidebarContent = (
+    <>
+      <div className="flex items-center justify-between rounded-lg bg-subtle-soft p-3.5">
+        <h2 className="hidden items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-primary xl:flex">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {t('chat.history')}
+        </h2>
+        <div className="flex items-center">
+          <IconButton
+            onClick={handleStartNewChat}
+            size="navigation"
+            tooltip={false}
+            aria-label={t('chat.newConversation')}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </IconButton>
+        </div>
+      </div>
+      <div className="px-3 pt-3">
+        <SearchInput
+          value={sessionSearch}
+          onChange={(event) => setSessionSearch(event.target.value)}
+          aria-label={t('layout.search')}
+          placeholder={t('common.searchPlaceholder')}
+          wrapperClassName="w-full shadow-none"
+        />
+      </div>
+      <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
+        {sessionsLoading ? (
+          <DashboardStateBlock
+            loading
+            compact
+            title={t('chat.loadingSessions')}
+          />
+        ) : sessionsError ? (
+          <ApiErrorAlert
+            error={sessionsError}
+            actionLabel={t('common.retry')}
+            onAction={() => void loadSessions()}
+          />
+        ) : sessions.length === 0 ? (
+          <DashboardStateBlock
+            compact
+            title={t('chat.emptySessionsTitle')}
+            description={t('chat.emptySessionsDescription')}
+          />
+        ) : filteredSessions.length === 0 ? (
+          <DashboardStateBlock
+            compact
+            title={t('common.noMatches')}
+          />
+        ) : (
+          <div className="space-y-2">
+            {filteredSessions.map((s) => (
+              <div key={s.session_id} className="session-item-row">
+                <Pressable
+                  onClick={() => void handleSwitchSession(s.session_id)}
+                  disabled={sessionLoading}
+                  className={`session-item ${s.session_id === sessionId ? 'active' : ''}`}
+                  aria-label={t('chat.switchSession', { title: s.title })}
+                  aria-current={s.session_id === sessionId ? 'page' : undefined}
+                >
+                  <div className="content">
+                    <span className="title">{s.title}</span>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="meta">
+                        {t('chat.sessionMessages', { count: s.message_count })}
+                      </span>
+                      {s.last_active && (
+                        <>
+                          <span className="separator" />
+                          <span className="meta">
+                            {formatUiDateTime(s.last_active, language, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </Pressable>
+                <IconButton
+                  variant="danger"
+                  size="navigation"
+                  tooltip={false}
+                  className="delete-btn"
+                  onClick={() => {
+                    setDeleteConfirmId(s.session_id);
+                    setDeleteError(null);
+                  }}
+                  disabled={sessionLoading}
+                  aria-label={t('chat.deleteSession', { title: s.title })}
+                >
+                  <Trash2 aria-hidden="true" />
+                </IconButton>
+              </div>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+    </>
   );
 
   const selectedSkillSummary = selectedSkillIds.length > 0
@@ -1060,47 +1291,202 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
-          <ChatComposer
-            language={language}
-            t={t}
-            sessionError={sessionError}
-            sessionLoading={sessionLoading}
-            chatError={chatError}
-            lastFailedRequest={lastFailedRequest}
-            onRetryLastStream={() => void retryLastStream()}
-            isFollowUpContextLoading={isFollowUpContextLoading}
-            contextCompressionEnabled={contextCompressionEnabled}
-            contextCompressionLoaded={contextCompressionLoaded}
-            contextCompressionSaving={contextCompressionSaving}
-            contextCompressionError={contextCompressionError}
-            onContextCompressionChange={(next) => void updateContextCompressionEnabled(next)}
-            skills={skills}
-            selectedSkillIds={selectedSkillIds}
-            selectedSkillIdSet={selectedSkillIdSet}
-            skillLimitReached={skillLimitReached}
-            selectedSkillSummary={selectedSkillSummary}
-            mobileSkillPickerOpen={mobileSkillPickerOpen}
-            onMobileSkillPickerOpenChange={setMobileSkillPickerOpen}
-            skillPickerRef={skillPickerRef}
-            showSkillDesc={showSkillDesc}
-            onShowSkillDesc={setShowSkillDesc}
-            onToggleSkill={toggleSkillSelection}
-            onClearSkills={() => setSelectedSkillIds([])}
-            activeStockCode={activeStockCode}
-            stockInWatchlist={Boolean(activeStockCode && stockInWatchlist(activeStockCode))}
-            isWatchlistActioning={isWatchlistActioning}
-            watchlistMessage={watchlistMessage}
-            onToggleWatchlist={() => {
-              if (activeStockCode) void handleToggleWatchlist(activeStockCode);
-            }}
-            input={input}
-            onInputChange={setInput}
-            onKeyDown={handleKeyDown}
-            loading={loading}
-            isSkillsLoading={isSkillsLoading}
-            onStop={() => stopStream()}
-            onSend={() => handleSend()}
-          />
+          {/* Input area */}
+          <div className="relative z-20 border-t border-subtle bg-card/88 p-4 md:p-6">
+            <div className="space-y-3">
+              {sessionError ? (
+                <ApiErrorAlert error={sessionError} />
+              ) : null}
+              {sessionLoading ? (
+                <InlineAlert
+                  variant="info"
+                  size="compact"
+                  title={t('chat.loadingSessions')}
+                  message={t('common.loading')}
+                />
+              ) : null}
+              {chatError ? (
+                <ApiErrorAlert
+                  error={chatError}
+                  actionLabel={lastFailedRequest ? t('common.retry') : undefined}
+                  onAction={lastFailedRequest ? () => void retryLastStream() : undefined}
+                />
+              ) : null}
+              {isFollowUpContextLoading ? (
+                <InlineAlert
+                  variant="info"
+                  size="compact"
+                  title={t('chat.followUpLoadingTitle')}
+                  message={t('chat.followUpLoadingMessage')}
+                />
+              ) : null}
+              <div data-testid="context-compression-settings" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-1">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">{t('chat.contextCompression')}</span>
+                  <span className="ml-2 text-xs text-muted-text">{t('chat.contextCompressionDescription')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {contextCompressionSaving ? (
+                    <span className="text-xs text-muted-text">{t('chat.saving')}</span>
+                  ) : null}
+                  <Switch
+                    checked={contextCompressionEnabled}
+                    onCheckedChange={(next) => void updateContextCompressionEnabled(next)}
+                    aria-label={t('chat.contextCompression')}
+                    disabled={!contextCompressionLoaded || contextCompressionSaving}
+                    visualTestId="context-compression-switch-visual"
+                  />
+                </div>
+              </div>
+              {contextCompressionError ? (
+                <InlineAlert
+                  variant="danger"
+                  size="compact"
+                  title={t('chat.contextCompressionUnsaved')}
+                  message={contextCompressionError}
+                />
+              ) : null}
+              {skills.length > 0 && (
+                <div className="relative space-y-2" ref={skillPickerRef}>
+                  <button
+                    type="button"
+                    className="home-surface-button flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs text-foreground !shadow-none"
+                    aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
+                    aria-expanded={mobileSkillPickerOpen}
+                    aria-controls="chat-skill-picker-panel"
+                    onClick={() => setMobileSkillPickerOpen((open) => !open)}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                      <span className="flex-shrink-0 font-medium">{t('chat.strategy')}</span>
+                      <span className="truncate text-xs text-muted-text">{selectedSkillSummary}</span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'h-4 w-4 flex-shrink-0 text-muted-text transition-transform',
+                        mobileSkillPickerOpen ? 'rotate-180' : '',
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <div
+                    id="chat-skill-picker-panel"
+                    data-testid="chat-skill-picker-panel"
+                    className={cn(
+                      mobileSkillPickerOpen ? 'flex' : 'hidden',
+                      'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
+                    )}
+                  >
+                    <Checkbox
+                      name="general-analysis"
+                      value=""
+                      checked={selectedSkillIds.length === 0}
+                      onChange={() => setSelectedSkillIds([])}
+                      containerClassName="group min-h-8 gap-1.5 text-sm"
+                      label={(
+                        <span
+                          className={`text-sm transition-colors ${selectedSkillIds.length === 0 ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
+                        >
+                          {t('chat.generalAnalysis')}
+                        </span>
+                      )}
+                    />
+                    {skills.map((s) => {
+                      const checked = selectedSkillIdSet.has(s.id);
+                      const disabled = !checked && skillLimitReached;
+                      const display = getStrategyDisplay(s, language);
+                      return (
+                        <div
+                          key={s.id}
+                          className={`flex min-h-8 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          onMouseEnter={() => setShowSkillDesc(s.id)}
+                          onMouseLeave={() => setShowSkillDesc(null)}
+                        >
+                          <Checkbox
+                            name="skills"
+                            value={s.id}
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => toggleSkillSelection(s.id)}
+                            containerClassName="min-h-8 gap-1.5"
+                            label={(
+                              <span
+                                className={`text-sm transition-colors ${checked ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
+                              >
+                                {display.name}
+                              </span>
+                            )}
+                          />
+                          {showSkillDesc === s.id && s.description && (
+                            <div className="skill-desc-tooltip">
+                              <p className="skill-title">{display.name}</p>
+                              <p>{display.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+            {activeStockCode && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-text font-mono">{activeStockCode}</span>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  isLoading={isWatchlistActioning}
+                  onClick={() => void handleToggleWatchlist(activeStockCode)}
+                  className="text-xs"
+                >
+                  {stockInWatchlist(activeStockCode) ? t('chat.removeWatchlist') : t('chat.addWatchlist')}
+                </Button>
+                {watchlistMessage && (
+                  <span className="text-xs text-secondary-text animate-in fade-in">{watchlistMessage}</span>
+                )}
+              </div>
+            )}
+
+              <div className="flex items-end gap-3">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  aria-label={t('chat.messageInput')}
+                  placeholder={t('chat.inputPlaceholder')}
+                  disabled={loading || sessionLoading}
+                  rows={1}
+                  className="flex-1 min-h-11 max-h-50 rounded-sm border border-border bg-transparent px-3 py-2 text-base placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+                  style={{ height: 'auto' }}
+                  onInput={(e) => {
+                    const t = e.target as HTMLTextAreaElement;
+                    t.style.height = 'auto';
+                    t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
+                  }}
+                />
+                {loading ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => stopStream()}
+                    aria-label={t('chat.stop')}
+                    className="flex-shrink-0"
+                  >
+                    {t('chat.stop')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleSend()}
+                    disabled={!input.trim() || isFollowUpContextLoading || isSkillsLoading || sessionLoading}
+                    className="btn-primary flex-shrink-0"
+                  >
+                    {t('chat.send')}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         </Surface>
       </div>
     </div>

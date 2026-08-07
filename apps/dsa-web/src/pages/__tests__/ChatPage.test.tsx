@@ -297,6 +297,9 @@ describe('ChatPage', () => {
     );
     expect(screen.getByTestId('chat-session-trigger')).toHaveClass('xl:hidden');
     expect(screen.getByTestId('chat-session-trigger')).not.toHaveClass('md:hidden');
+    const historyHeader = screen.getByRole('heading', { name: '历史对话' }).parentElement;
+    expect(historyHeader).toHaveClass('rounded-lg');
+    expect(historyHeader).not.toHaveClass('border-b', 'border-subtle');
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
   });
@@ -353,7 +356,7 @@ describe('ChatPage', () => {
     expect(researchSurface).not.toHaveClass('border');
   });
 
-  it('renders the session retry as an overlaid icon and removes the details divider', async () => {
+  it('renders the session retry inside the error toast', async () => {
     mockStoreState.sessionsError = createParsedApiError({
       title: '历史记录加载失败',
       message: '无法加载历史记录',
@@ -370,9 +373,9 @@ describe('ChatPage', () => {
     const retry = await screen.findByRole('button', { name: '重试' });
     const alert = screen.getByText('历史记录加载失败').closest('[role="alert"]');
 
-    expect(retry).toHaveAttribute('data-control', 'icon-button');
-    expect(retry.parentElement).toHaveClass('absolute', 'right-2', 'top-2');
-    expect(alert?.parentElement).toHaveClass('[&_details]:border-t-0', '[&_details]:pt-0');
+    expect(retry).toHaveAttribute('data-control', 'button');
+    expect(retry).toHaveAttribute('data-variant', 'ghost');
+    expect(alert?.closest('[data-overlay-root="toast"]')).not.toBeNull();
   });
 
   it('uses the shared mobile history drawer and restores focus after Escape', async () => {
@@ -1204,10 +1207,9 @@ describe('ChatPage', () => {
     const retry = await screen.findByRole('button', { name: '重试' });
     const alert = screen.getByText('请求失败').closest('[role="alert"]');
 
-    expect(retry).toHaveAttribute('data-control', 'icon-button');
-    expect(retry).toHaveAttribute('data-variant', 'danger');
-    expect(retry.parentElement).toHaveClass('absolute', 'right-2', 'top-2');
-    expect(alert).toHaveClass('pr-12', '[&>div>div]:w-full', '[&_details]:w-full');
+    expect(retry).toHaveAttribute('data-control', 'button');
+    expect(retry).toHaveAttribute('data-variant', 'ghost');
+    expect(alert?.closest('[data-overlay-root="toast"]')).not.toBeNull();
     fireEvent.click(retry);
 
     expect(mockRetryLastStream).toHaveBeenCalledTimes(1);

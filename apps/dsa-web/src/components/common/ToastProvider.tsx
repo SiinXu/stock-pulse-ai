@@ -30,10 +30,10 @@ const DEFAULT_TOAST_DURATION_MS = 5000;
 let toastSequence = 0;
 
 const TOAST_TONE_STYLES: Record<ToastTone, string> = {
-  info: 'border-info/25',
-  success: 'border-success/25',
-  warning: 'border-warning/25',
-  danger: 'border-danger/25',
+  info: 'border-info/25 bg-info/10',
+  success: 'border-success/25 bg-success/10',
+  warning: 'border-warning/25 bg-warning/10',
+  danger: 'border-danger/25 bg-danger/10',
 };
 
 const TOAST_ICON_STYLES: Record<ToastTone, string> = {
@@ -53,7 +53,7 @@ const TOAST_ICONS = {
 const ToastItem: React.FC<{
   toast: ToastRecord;
   closeLabel: string;
-  onDismiss: (id: string) => void;
+  onDismiss: (toast: ToastRecord) => void;
 }> = ({ toast, closeLabel, onDismiss }) => {
   const Icon = TOAST_ICONS[toast.tone];
   const [isHovered, setIsHovered] = useState(false);
@@ -62,9 +62,9 @@ const ToastItem: React.FC<{
 
   useEffect(() => {
     if (toast.durationMs <= 0 || isTimerPaused) return undefined;
-    const timeout = window.setTimeout(() => onDismiss(toast.id), toast.durationMs);
+    const timeout = window.setTimeout(() => onDismiss(toast), toast.durationMs);
     return () => window.clearTimeout(timeout);
-  }, [isTimerPaused, onDismiss, toast.durationMs, toast.id]);
+  }, [isTimerPaused, onDismiss, toast]);
 
   return (
     <div
@@ -81,37 +81,37 @@ const ToastItem: React.FC<{
         }
       }}
       className={cn(
-        'pointer-events-auto flex min-w-0 items-start gap-3 rounded-lg border bg-elevated p-3 text-foreground shadow-soft-card-strong',
+        'pointer-events-auto flex min-w-0 items-center gap-2.5 rounded-lg border px-3 py-2.5 text-foreground shadow-soft-card-strong',
         TOAST_TONE_STYLES[toast.tone],
       )}
     >
-      <Icon className={cn('mt-1 h-4 w-4 shrink-0', TOAST_ICON_STYLES[toast.tone])} aria-hidden="true" />
+      <Icon className={cn('h-5 w-5 shrink-0', TOAST_ICON_STYLES[toast.tone])} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">{toast.title}</p>
-        {toast.message ? <div className="mt-1 break-words text-sm text-secondary-text">{toast.message}</div> : null}
-        {toast.action ? (
-          <div className="mt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="compact"
-              onClick={() => {
-                toast.action?.onClick();
-                if (toast.action?.dismissOnClick !== false) onDismiss(toast.id);
-              }}
-            >
-              {toast.action.label}
-            </Button>
-          </div>
-        ) : null}
+        {toast.message ? <div className="mt-0.5 break-words text-xs leading-4 text-secondary-text">{toast.message}</div> : null}
       </div>
+      {toast.action ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="default"
+          className="shrink-0 bg-foreground/5 text-foreground hover:bg-foreground/10"
+          onClick={() => {
+            toast.action?.onClick();
+            if (toast.action?.dismissOnClick !== false) onDismiss(toast);
+          }}
+        >
+          {toast.action.label}
+        </Button>
+      ) : null}
       <IconButton
         type="button"
         variant="ghost"
         size="compact"
-        aria-label={closeLabel}
+        aria-label={toast.closeLabel ?? closeLabel}
         tooltip={false}
-        onClick={() => onDismiss(toast.id)}
+        className="shrink-0"
+        onClick={() => onDismiss(toast)}
       >
         <X aria-hidden="true" />
       </IconButton>
@@ -127,6 +127,10 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children, maxVisib
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
   const clearToasts = useCallback(() => setToasts([]), []);
+  const handleToastDismiss = useCallback((toast: ToastRecord) => {
+    dismissToast(toast.id);
+    toast.onDismiss?.();
+  }, [dismissToast]);
   const showToast = useCallback((input: ToastInput) => {
     toastSequence += 1;
     const id = `toast-${toastSequence}`;
@@ -155,7 +159,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children, maxVisib
             key={toast.id}
             toast={toast}
             closeLabel={t('common.close')}
-            onDismiss={dismissToast}
+            onDismiss={handleToastDismiss}
           />
         ))}
       </ToastViewport>
