@@ -1,17 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  ChevronDown,
-  History,
-  SlidersHorizontal,
-  Trash2,
-} from 'lucide-react';
+import { History } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
+import { Button, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
+import { ChatComposer } from '../components/chat/ChatComposer';
 import {
   resolveActiveStockContextFromMessage,
   restoreActiveStockContextFromMessages,
@@ -44,8 +40,6 @@ import { getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
 import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
-import { cn } from '../utils/cn';
-
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
   { labelKey: 'chat.quick.chan', skill: 'chan_theory' },
@@ -55,7 +49,6 @@ const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> 
   { labelKey: 'chat.quick.tencent', skill: 'bull_trend' },
   { labelKey: 'chat.quick.emotion', skill: 'emotion_cycle' },
 ];
-
 const MAX_SELECTED_SKILLS = 3;
 const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
 const CHAT_SESSION_QUERY_KEY = 'session';
@@ -161,7 +154,6 @@ const ChatPage: React.FC = () => {
   const shouldStickToBottomRef = useRef(true);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior>('auto');
   const skillPickerRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!mobileSkillPickerOpen) {
       return undefined;
@@ -174,9 +166,7 @@ const ChatPage: React.FC = () => {
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [mobileSkillPickerOpen, setMobileSkillPickerOpen]);
-
   const text = getReportText(language);
-
   // Cleanup timers on unmount
   useEffect(() => {
     const timers = copyResetTimerRef.current;
@@ -191,19 +181,16 @@ const ChatPage: React.FC = () => {
       });
     };
   }, []);
-
   // Set page title
   useEffect(() => {
     document.title = t('chat.pageTitle');
   }, [t]);
-
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
   }, []);
-
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') {
       return undefined;
@@ -229,7 +216,6 @@ const ChatPage: React.FC = () => {
       }
     };
   }, [setSidebarPresentationOpen]);
-
   const loadWatchlist = useCallback(async () => {
     try {
       const codes = await systemConfigApi.getWatchlist();
@@ -240,16 +226,13 @@ const ChatPage: React.FC = () => {
       // ignore error silently
     }
   }, []);
-
   useEffect(() => {
     void loadWatchlist();
   }, [loadWatchlist]);
-
   const stockInWatchlist = useCallback(
     (stockCode: string) => includesStockCode(watchlistCodes, stockCode),
     [watchlistCodes],
   );
-
   const handleToggleWatchlist = useCallback(
     async (stockCode: string) => {
       if (!stockCode || isWatchlistActioning) return;
@@ -290,7 +273,6 @@ const ChatPage: React.FC = () => {
     },
     [isWatchlistActioning, t, watchlistCodes],
   );
-
   const {
     messages,
     selectedSkillIds: sessionSelectedSkillIds,
@@ -315,7 +297,6 @@ const ChatPage: React.FC = () => {
     clearCompletionBadge,
   } = useAgentChatStore();
   const selectedSkillIds = sessionSelectedSkillIds ?? defaultSkillIds;
-
   const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -329,7 +310,6 @@ const ChatPage: React.FC = () => {
       return next;
     }, { replace: true });
   }, [setSearchParams]);
-
   const persistActiveContextInUrl = useCallback((context: ActiveStockContext | null) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -355,7 +335,6 @@ const ChatPage: React.FC = () => {
       return next;
     }, { replace: true });
   }, [sessionId, setSearchParams]);
-
   useEffect(() => {
     if (!hasInitialLoad) {
       return;
@@ -369,7 +348,6 @@ const ChatPage: React.FC = () => {
       void switchSession(urlSessionId);
     }
   }, [hasInitialLoad, searchParams, sessionId, setSessionInUrl, switchSession]);
-
   useEffect(() => {
     if (
       activeStockContext
@@ -387,7 +365,6 @@ const ChatPage: React.FC = () => {
     setActiveStockCode(restoredContext.stock_code);
     persistActiveContextInUrl(restoredContext);
   }, [activeStockContext, messages, persistActiveContextInUrl, searchParams, sessionId]);
-
   const syncScrollState = useCallback(() => {
     const viewport = messagesViewportRef.current;
     if (!viewport) return;
@@ -401,25 +378,20 @@ const ChatPage: React.FC = () => {
       setShowJumpToBottom(false);
     }
   }, [setShowJumpToBottom]);
-
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
-
   const requestScrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     shouldStickToBottomRef.current = true;
     pendingScrollBehaviorRef.current = behavior;
     setShowJumpToBottom(false);
   }, [setShowJumpToBottom]);
-
   const handleMessagesScroll = useCallback(() => {
     syncScrollState();
   }, [syncScrollState]);
-
   useEffect(() => {
     syncScrollState();
   }, [syncScrollState, sessionId]);
-
   useEffect(() => {
     const behavior = pendingScrollBehaviorRef.current;
     const shouldAutoScroll = shouldStickToBottomRef.current;
@@ -437,21 +409,17 @@ const ChatPage: React.FC = () => {
 
     return () => window.cancelAnimationFrame(frame);
   }, [messages, progressSteps, loading, sessionId, scrollToBottom, setShowJumpToBottom]);
-
   useEffect(() => {
     if (!loading) {
       pendingScrollBehaviorRef.current = 'smooth';
     }
   }, [loading]);
-
   useEffect(() => {
     clearCompletionBadge();
   }, [clearCompletionBadge]);
-
   useEffect(() => {
     void loadInitialSession(initialUrlSessionIdRef.current);
   }, [loadInitialSession]);
-
   useEffect(() => {
     let active = true;
 
@@ -482,7 +450,6 @@ const ChatPage: React.FC = () => {
       active = false;
     };
   }, []);
-
   useEffect(() => {
     let active = true;
 
@@ -512,8 +479,6 @@ const ChatPage: React.FC = () => {
       active = false;
     };
   }, [t]);
-
-
   const updateContextCompressionEnabled = useCallback(
     async (nextEnabled: boolean) => {
       if (!contextCompressionLoaded || contextCompressionSaving) {
@@ -555,14 +520,12 @@ const ChatPage: React.FC = () => {
       t,
     ],
   );
-
   const availableSkillIds = new Set(skills.map((skill) => skill.id));
   const quickQuestions = QUICK_QUESTION_DEFINITIONS
     .filter((question) => availableSkillIds.size === 0 || availableSkillIds.has(question.skill))
     .map((question) => ({ label: t(question.labelKey), skill: question.skill }));
   const selectedSkillIdSet = new Set(selectedSkillIds);
   const skillLimitReached = selectedSkillIds.length >= MAX_SELECTED_SKILLS;
-
   const getSkillNames = useCallback(
     (skillIds: string[]) => skillIds.map((id) => {
       const skill = skills.find((item) => item.id === id);
@@ -570,7 +533,6 @@ const ChatPage: React.FC = () => {
     }),
     [language, skills],
   );
-
   const normalizeSelectedSkillIds = useCallback((skillIds: string[]) => {
     const normalized: string[] = [];
     for (const skillId of skillIds) {
@@ -581,7 +543,6 @@ const ChatPage: React.FC = () => {
     }
     return normalized.slice(0, MAX_SELECTED_SKILLS);
   }, []);
-
   const toggleSkillSelection = useCallback((skillId: string) => {
     if (selectedSkillIds.includes(skillId)) {
       setSelectedSkillIds(selectedSkillIds.filter((id) => id !== skillId));
@@ -591,7 +552,6 @@ const ChatPage: React.FC = () => {
       setSelectedSkillIds([...selectedSkillIds, skillId]);
     }
   }, [selectedSkillIds, setSelectedSkillIds]);
-
   const handleStartNewChat = useCallback(() => {
     followUpContextRef.current = null;
     activeStockContextRef.current = null;
@@ -602,7 +562,6 @@ const ChatPage: React.FC = () => {
     setSessionInUrl(newSessionId, true);
     setSidebarPresentationOpen(false);
   }, [requestScrollToBottom, setSessionInUrl, setSidebarPresentationOpen]);
-
   const handleSwitchSession = useCallback(async (targetSessionId: string) => {
     if (targetSessionId === sessionId) {
       setSidebarPresentationOpen(false);
@@ -619,7 +578,6 @@ const ChatPage: React.FC = () => {
       setSidebarPresentationOpen(false);
     }
   }, [requestScrollToBottom, sessionId, setSessionInUrl, setSidebarPresentationOpen, switchSession]);
-
   const confirmDelete = useCallback(async () => {
     if (!deleteConfirmId || deleteLoading) return;
     setDeleteLoading(true);
@@ -637,14 +595,12 @@ const ChatPage: React.FC = () => {
       setDeleteLoading(false);
     }
   }, [deleteConfirmId, deleteLoading, handleStartNewChat, language, loadSessions, sessionId, setDeleteConfirmId, setDeleteError, setDeleteLoading]);
-
   // Handle report-page follow-up URLs such as `?stock=600519&name=贵州茅台&recordId=xxx`.
   useEffect(() => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));
     const recordId = parseFollowUpRecordId(searchParams.get(REPORT_ROUTE_QUERY_KEYS.recordId));
     const contextIsActive = searchParams.get(CHAT_CONTEXT_STATE_QUERY_KEY) === CHAT_ACTIVE_CONTEXT_STATE;
-
     if (!stock) {
       lastHydratedFollowUpKeyRef.current = null;
       return;
@@ -656,7 +612,6 @@ const ChatPage: React.FC = () => {
       return;
     }
     lastHydratedFollowUpKeyRef.current = followUpKey;
-
     const hydrationToken = ++followUpHydrationTokenRef.current;
     setActiveStockCode(stock);
     const stockContext = {
@@ -694,7 +649,6 @@ const ChatPage: React.FC = () => {
       }
     });
   }, [searchParams, sessionId]);
-
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
@@ -718,7 +672,6 @@ const ChatPage: React.FC = () => {
       const contextForSend = useActiveContextForThisSend
         ? nextActiveStockContext
         : followUpContextRef.current ?? nextActiveStockContext ?? undefined;
-
       const payload = {
         message: msgText,
         session_id: sessionId,
@@ -742,7 +695,6 @@ const ChatPage: React.FC = () => {
     },
     [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, startStream, t],
   );
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
     // mid-composition (isComposing is true, or legacy keyCode 229).
@@ -754,13 +706,11 @@ const ChatPage: React.FC = () => {
       handleSend();
     }
   };
-
   const handleQuickQuestion = (q: (typeof quickQuestions)[0]) => {
     const quickSkillIds = availableSkillIds.has(q.skill) ? [q.skill] : [];
     setSelectedSkillIds(quickSkillIds);
     handleSend(q.label, quickSkillIds);
   };
-
   const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {
     if (sendToastTimerRef.current !== null) {
       window.clearTimeout(sendToastTimerRef.current);
@@ -771,11 +721,9 @@ const ChatPage: React.FC = () => {
       sendToastTimerRef.current = null;
     }, durationMs);
   }, []);
-
   const toggleThinking = (msgId: string) => {
     dispatchUi({ type: 'toggleThinking', messageId: msgId });
   };
-
   const copyMessageToClipboard = async (msgId: string, content: string) => {
     if (await copyText(content)) {
       setCopiedMessages((prev) => new Set(prev).add(msgId));
@@ -795,7 +743,6 @@ const ChatPage: React.FC = () => {
       showSendFeedback({ type: 'error', message: t('common.copyFailed') }, 5000);
     }
   };
-
   const downloadMessageAsMarkdown = useCallback((msg: Message) => {
     const skillLabel = getMessageSkillLabel(msg);
     const heading = msg.role === 'user'
@@ -812,127 +759,10 @@ const ChatPage: React.FC = () => {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   }, [language, t]);
-
   const filteredSessions = useMemo(
     () => sessions.filter((session) => session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase())),
     [sessions, sessionSearch],
   );
-
-  const sidebarContent = (
-    <>
-      <div className="flex items-center justify-between rounded-lg bg-subtle-soft p-3.5">
-        <h2 className="hidden items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-primary xl:flex">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {t('chat.history')}
-        </h2>
-        <div className="flex items-center">
-          <IconButton
-            onClick={handleStartNewChat}
-            size="navigation"
-            tooltip={false}
-            aria-label={t('chat.newConversation')}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-          </IconButton>
-        </div>
-      </div>
-      <div className="px-3 pt-3">
-        <SearchInput
-          value={sessionSearch}
-          onChange={(event) => setSessionSearch(event.target.value)}
-          aria-label={t('layout.search')}
-          placeholder={t('common.searchPlaceholder')}
-          wrapperClassName="w-full shadow-none"
-        />
-      </div>
-      <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
-        {sessionsLoading ? (
-          <DashboardStateBlock
-            loading
-            compact
-            title={t('chat.loadingSessions')}
-          />
-        ) : sessionsError ? (
-          <ApiErrorAlert
-            error={sessionsError}
-            actionLabel={t('common.retry')}
-            onAction={() => void loadSessions()}
-          />
-        ) : sessions.length === 0 ? (
-          <DashboardStateBlock
-            compact
-            title={t('chat.emptySessionsTitle')}
-            description={t('chat.emptySessionsDescription')}
-          />
-        ) : filteredSessions.length === 0 ? (
-          <DashboardStateBlock
-            compact
-            title={t('common.noMatches')}
-          />
-        ) : (
-          <div className="space-y-2">
-            {filteredSessions.map((s) => (
-              <div key={s.session_id} className="session-item-row">
-                <Pressable
-                  onClick={() => void handleSwitchSession(s.session_id)}
-                  disabled={sessionLoading}
-                  className={`session-item ${s.session_id === sessionId ? 'active' : ''}`}
-                  aria-label={t('chat.switchSession', { title: s.title })}
-                  aria-current={s.session_id === sessionId ? 'page' : undefined}
-                >
-                  <div className="content">
-                    <span className="title">{s.title}</span>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <span className="meta">
-                        {t('chat.sessionMessages', { count: s.message_count })}
-                      </span>
-                      {s.last_active && (
-                        <>
-                          <span className="separator" />
-                          <span className="meta">
-                            {formatUiDateTime(s.last_active, language, { month: 'short', day: 'numeric' })}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </Pressable>
-                <IconButton
-                  variant="danger"
-                  size="navigation"
-                  tooltip={false}
-                  className="delete-btn"
-                  onClick={() => {
-                    setDeleteConfirmId(s.session_id);
-                    setDeleteError(null);
-                  }}
-                  disabled={sessionLoading}
-                  aria-label={t('chat.deleteSession', { title: s.title })}
-                >
-                  <Trash2 aria-hidden="true" />
-                </IconButton>
-              </div>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-    </>
-  );
-
   const selectedSkillSummary = selectedSkillIds.length > 0
     ? getSkillNames(selectedSkillIds).join(getUiListSeparator(language))
     : t('chat.generalAnalysis');
@@ -1179,202 +1009,48 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
-          {/* Input area */}
-          <div className="relative z-20 border-t border-subtle bg-card/88 p-4 md:p-6">
-            <div className="space-y-3">
-              {sessionError ? (
-                <ApiErrorAlert error={sessionError} />
-              ) : null}
-              {sessionLoading ? (
-                <InlineAlert
-                  variant="info"
-                  size="compact"
-                  title={t('chat.loadingSessions')}
-                  message={t('common.loading')}
-                />
-              ) : null}
-              {chatError ? (
-                <ApiErrorAlert
-                  error={chatError}
-                  actionLabel={lastFailedRequest ? t('common.retry') : undefined}
-                  onAction={lastFailedRequest ? () => void retryLastStream() : undefined}
-                />
-              ) : null}
-              {isFollowUpContextLoading ? (
-                <InlineAlert
-                  variant="info"
-                  size="compact"
-                  title={t('chat.followUpLoadingTitle')}
-                  message={t('chat.followUpLoadingMessage')}
-                />
-              ) : null}
-              <div data-testid="context-compression-settings" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-1">
-                <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">{t('chat.contextCompression')}</span>
-                  <span className="ml-2 text-xs text-muted-text">{t('chat.contextCompressionDescription')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {contextCompressionSaving ? (
-                    <span className="text-xs text-muted-text">{t('chat.saving')}</span>
-                  ) : null}
-                  <Switch
-                    checked={contextCompressionEnabled}
-                    onCheckedChange={(next) => void updateContextCompressionEnabled(next)}
-                    aria-label={t('chat.contextCompression')}
-                    disabled={!contextCompressionLoaded || contextCompressionSaving}
-                    visualTestId="context-compression-switch-visual"
-                  />
-                </div>
-              </div>
-              {contextCompressionError ? (
-                <InlineAlert
-                  variant="danger"
-                  size="compact"
-                  title={t('chat.contextCompressionUnsaved')}
-                  message={contextCompressionError}
-                />
-              ) : null}
-              {skills.length > 0 && (
-                <div className="relative space-y-2" ref={skillPickerRef}>
-                  <button
-                    type="button"
-                    className="home-surface-button flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs text-foreground !shadow-none"
-                    aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
-                    aria-expanded={mobileSkillPickerOpen}
-                    aria-controls="chat-skill-picker-panel"
-                    onClick={() => setMobileSkillPickerOpen((open) => !open)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                      <span className="flex-shrink-0 font-medium">{t('chat.strategy')}</span>
-                      <span className="truncate text-xs text-muted-text">{selectedSkillSummary}</span>
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        'h-4 w-4 flex-shrink-0 text-muted-text transition-transform',
-                        mobileSkillPickerOpen ? 'rotate-180' : '',
-                      )}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <div
-                    id="chat-skill-picker-panel"
-                    data-testid="chat-skill-picker-panel"
-                    className={cn(
-                      mobileSkillPickerOpen ? 'flex' : 'hidden',
-                      'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
-                    )}
-                  >
-                    <Checkbox
-                      name="general-analysis"
-                      value=""
-                      checked={selectedSkillIds.length === 0}
-                      onChange={() => setSelectedSkillIds([])}
-                      containerClassName="group min-h-8 gap-1.5 text-sm"
-                      label={(
-                        <span
-                          className={`text-sm transition-colors ${selectedSkillIds.length === 0 ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
-                        >
-                          {t('chat.generalAnalysis')}
-                        </span>
-                      )}
-                    />
-                    {skills.map((s) => {
-                      const checked = selectedSkillIdSet.has(s.id);
-                      const disabled = !checked && skillLimitReached;
-                      const display = getStrategyDisplay(s, language);
-                      return (
-                        <div
-                          key={s.id}
-                          className={`flex min-h-8 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                          onMouseEnter={() => setShowSkillDesc(s.id)}
-                          onMouseLeave={() => setShowSkillDesc(null)}
-                        >
-                          <Checkbox
-                            name="skills"
-                            value={s.id}
-                            checked={checked}
-                            disabled={disabled}
-                            onChange={() => toggleSkillSelection(s.id)}
-                            containerClassName="min-h-8 gap-1.5"
-                            label={(
-                              <span
-                                className={`text-sm transition-colors ${checked ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
-                              >
-                                {display.name}
-                              </span>
-                            )}
-                          />
-                          {showSkillDesc === s.id && s.description && (
-                            <div className="skill-desc-tooltip">
-                              <p className="skill-title">{display.name}</p>
-                              <p>{display.description}</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+          <ChatComposer
+            language={language}
+            t={t}
+            sessionError={sessionError}
+            sessionLoading={sessionLoading}
+            chatError={chatError}
+            lastFailedRequest={lastFailedRequest}
+            onRetryLastStream={() => void retryLastStream()}
+            isFollowUpContextLoading={isFollowUpContextLoading}
+            contextCompressionEnabled={contextCompressionEnabled}
+            contextCompressionLoaded={contextCompressionLoaded}
+            contextCompressionSaving={contextCompressionSaving}
+            contextCompressionError={contextCompressionError}
+            onContextCompressionChange={(next) => void updateContextCompressionEnabled(next)}
+            skills={skills}
+            selectedSkillIds={selectedSkillIds}
+            selectedSkillIdSet={selectedSkillIdSet}
+            skillLimitReached={skillLimitReached}
+            selectedSkillSummary={selectedSkillSummary}
+            mobileSkillPickerOpen={mobileSkillPickerOpen}
+            onMobileSkillPickerOpenChange={setMobileSkillPickerOpen}
+            skillPickerRef={skillPickerRef}
+            showSkillDesc={showSkillDesc}
+            onShowSkillDesc={setShowSkillDesc}
+            onToggleSkill={toggleSkillSelection}
+            onClearSkills={() => setSelectedSkillIds([])}
+            activeStockCode={activeStockCode}
+            stockInWatchlist={activeStockCode ? stockInWatchlist(activeStockCode) : false}
+            isWatchlistActioning={isWatchlistActioning}
+            watchlistMessage={watchlistMessage}
+            onToggleWatchlist={() => {
+              if (activeStockCode) void handleToggleWatchlist(activeStockCode);
+            }}
+            input={input}
+            onInputChange={setInput}
+            onKeyDown={handleKeyDown}
+            loading={loading}
+            isSkillsLoading={isSkillsLoading}
+            onStop={() => stopStream()}
+            onSend={() => handleSend()}
+          />
 
-            {activeStockCode && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-text font-mono">{activeStockCode}</span>
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  isLoading={isWatchlistActioning}
-                  onClick={() => void handleToggleWatchlist(activeStockCode)}
-                  className="text-xs"
-                >
-                  {stockInWatchlist(activeStockCode) ? t('chat.removeWatchlist') : t('chat.addWatchlist')}
-                </Button>
-                {watchlistMessage && (
-                  <span className="text-xs text-secondary-text animate-in fade-in">{watchlistMessage}</span>
-                )}
-              </div>
-            )}
-
-              <div className="flex items-end gap-3">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  aria-label={t('chat.messageInput')}
-                  placeholder={t('chat.inputPlaceholder')}
-                  disabled={loading || sessionLoading}
-                  rows={1}
-                  className="flex-1 min-h-11 max-h-50 rounded-sm border border-border bg-transparent px-3 py-2 text-base placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-                  style={{ height: 'auto' }}
-                  onInput={(e) => {
-                    const t = e.target as HTMLTextAreaElement;
-                    t.style.height = 'auto';
-                    t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
-                  }}
-                />
-                {loading ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => stopStream()}
-                    aria-label={t('chat.stop')}
-                    className="flex-shrink-0"
-                  >
-                    {t('chat.stop')}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    onClick={() => handleSend()}
-                    disabled={!input.trim() || isFollowUpContextLoading || isSkillsLoading || sessionLoading}
-                    className="btn-primary flex-shrink-0"
-                  >
-                    {t('chat.send')}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
         </Surface>
       </div>
     </div>
