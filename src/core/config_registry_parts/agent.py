@@ -646,7 +646,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "AGENT_OBSERVABILITY_ENABLED=true",
             "AGENT_OBSERVABILITY_ENABLED=false",
         ],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Agent Observability",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "AGENT_OBSERVABILITY_DEEP_PAYLOAD": {
@@ -670,7 +675,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "AGENT_OBSERVABILITY_DEEP_PAYLOAD=false",
             "AGENT_OBSERVABILITY_DEEP_PAYLOAD=true",
         ],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Agent Observability",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "AGENT_EVENT_MONITOR_ENABLED": {
