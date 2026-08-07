@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Investment Committee analysis mode (default-off `AGENT_INVESTMENT_COMMITTEE_MODE`): curated persona Skill preset via the existing specialist path + StrategyEngine, with a structured `committee_deliberation` report section (#545).
+- [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
 - [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
 - [Fixed] Reduced the screening availability status surface to a compact size.
 - [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.

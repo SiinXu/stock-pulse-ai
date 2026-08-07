@@ -33,6 +33,7 @@ This is the entry point for project documentation. The README covers the project
 | [README (EN, root)](../README.md) | Project homepage: positioning, differentiators, features, quick start |
 | [README (简体中文)](README_CN.md) | Chinese project overview |
 | [Beginner client setup (EN)](beginner-client-setup_EN.md) | Download desktop client, Anspire/AIHubMix keys, watchlist, first analysis; [中文](beginner-client-setup.md) |
+| [Agent-guided onboarding (EN)](agent-guided-onboarding_EN.md) | Profile intake, rule-based config plan, non-secret apply, L0–L3 paths; [中文](agent-guided-onboarding.md) |
 | [UI User Manual](ui-manual/README_EN.md) | Modular Web/desktop UI usage (no deployment); [简体中文](ui-manual/README.md) |
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |
 | [FAQ (EN)](FAQ_EN.md) | Common configuration, model, notification, deployment, and runtime issues |
