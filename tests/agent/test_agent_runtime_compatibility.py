@@ -73,8 +73,9 @@ def test_manifest_has_no_orphan_fixture_files():
                 break
         if skip:
             continue
-        on_disk.add(str(path.relative_to(FIXTURES_DIR)).replace("\", "/"))
+        on_disk.add(str(path.relative_to(FIXTURES_DIR)).replace(chr(92), "/"))
     assert on_disk == listed
+
 
 
 def test_manifest_covers_plan_matrix():
