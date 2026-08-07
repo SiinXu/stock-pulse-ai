@@ -45,6 +45,7 @@ from src.migrations.registry import (
     SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
     SCHEDULED_TASK_SCHEMA_MIGRATION,
     BACKTEST_RESOLUTION_NOTES_MIGRATION,
+    TASK_QUEUE_INFLIGHT_MIGRATION,
     TARGET_VERSION,
     get_migrations,
 )
@@ -433,6 +434,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         APPROVAL_GATE_SCHEMA_MIGRATION.id,
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
+        TASK_QUEUE_INFLIGHT_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)

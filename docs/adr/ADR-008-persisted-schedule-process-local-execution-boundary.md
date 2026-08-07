@@ -88,6 +88,14 @@ Natural-language planning, general workflow orchestration, a distributed lease,
 multi-process execution recovery, and a second analysis pipeline remain out of
 scope and require a separate decision.
 
+Process-local task-queue restart recovery (ADR-004 amendment) restores or
+interrupts canonical `AnalysisTaskQueue` executions from SQLite checkpoints
+before schedule reconciliation. It does not change occurrence fencing: a
+recovered execution keeps the same execution id so a `RUNNING` occurrence waits
+instead of being finished as `scheduled_task_execution_state_lost`, and a
+non-resumable interrupted execution follows the existing terminal reconcile path
+without replaying the same `(task_id, scheduled_for)` slot.
+
 ## Consequences
 
 - Definitions and occurrence evidence survive restarts without overstating the
