@@ -37,10 +37,25 @@ def _validate_analysis_date_range(
         raise HTTPException(
             status_code=400,
             detail={
-                "error": "invalid_params",
+                "error": "invalid_analysis_date_range",
                 "message": "analysis_date_from cannot be after analysis_date_to",
+                "params": {
+                    "analysis_date_from": analysis_date_from.isoformat(),
+                    "analysis_date_to": analysis_date_to.isoformat(),
+                },
             },
         )
+
+
+def _http_validation_error(exc: BacktestValidationError) -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={
+            "error": getattr(exc, "code", None) or "invalid_params",
+            "message": str(exc),
+            "params": getattr(exc, "params", {}) or {},
+        },
+    )
 
 
 @router.post(
@@ -72,10 +87,7 @@ def run_backtest(
         )
         return BacktestRunResponse(**stats)
     except BacktestValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "invalid_params", "message": str(exc)},
-        )
+        raise _http_validation_error(exc)
     except HTTPException:
         raise
     except Exception as exc:
@@ -132,10 +144,7 @@ def get_backtest_results(
             items=items,
         )
     except BacktestValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "invalid_params", "message": str(exc)},
-        )
+        raise _http_validation_error(exc)
     except HTTPException:
         raise
     except Exception as exc:
@@ -187,10 +196,7 @@ def get_overall_performance(
             )
         return PerformanceMetrics(**summary)
     except BacktestValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "invalid_params", "message": str(exc)},
-        )
+        raise _http_validation_error(exc)
     except HTTPException:
         raise
     except Exception as exc:
@@ -243,10 +249,7 @@ def get_stock_performance(
             )
         return PerformanceMetrics(**summary)
     except BacktestValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "invalid_params", "message": str(exc)},
-        )
+        raise _http_validation_error(exc)
     except HTTPException:
         raise
     except Exception as exc:

@@ -22,6 +22,20 @@ class BacktestRunRequest(BaseModel):
     limit: int = Field(200, ge=1, le=2000, description="最多处理的分析记录数")
 
 
+class BacktestAppliedConfig(BaseModel):
+    """Echo of the effective run configuration used for evaluation honesty."""
+
+    code: Optional[str] = Field(None, description="Normalized stock filter, if any")
+    force: bool = Field(False, description="Whether force re-evaluation was requested")
+    eval_window_days: int = Field(..., description="Effective evaluation window in trading days")
+    min_age_days: int = Field(..., description="Effective minimum analysis age in calendar days")
+    limit: int = Field(..., description="Maximum candidate analysis rows processed")
+    engine_version: str = Field(..., description="Effective backtest engine version label")
+    neutral_band_pct: float = Field(..., description="Neutral outcome band percentage")
+    analysis_date_from: Optional[date] = Field(None, description="Analysis date start filter (inclusive)")
+    analysis_date_to: Optional[date] = Field(None, description="Analysis date end filter (inclusive)")
+
+
 class BacktestRunResponse(BaseModel):
     processed: int = Field(..., description="候选记录数")
     saved: int = Field(..., description="写入回测结果数")
@@ -31,6 +45,10 @@ class BacktestRunResponse(BaseModel):
     applied_eval_window_days: Optional[int] = Field(
         ...,
         description="实际生效的评估窗口（交易日数）",
+    )
+    applied_config: Optional[BacktestAppliedConfig] = Field(
+        None,
+        description="Echo of the effective run configuration (window, universe limit, engine, dates)",
     )
     message: Optional[str] = Field(None, description="空结果或降级时的诊断说明")
     diagnostics: Dict[str, Any] = Field(default_factory=dict, description="回测筛选与诊断信息")
