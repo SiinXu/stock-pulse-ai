@@ -39,6 +39,7 @@ This is the entry point for project documentation. The README covers the project
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |
 | [FAQ (EN)](FAQ_EN.md) | Common configuration, model, notification, deployment, and runtime issues |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |
+| [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md) | OpenD setup, FUTU_* settings, live position import API, degradation, and local-gateway network policy |
 | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | Redaction coverage, Agent trace behavior, debug guarantees, limits, incident response, and rollback |
 | [Durable Security Audit Phase 1](security-audit.md) | Event schema, representative privileged paths, administrator query access, retention, failure semantics, and rollback |
 | [Changelog](CHANGELOG.md) | Release notes, capability changes, and migration notes |
