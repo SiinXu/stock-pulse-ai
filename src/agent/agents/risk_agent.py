@@ -22,6 +22,7 @@ from typing import Optional
 from src.agent.agents.base_agent import BaseAgent
 from src.agent.protocols import AgentContext, AgentOpinion
 from src.agent.runner import try_parse_json
+from src.agent.tools.valuation_tools import VALUATION_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,23 @@ class RiskAgent(BaseAgent):
         "get_stock_info",
     ]
 
+    def _filtered_registry(self):
+        """Add the optional valuation tool only when it was registered."""
+        registry = super()._filtered_registry()
+        valuation_tool = self.tool_registry.get(VALUATION_TOOL_NAME)
+        if valuation_tool is not None:
+            registry.register(valuation_tool)
+        return registry
+
     def system_prompt(self, ctx: AgentContext) -> str:
-        return """\
+        valuation_workflow = ""
+        if self.tool_registry.get(VALUATION_TOOL_NAME) is not None:
+            valuation_workflow = (
+                f"\n8. When valuation evidence would help, call {VALUATION_TOOL_NAME}; "
+                "always surface its stated assumptions, sensitivity range, and "
+                "insufficient_fundamentals status when present — never invent a number"
+            )
+        return f"""\
 You are a **Risk Screening Agent** focused exclusively on identifying \
 risks and red flags for the given stock.
 
@@ -50,7 +66,7 @@ output a structured JSON risk assessment.
 4. **Industry Policy** — headwinds, sector crackdowns
 5. **Lock-up Expirations** — large block unlocks within 30 days (解禁)
 6. **Valuation Extremes** — PE > 100 or negative, PB > 10 (flag as anomaly)
-7. **Technical Warning Signs** — death crosses, breaking key supports
+7. **Technical Warning Signs** — death crosses, breaking key supports{valuation_workflow}
 
 ## Severity Levels
 - "high": existential or material risk (lawsuits, fraud, massive insider selling)
@@ -59,21 +75,21 @@ output a structured JSON risk assessment.
 
 ## Output Format
 Return **only** a JSON object:
-{
+{{
   "risk_level": "high|medium|low|none",
   "risk_score": 0-100,
   "flags": [
-    {
+    {{
       "category": "insider|earnings|regulatory|industry|lockup|valuation|technical",
       "severity": "high|medium|low",
       "description": "Clear description of the risk",
       "source": "Where this information came from"
-    }
+    }}
   ],
   "veto_buy": true|false,
   "reasoning": "2-3 sentence overall risk assessment",
   "signal_adjustment": "none|downgrade_one|downgrade_two|veto"
-}
+}}
 
 Important: be thorough but factual. Only flag risks backed by evidence \
 from your search results. Do NOT invent risks.

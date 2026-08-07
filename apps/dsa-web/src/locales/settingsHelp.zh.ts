@@ -1083,6 +1083,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
     notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
   },
+  'settings.agent.event_impact_context': {
+    title: '告警影响上下文',
+    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
+    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
@@ -1501,11 +1507,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['决定 Kronos Agent Tool 能否注册并做本地推理。'],
     notes: ['示例：/absolute/path/to/kronos-weights，内含 Kronos-mini/ 与 Kronos-Tokenizer-2k/。'],
   },
-  'settings.agent.event_impact_context': {
-    title: '告警影响上下文',
-    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
-    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
-    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: '启用估值 Agent 工具',
+    summary: '可选的 DCF / 相对估值 Agent 工具，输出透明假设。',
+    usage: '默认关闭。仅在希望 Agent 调用 estimate_stock_valuation 时开启，并需重启进程。',
+    notes: [
+      '关闭时工具不会注册到进程内工具表。',
+      '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+    ],
   },
 };
 
