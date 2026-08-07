@@ -311,6 +311,28 @@ def run_full_analysis(
                 "All relevant markets are closed today; skipping the run. "
                 "Use --force-run to override."
             )
+            # Machine-readable status for Actions plain-language summary (#850).
+            try:
+                from src.services.actions_daily_run_summary import (
+                    build_status_for_non_trading_day,
+                    write_run_status,
+                )
+
+                write_run_status(
+                    build_status_for_non_trading_day(
+                        mode=getattr(args, "mode", None),
+                        force_run=bool(getattr(args, "force_run", False)),
+                        stock_codes=effective_codes,
+                    )
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - status write must not fail analysis
+                log_safe_exception(
+                    logger,
+                    "Actions run status write failed for non-trading skip",
+                    exc,
+                    error_code="actions_run_status_write_failed",
+                    level=logging.WARNING,
+                )
             return True
         if set(filtered_codes) != set(effective_codes):
             skipped = set(effective_codes) - set(filtered_codes)
@@ -667,6 +689,7 @@ def run_full_analysis(
                     ok_count = len(results or [])
                     failed_count = max(0, len(attempted_codes) - ok_count)
 
+            no_llm = analyzer_has_no_usable_llm(getattr(pipeline, "analyzer", None))
             emit_cli_run_summary(
                 CliRunSummary(
                     ok_count=ok_count,
@@ -679,9 +702,41 @@ def run_full_analysis(
                         no_notify=bool(getattr(args, "no_notify", False)),
                     ),
                     dry_run=dry_run,
-                    no_llm=analyzer_has_no_usable_llm(getattr(pipeline, "analyzer", None)),
+                    no_llm=no_llm,
                 )
             )
+            # Structured status for GitHub Actions Step Summary (#850).
+            try:
+                from src.services.actions_daily_run_summary import (
+                    build_status_from_counts,
+                    write_run_status,
+                )
+
+                successful_codes = [
+                    str(getattr(item, "code", "") or "").strip()
+                    for item in (results or [])
+                ]
+                successful_codes = [code for code in successful_codes if code]
+                write_run_status(
+                    build_status_from_counts(
+                        ok_count=int(ok_count or 0),
+                        failed_count=int(failed_count or 0),
+                        skipped_count=0,
+                        no_llm=no_llm,
+                        dry_run=dry_run,
+                        force_run=bool(getattr(args, "force_run", False)),
+                        attempted_codes=attempted_codes,
+                        successful_codes=successful_codes,
+                    )
+                )
+            except Exception as status_exc:  # broad-exception: fallback_recorded - status write must not fail analysis
+                log_safe_exception(
+                    logger,
+                    "Actions run status write failed after CLI summary",
+                    status_exc,
+                    error_code="actions_run_status_write_failed",
+                    level=logging.WARNING,
+                )
         except Exception as exc:  # broad-exception: fallback_recorded - summary must not fail the run
             log_safe_exception(
                 logger,
@@ -705,6 +760,25 @@ def run_full_analysis(
             exc,
             error_code="main_analysis_workflow_failed",
         )
+        try:
+            from src.services.actions_daily_run_summary import (
+                build_status_for_failure,
+                write_run_status,
+            )
+
+            write_run_status(
+                build_status_for_failure(
+                    detail=str(exc),
+                )
+            )
+        except Exception as status_exc:  # broad-exception: fallback_recorded - status write must not replace primary failure
+            log_safe_exception(
+                logger,
+                "Actions run status write failed after analysis error",
+                status_exc,
+                error_code="actions_run_status_write_failed",
+                level=logging.WARNING,
+            )
         if raise_errors:
             raise
         return False

@@ -9,11 +9,17 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.config_parts.defaults import (
     ANSPIRE_LLM_BASE_URL_DEFAULT,
     ANSPIRE_LLM_MODEL_DEFAULT,
+    SUPPORTED_LLM_CHANNEL_API_SURFACES,
     SUPPORTED_LLM_CHANNEL_PROTOCOLS,
 )
 from src.config_parts.parsers import (
+    apply_litellm_api_surface,
     canonicalize_llm_channel_protocol,
     channel_allows_empty_api_key,
+    find_incompatible_llm_channel_models,
+    find_llm_channel_surface_conflicts,
+    is_supported_llm_channel_api_surface_value,
+    normalize_llm_channel_api_surface,
     normalize_llm_channel_model,
     parse_env_bool,
     resolve_llm_channel_protocol,
@@ -23,6 +29,7 @@ from src.llm.hermes import (
     HERMES_DEFAULT_MODEL,
     HERMES_DEFAULT_PROTOCOL,
     HermesConfigIssue,
+    hermes_blocked_route_candidates,
     hermes_model_info,
     is_reserved_hermes_name,
     parse_hermes_channel,
@@ -101,6 +108,7 @@ class _ConfigLLMMethods:
         Format:
             LLM_CHANNELS=aihubmix,deepseek,gemini
             LLM_AIHUBMIX_PROTOCOL=openai
+            LLM_AIHUBMIX_API_SURFACE=chat_completions
             LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1
             LLM_AIHUBMIX_API_KEY=sk-xxx           (or LLM_AIHUBMIX_API_KEYS=k1,k2)
             LLM_AIHUBMIX_MODELS=gpt-5.5,claude-sonnet-4-6
@@ -115,6 +123,15 @@ class _ConfigLLMMethods:
         issues: List[HermesConfigIssue] = []
         blocks_legacy_fallback = False
         blocked_hermes_routes: List[str] = []
+
+        def record_blocked_hermes_routes(raw_models: List[str]) -> None:
+            nonlocal blocks_legacy_fallback
+            blocks_legacy_fallback = True
+            for raw_model in raw_models or [HERMES_DEFAULT_MODEL]:
+                for route_name in hermes_blocked_route_candidates(raw_model):
+                    if route_name not in blocked_hermes_routes:
+                        blocked_hermes_routes.append(route_name)
+
         for raw_name in channels_str.split(','):
             ch_name = raw_name.strip()
             if not ch_name:
@@ -143,6 +160,7 @@ class _ConfigLLMMethods:
                     base_url = str(provider["default_base_url"]).strip() or None
             if ch_lower == "anspire" and not protocol_raw:
                 protocol_raw = "openai"
+            api_surface_raw = os.getenv(f'LLM_{ch_upper}_API_SURFACE', '').strip()
             enabled_raw = os.getenv(f'LLM_{ch_upper}_ENABLED')
             if ch_lower == "anspire" and (enabled_raw is None or not enabled_raw.strip()):
                 enabled_raw = os.getenv('ANSPIRE_LLM_ENABLED')
@@ -169,7 +187,45 @@ class _ConfigLLMMethods:
                 if anspire_model:
                     raw_models = [anspire_model]
 
+            # Disabled channels are inert. In particular, stale values such as
+            # LLM_HERMES_API_SURFACE=responses must not block valid legacy
+            # deployments after Hermes has been explicitly disabled.
+            if not enabled:
+                _logger.info("LLM channel '%s': disabled, skipped", ch_name)
+                continue
+
+            if not is_supported_llm_channel_api_surface_value(api_surface_raw):
+                issues.append(HermesConfigIssue(
+                    f"LLM_{ch_upper}_API_SURFACE",
+                    "invalid_api_surface",
+                    (
+                        f"Unsupported LLM API surface '{api_surface_raw}'. "
+                        f"Supported: {', '.join(SUPPORTED_LLM_CHANNEL_API_SURFACES)}"
+                    ),
+                ))
+                if is_reserved_hermes_name(ch_name):
+                    record_blocked_hermes_routes(raw_models)
+                _logger.warning(
+                    "LLM_%s_API_SURFACE=%s is unsupported; channel skipped",
+                    ch_upper,
+                    api_surface_raw,
+                )
+                continue
+            api_surface = normalize_llm_channel_api_surface(api_surface_raw)
+
             if is_reserved_hermes_name(ch_name):
+                if api_surface == "responses":
+                    issues.append(HermesConfigIssue(
+                        f"LLM_{ch_upper}_API_SURFACE",
+                        "hermes_responses_unsupported",
+                        "The reserved Hermes channel does not support the Responses API surface",
+                    ))
+                    record_blocked_hermes_routes(raw_models)
+                    _logger.warning(
+                        "LLM_%s_API_SURFACE=responses is unsupported for reserved Hermes channel; channel skipped",
+                        ch_upper,
+                    )
+                    continue
                 if not raw_models:
                     raw_models = [HERMES_DEFAULT_MODEL]
                 result = parse_hermes_channel(
@@ -187,17 +243,47 @@ class _ConfigLLMMethods:
                     if route_name not in blocked_hermes_routes:
                         blocked_hermes_routes.append(route_name)
                 if result.channel is None:
-                    if not enabled:
-                        _logger.info("LLM channel '%s': disabled, skipped", ch_name)
-                    else:
-                        _logger.warning("LLM channel '%s': invalid reserved Hermes channel, skipped", ch_name)
+                    _logger.warning("LLM channel '%s': invalid reserved Hermes channel, skipped", ch_name)
                     continue
                 result.channel["provider_id"] = provider_id
+                result.channel["api_surface"] = api_surface
                 channels.append(result.channel)
                 _logger.info("LLM channel '%s': Hermes preset with %d model(s)", ch_name, len(result.channel["models"]))
                 continue
 
             protocol = resolve_llm_channel_protocol(protocol_raw, base_url=base_url, models=raw_models, channel_name=ch_name)
+            if api_surface == "responses" and protocol != "openai":
+                issues.append(HermesConfigIssue(
+                    f"LLM_{ch_upper}_API_SURFACE",
+                    "responses_requires_openai_protocol",
+                    "Responses API surface currently requires the openai protocol",
+                ))
+                _logger.warning(
+                    "LLM_%s_API_SURFACE=responses requires protocol=openai; channel skipped",
+                    ch_upper,
+                )
+                continue
+            incompatible_models = find_incompatible_llm_channel_models(
+                raw_models,
+                protocol,
+                api_surface,
+                base_url,
+            )
+            if incompatible_models:
+                issues.append(HermesConfigIssue(
+                    f"LLM_{ch_upper}_MODELS",
+                    "responses_requires_openai_model_provider",
+                    (
+                        "Responses API surface requires every model to use the OpenAI "
+                        f"provider route; incompatible: {', '.join(incompatible_models[:3])}"
+                    ),
+                ))
+                _logger.warning(
+                    "LLM_%s_API_SURFACE=responses has non-OpenAI model routes (%s); channel skipped",
+                    ch_upper,
+                    ", ".join(incompatible_models[:3]),
+                )
+                continue
             models = [normalize_llm_channel_model(m, protocol, base_url) for m in raw_models]
 
             # Extra headers (JSON string, optional)
@@ -208,10 +294,6 @@ class _ConfigLLMMethods:
                     extra_headers = json.loads(extra_headers_raw)
                 except json.JSONDecodeError:
                     _logger.warning(f"LLM_{ch_upper}_EXTRA_HEADERS: invalid JSON, ignored")
-
-            if not enabled:
-                _logger.info(f"LLM channel '{ch_name}': disabled, skipped")
-                continue
 
             if protocol_raw and canonicalize_llm_channel_protocol(protocol_raw) not in SUPPORTED_LLM_CHANNEL_PROTOCOLS:
                 _logger.warning(
@@ -235,6 +317,7 @@ class _ConfigLLMMethods:
                 'name': ch_name.lower(),
                 'provider_id': provider_id,
                 'protocol': protocol,
+                'api_surface': api_surface,
                 'enabled': enabled,
                 'base_url': base_url,
                 'api_keys': api_keys,
@@ -242,6 +325,36 @@ class _ConfigLLMMethods:
                 'extra_headers': extra_headers,
             })
             _logger.info(f"LLM channel '{ch_name}': {len(models)} model(s), {len(api_keys)} key(s)")
+
+        surface_conflicts = find_llm_channel_surface_conflicts(channels)
+        if surface_conflicts:
+            conflicting_models = set(surface_conflicts)
+            for model, surfaces in surface_conflicts.items():
+                issues.append(HermesConfigIssue(
+                    "LLM_CHANNELS",
+                    "mixed_api_surfaces_for_route",
+                    (
+                        f"LLM route alias '{model}' is declared with multiple API surfaces: "
+                        f"{', '.join(surfaces)}"
+                    ),
+                ))
+                _logger.warning(
+                    "LLM route alias '%s' mixes API surfaces (%s); conflicting channels skipped",
+                    model,
+                    ", ".join(surfaces),
+                )
+            channels = [
+                channel
+                for channel in channels
+                if not {
+                    normalize_llm_channel_model(
+                        str(model),
+                        str(channel.get("protocol") or ""),
+                        str(channel.get("base_url") or ""),
+                    )
+                    for model in channel.get("models") or []
+                }.intersection(conflicting_models)
+            ]
 
         return channels, issues, blocks_legacy_fallback, blocked_hermes_routes
 
@@ -254,6 +367,13 @@ class _ConfigLLMMethods:
         - LiteLLM model_list semantics: https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
         """
         from src.llm.model_ref import canonicalize_connection_id, encode_model_ref
+
+        surface_conflicts = find_llm_channel_surface_conflicts(channels)
+        if surface_conflicts:
+            raise ValueError(
+                "LLM route aliases cannot mix API surfaces: "
+                + ", ".join(sorted(surface_conflicts))
+            )
 
         model_list: List[Dict[str, Any]] = []
         model_ref_entries: List[Dict[str, Any]] = []
@@ -271,10 +391,12 @@ class _ConfigLLMMethods:
                 for ref in (ch.get("model_refs") or [])
                 if isinstance(ref, dict)
             }
+            api_surface = normalize_llm_channel_api_surface(ch.get("api_surface"))
             for model_name in ch['models']:
                 for api_key in ch['api_keys']:
                     model_ref = hermes_refs.get(str(model_name))
                     wire_model = str((model_ref or {}).get("wire_model") or model_name)
+                    wire_model = apply_litellm_api_surface(wire_model, api_surface)
                     litellm_params: Dict[str, Any] = {
                         'model': wire_model,
                     }
@@ -295,6 +417,8 @@ class _ConfigLLMMethods:
                         entry["model_info"] = hermes_model_info(
                             str((model_ref or {}).get("display_model") or "")
                         )
+                    elif api_surface == "responses":
+                        entry["model_info"] = {"dsa_api_surface": "responses"}
                     if len(route_owner_ids.get(str(model_name), set())) == 1:
                         model_list.append(entry)
 

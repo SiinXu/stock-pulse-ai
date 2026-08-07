@@ -37,13 +37,16 @@ if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
 
-function chooseVisibleDate(label: string): string {
+function chooseVisibleDateRange(label: string): { from: string; to: string } {
   fireEvent.click(screen.getByRole('textbox', { name: label }));
   const dialog = screen.getByRole('dialog', { name: label });
-  const day = dialog.querySelector<HTMLButtonElement>('button[data-calendar-day="true"]:not(:disabled)')!;
-  const value = day.dataset.date!;
-  fireEvent.click(day);
-  return value;
+  const days = [...dialog.querySelectorAll<HTMLButtonElement>('button[data-calendar-day="true"]:not(:disabled)')];
+  const from = days[0].dataset.date!;
+  const to = days[1].dataset.date!;
+  fireEvent.click(days[0]);
+  expect(screen.getByRole('dialog', { name: label })).toBeInTheDocument();
+  fireEvent.click(document.querySelector<HTMLButtonElement>(`button[data-date="${to}"]`)!);
+  return { from, to };
 }
 
 const {
@@ -170,8 +173,7 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
-    const startDateInput = screen.getByLabelText('分析开始日期');
-    const endDateInput = screen.getByLabelText('分析结束日期');
+    const dateRangeInput = screen.getByLabelText('分析开始日期 – 分析结束日期');
 
     expect(filterInput).toHaveAttribute('role', 'combobox');
     expect(filterInput).toHaveAttribute('aria-autocomplete', 'none');
@@ -179,16 +181,14 @@ describe('BacktestPage', () => {
     expect(windowInput).toHaveAttribute('data-size', 'default');
     expect(screen.getByRole('button', { name: '筛选' })).toHaveAttribute('data-size', 'primary');
     expect(screen.getByRole('button', { name: '运行回测' })).toHaveAttribute('data-size', 'primary');
-    expect(startDateInput).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(startDateInput).toHaveAttribute('aria-expanded', 'false');
-    expect(startDateInput).toHaveAttribute('aria-readonly', 'true');
-    expect(startDateInput).not.toHaveAttribute('readonly');
-    expect(endDateInput).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(endDateInput).toHaveAttribute('aria-expanded', 'false');
-    expect(endDateInput).toHaveAttribute('aria-readonly', 'true');
-    expect(endDateInput).not.toHaveAttribute('readonly');
-    expect(startDateInput.parentElement).toHaveAttribute('data-size', 'compact');
-    expect(endDateInput.parentElement).toHaveAttribute('data-size', 'compact');
+    expect(dateRangeInput).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(dateRangeInput).toHaveAttribute('aria-expanded', 'false');
+    expect(dateRangeInput).toHaveAttribute('aria-readonly', 'true');
+    expect(dateRangeInput).not.toHaveAttribute('readonly');
+    expect(dateRangeInput.parentElement).toHaveAttribute('data-control', 'date-range-picker');
+    expect(dateRangeInput.parentElement).toHaveAttribute('data-size', 'compact');
+    expect(screen.queryByLabelText('分析开始日期')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('分析结束日期')).not.toBeInTheDocument();
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -356,8 +356,7 @@ describe('BacktestPage', () => {
     const windowInput = screen.getByPlaceholderText('10');
     const phaseSelect = await screen.findByLabelText('结果筛选 · 阶段');
     expect(phaseSelect).toHaveTextContent('全部阶段');
-    const fromInput = screen.getByLabelText('分析开始日期');
-    const toInput = screen.getByLabelText('分析结束日期');
+    const dateRangeInput = screen.getByLabelText('分析开始日期 – 分析结束日期');
 
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
     fireEvent.change(windowInput, { target: { value: '20' } });
@@ -367,8 +366,8 @@ describe('BacktestPage', () => {
     await waitFor(() =>
       expect(mockGetResults).toHaveBeenCalledWith(expect.objectContaining({ analysisPhase: 'intraday' })),
     );
-    expect(fromInput).toHaveValue('2026-03-01');
-    expect(toInput).toHaveValue('2026-03-31');
+    expect(dateRangeInput).toHaveAttribute('data-start-value', '2026-03-01');
+    expect(dateRangeInput).toHaveAttribute('data-end-value', '2026-03-31');
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
     await waitFor(() => {
@@ -396,8 +395,7 @@ describe('BacktestPage', () => {
     renderPage();
     await screen.findByText('600519');
 
-    const from = chooseVisibleDate('分析开始日期');
-    const to = chooseVisibleDate('分析结束日期');
+    const { from, to } = chooseVisibleDateRange('分析开始日期 – 分析结束日期');
     mockGetResults.mockClear();
     mockGetOverallPerformance.mockClear();
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
@@ -414,10 +412,10 @@ describe('BacktestPage', () => {
       expect(appliedSearch.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to)).toBe(to);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '清除 分析开始日期' }));
-    fireEvent.click(screen.getByRole('button', { name: '清除 分析结束日期' }));
-    expect(screen.getByLabelText('分析开始日期')).toHaveValue('');
-    expect(screen.getByLabelText('分析结束日期')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: '清除 分析开始日期 – 分析结束日期' }));
+    const clearedRange = screen.getByLabelText('分析开始日期 – 分析结束日期');
+    expect(clearedRange).toHaveAttribute('data-start-value', '');
+    expect(clearedRange).toHaveAttribute('data-end-value', '');
     await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toBeEnabled());
 
     mockGetResults.mockClear();
@@ -878,8 +876,9 @@ describe('BacktestPage', () => {
 
     expect(await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）')).toHaveValue('AAPL');
     expect(screen.getByPlaceholderText('10')).toHaveValue(20);
-    expect(screen.getByLabelText('分析开始日期')).toHaveValue('2026-03-01');
-    expect(screen.getByLabelText('分析结束日期')).toHaveValue('2026-03-31');
+    const dateRangeInput = screen.getByLabelText('分析开始日期 – 分析结束日期');
+    expect(dateRangeInput).toHaveAttribute('data-start-value', '2026-03-01');
+    expect(dateRangeInput).toHaveAttribute('data-end-value', '2026-03-31');
     expect(await screen.findByLabelText('结果筛选 · 阶段')).toHaveTextContent('盘中');
     await waitFor(() => expect(mockGetResults).toHaveBeenCalledWith({
       code: 'AAPL',

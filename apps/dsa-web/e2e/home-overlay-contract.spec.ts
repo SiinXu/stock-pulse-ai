@@ -8,6 +8,7 @@ import {
   RUN_FLOW_ROUTE_QUERY_VALUES,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
+import { expectAnalyzeButtonReady } from './workbench-fixture';
 
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
 const REPORT_A_SUMMARY = 'Contract report A';
@@ -1140,11 +1141,10 @@ test.describe('Analysis Workbench interaction contract', () => {
     });
 
     // Wait for setup/experience readiness before typing; Analyze stays disabled until then.
-    const stockSearch = page.locator('#analysis-workbench-stock-search');
-    await expect(stockSearch).toBeEnabled();
-    await stockSearch.fill('AAPL');
-    const analyze = page.getByRole('button', { name: 'Analyze', exact: true }).last();
-    await expect(analyze).toBeEnabled();
+    const analyze = await expectAnalyzeButtonReady(page, 'AAPL', {
+      buttonName: 'Analyze',
+      last: true,
+    });
     await analyze.click();
 
     await expectSearchParams(page, {

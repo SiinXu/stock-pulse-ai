@@ -789,6 +789,22 @@ schedule:
 | 18:00 | `'0 10 * * 1-5'` |
 | 21:00 | `'0 13 * * 1-5'` |
 
+#### GitHub Actions 运行摘要与失败短通知（Issue #850）
+
+`00-daily-analysis.yml` 在分析步骤结束后（`if: always()`）会：
+
+1. 读取 runner 写出的 `data/run_status.json`（优先），必要时结合退出码 / job 状态 / 环境就绪信号 / 日志关键词兜底
+2. 向 GitHub **Step Summary** 写入中文为主、英文并列的人话结果：成功 / 非交易日跳过 / 部分成功 / 失败原因与下一步
+3. 可选：当结果为失败且已配置 `NOTIFICATION_SYSTEM_ERROR_CHANNELS`（或显式 `FAILURE_NOTIFY_ENABLED=true`）时，向系统错误渠道推送**一句**短文本（不含 Secret 明文与完整 traceback）
+
+| 配置项 | 说明 |
+|--------|------|
+| `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | 失败短通知路由；为空且未强制开启时仅写 Step Summary |
+| `FAILURE_NOTIFY_ENABLED` | 可选。默认：有系统错误渠道则开启；`false` 强制仅 Summary；`true` 强制尝试通知 |
+| 成功路径报告推送 | **不改变**（仍走既有 report 渠道逻辑） |
+
+常见原因码：`missing_llm` / `missing_watchlist` / `non_trading_day` / `data_source` / `timeout` / `quota` / `provider_down` / `unknown`（与 Config Check #847 共用词汇，便于对照）。
+
 #### GitHub Actions 非交易日手动运行（Issue #461 / #466）
 
 `00-daily-analysis.yml` 支持两种控制方式：

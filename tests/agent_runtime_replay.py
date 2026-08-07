@@ -388,6 +388,8 @@ BASE_CONFIG_FIELDS: Dict[str, Any] = {
     "agent_skill_dir": None,
     "agent_risk_override": True,
     "agent_memory_enabled": False,
+    "multimodal_agent_tools_enabled": False,
+    "multimodal_file_root": None,
     "agent_context_compression_enabled": False,
     "agent_context_compression_profile": "balanced",
     "agent_context_compression_trigger_tokens": 999999,
