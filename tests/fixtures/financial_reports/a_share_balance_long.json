@@ -1,0 +1,17 @@
+{
+  "description": "Recorded-style Eastmoney balance sheet (long) for A-share parsing tests. Offline only.",
+  "rows": [
+    {
+      "REPORT_DATE": "2024-12-31",
+      "TOTAL_ASSETS": 300000000000.0,
+      "TOTAL_LIABILITIES": 80000000000.0,
+      "TOTAL_EQUITY": 220000000000.0
+    },
+    {
+      "REPORT_DATE": "2023-12-31",
+      "TOTAL_ASSETS": 270000000000.0,
+      "TOTAL_LIABILITIES": 75000000000.0,
+      "TOTAL_EQUITY": 195000000000.0
+    }
+  ]
+}
