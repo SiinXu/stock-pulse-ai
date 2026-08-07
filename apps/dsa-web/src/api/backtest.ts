@@ -25,6 +25,18 @@ void _runFieldAnchor;
 void _resultFieldAnchor;
 void _metricsFieldAnchor;
 
+const backtestAppliedConfigSchema = z.object({
+  code: z.string().nullable().optional(),
+  force: z.boolean(),
+  evalWindowDays: z.number(),
+  minAgeDays: z.number(),
+  limit: z.number(),
+  engineVersion: z.string(),
+  neutralBandPct: z.number(),
+  analysisDateFrom: z.string().nullable().optional(),
+  analysisDateTo: z.string().nullable().optional(),
+}).passthrough();
+
 const backtestRunResponseSchema = z.object({
   processed: z.number(),
   saved: z.number(),
@@ -32,6 +44,7 @@ const backtestRunResponseSchema = z.object({
   insufficient: z.number(),
   errors: z.number(),
   appliedEvalWindowDays: z.number().nullable(),
+  appliedConfig: backtestAppliedConfigSchema.nullable().optional(),
   message: z.string().nullable().optional(),
   diagnostics: z.record(z.string(), z.unknown()).optional(),
 }).passthrough();

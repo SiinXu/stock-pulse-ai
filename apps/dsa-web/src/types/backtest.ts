@@ -19,6 +19,18 @@ export interface BacktestRunRequest {
   limit?: number;
 }
 
+export interface BacktestAppliedConfig {
+  code?: string | null;
+  force: boolean;
+  evalWindowDays: number;
+  minAgeDays: number;
+  limit: number;
+  engineVersion: string;
+  neutralBandPct: number;
+  analysisDateFrom?: string | null;
+  analysisDateTo?: string | null;
+}
+
 export interface BacktestRunResponse {
   processed: number;
   saved: number;
@@ -27,6 +39,8 @@ export interface BacktestRunResponse {
   errors: number;
   /** OpenAPI: required and nullable. */
   appliedEvalWindowDays: number | null;
+  /** Echo of the effective run configuration for result honesty. */
+  appliedConfig?: BacktestAppliedConfig | null;
   message?: string | null;
   diagnostics?: Record<string, unknown>;
 }
@@ -70,6 +84,12 @@ export interface BacktestResultItem {
   simulatedExitPrice?: number;
   simulatedExitReason?: string;
   simulatedReturnPct?: number;
+  /**
+   * Comma-separated resolution / skip markers such as
+   * legacy_analysis_date, prior_session_start, missing_daily_bars,
+   * insufficient_forward_bars.
+   */
+  resolutionNotes?: string | null;
 }
 
 export interface BacktestResultsResponse {
