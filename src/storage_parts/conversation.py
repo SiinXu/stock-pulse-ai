@@ -15,7 +15,12 @@ from src.agent.public_contract import (
     agent_history_public_fields,
     sanitize_agent_history_content,
 )
-from src.storage import AgentProviderTurn, ConversationMessage, ConversationSummary
+from src.storage import (
+    AgentProviderTurn,
+    ConversationMessage,
+    ConversationSessionState,
+    ConversationSummary,
+)
 from src.utils.sanitize import log_safe_exception
 
 
@@ -38,6 +43,56 @@ class _ConversationMethods:
             session.add(msg)
             session.flush()
             return int(msg.id)
+
+    def save_conversation_user_turn(
+        self,
+        session_id: str,
+        content: str,
+        selected_skill_ids: Optional[List[str]] = None,
+    ) -> int:
+        """Persist a user message and an optional session Skill selection atomically."""
+        with self.session_scope() as session:
+            msg = ConversationMessage(
+                session_id=session_id,
+                role="user",
+                content=content,
+            )
+            session.add(msg)
+            session.flush()
+
+            if selected_skill_ids is not None:
+                now = datetime.now()
+                values = {
+                    "session_id": session_id,
+                    "selected_skill_ids_json": json.dumps(
+                        selected_skill_ids, ensure_ascii=False
+                    ),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                stmt = sqlite_insert(ConversationSessionState).values(**values)
+                session.execute(
+                    stmt.on_conflict_do_update(
+                        index_elements=["session_id"],
+                        set_={
+                            "selected_skill_ids_json": values["selected_skill_ids_json"],
+                            "updated_at": now,
+                        },
+                    )
+                )
+
+            return int(msg.id)
+
+    def get_conversation_session_selected_skill_ids(
+        self,
+        session_id: str,
+    ) -> Optional[List[str]]:
+        """Return the saved Skill selection, or None when the session has no state row."""
+        with self.session_scope() as session:
+            state = session.get(ConversationSessionState, session_id)
+            if state is None:
+                return None
+            return json.loads(state.selected_skill_ids_json)
 
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
@@ -389,6 +444,11 @@ class _ConversationMethods:
             删除的消息数
         """
         with self.session_scope() as session:
+            session.execute(
+                delete(ConversationSessionState).where(
+                    ConversationSessionState.session_id == session_id
+                )
+            )
             session.execute(
                 delete(AgentProviderTurn).where(
                     AgentProviderTurn.session_id == session_id
