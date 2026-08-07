@@ -553,7 +553,7 @@ const StockScreeningPage: React.FC = () => {
           </div>
         </div>
 
-        <Surface level="interactive" padding="sm" className="inline-flex w-fit items-center gap-2 text-sm">
+        <Surface level="interactive" className="inline-flex w-fit items-center gap-2 px-3 py-2 text-sm">
           <span className={`h-2.5 w-2.5 rounded-full ${isScreeningEnabled ? 'bg-success' : 'bg-warning'}`} />
           <span className="font-medium text-secondary-text">{statusText}</span>
         </Surface>

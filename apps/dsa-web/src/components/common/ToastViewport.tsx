@@ -19,7 +19,7 @@ export const ToastViewport: React.FC<ToastViewportProps> = ({ children }) => {
       aria-live="polite"
       aria-relevant="additions text"
       style={getOverlayStyle('toast')}
-      className="pointer-events-none fixed inset-x-4 bottom-4 flex flex-col gap-3 sm:left-auto sm:w-90"
+      className="pointer-events-none fixed left-1/2 top-4 flex w-[calc(100%-2rem)] -translate-x-1/2 flex-col gap-2.5 sm:w-120"
     >
       {children}
     </div>,

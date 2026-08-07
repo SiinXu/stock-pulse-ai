@@ -10,7 +10,7 @@ import type {
   InvestmentFrameworkEvaluationDimension,
 } from '../../types/investmentFramework';
 import type { UiTextKey } from '../../i18n/uiText';
-import { Button, ConfirmDialog } from '../common';
+import { Button, ConfirmDialog, Modal } from '../common';
 import LineListTextarea from './LineListTextarea';
 import { SettingsAlert } from './SettingsAlert';
 import {
@@ -61,6 +61,8 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 }) => {
   const [pendingDeleteNode, setPendingDeleteNode] = useState<number | null>(null);
   const [dependencyWarning, setDependencyWarning] = useState('');
+  const [newNodeDraft, setNewNodeDraft] = useState<InvestmentFrameworkDecisionNode | null>(null);
+  const [newDimensionDraft, setNewDimensionDraft] = useState<InvestmentFrameworkEvaluationDimension | null>(null);
   const renameSession = useRef<NodeRenameSession | null>(null);
   const nodes = content.decisionTree ?? [];
   const dimensions = content.evaluationDimensions ?? [];
@@ -152,12 +154,17 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 
   const addNode = () => {
     const nodeId = nextFrameworkNodeId(nodes);
-    const nextNode: InvestmentFrameworkDecisionNode = {
+    setNewNodeDraft({
       nodeId,
       question: '',
       branches: [{ condition: '', targetNodeId: null, outcome: '' }],
-    };
-    setNodes([...nodes, nextNode], content.rootNodeId || nodeId);
+    });
+  };
+
+  const confirmAddNode = () => {
+    if (!newNodeDraft) return;
+    setNodes([...nodes, newNodeDraft], content.rootNodeId || newNodeDraft.nodeId);
+    setNewNodeDraft(null);
   };
 
   const duplicateNode = (index: number) => {
@@ -215,10 +222,13 @@ const InvestmentFrameworkStructuredEditor: React.FC<
   };
 
   const addDimension = () => {
-    setDimensions([
-      ...dimensions,
-      { name: '', weight: 0, criteria: [], description: null },
-    ]);
+    setNewDimensionDraft({ name: '', weight: 0, criteria: [], description: null });
+  };
+
+  const confirmAddDimension = () => {
+    if (!newDimensionDraft) return;
+    setDimensions([...dimensions, newDimensionDraft]);
+    setNewDimensionDraft(null);
   };
 
   const duplicateDimension = (index: number) => {
@@ -718,6 +728,241 @@ const InvestmentFrameworkStructuredEditor: React.FC<
           })}
         </div>
       </section>
+
+      <Modal
+        isOpen={newNodeDraft !== null}
+        onClose={() => setNewNodeDraft(null)}
+        title={t('settings.frameworkAddNode')}
+        size="wide"
+        footer={(
+          <>
+            <Button type="button" variant="secondary" onClick={() => setNewNodeDraft(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" form="investment-framework-new-node-form" variant="primary">
+              {t('common.confirm')}
+            </Button>
+          </>
+        )}
+      >
+        {newNodeDraft ? (
+          <form
+            id="investment-framework-new-node-form"
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              confirmAddNode();
+            }}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-secondary-text">
+                  {t('settings.frameworkNodeId')}
+                </span>
+                <input
+                  className={fieldClass}
+                  aria-label={t('settings.frameworkNodeIdAria', { number: nodes.length + 1 })}
+                  value={newNodeDraft.nodeId}
+                  required
+                  onChange={(event) => setNewNodeDraft((current) => current ? ({
+                    ...current,
+                    nodeId: event.target.value,
+                  }) : current)}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-secondary-text">
+                  {t('settings.frameworkNodeQuestion')}
+                </span>
+                <input
+                  className={fieldClass}
+                  aria-label={t('settings.frameworkNodeQuestionAria', { number: nodes.length + 1 })}
+                  value={newNodeDraft.question}
+                  required
+                  onChange={(event) => setNewNodeDraft((current) => current ? ({
+                    ...current,
+                    question: event.target.value,
+                  }) : current)}
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 p-3 sm:grid-cols-3">
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-text">
+                  {t('settings.frameworkBranchCondition', { number: 1 })}
+                </span>
+                <input
+                  className={fieldClass}
+                  value={newNodeDraft.branches[0].condition}
+                  required
+                  onChange={(event) => setNewNodeDraft((current) => current ? ({
+                    ...current,
+                    branches: [{ ...current.branches[0], condition: event.target.value }],
+                  }) : current)}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-text">
+                  {t('settings.frameworkBranchDestination')}
+                </span>
+                <select
+                  className={fieldClass}
+                  value={newNodeDraft.branches[0].targetNodeId != null ? 'target' : 'outcome'}
+                  onChange={(event) => setNewNodeDraft((current) => current ? ({
+                    ...current,
+                    branches: [{
+                      ...current.branches[0],
+                      ...(event.target.value === 'target'
+                        ? { targetNodeId: '', outcome: null }
+                        : { targetNodeId: null, outcome: '' }),
+                    }],
+                  }) : current)}
+                >
+                  <option value="outcome">{t('settings.frameworkBranchOutcome')}</option>
+                  <option value="target">{t('settings.frameworkBranchTarget')}</option>
+                </select>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-muted-text">
+                  {newNodeDraft.branches[0].targetNodeId != null
+                    ? t('settings.frameworkBranchTarget')
+                    : t('settings.frameworkBranchOutcome')}
+                </span>
+                {newNodeDraft.branches[0].targetNodeId != null ? (
+                  <select
+                    className={fieldClass}
+                    value={newNodeDraft.branches[0].targetNodeId ?? ''}
+                    required
+                    onChange={(event) => setNewNodeDraft((current) => current ? ({
+                      ...current,
+                      branches: [{
+                        ...current.branches[0],
+                        targetNodeId: event.target.value,
+                        outcome: null,
+                      }],
+                    }) : current)}
+                  >
+                    <option value="">{t('settings.frameworkSelectTarget')}</option>
+                    {nodes.map((node, index) => (
+                      <option key={`${node.nodeId}-${index}`} value={node.nodeId}>{node.nodeId}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className={fieldClass}
+                    value={newNodeDraft.branches[0].outcome ?? ''}
+                    required
+                    onChange={(event) => setNewNodeDraft((current) => current ? ({
+                      ...current,
+                      branches: [{
+                        ...current.branches[0],
+                        targetNodeId: null,
+                        outcome: event.target.value,
+                      }],
+                    }) : current)}
+                  />
+                )}
+              </label>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={newDimensionDraft !== null}
+        onClose={() => setNewDimensionDraft(null)}
+        title={t('settings.frameworkAddDimension')}
+        size="wide"
+        footer={(
+          <>
+            <Button type="button" variant="secondary" onClick={() => setNewDimensionDraft(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" form="investment-framework-new-dimension-form" variant="primary">
+              {t('common.confirm')}
+            </Button>
+          </>
+        )}
+      >
+        {newDimensionDraft ? (
+          <form
+            id="investment-framework-new-dimension-form"
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              confirmAddDimension();
+            }}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8rem]">
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-secondary-text">
+                  {t('settings.frameworkDimensionName')}
+                </span>
+                <input
+                  className={fieldClass}
+                  aria-label={t('settings.frameworkDimensionNameAria', { number: dimensions.length + 1 })}
+                  value={newDimensionDraft.name}
+                  required
+                  onChange={(event) => setNewDimensionDraft((current) => current ? ({
+                    ...current,
+                    name: event.target.value,
+                  }) : current)}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-secondary-text">
+                  {t('settings.frameworkDimensionWeight')}
+                </span>
+                <input
+                  className={fieldClass}
+                  aria-label={t('settings.frameworkDimensionWeightAria', { number: dimensions.length + 1 })}
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  value={Number.isFinite(newDimensionDraft.weight) ? newDimensionDraft.weight : ''}
+                  required
+                  onChange={(event) => setNewDimensionDraft((current) => current ? ({
+                    ...current,
+                    weight: event.target.value === '' ? Number.NaN : Number(event.target.value),
+                  }) : current)}
+                />
+              </label>
+            </div>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-secondary-text">
+                {t('settings.frameworkDimensionDescription')}
+              </span>
+              <textarea
+                className={`${fieldClass} min-h-16`}
+                value={newDimensionDraft.description ?? ''}
+                onChange={(event) => setNewDimensionDraft((current) => current ? ({
+                  ...current,
+                  description: event.target.value || null,
+                }) : current)}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-secondary-text">
+                {t('settings.frameworkDimensionCriteria')}
+              </span>
+              <LineListTextarea
+                className={`${fieldClass} min-h-20`}
+                aria-label={t('settings.frameworkDimensionCriteria')}
+                values={newDimensionDraft.criteria}
+                placeholder={t('settings.frameworkListPlaceholder')}
+                onValuesChange={(criteria) => setNewDimensionDraft((current) => current ? ({
+                  ...current,
+                  criteria,
+                }) : current)}
+              />
+            </label>
+          </form>
+        ) : null}
+      </Modal>
 
       <ConfirmDialog
         isOpen={pendingDeleteNode !== null}

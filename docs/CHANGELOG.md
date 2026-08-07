@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Investment Committee analysis mode (default-off `AGENT_INVESTMENT_COMMITTEE_MODE`): curated persona Skill preset via the existing specialist path + StrategyEngine, with a structured `committee_deliberation` report section (#545).
+- [Fixed] Reduced the screening availability status surface to a compact size.
+- [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.
+- [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.
+- [Fixed] Tightened history metadata, task-count, chat-history, scheduler-status, and Market Review sentiment/share controls to match their intended visual hierarchy.
+- [Fixed] Removed the redundant Backtest Filter action, aligned its Stock field, and clarified the relationship between window days and next-day validation.
 - [Added] Offline financial agent evaluation benchmark (V0): structural metrics over frozen agent_runtime replays, deterministic runner, committed baseline, and bilingual docs (#252).
 - [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
 - [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
@@ -32,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
 - [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
 - [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
+- [Added] Backtest phase-1 platform honesty: run responses echo `applied_config` (window, min age, candidate limit, engine, neutral band, force, dates), validation failures use stable error codes, insufficient rows persist resolution notes (`missing_daily_bars` / `insufficient_forward_bars`), and the Web backtest page surfaces notes, summary integrity counts, and advanced run options.
 - [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
@@ -2714,4 +2720,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 [1.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/4df277e109c38604e31e2184fcff36f561f8ffa5
 [1.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/5d5c095be55ff8cc2b0ed219ea35a9135536de38
 [1.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v1.0.0
-
