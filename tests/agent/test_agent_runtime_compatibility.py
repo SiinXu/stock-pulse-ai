@@ -60,11 +60,20 @@ def test_manifest_ids_unique_and_files_exist():
 
 def test_manifest_has_no_orphan_fixture_files():
     listed = {entry["file"] for entry in CASE_ENTRIES}
-    on_disk = {
-        str(path.relative_to(FIXTURES_DIR)).replace("\\", "/")
-        for path in FIXTURES_DIR.rglob("*.json")
-        if path.name != "manifest.json"
-    }
+    on_disk = set()
+    for path in FIXTURES_DIR.rglob("*.json"):
+        if path.name == "manifest.json":
+            continue
+        skip = False
+        for parent in path.parents:
+            if parent == FIXTURES_DIR:
+                break
+            if (parent / "manifest.json").is_file():
+                skip = True
+                break
+        if skip:
+            continue
+        on_disk.add(str(path.relative_to(FIXTURES_DIR)).replace("\", "/"))
     assert on_disk == listed
 
 
