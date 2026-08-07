@@ -295,6 +295,7 @@ If you prefer modifying files, configuring this in the `.env` file is also very 
 
 1. **Declare your channels first**: `LLM_CHANNELS=channel_name_1,channel_name_2`
 2. **Provide configurations for each channel** (Note the uppercase): `LLM_{CHANNEL_NAME}_XXX`
+3. **Optional API surface**: `LLM_{CHANNEL_NAME}_API_SURFACE=chat_completions` (default) or `responses`. The Responses surface requires `PROTOCOL=openai`, rejects LiteLLM direct provider prefixes on models, and keeps public route aliases unchanged while encoding `openai/responses/<model>` on the wire.
 
 ### Example: Configuring DeepSeek and a Third-party Relay with Fallbacks
 ```env

@@ -1,7 +1,8 @@
 """Pure value parsers and LLM route helpers for :mod:`src.config`."""
 
 import os
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from src.llm import generation_params as llm_generation_params
@@ -10,8 +11,10 @@ from src.config_parts.defaults import (
     AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE,
     AGENT_CONTEXT_COMPRESSION_PROFILES,
     NEWS_STRATEGY_WINDOWS,
+    SUPPORTED_LLM_CHANNEL_API_SURFACES,
     SUPPORTED_LLM_CHANNEL_PROTOCOLS,
     AgentContextCompressionPreset,
+    _FALLBACK_LITELLM_MODEL_PROVIDERS,
     _FALSEY_ENV_VALUES,
     _MANAGED_LITELLM_KEY_PROVIDERS,
     logger,
@@ -201,6 +204,100 @@ def canonicalize_llm_channel_protocol(value: Optional[str]) -> str:
     return aliases.get(candidate, candidate)
 
 
+def canonicalize_llm_channel_api_surface(value: Optional[str]) -> str:
+    """Normalize an LLM channel endpoint surface label."""
+    candidate = (value or "").strip().lower().replace("-", "_")
+    aliases = {
+        "chat": "chat_completions",
+        "chat_completion": "chat_completions",
+        "completions": "chat_completions",
+        "response": "responses",
+        "responses_api": "responses",
+    }
+    return aliases.get(candidate, candidate)
+
+
+def normalize_llm_channel_api_surface(value: Optional[str]) -> str:
+    """Return a supported endpoint surface, defaulting to Chat Completions."""
+    normalized = canonicalize_llm_channel_api_surface(value)
+    if normalized in SUPPORTED_LLM_CHANNEL_API_SURFACES:
+        return normalized
+    return "chat_completions"
+
+
+def is_supported_llm_channel_api_surface_value(value: Optional[str]) -> bool:
+    """Return whether a raw API surface is blank or recognized."""
+    canonical = canonicalize_llm_channel_api_surface(value)
+    return not canonical or canonical in SUPPORTED_LLM_CHANNEL_API_SURFACES
+
+
+@lru_cache(maxsize=1)
+def get_litellm_model_providers() -> frozenset[str]:
+    """Return provider identifiers from the installed LiteLLM routing enum.
+
+    LiteLLM adds direct providers independently of this repository. Loading
+    its enum keeps channel validation aligned with the actual router instead
+    of relying on a permanently incomplete local allow-list. The fallback is
+    only for lightweight test stubs or a broken optional import; a production
+    installation gets the complete provider set from its pinned LiteLLM.
+    """
+    providers = set(_FALLBACK_LITELLM_MODEL_PROVIDERS)
+    try:
+        from litellm.types.utils import LlmProviders
+
+        providers.update(
+            str(provider.value).strip().lower()
+            for provider in LlmProviders
+            if str(getattr(provider, "value", "")).strip()
+        )
+    except (ImportError, AttributeError, TypeError):
+        logger.debug("LiteLLM provider metadata unavailable; using the compatibility fallback")
+    return frozenset(providers)
+
+
+def get_explicit_llm_channel_model_provider(model: str) -> str:
+    """Return the explicit LiteLLM provider prefix, if the model has one.
+
+    A slash alone does not establish a provider: OpenAI-compatible gateways
+    commonly expose provider-owned IDs such as ``Qwen/Qwen3`` or
+    ``deepseek-ai/DeepSeek-V3``. Only prefixes understood as LiteLLM providers
+    are treated as routing declarations.
+    """
+    normalized_model = (model or "").strip()
+    if "/" not in normalized_model:
+        return ""
+    raw_prefix = normalized_model.split("/", 1)[0].lower()
+    canonical_prefix = canonicalize_llm_channel_protocol(raw_prefix)
+    providers = get_litellm_model_providers()
+    if raw_prefix in providers:
+        return raw_prefix
+    if canonical_prefix in providers:
+        return canonical_prefix
+    return ""
+
+
+def apply_litellm_api_surface(model: str, api_surface: Optional[str]) -> str:
+    """Encode an explicit API surface in a LiteLLM wire model.
+
+    LiteLLM's ``provider/responses/model`` convention keeps the public Router
+    alias stable while letting ``completion()`` bridge messages, streaming,
+    tools, responses, and usage through the provider's Responses endpoint.
+    """
+    normalized_model = (model or "").strip()
+    if not normalized_model or normalize_llm_channel_api_surface(api_surface) != "responses":
+        return normalized_model
+    provider = get_explicit_llm_channel_model_provider(normalized_model)
+    if provider != "openai":
+        raise ValueError(
+            "Responses API surface requires a normalized openai/<model> route; "
+            f"got {normalized_model!r}"
+        )
+    provider, remainder = normalized_model.split("/", 1)
+    if remainder.startswith("responses/"):
+        return normalized_model
+    return f"{provider}/responses/{remainder}"
+
+
 # Local endpoint hostnames that exempt a channel from requiring an API key.
 # Exposed via the provider-catalog API so the Web derives the same rule from
 # this single authority instead of hardcoding its own host list.
@@ -268,15 +365,10 @@ def normalize_llm_channel_model(model: str, protocol: Optional[str], base_url: O
         raw_prefix, remainder = normalized_model.split("/", 1)
         prefix = raw_prefix.lower()
         canonical_prefix = canonicalize_llm_channel_protocol(prefix)
-        known_providers = _MANAGED_LITELLM_KEY_PROVIDERS | set(SUPPORTED_LLM_CHANNEL_PROTOCOLS) | {
-            "minimax",
-            "cohere", "huggingface", "bedrock", "sagemaker", "azure",
-            "replicate", "together_ai", "palm", "text-completion-openai",
-            "command-r", "groq", "cerebras", "fireworks_ai", "friendliai",
-        }
-        if prefix in known_providers:
+        providers = get_litellm_model_providers()
+        if prefix in providers:
             return normalized_model
-        if canonical_prefix in known_providers:
+        if canonical_prefix in providers:
             return f"{canonical_prefix}/{remainder}"
         # Not a real provider prefix — add one so LiteLLM routes correctly.
         if resolved_protocol:
@@ -286,6 +378,59 @@ def normalize_llm_channel_model(model: str, protocol: Optional[str], base_url: O
     if not resolved_protocol:
         return normalized_model
     return f"{resolved_protocol}/{normalized_model}"
+
+
+
+def find_incompatible_llm_channel_models(
+    models: List[str],
+    protocol: Optional[str],
+    api_surface: Optional[str],
+    base_url: Optional[str] = None,
+) -> List[str]:
+    """Return models whose actual LiteLLM route conflicts with the surface.
+
+    Responses routing is implemented through LiteLLM's OpenAI bridge, so both
+    the channel protocol and every normalized model route must resolve to the
+    OpenAI provider. This is the shared invariant used by validation, runtime
+    loading, diagnostics, and screening.
+    """
+    if normalize_llm_channel_api_surface(api_surface) != "responses":
+        return []
+    resolved_protocol = resolve_llm_channel_protocol(
+        protocol,
+        base_url=base_url,
+        models=models,
+    )
+    if resolved_protocol != "openai":
+        return [model for model in models if (model or "").strip()]
+    incompatible: List[str] = []
+    for model in models:
+        normalized_model = normalize_llm_channel_model(model, resolved_protocol, base_url)
+        if normalized_model and get_explicit_llm_channel_model_provider(normalized_model) != "openai":
+            incompatible.append(model)
+    return incompatible
+
+
+def find_llm_channel_surface_conflicts(
+    channels: List[Dict[str, Any]],
+) -> Dict[str, Tuple[str, ...]]:
+    """Return public route aliases declared with more than one API surface."""
+    route_surfaces: Dict[str, set[str]] = {}
+    for channel in channels:
+        if not isinstance(channel, dict) or not channel.get("enabled", True):
+            continue
+        protocol = str(channel.get("protocol") or "")
+        base_url = str(channel.get("base_url") or "")
+        surface = normalize_llm_channel_api_surface(channel.get("api_surface"))
+        for raw_model in channel.get("models") or []:
+            model = normalize_llm_channel_model(str(raw_model), protocol, base_url)
+            if model:
+                route_surfaces.setdefault(model, set()).add(surface)
+    return {
+        model: tuple(sorted(surfaces))
+        for model, surfaces in route_surfaces.items()
+        if len(surfaces) > 1
+    }
 
 
 def get_configured_llm_models(model_list: List[Dict[str, Any]]) -> List[str]:

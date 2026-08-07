@@ -159,15 +159,16 @@ The current repository CI mainly contains:
 | --- | --- | --- | --- |
 | `changes` | `.github/workflows/ci.yml` | Path-filter job that sets the `frontend` output used to decide whether `web-gate` / `web-e2e` run | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
-| `backend-gate` | `.github/workflows/ci.yml` | Executes `./scripts/ci_gate.sh` | Yes |
-| `python-minimum` | `.github/workflows/ci.yml` | Installs the locked CI dependencies and executes `./scripts/ci_gate.sh` on Python 3.10 | Yes |
+| `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest (FULL fallback); push-to-main: full suite + coverage floor | Yes |
+| `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: full offline suite on Python 3.10 | Yes |
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
-| `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test`, and `npm run build` during frontend changes | Yes (triggered) |
-| `web-e2e` | `.github/workflows/ci.yml` | For frontend changes, starts a real backend, Vite, and local fake model endpoint with an isolated temporary `ENV_FILE`, then runs `npm run test:smoke` (Playwright) | Yes (when triggered) |
+| `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test`, and `npm run build` during frontend changes | Yes on PR when frontend paths change (not a ruleset required name; still the frontend quality gate) |
+| `web-e2e` | `.github/workflows/ci.yml` | Real backend + Vite + Playwright smoke | No on PR; observation on push-to-main when path filter matches |
+| `api-real-client` | `.github/workflows/ci.yml` | `tests/api` with real Starlette TestClient | No on PR; observation on push-to-main |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
-| `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, auxiliary item |
+| `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, opt-in via `workflow_dispatch` only |
 
 If there is a corresponding CI result on the existing PR, you can directly quote the CI conclusion; if the CI does not cover the changes or the local environment differs significantly from the CI environment, supplement local verification and gaps.
 
