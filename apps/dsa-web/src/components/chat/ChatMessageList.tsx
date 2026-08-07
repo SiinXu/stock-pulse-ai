@@ -103,8 +103,8 @@ export function ChatMessageList({
               </div>
               <div
                 className={cn(
-                  'group/message min-w-0 w-fit max-w-[min(100%,48rem)] overflow-hidden px-5 py-3.5 transition-colors',
-                  msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai',
+                  'group/message relative min-w-0 w-fit max-w-[min(100%,48rem)] px-5 py-3.5 transition-colors',
+                  msg.role === 'user' ? 'overflow-hidden chat-bubble-user' : 'mb-8 overflow-visible chat-bubble-ai',
                 )}
               >
                 {msg.role === 'assistant' && skillLabel && (
@@ -142,10 +142,10 @@ export function ChatMessageList({
                     <div className="chat-prose">
                       <Markdown remarkPlugins={[remarkGfm]}>{displayContent}</Markdown>
                     </div>
-                    <div className="chat-message-actions">
+                    <div className="chat-message-actions absolute left-0 top-full z-10 !mt-1">
                       <span
                         data-slot="chat-message-action"
-                        className="flex h-11 w-11 items-center justify-center"
+                        className="flex h-8 w-8 items-center justify-center"
                       >
                         <IconButton
                           size="compact"
@@ -162,7 +162,7 @@ export function ChatMessageList({
                       </span>
                       <span
                         data-slot="chat-message-action"
-                        className="flex h-11 w-11 items-center justify-center"
+                        className="flex h-8 w-8 items-center justify-center"
                       >
                         <IconButton
                           size="compact"

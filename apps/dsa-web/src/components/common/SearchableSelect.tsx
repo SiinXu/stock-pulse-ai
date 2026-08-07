@@ -41,6 +41,8 @@ interface SearchableSelectProps {
   emptyText?: string;
   searchPlaceholder?: string;
   searchInputRadius?: 'md' | 'lg';
+  /** When false, reserve the trigger width for the primary selected label. */
+  showSublabelInTrigger?: boolean;
   /**
    * Marker rendered when the current value is not in the options list. The
    * value is kept (never silently cleared) so a stale-but-persisted config
@@ -72,6 +74,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   emptyText,
   searchPlaceholder,
   searchInputRadius = 'md',
+  showSublabelInTrigger = true,
   staleValueLabel,
   staleValueText,
   clearable = false,
@@ -265,10 +268,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           )}
         >
           {triggerText ? (
-            <span className="flex min-w-0 items-baseline gap-2">
-              <span className="truncate">{triggerText}</span>
-              {selectedOption?.sublabel ? (
-                <span className="shrink-0 truncate text-xs text-muted-text">{selectedOption.sublabel}</span>
+            <span className="flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden">
+              <span className="min-w-0 flex-1 truncate">{triggerText}</span>
+              {showSublabelInTrigger && selectedOption?.sublabel ? (
+                <span className="max-w-[45%] min-w-0 truncate text-xs text-muted-text">{selectedOption.sublabel}</span>
               ) : null}
             </span>
           ) : (

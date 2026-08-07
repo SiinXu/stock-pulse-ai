@@ -1,9 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import type { SearchableSelectOption } from '../common';
+import { SearchableSelect, type SearchableSelectOption } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
-import { ModelMultiSelect } from './ModelMultiSelect';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT } from '../../locales/settingsControls';
 import { decodeModelRef } from '../../utils/modelRef';
@@ -89,10 +88,9 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
     setRoutes(next);
   };
   const selectableOptions = options.filter((option) => option.value !== primaryRoute);
-  const optionLabelByRoute = new Map(selectableOptions.map((option) => [
-    option.value,
-    option.sublabel ? `${option.label} · ${option.sublabel}` : option.label,
-  ]));
+  const addableOptions = selectableOptions.filter((option) => (
+    !routes.some((entry) => resolveRoute(entry) === option.value)
+  ));
   const toggleRoute = (route: string) => {
     if (routes.some((entry) => resolveRoute(entry) === route)) {
       setRoutes(routes.filter((entry) => resolveRoute(entry) !== route));
@@ -162,13 +160,14 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
           ))}
         </ul>
       )}
-      <ModelMultiSelect
-        options={selectableOptions.map((option) => option.value)}
-        isSelected={(route) => routes.some((entry) => resolveRoute(entry) === route)}
-        onToggle={toggleRoute}
+      <SearchableSelect
+        value=""
+        onChange={toggleRoute}
+        options={addableOptions}
         disabled={disabled}
-        language={language}
-        getOptionLabel={(route) => optionLabelByRoute.get(route) ?? route}
+        placeholder={text.selectFallbacks}
+        emptyText={text.noMatchingModels}
+        searchPlaceholder={text.searchModelsPlaceholder}
         ariaLabel={text.selectFallbacks}
       />
     </div>

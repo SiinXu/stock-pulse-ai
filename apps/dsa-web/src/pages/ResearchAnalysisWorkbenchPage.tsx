@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Upload,
   Workflow,
+  X,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { agentApi, type SkillInfo } from '../api/agent';
@@ -37,6 +38,7 @@ import {
   EmptyState,
   FileInput,
   InlineAlert,
+  IconButton,
   Modal,
   PageHeader,
   SegmentedControl,
@@ -177,7 +179,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const [batchNotice, setBatchNotice] = useState<WorkbenchNotice>(null);
   const [markdownRecordId, setMarkdownRecordId] = useState<number | null>(null);
-
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -925,7 +927,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
 
       <SegmentedControl
         id={WORKBENCH_TABS_ID}
-        className="mt-5"
+        className="mt-5 dark:!bg-foreground/10 dark:[&_.segmented-control-tab]:!text-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:!text-background"
         ariaLabel={t('analysisWorkbench.tabsLabel')}
         value={routeState.segment}
         options={tabItems.map((item) => ({
@@ -1219,41 +1221,27 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             )}
           />
         ) : (
-          <WorkspaceLayout
-            railPosition="start"
-            rail={(
-              <HistoryList
-                className="min-h-96"
-                items={analysisHistoryItems}
-                isLoading={isLoadingHistory}
-                isLoadingMore={isLoadingMore}
-                hasMore={hasMore}
-                selectedId={routeState.recordId ?? undefined}
-                selectedIds={new Set(selectedHistoryIds)}
-                isDeleting={isDeletingHistory}
-                onItemClick={navigateToRecord}
-                onLoadMore={() => void loadMoreHistory()}
-                onToggleItemSelection={toggleHistorySelection}
-                onToggleSelectAll={toggleAllHistory}
-                onDeleteSelected={requestDeleteSelectedHistory}
-              />
-            )}
-          >
-            <section className="min-w-0" aria-label={t('analysisWorkbench.history')}>
+          <WorkspaceLayout>
+            <section className="relative min-w-0" aria-label={t('analysisWorkbench.history')}>
               {isLoadingReport ? (
                 <DashboardStateBlock title={t('home.loadingReport')} loading />
               ) : selectedAnalysisReport ? (
                 <>
                   {!isHistoryTrendOpen ? (
-                    <div className="mb-3 flex flex-wrap items-end justify-end gap-2">
+                    <div className="mb-3 flex flex-nowrap items-end justify-end gap-2 overflow-x-auto pb-1">
+                      <IconButton type="button" variant="outline" size="default" onClick={() => setIsHistoryPanelOpen((current) => !current)} aria-label={t('analysisWorkbench.history')} aria-expanded={isHistoryPanelOpen} aria-controls="analysis-workbench-history-panel" className="ml-2">
+                        <History aria-hidden="true" />
+                      </IconButton>
                       <AnalysisPhaseSelect
                         id="analysis-workbench-reanalysis-phase"
                         value={analysisPhase}
                         onChange={setAnalysisPhase}
                         label={t('analysis.phase')}
-                        hint={t('analysis.phaseHint')}
                         disabled={isAnalyzing}
-                        className="mr-auto w-full sm:w-64"
+                        className="mr-auto w-44 shrink-0"
+                        labelAction={(
+                          <Tooltip content={t('analysis.phaseHint')}><button type="button" aria-label={`${t('analysis.phase')} · ${t('common.details')}`} className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"><CircleHelp className="h-3.5 w-3.5" aria-hidden="true" /></button></Tooltip>
+                        )}
                       />
                       <Button
                         type="button"
@@ -1354,6 +1342,12 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                   )}
                 />
               )}
+              {isHistoryPanelOpen ? (
+                <div id="analysis-workbench-history-panel" data-testid="analysis-history-popover" className="absolute left-2 top-14 z-30 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border/80 bg-elevated shadow-2xl shadow-black/30">
+                  <IconButton type="button" variant="bare" size="compact" tooltip={false} onClick={() => setIsHistoryPanelOpen(false)} aria-label={t('common.close')} className="absolute right-3 top-3 z-10"><X aria-hidden="true" /></IconButton>
+                  <HistoryList className="[&>aside]:max-h-[min(22rem,calc(100dvh-14rem))] [&>aside]:rounded-2xl [&>aside]:border-0 [&>aside]:bg-transparent [&_[data-testid=home-history-list-scroll]]:!p-3 [&_[data-testid=home-history-list-scroll]_.text-center.py-5]:hidden [&_[data-testid=history-card-meta]]:flex-nowrap [&_[data-testid=history-card-meta]]:gap-1 [&_[data-testid=history-card-meta]>span]:whitespace-nowrap" items={analysisHistoryItems} isLoading={isLoadingHistory} isLoadingMore={isLoadingMore} hasMore={hasMore} selectedId={routeState.recordId ?? undefined} selectedIds={new Set(selectedHistoryIds)} isDeleting={isDeletingHistory} onItemClick={(recordId) => { navigateToRecord(recordId); setIsHistoryPanelOpen(false); }} onLoadMore={() => void loadMoreHistory()} onToggleItemSelection={toggleHistorySelection} onToggleSelectAll={toggleAllHistory} onDeleteSelected={requestDeleteSelectedHistory} />
+                </div>
+              ) : null}
             </section>
           </WorkspaceLayout>
         )}

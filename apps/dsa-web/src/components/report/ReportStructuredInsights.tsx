@@ -48,7 +48,7 @@ const DetailLine: React.FC<{ label: string; value?: React.ReactNode }> = ({
     return null;
   }
   return (
-    <div className="grid gap-1 sm:grid-cols-[9rem_minmax(0,1fr)]">
+    <div className="grid gap-1 sm:grid-cols-[6rem_minmax(0,1fr)]">
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-text">{label}</dt>
       <dd className="min-w-0 text-sm text-foreground">{value}</dd>
     </div>

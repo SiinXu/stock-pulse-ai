@@ -93,6 +93,51 @@ describe('SearchableSelect', () => {
     }
   });
 
+  it('keeps the selected model label visible when the connection label is long', () => {
+    render(
+      <SearchableSelect
+        value="minimax/minimax-m3"
+        onChange={() => {}}
+        options={[{
+          value: 'minimax/minimax-m3',
+          label: 'minimax/minimax-m3',
+          sublabel: '自定义兼容服务',
+        }]}
+        ariaLabel="主要模型"
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '主要模型' });
+    const textContainer = trigger.querySelector('span');
+    const modelLabel = screen.getByText('minimax/minimax-m3');
+    const connectionLabel = screen.getByText('自定义兼容服务');
+
+    expect(textContainer).toHaveClass('flex-1', 'overflow-hidden');
+    expect(modelLabel).toHaveClass('min-w-0', 'flex-1');
+    expect(connectionLabel).toHaveClass('max-w-[45%]');
+    expect(connectionLabel).not.toHaveClass('shrink-0');
+  });
+
+  it('can reserve the full trigger width for the selected model label', () => {
+    render(
+      <SearchableSelect
+        value="agent/deepseek-v4-pro"
+        onChange={() => {}}
+        options={[{
+          value: 'agent/deepseek-v4-pro',
+          label: 'agent/deepseek-v4-pro',
+          sublabel: '自定义兼容服务',
+        }]}
+        ariaLabel="Agent 主要模型"
+        showSublabelInTrigger={false}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Agent 主要模型' });
+    expect(trigger).toHaveTextContent('agent/deepseek-v4-pro');
+    expect(trigger).not.toHaveTextContent('自定义兼容服务');
+  });
+
   it('supports Arrow keys, aria-activedescendant, Enter, and Escape', () => {
     const onChange = vi.fn();
     render(

@@ -43,6 +43,18 @@ if TYPE_CHECKING:
 
 
 class _SystemConfigSetupMethods:
+    @staticmethod
+    def _setup_model_runtime_route(model: str) -> str:
+        """Return the runtime route for a ModelRef while preserving legacy routes."""
+        from src.llm.model_ref import decode_model_ref
+
+        normalized = (model or "").strip()
+        try:
+            decoded = decode_model_ref(normalized)
+        except ValueError:
+            return normalized
+        return decoded.runtime_route if decoded else normalized
+
     @classmethod
     def _anspire_legacy_llm_enabled(cls, effective_map: Dict[str, str]) -> bool:
         return llm_channel_map.anspire_legacy_llm_enabled(effective_map)
@@ -180,11 +192,21 @@ class _SystemConfigSetupMethods:
         return ""
 
     def _resolve_setup_primary_model(self, effective_map: Dict[str, str]) -> Tuple[str, str]:
+        from src.llm.model_ref import is_model_ref, normalize_model_ref
+
         explicit_model = (effective_map.get("LITELLM_MODEL") or "").strip()
         yaml_models = self._collect_yaml_models_from_map(effective_map)
         channel_models = self._collect_setup_channel_models(effective_map)
+        channel_model_refs = set(self._collect_llm_channel_model_refs_from_map(effective_map))
 
         if explicit_model:
+            if is_model_ref(explicit_model):
+                normalized_ref = normalize_model_ref(explicit_model)
+                if yaml_models:
+                    return "", "主要模型未出现在当前 LiteLLM YAML model_list 中"
+                if normalized_ref in channel_model_refs:
+                    return normalized_ref, "explicit"
+                return "", "主要模型缺少可用连接或匹配的 API 密钥"
             if _uses_direct_env_provider(explicit_model):
                 return explicit_model, "explicit"
             has_direct_source = self._has_setup_runtime_source_for_model(explicit_model, effective_map)
@@ -366,7 +388,8 @@ class _SystemConfigSetupMethods:
                 )
             if primary_check["status"] == "configured":
                 primary_model, _source = self._resolve_setup_primary_model(effective_map)
-                if primary_model in hermes_routes and primary_model not in non_hermes_routes:
+                primary_runtime_route = self._setup_model_runtime_route(primary_model)
+                if primary_runtime_route in hermes_routes and primary_runtime_route not in non_hermes_routes:
                     return self._setup_check(
                         "llm_agent",
                         "Agent 模型",
@@ -394,26 +417,27 @@ class _SystemConfigSetupMethods:
                 "请先补齐主要模型配置。",
             )
 
-        configured_models = set(
-            self._collect_yaml_models_from_map(effective_map)
-            or self._collect_setup_channel_models(effective_map)
-        )
+        yaml_models = self._collect_yaml_models_from_map(effective_map)
+        configured_models = set(yaml_models or self._collect_setup_channel_models(effective_map))
+        if not yaml_models:
+            configured_models.update(self._collect_llm_channel_model_refs_from_map(effective_map))
         agent_model = normalize_agent_litellm_model(agent_model_raw, configured_models=configured_models)
-        if agent_model in hermes_routes and agent_model not in non_hermes_routes:
+        agent_runtime_route = self._setup_model_runtime_route(agent_model)
+        if agent_runtime_route in hermes_routes and agent_runtime_route not in non_hermes_routes:
             return self._setup_check(
                 "llm_agent",
                 "Agent 模型",
                 "agent",
                 True,
                 "needs_action",
-                f"Agent 主要模型 {agent_model} 只有 Hermes deployment，Phase 3 不支持 Agent 工具调用。",
+                f"Agent 主要模型 {agent_runtime_route} 只有 Hermes deployment，Phase 3 不支持 Agent 工具调用。",
                 "请选择非 Hermes Agent 模型，或配置 mixed route 中的非 Hermes deployment。",
             )
-        configured_agent_message = f"已配置 Agent 主要模型: {agent_model}"
+        configured_agent_message = f"已配置 Agent 主要模型: {agent_runtime_route}"
         if generation_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
             local_cli_display = resolve_local_cli_preset(generation_backend).display_name
             configured_agent_message = (
-                f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用主要模型: {agent_model}"
+                f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用主要模型: {agent_runtime_route}"
             )
         if _uses_direct_env_provider(agent_model):
             return self._setup_check(
@@ -443,7 +467,7 @@ class _SystemConfigSetupMethods:
             "agent",
             True,
             "needs_action",
-            f"Agent 主要模型 {agent_model} 缺少可用连接或匹配的 API 密钥。",
+            f"Agent 主要模型 {agent_runtime_route} 缺少可用连接或匹配的 API 密钥。",
             "请重新选择 Agent 主要模型或补齐对应模型连接配置。",
         )
 

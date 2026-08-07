@@ -193,6 +193,53 @@ def test_rejects_any_private_answer_from_mixed_dns_results() -> None:
             validate_outbound_url("https://mixed.example/path")
 
 
+def test_proxy_fake_ip_dns_requires_explicit_opt_in(monkeypatch) -> None:
+    fake_ip_answers = [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("198.18.0.93", 443)),
+        (
+            socket.AF_INET6,
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP,
+            "",
+            ("fdfe:dcba:9876::49", 443, 0, 0),
+        ),
+    ]
+    with patch(
+        "src.security.outbound_policy.socket.getaddrinfo",
+        return_value=fake_ip_answers,
+    ):
+        with pytest.raises(OutboundPolicyError, match="private_dns_address"):
+            validate_outbound_url("https://api.openai.com/v1/models")
+
+        monkeypatch.setenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", "true")
+        target = validate_outbound_url("https://api.openai.com/v1/models")
+
+    assert target.hostname == "api.openai.com"
+
+
+def test_local_only_mode_takes_precedence_over_proxy_fake_ip_opt_in(monkeypatch) -> None:
+    monkeypatch.setenv("LOCAL_ONLY_MODE", "true")
+    monkeypatch.setenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", "true")
+
+    with pytest.raises(OutboundPolicyError, match="local_only_mode_blocked"):
+        validate_outbound_url("https://api.openai.com/v1/models", resolve_dns=False)
+
+
+def test_proxy_fake_ip_opt_in_still_rejects_literal_and_non_public_targets(monkeypatch) -> None:
+    monkeypatch.setenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", "true")
+    with pytest.raises(OutboundPolicyError, match="private_ip_blocked"):
+        validate_outbound_url("https://198.18.0.93/v1/models", resolve_dns=False)
+
+    with patch(
+        "src.security.outbound_policy.socket.getaddrinfo",
+        return_value=[
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("198.18.0.93", 443))
+        ],
+    ):
+        with pytest.raises(OutboundPolicyError, match="private_dns_address"):
+            validate_outbound_url("https://model.internal/v1/models")
+
+
 def test_dns_failure_is_fail_closed() -> None:
     with patch(
         "src.security.outbound_policy.socket.getaddrinfo",
@@ -233,6 +280,44 @@ def test_sdk_guard_rejects_private_resolution_and_unexpected_proxy_host() -> Non
             with pytest.raises(OutboundPolicyError, match="unexpected_dns_target"):
                 outbound_policy.socket.getaddrinfo("proxy.example", 8080)
     resolver.assert_called_once()
+
+
+def test_sdk_guard_allows_configured_loopback_proxy_only_with_fake_ip_opt_in(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", raising=False)
+    with patch(
+        "src.security.outbound_policy.getproxies",
+        return_value={"https": "http://127.0.0.1:7897"},
+    ), patch(
+        "src.security.outbound_policy.socket.getaddrinfo",
+        return_value=PRIVATE_ADDRINFO,
+    ):
+        with guard_outbound_urls(("https://api.openai.com/v1",), strict_dns=True):
+            with pytest.raises(OutboundPolicyError, match="unexpected_dns_target"):
+                outbound_policy.socket.getaddrinfo("127.0.0.1", 7897)
+
+        monkeypatch.setenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", "true")
+        with guard_outbound_urls(("https://api.openai.com/v1",), strict_dns=True):
+            outbound_policy.socket.getaddrinfo("127.0.0.1", 7897)
+            with pytest.raises(OutboundPolicyError, match="unexpected_dns_target"):
+                outbound_policy.socket.getaddrinfo("127.0.0.1", 7898)
+
+
+def test_sdk_guard_does_not_trust_loopback_proxy_for_non_public_model_host(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", "true")
+    with patch(
+        "src.security.outbound_policy.getproxies",
+        return_value={"https": "http://127.0.0.1:7897"},
+    ), patch(
+        "src.security.outbound_policy.socket.getaddrinfo",
+        return_value=PRIVATE_ADDRINFO,
+    ):
+        with guard_outbound_urls(("https://model.internal/v1",), strict_dns=True):
+            with pytest.raises(OutboundPolicyError, match="unexpected_dns_target"):
+                outbound_policy.socket.getaddrinfo("127.0.0.1", 7897)
 
 
 def test_sdk_guard_matches_allowlist_by_host_and_port() -> None:
@@ -535,4 +620,3 @@ def test_admin_loopback_redirect_escape_to_private_lan_is_blocked() -> None:
         with pytest.raises(OutboundPolicyError, match="private_ip_blocked"):
             safe_get("http://127.0.0.1:11434/start", allow_admin_loopback=True)
     assert request_get.call_count == 1
-

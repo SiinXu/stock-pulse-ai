@@ -246,7 +246,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
             <div className="mb-5 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-heading-2 font-bold leading-tight text-foreground">
+                  <h2 className="text-xl font-bold leading-tight text-foreground">
                     {meta.stockName || meta.stockCode}
                   </h2>
                   {/* Price and percentage change */}
@@ -287,13 +287,14 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                 recordId={meta.id}
                 reportTitle={`${meta.stockName || meta.stockCode}-${meta.stockCode}`}
                 reportLanguage={reportLanguage}
+                className="[&_.home-surface-button]:w-10 [&_.home-surface-button]:gap-0 [&_.home-surface-button]:px-0 [&_.home-surface-button>span]:hidden"
               />
             </div>
 
             {/* Key conclusion */}
             <div className="border-t border-border pt-5">
               <span className="label-uppercase">{text.keyInsights}</span>
-              <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-base leading-7 text-foreground">
+              <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-sm leading-6 text-foreground">
                 {summary.analysisSummary || text.noAnalysisSummary}
               </p>
             </div>

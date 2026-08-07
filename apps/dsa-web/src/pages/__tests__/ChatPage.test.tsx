@@ -244,6 +244,36 @@ beforeEach(() => {
 });
 
 describe('ChatPage', () => {
+  it('links an unavailable Agent directly to task routing', async () => {
+    mockGetSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: true,
+      requiredMissingKeys: ['llm_agent'],
+      nextStepKey: 'llm_agent',
+      checks: [{
+        key: 'llm_agent',
+        title: 'Agent 模型',
+        category: 'agent',
+        required: true,
+        status: 'needs_action',
+        message: 'Agent 模型不可用',
+        nextStep: '选择模型',
+      }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const settingsLink = await screen.findByRole('link', { name: '前往设置' });
+    expect(settingsLink).toHaveAttribute(
+      'href',
+      '/settings?section=ai_models&view=task_routing',
+    );
+  });
+
   it('localizes persisted failure messages and updates them when UI language changes', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
     mockStoreState.messages = [{
@@ -960,7 +990,7 @@ describe('ChatPage', () => {
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
     expect(mobileToggle).toHaveClass('h-9', '!shadow-none');
-    expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11', 'text-foreground');
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
 
@@ -1099,13 +1129,15 @@ describe('ChatPage', () => {
     const prose = screen.getByText('趋势偏强').closest('.chat-prose');
 
     expect(actionGroup).toHaveClass('chat-message-actions');
+    expect(actionGroup).toHaveClass('absolute', 'left-0', 'top-full', '!mt-1');
     expect(actionGroup?.className).not.toMatch(/pointer-events-none|opacity-0/);
     expect(actionGroup?.querySelectorAll('[data-control="icon-button"]')).toHaveLength(2);
     const actionSlots = actionGroup?.querySelectorAll('[data-slot="chat-message-action"]') ?? [];
     expect(actionSlots).toHaveLength(2);
-    actionSlots.forEach((slot) => expect(slot).toHaveClass('h-11', 'w-11'));
+    actionSlots.forEach((slot) => expect(slot).toHaveClass('h-8', 'w-8'));
     expect(prose).not.toHaveClass('pr-20', 'sm:pr-24');
     expect(prose?.nextElementSibling).toBe(actionGroup);
+    expect(prose?.closest('[class~="group/message"]')).toHaveClass('relative', 'mb-8', 'overflow-visible');
   });
 
   it('sends exported markdown to notification channel and shows success feedback', async () => {

@@ -4965,7 +4965,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "components.settings.aiTaskMatrix.BACKEND_LABELS.codex_cli": "Codex CLI (local)",
   "components.settings.aiTaskMatrix.BACKEND_LABELS.litellm": "LiteLLM (cloud API)",
   "components.settings.aiTaskMatrix.BACKEND_LABELS.opencode_cli": "OpenCode CLI (local)",
-  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "CLI backends cover report generation only; the Q&A Agent requires a tool-capable API model (or will be unavailable).",
+  "components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE": "Codex, Claude Code, and OpenCode CLI are report-generation methods, not model connections, so they do not appear in model dropdowns; the Q&A Agent still requires a tool-capable API model.",
   "components.settings.aiTaskMatrix.NOT_CONFIGURED_LABEL": "Not configured",
   "components.settings.aiTaskMatrix.TASK_LABELS.agent": "Ask / Agent",
   "components.settings.aiTaskMatrix.TASK_LABELS.market_review": "Market review",

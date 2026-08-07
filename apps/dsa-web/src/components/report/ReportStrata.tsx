@@ -81,15 +81,51 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
   const strata = resolveReportStrataFromDetails(details);
+  const rawResult = details?.rawResult;
 
-  const facts = (strata?.verifiedFacts ?? [])
+  const fallbackFactStatements = [
+    rawResult?.technicalAnalysis ?? rawResult?.technical_analysis,
+    rawResult?.maAnalysis ?? rawResult?.ma_analysis,
+    rawResult?.volumeAnalysis ?? rawResult?.volume_analysis,
+  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  const fallbackGapDescriptions = [
+    rawResult?.fundamentalAnalysis ?? rawResult?.fundamental_analysis,
+    rawResult?.dataSources ?? rawResult?.data_sources,
+  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+
+  const normalizedFacts = (strata?.verifiedFacts ?? [])
     .map(normalizeFact)
     .filter((item): item is ReportStrataVerifiedFact => item !== null);
-  const gaps = (strata?.missingOrConflicts ?? [])
+  const facts = normalizedFacts.length > 0
+    ? normalizedFacts
+    : fallbackFactStatements.map((statement) => ({
+        statement,
+        sourceId: 'technical_analysis',
+        asOf: null,
+      }));
+  const normalizedGaps = (strata?.missingOrConflicts ?? [])
     .map(normalizeGap)
     .filter((item): item is ReportStrataGapOrConflict => item !== null);
-  const inference = asStringList(strata?.modelInference);
-  const risks = asStringList(strata?.risksCounterEvidence);
+  const gaps = normalizedGaps.length > 0
+    ? normalizedGaps
+    : fallbackGapDescriptions.map((description) => ({
+        kind: 'missing' as const,
+        description,
+        sourceIds: [],
+      }));
+  const structuredInference = asStringList(strata?.modelInference);
+  const inference = structuredInference.length > 0
+    ? structuredInference
+    : [
+        rawResult?.analysisSummary ?? rawResult?.analysis_summary,
+        rawResult?.trendAnalysis ?? rawResult?.trend_analysis,
+        rawResult?.buyReason ?? rawResult?.buy_reason,
+      ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  const structuredRisks = asStringList(strata?.risksCounterEvidence);
+  const risks = structuredRisks.length > 0
+    ? structuredRisks
+    : [rawResult?.riskWarning ?? rawResult?.risk_warning]
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
   const framework = strata?.frameworkAlignment;
   const frameworkSummary =
     (framework?.summary && framework.summary.trim())

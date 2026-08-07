@@ -69,6 +69,34 @@ describe('ReportStrata', () => {
     expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
   });
 
+  it('uses existing report fields when the structured strata lists are empty', () => {
+    render(
+      <ReportStrata
+        language="zh"
+        details={{
+          reportStrata: {
+            schemaVersion: 'report-strata-v1',
+            verifiedFacts: [],
+            missingOrConflicts: [],
+            modelInference: [],
+            risksCounterEvidence: [],
+          },
+          rawResult: {
+            technicalAnalysis: '价格位于主要均线上方。',
+            fundamentalAnalysis: '关键财务数据缺失。',
+            analysisSummary: '等待量价确认。',
+            riskWarning: '跌破支撑位时优先控制风险。',
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('价格位于主要均线上方');
+    expect(screen.getByTestId('report-strata-gaps')).toHaveTextContent('关键财务数据缺失');
+    expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('等待量价确认');
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('跌破支撑位');
+  });
+
   it('resolves strata from rawResult.dashboard when projection is absent', () => {
     const details: ReportDetails = {
       rawResult: {
@@ -120,4 +148,3 @@ describe('ReportStrata', () => {
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('Not investment advice');
   });
 });
-

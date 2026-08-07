@@ -19,12 +19,13 @@ export function buildModelSelectorOptions(
     const providerLabel = catalogProvider
       ? getProviderDisplayLabel(catalogProvider, uiLanguage)
       : entry.providerLabel ?? entry.provider;
+    const sublabel = providerLabel && connectionLabel && providerLabel !== connectionLabel
+      ? `${providerLabel} · ${connectionLabel}`
+      : providerLabel ?? connectionLabel ?? undefined;
     return {
       value: entry.modelRef || entry.route,
-      label: entry.display,
-      sublabel: [providerLabel, connectionLabel]
-        .filter((part): part is string => Boolean(part))
-        .join(' · ') || undefined,
+      label: entry.display || entry.route,
+      sublabel,
       group: connectionLabel ?? providerLabel ?? undefined,
       keywords: [entry.route, entry.modelRef, entry.providerId, connectionLabel]
         .filter((part): part is string => Boolean(part)),

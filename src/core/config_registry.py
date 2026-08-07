@@ -134,13 +134,14 @@ def _extract_option_values(options: List[Any]) -> List[str]:
 # field only in the surface its placement declares, instead of maintaining its
 # own provider/field lists:
 #   - model_access: edited exclusively by the model-access connection manager
-#   - task_routing: task model selectors (report / agent / vision) and routing
+#   - task_routing: report-generation backend and task model routing
 #   - developer_diagnostics: advanced diagnostics, collapsed by default
 #   - local_models: optional local finance model keys (Kronos), dedicated panel
 #   - hidden_legacy: legacy provider keys kept for back-compat; readable through
 #     the API but never rendered as a generic editable settings field
 #   - None: regular field, rendered by its category page as usual
 _UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
+    "GENERATION_BACKEND",
     "LITELLM_MODEL",
     "AGENT_LITELLM_MODEL",
     "VISION_MODEL",
@@ -151,7 +152,6 @@ _UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
 _UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({
     "LLM_CONFIG_MODE",
     "LITELLM_CONFIG",
-    "GENERATION_BACKEND",
     "GENERATION_FALLBACK_BACKEND",
     "GENERATION_BACKEND_MAX_CONCURRENCY",
     "GENERATION_BACKEND_MAX_OUTPUT_BYTES",

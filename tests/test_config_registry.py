@@ -1178,6 +1178,7 @@ class TestUiPlacement(unittest.TestCase):
         from src.core.config_registry import derive_ui_placement
 
         for key in (
+            "GENERATION_BACKEND",
             "LITELLM_MODEL",
             "AGENT_LITELLM_MODEL",
             "VISION_MODEL",
@@ -1192,7 +1193,6 @@ class TestUiPlacement(unittest.TestCase):
         for key in (
             "LLM_CONFIG_MODE",
             "LITELLM_CONFIG",
-            "GENERATION_BACKEND",
             "GENERATION_FALLBACK_BACKEND",
             "GENERATION_BACKEND_MAX_CONCURRENCY",
             "GENERATION_BACKEND_MAX_OUTPUT_BYTES",

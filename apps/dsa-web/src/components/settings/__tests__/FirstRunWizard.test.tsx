@@ -1168,7 +1168,7 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    fireEvent.click(screen.getByLabelText(/deepseek-v4-pro/));
+    fireEvent.click(screen.getByRole('option', { name: /deepseek-v4-pro/ }));
     chooseOption(
       screen.getByLabelText('Vision 模型'),
       'modelref:v1:existing:openai%2Fgpt-4o-mini',

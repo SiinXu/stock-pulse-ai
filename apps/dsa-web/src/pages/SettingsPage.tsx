@@ -827,11 +827,12 @@ const SettingsPage: React.FC = () => {
       .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     [configItemByKey],
   );
-  // Task Routing is the single canonical editor for per-task models and the
-  // generation temperature. Fallback order is edited under Reliability only, so
-  // here it is a read-only summary with a jump link (no duplicate editor).
+  // Task Routing is the single canonical editor for the report-generation
+  // backend, per-task models, and generation temperature. Fallback order is
+  // edited under Reliability only, so here it is a read-only summary with a
+  // jump link (no duplicate editor).
   const taskRoutingItems = useMemo(
-    () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE'])
+    () => pickAiModelItems(['GENERATION_BACKEND', 'LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE'])
       .filter((item) => item.schema?.uiPlacement === 'task_routing'),
     [pickAiModelItems],
   );
