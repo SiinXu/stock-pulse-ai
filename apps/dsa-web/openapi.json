@@ -11393,6 +11393,220 @@
         "title": "PerformanceMetrics",
         "type": "object"
       },
+      "PluginInfo": {
+        "additionalProperties": false,
+        "description": "One registered plugin and its lifecycle state.",
+        "properties": {
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "desired_enabled": {
+            "description": "Persisted operator intent (False means disabled across restarts)",
+            "title": "Desired Enabled",
+            "type": "boolean"
+          },
+          "extension_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Extension Points",
+            "type": "array"
+          },
+          "id": {
+            "description": "Stable plugin id from the manifest",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "package_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Absolute package directory for external plugins when known",
+            "title": "Package Root"
+          },
+          "reloadable": {
+            "description": "True when in-process hot-reload is attempted for this plugin",
+            "title": "Reloadable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "builtin",
+              "external"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "source",
+          "state",
+          "desired_enabled",
+          "reloadable"
+        ],
+        "title": "PluginInfo",
+        "type": "object"
+      },
+      "PluginLifecycleRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/v1/plugins/{plugin_id}/lifecycle body.",
+        "properties": {
+          "action": {
+            "description": "enable/disable toggles runtime state and persistence; reload re-imports code",
+            "enum": [
+              "enable",
+              "disable",
+              "reload"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "PluginLifecycleRequest",
+        "type": "object"
+      },
+      "PluginLifecycleResponse": {
+        "additionalProperties": false,
+        "description": "Result of one lifecycle action.",
+        "properties": {
+          "action": {
+            "enum": [
+              "enable",
+              "disable",
+              "reload"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "plugin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "reloaded": {
+            "default": false,
+            "title": "Reloaded",
+            "type": "boolean"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "action",
+          "success",
+          "state"
+        ],
+        "title": "PluginLifecycleResponse",
+        "type": "object"
+      },
+      "PluginListResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/plugins response.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginInfo"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "PluginListResponse",
+        "type": "object"
+      },
       "PortfolioAccountCreateRequest": {
         "properties": {
           "account_type": {
@@ -11924,6 +12138,79 @@
         "title": "PortfolioCashLedgerListResponse",
         "type": "object"
       },
+      "PortfolioConcentrationBlock": {
+        "properties": {
+          "diversification_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Normalized diversification score in [0, 1]; equal-weight → 1.0",
+            "title": "Diversification Score"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "1 / HHI",
+            "title": "Effective N"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Herfindahl-Hirschman index of weights",
+            "title": "Hhi"
+          },
+          "position_count": {
+            "default": 0,
+            "title": "Position Count",
+            "type": "integer"
+          },
+          "status": {
+            "description": "'ok' or 'empty_portfolio'",
+            "title": "Status",
+            "type": "string"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRiskWeightItem"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioConcentrationBlock",
+        "type": "object"
+      },
       "PortfolioCorporateActionCreateRequest": {
         "properties": {
           "account_id": {
@@ -12157,6 +12444,61 @@
         "title": "PortfolioCorporateActionListResponse",
         "type": "object"
       },
+      "PortfolioCorrelationBlock": {
+        "properties": {
+          "matrix": {
+            "description": "Pairwise Pearson correlation matrix aligned with symbols",
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "observation_count": {
+            "default": 0,
+            "title": "Observation Count",
+            "type": "integer"
+          },
+          "status": {
+            "description": "'ok', 'insufficient_history', or 'unavailable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioCorrelationBlock",
+        "type": "object"
+      },
       "PortfolioDecisionSignalRiskBlock": {
         "properties": {
           "actions": {
@@ -12299,6 +12641,104 @@
           "error_count"
         ],
         "title": "PortfolioFxRefreshResponse",
+        "type": "object"
+      },
+      "PortfolioHistoricalVaRBlock": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Days"
+          },
+          "observation_count": {
+            "default": 0,
+            "title": "Observation Count",
+            "type": "integer"
+          },
+          "one_day_var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Day Var Pct"
+          },
+          "percentile_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile Used"
+          },
+          "status": {
+            "description": "'ok', 'insufficient_history', or 'unavailable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical VaR as positive loss percentage points (e.g. 3.5 means 3.5%)",
+            "title": "Var Pct"
+          },
+          "var_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical VaR in portfolio currency units",
+            "title": "Var Value"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHistoricalVaRBlock",
         "type": "object"
       },
       "PortfolioImportBrokerItem": {
@@ -12659,6 +13099,226 @@
         "title": "PortfolioPositionItem",
         "type": "object"
       },
+      "PortfolioRiskAssumptions": {
+        "properties": {
+          "cash_excluded": {
+            "title": "Cash Excluded",
+            "type": "boolean"
+          },
+          "concentration_metrics": {
+            "title": "Concentration Metrics",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "correlation_method": {
+            "title": "Correlation Method",
+            "type": "string"
+          },
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "distribution_assumption": {
+            "title": "Distribution Assumption",
+            "type": "string"
+          },
+          "horizon_days": {
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "horizon_scaling": {
+            "title": "Horizon Scaling",
+            "type": "string"
+          },
+          "lookback_trading_days": {
+            "title": "Lookback Trading Days",
+            "type": "integer"
+          },
+          "min_correlation_observations": {
+            "title": "Min Correlation Observations",
+            "type": "integer"
+          },
+          "min_return_observations": {
+            "title": "Min Return Observations",
+            "type": "integer"
+          },
+          "portfolio_aggregation": {
+            "title": "Portfolio Aggregation",
+            "type": "string"
+          },
+          "provider_calls_on_hot_path": {
+            "title": "Provider Calls On Hot Path",
+            "type": "boolean"
+          },
+          "return_definition": {
+            "title": "Return Definition",
+            "type": "string"
+          },
+          "var_method": {
+            "title": "Var Method",
+            "type": "string"
+          },
+          "weight_basis": {
+            "title": "Weight Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "var_method",
+          "confidence",
+          "horizon_days",
+          "lookback_trading_days",
+          "min_return_observations",
+          "min_correlation_observations",
+          "return_definition",
+          "portfolio_aggregation",
+          "cash_excluded",
+          "weight_basis",
+          "horizon_scaling",
+          "distribution_assumption",
+          "correlation_method",
+          "concentration_metrics",
+          "data_source",
+          "provider_calls_on_hot_path"
+        ],
+        "title": "PortfolioRiskAssumptions",
+        "type": "object"
+      },
+      "PortfolioRiskHistoryMeta": {
+        "properties": {
+          "aligned_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aligned End"
+          },
+          "aligned_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aligned Start"
+          },
+          "aligned_trading_days": {
+            "default": 0,
+            "title": "Aligned Trading Days",
+            "type": "integer"
+          },
+          "lookback_trading_days_requested": {
+            "default": 0,
+            "title": "Lookback Trading Days Requested",
+            "type": "integer"
+          },
+          "price_series_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Price Series Symbols",
+            "type": "array"
+          }
+        },
+        "title": "PortfolioRiskHistoryMeta",
+        "type": "object"
+      },
+      "PortfolioRiskMetricsResponse": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/PortfolioRiskAssumptions"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioConcentrationBlock"
+          },
+          "correlation": {
+            "$ref": "#/components/schemas/PortfolioCorrelationBlock"
+          },
+          "cost_method": {
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "history": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioRiskHistoryMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portfolio_value": {
+            "default": 0.0,
+            "title": "Portfolio Value",
+            "type": "number"
+          },
+          "positions_used": {
+            "default": 0,
+            "title": "Positions Used",
+            "type": "integer"
+          },
+          "status": {
+            "description": "'ok', 'empty_portfolio', 'insufficient_history', or 'partial'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "var": {
+            "$ref": "#/components/schemas/PortfolioHistoricalVaRBlock"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "assumptions",
+          "var",
+          "correlation",
+          "concentration"
+        ],
+        "title": "PortfolioRiskMetricsResponse",
+        "type": "object"
+      },
       "PortfolioRiskResponse": {
         "properties": {
           "account_id": {
@@ -12719,6 +13379,24 @@
           "currency"
         ],
         "title": "PortfolioRiskResponse",
+        "type": "object"
+      },
+      "PortfolioRiskWeightItem": {
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioRiskWeightItem",
         "type": "object"
       },
       "PortfolioSnapshotResponse": {
@@ -26276,6 +26954,141 @@
         ]
       }
     },
+    "/api/v1/plugins": {
+      "get": {
+        "description": "Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.",
+        "operationId": "listPlugins",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List registered plugins and lifecycle state",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{plugin_id}/lifecycle": {
+      "post": {
+        "description": "Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.",
+        "operationId": "updatePluginLifecycle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginLifecycleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid lifecycle request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Lifecycle operation failed unexpectedly"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Enable, disable, or hot-reload one plugin",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
     "/api/v1/portfolio/accounts": {
       "get": {
         "operationId": "list_accounts_api_v1_portfolio_accounts_get",
@@ -27744,6 +28557,151 @@
           }
         },
         "summary": "Get portfolio risk report",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/risk-metrics": {
+      "get": {
+        "description": "Historical VaR, pairwise return correlation, and concentration/diversification metrics from stored daily closes and current holdings. Never calls market data providers. Insufficient history is reported explicitly (never silent zeros).",
+        "operationId": "getPortfolioRiskMetrics",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "description": "Cost method: fifo or avg",
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "description": "Cost method: fifo or avg",
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "VaR confidence level exclusive of 0.5 and 1.0 (default 0.95)",
+            "in": "query",
+            "name": "confidence",
+            "required": false,
+            "schema": {
+              "default": 0.95,
+              "description": "VaR confidence level exclusive of 0.5 and 1.0 (default 0.95)",
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.5,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          {
+            "description": "VaR horizon in trading days (1-day base; multi-day uses sqrt-time scaling)",
+            "in": "query",
+            "name": "horizon_days",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "VaR horizon in trading days (1-day base; multi-day uses sqrt-time scaling)",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Horizon Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of trading-day closes requested for the history window",
+            "in": "query",
+            "name": "lookback_trading_days",
+            "required": false,
+            "schema": {
+              "default": 252,
+              "description": "Number of trading-day closes requested for the history window",
+              "maximum": 1000,
+              "minimum": 60,
+              "title": "Lookback Trading Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRiskMetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Risk metrics computation failed"
+          }
+        },
+        "summary": "Get portfolio risk metrics",
         "tags": [
           "Portfolio"
         ]

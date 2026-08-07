@@ -131,6 +131,35 @@ The Settings exception is intentionally deferred. It spans configuration schema 
 selection, page navigation, and tests; moving it safely requires a focused behavioral slice rather
 than a line-count-driven file split.
 
+## TanStack Query Rollout Pattern (Pilot)
+
+`@tanstack/react-query` is mounted once at the application root via `query/QueryProvider.tsx` in
+`main.tsx`. The provider is **inert for non-consumers**: pages and hooks that never call
+`useQuery` / `useMutation` keep their existing fetch style and are unaffected.
+
+### Pilot consumer
+
+| Surface | Ownership | Behavior parity notes |
+| --- | --- | --- |
+| `MarketReviewPage` history list | `hooks/useMarketReviewHistoryQuery.ts` | `useQuery` with `refetchInterval: 30_000`, `refetchOnWindowFocus: true`, `retry: false`. First fetch uses the store's non-silent load; later refetches use silent refresh. Errors still land on the existing store / `ApiErrorAlert` surfaces. |
+| Market review trigger | `hooks/useMarketReviewRunner.ts` | `useMutation` for `triggerMarketReview`. Task-status polling stays custom (domain notices, 2s cadence, 120-attempt cap) so completion/timeout copy is unchanged. |
+
+### Rollout rules for the next pages
+
+1. Keep transport in `api/*` and UI loading/error presentation on existing surfaces; do not invent a
+   parallel error channel or change i18n keys.
+2. Prefer route-local query hooks under `hooks/` (or a feature-private subfolder) over page-inline
+   `useEffect` triples for list/detail fetch and polling.
+3. Match the previous polling cadence and focus/visibility refresh semantics before changing them.
+4. Default `retry: false` unless the product contract explicitly wants automatic retries.
+5. Migrate one page at a time. Leave Zustand/client state for selection, drafts, and presentation
+   until a later dedicated slice.
+6. Tests that render a Query consumer must wrap with a test `QueryClientProvider` (`retry: false`).
+
+Suggested migration order (follow-up issue): Home history lifecycle → Decision Signals feed →
+Portfolio projection session → Alerts rules list → Settings system-config loads → Chat/agent
+status surfaces that still hand-roll polling.
+
 ## Change Checklist
 
 Before adding or moving a module:
