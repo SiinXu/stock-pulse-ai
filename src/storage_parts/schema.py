@@ -681,6 +681,17 @@ class ConversationMessage(Base):
     created_at = Column(DateTime, default=datetime.now, index=True)
 
 
+class ConversationSessionState(Base):
+    """Persisted user selections for an Agent chat session."""
+
+    __tablename__ = 'conversation_session_states'
+
+    session_id = Column(String(100), primary_key=True)
+    selected_skill_ids_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+
 class ConversationSummary(Base):
     """Rolling summary for visible Agent chat history."""
 

@@ -58,6 +58,21 @@ class ConversationSession:
             self.last_active = datetime.now()
         return message_id
 
+    def add_user_message(
+        self,
+        content: str,
+        selected_skill_ids: Optional[List[str]] = None,
+    ) -> int:
+        """Add a user message and optionally update the persisted Skill selection."""
+        message_id = get_db().save_conversation_user_turn(
+            self.session_id,
+            content,
+            selected_skill_ids,
+        )
+        with self._context_lock:
+            self.last_active = datetime.now()
+        return message_id
+
     def update_context(self, key: str, value: Any):
         """Update session context."""
         with self._context_lock:
@@ -238,6 +253,16 @@ class ConversationManager:
         """Add a message to a session."""
         session = self.get_or_create(session_id)
         return session.add_message(role, content)
+
+    def add_user_message(
+        self,
+        session_id: str,
+        content: str,
+        selected_skill_ids: Optional[List[str]] = None,
+    ) -> int:
+        """Add a user message through the session-state transaction boundary."""
+        session = self.get_or_create(session_id)
+        return session.add_user_message(content, selected_skill_ids)
 
     def get_history(self, session_id: str) -> List[Dict[str, Any]]:
         """Get message history for a session."""
