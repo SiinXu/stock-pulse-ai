@@ -55,6 +55,7 @@ import { connectionItemsRespectSchema } from '../components/settings/settingsCon
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import SystemAboutCard from '../components/settings/SystemAboutCard';
 import ConfigBackupCard from '../components/settings/ConfigBackupCard';
+import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
 import AlphaSiftSettingsCard from '../components/settings/AlphaSiftSettingsCard';
 import {
   AiOverviewCard,
@@ -1643,19 +1644,10 @@ const SettingsPage: React.FC = () => {
               <SystemAboutCard />
             ) : null}
             {isTopLevelAdvanced && activeView === 'backup' ? (
-              <ConfigBackupCard
-                configVersion={configVersion}
-                hasDirty={hasDirty}
-                disabled={isSaving || isLoading}
-                load={load}
-                onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((current) => current + 1)}
-                onRefreshSetupStatus={() => { void refreshSetupStatus(); }}
-                onRolledBack={async (result) => {
-                  await refreshAfterExternalSave(result.updatedKeys);
-                  applyPostSaveEffects();
-                }}
-                onReloadLatest={() => refreshAfterExternalSave([])}
-              />
+              <>
+                <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
+                <ConfigBackupCard configVersion={configVersion} hasDirty={hasDirty} disabled={isSaving || isLoading} load={load} onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((c) => c + 1)} onRefreshSetupStatus={() => { void refreshSetupStatus(); }} onRolledBack={async (result) => { await refreshAfterExternalSave(result.updatedKeys); applyPostSaveEffects(); }} onReloadLatest={() => refreshAfterExternalSave([])} />
+              </>
             ) : null}
             {activeCategory === 'base' ? (
               <>
