@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Recover process-local in-flight task-queue work across restarts: idempotent stock analyses requeue with a recovery marker; non-resumable kinds surface as explicit `interrupted` with `task.interrupted.process_restart` (no silent drop, no fake completion).
 - [Added] Backend V0 context-aware corporate event alerts (`corporate_event`) evaluate managed intelligence items, attach holdings/watchlist impact context, and enrich alert notifications without new provider calls on the hot path (`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`).
 - [Added] Integrate A-share multi-period financial statements into the existing fundamental pipeline (`financial_report.periods` / `metrics` with formulas / `sufficiency`), with explicit insufficient-fundamentals honesty in analysis prompts and report rendering (issue #235).
 - [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
