@@ -217,7 +217,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("每一条都必须带具体日期（YYYY-MM-DD）", prompt)
         self.assertIn("超出近7日窗口的新闻一律忽略", prompt)
         self.assertIn("时间未知、无法确定发布日期的新闻一律忽略", prompt)
-        self.assertIn("财报与分红（价值投资口径）", prompt)
+        self.assertIn("财务报表（事实）", prompt)
+        self.assertIn("分红（价值投资口径）", prompt)
         self.assertIn("禁止编造", prompt)
 
     def test_prompt_includes_capital_flow_as_operation_filter(self) -> None:
