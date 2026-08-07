@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
+from src.utils.sanitize import log_safe_exception
 import re
 import threading
 import uuid
@@ -1846,8 +1847,15 @@ class AnalysisTaskQueue:
         """
         try:
             event_payload = copy.deepcopy(flow_event)
-        except Exception:
-            logger.debug("[TaskQueue] 忽略不可复制的运行流事件: task_id=%s", task_id)
+        except Exception as exc:  # broad-exception: fallback_recorded - ignore uncopyable run-stream events
+            log_safe_exception(
+                logger,
+                "Task queue ignored uncopyable run-stream event",
+                exc,
+                error_code="task_queue_uncopyable_run_stream_event",
+                level=logging.DEBUG,
+                context={"task_id": task_id},
+            )
             return None
 
         with self._data_lock:
@@ -2437,7 +2445,7 @@ def get_task_queue() -> AnalysisTaskQueue:
         config = get_config()
         target_workers = max(1, int(getattr(config, "max_workers", queue.max_workers)))
         queue.sync_max_workers(target_workers, log=False)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - keep current concurrency on config lookup failure
         log_safe_exception(
             logger,
             "Task queue worker configuration lookup failed; keeping current concurrency",
