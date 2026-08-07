@@ -1545,7 +1545,7 @@ def test_single_agent_us_chat_hides_a_share_only_tools() -> None:
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[1, 2],
     ), patch.object(executor, "_persist_provider_trace"):
         result = executor.chat("analyze AAPL", "us-capability")
@@ -1615,7 +1615,7 @@ def test_single_agent_non_cn_chat_cannot_dispatch_fully_filtered_tool(
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[1, 2],
     ), patch.object(executor, "_persist_provider_trace"):
         result = executor.chat(message, f"fully-filtered-{message}")
@@ -1676,7 +1676,7 @@ def test_single_agent_chat_routes_canonical_symbol_through_real_tool_guard(
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[1, 2],
     ), patch.object(executor, "_persist_provider_trace"):
         result = executor.chat(message, f"single-{canonical_code}")
@@ -1717,7 +1717,7 @@ def test_single_agent_chat_reuses_active_us_symbol_on_followup() -> None:
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[1, 2, 3, 4],
     ), patch.object(executor, "_persist_provider_trace"):
         executor.chat("分析 AAPL", "followup-us")
@@ -1756,7 +1756,7 @@ def test_single_agent_chat_prefers_explicit_context_over_restored_symbol() -> No
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[1, 2],
     ), patch.object(executor, "_persist_provider_trace"):
         executor.chat(
@@ -1808,7 +1808,7 @@ def test_single_agent_malformed_contextless_symbol_blocks_fragment_dispatch() ->
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[1, 2],
     ), patch.object(executor, "_persist_provider_trace"):
         result = executor.chat("analyze AAPL：TSLA", "malformed-single")
@@ -1886,7 +1886,7 @@ def test_multi_agent_malformed_contextless_symbol_blocks_fragment_dispatch() -> 
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[11, 12],
     ):
         result = orchestrator.chat("分析 SH：000001", "malformed-multi")
@@ -1936,7 +1936,7 @@ def test_multi_agent_chat_runs_each_comparison_symbol_in_its_own_scope() -> None
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
-        "src.agent.conversation.conversation_manager.add_message",
+        "src.agent.conversation.conversation_manager.add_user_message",
         side_effect=[11, 12],
     ):
         result = orchestrator.chat(
@@ -1997,7 +1997,8 @@ def test_multi_agent_chat_synthesis_exception_preserves_verified_soul_failure(
     )
     session = MagicMock()
     session.get_market_context.return_value = {}
-    add_message = MagicMock(side_effect=[11, 12])
+    add_user_message = MagicMock(return_value=11)
+    add_message = MagicMock(return_value=12)
     executed = []
 
     def fake_execute(ctx, **_kwargs):
@@ -2035,6 +2036,9 @@ def test_multi_agent_chat_synthesis_exception_preserves_verified_soul_failure(
         "src.agent.conversation.conversation_manager.get_or_create",
         return_value=session,
     ), patch(
+        "src.agent.conversation.conversation_manager.add_user_message",
+        add_user_message,
+    ), patch(
         "src.agent.conversation.conversation_manager.add_message",
         add_message,
     ), patch(
@@ -2065,12 +2069,14 @@ def test_multi_agent_chat_synthesis_exception_preserves_verified_soul_failure(
     assert project_agent_runtime_metadata(result.runtime_facts) == (
         get_agent_soul_metadata()
     )
-    assert add_message.call_args_list == [
+    assert add_user_message.call_args_list == [
         call(
             "multi-synthesis-failure",
-            "user",
             "compare AAPL and HK00700",
+            None,
         ),
+    ]
+    assert add_message.call_args_list == [
         call(
             "multi-synthesis-failure",
             "assistant",

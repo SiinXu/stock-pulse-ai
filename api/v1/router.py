@@ -28,6 +28,7 @@ from api.v1.endpoints import (
     local_models,
     model_packs,
     plugins,
+    onboarding,
     portfolio,
     portfolio_risk_metrics,
     scheduled_tasks,
@@ -143,6 +144,12 @@ router.include_router(
     investment_framework.router,
     prefix="/investment-framework",
     tags=["InvestmentFramework"]
+)
+
+router.include_router(
+    onboarding.router,
+    prefix="/onboarding",
+    tags=["Onboarding"],
 )
 
 router.include_router(
