@@ -451,6 +451,37 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_EVENT_IMPACT_CONTEXT_ENABLED": {
+        "title": "Alert Impact Context",
+        "description": (
+            "When enabled, triggered alert notifications include a managed-data impact "
+            "context block: what happened, why it matters, and whether the symbol is on "
+            "the watchlist or in portfolio holdings. Uses intelligence items, portfolio "
+            "snapshots without realtime refresh, and recent analysis history only."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 72,
+        "help_key": "settings.agent.event_impact_context",
+        "examples": [
+            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=true",
+            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MEMORY_ENABLED": {
         "title": "Agent Memory",
         "description": "Enable the memory & calibration system. Tracks prediction accuracy and adjusts agent confidence over time.",
