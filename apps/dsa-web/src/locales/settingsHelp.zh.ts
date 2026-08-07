@@ -1036,6 +1036,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
     notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
   },
+  'settings.agent.event_impact_context': {
+    title: '告警影响上下文',
+    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
+    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
