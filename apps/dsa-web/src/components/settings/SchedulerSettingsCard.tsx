@@ -208,22 +208,8 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   return (
     <SettingsSectionCard
       title={t('settings.schedulerTitle')}
-      description={t('settings.schedulerDescription')}
     >
       <div data-testid="scheduler-settings-card" className="space-y-4">
-        <InlineAlert
-          variant="info"
-          data-testid="scheduler-legacy-track-note"
-          title={t('settings.schedulerLegacyTrackTitle')}
-          message={(
-            <>
-              <span className="block">{t('settings.schedulerLegacyTrackNote')}</span>
-              <span className="mt-2 block" data-testid="scheduler-owner-note">
-                {t('settings.schedulerOwnerNote')}
-              </span>
-            </>
-          )}
-        />
         {showMigrationNotice ? (
           <InlineAlert
             variant="warning"
@@ -340,14 +326,16 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
 
           <Surface level="interactive" className="space-y-3 px-4 py-4">
             <div>
-              <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
-              <p className="mt-1 text-xs leading-6 text-muted-text">
-                {status?.running
-                  ? t('settings.schedulerRunning')
-                  : statusEnabled
-                    ? t('settings.schedulerEnabled')
-                    : t('settings.schedulerDisabled')}
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
+                <span className="text-xs text-muted-text">
+                  {status?.running
+                    ? t('settings.schedulerRunning')
+                    : statusEnabled
+                      ? t('settings.schedulerEnabled')
+                      : t('settings.schedulerDisabled')}
+                </span>
+              </div>
               <p className="mt-1 text-xs leading-6 text-muted-text">
                 {t('settings.schedulerStatusScopeNote')}
               </p>
