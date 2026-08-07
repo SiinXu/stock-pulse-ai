@@ -98,7 +98,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "TaskQueueInflightRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "3cdd382279fb1112ae458e84b15951fbd14951082aa897c9afc0c6323f61dc84"
+    "015141b6b893cd35882b8bf3a26e37de0ad1441aaa73dbff941212c25452ff0b"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",

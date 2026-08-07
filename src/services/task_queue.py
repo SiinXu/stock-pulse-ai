@@ -17,6 +17,7 @@ import asyncio
 import copy
 import logging
 from src.utils.sanitize import log_safe_exception
+from src.repositories.task_queue_inflight_repo import TaskQueueInflightCheckpoint
 import re
 import threading
 import uuid
@@ -765,7 +766,7 @@ class AnalysisTaskQueue:
             )
         return stats
 
-    def _recover_requeue_checkpoint_locked(self, checkpoint: Any) -> bool:
+    def _recover_requeue_checkpoint_locked(self, checkpoint: TaskQueueInflightCheckpoint) -> bool:
         """Rebuild and re-admit one requeueable stock-analysis command."""
         task_id = str(checkpoint.task_id)
         metadata = dict(getattr(checkpoint, "metadata", None) or {})
@@ -845,7 +846,7 @@ class AnalysisTaskQueue:
             )
             return False
 
-    def _recover_interrupt_checkpoint_locked(self, checkpoint: Any) -> None:
+    def _recover_interrupt_checkpoint_locked(self, checkpoint: TaskQueueInflightCheckpoint) -> None:
         """Materialize one non-resumable checkpoint as terminal interrupted."""
         task_id = str(checkpoint.task_id)
         metadata = dict(getattr(checkpoint, "metadata", None) or {})
