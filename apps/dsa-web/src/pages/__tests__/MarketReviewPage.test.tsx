@@ -189,6 +189,9 @@ describe('MarketReviewPage', () => {
     expect(historyRail).toHaveClass(
       'h-[min(36rem,calc(100dvh-10rem))]',
       'min-h-72',
+      '[&_[data-testid=history-card-meta]]:flex-nowrap',
+      '[&_[data-testid=history-card-meta]]:gap-1',
+      '[&_[data-testid=history-card-meta]>span]:whitespace-nowrap',
     );
     expect(historyRail).not.toHaveClass('self-start');
   });

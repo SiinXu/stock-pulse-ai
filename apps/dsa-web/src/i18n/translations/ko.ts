@@ -2132,7 +2132,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.backtest.BACKTEST_TEXT.endDate": "종료일",
   "locales.backtest.BACKTEST_TEXT.endDateAria": "분석 종료일",
   "locales.backtest.BACKTEST_TEXT.errors": "오류:",
-  "locales.backtest.BACKTEST_TEXT.evalWindow": "평가 창",
+  "locales.backtest.BACKTEST_TEXT.evalWindow": "창 기간(일)",
   "locales.backtest.BACKTEST_TEXT.evaluationCount": "평가",
   "locales.backtest.BACKTEST_TEXT.filter": "필터",
   "locales.backtest.BACKTEST_TEXT.filteredStock": "필터링 {code}",

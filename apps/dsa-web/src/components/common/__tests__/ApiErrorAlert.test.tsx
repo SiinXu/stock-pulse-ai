@@ -5,39 +5,42 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiErrorAlert } from '../ApiErrorAlert';
 
 describe('ApiErrorAlert', () => {
-  it('uses shared controls for dismiss and retry while preserving disclosure behavior', () => {
+  it('uses a compact Toast with shared dismiss and retry controls', () => {
     const onAction = vi.fn();
     const onDismiss = vi.fn();
     render(
-      <ApiErrorAlert
-        error={{
-          title: 'Request failed',
-          message: 'Try again.',
-          rawMessage: 'provider connection refused',
-          category: 'upstream_network',
-        }}
-        actionLabel="Retry"
-        onAction={onAction}
-        dismissLabel="Dismiss"
-        onDismiss={onDismiss}
-      />,
+      <div data-testid="page-layout">
+        <ApiErrorAlert
+          error={{
+            title: 'Request failed',
+            message: 'Try again.',
+            rawMessage: 'provider connection refused',
+            category: 'upstream_network',
+          }}
+          actionLabel="Retry"
+          onAction={onAction}
+          dismissLabel="Dismiss"
+          onDismiss={onDismiss}
+        />
+      </div>,
     );
 
     const dismiss = screen.getByRole('button', { name: 'Dismiss' });
     const retry = screen.getByRole('button', { name: 'Retry' });
-    const summary = screen.getByText(/^(?:查看详情|View details)$/);
 
+    expect(screen.getByTestId('page-layout')).toBeEmptyDOMElement();
+    expect(dismiss.closest('[data-overlay-root="toast"]')).not.toBeNull();
     expect(dismiss).toHaveAttribute('data-control', 'icon-button');
     expect(dismiss).toHaveAttribute('data-size', 'compact');
     expect(retry).toHaveAttribute('data-control', 'button');
-    expect(retry).toHaveAttribute('data-variant', 'danger-subtle');
-    expect(retry).toHaveAttribute('data-size', 'compact');
+    expect(retry).toHaveAttribute('data-variant', 'ghost');
+    expect(retry).toHaveAttribute('data-size', 'default');
+    expect(screen.queryByText(/^(?:查看详情|View details)$/)).not.toBeInTheDocument();
+    expect(screen.queryByText('provider connection refused')).not.toBeInTheDocument();
 
-    fireEvent.click(dismiss);
     fireEvent.click(retry);
-    fireEvent.click(summary);
-    expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(onAction).toHaveBeenCalledTimes(1);
-    expect(summary.closest('details')).toHaveAttribute('open');
+    fireEvent.click(dismiss);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

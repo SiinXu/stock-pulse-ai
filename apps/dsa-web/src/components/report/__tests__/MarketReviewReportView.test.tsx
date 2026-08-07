@@ -379,6 +379,8 @@ describe('MarketReviewReportView', () => {
     );
 
     expect(screen.getByRole('region', { name: '题材主线与个股位置' })).toBeInTheDocument();
+    expect(screen.getByRole('meter', { name: '市场情绪' })).toHaveAttribute('aria-valuenow', '68');
+    expect(screen.getByRole('meter', { name: '市场情绪' }).querySelector('.gauge-ring')).toBeInTheDocument();
     expect(screen.getByText('大盘题材层')).toBeInTheDocument();
     expect(screen.getByText('个股位置层')).toBeInTheDocument();
     expect(screen.getAllByText(/机器人概念/).length).toBeGreaterThan(0);
@@ -413,6 +415,10 @@ describe('MarketReviewReportView', () => {
     const runFlowButton = screen.getByRole('button', { name: '查看历史记录 7 运行流' });
     expect(runFlowButton).toHaveAttribute('data-control', 'icon-button');
     expect(runFlowButton).toHaveClass('control-hit-target');
+    const shareButton = document.querySelector<HTMLButtonElement>('button.home-surface-button');
+    expect(shareButton?.parentElement?.parentElement?.parentElement).toHaveClass(
+      '[&_.home-surface-button]:!shadow-none',
+    );
     expect(screen.getByRole('button', { name: '复制 Markdown 源码' })).toHaveAttribute('data-control', 'icon-button');
     expect(screen.getByRole('button', { name: '复制纯文本' })).toHaveAttribute('data-control', 'icon-button');
 

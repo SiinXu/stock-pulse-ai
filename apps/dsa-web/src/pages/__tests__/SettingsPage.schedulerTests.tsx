@@ -274,7 +274,9 @@ export function registerSettingsPageSchedulerTests(): void {
     fireEvent.click(await screen.findByTestId('scheduler-run-now-button'));
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText(/A scheduled analysis is already running/)).toBeInTheDocument();
+    const errorToast = await screen.findByRole('alert');
+    expect(errorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(errorToast).not.toHaveTextContent('A scheduled analysis is already running');
   });
 
   it('does not show a failed run as the last successful scheduler run', async () => {

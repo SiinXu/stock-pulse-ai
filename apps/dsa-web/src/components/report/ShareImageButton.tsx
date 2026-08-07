@@ -192,13 +192,11 @@ export const ShareImageButton: React.FC<ShareImageButtonProps> = ({
         </span>
       </Tooltip>
       {state === 'error' && shareError ? (
-        <div className="w-full min-w-[16rem] max-w-md" data-testid="share-image-error">
-          <ApiErrorAlert
-            error={shareError}
-            actionLabel={text.shareImageFailed}
-            onAction={() => void handleShare()}
-          />
-        </div>
+        <ApiErrorAlert
+          error={shareError}
+          actionLabel={text.shareImageFailed}
+          onAction={() => void handleShare()}
+        />
       ) : null}
     </span>
   );
