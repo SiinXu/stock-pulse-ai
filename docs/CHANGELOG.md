@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Recover process-local in-flight task-queue work across restarts: idempotent stock analyses requeue with a recovery marker; non-resumable kinds surface as explicit `interrupted` with `task.interrupted.process_restart` (no silent drop, no fake completion).
+- [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
 - [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
 - [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
 - [Changed] Web navigation mechanical IA hygiene: Research child labels use `layout.nav.*`, command palette indexes Home/Research/Analysis Workbench/Approvals with aligned labels, and deep links allow `/research/skill-outcomes` (no route renames).
