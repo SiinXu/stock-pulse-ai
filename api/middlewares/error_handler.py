@@ -186,6 +186,7 @@ def add_error_handlers(app) -> None:
             public_service_unavailable_codes = {
                 "security_audit_unavailable",
                 "share_image_unavailable",
+                "futu_opend_unavailable",
             }
             public_service_unavailable = (
                 exc.status_code == 503
