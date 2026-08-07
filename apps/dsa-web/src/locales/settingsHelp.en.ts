@@ -970,6 +970,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: 'Investment Committee Mode',
+    summary: 'Run multi-role investment committee style analysis with structured dissent.',
+    usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
+    valueNotes: ['Off preserves the existing single-path analysis behavior.'],
+    impact: ['Affects agent orchestration depth and report committee sections.'],
+    notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',

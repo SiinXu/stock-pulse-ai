@@ -1013,6 +1013,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: '投委会模式',
+    summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
+    usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
+    valueNotes: ['关闭时保持既有单路径分析行为。'],
+    impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
+    notes: ['需要 Agent multi 能力。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
