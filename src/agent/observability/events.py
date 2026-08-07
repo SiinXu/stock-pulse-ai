@@ -132,9 +132,9 @@ def build_span_id() -> str:
 def is_agent_observability_enabled() -> bool:
     """Return whether lightweight agent events should be recorded (default on)."""
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        config = get_config()
+        config = get_application_services().config
         return bool(getattr(config, "agent_observability_enabled", True))
     except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block analysis.
         log_safe_exception(
@@ -150,9 +150,9 @@ def is_agent_observability_enabled() -> bool:
 def is_deep_payload_enabled() -> bool:
     """Return whether deep payload capture is enabled (default off)."""
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        config = get_config()
+        config = get_application_services().config
         return bool(getattr(config, "agent_observability_deep_payload", False))
     except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block analysis.
         log_safe_exception(
