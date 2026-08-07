@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Investment Committee analysis mode (default-off `AGENT_INVESTMENT_COMMITTEE_MODE`): curated persona Skill preset via the existing specialist path + StrategyEngine, with a structured `committee_deliberation` report section (#545).
+- [Added] Integrate A-share multi-period financial statements into the existing fundamental pipeline (`financial_report.periods` / `metrics` with formulas / `sufficiency`), with explicit insufficient-fundamentals honesty in analysis prompts and report rendering (issue #235).
 - [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
 - [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
 - [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
