@@ -681,8 +681,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "JSON array of Event Monitor rules loaded by schedule mode. "
             "Legacy JSON supports only price_cross, price_change_percent, and volume_spike. "
-            "Technical indicator, watchlist, portfolio, market light, and corporate event "
-            "alert rules are available through the Alert API/Web center."
+            "Technical indicator, watchlist, portfolio, and market light alert rules "
+            "are available through the Alert API/Web center."
         ),
         "category": "agent",
         "data_type": "json",
@@ -715,12 +715,6 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "parse_financial_pdf and read_price_chart after a process restart. "
             "PDF parsing is local-first; chart reading uses VISION_MODEL and degrades "
             "honestly when vision is unavailable. See docs/multimodal-parsing_EN.md."
-    "AGENT_EVENT_IMPACT_CONTEXT_ENABLED": {
-        "title": "Alert Impact Context",
-            "When enabled, triggered alert notifications include a managed-data impact "
-            "context block: what happened, why it matters, and whether the symbol is on "
-            "the watchlist or in portfolio holdings. Uses intelligence items, portfolio "
-            "snapshots without realtime refresh, and recent analysis history only."
         ),
         "category": "agent",
         "data_type": "boolean",
@@ -786,13 +780,37 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
         "warning_codes": ["restart_required"],
+    },
+    "AGENT_EVENT_IMPACT_CONTEXT_ENABLED": {
+        "title": "Alert Impact Context",
+        "description": (
+            "When enabled, triggered alert notifications include a managed-data impact "
+            "context block: what happened, why it matters, and whether the symbol is on "
+            "the watchlist or in portfolio holdings. Uses intelligence items, portfolio "
+            "snapshots without realtime refresh, and recent analysis history only."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
         "default_value": "true",
+        "options": [],
+        "validation": {},
         "display_order": 72,
         "help_key": "settings.agent.event_impact_context",
+        "examples": [
             "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=true",
             "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=false",
+        ],
+        "docs": [
+            {
                 "label": "告警中心文档",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
         "warning_codes": [],
     },
+
 }
