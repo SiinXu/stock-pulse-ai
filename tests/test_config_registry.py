@@ -460,6 +460,8 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         "AGENT_EVENT_MONITOR_ENABLED",
         "AGENT_EVENT_MONITOR_INTERVAL_MINUTES",
         "AGENT_EVENT_ALERT_RULES_JSON",
+        "MULTIMODAL_AGENT_TOOLS_ENABLED",
+        "MULTIMODAL_FILE_ROOT",
         # PR3 Phase 2: Backtest
         "BACKTEST_ENABLED",
         "BACKTEST_EVAL_WINDOW_DAYS",

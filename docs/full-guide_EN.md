@@ -111,6 +111,18 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 >
 > The default `00-daily-analysis.yml` in this repository only exports fixed Secret / Variable names. Arbitrary numbered env vars such as `STOCK_GROUP_1` and `EMAIL_GROUP_1` are not auto-injected into the job, so grouped email routing is not available in the stock workflow unless you explicitly extend the workflow's `env:` mapping in your own fork. Actions now maps `CUSTOM_WEBHOOK_BODY_TEMPLATE`, `WEBHOOK_VERIFY_SSL`, `FEISHU_WEBHOOK_SECRET`, `FEISHU_WEBHOOK_KEYWORD`, `PUSHPLUS_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `GOTIFY_URL`, `GOTIFY_TOKEN`, the P3 notification route keys, and the P4 notification noise-control keys; `MARKDOWN_TO_IMAGE_CHANNELS` and `MERGE_EMAIL_NOTIFICATION` remain behavior toggles outside the default workflow mapping.
 
+#### Daily run summary and short failure notification (Issue #850)
+
+After each Daily Analysis job, the workflow always writes a plain-language bilingual **Step Summary** (Chinese primary, English secondary) from structured `data/run_status.json` when present, with exit code / job status / env readiness / log-keyword fallbacks.
+
+| Setting | Description |
+|---------|-------------|
+| `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | Optional route for a **one-line** failure IM (no secret values, no full traceback). Empty → Step Summary only under the default policy |
+| `FAILURE_NOTIFY_ENABLED` | Optional override: default enables notify when system-error channels are set; `false` forces Summary-only; `true` forces a notify attempt |
+| Success-path report push | **Unchanged** — still uses existing report routing |
+
+Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_watchlist`, `non_trading_day`, `data_source`, `timeout`, `quota`, `provider_down`, `unknown`.
+
 #### Push Behavior Configuration
 
 | Secret Name | Description | Required |

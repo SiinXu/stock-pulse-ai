@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { analysisApi } from '../api/analysis';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -43,7 +44,6 @@ export function useMarketReviewRunner({
     ),
     [language, t],
   );
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<MarketReviewNotice>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const pollTimerRef = useRef<number | null>(null);
@@ -51,8 +51,11 @@ export function useMarketReviewRunner({
   const activeRef = useRef(true);
   const onPersistedReportRef = useRef(onPersistedReport);
   const onFeedbackRef = useRef(onFeedback);
-  onPersistedReportRef.current = onPersistedReport;
-  onFeedbackRef.current = onFeedback;
+
+  useEffect(() => {
+    onPersistedReportRef.current = onPersistedReport;
+    onFeedbackRef.current = onFeedback;
+  }, [onFeedback, onPersistedReport]);
 
   const stopPolling = useCallback(() => {
     pollGenerationRef.current += 1;
@@ -183,16 +186,20 @@ export function useMarketReviewRunner({
     await runPoll();
   }, [formatRegionToken, refreshMarketReviewHistory, stopPolling, t]);
 
-  const triggerMarketReview = useCallback(async () => {
-    setIsSubmitting(true);
-    setNotice(null);
-    setError(null);
-    onFeedbackRef.current?.();
-    try {
-      const result = await analysisApi.triggerMarketReview({
-        sendNotification: notify,
-        regions,
-      });
+  // Trigger submit is a TanStack mutation; task status polling stays custom to
+  // preserve domain notice/timeout semantics (not a list-query refetch).
+  const triggerMutation = useMutation({
+    mutationFn: () => analysisApi.triggerMarketReview({
+      sendNotification: notify,
+      regions,
+    }),
+    retry: false,
+    onMutate: () => {
+      setNotice(null);
+      setError(null);
+      onFeedbackRef.current?.();
+    },
+    onSuccess: (result) => {
       if (!activeRef.current) return;
       setNotice({
         variant: 'success',
@@ -204,21 +211,28 @@ export function useMarketReviewRunner({
       });
       onFeedbackRef.current?.();
       if (result.taskId) void pollStatus(result.taskId);
-    } catch (triggerError: unknown) {
+    },
+    onError: (triggerError: unknown) => {
       if (!activeRef.current) return;
       setError(getParsedApiError(triggerError));
       setNotice(null);
       onFeedbackRef.current?.();
-    } finally {
-      if (activeRef.current) setIsSubmitting(false);
+    },
+  });
+
+  const triggerMarketReview = useCallback(async () => {
+    try {
+      await triggerMutation.mutateAsync();
+    } catch {
+      // Error surface is owned by onError + local error state.
     }
-  }, [formatRegionToken, notify, pollStatus, regions, t]);
+  }, [triggerMutation]);
 
   return {
     clear,
     dismissError: () => setError(null),
     error,
-    isSubmitting,
+    isSubmitting: triggerMutation.isPending,
     notice,
     triggerMarketReview,
   };

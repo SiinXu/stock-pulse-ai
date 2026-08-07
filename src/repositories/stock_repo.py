@@ -16,13 +16,14 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 from sqlalchemy import and_, desc, select
 
+from src.repositories.base import BaseRepository, RepositoryError
 from src.storage import DatabaseManager, StockDaily
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 
-class StockRepository:
+class StockRepository(BaseRepository):
     """
     股票数据访问层
     
@@ -36,7 +37,7 @@ class StockRepository:
         Args:
             db_manager: 数据库管理器（可选，默认使用单例）
         """
-        self.db = db_manager or DatabaseManager.get_instance()
+        super().__init__(db_manager)
     
     def get_latest(self, code: str, days: int = 2) -> List[StockDaily]:
         """
@@ -48,18 +49,26 @@ class StockRepository:
             
         Returns:
             StockDaily 对象列表（按日期降序）
+
+        Raises:
+            RepositoryError: when the underlying query fails
         """
         try:
             return self.db.get_latest_data(code, days)
         except Exception as exc:
+            context = {"stock_code": code}
             log_safe_exception(
                 logger,
                 "Latest stock data lookup failed",
                 exc,
                 error_code="latest_stock_data_lookup_failed",
-                context={"stock_code": code},
+                context=context,
             )
-            return []
+            raise RepositoryError(
+                "Latest stock data lookup failed",
+                error_code="latest_stock_data_lookup_failed",
+                context=context,
+            ) from exc
     
     def get_range(
         self,
@@ -77,18 +86,26 @@ class StockRepository:
             
         Returns:
             StockDaily 对象列表
+
+        Raises:
+            RepositoryError: when the underlying query fails
         """
         try:
             return self.db.get_data_range(code, start_date, end_date)
         except Exception as exc:
+            context = {"stock_code": code}
             log_safe_exception(
                 logger,
                 "Stock date range lookup failed",
                 exc,
                 error_code="stock_date_range_lookup_failed",
-                context={"stock_code": code},
+                context=context,
             )
-            return []
+            raise RepositoryError(
+                "Stock date range lookup failed",
+                error_code="stock_date_range_lookup_failed",
+                context=context,
+            ) from exc
     
     def save_dataframe(
         self,
@@ -106,18 +123,26 @@ class StockRepository:
             
         Returns:
             保存的记录数
+
+        Raises:
+            RepositoryError: when persistence fails (does not return 0)
         """
         try:
             return self.db.save_daily_data(df, code, data_source)
         except Exception as exc:
+            context = {"stock_code": code, "data_source": data_source}
             log_safe_exception(
                 logger,
                 "Daily stock data persistence failed",
                 exc,
                 error_code="daily_stock_data_save_failed",
-                context={"stock_code": code, "data_source": data_source},
+                context=context,
             )
-            return 0
+            raise RepositoryError(
+                "Daily stock data persistence failed",
+                error_code="daily_stock_data_save_failed",
+                context=context,
+            ) from exc
     
     def has_today_data(self, code: str, target_date: Optional[date] = None) -> bool:
         """
@@ -129,18 +154,26 @@ class StockRepository:
             
         Returns:
             是否存在数据
+
+        Raises:
+            RepositoryError: when the existence check itself fails
         """
         try:
             return self.db.has_today_data(code, target_date)
         except Exception as exc:
+            context = {"stock_code": code}
             log_safe_exception(
                 logger,
                 "Stock data existence check failed",
                 exc,
                 error_code="stock_data_existence_check_failed",
-                context={"stock_code": code},
+                context=context,
             )
-            return False
+            raise RepositoryError(
+                "Stock data existence check failed",
+                error_code="stock_data_existence_check_failed",
+                context=context,
+            ) from exc
     
     def get_analysis_context(
         self, 
@@ -155,19 +188,27 @@ class StockRepository:
             target_date: 目标日期
             
         Returns:
-            分析上下文字典
+            分析上下文字典, or None when no context exists
+
+        Raises:
+            RepositoryError: when the underlying lookup fails
         """
         try:
             return self.db.get_analysis_context(code, target_date)
         except Exception as exc:
+            context = {"stock_code": code}
             log_safe_exception(
                 logger,
                 "Stock analysis context lookup failed",
                 exc,
                 error_code="stock_analysis_context_lookup_failed",
-                context={"stock_code": code},
+                context=context,
             )
-            return None
+            raise RepositoryError(
+                "Stock analysis context lookup failed",
+                error_code="stock_analysis_context_lookup_failed",
+                context=context,
+            ) from exc
 
     def get_start_daily(self, *, code: str, analysis_date: date) -> Optional[StockDaily]:
         """Return StockDaily for analysis_date (preferred) or nearest previous date."""
