@@ -1,15 +1,15 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  ChevronDown,
   History,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { Button, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
-import { ChatComposer } from '../components/chat/ChatComposer';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
 import {
@@ -44,6 +44,7 @@ import { getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
 import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
+import { cn } from '../utils/cn';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
@@ -811,119 +812,6 @@ const ChatPage: React.FC = () => {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   }, [language, t]);
-
-  const getCurrentStage = (steps: ProgressStep[]): string => {
-    if (steps.length === 0) return t('chat.connecting');
-    const last = steps[steps.length - 1];
-    if (last.type === 'thinking') return last.message || t('chat.thinking');
-    if (last.type === 'tool_start')
-      return `${last.display_name || last.tool}...`;
-    if (last.type === 'tool_done')
-      return t('chat.completed', { name: last.display_name || last.tool || '' });
-    if (last.type === 'stage_start')
-      return last.message || `Starting ${last.stage || 'stage'}...`;
-    if (last.type === 'stage_done')
-      return getStageDoneLabel(last);
-    if (last.type === 'pipeline_timeout')
-      return last.message || `${last.stage || 'pipeline'} timed out`;
-    if (last.type === 'pipeline_budget_skipped')
-      return getPipelineBudgetSkippedLabel(last);
-    if (last.type === 'generating')
-      return last.message || t('chat.generating');
-    return t('chat.processing');
-  };
-
-  const renderThinkingBlock = (msg: Message) => {
-    if (!msg.thinkingSteps || msg.thinkingSteps.length === 0) return null;
-    const isExpanded = expandedThinking.has(msg.id);
-    const toolSteps = msg.thinkingSteps.filter((s) => s.type === 'tool_done');
-    const totalDuration = toolSteps.reduce(
-      (sum, s) => sum + (s.duration || 0),
-      0,
-    );
-    const summary = t('chat.toolCalls', { count: toolSteps.length, duration: totalDuration.toFixed(1) });
-
-    return (
-      <button
-        onClick={() => toggleThinking(msg.id)}
-        className="flex items-center gap-2 text-xs text-muted-text hover:text-secondary-text transition-colors mb-2 w-full text-left"
-      >
-        <svg
-          className={`w-3 h-3 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
-        <span className="flex items-center gap-1.5">
-          <span className="opacity-60">{t('chat.thinkingProcess')}</span>
-          <span className="text-muted-text/50">·</span>
-          <span className="opacity-50">{summary}</span>
-        </span>
-      </button>
-    );
-  };
-
-  const renderThinkingDetails = (steps: ProgressStep[]) => (
-    <div className="mb-3 pl-5 border-l border-border/40 space-y-1.5 animate-fade-in">
-      {steps.map((step, idx) => {
-        let statusClass = 'chat-progress-item-muted';
-        let iconClass = 'chat-progress-dot-muted';
-        let text = '';
-        if (step.type === 'thinking') {
-          text = step.message || t('chat.thinkingStep', { step: step.step || '' });
-          statusClass = 'chat-progress-item-thinking';
-          iconClass = 'chat-progress-dot-thinking';
-        } else if (step.type === 'tool_start') {
-          text = `${step.display_name || step.tool}...`;
-          statusClass = 'chat-progress-item-tool';
-          iconClass = 'chat-progress-dot-tool';
-        } else if (step.type === 'tool_done') {
-          text = `${step.display_name || step.tool} (${step.duration}s)`;
-          statusClass = step.success ? 'chat-progress-item-success' : 'chat-progress-item-danger';
-          iconClass = step.success ? 'chat-progress-dot-success' : 'chat-progress-dot-danger';
-        } else if (step.type === 'stage_start') {
-          text = step.message || `Starting ${step.stage || 'stage'}...`;
-          statusClass = 'chat-progress-item-thinking';
-          iconClass = 'chat-progress-dot-thinking';
-        } else if (step.type === 'stage_done') {
-          const isSuccess = isStageDoneSuccessful(step.status);
-          text = getStageDoneLabel(step);
-          statusClass = isSuccess ? 'chat-progress-item-success' : 'chat-progress-item-danger';
-          iconClass = isSuccess ? 'chat-progress-dot-success' : 'chat-progress-dot-danger';
-        } else if (step.type === 'pipeline_timeout') {
-          text = step.message || `${step.stage || 'pipeline'} timed out`;
-          statusClass = 'chat-progress-item-danger';
-          iconClass = 'chat-progress-dot-danger';
-        } else if (step.type === 'pipeline_budget_skipped') {
-          text = getPipelineBudgetSkippedLabel(step);
-          statusClass = 'chat-progress-item-muted';
-          iconClass = 'chat-progress-dot-muted';
-        } else if (step.type === 'generating') {
-          text = step.message || t('chat.generateAnalysis');
-          statusClass = 'chat-progress-item-generating';
-          iconClass = 'chat-progress-dot-generating';
-        } else {
-          text = step.message || step.type;
-        }
-        return (
-          <div
-            key={idx}
-            className={cn('chat-progress-item', statusClass)}
-          >
-            <span className={cn('chat-progress-dot', iconClass)} />
-            <span className="leading-relaxed">{text}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
 
   const filteredSessions = useMemo(
     () => sessions.filter((session) => session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase())),

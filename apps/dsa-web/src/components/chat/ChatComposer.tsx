@@ -114,7 +114,7 @@ export function ChatComposer({
               error={chatError}
               className={cn(
                 '[&>div>div]:w-full [&_details]:w-full',
-                lastFailedRequest && 'pr-12',
+                Boolean(lastFailedRequest) && 'pr-12',
               )}
             />
             {lastFailedRequest ? (
