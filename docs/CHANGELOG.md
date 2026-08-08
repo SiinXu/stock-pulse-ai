@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Report templates pin a Decision Card (direction/score, conclusion, confidence, key risks, watch/invalidation conditions) at the top of each stock section using existing dashboard fields only (#861 Phase 1).
+- [Chore] Added Web production bundle gzip size budgets and `npm run build:check` gate (baseline = measured size + 10%; no business-code slimming in this change).
 - [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
 - [Added] Web multi-market number/timezone/change-color formatting contract module (`marketFormat`) with semantic matrix unit tests (issue #889).
 - [Fixed] Keep report→Chat stock/record URL context until the chat stream succeeds so a mid-flight refresh can restore the unsent follow-up draft (#879 A5).

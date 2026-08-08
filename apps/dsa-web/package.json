@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:check": "npm run build && node scripts/check-bundle-size.mjs",
     "i18n:high-risk": "node scripts/check-high-risk-i18n.mjs",
     "i18n:resources": "node scripts/check-ui-i18n-resources.mjs",
     "lint": "eslint .",
