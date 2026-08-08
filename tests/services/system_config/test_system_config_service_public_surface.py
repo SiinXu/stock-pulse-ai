@@ -206,7 +206,8 @@ EXPECTED_PUBLIC_NAMES = ('annotations',
  'known_llm_provider_channel_names',
  'SystemConfigService')
 EXPECTED_MODULE_ANNOTATIONS = {}
-EXPECTED_CLASS_SURFACE = ('__annotations__',
+EXPECTED_CLASS_SURFACE = (
+ '__annotations__',
  '_ENV_KEY_PATTERN',
  '_GENERATION_BACKEND_STATUS_EXACT_KEYS',
  '_GENERATION_BACKEND_STATUS_LLM_CHANNEL_RE',
@@ -325,6 +326,9 @@ EXPECTED_CLASS_SURFACE = ('__annotations__',
  '_build_setup_stock_list_check',
  '_build_setup_notification_check',
  '_build_setup_storage_check',
+ '_detect_local_runtime_for_setup',
+ '_build_setup_local_runtime_check',
+ '_build_setup_data_only_check',
  '_is_safe_base_url',
  '_build_llm_models_url',
  '_get_runtime_llm_temperature',
@@ -366,7 +370,8 @@ EXPECTED_CLASS_SURFACE = ('__annotations__',
  '_validate_llm_runtime_selection',
  '_unknown_connection_contract_issues',
  '_validate_llm_channel_definition',
- '_validate_llm_channel_connection')
+ '_validate_llm_channel_connection',
+)
 EXPECTED_CLASS_ANNOTATIONS = {'_LLM_CAPABILITY_ORDER': 'Tuple[str, ...]',
  '_CONNECTION_SECRET_SCOPE_SUFFIXES': 'Tuple[str, ...]',
  '_NOTIFICATION_TEST_CHANNELS': 'Tuple[str, ...]',
@@ -381,7 +386,7 @@ EXPECTED_CLASS_STATIC_ATTRIBUTES = (
     "_runtime_scheduler",
     "_runtime_config_transaction",
 )
-EXPECTED_METHOD_METADATA_SHA256 = '195751fd8dc203cce1e1414e0c0d053d235f0860c3e96bb575b158733b5ba788'
+EXPECTED_METHOD_METADATA_SHA256 = '191013324555e66eb0140b18bf4317dc5329b8a49f3922f9e03c3269a7edc536'
 
 
 def _descriptor_function(descriptor):
