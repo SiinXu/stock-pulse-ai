@@ -2366,7 +2366,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.charts.CHARTS_TEXT.klineLegendFlat": "平盤",
   "locales.charts.CHARTS_TEXT.klineLegendUp": "上漲",
   "locales.charts.CHARTS_TEXT.klineLow": "低",
-  "locales.charts.CHARTS_TEXT.klineMa": "MA{period}",
+  "locales.charts.CHARTS_TEXT.klineMa": "均線{period}",
   "locales.charts.CHARTS_TEXT.klineOpen": "開",
   "locales.charts.CHARTS_TEXT.klineSummary": "區間 {start} 至 {end}，收盤從 {first} 到 {last}，漲跌 {change}，最高 {high}，最低 {low}",
   "locales.charts.CHARTS_TEXT.klineVolume": "成交量",
