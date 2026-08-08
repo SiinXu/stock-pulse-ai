@@ -207,7 +207,11 @@ class _SystemConfigSetupMethods:
 
         return "", "尚未检测到主要模型配置"
 
-    def _build_setup_primary_llm_check(self, effective_map: Dict[str, str]) -> Dict[str, Any]:
+    def _build_setup_primary_llm_check(
+        self,
+        effective_map: Dict[str, str],
+        local_detect: Any = None,
+    ) -> Dict[str, Any]:
         generation_backend = normalize_backend_id(
             effective_map.get("GENERATION_BACKEND"),
             default=LITELLM_BACKEND_ID,
@@ -259,14 +263,48 @@ class _SystemConfigSetupMethods:
                 "configured",
                 f"已检测到 {source_label}: {model}",
             )
+        # Zero-config first success (#796): keep needs_action for full AI smoke,
+        # but guide beginners to data-only dry-run and/or detected local Ollama.
+        if local_detect is None:
+            local_detect = self._detect_local_runtime_for_setup(effective_map)
+        if getattr(local_detect, "available", False):
+            models = list(getattr(local_detect, "models", None) or [])
+            base_url = getattr(local_detect, "base_url", None) or "http://127.0.0.1:11434"
+            models_hint = (
+                f"已发现模型：{', '.join(models[:3])}。"
+                if models
+                else "尚未列出本地模型，可在 Local Models 拉取后再应用。"
+            )
+            return self._setup_check(
+                "llm_primary",
+                "主要模型",
+                "ai_model",
+                True,
+                "needs_action",
+                (
+                    f"{source}。已在本机检测到 Ollama（{base_url}），"
+                    f"可作为零 Key 本地生成路径。{models_hint}"
+                ),
+                (
+                    "推荐：在「本地模型」应用检测到的 Ollama 配置（无需云端 API Key），"
+                    "或先运行 data-only：`python main.py --dry-run` 获取行情数据报告。"
+                ),
+            )
         return self._setup_check(
             "llm_primary",
             "主要模型",
             "ai_model",
             True,
             "needs_action",
-            source,
-            "请在“模型接入”中添加模型服务，或在任务路由中选择主要模型。",
+            (
+                f"{source}。"
+                "在配置模型前，仍可用 data-only 路径完成首次成功："
+                "`python main.py --dry-run`（仅行情数据，无 AI 分析）。"
+            ),
+            (
+                "请在「模型接入」添加云端 Key，或启动本机 Ollama 后走本地零成本路径；"
+                "也可先 dry-run 体验数据报告。"
+            ),
         )
 
     def _build_setup_agent_llm_check(
@@ -568,4 +606,99 @@ class _SystemConfigSetupMethods:
             "needs_action",
             f"数据库路径上级目录不可写: {probe}",
             "请调整 DATABASE_PATH 或目录权限。",
+        )
+
+    def _detect_local_runtime_for_setup(self, effective_map: Dict[str, str]):
+        """Run the fast loopback local-runtime probe used by setup readiness."""
+        from src.services.local_runtime_detect import detect_local_runtime_from_config_map
+
+        return detect_local_runtime_from_config_map(effective_map)
+
+    def _build_setup_local_runtime_check(
+        self,
+        effective_map: Dict[str, str],
+        local_detect: Any = None,
+    ) -> Dict[str, Any]:
+        """Surface local Ollama detect as a stable, non-blocking setup check."""
+        detect = (
+            local_detect
+            if local_detect is not None
+            else self._detect_local_runtime_for_setup(effective_map)
+        )
+        if not getattr(detect, "detect_enabled", True):
+            return self._setup_check(
+                "local_runtime",
+                "本地运行时检测",
+                "system",
+                False,
+                "optional",
+                "已关闭 LOCAL_RUNTIME_AUTO_DETECT，跳过本机 Ollama 探测。",
+                "需要自动发现时，将 LOCAL_RUNTIME_AUTO_DETECT 设为 true。",
+            )
+        if getattr(detect, "available", False):
+            models = list(getattr(detect, "models", None) or [])
+            model_text = (
+                f"已发现 {len(models)} 个本地模型"
+                + (f"（例如 {', '.join(models[:3])}）" if models else "（列表为空，可先拉取模型）")
+            )
+            profile_hint = ""
+            suggested = getattr(detect, "suggested_profile", None) or {}
+            litellm_model = str(suggested.get("LITELLM_MODEL") or "").strip()
+            if litellm_model:
+                profile_hint = (
+                    f" 建议非密钥字段：LLM_CHANNELS=ollama，LITELLM_MODEL={litellm_model}。"
+                )
+            base_url = getattr(detect, "base_url", None) or "http://127.0.0.1:11434"
+            return self._setup_check(
+                "local_runtime",
+                "本地运行时检测",
+                "system",
+                False,
+                "configured",
+                f"已检测到本机 Ollama：{base_url}。{model_text}。{profile_hint}".strip(),
+                "可在设置中应用本地零成本路径，无需云端 API Key。",
+            )
+        return self._setup_check(
+            "local_runtime",
+            "本地运行时检测",
+            "system",
+            False,
+            "optional",
+            (
+                "未在回环地址检测到可用的 Ollama（默认 http://127.0.0.1:11434）。"
+                "探测失败仅记录日志，不影响启动。"
+            ),
+            (
+                "可选：启动 Ollama 后刷新就绪检查以使用本地零成本路径；"
+                "或先 `python main.py --dry-run` 获取 data-only 报告。"
+            ),
+        )
+
+    def _build_setup_data_only_check(self, effective_map: Dict[str, str]) -> Dict[str, Any]:
+        """Explain the zero-key data-only first-success path (dry-run equivalent)."""
+        stocks = split_stock_list(effective_map.get("STOCK_LIST") or "")
+        if stocks:
+            return self._setup_check(
+                "data_only_path",
+                "零配置 data-only 路径",
+                "base",
+                False,
+                "configured",
+                (
+                    f"自选股已配置 {len(stocks)} 只；无 LLM Key 时仍可运行 "
+                    "`python main.py --dry-run` 获取行情数据报告（与 dry-run 产物一致）。"
+                ),
+                "配置主要模型或本地 Ollama 后即可升级为完整 AI 分析。",
+            )
+        return self._setup_check(
+            "data_only_path",
+            "零配置 data-only 路径",
+            "base",
+            False,
+            "optional",
+            (
+                "无 LLM Key 时，正常分析会给出明确引导，并可使用 "
+                "`python main.py --dry-run` 完成 data-only 首次成功。"
+            ),
+            "请先在 STOCK_LIST 添加至少 1 只股票，再运行 dry-run。",
         )

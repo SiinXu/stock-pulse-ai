@@ -44,6 +44,7 @@ from src.agent.chat_context import (
 )
 from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.disagreement import build_agent_disagreement_summary
+from src.agent.deliberation_scheduler import AgentSkillScheduler, SkillBatchResult
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.protocols import (
     AgentContext,
@@ -255,7 +256,11 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
-        self.strategy_engine = StrategyEngine()
+        self.strategy_engine = StrategyEngine(
+            deliberation_enabled=bool(
+                getattr(config, "agent_multi_strategy_deliberation", False)
+            ),
+        )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
         )

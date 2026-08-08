@@ -1,0 +1,20 @@
+{
+  "description": "Recorded-style Eastmoney profit sheet (long) for A-share parsing tests. Offline only.",
+  "rows": [
+    {
+      "REPORT_DATE": "2024-12-31",
+      "TOTAL_OPERATE_INCOME": 150000000000.0,
+      "PARENT_NETPROFIT": 70000000000.0
+    },
+    {
+      "REPORT_DATE": "2023-12-31",
+      "TOTAL_OPERATE_INCOME": 130000000000.0,
+      "PARENT_NETPROFIT": 60000000000.0
+    },
+    {
+      "REPORT_DATE": "2022-12-31",
+      "TOTAL_OPERATE_INCOME": 120000000000.0,
+      "PARENT_NETPROFIT": 55000000000.0
+    }
+  ]
+}

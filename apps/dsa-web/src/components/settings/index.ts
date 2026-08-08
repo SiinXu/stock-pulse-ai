@@ -22,6 +22,7 @@ export * from './ModelFallbackEditor';
 export * from './ModelMultiSelect';
 export * from './AuthSettingsCard';
 export * from './InvestmentFrameworkSettingsCard';
+export * from './InvestmentFrameworkPromptPreview';
 export * from './GenerationBackendStatusPanel';
 export * from './KronosSettingsFields';
 export * from './KronosStatusPanel';

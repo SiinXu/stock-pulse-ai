@@ -42,6 +42,7 @@ from api.v1.schemas.stocks import (
     KLineData,
 )
 from api.v1.schemas.backtest import (
+    BacktestAppliedConfig,
     BacktestRunRequest,
     BacktestRunResponse,
     BacktestResultItem,
@@ -150,6 +151,9 @@ from api.v1.schemas.decision_signals import (
     DecisionSignalOutcomeRunResponse,
     DecisionSignalOutcomeStatsBucket,
     DecisionSignalOutcomeStatsResponse,
+    DecisionSignalProfileCalibration,
+    DecisionSignalProfileCalibrationBreakdowns,
+    DecisionSignalProfileCalibrationBucket,
     DecisionSignalStatusUpdateRequest,
 )
 
@@ -185,6 +189,7 @@ __all__ = [
     "StockHistoryResponse",
     "KLineData",
     # backtest
+    "BacktestAppliedConfig",
     "BacktestRunRequest",
     "BacktestRunResponse",
     "BacktestResultItem",
@@ -287,5 +292,8 @@ __all__ = [
     "DecisionSignalOutcomeRunResponse",
     "DecisionSignalOutcomeStatsBucket",
     "DecisionSignalOutcomeStatsResponse",
+    "DecisionSignalProfileCalibration",
+    "DecisionSignalProfileCalibrationBreakdowns",
+    "DecisionSignalProfileCalibrationBucket",
     "DecisionSignalStatusUpdateRequest",
 ]

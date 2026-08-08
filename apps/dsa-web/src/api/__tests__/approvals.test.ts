@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { approvalsApi } from '../approvals';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, put, post } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -112,4 +113,32 @@ describe('approvalsApi', () => {
       },
     );
   });
+
+  it('preserves extra keys on valid rule payloads (byte-identical toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        owner: 'local_admin', enabled: false, risk_sources: [],
+        expires_in_seconds: 60, version: 1, unexpected_server_field: 'keep-me',
+      },
+    });
+    const rule = await approvalsApi.getRule();
+    expect(rule).toEqual({
+      owner: 'local_admin', enabled: false, riskSources: [],
+      expiresInSeconds: 60, version: 1, unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: { owner: 'local_admin', risk_sources: [], expires_in_seconds: 60, version: 1 },
+    });
+    await expect(approvalsApi.getRule()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('ApprovalRule');
+      return true;
+    });
+  });
+
 });

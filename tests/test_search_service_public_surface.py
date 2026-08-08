@@ -12,20 +12,20 @@ import typing
 from pathlib import Path
 
 
-EXPECTED_RAW_MODULE_COUNT = 74
+EXPECTED_RAW_MODULE_COUNT = 75
 EXPECTED_RAW_MODULE_SURFACE_SHA256 = (
-    "3efea536587dc1ec7869bb10b5e1af280d41a1395e7e51f3356f146d0bef4805"
+    "42583a9be31a62eaf2bcdbf7dcad7d5ff3c1d6622f8a0ec9d535c2f395a1cd37"
 )
-EXPECTED_MODULE_COUNT = 65
+EXPECTED_MODULE_COUNT = 66
 EXPECTED_MODULE_SURFACE_SHA256 = (
-    "4e54d92e2c354ac18ab7bdce417ced14af5910ae12063cba802a6eddc684286e"
+    "1e017c431b0e45fabaf95a3ac05c4c3fe8d0a01421ea5f92bc04ac0bdcdf72d9"
 )
-EXPECTED_PUBLIC_COUNT = 54
+EXPECTED_PUBLIC_COUNT = 55
 EXPECTED_PUBLIC_SURFACE_SHA256 = (
-    "c527fe8817034ae49440db32d059f8c7498a3bff246c1ca36d8fd7e54f1ad305"
+    "22bb473b0c8ae2b99d97772f809a5f14d9a29a2467db11bb487d15c260e4909c"
 )
 EXPECTED_REFLECTION_SHA256 = (
-    "a7c6be2ceb001b21eaa8c4e4eb8c7c37b58938abee6c487f1bb12a2042d90933"
+    "907e0da70d69595f76365ac045643750ba15849ad642104a3781c9e96a2ec9f3"
 )
 
 EXPECTED_AST_GROUPS = (
@@ -89,8 +89,14 @@ EXPECTED_AST_GROUPS = (
         "b14c330cb994e2e8a704a21daa60d14f5dd71e323cf33bdd9d60812ab5cbdfdb",
         416,
     ),
+    (
+        "rss_source.py",
+        ("RssAtomSearchProvider",),
+        "eaca0289eaeecc39f4a37190fba124fed91e93f607c4bd34f53a389086088501",
+        468,
+    ),
 )
-EXPECTED_MOVED_AST_LINES = 2_226
+EXPECTED_MOVED_AST_LINES = 2_694
 
 MOVED_FUNCTIONS = (
     "_stable_search_failure_message",
@@ -113,6 +119,7 @@ MOVED_CLASSES = (
     "MiniMaxSearchProvider",
     "BraveSearchProvider",
     "SearXNGSearchProvider",
+    "RssAtomSearchProvider",
 )
 PRIVATE_MODULES = tuple(
     f"src.search_parts.{filename.removesuffix('.py')}"

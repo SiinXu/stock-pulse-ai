@@ -159,16 +159,22 @@ The current repository CI mainly contains:
 | --- | --- | --- | --- |
 | `changes` | `.github/workflows/ci.yml` | Path-filter job for `web-gate` / `web-e2e`. On `merge_group`, forces the full path matrix | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
+<<<<<<< HEAD
 | `backend-gate` | `.github/workflows/ci.yml` | **Two-tier:** on `pull_request`/`push` runs syntax+flake8+deterministic+**selective** offline pytest (full suite when path mapping is uncertain). On `merge_group` is the summary job after **4 sharded** full offline suites with **combined** coverage floor | Yes |
 | `backend-tests` | `.github/workflows/ci.yml` | Merge-queue only: matrix-sharded full offline pytest (`scripts/ci_test_shard.py`) uploading per-shard coverage data | Yes on `merge_group` (feeds `backend-gate`) |
 | `python-minimum` | `.github/workflows/ci.yml` | Python 3.10: **PR/push** runs `python-min-smoke` (imports + small offline subset). **merge_group** runs the full offline suite so 3.10 coverage remains real once per merge | Yes |
+=======
+| `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest (FULL fallback); push-to-main: full suite + coverage floor | Yes |
+| `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: full offline suite on Python 3.10 | Yes |
+>>>>>>> origin/main
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
-| `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test`, and `npm run build` during frontend changes | Yes (triggered) |
-| `web-e2e` | `.github/workflows/ci.yml` | For frontend changes, starts a real backend, Vite, and local fake model endpoint with an isolated temporary `ENV_FILE`, then runs `npm run test:smoke` (Playwright) | Yes (when triggered) |
+| `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test`, and `npm run build` during frontend changes | Yes on PR when frontend paths change (not a ruleset required name; still the frontend quality gate) |
+| `web-e2e` | `.github/workflows/ci.yml` | Real backend + Vite + Playwright smoke | No on PR; observation on push-to-main when path filter matches |
+| `api-real-client` | `.github/workflows/ci.yml` | `tests/api` with real Starlette TestClient | No on PR; observation on push-to-main |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
-| `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, auxiliary item |
+| `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, opt-in via `workflow_dispatch` only |
 
 **Event model:** PR feedback uses the fast tier (selective pytest). Merge Queue (`merge_group`) runs the full offline suite once with shards + combined coverage. Prefer enabling GitHub Merge Queue on `main` so full rigor runs at queue time instead of on every PR resync.
 
@@ -243,7 +249,11 @@ If there is a corresponding CI result on the existing PR, you can directly quote
   - `.claude/skills/analyze-issue/SKILL.md`
   - `.claude/skills/analyze-pr/SKILL.md`
   - `.claude/skills/fix-issue/SKILL.md`
-- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`.
+  - `.claude/skills/develop-feature/SKILL.md`
+  - `.claude/skills/run-verification/SKILL.md`
+  - `.claude/skills/draft-issue/SKILL.md`
+  - `.claude/skills/handle-review-feedback/SKILL.md`
+- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`. For planned development tasks prefer `develop-feature` (which embeds `run-verification` and the `analyze-pr` review order); for responding to review feedback on your own PR follow `handle-review-feedback`. Skill selection guidance lives in `docs/claude-skills-guide.md`.
 - Commands, templates, validation order, and delivery structure in these skills must remain consistent with `AGENTS.md`.
 - Before creating or updating a PR, reviewing a PR, or analyzing an issue, synchronize the latest codebase: first check the workspace status and execute `git fetch --all --prune`; if the workspace is clean and the current branch can be fast-forwarded, execute `git pull --ff-only`. If there are local modifications, conflict states, untracked risk files, or inability to fast-forward, do not forcibly switch branches, stash, reset, or overwrite local status; PR review/issue analysis can use the fetched remote refs/PR head for analysis and clearly record the reason for not updating the local working tree and the current local HEAD with the remote baseline in the analysis document; PR creation/update should first explain the difference between the current branch and the target baseline, and request user confirmation to rebase, merge, or continue based on the current branch.
 - Skills should inspect CI and workflow evidence before deciding whether additional local validation is needed.

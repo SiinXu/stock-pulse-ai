@@ -116,6 +116,23 @@ def _normalize_skill_ids(
     return normalized, unknown
 
 
+def normalize_requested_skill_ids(config, skill_ids: List[str]) -> List[str]:
+    """Normalize API-requested Skill ids with the AgentFactory catalog rules."""
+    skill_manager = get_skill_manager(config)
+    available_skill_ids = {
+        str(getattr(skill, "name", "")).strip()
+        for skill in skill_manager.list_skills()
+        if str(getattr(skill, "name", "")).strip()
+    }
+    normalized, unknown = _normalize_skill_ids(
+        skill_ids,
+        available_skill_ids=available_skill_ids,
+    )
+    if unknown:
+        logger.warning("[AgentFactory] Ignoring unknown request skill ids: %s", unknown)
+    return normalized
+
+
 def _resolve_selected_skill_ids(
     *,
     requested_skills: Optional[List[str]],
@@ -201,24 +218,69 @@ def get_tool_registry():
     for tool_fn in ALL_DATA_TOOLS + ALL_ANALYSIS_TOOLS + ALL_SEARCH_TOOLS + ALL_MARKET_TOOLS + ALL_BACKTEST_TOOLS:
         registry.register(tool_fn)
 
+    # Optional multimodal PDF/chart tools (issue #253): default-off.
+    try:
+        from src.agent.tools.multimodal_tools import build_multimodal_tools
+        from src.application_services import get_application_services
+
+        multimodal_tools = build_multimodal_tools(get_application_services().config)
+        if multimodal_tools:
+            for tool_def in multimodal_tools:
+                registry.register(tool_def)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional tools stay absent.
+        log_safe_exception(
+            logger,
+            "Optional multimodal tool registration skipped",
+            exc,
+            error_code="multimodal_tool_registration_failed",
+            level=logging.WARNING,
+        )
+
+    # Optional valuation tool (issue #238): default-off, registered only when enabled.
+    try:
+        from src.agent.tools.valuation_tools import build_valuation_tool
+        from src.application_services import get_application_services
+
+        valuation_tool = build_valuation_tool(get_application_services().config)
+        if valuation_tool is not None:
+            registry.register(valuation_tool)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
+        log_safe_exception(
+            logger,
+            "Optional valuation tool registration skipped",
+            exc,
+            error_code="valuation_tool_registration_failed",
+            level=logging.WARNING,
+        )
+
     _TOOL_REGISTRY = registry
     logger.info("[AgentFactory] ToolRegistry cached (%d tools)", len(registry._tools) if hasattr(registry, "_tools") else -1)
     return _TOOL_REGISTRY
 
 
 def build_declarative_skill_manager(config: Config):
-    """Build the existing built-in plus custom declarative Skill catalog."""
+    """Build the declarative Skill catalog used for reserved-name checks.
+
+    Built-in strategies under ``strategies/`` are first-class
+    ``analysis_strategy`` plugins (see ``src.plugins.builtin``). They are
+    **not** loaded here so plugin registration is not rejected as a native
+    collision. Custom ``AGENT_SKILL_DIR`` YAML / ``SKILL.md`` definitions remain
+    declarative and still override same-named plugin strategies at catalog
+    assembly time.
+
+    Direct callers that need the legacy on-disk built-in YAML without plugin
+    composition should use ``SkillManager.load_builtin_skills()`` (compat shim).
+    """
 
     from src.agent.skills.base import SkillManager
 
     skill_manager = SkillManager()
-    skill_manager.load_builtin_skills()
 
     custom_dir = getattr(config, "agent_skill_dir", None)
     if custom_dir:
         try:
             skill_manager.load_custom_skills(custom_dir)
-        except Exception as exc:  # broad-exception: fallback_recorded - built-in skills remain available.
+        except Exception as exc:  # broad-exception: fallback_recorded - empty declarative catalog is safe.
             log_safe_exception(
                 logger,
                 "Agent factory custom skill loading failed",
@@ -282,10 +344,7 @@ def get_skill_manager(config: Optional[Config] = None):
         _SKILL_MANAGER_CUSTOM_DIR = current_custom_dir
         _SKILL_MANAGER_CATALOG_TOKEN = plugin_snapshot.catalog_token
         _SKILL_MANAGER_CATALOG_GENERATION = plugin_snapshot.generation
-        logger.info(
-            "[AgentFactory] SkillManager prototype cached (%d skills)",
-            len(skill_manager._skills),
-        )
+        logger.info("[AgentFactory] SkillManager prototype cached")
         return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
 
 

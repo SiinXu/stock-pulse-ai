@@ -2001,6 +2001,14 @@ def find_exception_log_violations(path: str, source: str) -> list[ExceptionLogVi
     return sorted(violations)
 
 
+# Production scan partitions. Shared-runner coverage previously segfaulted on
+# one mega-test and then timed out on a single ``src`` package case (PR #809).
+# Chunk by file count so each pytest case stays under the gate timeout while
+# the union still covers the full production surface with the same empty-
+# violation assertion per chunk.
+_PRODUCTION_SCAN_CHUNK_SIZE = 15
+
+
 def _scoped_python_files() -> list[Path]:
     files = {
         path
@@ -2010,6 +2018,28 @@ def _scoped_python_files() -> list[Path]:
     }
     files.update(SCOPED_FILES)
     return sorted(files)
+
+
+def _production_scan_chunks() -> tuple[tuple[str, tuple[Path, ...]], ...]:
+    """Return stable (chunk_id, files) partitions over the production surface."""
+
+    files = _scoped_python_files()
+    chunks: list[tuple[str, tuple[Path, ...]]] = []
+    size = _PRODUCTION_SCAN_CHUNK_SIZE
+    for index in range(0, len(files), size):
+        chunk_files = tuple(files[index : index + size])
+        first = chunk_files[0].relative_to(REPO_ROOT).as_posix()
+        last = chunk_files[-1].relative_to(REPO_ROOT).as_posix()
+        chunk_id = f"{index // size:03d}:{first}..{last}"
+        chunks.append((chunk_id, chunk_files))
+    return tuple(chunks)
+
+
+PRODUCTION_SCAN_CHUNKS = _production_scan_chunks()
+PRODUCTION_SCAN_CHUNK_IDS = tuple(chunk_id for chunk_id, _ in PRODUCTION_SCAN_CHUNKS)
+_PRODUCTION_SCAN_CHUNK_FILES = {
+    chunk_id: chunk_files for chunk_id, chunk_files in PRODUCTION_SCAN_CHUNKS
+}
 
 
 def test_callsite_guard_detects_all_unsafe_forms_and_accepts_shared_helper() -> None:
@@ -3059,15 +3089,40 @@ def emit(error, use_primary):
     assert find_exception_log_violations("fixture.py", source) == []
 
 
-@pytest.mark.timeout(600)
-def test_all_production_python_uses_shared_sanitized_exception_logging() -> None:
-    violations = [
-        violation
-        for path in _scoped_python_files()
-        for violation in find_exception_log_violations(
-            str(path.relative_to(REPO_ROOT)),
-            path.read_text(encoding="utf-8"),
+def test_production_scan_chunks_partition_full_surface() -> None:
+    """Chunks must cover every previously scanned production file exactly once."""
+
+    partitioned: list[Path] = []
+    for chunk_id in PRODUCTION_SCAN_CHUNK_IDS:
+        chunk_files = _PRODUCTION_SCAN_CHUNK_FILES[chunk_id]
+        assert chunk_files, f"empty production scan chunk: {chunk_id}"
+        assert len(chunk_files) <= _PRODUCTION_SCAN_CHUNK_SIZE
+        partitioned.extend(chunk_files)
+    assert partitioned == _scoped_python_files()
+    assert len(PRODUCTION_SCAN_CHUNK_IDS) == len(set(PRODUCTION_SCAN_CHUNK_IDS))
+
+
+@pytest.mark.timeout(120)
+@pytest.mark.parametrize("chunk_id", PRODUCTION_SCAN_CHUNK_IDS)
+def test_all_production_python_uses_shared_sanitized_exception_logging(
+    chunk_id: str,
+) -> None:
+    """Scan one file-count chunk so failures are attributable and CI-safe.
+
+    Evidence (PR #809): package-level ``src`` still timed out under coverage on
+    shared runners. Bounded chunks keep the same total assertions (every scoped
+    file scanned; empty violation list required) without one giant case.
+    """
+
+    violations: list[ExceptionLogViolation] = []
+    for path in _PRODUCTION_SCAN_CHUNK_FILES[chunk_id]:
+        # Stream per file so a single large module does not retain the whole
+        # chunk's AST-derived state longer than necessary.
+        violations.extend(
+            find_exception_log_violations(
+                str(path.relative_to(REPO_ROOT)),
+                path.read_text(encoding="utf-8"),
+            )
         )
-    ]
 
     assert violations == []

@@ -86,6 +86,12 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
+    # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
+    multimodal_agent_tools_enabled: bool = False
+    multimodal_file_root: Optional[str] = None
+    # === Optional DCF / relative valuation Agent Tool (issue #238) ===
+    valuation_agent_tool_enabled: bool = False
+
     # === Historical decision memory & reflection (Issue #118) ===
     decision_memory_enabled: bool = True
     decision_memory_lookback: int = 5
@@ -95,6 +101,15 @@ class Config:
     # === Public signal scorecard (Issue #379) ===
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
+
+    # === Daily brief with historical accuracy review (Issue #466) ===
+    daily_brief_enabled: bool = False
+    daily_brief_schedule_time: str = "08:30"
+    daily_brief_timezone: str = "Asia/Shanghai"
+    daily_brief_min_samples: int = 10
+    daily_brief_notify: bool = True
+    daily_brief_persist_history: bool = True
+    daily_brief_save_report_file: bool = True
 
     # === Paper trading portfolio (Issue #370) ===
     paper_portfolio_initial_cash: float = 1_000_000.0
@@ -187,6 +202,9 @@ class Config:
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
     searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
+    # Optional RSS/Atom feeds for on-demand news search (supplement to SearXNG; empty = inert)
+    rss_news_feed_urls: List[str] = field(default_factory=list)
+    rss_news_fetch_timeout_sec: float = 8.0  # Per-feed pull timeout for search-pipeline RSS/Atom
 
     # === Social Sentiment (US stocks only, api.adanos.org) ===
     social_sentiment_api_key: Optional[str] = None
@@ -215,7 +233,10 @@ class Config:
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
+    skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
+    decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
     agent_technical_agent_timeout_s: float = 0
     agent_intel_agent_timeout_s: float = 0
     agent_risk_agent_timeout_s: float = 0
@@ -223,6 +244,7 @@ class Config:
     agent_portfolio_agent_timeout_s: float = 0
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
+    agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
@@ -232,9 +254,13 @@ class Config:
     agent_context_compression_profile: str = AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE
     agent_context_compression_trigger_tokens: int = 12000
     agent_context_protected_turns: int = 4
+    agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
+    agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
+    # Attach holdings/watchlist impact context to triggered alert notifications (managed data only).
+    agent_event_impact_context_enabled: bool = True
 
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)
@@ -525,6 +551,7 @@ _CONFIG_METHOD_GROUPS = (
         (
             "reset_instance",
             "has_searxng_enabled",
+            "has_rss_news_feeds_enabled",
             "has_search_capability_enabled",
             "is_agent_available",
             "refresh_stock_list",
