@@ -380,7 +380,6 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
             onApply={() => {
               // Filters commit immediately on Select change; Apply only closes the sheet/popover.
             }}
-            triggerDisabled={isLoading}
           >
             <div className="grid gap-3">
               <Select
