@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { approvalsApi } from '../../api/approvals';
@@ -47,13 +49,25 @@ function proposal(
   };
 }
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <UiLanguageProvider initialLanguage="en">
-        <ApprovalsPage />
-      </UiLanguageProvider>
-    </MemoryRouter>,
+    wrapWithQueryClient(
+      <MemoryRouter>
+        <UiLanguageProvider initialLanguage="en">
+          <ApprovalsPage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    ),
   );
 }
 

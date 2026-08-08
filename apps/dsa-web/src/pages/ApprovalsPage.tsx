@@ -19,6 +19,7 @@ import {
   WorkspacePage,
 } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useApprovalsWorkspaceQuery } from '../hooks';
 import { APPROVALS_TEXT } from '../locales/approvals';
 import {
   APP_ROUTE_PATHS,
@@ -144,23 +145,21 @@ const ApprovalsPage: React.FC = () => {
 
   useEffect(() => {
     mountedRef.current = true;
-    void load();
     return () => {
       mountedRef.current = false;
     };
-  }, [load]);
+  }, []);
+
+  // Initial full load + 5s proposal poll schedule (poll suspended when auth-blocked).
+  useApprovalsWorkspaceQuery({
+    language,
+    actionsBlocked,
+    load: () => load(false),
+    pollProposals,
+  });
 
   useEffect(() => {
-    // Skip background polling while auth is permanently unavailable to avoid
-    // refresh-button flicker and repeated 401/403 noise.
-    if (actionsBlocked) return undefined;
-    const refreshTimer = window.setInterval(() => void pollProposals(), 5_000);
-    return () => {
-      window.clearInterval(refreshTimer);
-    };
-  }, [actionsBlocked, pollProposals]);
-
-  useEffect(() => {
+    // Local countdown for expiry badges — not a network fetch.
     const countdownTimer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => {
       window.clearInterval(countdownTimer);
