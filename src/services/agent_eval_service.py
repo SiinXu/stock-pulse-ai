@@ -996,13 +996,6 @@ class AgentEvalService:
                     )
                 )
 
-        # Always attach reserved LLM dimensions as skipped when not requested
-        # but judgements were provided for them.
-        if llm_judgements:
-            for dim in LLM_DIMENSIONS:
-                if dim not in dimensions:
-                    continue
-
         rule_score, dim_rule = _score_bucket(checks, judge=JUDGE_RULE)
         llm_score, dim_llm = _score_bucket(checks, judge=JUDGE_LLM)
 
