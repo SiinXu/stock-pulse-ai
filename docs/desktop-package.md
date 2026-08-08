@@ -61,7 +61,7 @@ npm run dev
 - electron-builder `26.15.7`（打包；`v26` dist-tag；`next` 为 27 alpha，不作为本仓库默认）
 - electron-updater `6.8.9`（自动更新；生产依赖）
 - `app-builder-lib` 的 `tar` override `7.5.22`（构建链审计修复，保留与 archive 路径的兼容性探测）
-- 顶层 `js-yaml` override `4.3.1`（覆盖 `electron-updater` 与 builder 链的 `^4.1.0` / `^4.3.0`，关闭 GHSA-5p4m-2wfm-xmqj / CVE-2026-59870；`npm audit` 与 `npm audit --omit=dev` 均应报告 0 vulnerabilities）
+- 顶层 `js-yaml` override `4.3.1`（覆盖 `electron-updater` 与 builder 链的 `^4.1.0` / `^4.3.0`，关闭 [GHSA-5p4m-2wfm-xmqj](https://github.com/advisories/GHSA-5p4m-2wfm-xmqj)——该记录当前 **无独立 CVE ID**，对应 3.x/4.x 线上与 CVE-2026-59870（5.x / [GHSA-724g-mxrg-4qvm](https://github.com/advisories/GHSA-724g-mxrg-4qvm)）相同的弱点；`npm audit` 与 `npm audit --omit=dev` 均应报告 0 vulnerabilities）
 
 本地校验：
 
