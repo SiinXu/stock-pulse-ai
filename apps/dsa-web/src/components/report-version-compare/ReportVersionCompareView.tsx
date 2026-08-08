@@ -1,12 +1,21 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { useMemo } from 'react';
 import {
+  type ConfigComponentDiff,
   type ReportFieldDiff,
   type ReportVersionCompareResponse,
   type ReportVersionSeverity,
 } from '../../api/reportVersionCompare';
-import { Badge, EmptyState, InlineAlert, Surface } from '../common';
+import {
+  Badge,
+  DataTable,
+  type DataTableColumn,
+  EmptyState,
+  InlineAlert,
+  Surface,
+} from '../common';
 import { REPORT_VERSION_COMPARE_TEXT } from '../../locales/reportVersionCompare';
 import type { UiLanguage } from '../../i18n/uiLanguages';
 import { severityBadgeVariant, severityRowClass } from './severityStyles';
@@ -57,8 +66,11 @@ function severityLabel(
   }
 }
 
-function formatCell(value: string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '—';
+function formatCell(
+  value: string | null | undefined,
+  emptyValue: string,
+): string {
+  if (value === null || value === undefined || value === '') return emptyValue;
   return value;
 }
 
@@ -88,6 +100,29 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
   idle = false,
 }) => {
   const text = REPORT_VERSION_COMPARE_TEXT[language];
+  const emptyValue = text.emptyValue;
+
+  const configColumns = useMemo<DataTableColumn<ConfigComponentDiff>[]>(
+    () => [
+      {
+        id: 'key',
+        header: text.configKey,
+        cell: (row) => row.key,
+        rowHeader: true,
+      },
+      {
+        id: 'base',
+        header: text.configBaseValue,
+        cell: (row) => formatCell(row.baseValue, emptyValue),
+      },
+      {
+        id: 'target',
+        header: text.configTargetValue,
+        cell: (row) => formatCell(row.targetValue, emptyValue),
+      },
+    ],
+    [emptyValue, text.configBaseValue, text.configKey, text.configTargetValue],
+  );
 
   if (idle || !result) {
     return (
@@ -157,19 +192,23 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
             <h3 className="text-sm font-semibold text-foreground">{label}</h3>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
               <dt className="text-secondary-text">{text.metaTime}</dt>
-              <dd className="text-foreground">{formatCell(run.createdAt)}</dd>
+              <dd className="text-foreground">{formatCell(run.createdAt, emptyValue)}</dd>
               <dt className="text-secondary-text">{text.metaAction}</dt>
-              <dd className="text-foreground">{formatCell(run.actionLabel ?? run.action)}</dd>
+              <dd className="text-foreground">
+                {formatCell(run.actionLabel ?? run.action, emptyValue)}
+              </dd>
               <dt className="text-secondary-text">{text.metaScore}</dt>
               <dd className="text-foreground">
                 {run.sentimentScore === null || run.sentimentScore === undefined
-                  ? '—'
+                  ? emptyValue
                   : String(run.sentimentScore)}
               </dd>
               <dt className="text-secondary-text">{text.metaModel}</dt>
-              <dd className="text-foreground">{formatCell(run.modelUsed)}</dd>
+              <dd className="text-foreground">{formatCell(run.modelUsed, emptyValue)}</dd>
               <dt className="text-secondary-text">{text.metaFingerprint}</dt>
-              <dd className="font-mono text-xs text-foreground">{formatCell(run.configFingerprint)}</dd>
+              <dd className="font-mono text-xs text-foreground">
+                {formatCell(run.configFingerprint, emptyValue)}
+              </dd>
             </dl>
           </Surface>
         ))}
@@ -185,45 +224,24 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
         <p className="text-sm text-secondary-text">
           {text.configBase}:{' '}
           <span className="font-mono text-foreground">
-            {formatCell(result.configDiff.baseFingerprint)}
+            {formatCell(result.configDiff.baseFingerprint, emptyValue)}
           </span>
           {' · '}
           {text.configTarget}:{' '}
           <span className="font-mono text-foreground">
-            {formatCell(result.configDiff.targetFingerprint)}
+            {formatCell(result.configDiff.targetFingerprint, emptyValue)}
           </span>
         </p>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-secondary-text">
-              <tr>
-                <th className="px-2 py-1 font-medium">{text.configKey}</th>
-                <th className="px-2 py-1 font-medium">{text.configBaseValue}</th>
-                <th className="px-2 py-1 font-medium">{text.configTargetValue}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(result.configDiff.components ?? []).map((component) => (
-                <tr
-                  key={component.key}
-                  className={
-                    component.changed
-                      ? 'border-t border-warning/30 bg-warning/5'
-                      : 'border-t border-border/30'
-                  }
-                >
-                  <td className="px-2 py-1.5 font-medium text-foreground">{component.key}</td>
-                  <td className="px-2 py-1.5 text-secondary-text">
-                    {formatCell(component.baseValue)}
-                  </td>
-                  <td className="px-2 py-1.5 text-secondary-text">
-                    {formatCell(component.targetValue)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          caption={text.configTableCaption}
+          columns={configColumns}
+          rows={result.configDiff.components ?? []}
+          getRowKey={(row) => row.key}
+          emptyState={{ title: text.configTableEmpty }}
+          density="compact"
+          frame="embedded"
+          minWidth="content"
+        />
       </Surface>
 
       <Surface className="space-y-3 p-4" data-testid="report-version-field-diffs">
@@ -248,11 +266,11 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
               <div className="grid gap-2 text-sm sm:grid-cols-2">
                 <div>
                   <div className="text-xs text-secondary-text">{text.baseValue}</div>
-                  <div className="text-foreground">{formatCell(diff.baseValue)}</div>
+                  <div className="text-foreground">{formatCell(diff.baseValue, emptyValue)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-secondary-text">{text.targetValue}</div>
-                  <div className="text-foreground">{formatCell(diff.targetValue)}</div>
+                  <div className="text-foreground">{formatCell(diff.targetValue, emptyValue)}</div>
                 </div>
               </div>
             </li>

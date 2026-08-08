@@ -4925,4 +4925,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetLabel": "Versi calon",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetValue": "Nilai calon",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.title": "Bandingkan versi laporan",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "Perbandingan komponen cap jari konfigurasi",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "Tiada komponen konfigurasi",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "t/d",
 } as const;

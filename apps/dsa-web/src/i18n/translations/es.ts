@@ -4925,4 +4925,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetLabel": "Versión candidata",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetValue": "Valor candidato",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.title": "Comparar versiones de informe",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "Comparación de componentes de huella de configuración",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "Sin componentes de configuración",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "s/d",
 } as const;

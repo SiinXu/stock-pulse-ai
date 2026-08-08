@@ -4925,4 +4925,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetLabel": "對比版本",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetValue": "對比值",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.title": "報告版本對比",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "設定指紋組件對比",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "無設定組件",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "無",
 } as const;

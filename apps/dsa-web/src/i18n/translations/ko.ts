@@ -4925,4 +4925,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetLabel": "비교 버전",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetValue": "비교 값",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.title": "보고서 버전 비교",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "설정 지문 구성 비교",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "설정 구성 없음",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "없음",
 } as const;

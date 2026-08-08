@@ -4925,4 +4925,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetLabel": "比較版",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.targetValue": "比較値",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.title": "レポート版比較",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "設定フィンガープリント構成の比較",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "設定構成がありません",
+  "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "なし",
 } as const;

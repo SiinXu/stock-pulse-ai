@@ -76,6 +76,9 @@ export const REPORT_VERSION_COMPARE_TEXT = createUiLanguageRecord(
       metaTime: '时间',
       metaAction: '动作',
       metaScore: '评分',
+      emptyValue: '无',
+      configTableCaption: '配置指纹组件对比',
+      configTableEmpty: '无配置组件',
     },
     en: {
       documentTitle: 'Report version compare - StockPulse',
@@ -148,6 +151,9 @@ export const REPORT_VERSION_COMPARE_TEXT = createUiLanguageRecord(
       metaTime: 'Time',
       metaAction: 'Action',
       metaScore: 'Score',
+      emptyValue: 'n/a',
+      configTableCaption: 'Configuration fingerprint component comparison',
+      configTableEmpty: 'No configuration components',
     },
   },
 );
