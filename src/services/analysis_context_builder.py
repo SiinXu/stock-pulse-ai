@@ -72,6 +72,7 @@ class PipelineAnalysisArtifacts:
     news_result_count: Optional[int]
     metadata: Dict[str, Any]
     portfolio_context: Optional[Dict[str, Any]] = None
+    money_flow_data: Optional[Any] = None
 
 
 class AnalysisContextBuilder:
@@ -92,6 +93,9 @@ class AnalysisContextBuilder:
         blocks["technical"] = technical_block
         data_quality_warnings.extend(technical_warnings)
         blocks["chip"] = _build_chip_block(artifacts)
+        money_flow_block = _build_money_flow_block(artifacts)
+        if money_flow_block is not None:
+            blocks["money_flow"] = money_flow_block
         blocks["fundamentals"] = _build_fundamentals_block(artifacts)
         blocks["news"] = _build_news_block(artifacts)
         portfolio_block = _build_portfolio_block(artifacts)
@@ -351,6 +355,63 @@ def _build_chip_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBl
         },
         source=source,
         metadata={"date": chip.get("date")} if chip.get("date") else {},
+    )
+
+
+def _build_money_flow_block(
+    artifacts: PipelineAnalysisArtifacts,
+) -> Optional[AnalysisContextBlock]:
+    """Optional capital-flow block; omitted when SmartMoney produced no data."""
+    money_flow = _to_dict(artifacts.money_flow_data)
+    if not money_flow:
+        # Do not force a missing block when the feature is disabled — keeps pack
+        # shape stable for default (SMARTMONEY_ENABLED=false) runs.
+        if not bool((artifacts.metadata or {}).get("smartmoney_enabled")):
+            return None
+        not_supported = bool((artifacts.metadata or {}).get("money_flow_not_supported"))
+        status = (
+            ContextFieldStatus.NOT_SUPPORTED
+            if not_supported
+            else ContextFieldStatus.MISSING
+        )
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    missing_reason=(
+                        "money_flow_not_supported"
+                        if not_supported
+                        else "money_flow_missing"
+                    ),
+                )
+            },
+        )
+
+    source = _source_text(money_flow.get("source"))
+    items = {
+        key: AnalysisContextItem(
+            status=ContextFieldStatus.AVAILABLE,
+            value=value,
+            source=source,
+            metadata={
+                "bucket_definition": money_flow.get("bucket_definition"),
+            }
+            if key.endswith("net_inflow") or key.endswith("net_inflow_ratio")
+            else {},
+        )
+        for key, value in money_flow.items()
+        if value is not None and key not in {"raw_field_map"}
+    }
+    return AnalysisContextBlock(
+        status=ContextFieldStatus.AVAILABLE,
+        items=items,
+        source=source,
+        metadata={
+            key: money_flow.get(key)
+            for key in ("date", "bucket_definition", "unit", "attitude")
+            if money_flow.get(key) is not None
+        },
     )
 
 

@@ -114,6 +114,7 @@ class _AgentAnalysisStageMixin:
         daily_market_context: Optional[DailyMarketContext] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
         market_structure_context: Optional[Dict[str, Any]] = None,
+        money_flow_data: Optional[Any] = None,
     ) -> Optional[AnalysisResult]:
         """
         使用 Agent 模式分析单只股票。
@@ -167,6 +168,22 @@ class _AgentAnalysisStageMixin:
                 initial_context["realtime_quote"] = self._safe_to_dict(realtime_quote)
             if chip_data:
                 initial_context["chip_distribution"] = self._safe_to_dict(chip_data)
+            if money_flow_data is not None:
+                try:
+                    from src.services.smartmoney_flow_service import money_flow_to_context
+
+                    money_flow_context = money_flow_to_context(money_flow_data)
+                    if money_flow_context:
+                        initial_context["money_flow"] = money_flow_context
+                except Exception as exc:  # broad-exception: fallback_recorded - optional money-flow inject
+                    log_safe_exception(
+                        logger,
+                        "SmartMoney money-flow agent context inject failed",
+                        exc,
+                        error_code="pipeline_money_flow_agent_inject_failed",
+                        level=logging.DEBUG,
+                        context={"stock_code": code},
+                    )
             if trend_result:
                 initial_context["trend_result"] = self._safe_to_dict(trend_result)
 

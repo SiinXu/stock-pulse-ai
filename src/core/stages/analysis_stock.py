@@ -222,6 +222,30 @@ class _StockAnalysisStageMixin:
                     context={"stock_code": code},
                 )
 
+            # Step 2b: Optional SmartMoney money-flow (default off; fail-open).
+            money_flow_data = None
+            try:
+                if getattr(self.config, "smartmoney_enabled", False):
+                    money_flow_data = self.fetcher_manager.get_money_flow(code)
+                    if money_flow_data is not None:
+                        logger.info(
+                            "%s(%s) money flow: main_net_inflow=%s source=%s",
+                            stock_name,
+                            code,
+                            getattr(money_flow_data, "main_net_inflow", None),
+                            getattr(money_flow_data, "source", None),
+                        )
+            except Exception as e:  # broad-exception: fallback_recorded - money-flow is optional
+                log_safe_exception(
+                    logger,
+                    "SmartMoney money flow retrieval failed",
+                    e,
+                    error_code="pipeline_money_flow_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                money_flow_data = None
+
             # If agent mode is explicitly enabled, or specific agent skills are configured, use the Agent analysis pipeline.
             # NOTE: use config.agent_mode (explicit opt-in) instead of
             # config.is_agent_available() so that users who only configured an
@@ -407,6 +431,7 @@ class _StockAnalysisStageMixin:
                     daily_market_context=daily_market_context,
                     portfolio_context=portfolio_context,
                     market_structure_context=market_structure_context,
+                    money_flow_data=money_flow_data,
                 )
 
             # Step 4: Multi-Dimensional Intelligence Search (Latest News + Risk Assessment + Earnings Expectations)
@@ -628,6 +653,7 @@ class _StockAnalysisStageMixin:
                 fundamental_context,
                 market_phase_context=market_phase_context_dict,
                 portfolio_context=portfolio_context,
+                money_flow_data=money_flow_data,
             )
             enhanced_context["market_phase_context"] = market_phase_context_dict
             self._attach_daily_market_context(
@@ -717,6 +743,7 @@ class _StockAnalysisStageMixin:
                     news_result_count=news_result_count,
                     query_id=query_id,
                     portfolio_context=portfolio_context,
+                    money_flow_data=money_flow_data,
                 ),
                 report_language=report_language,
                 code=code,

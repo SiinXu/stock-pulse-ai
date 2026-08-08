@@ -506,11 +506,18 @@ on the factory result:
 | `daily_data` | `get_daily_data` |
 | `realtime_quote` | `get_realtime_quote` |
 | `chip_distribution` | `get_chip_distribution` |
+| `money_flow` | `get_money_flow` |
 | `stock_name` / `stock_list` | `get_stock_name` / `get_stock_list` |
 | `belong_boards` | `get_belong_board` |
 | `main_indices` / `market_stats` | `get_main_indices` / `get_market_stats` |
 | `sector_rankings` / `concept_rankings` | `get_sector_rankings` / `get_concept_rankings` |
 | `hot_stocks` / `limit_up_pool` | `get_hot_stocks` / `get_limit_up_pool` |
+
+`money_flow` is an additive contract v1 capability (Issue #862 / #619). Existing
+providers that do not declare or implement it remain valid: registration still
+requires only the capabilities listed on the registration object, and the
+manager treats undeclared/unimplemented money-flow as a capability miss (returns
+`None`) rather than a hard failure.
 
 Existing `prefetch_*` paths remain built-in manager optimizations and are not
 plugin capabilities in contract version 1.

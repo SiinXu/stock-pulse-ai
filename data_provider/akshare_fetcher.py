@@ -1726,6 +1726,28 @@ class AkshareFetcher(BaseFetcher):
             )
             return None
     
+    def get_money_flow(self, stock_code: str, days: int = 5):
+        """
+        Fetch A-share individual main-force / large-order money flow.
+
+        Data source: ak.stock_individual_fund_flow (Eastmoney).
+        Non-CN symbols return None without network I/O.
+
+        Args:
+            stock_code: Stock code
+            days: History window hint for multi-day rollups
+
+        Returns:
+            MoneyFlowSnapshot for the latest session, or None
+        """
+        from .money_flow_akshare import fetch_akshare_individual_money_flow
+
+        return fetch_akshare_individual_money_flow(
+            stock_code,
+            history_days=days,
+            rate_limit=self._enforce_rate_limit,
+        )
+
     def get_chip_distribution(self, stock_code: str) -> Optional[ChipDistribution]:
         """
         获取筹码分布数据

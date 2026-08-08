@@ -335,6 +335,8 @@ class Config:
     enable_realtime_technical_indicators: bool = True
     # Chip distribution switch (the upstream API is unstable; disabling it is recommended for cloud deployments)
     enable_chip_distribution: bool = True
+    # SmartMoney money-flow (main-force / large-order) switch; default off to avoid extra scraping.
+    smartmoney_enabled: bool = False
     # Eastmoney API patch switch
     enable_eastmoney_patch: bool = False
     # Real-time quote data source priority (comma separated)

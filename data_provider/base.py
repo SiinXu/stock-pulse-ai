@@ -2430,6 +2430,132 @@ class DataFetcherManager:
         logger.warning(f"[筹码分布] {stock_code} 所有数据源均失败")
         return None
 
+    def get_money_flow(self, stock_code: str, days: int = 5):
+        """
+        Fetch normalized main-force / large-order money flow with multi-source fallback.
+
+        Strategy:
+        1. Honor SMARTMONEY_ENABLED (config.smartmoney_enabled); when off, return
+           None without contacting any provider.
+        2. Iterate capability-filtered providers that implement get_money_flow.
+        3. Skip empty / incomplete snapshots and continue to the next provider.
+        4. All providers missing or failing => None (optional enhancement; never
+           raises to the analysis pipeline).
+
+        Args:
+            stock_code: Stock code
+            days: Hint for multi-day rollups when the provider supports history
+
+        Returns:
+            MoneyFlowSnapshot or None
+        """
+        stock_code = normalize_stock_code(stock_code)
+
+        from .money_flow_types import is_meaningful_money_flow
+
+        # Gate via env first so this path does not grow the bare get_config()
+        # ratchet on data_provider/base.py. Runtime Config also loads
+        # SMARTMONEY_ENABLED into smartmoney_enabled for composition-root callers.
+        if os.getenv("SMARTMONEY_ENABLED", "false").lower() != "true":
+            logger.debug("[money_flow] feature disabled; skip %s", stock_code)
+            return None
+
+        candidate_fetchers = []
+        for fetcher in self._get_fetchers_for_capability(
+            "money_flow",
+            market=_market_tag(stock_code),
+        ):
+            method = getattr(fetcher, "get_money_flow", None)
+            if not callable(method):
+                continue
+            candidate_fetchers.append(fetcher)
+
+        for index, fetcher in enumerate(candidate_fetchers):
+            fetcher_name = fetcher.name
+            fallback_to = (
+                candidate_fetchers[index + 1].name
+                if index + 1 < len(candidate_fetchers)
+                else None
+            )
+            attempt_start = time.time()
+            try:
+                record_provider_run_started(
+                    data_type="money_flow",
+                    provider=fetcher_name,
+                    operation="get_money_flow",
+                )
+                # Prefer days= when supported; fall back to stock_code-only signature.
+                try:
+                    snapshot = self._call_fetcher_method(
+                        fetcher,
+                        "get_money_flow",
+                        stock_code,
+                        days=days,
+                    )
+                except TypeError:
+                    snapshot = self._call_fetcher_method(
+                        fetcher,
+                        "get_money_flow",
+                        stock_code,
+                    )
+                latency_ms = int((time.time() - attempt_start) * 1000)
+                if is_meaningful_money_flow(snapshot):
+                    record_provider_run(
+                        data_type="money_flow",
+                        provider=fetcher_name,
+                        operation="get_money_flow",
+                        success=True,
+                        latency_ms=latency_ms,
+                        record_count=1,
+                    )
+                    logger.info(
+                        "[money_flow] %s fetched successfully (source: %s)",
+                        stock_code,
+                        fetcher_name,
+                    )
+                    return snapshot
+                record_provider_run(
+                    data_type="money_flow",
+                    provider=fetcher_name,
+                    operation="get_money_flow",
+                    success=False,
+                    latency_ms=latency_ms,
+                    error_type="empty",
+                    error_message="empty or incomplete money flow",
+                    fallback_to=fallback_to,
+                    record_count=0,
+                )
+            except Exception as e:  # broad-exception: fallback_recorded - money flow fallback
+                error_type, error_reason = summarize_exception(e)
+                record_provider_run(
+                    data_type="money_flow",
+                    provider=fetcher_name,
+                    operation="get_money_flow",
+                    success=False,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
+                    error_type=error_type,
+                    error_message=error_reason,
+                    fallback_to=fallback_to,
+                )
+                log_safe_exception(
+                    logger,
+                    "Data provider money flow fetch failed",
+                    e,
+                    error_code="data_provider_money_flow_failed",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code, "provider": fetcher_name},
+                )
+                continue
+
+        if candidate_fetchers:
+            logger.warning("[money_flow] %s all providers failed or empty", stock_code)
+        else:
+            logger.debug(
+                "[money_flow] %s no provider implements money_flow capability",
+                stock_code,
+            )
+        return None
+
     def get_stock_name(self, stock_code: str, allow_realtime: bool = True) -> Optional[str]:
         """
         获取股票中文名称（自动切换数据源）

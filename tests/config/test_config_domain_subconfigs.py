@@ -241,6 +241,7 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'enable_realtime_quote',
     'enable_realtime_technical_indicators',
     'enable_chip_distribution',
+    'smartmoney_enabled',
     'enable_eastmoney_patch',
     'realtime_source_priority',
     'realtime_cache_ttl',

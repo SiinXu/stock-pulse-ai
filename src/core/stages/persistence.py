@@ -646,6 +646,7 @@ class _PersistenceStageMixin:
         news_result_count: Optional[int],
         query_id: str,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        money_flow_data: Optional[Any] = None,
     ) -> PipelineAnalysisArtifacts:
         return PipelineAnalysisArtifacts(
             code=code,
@@ -663,8 +664,14 @@ class _PersistenceStageMixin:
             metadata={
                 "query_id": query_id,
                 "trigger_source": self.query_source,
+                **(
+                    {"smartmoney_enabled": True}
+                    if getattr(self.config, "smartmoney_enabled", False)
+                    else {}
+                ),
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
+            money_flow_data=money_flow_data,
         )
 
     def _build_agent_analysis_artifacts(
