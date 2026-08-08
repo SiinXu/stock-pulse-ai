@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Fixed] Restore the shared UI i18n source/inventory prerequisite for Settings mounts: fill missing Simplified Chinese settingsHelp entries and regenerate stable-key locale inventory for RSS feeds, multi-strategy/committee agent fields, and local-runtime detect keys (does not by itself complete auth or tooltip e2e contracts).
-- [Fixed] Restore Settings page load in Vite DEV/e2e by syncing missing UI i18n inventory keys (systemConfig field titles + settingsHelp) so auth credential-boundary and disable-reconfirm e2e can run against a real Settings surface.
+- [Fixed] Treat settings-help `examples` as non-translatable config literals (scoped to SETTINGS_HELP_MAPS), restore missing Simplified Chinese settingsHelp source for RSS/multi-strategy/local-runtime keys, and regenerate inventory without example stable keys.
 - [Added] Shared Web URL state helper (`urlState`) with typed schemas, replace/push history rules, unknown-param preservation, Decision Signals schema example, and unit tests (UI-03A / #879 A1 foundation; no page wiring yet).
 - [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).
 - [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).
