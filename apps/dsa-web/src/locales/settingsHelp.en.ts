@@ -1051,6 +1051,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
     notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
   },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: 'Investment Committee Mode',
+    summary: 'Run multi-role investment committee style analysis with structured dissent.',
+    usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
+    valueNotes: ['Off preserves the existing single-path analysis behavior.'],
+    impact: ['Affects agent orchestration depth and report committee sections.'],
+    notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
     summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
