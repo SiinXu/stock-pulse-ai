@@ -461,6 +461,72 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {},
         "display_order": 53,
     },
+    "RSS_NEWS_FEED_URLS": {
+        "title": "RSS/Atom News Feed URLs",
+        "description": (
+            "Optional comma-separated RSS or Atom feed URLs used as a free "
+            "supplement in the on-demand news search pipeline (not a replacement "
+            "for SearXNG or paid search). Empty keeps the feature inert. Feed "
+            "fetching uses the fail-closed outbound policy; private/loopback hosts "
+            "require an exact OUTBOUND_HTTP_ALLOWLIST entry."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "multi_value": True,
+            "delimiter": ",",
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+        },
+        "display_order": 54,
+        "help_key": "settings.data_source.RSS_NEWS_FEED_URLS",
+        "examples": [
+            "RSS_NEWS_FEED_URLS=https://www.sec.gov/news/pressreleases.rss",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：搜索服务配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#搜索服务配置",
+            },
+            {
+                "label": "出站 HTTP 安全策略",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md",
+            },
+        ],
+    },
+    "RSS_NEWS_FETCH_TIMEOUT_SEC": {
+        "title": "RSS/Atom Feed Fetch Timeout",
+        "description": (
+            "Per-feed timeout in seconds for on-demand RSS/Atom news search "
+            "(1-30). Default 8. Independent of NEWS_INTEL_FETCH_TIMEOUT_SEC."
+        ),
+        "category": "data_source",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8",
+        "options": [],
+        "validation": {"min": 1, "max": 30},
+        "display_order": 55,
+        "help_key": "settings.data_source.RSS_NEWS_FEED_URLS",
+        "examples": [
+            "RSS_NEWS_FETCH_TIMEOUT_SEC=8",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：搜索服务配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#搜索服务配置",
+            },
+        ],
+    },
     "ENABLE_REALTIME_QUOTE": {
         "title": "Enable Realtime Quote",
         "description": "Enable realtime market quotes. Disable to only use historical close prices.",

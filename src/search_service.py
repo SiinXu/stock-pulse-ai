@@ -6,7 +6,7 @@ A股自选股智能分析系统 - 搜索服务模块
 
 职责：
 1. 提供统一的新闻搜索接口
-2. 支持 Bocha、Tavily、Brave、SerpAPI、SearXNG 多种搜索引擎
+2. 支持 Bocha、Tavily、Brave、SerpAPI、SearXNG、RSS/Atom 多种搜索引擎
 3. 多 Key 负载均衡和故障转移
 4. 搜索结果缓存和格式化
 """
@@ -73,6 +73,7 @@ if _TYPE_CHECKING:
         _stable_search_failure_message,
         fetch_url_content,
     )
+    from src.search_parts.rss_source import RssAtomSearchProvider
     from src.search_parts.searxng import SearXNGSearchProvider
     from src.search_parts.serpapi import SerpAPISearchProvider
     from src.search_parts.tavily import TavilySearchProvider
@@ -89,6 +90,7 @@ _SEARCH_SOURCE_MODULES = (
     "src.search_parts.minimax",
     "src.search_parts.brave",
     "src.search_parts.searxng",
+    "src.search_parts.rss_source",
 )
 for _search_source_module in _SEARCH_SOURCE_MODULES:
     _search_source_spec = _find_spec(_search_source_module)
@@ -282,6 +284,8 @@ class SearchService:
         minimax_keys: Optional[List[str]] = None,
         searxng_base_urls: Optional[List[str]] = None,
         searxng_public_instances_enabled: bool = True,
+        rss_news_feed_urls: Optional[List[str]] = None,
+        rss_news_fetch_timeout_sec: float = 8.0,
         news_max_age_days: int = 3,
         news_strategy_profile: str = "short",
     ):
@@ -297,6 +301,8 @@ class SearchService:
             minimax_keys: MiniMax API Key 列表
             searxng_base_urls: SearXNG 实例地址列表（自建无配额兜底）
             searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例
+            rss_news_feed_urls: Optional RSS/Atom feed URLs (supplement; empty keeps feature inert)
+            rss_news_fetch_timeout_sec: Per-feed fetch timeout in seconds
             news_max_age_days: 新闻最大时效（天）
             news_strategy_profile: 新闻窗口策略档位（ultra_short/short/medium/long）
         """
@@ -356,7 +362,16 @@ class SearchService:
             else:
                 logger.info("已启用 SearXNG 公共实例自动发现模式")
 
-        # 7. Anspire Search (real-time intelligent search optimization)
+        # 7. RSS/Atom feeds (optional free supplement; inert when no feeds configured)
+        rss_provider = RssAtomSearchProvider(
+            rss_news_feed_urls,
+            timeout_sec=rss_news_fetch_timeout_sec,
+        )
+        if rss_provider.is_available:
+            self._providers.append(rss_provider)
+            logger.info("已配置 RSS/Atom 新闻源，共 %s 个 feed", len(rss_provider._feed_urls))
+
+        # 8. Anspire Search (real-time intelligent search optimization)
         if anspire_keys:
             self._providers.insert(0, AnspireSearchProvider(anspire_keys))
             logger.info(f"已配置 Anspire Search 搜索，共 {len(anspire_keys)} 个 API Key")
@@ -653,6 +668,10 @@ def get_search_service() -> SearchService:
                     minimax_keys=config.minimax_api_keys,
                     searxng_base_urls=config.searxng_base_urls,
                     searxng_public_instances_enabled=config.searxng_public_instances_enabled,
+                    rss_news_feed_urls=getattr(config, "rss_news_feed_urls", None),
+                    rss_news_fetch_timeout_sec=getattr(
+                        config, "rss_news_fetch_timeout_sec", 8.0
+                    ),
                     news_max_age_days=config.news_max_age_days,
                     news_strategy_profile=getattr(config, "news_strategy_profile", "short"),
                 )

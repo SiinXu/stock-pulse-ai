@@ -334,6 +334,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects AlphaSift adapter source validation and explicit repair installs.'],
     notes: ['Use a trusted source only. AlphaSift is an experimental screening capability, so understand the risk before enabling it.'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom News Feeds',
+    summary: 'Optional free RSS or Atom feed URLs used as a supplement in on-demand news search.',
+    usage: 'Provide comma-separated http(s) feed URLs. Leave empty to keep the feature inert. Feed fetching follows the fail-closed outbound policy.',
+    valueNotes: [
+      'This supplements SearXNG or paid search; it is not a full replacement.',
+      'Private or loopback hosts require an exact OUTBOUND_HTTP_ALLOWLIST entry.',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC controls per-feed timeout (1-30 seconds, default 8).',
+    ],
+    impact: ['Affects on-demand news search coverage when configured feeds return items.'],
+    notes: ['A single feed failure should not halt the rest of the news pipeline.'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: 'Realtime Source Priority',
     summary: 'Configures the provider order for realtime quotes.',

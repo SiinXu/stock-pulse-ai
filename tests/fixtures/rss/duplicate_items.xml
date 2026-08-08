@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Dup Source B</title>
+    <item>
+      <title>AAPL reports quarterly earnings beat</title>
+      <link>https://news.example.com/aapl-earnings</link>
+      <description>Duplicate of source A entry by URL.</description>
+      <pubDate>Wed, 05 Aug 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>AAPL unique second source story</title>
+      <link>https://news.example.com/aapl-unique-b</link>
+      <description>Only on source B about Apple stock.</description>
+      <pubDate>Wed, 05 Aug 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
