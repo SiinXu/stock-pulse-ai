@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Earnings-call transcript parsing (`earnings-transcript-v1`) with section/Q&A structure, chunking, and source-traceable metrics; default-off Agent tool `parse_earnings_transcript` behind existing multimodal gates (#253 remaining).
+
 - [Fixed] Treat non-finite numbers (±Infinity) as missing values in marketFormat price and change-color guards so sentinel/overflow inputs never render as prices or paint as up/down moves.
 - [Added] Report templates pin a Decision Card (direction/score, conclusion, confidence, key risks, watch/invalidation conditions) at the top of each stock section using existing dashboard fields only; brief uses a 1+1 line push length budget so a typical 10-stock brief stays within Pushover max_length=1024 (#861 Phase 1).
 - [Fixed] Restore Simplified Chinese Settings help source for RSS news feeds and multi-strategy deliberation so UI i18n resource extraction no longer fails at import.

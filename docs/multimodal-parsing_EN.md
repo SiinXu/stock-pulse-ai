@@ -6,7 +6,7 @@ chart images into structured visual observations. This document describes
 Tools.
 
 HTTP upload UI, report/prompt projection into the default analysis path,
-earnings-transcript analysis, and scanned-PDF vision assist remain later phases.
+scanned-PDF vision assist, and report evidence-chain projection remain later phases. Earnings-call transcript parsing is documented separately in `docs/earnings-transcript-parsing_EN.md` (tool `parse_earnings_transcript`).
 
 ## Honesty Contract
 
@@ -20,7 +20,8 @@ Every successful or degraded payload includes a mandatory research-only disclaim
 
 ## Default And Registration Contract
 
-Agent Tools `parse_financial_pdf` and `read_price_chart` are **default-off**.
+Agent Tools `parse_financial_pdf`, `read_price_chart`, and
+`parse_earnings_transcript` are **default-off**.
 
 | Gate | Behavior |
 | --- | --- |
@@ -45,7 +46,9 @@ MULTIMODAL_AGENT_TOOLS_ENABLED=false
 | --- | --- |
 | `src/services/pdf_parsing_service.py` | Local PDF parse → `schema_version=pdf-parse-v1` |
 | `src/services/chart_reading_service.py` | Vision chart read → `schema_version=chart-reading-v1` |
-| `src/agent/tools/multimodal_tools.py` | Default-off `ToolDefinition` factories |
+| `src/services/earnings_transcript_service.py` | Transcript parse → `schema_version=earnings-transcript-v1` |
+| `src/agent/tools/multimodal_tools.py` | Default-off PDF/chart `ToolDefinition` factories |
+| `src/agent/tools/earnings_transcript_tools.py` | Default-off transcript tool (separate from OCR) |
 
 ### PDF output (summary)
 
@@ -75,9 +78,12 @@ including the full prompt in the PR description (same house rule as
 ## Deferred (not phase 1)
 
 - HTTP upload API pair / Web UI
-- Earnings call transcript analysis
+- Automatic third-party earnings-transcript fetch
 - Scanned-PDF page rasterization + vision assist
 - Default analysis-path projection and report evidence chain wiring
+
+Earnings-call **user-supplied** transcript parsing is available when multimodal
+tools are enabled; see `docs/earnings-transcript-parsing_EN.md`.
 
 ## Rollback
 

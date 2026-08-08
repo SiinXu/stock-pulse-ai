@@ -2,7 +2,7 @@
 
 StockPulse 可将财经 PDF 解析为结构化文本/表格，并将行情图表读成结构化视觉观察。本文描述 issue #253 的**第一阶段**：后端服务 + 默认关闭的可选 Agent Tools。
 
-HTTP 上传 UI、默认分析路径的报告/Prompt 投影、财报电话会纪要分析，以及扫描件 PDF 的视觉辅助，均留到后续阶段。
+HTTP 上传 UI、默认分析路径的报告/Prompt 投影、扫描件 PDF 的视觉辅助，以及第三方转录自动拉取，均留到后续阶段。用户提供的财报电话会转录解析见 `docs/earnings-transcript-parsing.md`（工具 `parse_earnings_transcript`）。
 
 ## 诚实契约
 
