@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bell, Trash2 } from 'lucide-react';
 import {
   AdvancedFilterSheet,
@@ -31,6 +31,19 @@ import {
 import type { AlertRuleItem, AlertType, MarketRegion } from '../../types/alerts';
 import { formatUiDateTime, formatUiNumber } from '../../utils/uiLocale';
 import { getEffectiveAlertCooldown } from '../../utils/alertCooldown';
+
+/**
+ * Mirrors `DESKTOP_FILTER_QUERY` in `components/common/AdvancedFilterSheet.tsx`.
+ * Extracting a shared `useMediaQuery` hook belongs to the shared-component owner
+ * and is outside this task boundary; keep the query string character-identical.
+ */
+const DESKTOP_FILTER_QUERY = '(min-width: 48rem)';
+
+function isDesktopFilterViewport(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(DESKTOP_FILTER_QUERY).matches;
+}
 
 export type AlertRuleEnabledFilter = 'all' | 'enabled' | 'disabled';
 export type AlertTypeFilter = 'all' | AlertType;
@@ -160,11 +173,21 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   const enabledOptions = ALERT_ENABLED_FILTER_OPTIONS[language];
   const typeOptions = ALERT_TYPE_FILTER_OPTIONS[language];
   const [pendingDelete, setPendingDelete] = useState<AlertRuleItem | null>(null);
+  const [isDesktop, setIsDesktop] = useState(isDesktopFilterViewport);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isRuleBusy = (rule: AlertRuleItem) => Boolean(busyRules[rule.id]);
   const isRuleActionBusy = (rule: AlertRuleItem, action: AlertRuleBusyAction) => (
     busyRules[rule.id] === action
   );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia(DESKTOP_FILTER_QUERY);
+    const update = () => setIsDesktop(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   const activeFilterCount = (enabledFilter !== 'all' ? 1 : 0) + (alertTypeFilter !== 'all' ? 1 : 0);
   const filtersActive = activeFilterCount > 0;
@@ -365,45 +388,68 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
       subtitle={formatUiText(text.subtitle, { total })}
       headerRight={(
         <div className="flex w-full max-w-full flex-col items-stretch gap-2 sm:items-end">
-          <AdvancedFilterSheet
-            triggerLabel={text.filters}
-            triggerAriaLabel={
-              activeFilterCount > 0
-                ? formatUiText(text.filtersAria, { count: activeFilterCount })
-                : text.filters
-            }
-            activeCount={activeFilterCount}
-            title={text.filters}
-            resetLabel={text.resetFilters}
-            applyLabel={text.applyFilters}
-            onReset={clearAllFilters}
-            onApply={() => {
-              // Filters commit immediately on Select change; Apply only closes the sheet/popover.
-            }}
-          >
-            <div className="grid gap-3">
+          {isDesktop ? (
+            <div className="grid w-full max-w-full items-end gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
               <Select
-                label={text.enabledFilter}
                 ariaLabel={text.enabledFilter}
                 value={enabledFilter}
                 options={enabledOptions}
                 onChange={(value) => {
                   onEnabledFilterChange(value as AlertRuleEnabledFilter);
                 }}
-                className="w-full"
+                className="w-full sm:w-32"
               />
               <Select
-                label={text.alertTypeFilter}
                 ariaLabel={text.alertTypeFilter}
                 value={alertTypeFilter}
                 options={typeOptions}
                 onChange={(value) => {
                   onAlertTypeFilterChange(value as AlertTypeFilter);
                 }}
-                className="w-full max-w-full"
+                className="w-full max-w-full sm:w-44"
               />
             </div>
-          </AdvancedFilterSheet>
+          ) : (
+            <AdvancedFilterSheet
+              triggerLabel={text.filters}
+              triggerAriaLabel={
+                activeFilterCount > 0
+                  ? formatUiText(text.filtersAria, { count: activeFilterCount })
+                  : text.filters
+              }
+              activeCount={activeFilterCount}
+              title={text.filters}
+              resetLabel={text.resetFilters}
+              applyLabel={text.applyFilters}
+              onReset={clearAllFilters}
+              onApply={() => {
+                // Filters commit immediately on Select change; Apply only closes the sheet/popover.
+              }}
+            >
+              <div className="grid gap-3">
+                <Select
+                  label={text.enabledFilter}
+                  ariaLabel={text.enabledFilter}
+                  value={enabledFilter}
+                  options={enabledOptions}
+                  onChange={(value) => {
+                    onEnabledFilterChange(value as AlertRuleEnabledFilter);
+                  }}
+                  className="w-full"
+                />
+                <Select
+                  label={text.alertTypeFilter}
+                  ariaLabel={text.alertTypeFilter}
+                  value={alertTypeFilter}
+                  options={typeOptions}
+                  onChange={(value) => {
+                    onAlertTypeFilterChange(value as AlertTypeFilter);
+                  }}
+                  className="w-full max-w-full"
+                />
+              </div>
+            </AdvancedFilterSheet>
+          )}
           <AppliedFilterChips
             aria-label={text.appliedFilters}
             clearAllLabel={text.clearFilters}
