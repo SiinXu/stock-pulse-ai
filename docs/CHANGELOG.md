@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Portfolio position analysis attaches the shared TaskPanel/RunFlow progress surface and restores tracked task state from the URL `task` param and session storage after leave/refresh (#879 A6).
+- [Fixed] Collapse Alerts rule filters behind AdvancedFilterSheet on mobile/desktop breakpoints and distinguish true-empty vs filtered-empty states with clear/create actions (#879 B2).
 - [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
