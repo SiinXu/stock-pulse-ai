@@ -169,7 +169,7 @@ export const TodaysFocusPanel: React.FC<TodaysFocusPanelProps> = ({
       ) : null}
 
       {!error && data && items.length > 0 ? (
-        <p className="mt-3 text-[11px] text-secondary-text" data-testid="todays-focus-cap-hint">
+        <p className="mt-3 text-xs text-secondary-text" data-testid="todays-focus-cap-hint">
           {t('home.todaysFocus.capHint', { count: data.itemCount, max: data.maxItems })}
         </p>
       ) : null}
