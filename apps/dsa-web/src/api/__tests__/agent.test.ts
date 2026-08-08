@@ -3,13 +3,9 @@ import apiClient from '../index';
 import { agentApi } from '../agent';
 import { getParsedApiError, isApiRequestError } from '../error';
 
-<<<<<<< HEAD
 vi.mock('../index', () => ({
   default: { post: vi.fn(), get: vi.fn(), delete: vi.fn() },
 }));
-=======
-vi.mock('../index', () => ({ default: { post: vi.fn(), get: vi.fn() } }));
->>>>>>> origin/main
 
 const mockPost = vi.mocked(apiClient.post);
 const mockGet = vi.mocked(apiClient.get);

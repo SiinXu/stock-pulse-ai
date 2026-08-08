@@ -253,7 +253,6 @@ export const agentApi = {
     );
     return data.sessions;
   },
-<<<<<<< HEAD
   async getChatSessionMessages(sessionId: string): Promise<ChatSessionMessage[]> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`,
@@ -264,13 +263,6 @@ export const agentApi = {
       'SessionMessagesResponse',
     );
     return data.messages;
-=======
-  async getChatSessionMessages(sessionId: string): Promise<ChatSessionDetail> {
-    const response = await apiClient.get<ChatSessionDetail>(
-      `/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`,
-    );
-    return response.data;
->>>>>>> origin/main
   },
   async deleteChatSession(sessionId: string): Promise<void> {
     // OpenAPI response body is unknown; no structured validation.
