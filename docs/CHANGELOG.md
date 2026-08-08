@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) at Web validation and symbol normalization boundaries, rewriting them to canonical `HKxxxxx` form so analysis/watchlist entry points no longer require an explicit `hk` prefix.
+- [Chore] Added Web production bundle gzip size budgets and `npm run build:check` gate (baseline = measured size + 10%; no business-code slimming in this change).
 - [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
 - [Added] Web multi-market number/timezone/change-color formatting contract module (`marketFormat`) with semantic matrix unit tests (issue #889).
 - [Fixed] Keep report→Chat stock/record URL context until the chat stream succeeds so a mid-flight refresh can restore the unsent follow-up draft (#879 A5).
