@@ -3,15 +3,22 @@ import apiClient from '../index';
 import { agentApi } from '../agent';
 import { getParsedApiError, isApiRequestError } from '../error';
 
+<<<<<<< HEAD
 vi.mock('../index', () => ({
   default: { post: vi.fn(), get: vi.fn(), delete: vi.fn() },
 }));
+=======
+vi.mock('../index', () => ({ default: { post: vi.fn(), get: vi.fn() } }));
+>>>>>>> origin/main
 
 const mockPost = vi.mocked(apiClient.post);
 const mockGet = vi.mocked(apiClient.get);
 
 describe('agentApi.research', () => {
-  beforeEach(() => mockPost.mockReset());
+  beforeEach(() => {
+    mockPost.mockReset();
+    mockGet.mockReset();
+  });
 
   it('POSTs the question with snake_case stock_code, a long timeout, and the abort signal', async () => {
     mockPost.mockResolvedValue({
@@ -91,7 +98,10 @@ describe('agentApi.research', () => {
 });
 
 describe('agentApi.chat', () => {
-  beforeEach(() => mockPost.mockReset());
+  beforeEach(() => {
+    mockPost.mockReset();
+    mockGet.mockReset();
+  });
 
   it('preserves additive Agent Soul run metadata from the Chat response', async () => {
     mockPost.mockResolvedValue({
@@ -224,5 +234,49 @@ describe('agentApi.getSkills / sessions', () => {
       expect(parsed.params).toMatchObject({ label: 'SessionMessagesResponse' });
       return true;
     });
+  });
+});
+
+describe('agentApi.getChatSessionMessages', () => {
+  beforeEach(() => {
+    mockPost.mockReset();
+    mockGet.mockReset();
+  });
+
+  it('returns session messages together with persisted Skill state', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        session_id: 'session-1',
+        messages: [
+          { id: '1', role: 'user', content: '分析 AAPL', created_at: null },
+        ],
+        session_state: {
+          selected_skill_ids: ['technical', 'risk'],
+        },
+      },
+    });
+
+    const result = await agentApi.getChatSessionMessages('session-1');
+
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/agent/chat/sessions/session-1');
+    expect(result.session_state.selected_skill_ids).toEqual(['technical', 'risk']);
+  });
+
+  it('preserves null when a legacy session has no persisted Skill state', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        session_id: 'legacy-session',
+        messages: [
+          { id: '1', role: 'user', content: '继续分析', created_at: null },
+        ],
+        session_state: {
+          selected_skill_ids: null,
+        },
+      },
+    });
+
+    const result = await agentApi.getChatSessionMessages('legacy-session');
+
+    expect(result.session_state.selected_skill_ids).toBeNull();
   });
 });

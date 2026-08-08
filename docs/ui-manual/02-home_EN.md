@@ -68,7 +68,7 @@ Home includes a read-only **Today's scheduled tasks** block for today's ran and 
 | Status | Pending, running, completed, failed, skipped, retry wait, … |
 | Empty list | No ran/upcoming items for today — normal |
 
-Home is **read-only** for today's occurrences. When tasks exist, **Manage schedules** appears in the block header; when the list is empty, it appears inside the empty state. It opens **Settings → System & security / Scheduling**. A **long-running** Web / API / Desktop process must stay up for on-time execution.
+Home is **read-only** for today's occurrences. The heading and task list share one module border, and the heading itself is not clickable. When tasks exist, **Manage schedules** appears in the block header; when the list is empty, it appears inside the empty state. It opens **Settings → System & security / Scheduling**. A **long-running** Web / API / Desktop process must stay up for on-time execution.
 
 If your UI lacks this region, upgrade to a build that includes scheduled tasks.
 

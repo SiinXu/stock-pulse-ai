@@ -53,8 +53,9 @@ class StrategyResult:
 class StrategyEngine:
     """Centralize the skill-opinion evidence chain into one facade."""
 
-    def __init__(self, aggregator: Optional[SkillAggregator] = None) -> None:
+    def __init__(self, aggregator: Optional[SkillAggregator] = None, *, deliberation_enabled: bool = False) -> None:
         self.aggregator = aggregator or SkillAggregator()
+        self.deliberation_enabled = bool(deliberation_enabled)
 
     def partition_only(self, opinions: List[AgentOpinion]) -> EvidencePartition:
         valid_skill_opinions: List[AgentOpinion] = []
@@ -128,8 +129,13 @@ class StrategyEngine:
             evidence_opinions=evidence_opinions,
         )
 
-    def process(self, opinions: List[AgentOpinion]) -> StrategyResult:
-        return self.process_partition(self.partition_only(opinions))
+    def process(self, opinions: List[AgentOpinion], *, diagnostic_records: Optional[List[Dict[str, Any]]] = None) -> StrategyResult:
+        partition = self.partition_only(opinions)
+        existing = [dict(r) for r in (diagnostic_records or []) if isinstance(r, dict)]
+        if existing:
+            partition.invalid_records = existing + partition.invalid_records
+            partition.invalid_count = len(partition.invalid_records)
+        return self.process_partition(partition)
 
     def process_partition(self, partition: EvidencePartition) -> StrategyResult:
         if not partition.valid_skill_opinions:
@@ -171,7 +177,7 @@ class StrategyEngine:
                 invalid_count=partition.invalid_count,
             )
 
-        synthesis = StrategySynthesizer().synthesize(
+        synthesis = StrategySynthesizer(deliberation_enabled=self.deliberation_enabled).synthesize(
             aggregation.strategy_opinions,
             weighted_score=aggregation.weighted_score,
             final_signal=aggregation.final_signal,

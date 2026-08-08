@@ -324,7 +324,8 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     }));
 
     const tasksTab = await screen.findByRole('tab', { name: /运行中任务/u });
-    expect(within(tasksTab).getByText('1')).toBeInTheDocument();
+    const taskCount = within(tasksTab).getByText('1');
+    expect(taskCount).toHaveClass('h-4', 'min-w-4', 'px-1', 'py-0', 'text-xxs');
     expect(screen.getByText('Apple')).toBeInTheDocument();
     expect(screen.queryByText('Market review task')).not.toBeInTheDocument();
     const runFlowTrigger = screen.getByRole('button', { name: '查看 Apple 运行流' });
@@ -797,7 +798,8 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     await waitFor(() => {
       expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBeNull();
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('The requested report is unavailable.');
+    expect(screen.getByRole('alert').closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(screen.getByRole('alert')).not.toHaveTextContent('The requested report is unavailable.');
     expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
     expect(useStockPoolStore.getState().selectedRecordId).toBeNull();
   });

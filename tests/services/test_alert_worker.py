@@ -257,12 +257,22 @@ class AlertWorkerTestCase(unittest.TestCase):
         os.environ.pop("DATABASE_PATH", None)
         self.temp_dir.cleanup()
 
-    def _config(self, raw_rules: str = "", *, report_language: str = "zh") -> SimpleNamespace:
+    def _config(
+        self,
+        raw_rules: str = "",
+        *,
+        report_language: str = "zh",
+        impact_context_enabled: bool = True,
+        stock_list: list | None = None,
+    ) -> SimpleNamespace:
         return SimpleNamespace(
             agent_event_monitor_enabled=True,
             agent_event_alert_rules_json=raw_rules,
+            agent_event_impact_context_enabled=impact_context_enabled,
             trading_day_check_enabled=False,
             report_language=report_language,
+            stock_list=list(stock_list or []),
+            refresh_stock_list=lambda: None,
         )
 
     def _create_rule(self, **overrides) -> dict:
@@ -1896,6 +1906,206 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(len(triggers), 1)
         self.assertEqual(triggers[0]["target"], "account:all")
         self.assertIn("account_id", triggers[0]["diagnostics"])
+
+
+    def test_corporate_event_trigger_assembles_impact_context_in_notification(self) -> None:
+        rule = self._create_rule(
+            name="Earnings event",
+            target="600519",
+            alert_type="corporate_event",
+            parameters={"event_categories": ["earnings"], "lookback_hours": 24, "min_items": 1},
+        )
+        notifier = self._notifier()
+        config = self._config(stock_list=["600519"])
+
+        async def _evaluate_corporate(rule_obj, *_args, **_kwargs):
+            return {
+                "rule_id": self.service._runtime_rule_id(rule_obj),
+                "status": "triggered",
+                "record_status": "triggered",
+                "triggered": True,
+                "observed_value": 1.0,
+                "threshold": 1.0,
+                "data_source": "intelligence_items",
+                "data_timestamp": None,
+                "reason": "600519 corporate event (earnings): 年度业绩预告",
+                "message": "600519 corporate event (earnings): 年度业绩预告",
+                "diagnostics": {
+                    "event_context": {
+                        "what_happened": "年度业绩预告",
+                        "why_it_matters": "业绩/财报事件可能重定价盈利预期与估值锚点。",
+                        "event_category": "earnings",
+                        "matched_count": 1,
+                    }
+                },
+            }
+
+        portfolio_snapshot = {
+            "accounts": [
+                {
+                    "id": 7,
+                    "total_equity": 200000.0,
+                    "positions": [
+                        {"symbol": "600519", "quantity": 50, "market_value_base": 20000.0},
+                    ],
+                }
+            ]
+        }
+
+        worker = AlertWorker(
+            config_provider=lambda: config,
+            service=self.service,
+            decision_signal_service=DecisionSignalService(),
+            notifier=notifier,
+        )
+        with patch.object(self.service, "_evaluate_rule", new=_evaluate_corporate), patch(
+            "src.services.portfolio_service.PortfolioService"
+        ) as portfolio_cls:
+            portfolio_cls.return_value.get_portfolio_snapshot.return_value = portfolio_snapshot
+            stats = worker.run_once()
+
+        self.assertEqual(stats["triggered"], 1)
+        self.assertEqual(stats["notified"], 1)
+        triggers = self._triggers(rule_id=rule["id"], status="triggered")
+        self.assertEqual(len(triggers), 1)
+        diagnostics_text = triggers[0]["diagnostics"] or ""
+        self.assertIn("impact_context", diagnostics_text)
+        self.assertIn("in_watchlist", diagnostics_text)
+        self.assertIn("in_portfolio", diagnostics_text)
+        alert_text = notifier.send_with_results.call_args.args[0]
+        self.assertIn("影响上下文", alert_text)
+        self.assertIn("年度业绩预告", alert_text)
+        self.assertEqual(notifier.send_with_results.call_args.kwargs["route_type"], "alert")
+
+    def test_impact_context_disabled_skips_assembly(self) -> None:
+        self._create_rule(
+            target="600519",
+            alert_type="corporate_event",
+            parameters={"event_categories": ["earnings"]},
+        )
+        notifier = self._notifier()
+        config = self._config(impact_context_enabled=False, stock_list=["600519"])
+
+        async def _evaluate_corporate(rule_obj, *_args, **_kwargs):
+            return {
+                "rule_id": self.service._runtime_rule_id(rule_obj),
+                "status": "triggered",
+                "record_status": "triggered",
+                "triggered": True,
+                "observed_value": 1.0,
+                "threshold": 1.0,
+                "data_source": "intelligence_items",
+                "data_timestamp": None,
+                "reason": "earnings hit",
+                "message": "earnings hit",
+                "diagnostics": {
+                    "event_context": {
+                        "what_happened": "earnings hit",
+                        "event_category": "earnings",
+                    }
+                },
+            }
+
+        worker = AlertWorker(config_provider=lambda: config, service=self.service, notifier=notifier)
+        with patch.object(self.service, "_evaluate_rule", new=_evaluate_corporate):
+            stats = worker.run_once()
+
+        self.assertEqual(stats["triggered"], 1)
+        diagnostics_text = self._triggers(status="triggered")[0]["diagnostics"] or ""
+        self.assertNotIn("impact_context", diagnostics_text)
+        alert_text = notifier.send_with_results.call_args.args[0]
+        self.assertNotIn("影响上下文", alert_text)
+        self.assertNotIn("Impact context", alert_text)
+
+    def test_impact_context_degrades_when_portfolio_unavailable(self) -> None:
+        self._create_rule(
+            target="600519",
+            alert_type="corporate_event",
+            parameters={"event_categories": ["earnings"]},
+        )
+        notifier = self._notifier()
+        config = self._config(stock_list=[])
+
+        async def _evaluate_corporate(rule_obj, *_args, **_kwargs):
+            return {
+                "rule_id": self.service._runtime_rule_id(rule_obj),
+                "status": "triggered",
+                "record_status": "triggered",
+                "triggered": True,
+                "observed_value": 1.0,
+                "threshold": 1.0,
+                "data_source": "intelligence_items",
+                "data_timestamp": None,
+                "reason": "earnings hit",
+                "message": "earnings hit",
+                "diagnostics": {
+                    "event_context": {
+                        "what_happened": "earnings hit",
+                        "why_it_matters": "valuation may reprice",
+                        "event_category": "earnings",
+                    }
+                },
+            }
+
+        worker = AlertWorker(config_provider=lambda: config, service=self.service, notifier=notifier)
+        with patch.object(self.service, "_evaluate_rule", new=_evaluate_corporate), patch(
+            "src.services.portfolio_service.PortfolioService"
+        ) as portfolio_cls:
+            portfolio_cls.return_value.get_portfolio_snapshot.side_effect = RuntimeError("portfolio offline")
+            stats = worker.run_once()
+
+        self.assertEqual(stats["triggered"], 1)
+        self.assertEqual(stats["notified"], 1)
+        diagnostics_text = self._triggers(status="triggered")[0]["diagnostics"] or ""
+        self.assertIn("impact_context", diagnostics_text)
+        self.assertIn("degraded", diagnostics_text)
+        alert_text = notifier.send_with_results.call_args.args[0]
+        self.assertIn("影响上下文", alert_text)
+        self.assertIn("earnings hit", alert_text)
+        self.assertIn("降级", alert_text)
+
+    def test_channel_failure_does_not_halt_subsequent_rules(self) -> None:
+        self._create_rule(name="Rule A", target="600519", parameters={"direction": "above", "price": 1800})
+        self._create_rule(name="Rule B", target="000001", parameters={"direction": "above", "price": 10})
+        dispatches = [
+            NotificationDispatchResult(
+                dispatched=True,
+                success=False,
+                status="all_failed",
+                channel_results=[
+                    ChannelAttemptResult(channel="wechat", success=False, error_code="send_failed", retryable=True)
+                ],
+            ),
+            self._dispatch_result(True, channel="feishu"),
+        ]
+
+        class FakeNotifier:
+            def send_with_results(self, *_args, **_kwargs):
+                return dispatches.pop(0)
+
+        async def _quote(_monitor, stock_code):
+            if stock_code == "600519":
+                return SimpleNamespace(price=1810.0)
+            return SimpleNamespace(price=12.0)
+
+        worker = AlertWorker(
+            config_provider=lambda: self._config(),
+            service=self.service,
+            notifier=FakeNotifier(),
+        )
+        with patch("src.agent.events.EventMonitor._get_realtime_quote", new=_quote):
+            stats = worker.run_once()
+
+        self.assertEqual(stats["triggered"], 2)
+        self.assertEqual(stats["notified"], 1)
+        self.assertEqual(len(self._triggers(status="triggered")), 2)
+        notifications = self._notifications()
+        channels = {item["channel"] for item in notifications}
+        self.assertIn("wechat", channels)
+        self.assertIn("feishu", channels)
+        failed = [item for item in notifications if item["channel"] == "wechat"]
+        self.assertTrue(failed)
+        self.assertFalse(failed[0]["success"])
 
 
 if __name__ == "__main__":

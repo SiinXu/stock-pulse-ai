@@ -274,12 +274,19 @@ export interface GetHistoryListParams extends HistoryFilters {
   limit?: number;
 }
 
+export interface GetHistoryListOptions {
+  signal?: AbortSignal;
+}
+
 export const historyApi = {
   /**
    * Get the history analysis list
    * @param params Filtering and pagination parameters
    */
-  getList: async (params: GetHistoryListParams = {}): Promise<HistoryListResponse> => {
+  getList: async (
+    params: GetHistoryListParams = {},
+    options: GetHistoryListOptions = {},
+  ): Promise<HistoryListResponse> => {
     const { stockCode, reportType, startDate, endDate, page = 1, limit = 20 } = params;
 
     const queryParams: Record<string, string | number> = { page, limit };
@@ -290,6 +297,7 @@ export const historyApi = {
 
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/history', {
       params: queryParams,
+      signal: options.signal,
     });
 
     const data = parseCamelCasePayload<{

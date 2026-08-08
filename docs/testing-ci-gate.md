@@ -1,7 +1,7 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-05
+- Last verified: 2026-08-06
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
@@ -148,6 +148,49 @@ Current benchmark-marked wall-clock cases:
 - `tests/security/test_sensitive_redaction.py::test_field_scanner_checks_one_public_boundary_per_whitespace_run` (`elapsed < 0.5`)
 - `tests/data_provider/test_hk_stock_name_fallback.py::test_parallel_cold_lookups_share_one_em_request` (4-thread barrier / sleep; relocated from the blocking gate)
 
+## Time determinism (fake clock, phase 1)
+
+Wall-clock-sensitive offline tests should prefer the repo-local seam in
+[`tests/time_determinism.py`](../tests/time_determinism.py) over real
+`time.sleep` or live `datetime.now()` anchors.
+
+| Piece | Role |
+| --- | --- |
+| `FakeClock` | Explicit `time()` / `monotonic()` / `tick()` / optional non-blocking `sleep()` |
+| `install_fake_clock(monkeypatch, ...)` | Pytest install (reverts automatically) |
+| `frozen_time(...)` | Context manager for `unittest.TestCase` |
+| `fake_clock` fixture | Default freeze at `DEFAULT_FAKE_NOW` (2026-06-15 12:00 UTC) |
+
+**Why not freezegun (phase 1):** freezegun is not in the dependency lock.
+Adding it requires the reviewed lock-refresh path
+(`scripts/check_dependency_locks.py --update` + supply-chain review). A
+monkeypatch fixture covers the first converted suites without expanding the
+lock surface. Revisit freezegun only through that process if a later phase
+needs broader auto-patching.
+
+**Scope notes:**
+
+* Rebind module-level `datetime` names when code uses
+  `from datetime import datetime` (pass `datetime_modules=[...]`).
+* Leave `patch_sleep=False` when a test still needs real short sleeps (for
+  example worker-drain loops). Prefer explicit `clock.tick(...)` for TTL /
+  cooldown advances.
+* OS-level waits (`concurrent.futures` timeouts, subprocess, thread joins)
+  are **not** controlled by the fake clock.
+
+* Pytest assertion rewriting may keep a separate globals dict for test methods.
+  Rebinding ``datetime`` only on ``sys.modules[name]`` will not affect bare
+  ``datetime.now()`` inside rewritten tests; also rebind the test method
+  globals (see the news-freshness suite) or call ``clock.now()`` explicitly.
+
+
+Phase-1 converted modules: `tests/search/test_search_news_freshness.py`,
+`tests/data_provider/test_realtime_types.py`,
+`tests/services/test_market_structure_service.py` (TTL / retry-delay cases).
+
+There is no separate Chinese twin of this guide; keep time-determinism notes
+here only until a bilingual testing guide pair is introduced.
+
 ## Parallelism (`pytest-xdist`)
 
 `pytest-xdist` is **not** enabled in the gate by default. Global monkeypatches in `tests/conftest.py` (asyncio/anyio/TestClient rebinding) are process-global and may not be safe under multi-process collection. Re-evaluate with two clean `pytest -n auto -m "not network and not benchmark"` runs before enabling in `ci_gate.sh`.
@@ -171,7 +214,54 @@ STOCKPULSE_TEST_THREADLESS=0 \
   python -m pytest tests/api -m "not network and not benchmark"
 ```
 
-The `api-real-client` job in `.github/workflows/ci.yml` is **not** a required branch-ruleset check. It always runs on PR and push-to-main (after `ai-governance`) so real-client regressions surface without blocking merges while the inventory stabilizes.
+The `api-real-client` job in `.github/workflows/ci.yml` is **not** a required branch-ruleset check. It runs **only on push-to-main** (after `ai-governance`), not on pull requests, so real-client regressions still surface post-merge without consuming PR runners.
+
+
+## Playwright flake quarantine
+
+Web e2e uses Playwright with **`retries: 0`**. Flakes must not be masked by re-runs or `waitForTimeout` sleeps. When a spec is intermittently red and the root cause cannot ship in the same PR, move it into the **quarantine lane** instead of weakening the blocking suite.
+
+### Rules
+
+1. **Tag** the test with `@quarantine` (Playwright `tag: ['@quarantine']` and/or the literal token in the title).
+2. **Tracking issue required**: every quarantined case must pass `quarantineDetails(issueUrl, reason)` from `apps/dsa-web/e2e/quarantine.ts`. The helper rejects non-GitHub issue URLs and empty reasons at load time.
+3. **Empty is healthy**: when the flake is fixed, remove the tag and details. Shipping zero quarantined specs is the default; the mechanism is the deliverable.
+4. **No product bypass**: quarantine is for test harness isolation only. A genuine UI race still needs an English issue with trace evidence; the deterministic wait belongs in e2e helpers such as `expectAnalyzeButtonReady` in `apps/dsa-web/e2e/workbench-fixture.ts`.
+
+### Example
+
+```ts
+import { test } from '@playwright/test';
+import { quarantineDetails } from './quarantine';
+
+test(
+  'flaky surface @quarantine',
+  quarantineDetails(
+    'https://github.com/SiinXu/stock-pulse-ai/issues/1234',
+    'Analyze button enable races setup-status; awaiting product fix on issue 1234.',
+  ),
+  async ({ page }) => {
+    // ...
+  },
+);
+```
+
+### Lanes
+
+| Lane | How | Role |
+| --- | --- | --- |
+| Blocking smoke | `npm run test:smoke` (default `chromium` project, `grepInvert: /@quarantine/`) | CI `web-e2e` and local default; must stay deterministic |
+| Quarantine | `npm run test:smoke:quarantine` (`DSA_WEB_E2E_QUARANTINE_LANE=1`, project `chromium-quarantine`) | Non-blocking observation; may be red without failing the main gate |
+
+`retries` stays `0` in both lanes. Quarantine is not a license to add sleeps.
+
+### Workflow note
+
+Wiring a continuous quarantine job in GitHub Actions (schedule / push-to-main observation, non-required check) is intentionally left to CI throughput PRs (`#808` / `#810` class). This repository ships the Playwright project + npm script so that wiring is a thin workflow step, not a second config design.
+
+### Related readiness helper
+
+The Analysis Workbench primary action stays disabled until `isExperienceModeReady` (setup-status request settled) and the stock query is non-empty. Specs that type a symbol and click **分析 / Analyze** must use `expectAnalyzeButtonReady` (controlled-input set + `expect(...).toBeEnabled()` on `#analysis-workbench-stock-search` and Analyze) rather than filling a still-disabled control or relying on placeholder visibility.
 
 ## CI path filters (`web-gate` vs `web-e2e`)
 
@@ -179,10 +269,21 @@ The `changes` job in `.github/workflows/ci.yml` emits two independent filters:
 
 | Output | Consumed by | Paths (summary) |
 | --- | --- | --- |
-| `frontend` | `web-gate` (lint / i18n / unit / build) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
-| `web_e2e` | `web-e2e` (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
+| `frontend` | `web-gate` on PR and push (lint / i18n / unit / build) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
+| `web_e2e` | `web-e2e` on **push-to-main only** (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
 
-Pure backend changes under `src/**` / `data_provider/**` / `bot/**` therefore re-run the e2e stack that boots the real app, without paying for frontend lint/unit/build. Pure frontend changes still run both jobs.
+PR runs keep the ruleset-required backend/docker/openapi gates (plus path-filtered `web-gate` for frontend). `web-e2e` and `api-real-client` are observation jobs after merge. The auxiliary `PR Review` workflow is opt-in via `workflow_dispatch` and does not auto-run on every PR.
+
+### PR-tier backend throughput
+
+To avoid a doubled full offline suite on every PR:
+
+| Job | PR tier | Push-to-main |
+| --- | --- | --- |
+| `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `FULL` / `NONE` / path targets) | `./scripts/ci_gate.sh offline-tests` (coverage floor) |
+| `python-minimum` | `./scripts/ci_gate.sh python-min-smoke` (3.10 import + small contract suite) | `./scripts/ci_gate.sh offline-tests` |
+
+Selective mapping falls back to the full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config).
 
 ## Push-to-main CI
 

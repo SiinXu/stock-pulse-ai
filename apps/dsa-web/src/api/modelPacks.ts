@@ -1,3 +1,7 @@
+import { z } from 'zod';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
+import apiClient from './index';
 import type { AxiosProgressEvent } from 'axios';
 
 import type {
@@ -6,9 +10,53 @@ import type {
   ModelPackImportResult,
   ModelPackImportStatus,
 } from '../types/localModels';
-import apiClient from './index';
-import { toCamelCase } from './utils';
 
+type OpenApiModelPackImportAccepted = components['schemas']['ModelPackImportAccepted'];
+type OpenApiModelPackImportStatus = components['schemas']['ModelPackImportStatus'];
+type OpenApiLocalModelMutationResponse = components['schemas']['LocalModelMutationResponse'];
+type _AssertAccepted = keyof OpenApiModelPackImportAccepted;
+type _AssertStatus = keyof OpenApiModelPackImportStatus;
+type _AssertMutation = keyof OpenApiLocalModelMutationResponse;
+const _acceptedAnchor: _AssertAccepted = 'task_id';
+const _statusAnchor: _AssertStatus = 'progress';
+const _mutationAnchor: _AssertMutation = 'model_id';
+void _acceptedAnchor;
+void _statusAnchor;
+void _mutationAnchor;
+
+const modelPackImportAcceptedSchema = z.object({
+  message: z.string(),
+  messageCode: z.string().optional(),
+  status: z.string().optional(),
+  taskId: z.string(),
+}).passthrough();
+
+const modelPackImportStatusSchema = z.object({
+  error: z.string().nullable().optional(),
+  message: z.string().nullable().optional(),
+  progress: z.number(),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  status: z.string(),
+  taskId: z.string(),
+}).passthrough();
+
+const localModelMutationResponseSchema = z.object({
+  agentModel: z.string().optional(),
+  appliedCount: z.number().optional(),
+  configVersion: z.string(),
+  deleted: z.boolean().optional(),
+  importedModels: z.array(z.record(z.string(), z.unknown())).optional(),
+  modelId: z.string(),
+  primaryModel: z.string().optional(),
+  registeredModels: z.array(z.string()).optional(),
+  reloadTriggered: z.boolean().optional(),
+  selectedAgent: z.boolean().optional(),
+  selectedPrimary: z.boolean().optional(),
+  skippedMaskedCount: z.number().optional(),
+  success: z.boolean().optional(),
+  updatedKeys: z.array(z.string()).optional(),
+  warnings: z.array(z.string()).optional(),
+}).passthrough();
 
 const MODEL_PACK_UPLOAD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -34,14 +82,24 @@ export const modelPacksApi = {
         onUploadProgress: options.onUploadProgress,
       },
     );
-    return toCamelCase<ModelPackImportAccepted>(response.data);
+    return parseCamelCasePayload<ModelPackImportAccepted>(
+      response.data,
+      modelPackImportAcceptedSchema,
+      'ModelPackImportAccepted',
+      'modelPacks',
+    );
   },
 
   async getImport(taskId: string): Promise<ModelPackImportStatus> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/model-packs/imports/${encodeURIComponent(taskId)}`,
     );
-    return toCamelCase<ModelPackImportStatus>(response.data);
+    return parseCamelCasePayload<ModelPackImportStatus>(
+      response.data,
+      modelPackImportStatusSchema,
+      'ModelPackImportStatus',
+      'modelPacks',
+    );
   },
 
   async activateDesktop(
@@ -65,6 +123,11 @@ export const modelPacksApi = {
         desktop_attestation: desktopAttestation,
       },
     );
-    return toCamelCase<LocalModelMutationResponse>(response.data);
+    return parseCamelCasePayload<LocalModelMutationResponse>(
+      response.data,
+      localModelMutationResponseSchema,
+      'LocalModelMutationResponse',
+      'modelPacks',
+    );
   },
 };

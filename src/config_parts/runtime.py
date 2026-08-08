@@ -27,6 +27,10 @@ class _ConfigRuntimeMethods:
         """Whether SearXNG fallback is enabled via self-hosted or public mode."""
         return bool(self.searxng_base_urls) or bool(self.searxng_public_instances_enabled)
 
+    def has_rss_news_feeds_enabled(self) -> bool:
+        """Whether optional RSS/Atom market-news feeds are configured."""
+        return bool(getattr(self, "rss_news_feed_urls", None))
+
     def has_search_capability_enabled(self) -> bool:
         """Whether any search provider is configured or SearXNG fallback is enabled."""
         return bool(
@@ -37,6 +41,7 @@ class _ConfigRuntimeMethods:
             or self.brave_api_keys
             or self.serpapi_keys
             or self.has_searxng_enabled()
+            or self.has_rss_news_feeds_enabled()
         )
 
     def is_agent_available(self) -> bool:

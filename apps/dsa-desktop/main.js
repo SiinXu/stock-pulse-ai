@@ -1,3 +1,4 @@
+// @ts-check
 const {
   app,
   BrowserWindow,
@@ -135,8 +136,11 @@ const DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE = Object.freeze({
   EXTERNAL_SERVICE: 'external-service',
   UNAVAILABLE: 'unavailable',
 });
-const DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
+const _DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
 const DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE = '/settings?section=ai_models&view=local_models';
+// Fresh-install route: Settings overview readiness + from=onboarding opens the
+// existing Web FirstRunWizard (cloud / local model / CLI) without a second UI.
+const DESKTOP_FIRST_RUN_SETTINGS_ROUTE = '/settings?section=overview&view=readiness&from=onboarding';
 // The checked-in catalog is the only allowlist authority. Arbitrary
 // user-provided model names are never downloaded by the desktop shell.
 const DESKTOP_LOCAL_MODEL_PRESETS = loadDesktopLocalModelPresets();
@@ -3206,6 +3210,121 @@ async function selectDesktopModelPackSource({
   return selection.filePaths.length === 1 ? selection.filePaths[0] : null;
 }
 
+/**
+ * Decide the first private-origin route after backend health succeeds.
+ * Fresh installs (no .env before bootstrap) open the guided FirstRunWizard via
+ * the existing Settings onboarding deep link. Pending protocol deep links win.
+ * Returning users keep Home; incomplete setup remains visible via the Home banner.
+ */
+function resolveInitialDesktopPageRoute({
+  envFileExistedBeforeBootstrap = true,
+  pendingDeepLinkRoute = null,
+  firstRunRoute = DESKTOP_FIRST_RUN_SETTINGS_ROUTE,
+} = {}) {
+  if (typeof pendingDeepLinkRoute === 'string' && pendingDeepLinkRoute.trim()) {
+    return pendingDeepLinkRoute;
+  }
+  if (!envFileExistedBeforeBootstrap) {
+    return firstRunRoute;
+  }
+  return null;
+}
+
+/**
+ * One-click local install prerequisite: detect system/embedded/external Ollama,
+ * start a managed runtime when available, and return actionable failures without
+ * silent multi-GB downloads. Model Pack import remains an explicit user opt-in
+ * after this step (file/folder picker).
+ */
+async function ensureLocalModelRuntimeReadyForInstall({
+  baseUrl = resolveLocalModelBaseUrl(),
+  spawnImpl = spawn,
+  sourceEnv = process.env,
+  appDir = resolveAppDir(),
+  detectRuntime = detectLocalModelRuntime,
+  startRuntime = startManagedLocalModelRuntime,
+  requestImpl = null,
+  embeddedRoot = resolveEmbeddedLocalModelRoot(),
+} = {}) {
+  setLocalModelState({
+    operation: 'import',
+    progress: { modelId: '', percent: 0, status: 'Detecting local model runtime' },
+    message: '',
+  });
+
+  const detection = await detectRuntime({
+    baseUrl,
+    spawnImpl,
+    sourceEnv,
+    embeddedRoot,
+    requestImpl,
+  });
+
+  if (detection.status === DESKTOP_LOCAL_MODEL_STATUS.RUNNING) {
+    return {
+      ok: true,
+      detection,
+      runtimeBinary: localModelServeRuntime || detection.runtimeBinary || null,
+    };
+  }
+
+  if (detection.status === DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED
+    || !detection.runtimeBinary) {
+    const message = 'Ollama is not installed. Install the system or embedded runtime, then try again.';
+    setLocalModelState({
+      ...toPublicLocalModelDetection(detection),
+      operation: null,
+      progress: null,
+      message,
+    });
+    return {
+      ok: false,
+      error: 'ollama_unavailable',
+      message,
+      detection,
+    };
+  }
+
+  setLocalModelState({
+    ...toPublicLocalModelDetection(detection),
+    operation: 'import',
+    progress: { modelId: '', percent: 5, status: 'Starting local model runtime' },
+    message: '',
+  });
+
+  const started = await startRuntime({
+    baseUrl,
+    spawnImpl,
+    sourceEnv,
+    appDir,
+    embeddedRoot,
+    requestImpl,
+  });
+
+  if (started.status !== DESKTOP_LOCAL_MODEL_STATUS.RUNNING) {
+    const message = started.message
+      || 'Could not start the local model runtime. Install or start Ollama, then try again.';
+    setLocalModelState({
+      ...started,
+      operation: null,
+      progress: null,
+      message,
+    });
+    return {
+      ok: false,
+      error: 'ollama_unavailable',
+      message,
+      detection: started,
+    };
+  }
+
+  return {
+    ok: true,
+    detection: started,
+    runtimeBinary: localModelServeRuntime || detection.runtimeBinary || null,
+  };
+}
+
 async function importDesktopModelPack({
   dialogImpl = dialog,
   spawnImpl = spawn,
@@ -3214,10 +3333,14 @@ async function importDesktopModelPack({
   selectSource = selectDesktopModelPackSource,
   detectRuntime = detectLocalModelRuntime,
   resolveRuntimeBinary = resolveLocalModelBinary,
+  ensureRuntimeReady = ensureLocalModelRuntimeReadyForInstall,
+  startRuntime = startManagedLocalModelRuntime,
   importPack = importModelPack,
   refreshState = refreshLocalModelState,
   expectedConfigVersion = '',
   createAttestation = createDesktopModelPackAttestation,
+  requestImpl = null,
+  embeddedRoot = resolveEmbeddedLocalModelRoot(),
 } = {}) {
   const configVersion = String(expectedConfigVersion || '').trim();
   if (!configVersion || configVersion.length > 128 || /[\u0000-\u001f]/.test(configVersion)) {
@@ -3227,6 +3350,7 @@ async function importDesktopModelPack({
       message: 'Refresh Local Models and import the Model Pack again.',
     };
   }
+  // Explicit opt-in: never import or download until the user picks a pack.
   const source = await selectSource({ dialogImpl, windowRef: mainWindow });
   if (!source) {
     return { ok: false, canceled: true };
@@ -3234,19 +3358,32 @@ async function importDesktopModelPack({
 
   const baseUrl = resolveLocalModelBaseUrl();
   const runtimeIdentity = getLocalModelRuntimeIdentity(baseUrl);
-  const detection = await detectRuntime({ baseUrl, spawnImpl, sourceEnv });
-  if (detection.status !== DESKTOP_LOCAL_MODEL_STATUS.RUNNING) {
+  const runtimeReady = await ensureRuntimeReady({
+    baseUrl,
+    spawnImpl,
+    sourceEnv,
+    appDir,
+    detectRuntime,
+    startRuntime,
+    requestImpl,
+    embeddedRoot,
+  });
+  if (!runtimeReady.ok) {
     return {
       ok: false,
-      error: 'ollama_unavailable',
-      message: 'Start the local model runtime, then import the Model Pack again.',
+      error: runtimeReady.error || 'ollama_unavailable',
+      message: runtimeReady.message
+        || 'Start the local model runtime, then import the Model Pack again.',
     };
   }
 
-  const runtimeBinary = localModelServeRuntime || await resolveRuntimeBinary({
-    spawnImpl,
-    sourceEnv,
-  });
+  const runtimeBinary = runtimeReady.runtimeBinary
+    || localModelServeRuntime
+    || await resolveRuntimeBinary({
+      spawnImpl,
+      sourceEnv,
+      embeddedRoot,
+    });
   if (!runtimeBinary || typeof runtimeBinary.command !== 'string') {
     return {
       ok: false,
@@ -3256,9 +3393,9 @@ async function importDesktopModelPack({
   }
 
   setLocalModelState({
-    ...toPublicLocalModelDetection(detection),
+    ...toPublicLocalModelDetection(runtimeReady.detection),
     operation: 'import',
-    progress: { modelId: '', percent: 0, status: 'Validating Model Pack' },
+    progress: { modelId: '', percent: 10, status: 'Validating Model Pack' },
     message: '',
   });
   try {
@@ -3273,14 +3410,16 @@ async function importDesktopModelPack({
       }),
       onProgress: (percent, message) => {
         const boundedPercent = Math.max(0, Math.min(100, Number(percent) || 0));
+        // Map pack progress into the remaining 10–100% of the one-click bar.
+        const scaledPercent = 10 + Math.round(boundedPercent * 0.9);
         setLocalModelState({
           operation: 'import',
-          progress: { modelId: '', percent: boundedPercent, status: String(message || '') },
+          progress: { modelId: '', percent: scaledPercent, status: String(message || '') },
           message: '',
         });
       },
     });
-    await refreshState({ spawnImpl });
+    await refreshState({ spawnImpl, requestImpl });
     const desktopAttestation = createAttestation({
       ...result,
       expectedConfigVersion: configVersion,
@@ -3359,6 +3498,9 @@ function buildMainWindowOptions() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
+    // Keep the shell hidden until the loading page paints, then reveal once.
+    // Avoids a blank native chrome flash during first-run backend bootstrap.
+    show: false,
     backgroundColor: resolveWindowBackgroundColor(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -3368,6 +3510,20 @@ function buildMainWindowOptions() {
       additionalArguments: [`--dsa-desktop-version=${app.getVersion()}`],
     },
   };
+}
+
+function revealMainWindow(windowRef = mainWindow) {
+  if (!isDesktopWindowAvailable(windowRef)) {
+    return false;
+  }
+  if (typeof windowRef.show === 'function') {
+    windowRef.show();
+  }
+  if (typeof windowRef.focus === 'function') {
+    windowRef.focus();
+  }
+  notifyDesktopAssistantState();
+  return true;
 }
 
 function isAllowedMainWindowNavigation(targetUrl, allowedPageUrl) {
@@ -3580,6 +3736,15 @@ async function createWindow(brandMigrationResult) {
   logStartup('BrowserWindow created');
   registerMainWindowNavigationGuards(mainWindow.webContents);
 
+  let mainWindowRevealed = false;
+  const revealMainWindowOnce = () => {
+    if (mainWindowRevealed || !isDesktopWindowAvailable(mainWindow)) {
+      return false;
+    }
+    mainWindowRevealed = true;
+    return revealMainWindow(mainWindow);
+  };
+
   if (typeof mainWindow.on === 'function') {
     mainWindow.on('close', handleMainWindowClose);
     mainWindow.on('show', notifyDesktopAssistantState);
@@ -3587,10 +3752,18 @@ async function createWindow(brandMigrationResult) {
     mainWindow.on('minimize', notifyDesktopAssistantState);
     mainWindow.on('restore', notifyDesktopAssistantState);
   }
+  if (typeof mainWindow.once === 'function') {
+    // ready-to-show fires after the first paint of the loading page (or error page).
+    mainWindow.once('ready-to-show', () => {
+      revealMainWindowOnce();
+    });
+  }
 
   const loadingPath = path.join(__dirname, 'renderer', 'loading.html');
   const loadingPageStartedAt = Date.now();
   await mainWindow.loadFile(loadingPath);
+  // Some test doubles omit ready-to-show; reveal after the loading page loads.
+  revealMainWindowOnce();
   logStartup(`Loading page rendered in ${Date.now() - loadingPageStartedAt}ms`);
 
   const applyThemeBackground = () => {
@@ -3631,8 +3804,12 @@ async function createWindow(brandMigrationResult) {
 
   const appDir = resolveAppDir();
   const envPath = path.join(appDir, '.env');
+  // Capture before bootstrap so a fresh install can surface FirstRunWizard once.
+  const envFileExistedBeforeBootstrap = fs.existsSync(envPath);
   ensureEnvFile(envPath);
-  logStartup(`Env file ready: ${envPath}`);
+  logStartup(
+    `Env file ready: ${envPath} firstRun=${envFileExistedBeforeBootstrap ? 'false' : 'true'}`
+  );
 
   const backendBindHost = resolveBackendBindHost({ envFile: envPath });
   const backendConnectHost = resolveDesktopConnectHost(backendBindHost);
@@ -3719,9 +3896,16 @@ async function createWindow(brandMigrationResult) {
     const initialDeepLinkOutcome = pendingDesktopDeepLinkOutcome;
     pendingDesktopDeepLinkRoute = null;
     pendingDesktopDeepLinkOutcome = null;
-    const initialPageUrl = initialDeepLinkRoute
-      ? buildDesktopDeepLinkTargetUrl(mainPageUrl, initialDeepLinkRoute)
+    const guidedRoute = resolveInitialDesktopPageRoute({
+      envFileExistedBeforeBootstrap,
+      pendingDeepLinkRoute: initialDeepLinkRoute,
+    });
+    const initialPageUrl = guidedRoute
+      ? buildDesktopDeepLinkTargetUrl(mainPageUrl, guidedRoute)
       : mainPageUrl;
+    if (guidedRoute === DESKTOP_FIRST_RUN_SETTINGS_ROUTE) {
+      logStartup('Fresh install: opening first-run setup wizard route');
+    }
     try {
       await mainWindow.loadURL(initialPageUrl);
       if (initialDeepLinkOutcome) {
@@ -3740,6 +3924,12 @@ async function createWindow(brandMigrationResult) {
     backendRuntime.resetStartError();
     desktopAssistantLastReadyAt = new Date().toISOString();
     notifyDesktopAssistantState();
+    // Warm local-model detection so FirstRunWizard / Local Models show runtime
+    // status without a second manual Detect click. Failures stay non-blocking.
+    void refreshLocalModelState().catch((error) => {
+      const errorName = error instanceof Error && error.name ? error.name : 'unknown_error';
+      logLine(`[local-model] first-run detect skipped type=${errorName}`);
+    });
     await flushPendingDesktopDeepLink();
     logStartup(
       `Main page loadURL resolved in ${Date.now() - mainPageStartedAt}ms url=${sanitizeUrlForLog(initialPageUrl)}`
@@ -3756,6 +3946,7 @@ async function createWindow(brandMigrationResult) {
     logStartup(`Startup failed while waiting for health: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
     await mainWindow.loadURL(errorUrl);
+    revealMainWindowOnce();
   }
 }
 
@@ -3873,6 +4064,7 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES,
   DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES,
   DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE,
+  DESKTOP_FIRST_RUN_SETTINGS_ROUTE,
   DESKTOP_LOCAL_MODEL_PRESETS,
   DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE,
   DESKTOP_LOCAL_MODEL_STATUS,
@@ -3896,6 +4088,8 @@ module.exports = {
   findAvailablePort,
   buildMainPageUrl,
   buildMainWindowOptions,
+  revealMainWindow,
+  resolveInitialDesktopPageRoute,
   isAllowedMainWindowNavigation,
   registerMainWindowNavigationGuards,
   sanitizeExternalWebUrl,
@@ -3923,6 +4117,7 @@ module.exports = {
   pullLocalModel,
   removeLocalModel,
   importDesktopModelPack,
+  ensureLocalModelRuntimeReadyForInstall,
   selectDesktopModelPackSource,
   isLocalModelAssigned,
   decodeConfiguredModelRoute,

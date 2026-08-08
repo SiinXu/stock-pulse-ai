@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "upstream_repo": "ZhuLinsen/daily_stock_analysis",
+  "description": "Path prefixes deliberately diverged by StockPulse. Upstream-only commits whose changed paths all match these prefixes are informational; any other path is a shared path that needs attention unless already marked Ported-from.",
+  "deliberately_diverged_prefixes": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".claude/",
+    ".github/copilot-instructions.md",
+    ".github/instructions/",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "apps/dsa-desktop/",
+    "docs/upstream-parity.md",
+    "docs/upstream-parity_CN.md",
+    "docs/foundation-product-architecture.md",
+    "docs/license-ownership-inventory.md",
+    "docs/supply-chain-maintenance.md",
+    "examples/",
+    "scripts/check_ai_assets.py",
+    "scripts/check_coverage_floor.py",
+    "scripts/check_import_layers.py",
+    "scripts/check_legacy_facade_imports.py",
+    "scripts/check_upstream_parity.py",
+    "scripts/check_workflow_supply_chain.py",
+    "scripts/coverage_floor_baseline.json",
+    "scripts/import_layer_baseline.json",
+    "scripts/legacy_facade_import_baseline.json",
+    "scripts/upstream_parity_whitelist.json",
+    "scripts/workflow_supply_chain_exceptions.json"
+  ]
+}
