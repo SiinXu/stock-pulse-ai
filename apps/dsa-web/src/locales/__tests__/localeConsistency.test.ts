@@ -1107,8 +1107,13 @@ describe('locale registries', () => {
       }
       expect(translations['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.WEBHOOK_VERIFY_SSL.notes.0'])
         .toContain('SSL');
-      expect(translations['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENCODE_CLI_MODEL.examples.0'])
-        .toBe('OPENCODE_CLI_MODEL=provider/model');
+      // examples are source literals, not locale-bundle keys (Scheme 3).
+      expect(
+        Object.prototype.hasOwnProperty.call(
+          translations,
+          'locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENCODE_CLI_MODEL.examples.0',
+        ),
+      ).toBe(false);
       const openCodeSummary = translations[
         'locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENCODE_CLI_MODEL.summary'
       ];
