@@ -31,7 +31,7 @@ from typing import (
 import numpy as np
 import pandas as pd
 
-from src.utils.sanitize import sanitize_diagnostic_text
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 from ..realtime_types import CircuitBreaker
 from ..symbol_normalization import _market_tag, normalize_stock_code
@@ -723,6 +723,20 @@ def bind_daily_source_health_facade(
             ),
         )
         bound_names.append(name)
+    # T11 / #185: install financial data validation at manager unified exits.
+    # Kept inside manager_parts so T10-owned data_provider/base.py stays untouched.
+    try:
+        from .data_validation_wiring import ensure_validation_wrappers
+
+        ensure_validation_wrappers(target_class)
+    except Exception as exc:  # broad-exception: fallback_recorded - validation install must not break imports
+        log_safe_exception(
+            logger,
+            "data validation wrapper install skipped",
+            exc,
+            error_code="data_validation_install",
+            level=logging.WARNING,
+        )
     return tuple(bound_names)
 
 
