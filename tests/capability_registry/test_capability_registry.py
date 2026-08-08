@@ -162,11 +162,21 @@ def test_available_provider_when_config_and_deps_present() -> None:
 
 def test_registered_tools_are_available_and_tokens_reflect_providers() -> None:
     tools = [
-        _FakeTool(name="get_realtime_quote", policy=_FakePolicy(permissions=["market_data:read"])),
-        _FakeTool(name="parse_financial_pdf", category="multimodal", policy=_FakePolicy(permissions=["multimodal:read"])),
+        _FakeTool(
+            name="get_realtime_quote",
+            policy=_FakePolicy(permissions=["market_data:read"]),
+        ),
+        _FakeTool(
+            name="parse_financial_pdf",
+            category="multimodal",
+            policy=_FakePolicy(permissions=["multimodal:read"]),
+        ),
     ]
     records = collect_capability_records(
-        config=_base_config(multimodal_agent_tools_enabled=True, multimodal_file_root="/tmp/multimodal"),),
+        config=_base_config(
+            multimodal_agent_tools_enabled=True,
+            multimodal_file_root="/tmp/multimodal",
+        ),
         tool_registry=_FakeToolRegistry(tools),
         plugin_manager=_FakePluginManager([]),
         dependency_probe=lambda _name: True,
@@ -179,6 +189,7 @@ def test_registered_tools_are_available_and_tokens_reflect_providers() -> None:
     token = by_id["tool.capability:market_data:read"]
     assert token.available is True
     assert "get_realtime_quote" in token.provider
+
 
 
 def test_plugin_disabled_reason() -> None:
