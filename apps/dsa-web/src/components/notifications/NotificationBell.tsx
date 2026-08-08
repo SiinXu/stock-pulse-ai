@@ -8,6 +8,7 @@ import { useUnreadNotifications } from '../../hooks/useUnreadNotifications';
 import { formatUiText } from '../../i18n/uiText';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
 import {
+  APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
   buildSignalCenterHref,
 } from '../../routing/routes';
@@ -232,7 +233,7 @@ export function NotificationBell({
           </div>
 
           <Link
-            to={buildSignalCenterHref()}
+            to={APP_ROUTE_PATHS.notifications}
             onClick={close}
             className="flex min-h-11 shrink-0 items-center justify-center border-t border-border px-4 text-sm font-medium text-primary hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
           >

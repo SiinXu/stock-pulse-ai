@@ -1406,3 +1406,19 @@ class TaskQueueInflightRecord(Base):
         index=True,
     )
 
+
+class NotificationInboxReadStateRecord(Base):
+    """Durable per-item read markers for the in-app notification inbox.
+
+    Inbox items themselves are projected on read from existing event sources
+    (analysis history, alert triggers, scheduled runs, decision signals).
+    This table only stores administrator-local read state so the inbox can
+    mark items without mutating outbound push channels or source tables.
+    """
+
+    __tablename__ = 'notification_inbox_read_state'
+
+    item_id = Column(String(128), primary_key=True)
+    kind = Column(String(32), nullable=False, index=True)
+    read_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+

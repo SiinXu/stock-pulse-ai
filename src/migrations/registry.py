@@ -49,6 +49,9 @@ from src.migrations.versions.v202608050001_backtest_resolution_notes import (
 from src.migrations.versions.v202608060001_task_queue_inflight import (
     MIGRATION as TASK_QUEUE_INFLIGHT_MIGRATION,
 )
+from src.migrations.versions.v202608090020_notification_inbox_read_state import (
+    MIGRATION as NOTIFICATION_INBOX_READ_STATE_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -67,6 +70,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
         BACKTEST_RESOLUTION_NOTES_MIGRATION,
         TASK_QUEUE_INFLIGHT_MIGRATION,
+        NOTIFICATION_INBOX_READ_STATE_MIGRATION,
     )
 )
 

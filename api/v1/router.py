@@ -27,6 +27,7 @@ from api.v1.endpoints import (
     intelligence,
     local_models,
     model_packs,
+    notification_inbox,
     plugins,
     onboarding,
     portfolio,
@@ -114,6 +115,12 @@ router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
+)
+
+router.include_router(
+    notification_inbox.router,
+    prefix="/notification-inbox",
+    tags=["NotificationInbox"],
 )
 
 router.include_router(

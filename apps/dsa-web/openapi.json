@@ -11773,6 +11773,248 @@
         "title": "NewsIntelResponse",
         "type": "object"
       },
+      "NotificationInboxItem": {
+        "additionalProperties": false,
+        "description": "One aggregated inbox row projected from durable event sources.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "href": {
+            "description": "In-app deep link path with query string",
+            "title": "Href",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable item key kind:source_id",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_read": {
+            "default": false,
+            "title": "Is Read",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "analysis_complete",
+              "alert_triggered",
+              "scheduled_task_result",
+              "decision_signal"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "severity": {
+            "default": "info",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "summary",
+          "created_at",
+          "href",
+          "source_id"
+        ],
+        "title": "NotificationInboxItem",
+        "type": "object"
+      },
+      "NotificationInboxListResponse": {
+        "additionalProperties": false,
+        "description": "GET /notification-inbox/items response body.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationInboxItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "max_items": {
+            "minimum": 1.0,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "retention_days": {
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total",
+          "unread_total",
+          "retention_days",
+          "max_items"
+        ],
+        "title": "NotificationInboxListResponse",
+        "type": "object"
+      },
+      "NotificationInboxMarkAllReadRequest": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-all-read request body.",
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional kind filter when marking the current window",
+            "title": "Kind"
+          }
+        },
+        "title": "NotificationInboxMarkAllReadRequest",
+        "type": "object"
+      },
+      "NotificationInboxMarkAllReadResponse": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-all-read response body.",
+        "properties": {
+          "marked_count": {
+            "minimum": 0.0,
+            "title": "Marked Count",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked_count",
+          "unread_total"
+        ],
+        "title": "NotificationInboxMarkAllReadResponse",
+        "type": "object"
+      },
+      "NotificationInboxMarkReadRequest": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-read request body.",
+        "properties": {
+          "item_ids": {
+            "description": "Composite inbox item ids (kind:source_id)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "NotificationInboxMarkReadRequest",
+        "type": "object"
+      },
+      "NotificationInboxMarkReadResponse": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-read response body.",
+        "properties": {
+          "marked_count": {
+            "minimum": 0.0,
+            "title": "Marked Count",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked_count",
+          "unread_total"
+        ],
+        "title": "NotificationInboxMarkReadResponse",
+        "type": "object"
+      },
+      "NotificationInboxUnreadCountResponse": {
+        "additionalProperties": false,
+        "description": "GET /notification-inbox/unread-count response body.",
+        "properties": {
+          "max_items": {
+            "minimum": 1.0,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "retention_days": {
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread_total",
+          "retention_days",
+          "max_items"
+        ],
+        "title": "NotificationInboxUnreadCountResponse",
+        "type": "object"
+      },
       "NotificationTestAttempt": {
         "description": "One notification delivery attempt result.",
         "properties": {
@@ -28786,6 +29028,310 @@
         "summary": "Get Model Pack import status",
         "tags": [
           "ModelPacks"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/items": {
+      "get": {
+        "operationId": "list_inbox_items_api_v1_notification_inbox_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List in-app notification inbox items",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/items/mark-all-read": {
+      "post": {
+        "operationId": "mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInboxMarkAllReadRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxMarkAllReadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Mark the current notification inbox window as read",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/items/mark-read": {
+      "post": {
+        "operationId": "mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationInboxMarkReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxMarkReadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Mark specific notification inbox items as read",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/unread-count": {
+      "get": {
+        "operationId": "get_inbox_unread_count_api_v1_notification_inbox_unread_count_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxUnreadCountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get unread notification inbox count",
+        "tags": [
+          "NotificationInbox"
         ]
       }
     },

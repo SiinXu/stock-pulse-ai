@@ -341,3 +341,11 @@ def get_model_pack_import_service(request: Request) -> ModelPackImportService:
                 )
                 request.app.state.model_pack_import_service = service
     return service
+
+
+def get_notification_inbox_service() -> "NotificationInboxService":
+    """Build a request-scoped in-app notification inbox service."""
+    from src.services.notification_inbox_service import NotificationInboxService
+
+    return NotificationInboxService(get_database_manager())
+
