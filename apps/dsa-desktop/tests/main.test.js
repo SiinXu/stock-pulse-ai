@@ -634,6 +634,61 @@ test('desktop update IPC rejects foreign renderers', async (t) => {
       channel
     );
   }
+
+  const diagnosticsHandler = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL
+  );
+  await assert.rejects(
+    async () => diagnosticsHandler({ sender: { id: 'foreign-renderer' } }),
+    /Unauthorized desktop environment diagnostics IPC sender/
+  );
+});
+
+test('desktop environment diagnostics IPC returns PATH/CLI visibility for the main window', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'darwin' });
+  const mainWebContents = { send: () => undefined };
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    webContents: mainWebContents,
+  });
+  t.after(() => mainModule.__setMainWindowForTest(null));
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-env-ipc-'));
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+  const binDir = path.join(tempRoot, 'bin');
+  fs.mkdirSync(binDir, { recursive: true });
+  const ollamaPath = path.join(binDir, 'ollama');
+  fs.writeFileSync(ollamaPath, '#!/bin/sh\n', { mode: 0o755 });
+  fs.chmodSync(ollamaPath, 0o755);
+  const envFile = path.join(tempRoot, '.env');
+  fs.writeFileSync(envFile, 'GENERATION_BACKEND=codex_cli\n', 'utf-8');
+
+  const diagnostics = mainModule.getDesktopEnvironmentDiagnostics({
+    platform: 'darwin',
+    sourceEnv: { PATH: binDir },
+    appDir: tempRoot,
+    envFile,
+    nowMs: Date.parse('2026-08-08T15:30:00.000Z'),
+  });
+  assert.equal(diagnostics.schemaVersion, 1);
+  assert.equal(diagnostics.path.policy, 'macos-gui-homebrew-extend');
+  assert.equal(
+    diagnostics.cli.find((entry) => entry.name === 'ollama')?.path,
+    ollamaPath
+  );
+  assert.equal(JSON.stringify(diagnostics).includes('codex_cli'), false);
+
+  const handler = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL
+  );
+  const payload = await handler({ sender: mainWebContents });
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(typeof payload.path.effective, 'string');
+  assert.ok(Array.isArray(payload.cli));
+  assert.deepEqual(
+    payload.cli.map((entry) => entry.name).sort(),
+    ['claude', 'codex', 'ollama', 'opencode']
+  );
 });
 
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {

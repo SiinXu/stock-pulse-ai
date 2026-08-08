@@ -5,6 +5,7 @@ const DESKTOP_GET_UPDATE_STATE_CHANNEL = 'desktop:get-update-state';
 const DESKTOP_CHECK_FOR_UPDATES_CHANNEL = 'desktop:check-for-updates';
 const DESKTOP_INSTALL_DOWNLOADED_UPDATE_CHANNEL = 'desktop:install-downloaded-update';
 const DESKTOP_OPEN_RELEASE_PAGE_CHANNEL = 'desktop:open-release-page';
+const DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL = 'desktop:get-environment-diagnostics';
 const DESKTOP_UPDATE_STATE_EVENT = 'desktop:update-state';
 const DESKTOP_LOCAL_MODEL_GET_STATE_CHANNEL = 'desktop-local-model:get-state';
 const DESKTOP_LOCAL_MODEL_DETECT_CHANNEL = 'desktop-local-model:detect';
@@ -40,6 +41,9 @@ function createDesktopBridge({
     },
     openReleasePage(releaseUrl) {
       return renderer.invoke(DESKTOP_OPEN_RELEASE_PAGE_CHANNEL, releaseUrl);
+    },
+    getEnvironmentDiagnostics() {
+      return renderer.invoke(DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL);
     },
     onUpdateStateChange(listener) {
       if (typeof listener !== 'function') {
@@ -107,6 +111,7 @@ module.exports = {
   DESKTOP_GET_UPDATE_STATE_CHANNEL,
   DESKTOP_INSTALL_DOWNLOADED_UPDATE_CHANNEL,
   DESKTOP_OPEN_RELEASE_PAGE_CHANNEL,
+  DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL,
   DESKTOP_UPDATE_STATE_EVENT,
   DESKTOP_VERSION_ARG_PREFIX,
   DESKTOP_LOCAL_MODEL_GET_STATE_CHANNEL,
