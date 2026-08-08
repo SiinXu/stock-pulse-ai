@@ -1516,6 +1516,28 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
     notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
   },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: 'Local Runtime Auto-Detect',
+    summary: 'Fast loopback-only probe for a local Ollama runtime during setup readiness.',
+    usage:
+      'Leave enabled for zero-config first success. The probe only targets loopback ' +
+      '(127.0.0.0/8, ::1, localhost), never blocks startup, and logs failures only. ' +
+      'When Ollama is reachable, setup readiness offers non-secret local-zero-cost fields.',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
+  },
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: 'Local Runtime Detect Timeout',
+    summary: 'Per-request timeout for the loopback local-runtime detect probe.',
+    usage: 'Keep this low (default 0.35s, clamped to 0.05–2.0) so setup status stays fast when Ollama is down.',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
 };
 
 export default settingsHelpEnUS;

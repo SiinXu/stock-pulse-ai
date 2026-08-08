@@ -1557,6 +1557,27 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
     notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
   },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: '本地运行时自动探测',
+    summary: '就绪检查时对本机 Ollama 做快速回环探测（零配置首次成功）。',
+    usage:
+      '默认开启。仅探测回环地址（127.0.0.0/8、::1、localhost），失败只写日志、不阻塞启动。' +
+      '探测成功时会提示本地零成本路径的非密钥字段。',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
+  },
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: '本地运行时探测超时',
+    summary: '本地运行时探测单次请求超时（秒）。',
+    usage: '保持较短（默认 0.35，限制 0.05–2.0），避免 Ollama 未启动时拖慢就绪检查。',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
 };
 
 export default settingsHelpZhCN;
