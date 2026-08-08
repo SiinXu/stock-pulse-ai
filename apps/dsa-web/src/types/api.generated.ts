@@ -2225,6 +2225,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/stress-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run a built-in portfolio stress scenario
+         * @description Applies a declarative deterministic factor shock to current holdings and returns estimated PnL impact with explicit assumptions. Missing beta defaults to 1.0 with status=partial. Does not call market data providers. Historical replay is not implemented.
+         */
+        get: operations["getPortfolioStressTest"];
+        put?: never;
+        /**
+         * Run portfolio stress test with optional custom shocks
+         * @description Same deterministic engine as GET, with optional custom_shocks, per-symbol betas, and sector_map. Prefer supplying betas/sector_map to avoid unit-beta and unclassified-sector simplifications.
+         */
+        post: operations["postPortfolioStressTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/stress-test/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portfolio stress scenarios
+         * @description Built-in deterministic factor-shock scenarios plus any overrides loaded from PORTFOLIO_STRESS_SCENARIOS_PATH. Historical path replay is not available in this delivery.
+         */
+        get: operations["listPortfolioStressScenarios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/trades": {
         parameters: {
             query?: never;
@@ -8943,6 +8987,113 @@ export interface components {
             /** Unrealized Pnl */
             unrealized_pnl: number;
         };
+        /**
+         * PortfolioStressTestRequest
+         * @description Optional body for POST custom / overridden stress runs.
+         */
+        PortfolioStressTestRequest: {
+            /** Account Id */
+            account_id?: number | null;
+            /**
+             * As Of
+             * @description ISO date YYYY-MM-DD; default today
+             */
+            as_of?: string | null;
+            /**
+             * Betas
+             * @description Optional per-symbol market beta; missing names use beta=1 with label
+             */
+            betas?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Cost Method
+             * @default fifo
+             */
+            cost_method: string;
+            /**
+             * Custom Shocks
+             * @description When set, builds a custom scenario instead of a preset id
+             */
+            custom_shocks?: components["schemas"]["StressShock"][] | null;
+            /**
+             * Rate Sensitivity Pct Per 100Bp
+             * @description Override default equity sensitivity to rate moves
+             */
+            rate_sensitivity_pct_per_100bp?: number | null;
+            /**
+             * Scenario Id
+             * @description Built-in or YAML scenario id; omit when custom_shocks is set
+             */
+            scenario_id?: string | null;
+            /**
+             * Sector Map
+             * @description Optional per-symbol sector labels for sector shocks
+             */
+            sector_map?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Target Sector
+             * @description Required for sector scenarios
+             */
+            target_sector?: string | null;
+        };
+        /** PortfolioStressTestResponse */
+        PortfolioStressTestResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /** As Of */
+            as_of: string;
+            assumptions: components["schemas"]["StressAssumptions"];
+            concentration: components["schemas"]["StressConcentrationBlock"];
+            /** Cost Method */
+            cost_method: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Historical Replay Available
+             * @default false
+             */
+            historical_replay_available: boolean;
+            /** Missing Data */
+            missing_data?: string[];
+            /** Portfolio Pnl */
+            portfolio_pnl?: number | null;
+            /** Portfolio Pnl Pct */
+            portfolio_pnl_pct?: number | null;
+            /**
+             * Portfolio Value
+             * @default 0
+             */
+            portfolio_value: number;
+            /** Position Impacts */
+            position_impacts?: components["schemas"]["StressPositionImpact"][];
+            /**
+             * Positions Used
+             * @default 0
+             */
+            positions_used: number;
+            scenario: components["schemas"]["StressScenarioBlock"];
+            /**
+             * Simulation Method
+             * @default deterministic_factor_shock
+             */
+            simulation_method: string;
+            /**
+             * Status
+             * @description 'ok', 'empty_portfolio', or 'partial'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /** Stressed Portfolio Value */
+            stressed_portfolio_value?: number | null;
+            /** Top Losers */
+            top_losers?: components["schemas"]["StressPositionImpact"][];
+            /** Top Winners */
+            top_winners?: components["schemas"]["StressPositionImpact"][];
+        };
         /** PortfolioTradeCreateRequest */
         PortfolioTradeCreateRequest: {
             /** Account Id */
@@ -10690,6 +10841,182 @@ export interface components {
              * @description 成交量（股）
              */
             volume?: number | null;
+        };
+        /** StressAssumptions */
+        StressAssumptions: {
+            /** Beta Policy */
+            beta_policy: string;
+            /**
+             * Cash Excluded
+             * @default true
+             */
+            cash_excluded: boolean;
+            /** Data Source */
+            data_source: string;
+            /** Fx Policy */
+            fx_policy: string;
+            /**
+             * Historical Replay
+             * @default false
+             */
+            historical_replay: boolean;
+            /**
+             * Instantaneous Shock
+             * @default true
+             */
+            instantaneous_shock: boolean;
+            /**
+             * Linear Factor Additivity
+             * @default true
+             */
+            linear_factor_additivity: boolean;
+            /**
+             * Provider Calls On Hot Path
+             * @default false
+             */
+            provider_calls_on_hot_path: boolean;
+            /** Rate Policy */
+            rate_policy: string;
+            /** Rate Sensitivity Pct Per 100Bp */
+            rate_sensitivity_pct_per_100bp: number;
+            /**
+             * Reuses Risk Metrics Concentration
+             * @default true
+             */
+            reuses_risk_metrics_concentration: boolean;
+            /** Scenario Category */
+            scenario_category?: string | null;
+            /** Sector Policy */
+            sector_policy: string;
+            /** Simplified Assumptions */
+            simplified_assumptions?: string[];
+            /** Simulation Method */
+            simulation_method: string;
+            /** Weight Basis */
+            weight_basis: string;
+        };
+        /** StressConcentrationBlock */
+        StressConcentrationBlock: {
+            /** Diversification Score */
+            diversification_score?: number | null;
+            /** Effective N */
+            effective_n?: number | null;
+            /** Hhi */
+            hhi?: number | null;
+            /**
+             * Position Count
+             * @default 0
+             */
+            position_count: number;
+            /** Status */
+            status: string;
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+            /** Weights */
+            weights?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** StressPositionImpact */
+        StressPositionImpact: {
+            /** Beta Source */
+            beta_source?: string | null;
+            /** Beta Used */
+            beta_used?: number | null;
+            /** Market Value */
+            market_value: number;
+            /** Pnl */
+            pnl: number;
+            /** Sector */
+            sector?: string | null;
+            /** Shock Pct */
+            shock_pct: number;
+            /** Stressed Market Value */
+            stressed_market_value: number;
+            /** Symbol */
+            symbol: string;
+            /** Valuation Currency */
+            valuation_currency?: string | null;
+            /** Weight Pct */
+            weight_pct: number;
+        };
+        /** StressScenarioBlock */
+        StressScenarioBlock: {
+            /**
+             * Category
+             * @default custom
+             */
+            category: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Shocks */
+            shocks?: components["schemas"]["StressShock"][];
+            /** Target Sector */
+            target_sector?: string | null;
+        };
+        /** StressScenarioListResponse */
+        StressScenarioListResponse: {
+            /**
+             * Historical Replay Available
+             * @default false
+             */
+            historical_replay_available: boolean;
+            /** Scenarios */
+            scenarios?: components["schemas"]["StressScenarioSummary"][];
+            /**
+             * Simulation Method
+             * @default deterministic_factor_shock
+             */
+            simulation_method: string;
+        };
+        /** StressScenarioSummary */
+        StressScenarioSummary: {
+            /**
+             * Category
+             * @default custom
+             */
+            category: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Requires Target Sector
+             * @default false
+             */
+            requires_target_sector: boolean;
+            /** Shocks */
+            shocks?: components["schemas"]["StressShock"][];
+        };
+        /** StressShock */
+        StressShock: {
+            /**
+             * Factor
+             * @description market | sector | fx | rate
+             */
+            factor: string;
+            /**
+             * Value Bp
+             * @description Shock magnitude in basis points (rate factor)
+             */
+            value_bp?: number | null;
+            /**
+             * Value Pct
+             * @description Shock magnitude in percent points (market/sector/fx)
+             */
+            value_pct?: number | null;
         };
         /**
          * SystemConfigCategorySchema
@@ -18254,6 +18581,146 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioStressTest: {
+        parameters: {
+            query: {
+                /** @description Built-in or YAML scenario id */
+                scenario_id: string;
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                /** @description Cost method: fifo or avg */
+                cost_method?: string;
+                /** @description Required for sector scenarios (e.g. sector_down_30) */
+                target_sector?: string | null;
+                /** @description Equity return percent points per +100bp rate move (simplified) */
+                rate_sensitivity_pct_per_100bp?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioStressTestResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Stress test computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postPortfolioStressTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioStressTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioStressTestResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Stress test computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listPortfolioStressScenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StressScenarioListResponse"];
+                };
+            };
+            /** @description Scenario catalog failed */
             500: {
                 headers: {
                     [name: string]: unknown;

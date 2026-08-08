@@ -14854,6 +14854,267 @@
         "title": "PortfolioSnapshotResponse",
         "type": "object"
       },
+      "PortfolioStressTestRequest": {
+        "description": "Optional body for POST custom / overridden stress runs.",
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO date YYYY-MM-DD; default today",
+            "title": "As Of"
+          },
+          "betas": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional per-symbol market beta; missing names use beta=1 with label",
+            "title": "Betas"
+          },
+          "cost_method": {
+            "default": "fifo",
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "custom_shocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StressShock"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When set, builds a custom scenario instead of a preset id",
+            "title": "Custom Shocks"
+          },
+          "rate_sensitivity_pct_per_100bp": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Override default equity sensitivity to rate moves",
+            "title": "Rate Sensitivity Pct Per 100Bp"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Built-in or YAML scenario id; omit when custom_shocks is set",
+            "title": "Scenario Id"
+          },
+          "sector_map": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional per-symbol sector labels for sector shocks",
+            "title": "Sector Map"
+          },
+          "target_sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required for sector scenarios",
+            "title": "Target Sector"
+          }
+        },
+        "title": "PortfolioStressTestRequest",
+        "type": "object"
+      },
+      "PortfolioStressTestResponse": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/StressAssumptions"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/StressConcentrationBlock"
+          },
+          "cost_method": {
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "historical_replay_available": {
+            "default": false,
+            "title": "Historical Replay Available",
+            "type": "boolean"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Data",
+            "type": "array"
+          },
+          "portfolio_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Pnl"
+          },
+          "portfolio_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Pnl Pct"
+          },
+          "portfolio_value": {
+            "default": 0.0,
+            "title": "Portfolio Value",
+            "type": "number"
+          },
+          "position_impacts": {
+            "items": {
+              "$ref": "#/components/schemas/StressPositionImpact"
+            },
+            "title": "Position Impacts",
+            "type": "array"
+          },
+          "positions_used": {
+            "default": 0,
+            "title": "Positions Used",
+            "type": "integer"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/StressScenarioBlock"
+          },
+          "simulation_method": {
+            "default": "deterministic_factor_shock",
+            "title": "Simulation Method",
+            "type": "string"
+          },
+          "status": {
+            "description": "'ok', 'empty_portfolio', or 'partial'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "stressed_portfolio_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stressed Portfolio Value"
+          },
+          "top_losers": {
+            "items": {
+              "$ref": "#/components/schemas/StressPositionImpact"
+            },
+            "title": "Top Losers",
+            "type": "array"
+          },
+          "top_winners": {
+            "items": {
+              "$ref": "#/components/schemas/StressPositionImpact"
+            },
+            "title": "Top Winners",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "scenario",
+          "assumptions",
+          "concentration"
+        ],
+        "title": "PortfolioStressTestResponse",
+        "type": "object"
+      },
       "PortfolioTradeCreateRequest": {
         "properties": {
           "account_id": {
@@ -19033,6 +19294,401 @@
           "current_price"
         ],
         "title": "StockQuote",
+        "type": "object"
+      },
+      "StressAssumptions": {
+        "properties": {
+          "beta_policy": {
+            "title": "Beta Policy",
+            "type": "string"
+          },
+          "cash_excluded": {
+            "default": true,
+            "title": "Cash Excluded",
+            "type": "boolean"
+          },
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "fx_policy": {
+            "title": "Fx Policy",
+            "type": "string"
+          },
+          "historical_replay": {
+            "default": false,
+            "title": "Historical Replay",
+            "type": "boolean"
+          },
+          "instantaneous_shock": {
+            "default": true,
+            "title": "Instantaneous Shock",
+            "type": "boolean"
+          },
+          "linear_factor_additivity": {
+            "default": true,
+            "title": "Linear Factor Additivity",
+            "type": "boolean"
+          },
+          "provider_calls_on_hot_path": {
+            "default": false,
+            "title": "Provider Calls On Hot Path",
+            "type": "boolean"
+          },
+          "rate_policy": {
+            "title": "Rate Policy",
+            "type": "string"
+          },
+          "rate_sensitivity_pct_per_100bp": {
+            "title": "Rate Sensitivity Pct Per 100Bp",
+            "type": "number"
+          },
+          "reuses_risk_metrics_concentration": {
+            "default": true,
+            "title": "Reuses Risk Metrics Concentration",
+            "type": "boolean"
+          },
+          "scenario_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Category"
+          },
+          "sector_policy": {
+            "title": "Sector Policy",
+            "type": "string"
+          },
+          "simplified_assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Simplified Assumptions",
+            "type": "array"
+          },
+          "simulation_method": {
+            "title": "Simulation Method",
+            "type": "string"
+          },
+          "weight_basis": {
+            "title": "Weight Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "simulation_method",
+          "weight_basis",
+          "beta_policy",
+          "sector_policy",
+          "fx_policy",
+          "rate_policy",
+          "rate_sensitivity_pct_per_100bp",
+          "data_source"
+        ],
+        "title": "StressAssumptions",
+        "type": "object"
+      },
+      "StressConcentrationBlock": {
+        "properties": {
+          "diversification_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "position_count": {
+            "default": 0,
+            "title": "Position Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "weights": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StressConcentrationBlock",
+        "type": "object"
+      },
+      "StressPositionImpact": {
+        "properties": {
+          "beta_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Source"
+          },
+          "beta_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Used"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "number"
+          },
+          "pnl": {
+            "title": "Pnl",
+            "type": "number"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "shock_pct": {
+            "title": "Shock Pct",
+            "type": "number"
+          },
+          "stressed_market_value": {
+            "title": "Stressed Market Value",
+            "type": "number"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "valuation_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Currency"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "market_value",
+          "weight_pct",
+          "shock_pct",
+          "pnl",
+          "stressed_market_value"
+        ],
+        "title": "StressPositionImpact",
+        "type": "object"
+      },
+      "StressScenarioBlock": {
+        "properties": {
+          "category": {
+            "default": "custom",
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "shocks": {
+            "items": {
+              "$ref": "#/components/schemas/StressShock"
+            },
+            "title": "Shocks",
+            "type": "array"
+          },
+          "target_sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Sector"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "StressScenarioBlock",
+        "type": "object"
+      },
+      "StressScenarioListResponse": {
+        "properties": {
+          "historical_replay_available": {
+            "default": false,
+            "title": "Historical Replay Available",
+            "type": "boolean"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/StressScenarioSummary"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "simulation_method": {
+            "default": "deterministic_factor_shock",
+            "title": "Simulation Method",
+            "type": "string"
+          }
+        },
+        "title": "StressScenarioListResponse",
+        "type": "object"
+      },
+      "StressScenarioSummary": {
+        "properties": {
+          "category": {
+            "default": "custom",
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requires_target_sector": {
+            "default": false,
+            "title": "Requires Target Sector",
+            "type": "boolean"
+          },
+          "shocks": {
+            "items": {
+              "$ref": "#/components/schemas/StressShock"
+            },
+            "title": "Shocks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "StressScenarioSummary",
+        "type": "object"
+      },
+      "StressShock": {
+        "properties": {
+          "factor": {
+            "description": "market | sector | fx | rate",
+            "title": "Factor",
+            "type": "string"
+          },
+          "value_bp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shock magnitude in basis points (rate factor)",
+            "title": "Value Bp"
+          },
+          "value_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shock magnitude in percent points (market/sector/fx)",
+            "title": "Value Pct"
+          }
+        },
+        "required": [
+          "factor"
+        ],
+        "title": "StressShock",
         "type": "object"
       },
       "SystemConfigCategorySchema": {
@@ -31039,6 +31695,243 @@
           }
         },
         "summary": "Get portfolio snapshot",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/stress-test": {
+      "get": {
+        "description": "Applies a declarative deterministic factor shock to current holdings and returns estimated PnL impact with explicit assumptions. Missing beta defaults to 1.0 with status=partial. Does not call market data providers. Historical replay is not implemented.",
+        "operationId": "getPortfolioStressTest",
+        "parameters": [
+          {
+            "description": "Built-in or YAML scenario id",
+            "in": "query",
+            "name": "scenario_id",
+            "required": true,
+            "schema": {
+              "description": "Built-in or YAML scenario id",
+              "title": "Scenario Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "description": "Cost method: fifo or avg",
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "description": "Cost method: fifo or avg",
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required for sector scenarios (e.g. sector_down_30)",
+            "in": "query",
+            "name": "target_sector",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required for sector scenarios (e.g. sector_down_30)",
+              "title": "Target Sector"
+            }
+          },
+          {
+            "description": "Equity return percent points per +100bp rate move (simplified)",
+            "in": "query",
+            "name": "rate_sensitivity_pct_per_100bp",
+            "required": false,
+            "schema": {
+              "default": 2.0,
+              "description": "Equity return percent points per +100bp rate move (simplified)",
+              "exclusiveMinimum": 0,
+              "title": "Rate Sensitivity Pct Per 100Bp",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioStressTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Stress test computation failed"
+          }
+        },
+        "summary": "Run a built-in portfolio stress scenario",
+        "tags": [
+          "Portfolio"
+        ]
+      },
+      "post": {
+        "description": "Same deterministic engine as GET, with optional custom_shocks, per-symbol betas, and sector_map. Prefer supplying betas/sector_map to avoid unit-beta and unclassified-sector simplifications.",
+        "operationId": "postPortfolioStressTest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioStressTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioStressTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Stress test computation failed"
+          }
+        },
+        "summary": "Run portfolio stress test with optional custom shocks",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/stress-test/scenarios": {
+      "get": {
+        "description": "Built-in deterministic factor-shock scenarios plus any overrides loaded from PORTFOLIO_STRESS_SCENARIOS_PATH. Historical path replay is not available in this delivery.",
+        "operationId": "listPortfolioStressScenarios",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StressScenarioListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Scenario catalog failed"
+          }
+        },
+        "summary": "List portfolio stress scenarios",
         "tags": [
           "Portfolio"
         ]
