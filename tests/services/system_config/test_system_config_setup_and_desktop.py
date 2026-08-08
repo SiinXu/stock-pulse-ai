@@ -36,7 +36,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             self.assertIn("message", check)
         check_keys = {check["key"] for check in status["checks"]}
         self.assertTrue(
-            {"llm_primary", "llm_agent", "stock_list", "notification", "storage"}.issubset(check_keys)
+            {"llm_primary", "llm_agent", "stock_list", "data_only_path", "local_runtime", "notification", "storage"}.issubset(check_keys)
         )
 
     def test_get_setup_status_marks_minimal_config_complete(self) -> None:

@@ -1524,8 +1524,40 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: [
       '关闭时工具不会注册到进程内工具表。',
       '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+      '第一阶段契约与回滚步骤见 docs/valuation-models.md。',
     ],
   },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: '本地运行时自动探测',
+    summary: '就绪检查时对本机 Ollama 做快速回环探测（零配置首次成功）。',
+    usage:
+      '默认开启。仅探测回环地址（127.0.0.0/8、::1、localhost），失败只写日志、不阻塞启动。' +
+      '探测成功时会提示本地零成本路径的非密钥字段。',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
+  },
+
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: '本地运行时探测超时',
+    summary: '本地运行时探测单次请求超时（秒）。',
+    usage: '保持较短（默认 0.35，限制 0.05–2.0），避免 Ollama 未启动时拖慢就绪检查。',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: '投委会模式',
+    summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
+    usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
+    valueNotes: ['关闭时保持既有单路径分析行为。'],
+    impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
+    notes: ['需要 Agent multi 能力。'],
+  },
+
 };
 
 export default settingsHelpZhCN;

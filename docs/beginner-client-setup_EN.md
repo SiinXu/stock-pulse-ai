@@ -6,6 +6,17 @@ This guide is for users who do not want to read code: download the desktop clien
 
 Chinese version: [beginner-client-setup.md](beginner-client-setup.md). After install, continue with the [UI operation manual](ui-manual/README_EN.md).
 
+
+## Zero-config first success (no API key)
+
+You can complete a useful first run without a cloud key:
+
+1. **Data-only (same artifact as `--dry-run`)**: after setting a watchlist, run `python main.py --dry-run` to fetch market data without calling an LLM.
+2. **Local Ollama auto-detect**: setup readiness probes loopback (`127.0.0.1` / `localhost` / `::1`) by default. Failures are log-only and **never block startup**. When Ollama is reachable, readiness surfaces non-secret local-zero-cost fields (for example `LLM_CHANNELS=ollama`).
+3. Turn detection off with `LOCAL_RUNTIME_AUTO_DETECT=false`. Timeout: `LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35` (default).
+
+Full AI analysis still needs a primary model (cloud key or an applied local Ollama profile). Cloud setup continues in **Configure an AI model** below.
+
 ## Before you start
 
 1. A Windows or macOS computer.
