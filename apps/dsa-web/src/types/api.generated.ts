@@ -1181,6 +1181,26 @@ export interface paths {
         patch: operations["updateDecisionSignalStatus"];
         trace?: never;
     };
+    "/api/v1/focus/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get today's focus recommendations
+         * @description Deterministic short list of symbols from watchlist + holdings. Hard-capped; empty when nothing qualifies. Never triggers market data fetches or analysis runs.
+         */
+        get: operations["getTodaysFocus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -11456,6 +11476,92 @@ export interface components {
             /** Success */
             success: boolean;
         };
+        /** TodaysFocusCostContract */
+        TodaysFocusCostContract: {
+            /**
+             * Analysis Runs Triggered
+             * @default 0
+             */
+            analysis_runs_triggered: number;
+            /**
+             * Provider Calls
+             * @default 0
+             */
+            provider_calls: number;
+            /**
+             * Zero Extra Fetch
+             * @default true
+             */
+            zero_extra_fetch: boolean;
+        };
+        /** TodaysFocusItem */
+        TodaysFocusItem: {
+            /** Code */
+            code: string;
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+            /** Priority */
+            priority: number;
+            /**
+             * Reason Code
+             * @description Deterministic reason code: alert_triggered | corporate_event | analysis_reversal | high_weight_move
+             */
+            reason_code: string;
+            /** Reason Display */
+            reason_display: string;
+            /** Secondary Reason Codes */
+            secondary_reason_codes?: string[];
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /** TodaysFocusPresentationBoundary */
+        TodaysFocusPresentationBoundary: {
+            /**
+             * Alerts Owned By
+             * @default notifications_or_alerts_hub
+             */
+            alerts_owned_by: string;
+            /**
+             * Duplicate Alert Ui
+             * @default false
+             */
+            duplicate_alert_ui: boolean;
+            /**
+             * Focus Shows
+             * @default prioritized_symbols_with_why_selected
+             */
+            focus_shows: string;
+        };
+        /** TodaysFocusResponse */
+        TodaysFocusResponse: {
+            cost_contract?: components["schemas"]["TodaysFocusCostContract"];
+            /** Empty Message */
+            empty_message?: string | null;
+            /** Empty Reason */
+            empty_reason?: string | null;
+            /** Generated At */
+            generated_at: string;
+            /** Item Count */
+            item_count: number;
+            /** Items */
+            items?: components["schemas"]["TodaysFocusItem"][];
+            /** Max Items */
+            max_items: number;
+            /** Pack Version */
+            pack_version: string;
+            presentation_boundary?: components["schemas"]["TodaysFocusPresentationBoundary"];
+            /** Sources Used */
+            sources_used?: string[];
+            /**
+             * Status
+             * @description 'ok' or 'empty'
+             */
+            status: string;
+        };
         /**
          * UnsupportedScheduledTaskItem
          * @description Opaque projection of a definition written by a newer application.
@@ -15054,6 +15160,60 @@ export interface operations {
                 };
             };
             /** @description 更新失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTodaysFocus: {
+        parameters: {
+            query?: {
+                /** @description Hard cap for returned focus items (default 5, max 10) */
+                max_items?: number;
+                /** @description Optional portfolio account id for holdings weight context */
+                account_id?: number | null;
+                /** @description Reason display language (en/zh); defaults to report_language */
+                language?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodaysFocusResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Focus aggregation failed */
             500: {
                 headers: {
                     [name: string]: unknown;

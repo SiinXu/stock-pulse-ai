@@ -20651,6 +20651,181 @@
         "title": "TestNotificationChannelResponse",
         "type": "object"
       },
+      "TodaysFocusCostContract": {
+        "properties": {
+          "analysis_runs_triggered": {
+            "default": 0,
+            "title": "Analysis Runs Triggered",
+            "type": "integer"
+          },
+          "provider_calls": {
+            "default": 0,
+            "title": "Provider Calls",
+            "type": "integer"
+          },
+          "zero_extra_fetch": {
+            "default": true,
+            "title": "Zero Extra Fetch",
+            "type": "boolean"
+          }
+        },
+        "title": "TodaysFocusCostContract",
+        "type": "object"
+      },
+      "TodaysFocusItem": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "reason_code": {
+            "description": "Deterministic reason code: alert_triggered | corporate_event | analysis_reversal | high_weight_move",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reason_display": {
+            "title": "Reason Display",
+            "type": "string"
+          },
+          "secondary_reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Secondary Reason Codes",
+            "type": "array"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "reason_code",
+          "reason_display",
+          "priority"
+        ],
+        "title": "TodaysFocusItem",
+        "type": "object"
+      },
+      "TodaysFocusPresentationBoundary": {
+        "properties": {
+          "alerts_owned_by": {
+            "default": "notifications_or_alerts_hub",
+            "title": "Alerts Owned By",
+            "type": "string"
+          },
+          "duplicate_alert_ui": {
+            "default": false,
+            "title": "Duplicate Alert Ui",
+            "type": "boolean"
+          },
+          "focus_shows": {
+            "default": "prioritized_symbols_with_why_selected",
+            "title": "Focus Shows",
+            "type": "string"
+          }
+        },
+        "title": "TodaysFocusPresentationBoundary",
+        "type": "object"
+      },
+      "TodaysFocusResponse": {
+        "properties": {
+          "cost_contract": {
+            "$ref": "#/components/schemas/TodaysFocusCostContract"
+          },
+          "empty_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Message"
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TodaysFocusItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "max_items": {
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "pack_version": {
+            "title": "Pack Version",
+            "type": "string"
+          },
+          "presentation_boundary": {
+            "$ref": "#/components/schemas/TodaysFocusPresentationBoundary"
+          },
+          "sources_used": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources Used",
+            "type": "array"
+          },
+          "status": {
+            "description": "'ok' or 'empty'",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pack_version",
+          "generated_at",
+          "status",
+          "max_items",
+          "item_count"
+        ],
+        "title": "TodaysFocusResponse",
+        "type": "object"
+      },
       "UnsupportedScheduledTaskItem": {
         "additionalProperties": false,
         "description": "Opaque projection of a definition written by a newer application.",
@@ -26350,6 +26525,110 @@
         "summary": "更新决策信号状态",
         "tags": [
           "DecisionSignals"
+        ]
+      }
+    },
+    "/api/v1/focus/today": {
+      "get": {
+        "description": "Deterministic short list of symbols from watchlist + holdings. Hard-capped; empty when nothing qualifies. Never triggers market data fetches or analysis runs.",
+        "operationId": "getTodaysFocus",
+        "parameters": [
+          {
+            "description": "Hard cap for returned focus items (default 5, max 10)",
+            "in": "query",
+            "name": "max_items",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "Hard cap for returned focus items (default 5, max 10)",
+              "maximum": 10,
+              "minimum": 0,
+              "title": "Max Items",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional portfolio account id for holdings weight context",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional portfolio account id for holdings weight context",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "Reason display language (en/zh); defaults to report_language",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reason display language (en/zh); defaults to report_language",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaysFocusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Focus aggregation failed"
+          }
+        },
+        "summary": "Get today's focus recommendations",
+        "tags": [
+          "TodaysFocus"
         ]
       }
     },

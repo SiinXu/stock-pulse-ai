@@ -4,6 +4,8 @@ import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
 import { HomeReadinessCard } from '../../components/home/HomeReadinessCard';
+import { TodaysFocusPanel } from '../../components/home/TodaysFocusPanel';
+import type { TodaysFocusResponse } from '../../types/todaysFocus';
 import { AgentOnboardingWizard } from '../../components/onboarding/AgentOnboardingWizard';
 import { HomeOnboardingSection } from '../../components/onboarding/HomeOnboardingSection';
 import { OnboardingTodayPlanCard } from '../../components/onboarding/OnboardingTodayPlanCard';
@@ -224,6 +226,42 @@ const HomeReadinessCardStory = () => {
   );
 };
 
+
+const FIXTURE_TODAYS_FOCUS: TodaysFocusResponse = {
+  packVersion: 'todays_focus/1.0',
+  generatedAt: '2026-08-09T08:00:00Z',
+  status: 'ok',
+  maxItems: 5,
+  itemCount: 2,
+  items: [
+    { code: '600519', name: 'Kweichow Moutai', reasonCode: 'alert_triggered', reasonDisplay: 'Alert triggered: price above MA', priority: 100 },
+    { code: 'AAPL', name: 'Apple', reasonCode: 'high_weight_move', reasonDisplay: 'High portfolio weight with large move: weight 22.0%, unrealized +8.5%', priority: 50, weightPct: 22 },
+  ],
+  costContract: { providerCalls: 0, analysisRunsTriggered: 0, zeroExtraFetch: true },
+};
+
+const TodaysFocusPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const { t } = useUiLanguage();
+  const isLoading = scenario === 'loading';
+  const isError = scenario === 'error';
+  const isEmpty = scenario === 'empty';
+  const data = isEmpty
+    ? { ...FIXTURE_TODAYS_FOCUS, status: 'empty' as const, itemCount: 0, items: [], emptyReason: 'no_deterministic_signals', emptyMessage: 'No symbols need special attention today.' }
+    : isLoading || isError ? null : FIXTURE_TODAYS_FOCUS;
+  return (
+    <div className="max-w-xl">
+      <TodaysFocusPanel
+        data={data}
+        isLoading={isLoading}
+        error={isError ? createParsedApiError({ title: 'Fixture error', message: 'Unable to load focus.' }) : null}
+        onRefresh={() => undefined}
+        t={t}
+      />
+    </div>
+  );
+};
+
 const HomeOnboardingSectionStory = () => {
   const { scenario } = usePlaygroundScenario();
   const { t } = useUiLanguage();
@@ -277,6 +315,7 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'task-panel': TaskPanelStory,
   'home-stock-workspace': HomeStockWorkspaceStory,
   'home-readiness-card': HomeReadinessCardStory,
+  'todays-focus-panel': TodaysFocusPanelStory,
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
