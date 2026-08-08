@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
 import { createDeferred, chooseOption } from '../../test-utils';
+import { createParsedApiError, createApiError } from '../../api/error';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -20,8 +22,13 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-function renderAlertsPage(ui: ReactNode = <AlertsPage />) {
-  return render(wrapWithQueryClient(<>{ui}</>));
+function renderAlertsPage(ui: ReactNode = <AlertsPage />, initialPath = '/alerts') {
+  window.history.pushState({}, '', initialPath);
+  return render(wrapWithQueryClient(
+    <BrowserRouter>
+      {ui}
+    </BrowserRouter>,
+  ));
 }
 
 const {
@@ -433,5 +440,63 @@ describe('AlertsPage', () => {
 
     expect(await screen.findByText('加载失败')).toBeInTheDocument();
     expect(screen.getByText('告警 API 不可用')).toBeInTheDocument();
+  });
+});
+
+describe('AlertsPage URL contract', () => {
+  it('preserves rule filters in the URL across refresh', async () => {
+    renderAlertsPage();
+    await screen.findByText('茅台价格突破');
+
+    fireEvent.click(screen.getByRole('button', { name: /筛选/ }));
+    const filterDialog = await screen.findByRole('dialog', { name: '筛选' });
+    chooseOption(within(filterDialog).getByLabelText('启停状态'), 'disabled');
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get('enabled')).toBe('disabled');
+    });
+
+    // Simulate hard refresh by remounting with the same URL.
+    const href = `${window.location.pathname}${window.location.search}`;
+    renderAlertsPage(<AlertsPage />, href);
+
+    await waitFor(() => expect(listRules).toHaveBeenLastCalledWith(expect.objectContaining({
+      enabled: false,
+      page: 1,
+      pageSize: 20,
+    })));
+    expect(new URLSearchParams(window.location.search).get('enabled')).toBe('disabled');
+  });
+
+  it('opens a deep-linked alert rule edit modal by id', async () => {
+    renderAlertsPage(<AlertsPage />, '/alerts?alert=1');
+
+    await waitFor(() => expect(getRule).toHaveBeenCalledWith(1));
+    expect(await screen.findByRole('dialog', { name: '编辑告警规则' })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('1800')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('alert')).toBe('1');
+  });
+
+  it('clears a 404 deep-link alert param without blanking the page', async () => {
+    getRule.mockRejectedValueOnce(
+      createApiError(
+        createParsedApiError({
+          title: '未找到请求的内容',
+          message: '该内容可能已删除、过期或尚未生成。',
+          status: 404,
+          category: 'http_error',
+          code: 'not_found',
+        }),
+      ),
+    );
+
+    renderAlertsPage(<AlertsPage />, '/alerts?alert=40404');
+
+    await waitFor(() => expect(getRule).toHaveBeenCalledWith(40404));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('alert')).toBeNull());
+    expect(screen.queryByRole('dialog', { name: '编辑告警规则' })).not.toBeInTheDocument();
+    expect(await screen.findByText('未找到请求的内容')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '告警中心' })).toBeInTheDocument();
   });
 });

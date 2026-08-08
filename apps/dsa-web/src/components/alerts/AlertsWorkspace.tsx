@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BellRing, RefreshCw } from 'lucide-react';
 import { alertsApi } from '../../api/alerts';
 import type { ParsedApiError } from '../../api/error';
-import { getParsedApiError } from '../../api/error';
+import { createParsedApiError, getParsedApiError } from '../../api/error';
 import { AlertRuleForm } from './AlertRuleForm';
 import {
   AlertRuleList,
@@ -13,6 +13,7 @@ import {
   type AlertTypeFilter,
 } from './AlertRuleList';
 import { AlertTriggerHistory } from './AlertTriggerHistory';
+import { useAlertsWorkspaceUrlState } from './useAlertsWorkspaceUrlState';
 import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination, Select, TabPanel, Tabs, Toolbar } from '../common';
 import type {
   AlertNotificationItem,
@@ -134,45 +135,60 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   createRuleRequested = false,
   onCreateRuleRequestHandled,
   ruleStock,
-  selectedTriggerId = null,
+  selectedTriggerId: selectedTriggerIdProp = null,
 }) => {
   const { language, t } = useUiLanguage();
   const text = ALERT_PAGE_TEXT[language];
   const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
+  const {
+    urlOwned,
+    patchUrl,
+    activeView,
+    setActiveView,
+    enabledFilter,
+    setEnabledFilter,
+    alertTypeFilter,
+    setAlertTypeFilter,
+    rulesPage,
+    setRulesPage,
+    triggersPage,
+    setTriggersPage,
+    notificationsPage,
+    setNotificationsPage,
+    notificationChannelFilter,
+    setNotificationChannelFilter,
+    notificationSuccessFilter,
+    setNotificationSuccessFilter,
+    selectedAlertId,
+    setSelectedAlertId,
+    selectedTriggerId,
+  } = useAlertsWorkspaceUrlState({
+    embedded,
+    controlledActiveView,
+    onActiveViewChange,
+    selectedTriggerIdProp,
+  });
   useEffect(() => {
     if (!embedded) document.title = text.documentTitle;
   }, [embedded, text.documentTitle]);
 
   const [createRuleModalOpen, setCreateRuleModalOpen] = useState(false);
-  const [uncontrolledActiveView, setUncontrolledActiveView] = useState<AlertsView>('rules');
-  const activeView = controlledActiveView ?? uncontrolledActiveView;
-  const setActiveView = useCallback((view: AlertsView) => {
-    if (controlledActiveView === undefined) setUncontrolledActiveView(view);
-    onActiveViewChange?.(view);
-  }, [controlledActiveView, onActiveViewChange]);
   const [rules, setRules] = useState<AlertRuleItem[]>([]);
   const [rulesTotal, setRulesTotal] = useState(0);
-  const [rulesPage, setRulesPage] = useState(1);
-  const [enabledFilter, setEnabledFilter] = useState<AlertRuleEnabledFilter>('all');
-  const [alertTypeFilter, setAlertTypeFilter] = useState<AlertTypeFilter>('all');
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState<ParsedApiError | null>(null);
 
   const [triggers, setTriggers] = useState<AlertTriggerItem[]>([]);
-  const [triggersPage, setTriggersPage] = useState(1);
   const [triggersTotal, setTriggersTotal] = useState(0);
   const [triggersLastUpdated, setTriggersLastUpdated] = useState<string | null>(null);
   const [triggersLoading, setTriggersLoading] = useState(false);
   const [triggersError, setTriggersError] = useState<ParsedApiError | null>(null);
 
   const [notifications, setNotifications] = useState<AlertNotificationItem[]>([]);
-  const [notificationsPage, setNotificationsPage] = useState(1);
   const [notificationsTotal, setNotificationsTotal] = useState(0);
   const [notificationsLastUpdated, setNotificationsLastUpdated] = useState<string | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<ParsedApiError | null>(null);
-  const [notificationChannelFilter, setNotificationChannelFilter] = useState('all');
-  const [notificationSuccessFilter, setNotificationSuccessFilter] = useState<'all' | 'success' | 'failure'>('all');
 
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
@@ -194,6 +210,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   const previousSelectedTriggerIdRef = useRef<number | null>(null);
   const notificationsRequestIdRef = useRef(0);
   const editRequestIdRef = useRef(0);
+  const deepLinkAlertIdRef = useRef<number | null>(null);
   const busyRulesRef = useRef<Map<number, AlertRuleBusyAction>>(new Map());
   const mountedRef = useRef(true);
 
@@ -387,7 +404,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     }
   };
 
-  const handleEditOpen = async (rule: AlertRuleItem) => {
+  const loadEditRuleById = useCallback(async (ruleId: number) => {
     const requestId = editRequestIdRef.current + 1;
     editRequestIdRef.current = requestId;
     setEditError(null);
@@ -397,18 +414,103 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     try {
       // Load the current server state so the edit starts from the latest
       // values rather than a possibly stale list row (concurrent-change guard).
-      const fresh = await alertsApi.getRule(rule.id);
+      const fresh = await alertsApi.getRule(ruleId);
       // Latest-request-wins: opening edit on B after A must not let A's slower
       // response seed the form with the wrong rule.
       if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
       setEditRule(fresh);
+      deepLinkAlertIdRef.current = ruleId;
     } catch (error) {
       if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
-      setEditError(getParsedApiError(error));
+      const parsed = getParsedApiError(error);
+      setEditError(parsed);
+      // Deep-link 404/forbidden: clear the param so refresh/share does not loop.
+      if (
+        urlOwned
+        && (parsed.status === 404 || parsed.status === 403 || parsed.code === 'not_found' || parsed.code === 'forbidden')
+      ) {
+        deepLinkAlertIdRef.current = null;
+        setEditModalOpen(false);
+        setEditRule(null);
+        setRulesError(parsed);
+        setSelectedAlertId(null);
+      }
     } finally {
       if (mountedRef.current && editRequestIdRef.current === requestId) setEditOpening(false);
     }
+  }, [setSelectedAlertId, urlOwned]);
+
+  const handleEditOpen = async (rule: AlertRuleItem) => {
+    if (urlOwned) {
+      // Selection uses push history so Back closes the edit modal.
+      setSelectedAlertId(rule.id);
+      return;
+    }
+    await loadEditRuleById(rule.id);
   };
+
+  const handleEditClose = useCallback(() => {
+    if (editLoading) return;
+    if (urlOwned) {
+      setSelectedAlertId(null);
+      return;
+    }
+    setEditModalOpen(false);
+    setEditRule(null);
+    setEditError(null);
+  }, [editLoading, setSelectedAlertId, urlOwned]);
+
+  // Restore / deep-link the edit modal from `?alert=<id>`.
+  useEffect(() => {
+    if (!urlOwned) return;
+    if (selectedAlertId === null) {
+      if (deepLinkAlertIdRef.current !== null || editModalOpen) {
+        deepLinkAlertIdRef.current = null;
+        if (!editLoading) {
+          setEditModalOpen(false);
+          setEditRule(null);
+          setEditError(null);
+        }
+      }
+      return;
+    }
+    if (deepLinkAlertIdRef.current === selectedAlertId && (editModalOpen || editOpening)) {
+      return;
+    }
+    void loadEditRuleById(selectedAlertId);
+  }, [editLoading, editModalOpen, editOpening, loadEditRuleById, selectedAlertId, urlOwned]);
+
+  // Trigger deep links only highlight rows already on the loaded page.
+  // There is no get-trigger-by-id API; missing ids clear the param with a visible error.
+  useEffect(() => {
+    if (!urlOwned || selectedTriggerId === null || selectedTriggerIdProp !== null) return;
+    if (triggersLoading) return;
+    if (activeView !== 'history') {
+      patchUrl({ view: 'history' });
+      return;
+    }
+    const found = triggers.some((item) => item.id === selectedTriggerId);
+    if (found) return;
+    setTriggersError(createParsedApiError({
+      title: language === 'en' ? 'Requested content not found' : '未找到请求的内容',
+      message: language === 'en'
+        ? 'It may have been removed, expired, or not generated yet.'
+        : '该内容可能已删除、过期或尚未生成。',
+      status: 404,
+      category: 'http_error',
+      code: 'not_found',
+    }));
+    patchUrl({ trigger: null });
+  }, [
+    activeView,
+    language,
+    patchUrl,
+    selectedTriggerId,
+    selectedTriggerIdProp,
+    triggers,
+    triggersLoading,
+    urlOwned,
+  ]);
 
   const handleUpdateRule = async (payload: AlertRuleCreateRequest) => {
     if (!editRule) return false;
@@ -605,13 +707,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
 
       <Modal
         isOpen={editModalOpen}
-        onClose={() => {
-          if (!editLoading) {
-            setEditModalOpen(false);
-            setEditRule(null);
-            setEditError(null);
-          }
-        }}
+        onClose={handleEditClose}
         title={text.editRule}
       >
         {editError ? <ApiErrorAlert error={editError} onDismiss={() => setEditError(null)} className="mb-4" /> : null}
@@ -625,8 +721,12 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             onSubmit={async (payload) => {
               const ok = await handleUpdateRule(payload);
               if (ok) {
-                setEditModalOpen(false);
-                setEditRule(null);
+                if (urlOwned) {
+                  setSelectedAlertId(null);
+                } else {
+                  setEditModalOpen(false);
+                  setEditRule(null);
+                }
               }
               return ok;
             }}
@@ -674,11 +774,11 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             alertTypeFilter={alertTypeFilter}
             onEnabledFilterChange={(value) => {
               setEnabledFilter(value);
-              setRulesPage(1);
+              if (!urlOwned) setRulesPage(1);
             }}
             onAlertTypeFilterChange={(value) => {
               setAlertTypeFilter(value);
-              setRulesPage(1);
+              if (!urlOwned) setRulesPage(1);
             }}
             onPageChange={setRulesPage}
             onToggleEnabled={(rule) => void handleToggleEnabled(rule)}
@@ -744,7 +844,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
                     value={notificationChannelFilter}
                     onChange={(value) => {
                       setNotificationChannelFilter(value);
-                      setNotificationsPage(1);
+                      if (!urlOwned) setNotificationsPage(1);
                     }}
                     options={[
                       { value: 'all', label: t('usage.period.all') },
@@ -777,7 +877,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
                     value={notificationSuccessFilter}
                     onChange={(value) => {
                       setNotificationSuccessFilter(value as 'all' | 'success' | 'failure');
-                      setNotificationsPage(1);
+                      if (!urlOwned) setNotificationsPage(1);
                     }}
                     options={[
                       { value: 'all', label: t('usage.period.all') },
