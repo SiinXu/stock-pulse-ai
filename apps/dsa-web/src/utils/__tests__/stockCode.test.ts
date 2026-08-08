@@ -95,6 +95,8 @@ describe('normalizeStockCode', () => {
   it('compares stock-code variants with both sides normalized', () => {
     expect(areStockCodesEquivalent('00700', 'HK00700')).toBe(true);
     expect(areStockCodesEquivalent('01810', '1810.HK')).toBe(true);
+    expect(areStockCodesEquivalent('0941', 'HK00941')).toBe(true);
+    expect(areStockCodesEquivalent('0001', 'HK00001')).toBe(true);
     expect(areStockCodesEquivalent('aapl', 'AAPL')).toBe(true);
     expect(areStockCodesEquivalent('7203.t', '7203.T')).toBe(true);
     expect(areStockCodesEquivalent('005930.ks', '005930.KS')).toBe(true);

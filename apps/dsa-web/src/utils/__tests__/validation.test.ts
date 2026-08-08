@@ -30,7 +30,10 @@ describe('stock code validation', () => {
 
   test('bare 4-digit 7203 is a valid HK code, not a JP suffix code', () => {
     expect(looksLikeStockCode('7203')).toBe(true);
-    expect(validateStockCode('7203').valid).toBe(true);
+    expect(validateStockCode('7203')).toEqual({
+      valid: true,
+      normalized: 'HK07203',
+    });
   });
 
   test.each([
