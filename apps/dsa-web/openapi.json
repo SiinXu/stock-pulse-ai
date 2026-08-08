@@ -14011,6 +14011,390 @@
         "title": "PortfolioFxRefreshResponse",
         "type": "object"
       },
+      "PortfolioHealthBand": {
+        "properties": {
+          "max_exclusive": {
+            "title": "Max Exclusive",
+            "type": "number"
+          },
+          "min_inclusive": {
+            "title": "Min Inclusive",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "min_inclusive",
+          "max_exclusive"
+        ],
+        "title": "PortfolioHealthBand",
+        "type": "object"
+      },
+      "PortfolioHealthDataQuality": {
+        "properties": {
+          "fx_stale": {
+            "default": false,
+            "title": "Fx Stale",
+            "type": "boolean"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "missing_price_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Price Symbols",
+            "type": "array"
+          },
+          "partial_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Partial Reasons",
+            "type": "array"
+          },
+          "risk_metrics_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Metrics Status"
+          },
+          "snapshot_data_quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Data Quality"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHealthDataQuality",
+        "type": "object"
+      },
+      "PortfolioHealthInputs": {
+        "properties": {
+          "cash_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Pct"
+          },
+          "diversification_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "total_cash": {
+            "default": 0.0,
+            "title": "Total Cash",
+            "type": "number"
+          },
+          "total_equity": {
+            "default": 0.0,
+            "title": "Total Equity",
+            "type": "number"
+          },
+          "total_market_value": {
+            "default": 0.0,
+            "title": "Total Market Value",
+            "type": "number"
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Pct"
+          }
+        },
+        "title": "PortfolioHealthInputs",
+        "type": "object"
+      },
+      "PortfolioHealthInsight": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "severity": {
+            "description": "'info' or 'warning'",
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "default": "rule",
+            "description": "'rule' or 'rule+llm_polish' — LLM never changes score fields",
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "PortfolioHealthInsight",
+        "type": "object"
+      },
+      "PortfolioHealthResponse": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "'healthy' | 'fair' | 'caution' | 'poor'",
+            "title": "Band"
+          },
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHealthBand"
+            },
+            "title": "Bands",
+            "type": "array"
+          },
+          "cost_method": {
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "data_quality": {
+            "$ref": "#/components/schemas/PortfolioHealthDataQuality"
+          },
+          "dimensions": {
+            "additionalProperties": true,
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "effective_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Effective Weights",
+            "type": "object"
+          },
+          "formula_version": {
+            "default": "portfolio_health_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/PortfolioHealthInputs"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHealthInsight"
+            },
+            "title": "Insights",
+            "type": "array"
+          },
+          "llm_can_modify_score": {
+            "default": false,
+            "description": "Hard contract flag; always false",
+            "title": "Llm Can Modify Score",
+            "type": "boolean"
+          },
+          "persisted": {
+            "default": false,
+            "title": "Persisted",
+            "type": "boolean"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deterministic 0-100 health score; null when unscorable",
+            "title": "Score"
+          },
+          "score_source": {
+            "default": "rules",
+            "description": "Always 'rules' — LLM cannot modify the score",
+            "title": "Score Source",
+            "type": "string"
+          },
+          "status": {
+            "description": "'ok', 'partial', 'empty_portfolio', or 'unavailable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unavailable_dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unavailable Dimensions",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "disclaimer",
+          "data_quality",
+          "inputs"
+        ],
+        "title": "PortfolioHealthResponse",
+        "type": "object"
+      },
       "PortfolioHistoricalVaRBlock": {
         "properties": {
           "confidence": {
@@ -30207,6 +30591,121 @@
           }
         },
         "summary": "Refresh FX cache online with stale fallback",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/health": {
+      "get": {
+        "description": "Deterministic 0-100 portfolio health score with dimension breakdown and actionable insights. Aggregates existing snapshot and risk-metrics inputs; never calls market data providers on the hot path. Scores are rule-based (LLM cannot modify them). Partial data quality is reported explicitly. This is a structural metric, not investment advice.",
+        "operationId": "getPortfolioHealth",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "description": "Cost method: fifo or avg",
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "description": "Cost method: fifo or avg",
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Upsert the daily snapshot (overwrite same day); set false for dry compute",
+            "in": "query",
+            "name": "persist",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Upsert the daily snapshot (overwrite same day); set false for dry compute",
+              "title": "Persist",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health score computation failed"
+          }
+        },
+        "summary": "Get daily portfolio health score",
         "tags": [
           "Portfolio"
         ]

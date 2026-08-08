@@ -2063,6 +2063,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get daily portfolio health score
+         * @description Deterministic 0-100 portfolio health score with dimension breakdown and actionable insights. Aggregates existing snapshot and risk-metrics inputs; never calls market data providers on the hot path. Scores are rule-based (LLM cannot modify them). Partial data quality is reported explicitly. This is a structural metric, not investment advice.
+         */
+        get: operations["getPortfolioHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/imports/csv/brokers": {
         parameters: {
             query?: never;
@@ -8604,6 +8624,161 @@ export interface components {
             stale_count: number;
             /** Updated Count */
             updated_count: number;
+        };
+        /** PortfolioHealthBand */
+        PortfolioHealthBand: {
+            /** Max Exclusive */
+            max_exclusive: number;
+            /** Min Inclusive */
+            min_inclusive: number;
+            /** Name */
+            name: string;
+        };
+        /** PortfolioHealthDataQuality */
+        PortfolioHealthDataQuality: {
+            /**
+             * Fx Stale
+             * @default false
+             */
+            fx_stale: boolean;
+            /** Limitations */
+            limitations?: string[];
+            /** Missing Price Symbols */
+            missing_price_symbols?: string[];
+            /** Partial Reasons */
+            partial_reasons?: string[];
+            /** Risk Metrics Status */
+            risk_metrics_status?: string | null;
+            /** Snapshot Data Quality */
+            snapshot_data_quality?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** PortfolioHealthInputs */
+        PortfolioHealthInputs: {
+            /** Cash Pct */
+            cash_pct?: number | null;
+            /** Diversification Score */
+            diversification_score?: number | null;
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+            /**
+             * Total Cash
+             * @default 0
+             */
+            total_cash: number;
+            /**
+             * Total Equity
+             * @default 0
+             */
+            total_equity: number;
+            /**
+             * Total Market Value
+             * @default 0
+             */
+            total_market_value: number;
+            /** Unrealized Pnl Pct */
+            unrealized_pnl_pct?: number | null;
+            /** Var Pct */
+            var_pct?: number | null;
+        };
+        /** PortfolioHealthInsight */
+        PortfolioHealthInsight: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Metric */
+            metric?: string | null;
+            /**
+             * Severity
+             * @description 'info' or 'warning'
+             */
+            severity: string;
+            /**
+             * Source
+             * @description 'rule' or 'rule+llm_polish' — LLM never changes score fields
+             * @default rule
+             */
+            source: string;
+            /** Symbol */
+            symbol?: string | null;
+            /** Threshold */
+            threshold?: number | null;
+            /** Value */
+            value?: number | null;
+        };
+        /** PortfolioHealthResponse */
+        PortfolioHealthResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /** As Of */
+            as_of: string;
+            /**
+             * Band
+             * @description 'healthy' | 'fair' | 'caution' | 'poor'
+             */
+            band?: string | null;
+            /** Bands */
+            bands?: components["schemas"]["PortfolioHealthBand"][];
+            /** Cost Method */
+            cost_method: string;
+            /** Currency */
+            currency: string;
+            data_quality: components["schemas"]["PortfolioHealthDataQuality"];
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: unknown;
+            };
+            /** Disclaimer */
+            disclaimer: string;
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: number;
+            };
+            /**
+             * Formula Version
+             * @default portfolio_health_v1
+             */
+            formula_version: string;
+            inputs: components["schemas"]["PortfolioHealthInputs"];
+            /** Insights */
+            insights?: components["schemas"]["PortfolioHealthInsight"][];
+            /**
+             * Llm Can Modify Score
+             * @description Hard contract flag; always false
+             * @default false
+             */
+            llm_can_modify_score: boolean;
+            /**
+             * Persisted
+             * @default false
+             */
+            persisted: boolean;
+            /**
+             * Score
+             * @description Deterministic 0-100 health score; null when unscorable
+             */
+            score?: number | null;
+            /**
+             * Score Source
+             * @description Always 'rules' — LLM cannot modify the score
+             * @default rules
+             */
+            score_source: string;
+            /**
+             * Status
+             * @description 'ok', 'partial', 'empty_portfolio', or 'unavailable'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /** Unavailable Dimensions */
+            unavailable_dimensions?: string[];
+            /** Weights */
+            weights?: {
+                [key: string]: number;
+            };
         };
         /** PortfolioHistoricalVaRBlock */
         PortfolioHistoricalVaRBlock: {
@@ -17737,6 +17912,62 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioHealth: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                /** @description Cost method: fifo or avg */
+                cost_method?: string;
+                /** @description Upsert the daily snapshot (overwrite same day); set false for dry compute */
+                persist?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioHealthResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Health score computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
