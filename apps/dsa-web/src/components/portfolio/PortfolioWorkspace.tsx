@@ -5,20 +5,20 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
-import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
+import { BriefcaseBusiness, Inbox } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { readParams, writeParams } from '../../utils/urlState';
 import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, SegmentedControl, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
 import {
-  formatBrokerLabel,
   formatCashDirectionLabel,
   formatCorporateActionLabel,
   formatMoney,
@@ -27,8 +27,6 @@ import {
   formatPositionPrice,
   formatSideLabel,
   formatSignedPct,
-  getCsvCommitVariant,
-  getCsvParseVariant,
   getFxRefreshFeedbackVariant,
   getPositionPriceLabel,
   hasPositionPrice,
@@ -63,6 +61,12 @@ import { usePortfolioLedgerMutationWorkflow } from '../../hooks/portfolio/usePor
 import { usePortfolioHoldingSignals } from '../../hooks/portfolio/usePortfolioHoldingSignals';
 import { usePortfolioLedgerEntryForms } from '../../hooks/portfolio/usePortfolioLedgerEntryForms';
 import { usePortfolioCsvImportSession } from '../../hooks/portfolio/usePortfolioCsvImportSession';
+import PortfolioImportWizard from './PortfolioImportWizard';
+import {
+  buildPositionRowKey,
+  portfolioUrlSchema,
+  type PortfolioTab,
+} from './portfolioUrlState';
 import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
 import { PIE_COLORS, PORTFOLIO_DATE_TRIGGER_CLASS } from '../../hooks/portfolio/constants';
 import type {
@@ -89,9 +93,13 @@ const PortfolioWorkspace: React.FC = () => {
     () => parseDeepLink(`/portfolio${searchParams.size ? `?${searchParams.toString()}` : ''}`),
     [searchParams],
   );
+  const urlState = useMemo(
+    () => readParams(portfolioUrlSchema, searchParams),
+    [searchParams],
+  );
   const requestedAccountId = parsedPortfolioLink.target?.page === 'portfolio'
     ? parsedPortfolioLink.target.accountId
-    : undefined;
+    : (urlState.account ?? undefined);
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [selectedAccount, setSelectedAccountState] = useState<AccountOption>(requestedAccountId ?? 'all');
@@ -101,6 +109,9 @@ const PortfolioWorkspace: React.FC = () => {
   const setSearchParamsRef = useRef(setSearchParams);
   searchParamsRef.current = searchParams;
   setSearchParamsRef.current = setSearchParams;
+  const activeTab = urlState.tab as PortfolioTab;
+  const selectedPositionKey = urlState.selected;
+  const ledgerPageFromUrl = urlState.page ?? 1;
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [accountCreating, setAccountCreating] = useState(false);
@@ -138,6 +149,17 @@ const PortfolioWorkspace: React.FC = () => {
   const isPaperAccountSelected = Boolean(writableAccount) && writableAccountType === 'paper';
   const writeBlocked = !writableAccountId;
 
+  const patchPortfolioUrl = useCallback((
+    patch: Parameters<typeof writeParams<typeof portfolioUrlSchema>>[1],
+    history?: 'replace' | 'push',
+  ) => {
+    const result = writeParams(portfolioUrlSchema, patch, {
+      search: searchParamsRef.current,
+      ...(history ? { history } : {}),
+    });
+    setSearchParamsRef.current(result.params, { replace: result.history === 'replace' });
+  }, []);
+
   const setSelectedAccount = useCallback((
     account: AccountOption,
     replace = false,
@@ -146,11 +168,25 @@ const PortfolioWorkspace: React.FC = () => {
     selectedAccountRef.current = account;
     setSelectedAccountState(account);
     setUnavailableAccountId(unavailableId);
+    // Preserve existing query key order (unknown keys + account) so shareable
+    // deep links and Back navigation stay byte-stable with prior contracts.
     const next = new URLSearchParams(searchParamsRef.current);
     if (account === 'all') next.delete('account');
     else next.set('account', String(account));
     setSearchParamsRef.current(next, { replace });
   }, []);
+
+  const setActiveTab = useCallback((tab: PortfolioTab) => {
+    patchPortfolioUrl({ tab }, 'replace');
+  }, [patchPortfolioUrl]);
+
+  const setSelectedPositionKey = useCallback((key: string | null) => {
+    patchPortfolioUrl({ selected: key }, 'push');
+  }, [patchPortfolioUrl]);
+
+  const setLedgerPageInUrl = useCallback((page: number) => {
+    patchPortfolioUrl({ page }, 'replace');
+  }, [patchPortfolioUrl]);
 
   useEffect(() => {
     const nextAccount = requestedAccountId ?? 'all';
@@ -247,6 +283,16 @@ const PortfolioWorkspace: React.FC = () => {
     loadAccounts,
     setError,
   });
+
+  // Keep ledger pagination durable in the URL (replace history).
+  useEffect(() => {
+    setEventPage((current) => (current === ledgerPageFromUrl ? current : ledgerPageFromUrl));
+  }, [ledgerPageFromUrl, setEventPage]);
+
+  const handleLedgerPageChange = useCallback((nextPage: number) => {
+    setEventPage(nextPage);
+    setLedgerPageInUrl(nextPage);
+  }, [setEventPage, setLedgerPageInUrl]);
 
   const mutation = usePortfolioLedgerMutationWorkflow({
     refreshPortfolioData,
@@ -733,6 +779,40 @@ const PortfolioWorkspace: React.FC = () => {
 
   return (
     <AppPage className="portfolio-page space-y-4">
+      {csvModalOpen ? (
+        <PortfolioImportWizard
+          text={text}
+          fileText={fileText}
+          language={language}
+          writableAccountId={writableAccountId}
+          brokers={brokers}
+          selectedBroker={selectedBroker}
+          setSelectedBroker={setSelectedBroker}
+          brokerLoadWarning={brokerLoadWarning}
+          csvFile={csvFile}
+          setCsvFile={setCsvFile}
+          csvInputRef={csvInputRef}
+          csvDryRun={csvDryRun}
+          setCsvDryRun={setCsvDryRun}
+          csvParsing={csvParsing}
+          csvCommitting={csvCommitting}
+          csvError={csvError}
+          setCsvError={setCsvError}
+          csvParseResult={csvParseResult}
+          setCsvParseResult={setCsvParseResult}
+          csvCommitResult={csvCommitResult}
+          setCsvCommitResult={setCsvCommitResult}
+          onParse={handleParseCsv}
+          onCommit={handleCommitCsv}
+          onClose={() => {
+            setCsvError(null);
+            setCsvModalOpen(false);
+          }}
+          commonCancelLabel={t('common.cancel')}
+          commonCloseLabel={t('common.close')}
+        />
+      ) : (
+      <>
       <section className="space-y-3">
         <PageHeader
           title={text.title}
@@ -1118,6 +1198,20 @@ const PortfolioWorkspace: React.FC = () => {
         </Card>
       </section>
 
+
+      <SegmentedControl
+        id="portfolio-workspace-tabs"
+        ariaLabel={text.workspaceTabsLabel}
+        value={activeTab}
+        onChange={(value) => setActiveTab(value)}
+        options={[
+          { value: 'positions', label: text.positionsTitle },
+          { value: 'ledger', label: text.eventLog },
+          { value: 'risk', label: text.tabRisk },
+        ]}
+      />
+
+      {activeTab === 'positions' ? (
       <section className="grid grid-cols-1 gap-3">
         <Card padding="md">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1150,7 +1244,15 @@ const PortfolioWorkspace: React.FC = () => {
             caption={text.positionsTitle}
             columns={positionColumns}
             rows={positionRows}
-            getRowKey={(row) => `${row.accountId}-${row.symbol}-${row.market}`}
+            getRowKey={(row) => buildPositionRowKey(row.accountId, row.symbol, row.market)}
+            isRowSelected={(row) => (
+              selectedPositionKey === buildPositionRowKey(row.accountId, row.symbol, row.market)
+            )}
+            onRowActivate={(row) => {
+              const key = buildPositionRowKey(row.accountId, row.symbol, row.market);
+              setSelectedPositionKey(selectedPositionKey === key ? null : key);
+            }}
+            getRowAriaLabel={(row) => `${row.symbol} ${row.accountName}`}
             emptyState={{
               title: text.noPositionsTitle,
               description: text.noPositionsDescription,
@@ -1160,6 +1262,7 @@ const PortfolioWorkspace: React.FC = () => {
           />
         </Card>
       </section>
+      ) : null}
 
       {writeBlocked && hasAccounts ? (
         <InlineAlert
@@ -1169,7 +1272,8 @@ const PortfolioWorkspace: React.FC = () => {
         />
       ) : null}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      {activeTab !== 'ledger' ? (
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" data-testid="portfolio-tab-risk">
         <Card padding="md">
           <h3 className="text-sm font-semibold text-foreground mb-2">{text.drawdownMonitor}</h3>
           <div className="text-xs text-secondary space-y-1">
@@ -1228,6 +1332,63 @@ const PortfolioWorkspace: React.FC = () => {
           </div>
         </Card>
       </section>
+      ) : null}
+
+      {activeTab === 'ledger' ? (
+        <Card padding="md" data-testid="portfolio-tab-ledger" className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">{text.eventLog}</h2>
+            <Button
+              type="button"
+              variant="secondary"
+              size="comfortable"
+              onClick={() => {
+                setEventError(null);
+                setEventModalOpen(true);
+              }}
+            >
+              {text.refreshLedger}
+            </Button>
+          </div>
+          <p className="text-xs text-secondary-text">{text.deleteHint}</p>
+          <div className="max-h-96 overflow-auto rounded-lg border border-subtle p-2">
+            {eventType === 'trade' && tradeEvents.map((item) => (
+              <div key={`tab-t-${item.id}`} className="border-b border-subtle py-2 text-xs text-secondary">
+                {formatUiText(text.tradeRow, { date: item.tradeDate, side: formatSideLabel(item.side, language), symbol: item.symbol, quantity: item.quantity, price: item.price })}
+              </div>
+            ))}
+            {eventType === 'cash' && cashEvents.map((item) => (
+              <div key={`tab-c-${item.id}`} className="border-b border-subtle py-2 text-xs text-secondary">
+                {item.eventDate} {formatCashDirectionLabel(item.direction, language)} {item.amount} {item.currency}
+              </div>
+            ))}
+            {eventType === 'corporate' && corporateEvents.map((item) => (
+              <div key={`tab-ca-${item.id}`} className="border-b border-subtle py-2 text-xs text-secondary">
+                {item.effectiveDate} {formatCorporateActionLabel(item.actionType, language)} {item.symbol}
+              </div>
+            ))}
+            {!eventLoading
+              && ((eventType === 'trade' && tradeEvents.length === 0)
+                || (eventType === 'cash' && cashEvents.length === 0)
+                || (eventType === 'corporate' && corporateEvents.length === 0)) ? (
+                  <EmptyState title={text.noLedger} description={text.noLedgerDescription} compact />
+                ) : null}
+          </div>
+          <div className="flex items-center justify-between text-xs text-secondary">
+            <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage <= 1}
+                onClick={() => handleLedgerPageChange(Math.max(1, eventPage - 1))}>
+                {text.prevPage}
+              </Button>
+              <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage >= totalEventPages}
+                onClick={() => handleLedgerPageChange(Math.min(totalEventPages, eventPage + 1))}>
+                {text.nextPage}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {isPaperAccountSelected ? (
@@ -1507,124 +1668,6 @@ const PortfolioWorkspace: React.FC = () => {
           </form>
       </Modal>
 
-      <Modal
-        isOpen={csvModalOpen}
-        closeDisabled={csvParsing || csvCommitting}
-        onClose={() => {
-          setCsvError(null);
-          setCsvModalOpen(false);
-        }}
-        title={text.csvImport}
-      >
-          <fieldset
-            disabled={csvParsing || csvCommitting}
-            aria-busy={csvParsing || csvCommitting}
-            className="m-0 min-w-0 space-y-2 border-0 p-0"
-          >
-            {brokerLoadWarning ? (
-              <InlineAlert
-                variant="warning"
-                size="compact"
-                message={brokerLoadWarning}
-              />
-            ) : null}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Select
-                label={text.broker}
-                value={selectedBroker}
-                onChange={(value) => {
-                  setSelectedBroker(value);
-                  setCsvCommitResult(null);
-                }}
-                disabled={csvParsing || csvCommitting || brokers.length === 0}
-                options={brokers.map((item) => ({ value: item.broker, label: formatBrokerLabel(item.broker, item.displayName, language) }))}
-              />
-              <div className="grid gap-1">
-                <span className="block text-xs text-muted-text">{text.csvFile}</span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="primary"
-                  disabled={csvParsing || csvCommitting || brokers.length === 0}
-                  onClick={() => csvInputRef.current?.click()}
-                >
-                  {text.chooseCsv}
-                </Button>
-                <FileInput
-                  ref={csvInputRef}
-                  accept=".csv"
-                  aria-label={text.chooseCsv}
-                  disabled={csvParsing || csvCommitting || brokers.length === 0}
-                  onChange={(e) => {
-                    setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
-                    setCsvParseResult(null);
-                    setCsvCommitResult(null);
-                  }}
-                />
-                {csvFile ? (
-                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-subtle-soft px-2 py-1.5">
-                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">{csvFile.name}</span>
-                    <span className="shrink-0 text-xs text-muted-text">
-                      {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
-                    </span>
-                    <IconButton
-                      type="button"
-                      variant="ghost"
-                      size="default"
-                      aria-label={fileText.clear}
-                      onClick={() => {
-                        setCsvFile(null);
-                        if (csvInputRef.current) csvInputRef.current.value = '';
-                        setCsvParseResult(null);
-                        setCsvCommitResult(null);
-                      }}
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </IconButton>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <Checkbox
-              id="csv-dry-run"
-              checked={csvDryRun}
-              onChange={(event) => {
-                setCsvDryRun(event.target.checked);
-              }}
-              containerClassName="min-h-11 text-xs text-secondary"
-              label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <Button type="button" variant="secondary" size="comfortable" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
-                {text.parseFile}
-              </Button>
-              <Button type="button" variant="secondary" size="comfortable"
-                disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
-                {text.commitImport}
-              </Button>
-            </div>
-            {csvError ? (
-              <ApiErrorAlert error={csvError} onDismiss={() => setCsvError(null)} />
-            ) : null}
-            {csvParseResult ? (
-              <InlineAlert
-                variant={getCsvParseVariant(csvParseResult)}
-                size="compact"
-                title={text.csvParseResult}
-                message={formatUiText(text.csvParseSummary, { valid: csvParseResult.recordCount, skipped: csvParseResult.skippedCount, errors: csvParseResult.errorCount })}
-              />
-            ) : null}
-            {csvCommitResult ? (
-              <InlineAlert
-                variant={getCsvCommitVariant(csvCommitResult, csvCommitResult.dryRun)}
-                size="compact"
-                title={csvCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult}
-                message={formatUiText(text.csvCommitSummary, { mode: csvCommitResult.dryRun ? text.dryCheck : text.actualWrite, inserted: csvCommitResult.insertedCount, duplicates: csvCommitResult.duplicateCount, failed: csvCommitResult.failedCount })}
-              />
-            ) : null}
-          </fieldset>
-      </Modal>
-
       <Modal isOpen={eventModalOpen} onClose={() => { setEventError(null); setEventModalOpen(false); }} title={text.eventLog}>
           <div className="space-y-2">
             <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
@@ -1791,11 +1834,11 @@ const PortfolioWorkspace: React.FC = () => {
               <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
               <div className="flex gap-2">
                 <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage <= 1}
-                  onClick={() => setEventPage((prev) => Math.max(1, prev - 1))}>
+                  onClick={() => handleLedgerPageChange(Math.max(1, eventPage - 1))}>
                   {text.prevPage}
                 </Button>
                 <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage >= totalEventPages}
-                  onClick={() => setEventPage((prev) => Math.min(totalEventPages, prev + 1))}>
+                  onClick={() => handleLedgerPageChange(Math.min(totalEventPages, eventPage + 1))}>
                   {text.nextPage}
                 </Button>
               </div>
@@ -1845,6 +1888,8 @@ const PortfolioWorkspace: React.FC = () => {
         }}
       />
         </>
+      )}
+      </>
       )}
     </AppPage>
   );
