@@ -13,10 +13,17 @@ import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
+import { RunFlowPanel } from '../run-flow';
+import { TaskPanel } from '../tasks';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
+import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  buildAnalysisWorkbenchHref,
+} from '../../routing/routes';
+import { usePortfolioAnalysisTasks } from './usePortfolioAnalysisTasks';
 import {
   formatBrokerLabel,
   formatCashDirectionLabel,
@@ -119,7 +126,18 @@ const PortfolioWorkspace: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [positionAnalysisLoadingKey, setPositionAnalysisLoadingKey] = useState<string | null>(null);
-  const [positionAnalysisMessage, setPositionAnalysisMessage] = useState<string | null>(null);
+  const {
+    tasks: portfolioAnalysisTasks,
+    acceptTask: acceptPortfolioAnalysisTask,
+    attachExistingTask: attachPortfolioAnalysisTask,
+    dismissTask: dismissPortfolioAnalysisTask,
+    openRunFlow: openPortfolioRunFlow,
+    closeRunFlow: closePortfolioRunFlow,
+    runFlowDialog: portfolioRunFlowDialog,
+  } = usePortfolioAnalysisTasks({
+    searchParams,
+    setSearchParams,
+  });
 
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -370,7 +388,6 @@ const PortfolioWorkspace: React.FC = () => {
   const handleAnalyzePosition = async (row: FlatPosition) => {
     const key = `${row.accountId}-${row.symbol}-${row.market}`;
     setPositionAnalysisLoadingKey(key);
-    setPositionAnalysisMessage(null);
     setError(null);
     try {
       const task = await portfolioApi.analyzePosition(row.symbol, {
@@ -378,9 +395,20 @@ const PortfolioWorkspace: React.FC = () => {
         analysisPhase: positionAnalysisPhase,
         force: false,
       });
-      setPositionAnalysisMessage(formatUiText(text.analysisSubmitted, { symbol: row.symbol, taskId: task.taskId }));
+      acceptPortfolioAnalysisTask(task, row.symbol, positionAnalysisPhase);
     } catch (err) {
-      setError(getParsedApiError(err));
+      const parsed = getParsedApiError(err);
+      const existingTaskId = String(
+        parsed.params?.existing_task_id
+          ?? parsed.params?.existingTaskId
+          ?? '',
+      ).trim();
+      // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
+      if (parsed.code === 'duplicate_task' && existingTaskId) {
+        await attachPortfolioAnalysisTask(existingTaskId, row.symbol, positionAnalysisPhase);
+      } else {
+        setError(parsed);
+      }
     } finally {
       setPositionAnalysisLoadingKey(null);
     }
@@ -804,13 +832,55 @@ const PortfolioWorkspace: React.FC = () => {
           message={writeWarning}
         />
       ) : null}
-      {hasAccounts && positionAnalysisMessage ? (
-        <InlineAlert
-          variant="success"
-          title={text.analysisTask}
-          message={positionAnalysisMessage}
-        />
+      {hasAccounts && portfolioAnalysisTasks.length > 0 ? (
+        <div className="space-y-2" data-testid="portfolio-analysis-task-panel">
+          <TaskPanel
+            tasks={portfolioAnalysisTasks}
+            title={text.analysisTask}
+            onOpenRunFlow={openPortfolioRunFlow}
+            onDismiss={dismissPortfolioAnalysisTask}
+          />
+          {portfolioAnalysisTasks.some((task) => task.status === 'completed') ? (
+            <div className="flex flex-wrap gap-2">
+              {portfolioAnalysisTasks
+                .filter((task) => task.status === 'completed')
+                .map((task) => (
+                  <Link
+                    key={`result-${task.taskId}`}
+                    to={buildAnalysisWorkbenchHref({
+                      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+                      stock: task.stockCode,
+                    })}
+                    data-control="navigation-link"
+                    className="control-hit-target inline-flex min-h-9 items-center rounded-md border border-subtle bg-surface px-3 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  >
+                    {t('analysisWorkbench.viewReport')}: {task.stockName || task.stockCode}
+                  </Link>
+                ))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
+
+      <Modal
+        isOpen={portfolioRunFlowDialog.open}
+        onClose={closePortfolioRunFlow}
+        title={portfolioRunFlowDialog.open
+          ? t('runFlow.taskDrawerTitle', { stock: portfolioRunFlowDialog.title })
+          : t('taskPanel.title')}
+        size="fullscreen"
+      >
+        {portfolioRunFlowDialog.open ? (
+          <RunFlowPanel
+            key={`portfolio-run-flow-${portfolioRunFlowDialog.source.type === 'task' ? portfolioRunFlowDialog.source.taskId : 'none'}`}
+            source={portfolioRunFlowDialog.source}
+            title={t('runFlow.taskDrawerTitle', { stock: portfolioRunFlowDialog.title })}
+            onUnavailable={() => {
+              closePortfolioRunFlow();
+            }}
+          />
+        ) : null}
+      </Modal>
 
       <Modal
         isOpen={showCreateAccount}

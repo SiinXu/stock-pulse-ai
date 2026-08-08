@@ -112,6 +112,37 @@ vi.mock('../../api/portfolio', () => ({
   },
 }));
 
+vi.mock('../../api/analysis', () => ({
+  analysisApi: {
+    getStatus: vi.fn(async () => ({
+      taskId: 'task-portfolio-1',
+      status: 'pending',
+      progress: 0,
+    })),
+    getTasks: vi.fn(async () => ({
+      total: 0,
+      pending: 0,
+      processing: 0,
+      tasks: [],
+    })),
+    getTaskStreamUrl: () => '/api/v1/analysis/tasks/stream',
+    getTaskFlow: vi.fn(async () => ({
+      taskId: 'task-portfolio-1',
+      nodes: [],
+      edges: [],
+      events: [],
+    })),
+  },
+}));
+
+vi.mock('../../hooks/useTaskStream', () => ({
+  useTaskStream: () => ({
+    isConnected: false,
+    reconnect: () => undefined,
+    disconnect: () => undefined,
+  }),
+}));
+
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -1253,7 +1284,12 @@ describe('PortfolioPage FX refresh', () => {
         force: false,
       });
     });
-    expect(await screen.findByText('已提交 HK00700 分析任务：task-portfolio-1')).toBeInTheDocument();
+    const taskPanel = await screen.findByTestId('portfolio-analysis-task-panel');
+    expect(taskPanel).toBeInTheDocument();
+    const taskItem = within(taskPanel).getByTestId('task-panel-item');
+    expect(taskItem).toBeInTheDocument();
+    expect(within(taskItem).getAllByText('HK00700').length).toBeGreaterThan(0);
+    expect(screen.queryByText('已提交 HK00700 分析任务：task-portfolio-1')).not.toBeInTheDocument();
   });
 
   it('sends an explicit phase for portfolio-triggered analysis', async () => {
