@@ -1312,6 +1312,28 @@
             ],
             "title": "Name"
           },
+          "news_search_requested": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Search Requested"
+          },
+          "news_search_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "News Search Status"
+          },
           "provider": {
             "title": "Provider",
             "type": "string"
@@ -1713,6 +1735,17 @@
               }
             ],
             "title": "Published At"
+          },
+          "search_result": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Result"
           },
           "source": {
             "anyOf": [
@@ -3567,6 +3600,89 @@
         "title": "AuthSettingsRequest",
         "type": "object"
       },
+      "BacktestAppliedConfig": {
+        "description": "Echo of the effective run configuration used for evaluation honesty.",
+        "properties": {
+          "analysis_date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Analysis date start filter (inclusive)",
+            "title": "Analysis Date From"
+          },
+          "analysis_date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Analysis date end filter (inclusive)",
+            "title": "Analysis Date To"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Normalized stock filter, if any",
+            "title": "Code"
+          },
+          "engine_version": {
+            "description": "Effective backtest engine version label",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "eval_window_days": {
+            "description": "Effective evaluation window in trading days",
+            "title": "Eval Window Days",
+            "type": "integer"
+          },
+          "force": {
+            "default": false,
+            "description": "Whether force re-evaluation was requested",
+            "title": "Force",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum candidate analysis rows processed",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "min_age_days": {
+            "description": "Effective minimum analysis age in calendar days",
+            "title": "Min Age Days",
+            "type": "integer"
+          },
+          "neutral_band_pct": {
+            "description": "Neutral outcome band percentage",
+            "title": "Neutral Band Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "eval_window_days",
+          "min_age_days",
+          "limit",
+          "engine_version",
+          "neutral_band_pct"
+        ],
+        "title": "BacktestAppliedConfig",
+        "type": "object"
+      },
       "BacktestResultItem": {
         "properties": {
           "action": {
@@ -4080,6 +4196,17 @@
       },
       "BacktestRunResponse": {
         "properties": {
+          "applied_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestAppliedConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Echo of the effective run configuration (window, universe limit, engine, dates)"
+          },
           "applied_eval_window_days": {
             "anyOf": [
               {
@@ -4556,6 +4683,460 @@
           "session_id"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "ConfigPresetApplyRequest": {
+        "description": "Apply or preview an official preset against the current config version.",
+        "properties": {
+          "config_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Version",
+            "type": "string"
+          },
+          "reload_now": {
+            "default": true,
+            "title": "Reload Now",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "config_version"
+        ],
+        "title": "ConfigPresetApplyRequest",
+        "type": "object"
+      },
+      "ConfigPresetApplyResponse": {
+        "description": "Result of applying an official preset.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "new_config_version": {
+            "title": "New Config Version",
+            "type": "string"
+          },
+          "preset_id": {
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "updated_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Updated Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "preset_id",
+          "display_name",
+          "applied",
+          "config_version",
+          "new_config_version"
+        ],
+        "title": "ConfigPresetApplyResponse",
+        "type": "object"
+      },
+      "ConfigPresetItem": {
+        "description": "One official recommended configuration preset.",
+        "properties": {
+          "config_values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Config Values",
+            "type": "object"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "meets_requirements": {
+            "default": true,
+            "title": "Meets Requirements",
+            "type": "boolean"
+          },
+          "preference_order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preference Order",
+            "type": "array"
+          },
+          "recommended": {
+            "default": false,
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "requirements": {
+            "additionalProperties": true,
+            "title": "Requirements",
+            "type": "object"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "strategies": {
+            "additionalProperties": true,
+            "title": "Strategies",
+            "type": "object"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "description"
+        ],
+        "title": "ConfigPresetItem",
+        "type": "object"
+      },
+      "ConfigPresetListResponse": {
+        "description": "Official presets with recommendation ranking.",
+        "properties": {
+          "detection": {
+            "$ref": "#/components/schemas/ConfigProfileDetection"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigPresetItem"
+            },
+            "title": "Presets",
+            "type": "array"
+          },
+          "recommended_preset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Preset Id"
+          }
+        },
+        "title": "ConfigPresetListResponse",
+        "type": "object"
+      },
+      "ConfigPresetPreviewResponse": {
+        "description": "Preview of applying an official preset.",
+        "properties": {
+          "change_count": {
+            "default": 0,
+            "title": "Change Count",
+            "type": "integer"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "preset_id": {
+            "title": "Preset Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preset_id",
+          "display_name",
+          "config_version"
+        ],
+        "title": "ConfigPresetPreviewResponse",
+        "type": "object"
+      },
+      "ConfigProfileChange": {
+        "description": "One non-secret configuration key change.",
+        "properties": {
+          "from_value": {
+            "description": "Previous non-secret value",
+            "title": "From Value",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "to": {
+            "description": "Next non-secret value",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "from_value",
+          "to"
+        ],
+        "title": "ConfigProfileChange",
+        "type": "object"
+      },
+      "ConfigProfileDetection": {
+        "description": "Local-first detection signals used for preset ranking.",
+        "properties": {
+          "cli_detected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cli Detected",
+            "type": "array"
+          },
+          "cloud_ready": {
+            "default": false,
+            "title": "Cloud Ready",
+            "type": "boolean"
+          },
+          "model_pack_present": {
+            "default": false,
+            "title": "Model Pack Present",
+            "type": "boolean"
+          },
+          "ollama_healthy": {
+            "default": false,
+            "title": "Ollama Healthy",
+            "type": "boolean"
+          }
+        },
+        "title": "ConfigProfileDetection",
+        "type": "object"
+      },
+      "ConfigProfileExportResponse": {
+        "description": "Exported stockpulse-profile YAML (secrets stripped).",
+        "properties": {
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "keys_exported": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys Exported",
+            "type": "array"
+          },
+          "keys_redacted": {
+            "default": 0,
+            "title": "Keys Redacted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "content",
+          "config_version",
+          "filename"
+        ],
+        "title": "ConfigProfileExportResponse",
+        "type": "object"
+      },
+      "ConfigProfileImportApplyResponse": {
+        "description": "Result of applying an imported stockpulse-profile YAML.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "new_config_version": {
+            "title": "New Config Version",
+            "type": "string"
+          },
+          "updated_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Updated Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied",
+          "config_version",
+          "new_config_version"
+        ],
+        "title": "ConfigProfileImportApplyResponse",
+        "type": "object"
+      },
+      "ConfigProfileImportPreviewResponse": {
+        "description": "Validated profile import preview with non-secret diff.",
+        "properties": {
+          "change_count": {
+            "default": 0,
+            "title": "Change Count",
+            "type": "integer"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProfileChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "title": "Features",
+            "type": "object"
+          },
+          "issues": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "config_version"
+        ],
+        "title": "ConfigProfileImportPreviewResponse",
+        "type": "object"
+      },
+      "ConfigProfileImportRequest": {
+        "description": "Import or preview a stockpulse-profile YAML document.",
+        "properties": {
+          "config_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Version",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 262144,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "reload_now": {
+            "default": true,
+            "title": "Reload Now",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "config_version",
+          "content"
+        ],
+        "title": "ConfigProfileImportRequest",
         "type": "object"
       },
       "ConfigValidationIssue": {
@@ -6251,6 +6832,16 @@
             "title": "Neutral",
             "type": "integer"
           },
+          "profile_calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionSignalProfileCalibration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statuses": {
             "items": {
               "type": "string"
@@ -6497,6 +7088,177 @@
           "metadata"
         ],
         "title": "DecisionSignalPreview",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibration": {
+        "properties": {
+          "breakdowns": {
+            "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBreakdowns"
+          },
+          "minimum_completed_sample_size": {
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minimum_completed_sample_size",
+          "breakdowns"
+        ],
+        "title": "DecisionSignalProfileCalibration",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibrationBreakdowns": {
+        "properties": {
+          "decision_profile": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile",
+            "type": "array"
+          },
+          "decision_profile_action": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Action",
+            "type": "array"
+          },
+          "decision_profile_data_quality_level": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Data Quality Level",
+            "type": "array"
+          },
+          "decision_profile_horizon": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Horizon",
+            "type": "array"
+          },
+          "decision_profile_market_phase": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Market Phase",
+            "type": "array"
+          },
+          "profile_source": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Profile Source",
+            "type": "array"
+          }
+        },
+        "title": "DecisionSignalProfileCalibrationBreakdowns",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibrationBucket": {
+        "properties": {
+          "avg_stock_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Stock Return Pct"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "hit": {
+            "title": "Hit",
+            "type": "integer"
+          },
+          "hit_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate Pct"
+          },
+          "max_adverse_excursion_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Adverse Excursion Pct"
+          },
+          "miss": {
+            "title": "Miss",
+            "type": "integer"
+          },
+          "miss_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Miss Rate Pct"
+          },
+          "neutral": {
+            "title": "Neutral",
+            "type": "integer"
+          },
+          "sample_sufficient": {
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "unable": {
+            "title": "Unable",
+            "type": "integer"
+          },
+          "unable_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unable Rate Pct"
+          }
+        },
+        "required": [
+          "total",
+          "completed",
+          "unable",
+          "hit",
+          "miss",
+          "neutral",
+          "sample_sufficient"
+        ],
+        "title": "DecisionSignalProfileCalibrationBucket",
         "type": "object"
       },
       "DecisionSignalReassessErrorResponse": {
@@ -10364,6 +11126,42 @@
         "title": "LocalModelUpstream",
         "type": "object"
       },
+      "LocalOnlyModeStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_destination_classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Destination Classes",
+            "type": "array"
+          },
+          "blocked_error_reason": {
+            "default": "local_only_mode_blocked",
+            "title": "Blocked Error Reason",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "env_key": {
+            "default": "LOCAL_ONLY_MODE",
+            "title": "Env Key",
+            "type": "string"
+          },
+          "policy": {
+            "default": "non_loopback_denied",
+            "title": "Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "LocalOnlyModeStatus",
+        "type": "object"
+      },
       "LoginRequest": {
         "description": "Login request body. For first-time setup use password + password_confirm.",
         "properties": {
@@ -11069,6 +11867,564 @@
         "title": "NotificationTestAttempt",
         "type": "object"
       },
+      "OnboardingApplyRequest": {
+        "description": "Apply non-secret recommended config after explicit user confirmation.",
+        "properties": {
+          "config_version": {
+            "minLength": 1,
+            "title": "Config Version",
+            "type": "string"
+          },
+          "confirm": {
+            "default": true,
+            "description": "Must be true to apply.",
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "model_available": {
+            "default": false,
+            "title": "Model Available",
+            "type": "boolean"
+          },
+          "prefer_llm": {
+            "default": false,
+            "title": "Prefer Llm",
+            "type": "boolean"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/UserOnboardingProfile"
+          }
+        },
+        "required": [
+          "config_version"
+        ],
+        "title": "OnboardingApplyRequest",
+        "type": "object"
+      },
+      "OnboardingApplyResponse": {
+        "properties": {
+          "applied_count": {
+            "default": 0,
+            "title": "Applied Count",
+            "type": "integer"
+          },
+          "applied_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Applied Keys",
+            "type": "array"
+          },
+          "config_version": {
+            "title": "Config Version",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/OnboardingPlanResponse"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "title": "Profile",
+            "type": "object"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "update": {
+            "additionalProperties": true,
+            "title": "Update",
+            "type": "object"
+          }
+        },
+        "required": [
+          "success",
+          "config_version",
+          "plan",
+          "profile",
+          "message"
+        ],
+        "title": "OnboardingApplyResponse",
+        "type": "object"
+      },
+      "OnboardingConfigItem": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "OnboardingConfigItem",
+        "type": "object"
+      },
+      "OnboardingFeaturePath": {
+        "properties": {
+          "defer": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Defer",
+            "type": "array"
+          },
+          "emphasize": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Emphasize",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "primary_path": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Primary Path",
+            "type": "array"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "label"
+        ],
+        "title": "OnboardingFeaturePath",
+        "type": "object"
+      },
+      "OnboardingPlanRequest": {
+        "description": "Generate a rule-based (optionally LLM-refined) onboarding plan.",
+        "properties": {
+          "model_available": {
+            "default": false,
+            "description": "Whether a usable model is already configured (client-reported or server-known).",
+            "title": "Model Available",
+            "type": "boolean"
+          },
+          "prefer_llm": {
+            "default": false,
+            "description": "Request LLM refinement when a model is available. When false or when no model is available, the engine stays rule-based honestly.",
+            "title": "Prefer Llm",
+            "type": "boolean"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/UserOnboardingProfile"
+          }
+        },
+        "title": "OnboardingPlanRequest",
+        "type": "object"
+      },
+      "OnboardingPlanResponse": {
+        "properties": {
+          "beginner_mode_recommended": {
+            "default": true,
+            "title": "Beginner Mode Recommended",
+            "type": "boolean"
+          },
+          "config_changes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Config Changes",
+            "type": "array"
+          },
+          "config_items": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingConfigItem"
+            },
+            "title": "Config Items",
+            "type": "array"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "feature_path": {
+            "$ref": "#/components/schemas/OnboardingFeaturePath"
+          },
+          "feature_stage": {
+            "title": "Feature Stage",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "llm_note": {
+            "title": "Llm Note",
+            "type": "string"
+          },
+          "model_available": {
+            "default": false,
+            "title": "Model Available",
+            "type": "boolean"
+          },
+          "prefer_llm": {
+            "default": false,
+            "title": "Prefer Llm",
+            "type": "boolean"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "title": "Profile",
+            "type": "object"
+          },
+          "recommended_preset_id": {
+            "title": "Recommended Preset Id",
+            "type": "string"
+          },
+          "recommended_preset_name": {
+            "title": "Recommended Preset Name",
+            "type": "string"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "today_plan": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingPlanStep"
+            },
+            "title": "Today Plan",
+            "type": "array"
+          },
+          "todos": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingTodoItem"
+            },
+            "title": "Todos",
+            "type": "array"
+          },
+          "week_plan": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingWeekStep"
+            },
+            "title": "Week Plan",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "engine",
+          "llm_note",
+          "profile",
+          "feature_stage",
+          "feature_path",
+          "recommended_preset_id",
+          "recommended_preset_name",
+          "disclaimer",
+          "generated_at"
+        ],
+        "title": "OnboardingPlanResponse",
+        "type": "object"
+      },
+      "OnboardingPlanStep": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "detail"
+        ],
+        "title": "OnboardingPlanStep",
+        "type": "object"
+      },
+      "OnboardingResetResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "reset": {
+            "title": "Reset",
+            "type": "boolean"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "reset",
+          "message"
+        ],
+        "title": "OnboardingResetResponse",
+        "type": "object"
+      },
+      "OnboardingStateResponse": {
+        "description": "Persisted profile + last plan (may be null fields when unset).",
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "applied_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Applied Keys",
+            "type": "array"
+          },
+          "config_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Version"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingPlanResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "exists"
+        ],
+        "title": "OnboardingStateResponse",
+        "type": "object"
+      },
+      "OnboardingTodoItem": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": "setup",
+            "title": "Kind",
+            "type": "string"
+          },
+          "priority": {
+            "default": 1,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description"
+        ],
+        "title": "OnboardingTodoItem",
+        "type": "object"
+      },
+      "OnboardingWeekStep": {
+        "properties": {
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "title",
+          "detail"
+        ],
+        "title": "OnboardingWeekStep",
+        "type": "object"
+      },
+      "OutboundActivityItem": {
+        "additionalProperties": false,
+        "properties": {
+          "allowlisted": {
+            "title": "Allowlisted",
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "allowed",
+              "blocked"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "destination_class": {
+            "title": "Destination Class",
+            "type": "string"
+          },
+          "host_type": {
+            "title": "Host Type",
+            "type": "string"
+          },
+          "local_only_mode": {
+            "title": "Local Only Mode",
+            "type": "boolean"
+          },
+          "occurred_at": {
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "scheme": {
+            "title": "Scheme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "decision",
+          "destination_class",
+          "scheme",
+          "host_type",
+          "reason",
+          "correlation_id",
+          "local_only_mode",
+          "allowlisted"
+        ],
+        "title": "OutboundActivityItem",
+        "type": "object"
+      },
+      "OutboundActivityPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OutboundActivityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "local_only_mode": {
+            "title": "Local Only Mode",
+            "type": "boolean"
+          },
+          "max_retained": {
+            "title": "Max Retained",
+            "type": "integer"
+          },
+          "returned": {
+            "minimum": 0.0,
+            "title": "Returned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "local_only_mode",
+          "limit",
+          "returned",
+          "max_retained"
+        ],
+        "title": "OutboundActivityPage",
+        "type": "object"
+      },
       "PaperTradeCreateRequest": {
         "properties": {
           "note": {
@@ -11358,6 +12714,220 @@
           "neutral_count"
         ],
         "title": "PerformanceMetrics",
+        "type": "object"
+      },
+      "PluginInfo": {
+        "additionalProperties": false,
+        "description": "One registered plugin and its lifecycle state.",
+        "properties": {
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "desired_enabled": {
+            "description": "Persisted operator intent (False means disabled across restarts)",
+            "title": "Desired Enabled",
+            "type": "boolean"
+          },
+          "extension_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Extension Points",
+            "type": "array"
+          },
+          "id": {
+            "description": "Stable plugin id from the manifest",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "package_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Absolute package directory for external plugins when known",
+            "title": "Package Root"
+          },
+          "reloadable": {
+            "description": "True when in-process hot-reload is attempted for this plugin",
+            "title": "Reloadable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "builtin",
+              "external"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "source",
+          "state",
+          "desired_enabled",
+          "reloadable"
+        ],
+        "title": "PluginInfo",
+        "type": "object"
+      },
+      "PluginLifecycleRequest": {
+        "additionalProperties": false,
+        "description": "POST /api/v1/plugins/{plugin_id}/lifecycle body.",
+        "properties": {
+          "action": {
+            "description": "enable/disable toggles runtime state and persistence; reload re-imports code",
+            "enum": [
+              "enable",
+              "disable",
+              "reload"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "PluginLifecycleRequest",
+        "type": "object"
+      },
+      "PluginLifecycleResponse": {
+        "additionalProperties": false,
+        "description": "Result of one lifecycle action.",
+        "properties": {
+          "action": {
+            "enum": [
+              "enable",
+              "disable",
+              "reload"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "plugin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "reloaded": {
+            "default": false,
+            "title": "Reloaded",
+            "type": "boolean"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "action",
+          "success",
+          "state"
+        ],
+        "title": "PluginLifecycleResponse",
+        "type": "object"
+      },
+      "PluginListResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/plugins response.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginInfo"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "PluginListResponse",
         "type": "object"
       },
       "PortfolioAccountCreateRequest": {
@@ -11891,6 +13461,79 @@
         "title": "PortfolioCashLedgerListResponse",
         "type": "object"
       },
+      "PortfolioConcentrationBlock": {
+        "properties": {
+          "diversification_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Normalized diversification score in [0, 1]; equal-weight → 1.0",
+            "title": "Diversification Score"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "1 / HHI",
+            "title": "Effective N"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Herfindahl-Hirschman index of weights",
+            "title": "Hhi"
+          },
+          "position_count": {
+            "default": 0,
+            "title": "Position Count",
+            "type": "integer"
+          },
+          "status": {
+            "description": "'ok' or 'empty_portfolio'",
+            "title": "Status",
+            "type": "string"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRiskWeightItem"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioConcentrationBlock",
+        "type": "object"
+      },
       "PortfolioCorporateActionCreateRequest": {
         "properties": {
           "account_id": {
@@ -12124,6 +13767,61 @@
         "title": "PortfolioCorporateActionListResponse",
         "type": "object"
       },
+      "PortfolioCorrelationBlock": {
+        "properties": {
+          "matrix": {
+            "description": "Pairwise Pearson correlation matrix aligned with symbols",
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "observation_count": {
+            "default": 0,
+            "title": "Observation Count",
+            "type": "integer"
+          },
+          "status": {
+            "description": "'ok', 'insufficient_history', or 'unavailable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioCorrelationBlock",
+        "type": "object"
+      },
       "PortfolioDecisionSignalRiskBlock": {
         "properties": {
           "actions": {
@@ -12214,6 +13912,51 @@
         "title": "PortfolioEventCreatedResponse",
         "type": "object"
       },
+      "PortfolioFutuImportRequest": {
+        "properties": {
+          "account_id": {
+            "description": "Target portfolio account id",
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Synthetic buy trade date for imported positions; defaults to today",
+            "title": "As Of"
+          },
+          "dry_run": {
+            "default": false,
+            "description": "Preview insert counts without writing trades",
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).",
+            "title": "Operation Id"
+          }
+        },
+        "required": [
+          "account_id"
+        ],
+        "title": "PortfolioFutuImportRequest",
+        "type": "object"
+      },
       "PortfolioFxRefreshResponse": {
         "properties": {
           "account_count": {
@@ -12266,6 +14009,104 @@
           "error_count"
         ],
         "title": "PortfolioFxRefreshResponse",
+        "type": "object"
+      },
+      "PortfolioHistoricalVaRBlock": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Days"
+          },
+          "observation_count": {
+            "default": 0,
+            "title": "Observation Count",
+            "type": "integer"
+          },
+          "one_day_var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Day Var Pct"
+          },
+          "percentile_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile Used"
+          },
+          "status": {
+            "description": "'ok', 'insufficient_history', or 'unavailable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical VaR as positive loss percentage points (e.g. 3.5 means 3.5%)",
+            "title": "Var Pct"
+          },
+          "var_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historical VaR in portfolio currency units",
+            "title": "Var Value"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHistoricalVaRBlock",
         "type": "object"
       },
       "PortfolioImportBrokerItem": {
@@ -12626,6 +14467,226 @@
         "title": "PortfolioPositionItem",
         "type": "object"
       },
+      "PortfolioRiskAssumptions": {
+        "properties": {
+          "cash_excluded": {
+            "title": "Cash Excluded",
+            "type": "boolean"
+          },
+          "concentration_metrics": {
+            "title": "Concentration Metrics",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "correlation_method": {
+            "title": "Correlation Method",
+            "type": "string"
+          },
+          "data_source": {
+            "title": "Data Source",
+            "type": "string"
+          },
+          "distribution_assumption": {
+            "title": "Distribution Assumption",
+            "type": "string"
+          },
+          "horizon_days": {
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "horizon_scaling": {
+            "title": "Horizon Scaling",
+            "type": "string"
+          },
+          "lookback_trading_days": {
+            "title": "Lookback Trading Days",
+            "type": "integer"
+          },
+          "min_correlation_observations": {
+            "title": "Min Correlation Observations",
+            "type": "integer"
+          },
+          "min_return_observations": {
+            "title": "Min Return Observations",
+            "type": "integer"
+          },
+          "portfolio_aggregation": {
+            "title": "Portfolio Aggregation",
+            "type": "string"
+          },
+          "provider_calls_on_hot_path": {
+            "title": "Provider Calls On Hot Path",
+            "type": "boolean"
+          },
+          "return_definition": {
+            "title": "Return Definition",
+            "type": "string"
+          },
+          "var_method": {
+            "title": "Var Method",
+            "type": "string"
+          },
+          "weight_basis": {
+            "title": "Weight Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "var_method",
+          "confidence",
+          "horizon_days",
+          "lookback_trading_days",
+          "min_return_observations",
+          "min_correlation_observations",
+          "return_definition",
+          "portfolio_aggregation",
+          "cash_excluded",
+          "weight_basis",
+          "horizon_scaling",
+          "distribution_assumption",
+          "correlation_method",
+          "concentration_metrics",
+          "data_source",
+          "provider_calls_on_hot_path"
+        ],
+        "title": "PortfolioRiskAssumptions",
+        "type": "object"
+      },
+      "PortfolioRiskHistoryMeta": {
+        "properties": {
+          "aligned_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aligned End"
+          },
+          "aligned_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aligned Start"
+          },
+          "aligned_trading_days": {
+            "default": 0,
+            "title": "Aligned Trading Days",
+            "type": "integer"
+          },
+          "lookback_trading_days_requested": {
+            "default": 0,
+            "title": "Lookback Trading Days Requested",
+            "type": "integer"
+          },
+          "price_series_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Price Series Symbols",
+            "type": "array"
+          }
+        },
+        "title": "PortfolioRiskHistoryMeta",
+        "type": "object"
+      },
+      "PortfolioRiskMetricsResponse": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/PortfolioRiskAssumptions"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioConcentrationBlock"
+          },
+          "correlation": {
+            "$ref": "#/components/schemas/PortfolioCorrelationBlock"
+          },
+          "cost_method": {
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "history": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioRiskHistoryMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portfolio_value": {
+            "default": 0.0,
+            "title": "Portfolio Value",
+            "type": "number"
+          },
+          "positions_used": {
+            "default": 0,
+            "title": "Positions Used",
+            "type": "integer"
+          },
+          "status": {
+            "description": "'ok', 'empty_portfolio', 'insufficient_history', or 'partial'",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "var": {
+            "$ref": "#/components/schemas/PortfolioHistoricalVaRBlock"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "assumptions",
+          "var",
+          "correlation",
+          "concentration"
+        ],
+        "title": "PortfolioRiskMetricsResponse",
+        "type": "object"
+      },
       "PortfolioRiskResponse": {
         "properties": {
           "account_id": {
@@ -12686,6 +14747,24 @@
           "currency"
         ],
         "title": "PortfolioRiskResponse",
+        "type": "object"
+      },
+      "PortfolioRiskWeightItem": {
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioRiskWeightItem",
         "type": "object"
       },
       "PortfolioSnapshotResponse": {
@@ -15627,13 +17706,40 @@
           "session_id": {
             "title": "Session Id",
             "type": "string"
+          },
+          "session_state": {
+            "$ref": "#/components/schemas/SessionStateResponse"
           }
         },
         "required": [
           "session_id",
-          "messages"
+          "messages",
+          "session_state"
         ],
         "title": "SessionMessagesResponse",
+        "type": "object"
+      },
+      "SessionStateResponse": {
+        "properties": {
+          "selected_skill_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Skill Ids"
+          }
+        },
+        "required": [
+          "selected_skill_ids"
+        ],
+        "title": "SessionStateResponse",
         "type": "object"
       },
       "SessionsResponse": {
@@ -18886,6 +20992,70 @@
         "title": "UsageSummaryResponse",
         "type": "object"
       },
+      "UserOnboardingProfile": {
+        "description": "Versioned structured intake profile (not free-form chat memory).",
+        "properties": {
+          "experience_stage": {
+            "default": "beginner",
+            "description": "beginner | report_reader | has_system",
+            "title": "Experience Stage",
+            "type": "string"
+          },
+          "goals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "holdings": {
+            "default": "none",
+            "description": "none | watchlist | bookkeeping",
+            "title": "Holdings",
+            "type": "string"
+          },
+          "infrastructure": {
+            "default": "cloud_key",
+            "description": "cloud_key | local_models | free_only",
+            "title": "Infrastructure",
+            "type": "string"
+          },
+          "interaction": {
+            "default": "web",
+            "description": "push | web | chat",
+            "title": "Interaction",
+            "type": "string"
+          },
+          "markets": {
+            "description": "cn | hk | us (multi-select)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "report_language": {
+            "default": "zh",
+            "description": "zh | en | ko | ja",
+            "title": "Report Language",
+            "type": "string"
+          },
+          "risk_tone": {
+            "default": "balanced",
+            "description": "conservative | balanced | assertive (tone only, not advice)",
+            "title": "Risk Tone",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "title": "UserOnboardingProfile",
+        "type": "object"
+      },
       "ValidateSystemConfigRequest": {
         "description": "Validation request payload.",
         "properties": {
@@ -20353,6 +22523,18 @@
             "schema": {
               "default": false,
               "title": "Refresh",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "When true (default), auto-attach bounded news-search catalysts if the structured route has no external event. Search is response-only and is never written to the shared hotspot detail cache.",
+            "in": "query",
+            "name": "include_search",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "When true (default), auto-attach bounded news-search catalysts if the structured route has no external event. Search is response-only and is never written to the shared hotspot detail cache.",
+              "title": "Include Search",
               "type": "boolean"
             }
           }
@@ -22136,6 +24318,409 @@
         "summary": "触发回测",
         "tags": [
           "Backtest"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/export": {
+      "get": {
+        "description": "Export non-secret configuration as stockpulse-profile v1 YAML. Secret keys (API keys, tokens, passwords, extra headers) are never included.",
+        "operationId": "export_config_profile_api_v1_config_profiles_export_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Export stockpulse-profile YAML",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/import/apply": {
+      "post": {
+        "description": "Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply.",
+        "operationId": "apply_config_profile_import_api_v1_config_profiles_import_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigProfileImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileImportApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Apply stockpulse-profile YAML import",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/import/preview": {
+      "post": {
+        "description": "Validate profile YAML (schema + no secrets) and return a non-secret diff. Does not write configuration.",
+        "operationId": "preview_config_profile_import_api_v1_config_profiles_import_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigProfileImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileImportPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Preview stockpulse-profile YAML import",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/presets": {
+      "get": {
+        "description": "Return official named presets with local-first recommendation ranking. Detection prefers healthy Ollama / Model Pack, then CLI backends, then cloud.",
+        "operationId": "list_config_presets_api_v1_config_profiles_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List recommended configuration presets",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/presets/{preset_id}/apply": {
+      "post": {
+        "description": "Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm.",
+        "operationId": "apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPresetApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Apply a configuration preset",
+        "tags": [
+          "ConfigProfiles"
+        ]
+      }
+    },
+    "/api/v1/config-profiles/presets/{preset_id}/preview": {
+      "post": {
+        "operationId": "preview_config_preset_api_v1_config_profiles_presets__preset_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preset_id",
+            "required": true,
+            "schema": {
+              "title": "Preset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPresetApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Preview applying a configuration preset",
+        "tags": [
+          "ConfigProfiles"
         ]
       }
     },
@@ -26204,6 +28789,345 @@
         ]
       }
     },
+    "/api/v1/onboarding/apply": {
+      "post": {
+        "description": "Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.",
+        "operationId": "apply_onboarding_plan_api_v1_onboarding_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Apply non-secret onboarding config recommendations",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/api/v1/onboarding/plan": {
+      "post": {
+        "description": "Rule-based plan generation is the default. When prefer_llm is true but no model is available, the response stays engine=rules with an honest llm_note (no fake AI).",
+        "operationId": "generate_onboarding_plan_api_v1_onboarding_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingPlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Generate an agent-guided onboarding plan",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/api/v1/onboarding/state": {
+      "delete": {
+        "operationId": "reset_onboarding_state_api_v1_onboarding_state_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Reset persisted onboarding profile (keeps already written config)",
+        "tags": [
+          "Onboarding"
+        ]
+      },
+      "get": {
+        "operationId": "get_onboarding_state_api_v1_onboarding_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Get persisted onboarding profile and last plan",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/api/v1/plugins": {
+      "get": {
+        "description": "Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.",
+        "operationId": "listPlugins",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List registered plugins and lifecycle state",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{plugin_id}/lifecycle": {
+      "post": {
+        "description": "Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.",
+        "operationId": "updatePluginLifecycle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginLifecycleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid lifecycle request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Lifecycle operation failed unexpectedly"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Enable, disable, or hot-reload one plugin",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
     "/api/v1/portfolio/accounts": {
       "get": {
         "operationId": "list_accounts_api_v1_portfolio_accounts_get",
@@ -27471,6 +30395,190 @@
         ]
       }
     },
+    "/api/v1/portfolio/imports/futu": {
+      "post": {
+        "description": "Import live Futu positions via the shared trade-record commit path.\n\nPortfolio Web UI for this action is a follow-up; this endpoint is the backend\nseam for API clients and future UI wiring.",
+        "operationId": "commit_futu_import_api_v1_portfolio_imports_futu_post",
+        "parameters": [
+          {
+            "description": "Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioFutuImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioImportCommitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Import Futu OpenD real positions into a portfolio account",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/imports/futu/preview": {
+      "post": {
+        "operationId": "preview_futu_import_api_v1_portfolio_imports_futu_preview_post",
+        "parameters": [
+          {
+            "description": "Synthetic buy trade date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Synthetic buy trade date; default today",
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioImportParseResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Preview Futu OpenD real positions as import trade records",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
     "/api/v1/portfolio/positions/{symbol}/analysis": {
       "post": {
         "operationId": "analyze_position_api_v1_portfolio_positions__symbol__analysis_post",
@@ -27672,6 +30780,151 @@
           }
         },
         "summary": "Get portfolio risk report",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/risk-metrics": {
+      "get": {
+        "description": "Historical VaR, pairwise return correlation, and concentration/diversification metrics from stored daily closes and current holdings. Never calls market data providers. Insufficient history is reported explicitly (never silent zeros).",
+        "operationId": "getPortfolioRiskMetrics",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "description": "Cost method: fifo or avg",
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "description": "Cost method: fifo or avg",
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "VaR confidence level exclusive of 0.5 and 1.0 (default 0.95)",
+            "in": "query",
+            "name": "confidence",
+            "required": false,
+            "schema": {
+              "default": 0.95,
+              "description": "VaR confidence level exclusive of 0.5 and 1.0 (default 0.95)",
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.5,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          {
+            "description": "VaR horizon in trading days (1-day base; multi-day uses sqrt-time scaling)",
+            "in": "query",
+            "name": "horizon_days",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "VaR horizon in trading days (1-day base; multi-day uses sqrt-time scaling)",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Horizon Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of trading-day closes requested for the history window",
+            "in": "query",
+            "name": "lookback_trading_days",
+            "required": false,
+            "schema": {
+              "default": 252,
+              "description": "Number of trading-day closes requested for the history window",
+              "maximum": 1000,
+              "minimum": 60,
+              "title": "Lookback Trading Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRiskMetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Risk metrics computation failed"
+          }
+        },
+        "summary": "Get portfolio risk metrics",
         "tags": [
           "Portfolio"
         ]
@@ -28646,7 +31899,6 @@
     },
     "/api/v1/security/audit-events": {
       "get": {
-        "description": "Return a bounded page only to an authenticated administrator session.",
         "operationId": "list_security_audit_events_api_v1_security_audit_events_get",
         "parameters": [
           {
@@ -28830,6 +32082,92 @@
           }
         },
         "summary": "List privileged-operation security audit events",
+        "tags": [
+          "SecurityAudit"
+        ]
+      }
+    },
+    "/api/v1/security/local-only": {
+      "get": {
+        "operationId": "get_local_only_mode_status_api_v1_security_local_only_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalOnlyModeStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "Read LOCAL_ONLY_MODE enforcement status",
+        "tags": [
+          "SecurityAudit"
+        ]
+      }
+    },
+    "/api/v1/security/outbound-activity": {
+      "get": {
+        "operationId": "list_outbound_activity_api_v1_security_outbound_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundActivityPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List recent outbound HTTP policy decisions",
         "tags": [
           "SecurityAudit"
         ]

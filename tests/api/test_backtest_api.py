@@ -91,22 +91,61 @@ def test_response_validation_error_is_safe_internal_error(client: TestClient) ->
     _assert_safe_internal_error(response)
 
 
-def test_controlled_validation_error_remains_invalid_params(client: TestClient) -> None:
+def test_controlled_validation_error_uses_coded_error(client: TestClient) -> None:
     service = MagicMock()
-    service.run_backtest.side_effect = BacktestValidationError("非法股票代码格式: invalid")
+    service.run_backtest.side_effect = BacktestValidationError(
+        "非法股票代码格式: invalid",
+        code="invalid_stock_code",
+        params={"stock_code": "invalid"},
+    )
 
     with patch.object(backtest_endpoint, "BacktestService", return_value=service):
         response = client.post("/api/v1/backtest/run", json={"code": "invalid"})
 
     payload = response.json()
     assert response.status_code == 400
-    assert payload["error"] == "invalid_params"
+    assert payload["error"] == "invalid_stock_code"
     assert payload["message"] == "非法股票代码格式: invalid"
-    assert payload["params"] == {}
+    assert payload["params"] == {"stock_code": "invalid"}
     assert payload["details"] is None
     assert payload["trace_id"]
 
 
+def test_invalid_analysis_date_range_uses_coded_error(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/backtest/run",
+        json={
+            "analysis_date_from": "2026-05-31",
+            "analysis_date_to": "2026-05-01",
+        },
+    )
+    payload = response.json()
+    assert response.status_code == 400
+    assert payload["error"] == "invalid_analysis_date_range"
+    assert "analysis_date_from cannot be after analysis_date_to" in payload["message"]
+    assert payload["params"]["analysis_date_from"] == "2026-05-31"
+    assert payload["params"]["analysis_date_to"] == "2026-05-01"
+
+
 def test_invalid_stock_code_uses_controlled_validation_error() -> None:
-    with pytest.raises(BacktestValidationError, match="非法股票代码格式"):
+    with pytest.raises(BacktestValidationError, match="非法股票代码格式") as exc_info:
         BacktestService._normalize_code("invalid")
+    assert exc_info.value.code == "invalid_stock_code"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "code"),
+    [
+        ({"eval_window_days": 0}, "invalid_eval_window_days"),
+        ({"eval_window_days": 121}, "invalid_eval_window_days"),
+        ({"min_age_days": -1}, "invalid_min_age_days"),
+        ({"min_age_days": 366}, "invalid_min_age_days"),
+        ({"limit": 0}, "invalid_run_limit"),
+        ({"limit": 2001}, "invalid_run_limit"),
+    ],
+)
+def test_run_config_validation_codes(kwargs: dict, code: str) -> None:
+    service = BacktestService(db_manager=MagicMock())
+    with pytest.raises(BacktestValidationError) as exc_info:
+        service.run_backtest(**kwargs)
+    assert exc_info.value.code == code

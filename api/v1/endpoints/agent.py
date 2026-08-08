@@ -9,11 +9,13 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from api.deps import get_agent_chat_session_service
 from api.v1.errors import api_error
+from src.services.agent_chat_session_service import AgentChatSessionService
 from src.agent.public_contract import (
     AGENT_CHAT_FAILED,
     AGENT_CHAT_FAILURE_MESSAGE,
@@ -76,6 +78,31 @@ class ChatRequest(BaseModel):
     def effective_skills(self) -> Optional[List[str]]:
         """Return skill ids from the unified request shape."""
         return self.skills
+
+
+def _build_agent_chat_context(
+    request: ChatRequest,
+    config,
+    skills: Optional[List[str]],
+) -> Dict[str, Any]:
+    """Build the shared context contract for regular and streaming Agent Chat.
+
+    Caller-provided skills always take precedence over any stale value carried
+    in the context dict. When ``context.report_language`` is missing, null, or
+    blank, fall back to the global ``REPORT_LANGUAGE`` setting so Agent Chat
+    follows the same default output language as reports and notifications.
+    """
+    context = dict(request.context or {})
+    context.pop("skills", None)
+    context.pop("strategies", None)
+    if skills is not None:
+        context["skills"] = skills
+    report_language = context.get("report_language")
+    if report_language is None or (
+        isinstance(report_language, str) and not report_language.strip()
+    ):
+        context["report_language"] = config.report_language
+    return context
 
 
 class AgentRuntimeMetadata(BaseModel):
@@ -188,7 +215,10 @@ async def get_strategies():
     )
 
 @router.post("/chat", response_model=ChatResponse)
-async def agent_chat(request: ChatRequest):
+async def agent_chat(
+    request: ChatRequest,
+    session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
+):
     """
     Chat with the AI Agent.
     """
@@ -200,22 +230,26 @@ async def agent_chat(request: ChatRequest):
     session_id = request.session_id or str(uuid.uuid4())
     
     try:
-        skills = request.effective_skills
+        skill_selection = session_service.resolve_skill_selection(
+            config,
+            session_id,
+            request.effective_skills,
+        )
+        skills = skill_selection.effective_skill_ids
+        selected_skill_ids = skill_selection.selected_skill_ids_update
         executor = _build_executor(config, skills or None)
-
-        # Pass explicit skills into context for the orchestrator.
-        # Direct assignment so caller-provided skills always take precedence
-        # over any stale value carried in the context dict.
-        ctx = dict(request.context or {})
-        if skills is not None:
-            ctx["skills"] = skills
+        ctx = _build_agent_chat_context(request, config, skills)
 
         # Offload the blocking call to a thread to avoid blocking the event loop.
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
-            lambda: executor.chat(message=request.message, session_id=session_id,
-                                  context=ctx),
+            lambda: executor.chat(
+                message=request.message,
+                session_id=session_id,
+                context=ctx,
+                selected_skill_ids=selected_skill_ids,
+            ),
         )
         agent_runtime = _project_agent_runtime(result)
 
@@ -271,13 +305,22 @@ class SessionMessage(BaseModel):
     params: Optional[Dict[str, Any]] = None
 
 
+class SessionStateResponse(BaseModel):
+    selected_skill_ids: Optional[List[str]]
+
+
 class SessionMessagesResponse(BaseModel):
     session_id: str
     messages: List[SessionMessage]
+    session_state: SessionStateResponse
 
 
 @router.get("/chat/sessions", response_model=SessionsResponse)
-async def list_chat_sessions(limit: int = 50, user_id: Optional[str] = None):
+async def list_chat_sessions(
+    limit: int = 50,
+    user_id: Optional[str] = None,
+    session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
+):
     """获取聊天会话列表
 
     Args:
@@ -288,32 +331,51 @@ async def list_chat_sessions(limit: int = 50, user_id: Optional[str] = None):
             include the platform prefix, e.g. ``telegram_12345``,
             ``feishu_ou_abc``.
     """
-    from src.storage import get_db
-    sessions = get_db().get_chat_sessions(
-        limit=limit,
-        session_prefix=user_id,
-        extra_session_ids=[user_id] if user_id else None,
-    )
+    sessions = session_service.list_sessions(limit, user_id)
     return SessionsResponse(sessions=sessions)
 
 
 @router.get(
     "/chat/sessions/{session_id}",
     response_model=SessionMessagesResponse,
-    response_model_exclude_none=True,
+    response_model_exclude_unset=True,
 )
-async def get_chat_session_messages(session_id: str, limit: int = 100):
+async def get_chat_session_messages(
+    session_id: str,
+    limit: int = 100,
+    session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
+):
     """获取单个会话的完整消息"""
-    from src.storage import get_db
-    messages = get_db().get_conversation_messages(session_id, limit=limit)
-    return SessionMessagesResponse(session_id=session_id, messages=messages)
+    detail = session_service.get_session_detail(session_id, limit)
+    messages: List[SessionMessage] = []
+    for raw in detail.messages:
+        payload: Dict[str, Any] = {
+            "id": raw["id"],
+            "role": raw["role"],
+            "content": raw["content"],
+            "created_at": raw.get("created_at"),
+        }
+        if raw.get("error") is not None:
+            payload["error"] = raw["error"]
+        if raw.get("params") is not None:
+            payload["params"] = raw["params"]
+        messages.append(SessionMessage(**payload))
+    return SessionMessagesResponse(
+        session_id=session_id,
+        messages=messages,
+        session_state=SessionStateResponse(
+            selected_skill_ids=detail.selected_skill_ids,
+        ),
+    )
 
 
 @router.delete("/chat/sessions/{session_id}")
-async def delete_chat_session(session_id: str):
+async def delete_chat_session(
+    session_id: str,
+    session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
+):
     """删除指定会话"""
-    from src.storage import get_db
-    count = get_db().delete_conversation_session(session_id)
+    count = session_service.delete_session(session_id)
     return {"deleted": count}
 
 
@@ -467,7 +529,10 @@ async def agent_research(request: ResearchRequest):
 
 
 @router.post("/chat/stream")
-async def agent_chat_stream(request: ChatRequest):
+async def agent_chat_stream(
+    request: ChatRequest,
+    session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
+):
     """
     Chat with the AI Agent, streaming progress via SSE.
     Each SSE event is a JSON object with a 'type' field:
@@ -492,12 +557,14 @@ async def agent_chat_stream(request: ChatRequest):
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
-    # Pass explicit skills into context for the orchestrator.
-    # Direct assignment so caller-provided skills always take precedence.
-    skills = request.effective_skills
-    stream_ctx = dict(request.context or {})
-    if skills is not None:
-        stream_ctx["skills"] = skills
+    skill_selection = session_service.resolve_skill_selection(
+        config,
+        session_id,
+        request.effective_skills,
+    )
+    skills = skill_selection.effective_skill_ids
+    selected_skill_ids = skill_selection.selected_skill_ids_update
+    stream_ctx = _build_agent_chat_context(request, config, skills)
 
     # Bind this stream to one runtime execution: it owns the versioned
     # event stream (with its late-write fence) and the cancellation intent
@@ -537,6 +604,7 @@ async def agent_chat_stream(request: ChatRequest):
                 progress_callback=progress_callback,
                 context=stream_ctx,
                 cancelled_check=lifecycle.cancelled_check,
+                selected_skill_ids=selected_skill_ids,
             )
             lifecycle.finish_from_result(result)
             if not result.success and not getattr(result, "cancelled", False):

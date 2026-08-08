@@ -78,7 +78,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. Ownership after ADR-006 extractions: [data provider ownership map](data-provider-ownership.md). |
 | `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
 | `bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
-| `strategies/` | Built-in natural-language trading Skill definitions loaded from root YAML files plus the reserved `strategies/personas/` YAML collection; other nested YAML directories are not discovered. |
+| `strategies/` | Built-in natural-language trading Skill YAML content (root plus reserved `strategies/personas/`), published as first-class `analysis_strategy` plugins; other nested YAML directories are not discovered. |
 | `templates/` | Jinja report presentation templates consumed by the report renderer. |
 
 `src/`, `data_provider/`, `api/`, and `bot/` intentionally remain separate
@@ -96,7 +96,7 @@ path-filter, container-smoke, and reference-update coverage.
 
 | Area | Owns | Does not own |
 | --- | --- | --- |
-| `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection | Full dependency injection for every caller; adoption is currently incremental. |
+| `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection. New/touched code should prefer constructor injection or `get_application_services().config` over bare `get_config()`; growth is ratcheted by [config-access ratchet](config-access-ratchet.md) / [ADR-011](adr/ADR-011-config-access-ratchet.md). | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
 | `src/core/pipeline.py` and `src/core/stages/` | Analysis orchestration, typed stage outcomes, analysis stages, rendering, and dispatch sequencing | Transport lifecycle or persistent query APIs. |
 | `data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control | Product task lifecycle or report presentation. |
@@ -247,9 +247,10 @@ plugin extension point, and a new ADR must follow the
 
 ```mermaid
 flowchart TB
-  BUILTIN[Built-in definitions<br/>top-level YAML<br/>and strategies/personas YAML] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]
-  CUSTOM[Configured custom directory<br/>top-level YAML or nested SKILL.md] -->|load; same name overrides built-in| MANAGER
-  PLUGIN[Enabled analysis_strategy plugins<br/>validated Skill definitions] -->|exact-owner registration| ROOT[ApplicationServices<br/>one PluginManager and native catalog]
+  YAML[strategies/ YAML content<br/>root plus personas/] -->|package as built-in plugins| BUILTIN[Built-in analysis_strategy plugins<br/>builtin.analysis-strategy.*]
+  BUILTIN -->|register| ROOT[ApplicationServices<br/>one PluginManager and native catalog]
+  CUSTOM[Configured custom directory<br/>top-level YAML or nested SKILL.md] -->|declarative load; same name overrides plugin| MANAGER[SkillManager<br/>src/agent/skills/base.py]
+  PLUGIN[Enabled analysis_strategy plugins<br/>validated Skill definitions] -->|exact-owner registration| ROOT
   ROOT -->|detached generation snapshot; conflicts fail closed| MANAGER
   MANAGER -->|catalog clone and activation| ASSEMBLY[Runtime assembly<br/>src/agent/runtime_assembly.py]
 
@@ -276,16 +277,18 @@ flowchart TB
 
 The catalog and execution flow has these stages:
 
-1. `SkillManager` loads built-in root YAML definitions from `strategies/` plus
-   the explicitly reserved `strategies/personas/` YAML collection. Other
+1. Built-in root YAML under `strategies/` plus the reserved
+   `strategies/personas/` collection is packaged as first-class
+   `analysis_strategy` plugins (`builtin.analysis-strategy.<name>`). Other
    built-in YAML subdirectories are not discovered. When `AGENT_SKILL_DIR` is
    configured, custom discovery remains top-level `*.yaml` / `*.yml` plus nested
    `SKILL.md`. A custom definition with the same name replaces the built-in
-   catalog entry.
+   plugin entry in the published catalog.
 2. The installed `ApplicationServices` root exposes one `PluginManager` paired
-   with one Analysis Strategy native adapter. Enabled plugins contribute
-   validated, detached `Skill` definitions only when their names do not collide
-   with the resolved built-in/custom catalog or another plugin.
+   with one Analysis Strategy native adapter. Built-in strategy plugins and
+   other enabled plugins contribute validated, detached `Skill` definitions only
+   when their names do not collide with the resolved custom catalog or another
+   plugin.
 3. `src/agent/runtime_assembly.py` caches the resolved prototype by custom
    directory, root identity, and plugin generation, returns an isolated clone per
    assembly, resolves active skills, and supplies their prompt instructions to
@@ -321,9 +324,9 @@ The catalog and execution flow has these stages:
 
 | Surface | Current role | Boundary |
 | --- | --- | --- |
-| `strategies/` | Built-in natural-language Skill definitions in root YAML files plus the reserved `personas/` YAML collection; the directory name is retained for product language and compatibility | Definition catalog, not a second loader or execution engine; other nested YAML directories are not discovered |
-| Configured `AGENT_SKILL_DIR` | Optional custom top-level YAML definitions and nested `SKILL.md` bundles | Custom names can override built-ins; no directory is loaded when the setting is empty |
-| Enabled `analysis_strategy` plugin | Trusted Python lifecycle publishes a validated, detached `Skill` definition into the root-owned catalog | Cannot replace built-ins, custom definitions, another plugin, `SkillManager`, or `StrategyEngine`; use the [author guide](analysis-strategy-plugin-authoring.md) |
+| `strategies/` | On-disk YAML content for built-in natural-language Skills (root plus reserved `personas/`); packaged as first-class plugins | Definition content and desktop data asset, not a second execution engine; other nested YAML directories are not discovered |
+| Configured `AGENT_SKILL_DIR` | Optional custom top-level YAML definitions and nested `SKILL.md` bundles | Custom names can override built-in plugins; no directory is loaded when the setting is empty |
+| Enabled `analysis_strategy` plugin | Trusted Python lifecycle publishes a validated, detached `Skill` definition into the root-owned catalog; built-ins use ids `builtin.analysis-strategy.*` | Cannot replace custom definitions, another plugin, `SkillManager`, or `StrategyEngine`; use the [author guide](analysis-strategy-plugin-authoring.md) |
 | `src/agent/skills/` | Canonical product runtime: model, loaders, `SkillManager`, defaults, `SkillRouter`, `SkillAgent`, aggregation, synthesis, and `StrategyEngine` | Source of truth for current Skill/Strategy execution semantics |
 | `src/agent/runtime_assembly.py` | Tool and Skill catalog assembly, activation, prompt-state resolution, and Single/Multi executor construction | `src/agent/factory.py` remains a compatibility facade, not another authority |
 | `src/agent/orchestrator.py` and `src/agent/orchestrator_parts/` | Public `AgentOrchestrator` facade plus private pipeline, execution, dashboard, chat, and optional bounded-Critic coordination owners | The facade retains the legacy class, import, patch, reflection, and reload surface; the parts are internal implementation owners, the Critic is default-off and non-Chat Native Multi only, and neither creates another runtime or synthesis authority |
@@ -358,7 +361,8 @@ separately owned contract.
 
 - The [composition root](adr/ADR-003-application-services-composition-root.md)
   is a compatibility-preserving seam, not proof that every dependency is already
-  injected through one object.
+  injected through one object. Bare `get_config()` growth is blocked by the
+  [config-access ratchet](config-access-ratchet.md) ([ADR-011](adr/ADR-011-config-access-ratchet.md)).
 - The task authority is process-local. Durable recovery or multi-worker state
   requires a new decision and implementation.
 - Scheduled-task definitions and occurrence audit are durable, but their
@@ -398,6 +402,8 @@ separately owned contract.
 - [API specification artifact](architecture/api_spec.json)
 - [Behavior-preserving decomposition method](adr/ADR-006-behavior-preserving-module-decomposition.md)
 - [Legacy facade import policy and inventory](legacy-facade-import-policy.md)
+- [Config-access ratchet](config-access-ratchet.md)
+- [Import-cycle ratchet](import-cycle-ratchet.md)
 
 ## Keeping This Overview Current
 

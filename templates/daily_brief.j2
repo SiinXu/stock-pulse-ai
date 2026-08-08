@@ -1,0 +1,97 @@
+{# Daily brief with historical accuracy review (Issue #466).
+   Honesty rule: when accuracy.status != ok, never invent hit-rate numbers.
+#}
+# 📋 {{ brief.report_date }} {{ labels.title }}
+
+{% set accuracy = brief.accuracy or {} %}
+## 📊 {{ labels.accuracy_heading }}
+
+{% if accuracy.status == 'ok' %}
+{{ accuracy.honesty_note }}
+
+### {{ labels.signals_heading }}
+{% set signals = accuracy.decision_signals or {} %}
+{% if signals.status == 'ok' %}
+- {{ labels.hit_rate }}: **{{ signals.hit_rate_pct }}%** ({{ labels.samples }}: {{ signals.sample_size }})
+{% if signals.avg_return_pct is not none %}- Avg return: {{ signals.avg_return_pct }}%
+{% endif %}
+{% if signals.notable_hits %}
+- {{ labels.notable_hits }}:
+{% for hit in signals.notable_hits %}
+  - {{ hit.stock_code or '—' }}{% if hit.stock_name %} ({{ hit.stock_name }}){% endif %} · {{ hit.action or '—' }} · {{ hit.horizon or '—' }}{% if hit.return_pct is not none %} · {{ hit.return_pct }}%{% endif %}
+{% endfor %}
+{% endif %}
+{% if signals.notable_misses %}
+- {{ labels.notable_misses }}:
+{% for miss in signals.notable_misses %}
+  - {{ miss.stock_code or '—' }}{% if miss.stock_name %} ({{ miss.stock_name }}){% endif %} · {{ miss.action or '—' }} · {{ miss.horizon or '—' }}{% if miss.return_pct is not none %} · {{ miss.return_pct }}%{% endif %}
+{% endfor %}
+{% endif %}
+{% elif signals.status == 'insufficient_data' %}
+- {{ labels.accuracy_insufficient }}: {{ signals.message }}
+{% else %}
+- {{ labels.accuracy_unavailable }}{% if signals.message %}: {{ signals.message }}{% endif %}
+{% endif %}
+
+### {{ labels.backtest_heading }}
+{% set backtest = accuracy.backtest or {} %}
+{% if backtest.status == 'ok' %}
+- {{ labels.direction_accuracy }}: **{{ backtest.direction_accuracy_pct }}%**
+- {{ labels.win_rate }}: {{ backtest.win_rate_pct }}%
+- {{ labels.samples }}: {{ backtest.completed_count }}{% if backtest.eval_window_days %} · window {{ backtest.eval_window_days }}d{% endif %}
+{% elif backtest.status == 'insufficient_data' %}
+- {{ labels.accuracy_insufficient }}: {{ backtest.message }}
+{% else %}
+- {{ labels.accuracy_unavailable }}{% if backtest.message %}: {{ backtest.message }}{% endif %}
+{% endif %}
+
+### {{ labels.skills_heading }}
+{% set skills = accuracy.skill_outcomes or {} %}
+{% if skills.status == 'ok' and skills.buckets %}
+{% for bucket in skills.buckets %}
+- `{{ bucket.skill_id }}` / {{ bucket.horizon }}: {{ labels.hit_rate }} **{{ bucket.hit_rate_pct }}%** (n={{ bucket.evaluated }})
+{% endfor %}
+{% elif skills.status == 'insufficient_data' %}
+- {{ labels.accuracy_insufficient }}: {{ skills.message }}
+{% else %}
+- {{ labels.accuracy_unavailable }}{% if skills.message %}: {{ skills.message }}{% endif %}
+{% endif %}
+
+{% elif accuracy.status == 'unavailable' %}
+**{{ labels.accuracy_unavailable }}**
+
+{{ accuracy.honesty_note }}
+{% else %}
+**{{ labels.accuracy_insufficient }}**
+
+{{ accuracy.honesty_note }}
+{% endif %}
+
+## 🗂️ {{ labels.yesterday_heading }}
+{% set analyses = brief.yesterday_analyses or [] %}
+{% if analyses %}
+{% for item in analyses %}
+- **{{ item.name or item.code }}** ({{ item.code }}){% if item.operation_advice %} · {{ item.operation_advice }}{% endif %}{% if item.sentiment_score is not none %} · score {{ item.sentiment_score }}{% endif %}{% if item.on_watchlist %} · ★{% endif %}
+{% if item.analysis_summary %}
+  {{ item.analysis_summary }}
+{% endif %}
+{% endfor %}
+{% else %}
+{{ labels.yesterday_empty }}
+{% endif %}
+
+## 👀 {{ labels.watchlist_heading }}
+{% set watchlist = brief.watchlist or {} %}
+{% if watchlist.empty %}
+{{ labels.watchlist_empty }}
+{% else %}
+{{ labels.watchlist_covered }}: {{ watchlist.with_yesterday_analysis }} · {{ labels.watchlist_missing }}: {{ watchlist.without_yesterday_analysis }} · total: {{ watchlist.total }}
+
+{% for entry in watchlist.entries or [] %}
+- `{{ entry.code }}`{% if entry.had_yesterday_analysis %} · {{ labels.watchlist_covered }}{% else %} · {{ labels.watchlist_missing }}{% endif %}
+{% endfor %}
+{% endif %}
+
+---
+*{{ labels.disclaimer }}*
+*{{ brief.report_timestamp }}*

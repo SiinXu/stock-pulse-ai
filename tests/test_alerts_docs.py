@@ -346,3 +346,28 @@ def test_changelog_unreleased_keeps_flat_entries() -> None:
     unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
 
     assert "\n### " not in unreleased
+
+def test_alerts_doc_covers_issue_241_event_context_v0() -> None:
+    doc = _read_doc()
+    for token in (
+        "P9 智能事件告警与影响上下文",
+        "corporate_event",
+        "AGENT_EVENT_IMPACT_CONTEXT_ENABLED",
+        "intelligence_items",
+        "impact_context",
+        "include_realtime=False",
+        "alerts_EN.md",
+    ):
+        assert token in doc
+
+    en_doc = (PROJECT_ROOT / "docs" / "alerts_EN.md").read_text(encoding="utf-8")
+    for token in (
+        "Issue #241",
+        "corporate_event",
+        "AGENT_EVENT_IMPACT_CONTEXT_ENABLED",
+        "what happened",
+        "why it matters",
+        "include_realtime=False",
+    ):
+        assert token in en_doc
+

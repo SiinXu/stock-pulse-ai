@@ -1979,29 +1979,20 @@
     },
     "/api/v1/decision-signals/outcomes/stats": {
       "get": {
-        "tags": [
-          "DecisionSignals"
-        ],
-        "summary": "查询决策信号后验统计",
         "description": "默认统计当前 engine_version，且排除 archived 信号。",
         "operationId": "getDecisionSignalOutcomeStats",
-        "security": [
-          {
-            "AdminSessionCookie": []
-          }
-        ],
         "parameters": [
           {
-            "name": "horizons",
             "in": "query",
+            "name": "horizons",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "array",
                   "items": {
                     "type": "string"
-                  }
+                  },
+                  "type": "array"
                 },
                 {
                   "type": "null"
@@ -2011,8 +2002,8 @@
             }
           },
           {
-            "name": "engine_version",
             "in": "query",
+            "name": "engine_version",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2027,16 +2018,16 @@
             }
           },
           {
-            "name": "statuses",
             "in": "query",
+            "name": "statuses",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "array",
                   "items": {
                     "type": "string"
-                  }
+                  },
+                  "type": "array"
                 },
                 {
                   "type": "null"
@@ -2048,56 +2039,65 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DecisionSignalOutcomeStatsResponse"
                 }
               }
-            }
+            },
+            "description": "Successful Response"
           },
           "400": {
-            "description": "查询参数非法",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "查询参数非法"
           },
           "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
           },
           "422": {
-            "description": "查询参数校验失败",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "查询参数校验失败"
           },
           "500": {
-            "description": "统计失败",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "统计失败"
           }
-        }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "查询决策信号后验统计",
+        "tags": [
+          "DecisionSignals"
+        ]
       }
     },
     "/api/v1/decision-signals/{signal_id}/outcomes": {
@@ -9298,9 +9298,49 @@
       },
       "DecisionSignalOutcomeStatsResponse": {
         "properties": {
+          "avg_stock_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Stock Return Pct"
+          },
+          "breakdowns": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/DecisionSignalOutcomeStatsBucket"
+              },
+              "type": "array"
+            },
+            "title": "Breakdowns",
+            "type": "object"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
           "engine_version": {
-            "type": "string",
-            "title": "Engine Version"
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "hit": {
+            "title": "Hit",
+            "type": "integer"
+          },
+          "hit_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate Pct"
           },
           "horizons": {
             "anyOf": [
@@ -9316,78 +9356,47 @@
             ],
             "title": "Horizons"
           },
+          "miss": {
+            "title": "Miss",
+            "type": "integer"
+          },
+          "neutral": {
+            "title": "Neutral",
+            "type": "integer"
+          },
+          "profile_calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionSignalProfileCalibration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statuses": {
             "items": {
               "type": "string"
             },
-            "type": "array",
-            "title": "Statuses"
+            "title": "Statuses",
+            "type": "array"
           },
           "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "completed": {
-            "type": "integer",
-            "title": "Completed"
+            "title": "Total",
+            "type": "integer"
           },
           "unable": {
-            "type": "integer",
-            "title": "Unable"
-          },
-          "hit": {
-            "type": "integer",
-            "title": "Hit"
-          },
-          "miss": {
-            "type": "integer",
-            "title": "Miss"
-          },
-          "neutral": {
-            "type": "integer",
-            "title": "Neutral"
-          },
-          "hit_rate_pct": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hit Rate Pct"
-          },
-          "avg_stock_return_pct": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avg Stock Return Pct"
+            "title": "Unable",
+            "type": "integer"
           },
           "unable_reasons": {
             "additionalProperties": {
               "type": "integer"
             },
-            "type": "object",
-            "title": "Unable Reasons"
-          },
-          "breakdowns": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/DecisionSignalOutcomeStatsBucket"
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "Breakdowns"
+            "title": "Unable Reasons",
+            "type": "object"
           }
         },
-        "type": "object",
         "required": [
           "engine_version",
           "total",
@@ -9397,7 +9406,8 @@
           "miss",
           "neutral"
         ],
-        "title": "DecisionSignalOutcomeStatsResponse"
+        "title": "DecisionSignalOutcomeStatsResponse",
+        "type": "object"
       },
       "AlertTriggerItem": {
         "properties": {
@@ -13086,6 +13096,177 @@
         ],
         "title": "ApprovalStatus",
         "description": "Durable proposal states; terminal states never transition again."
+      },
+      "DecisionSignalProfileCalibration": {
+        "properties": {
+          "breakdowns": {
+            "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBreakdowns"
+          },
+          "minimum_completed_sample_size": {
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minimum_completed_sample_size",
+          "breakdowns"
+        ],
+        "title": "DecisionSignalProfileCalibration",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibrationBreakdowns": {
+        "properties": {
+          "decision_profile": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile",
+            "type": "array"
+          },
+          "decision_profile_action": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Action",
+            "type": "array"
+          },
+          "decision_profile_data_quality_level": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Data Quality Level",
+            "type": "array"
+          },
+          "decision_profile_horizon": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Horizon",
+            "type": "array"
+          },
+          "decision_profile_market_phase": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Decision Profile Market Phase",
+            "type": "array"
+          },
+          "profile_source": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSignalProfileCalibrationBucket"
+            },
+            "title": "Profile Source",
+            "type": "array"
+          }
+        },
+        "title": "DecisionSignalProfileCalibrationBreakdowns",
+        "type": "object"
+      },
+      "DecisionSignalProfileCalibrationBucket": {
+        "properties": {
+          "avg_stock_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Stock Return Pct"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "hit": {
+            "title": "Hit",
+            "type": "integer"
+          },
+          "hit_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate Pct"
+          },
+          "max_adverse_excursion_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Adverse Excursion Pct"
+          },
+          "miss": {
+            "title": "Miss",
+            "type": "integer"
+          },
+          "miss_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Miss Rate Pct"
+          },
+          "neutral": {
+            "title": "Neutral",
+            "type": "integer"
+          },
+          "sample_sufficient": {
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "unable": {
+            "title": "Unable",
+            "type": "integer"
+          },
+          "unable_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unable Rate Pct"
+          }
+        },
+        "required": [
+          "total",
+          "completed",
+          "unable",
+          "hit",
+          "miss",
+          "neutral",
+          "sample_sufficient"
+        ],
+        "title": "DecisionSignalProfileCalibrationBucket",
+        "type": "object"
       }
     },
     "securitySchemes": {

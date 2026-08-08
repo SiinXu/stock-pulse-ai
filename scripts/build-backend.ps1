@@ -136,12 +136,15 @@ $hiddenImports = @(
 )
 $hiddenImportArgs = $hiddenImports | ForEach-Object { "--hidden-import=$_" }
 
+# setuptools>=82 removed pkg_resources; exclude so PyInstaller's obsolete
+# pyi_rth_pkgres hook is not collected into the frozen backend.
 $pyInstallerArgs = @(
   '-m', 'PyInstaller',
   '--name', 'stock_analysis',
   '--onedir',
   '--noconfirm',
   '--noconsole',
+  '--exclude-module', 'pkg_resources',
   '--add-data', 'static;static',
   '--add-data', 'strategies;strategies',
   '--add-data', 'src/llm/local_model_catalog.json;src/llm',

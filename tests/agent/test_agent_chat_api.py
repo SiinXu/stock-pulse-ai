@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.app import create_app
@@ -86,7 +87,11 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     Config.reset_instance()
     db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'trace.db'}")
     session_id = "api-trace-hidden"
-    user_id = db.save_conversation_message(session_id, "user", "visible question")
+    user_id = db.save_conversation_user_turn(
+        session_id,
+        "visible question",
+        ["technical"],
+    )
     assistant_id = db.save_conversation_message(session_id, "assistant", "visible answer")
     db.save_conversation_message(
         session_id,
@@ -140,6 +145,9 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
     ]
+    assert payload["session_state"] == {
+        "selected_skill_ids": ["technical"],
+    }
     assert "error" not in payload["messages"][0]
     assert "params" not in payload["messages"][0]
     assert "error" not in payload["messages"][1]
@@ -160,7 +168,10 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
         content="ok",
         error=None,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -182,9 +193,140 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
     kwargs = executor.chat.call_args.kwargs
     assert kwargs["message"] == "如果不考虑 TTM 呢"
     assert kwargs["session_id"] == "s1"
-    assert kwargs["context"]["stock_code"] == "600519"
-    assert kwargs["context"]["stock_name"] == "匿名标的"
+    assert kwargs["context"] == {
+        "stock_code": "600519",
+        "stock_name": "匿名标的",
+        "report_language": "en",
+    }
     assert "agent_runtime" not in response.json()
+
+
+def test_agent_chat_preserves_explicit_report_language(tmp_path: Path) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+    )
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={
+                        "message": "분석해 주세요",
+                        "session_id": "explicit-language",
+                        "context": {"report_language": "ko"},
+                    },
+                )
+
+    assert response.status_code == 200
+    assert executor.chat.call_args.kwargs["context"]["report_language"] == "ko"
+
+
+@pytest.mark.parametrize("provided_language", [None, "", "   "])
+def test_agent_chat_treats_null_or_blank_report_language_as_missing(
+    tmp_path: Path,
+    provided_language,
+) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+    )
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={
+                        "message": "analyze",
+                        "session_id": "default-language",
+                        "context": {"report_language": provided_language},
+                    },
+                )
+
+    assert response.status_code == 200
+    assert executor.chat.call_args.kwargs["context"]["report_language"] == "en"
+
+
+@pytest.mark.parametrize("provided_language", [None, "", "   "])
+def test_agent_chat_stream_treats_null_or_blank_report_language_as_missing(
+    tmp_path: Path,
+    provided_language,
+) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        total_steps=1,
+    )
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={
+                        "message": "analyze",
+                        "session_id": "stream-default-language",
+                        "context": {"report_language": provided_language},
+                    },
+                )
+
+    assert response.status_code == 200
+    assert '"type": "done"' in response.text
+    assert executor.chat.call_args.kwargs["context"]["report_language"] == "en"
+
+
+@pytest.mark.parametrize(
+    "provided_language, expected_language",
+    [
+        (None, "en"),
+        ("", "en"),
+        ("   ", "en"),
+        ("ko", "ko"),
+    ],
+)
+def test_build_agent_chat_context_normalizes_default_report_language(
+    provided_language,
+    expected_language,
+) -> None:
+    from api.v1.endpoints import agent as agent_endpoint
+
+    request = agent_endpoint.ChatRequest(
+        message="question",
+        context=(
+            {"report_language": provided_language}
+            if provided_language is not None
+            else {"report_language": None}
+        ),
+    )
+    context = agent_endpoint._build_agent_chat_context(
+        request,
+        SimpleNamespace(report_language="en"),
+        skills=None,
+    )
+    assert context["report_language"] == expected_language
 
 
 def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> None:
@@ -197,7 +339,7 @@ def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> No
             compose_agent_soul_prompt("Chat API verified prompt")
         ),
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -220,7 +362,7 @@ def test_agent_chat_omits_direct_unverified_runtime_facts(tmp_path: Path) -> Non
         error=None,
         runtime_facts=AgentRuntimeFacts(),
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -253,7 +395,7 @@ def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, cap
         content=SENSITIVE_PROVIDER_ERROR,
         error=SENSITIVE_PROVIDER_ERROR,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
     caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
@@ -283,7 +425,7 @@ def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
 ) -> None:
     executor = MagicMock()
     executor.chat.return_value = _build_all_unavailable_comparison_result()
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -311,6 +453,7 @@ def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
 def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) -> None:
     config = SimpleNamespace(
         is_agent_available=lambda: True,
+        report_language="zh",
         agent_deep_research_budget=30000,
         agent_deep_research_timeout=180,
     )
@@ -350,6 +493,7 @@ def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) 
 def test_agent_research_timeout_does_not_expose_internal_result(tmp_path: Path) -> None:
     config = SimpleNamespace(
         is_agent_available=lambda: True,
+        report_language="zh",
         agent_deep_research_budget=30000,
         agent_deep_research_timeout=180,
     )
@@ -394,7 +538,10 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
         error=None,
         total_steps=1,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -419,6 +566,7 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["session_id"] == "s1"
     assert kwargs["context"]["stock_code"] == "600519"
     assert kwargs["context"]["stock_name"] == "匿名标的"
+    assert kwargs["context"]["report_language"] == "zh"
 
 
 def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
@@ -432,7 +580,7 @@ def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
         error=None,
         total_steps=1,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -470,7 +618,7 @@ def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Pa
         error=SENSITIVE_PROVIDER_ERROR,
         total_steps=1,
     )
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
     caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
@@ -498,7 +646,7 @@ def test_agent_chat_stream_keeps_all_unavailable_failure_content_empty(
 ) -> None:
     executor = MagicMock()
     executor.chat.return_value = _build_all_unavailable_comparison_result()
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -540,7 +688,7 @@ def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: 
         )
 
     executor.chat.side_effect = fail_with_callback
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -577,7 +725,7 @@ def test_agent_chat_stream_callback_error_redacts_secret_shaped_trace_id(
         )
 
     executor.chat.side_effect = fail_with_callback
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         with patch("api.v1.endpoints.agent.get_config", return_value=config):
@@ -600,7 +748,7 @@ def test_agent_chat_stream_callback_error_redacts_secret_shaped_trace_id(
 def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: Path, caplog) -> None:
     executor = MagicMock()
     executor.chat.side_effect = RuntimeError(SENSITIVE_PROVIDER_ERROR)
-    config = SimpleNamespace(is_agent_available=lambda: True)
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
     caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
@@ -623,3 +771,116 @@ def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: P
     assert "super-secret" not in caplog.text
     assert "private.example" not in caplog.text
     assert SENSITIVE_STREAM_SESSION_ID not in caplog.text
+
+
+
+def test_chat_session_messages_returns_null_when_state_is_missing(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'default-state.db'}")
+    db.save_conversation_message("legacy-session", "user", "legacy question")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).get(
+            "/api/v1/agent/chat/sessions/legacy-session"
+        )
+
+    assert response.status_code == 200
+    assert response.json()["session_state"] == {
+        "selected_skill_ids": None,
+    }
+
+
+def test_agent_chat_inherits_saved_skills_without_rewriting_session_state(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'inherit.db'}")
+    db.save_conversation_user_turn("saved-session", "first", ["technical"])
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=None,
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat",
+            json={
+                "message": "follow up",
+                "session_id": "saved-session",
+                "context": {
+                    "stock_code": "600519",
+                    "skills": ["old_skill"],
+                    "strategies": ["older_strategy"],
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    build_executor.assert_called_once_with(config, ["technical"])
+    context = executor.chat.call_args.kwargs["context"]
+    assert context["stock_code"] == "600519"
+    assert context["skills"] == ["technical"]
+    assert "strategies" not in context
+    assert executor.chat.call_args.kwargs["selected_skill_ids"] is None
+
+
+def test_agent_chat_all_invalid_skills_inherit_without_clearing_state(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'all-invalid.db'}")
+    db.save_conversation_user_turn("saved-session", "first", ["technical"])
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=None,
+    )
+    skill_manager = MagicMock()
+    skill_manager.list_skills.return_value = [SimpleNamespace(name="technical")]
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("src.agent.factory.get_skill_manager", return_value=skill_manager), \
+         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat",
+            json={
+                "message": "follow up",
+                "session_id": "saved-session",
+                "skills": ["old_technical"],
+            },
+        )
+
+    assert response.status_code == 200
+    build_executor.assert_called_once_with(config, ["technical"])
+    assert executor.chat.call_args.kwargs["context"]["skills"] == ["technical"]
+    assert executor.chat.call_args.kwargs["selected_skill_ids"] is None
+    assert db.get_conversation_session_selected_skill_ids("saved-session") == [
+        "technical"
+    ]
+
+
+def test_requested_skill_normalization_reuses_agent_factory_catalog_rules() -> None:
+    from src.agent.factory import normalize_requested_skill_ids
+
+    skill_manager = MagicMock()
+    skill_manager.list_skills.return_value = [
+        SimpleNamespace(name="technical"),
+        SimpleNamespace(name="risk"),
+    ]
+
+    with patch("src.agent.factory.get_skill_manager", return_value=skill_manager):
+        normalized = normalize_requested_skill_ids(
+            SimpleNamespace(),
+            [" technical ", "technical", "unknown", "risk"],
+        )
+
+    assert normalized == ["technical", "risk"]
