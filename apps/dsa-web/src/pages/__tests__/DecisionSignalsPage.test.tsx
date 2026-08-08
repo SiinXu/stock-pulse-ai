@@ -8,6 +8,7 @@ import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
 } from '../../api/decisionSignals';
+import { createApiError, createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { alertsApi } from '../../api/alerts';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -2659,6 +2660,61 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByRole('heading', { name: '决策记忆' })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
+  });
+
+  it('opens a deep-linked signal by id when it is not in the loaded list page', async () => {
+    const remoteSignal = makeSignal({
+      id: 99,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+    });
+    // Loaded page only contains signal id 7; deep link targets 99.
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal]));
+    vi.mocked(decisionSignalsApi.get).mockImplementation(async (signalId: number) => {
+      if (signalId === remoteSignal.id) return remoteSignal;
+      return signal;
+    });
+    vi.mocked(decisionSignalsApi.getSignalOutcomes).mockResolvedValue(outcomeList);
+    vi.mocked(decisionSignalsApi.getMemoryFlag).mockResolvedValue({
+      signalId: remoteSignal.id,
+      memorable: false,
+      ignored: false,
+    });
+
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?signal=${remoteSignal.id}`);
+    renderPage();
+
+    await waitFor(() => expect(decisionSignalsApi.get).toHaveBeenCalledWith(remoteSignal.id));
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    expect(within(dialog).getByText('Apple')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe(String(remoteSignal.id));
+    await waitFor(() => expect(decisionSignalsApi.getSignalOutcomes).toHaveBeenCalledWith(remoteSignal.id));
+  });
+
+  it('clears a 404 deep-link signal param without crashing', async () => {
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal]));
+    vi.mocked(decisionSignalsApi.get).mockRejectedValue(
+      createApiError(
+        createParsedApiError({
+          title: '未找到',
+          message: '信号不存在',
+          status: 404,
+          category: 'http_error',
+          code: 'not_found',
+        }),
+      ),
+    );
+
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?signal=40404`);
+    renderPage();
+
+    await waitFor(() => expect(decisionSignalsApi.get).toHaveBeenCalledWith(40404));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
+    expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument();
+    // Existing statusError + ApiErrorAlert path surfaces the stable not_found copy (no new i18n key).
+    expect(await screen.findByText('该内容可能已删除、过期或尚未生成。')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '信号中心' })).toBeInTheDocument();
   });
 
   it('opens a Bell signal detail after same-route navigation', async () => {
