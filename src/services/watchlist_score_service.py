@@ -8,7 +8,7 @@ score when a symbol has no analysis history, and never triggers a new LLM call.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from sqlalchemy import desc, select
 
