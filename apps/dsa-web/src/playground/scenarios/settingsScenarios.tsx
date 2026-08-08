@@ -12,8 +12,14 @@ import { KronosStatusPanel } from '../../components/settings/KronosStatusPanel';
 import { LocalModelsWithKronos } from '../../components/settings/LocalModelsWithKronos';
 import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
+import { InvestmentFrameworkPromptPreview } from '../../components/settings/InvestmentFrameworkPromptPreview';
 import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
+import { emptyInvestmentFrameworkContent } from '../../components/settings/investmentFrameworkEditorModel';
 import { LLMChannelEditor } from '../../components/settings/LLMChannelEditor';
+import { SettingsModeToggle, type SettingsDisplayMode } from '../../components/settings/SettingsModeToggle';
+import { SettingsAgentOnboardingHost } from '../../components/onboarding/SettingsAgentOnboardingHost';
+import { SettingsOnboardingHosts } from '../../components/onboarding/SettingsOnboardingHosts';
+import type { SetupStatusResponse } from '../../types/systemConfig';
 import { LLMConfigModeBanner } from '../../components/settings/LLMConfigModeBanner';
 import { LocalModelsPanel } from '../../components/settings/LocalModelsPanel';
 import { ModelFallbackEditor } from '../../components/settings/ModelFallbackEditor';
@@ -483,6 +489,116 @@ const SystemConfigSummaryStory = () => (
   <SystemConfigSummary items={NOTIFICATION_ITEMS} maskToken={MASK_TOKEN} />
 );
 
+const FIXTURE_SETUP_STATUS: SetupStatusResponse = {
+  isComplete: false,
+  readyForSmoke: false,
+  requiredMissingKeys: ['LITELLM_MODEL'],
+  nextStepKey: 'llm_primary',
+  checks: [
+    {
+      key: 'llm_primary',
+      title: 'Primary model',
+      category: 'ai_model',
+      required: true,
+      status: 'needs_action',
+      message: 'Primary model is not configured.',
+      nextStep: 'Configure a primary model in Settings.',
+    },
+    {
+      key: 'auth',
+      title: 'Authentication',
+      category: 'system',
+      required: false,
+      status: 'optional',
+      message: 'Password login is optional for local use.',
+    },
+  ],
+};
+
+const InvestmentFrameworkPromptPreviewStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const { text } = useStoryText();
+  const content = scenario === 'empty'
+    ? emptyInvestmentFrameworkContent()
+    : {
+      ...emptyInvestmentFrameworkContent(),
+      title: 'Quality first',
+      freeFormRules: 'Prefer durable cash flow',
+      riskRules: ['Cap single-name size at 10%'],
+      trackingCriteria: ['Review earnings revisions'],
+    };
+  return (
+    <InvestmentFrameworkPromptPreview
+      content={content}
+      frameworkId={scenario === 'empty' ? null : 1}
+      frameworkVersion={scenario === 'empty' ? null : 2}
+      draft
+      reportLanguage="en"
+      title={text.panelTitle}
+      description={text.fieldHint}
+      emptyLabel={text.preview}
+    />
+  );
+};
+
+const SettingsModeToggleStory = () => {
+  const { language } = useStoryText();
+  const [mode, setMode] = useState<SettingsDisplayMode>('essentials');
+  return <SettingsModeToggle mode={mode} onModeChange={setMode} language={language} />;
+};
+
+const SettingsAgentOnboardingHostStory = () => {
+  const { t } = useUiLanguage();
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="space-y-3">
+      <Button variant="primary" onClick={() => setOpen(true)}>Open agent onboarding</Button>
+      <SettingsAgentOnboardingHost
+        open={open}
+        onClose={() => setOpen(false)}
+        onApplied={() => setOpen(false)}
+        setupStatus={FIXTURE_SETUP_STATUS}
+        reportLanguage="en"
+        t={t}
+      />
+    </div>
+  );
+};
+
+const SettingsOnboardingHostsStory = () => {
+  const { language, text } = useStoryText();
+  const { t } = useUiLanguage();
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(true);
+  return (
+    <div className="space-y-3">
+      <Button variant="secondary" onClick={() => setIsWizardOpen(true)}>Open first-run wizard</Button>
+      <Button variant="primary" onClick={() => setIsAgentOnboardingOpen(true)}>Open agent onboarding</Button>
+      <SettingsOnboardingHosts
+        isWizardOpen={isWizardOpen}
+        isAgentOnboardingOpen={isAgentOnboardingOpen}
+        setIsWizardOpen={setIsWizardOpen}
+        setIsAgentOnboardingOpen={setIsAgentOnboardingOpen}
+        handleWizardComplete={async () => ({ success: true })}
+        isSaving={false}
+        uiLanguage={language}
+        existingChannelNames={[]}
+        providerCatalog={fixtureProviders}
+        providerConnectionFields={CONNECTION_FIELDS}
+        modelSelectorOptions={[{ value: MODEL_REF, label: 'Fixture Route' }]}
+        initialFallbackModels=""
+        initialVisionModel=""
+        onViewRouting={() => undefined}
+        onLocalModelConfigurationChanged={() => undefined}
+        onAgentApplied={() => setIsAgentOnboardingOpen(false)}
+        setupStatus={FIXTURE_SETUP_STATUS}
+        t={t}
+      />
+      <p className="text-xs text-muted-text">{text.preview}</p>
+    </div>
+  );
+};
+
 export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
@@ -495,6 +611,10 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'local-models-with-kronos': LocalModelsWithKronosStory,
   'intelligent-import': IntelligentImportStory,
   'investment-framework-settings-card': InvestmentFrameworkSettingsCard,
+  'investment-framework-prompt-preview': InvestmentFrameworkPromptPreviewStory,
+  'settings-mode-toggle': SettingsModeToggleStory,
+  'settings-agent-onboarding-host': SettingsAgentOnboardingHostStory,
+  'settings-onboarding-hosts': SettingsOnboardingHostsStory,
   'intelligence-sources-panel': IntelligenceSourcesPanel,
   'llm-channel-editor': LLMChannelEditorStory,
   'llm-config-mode-banner': LLMConfigModeBannerStory,
