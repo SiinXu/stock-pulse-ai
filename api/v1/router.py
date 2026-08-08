@@ -21,6 +21,7 @@ from api.v1.endpoints import (
     backtest,
     config_profiles,
     decision_signals,
+    event_calendar,
     health,
     history,
     investment_framework,
@@ -114,6 +115,12 @@ router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
+)
+
+router.include_router(
+    event_calendar.router,
+    prefix="/event-calendar",
+    tags=["EventCalendar"],
 )
 
 router.include_router(

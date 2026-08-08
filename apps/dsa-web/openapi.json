@@ -4535,6 +4535,88 @@
         "title": "Body_parse_csv_import_api_v1_portfolio_imports_csv_parse_post",
         "type": "object"
       },
+      "CalendarEventItem": {
+        "properties": {
+          "certainty": {
+            "description": "confirmed|scheduled|estimated",
+            "title": "Certainty",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "event_date": {
+            "description": "ISO date YYYY-MM-DD",
+            "title": "Event Date",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "description": "earnings|ex_dividend|unlock|index_rebalance|macro",
+            "title": "Event Type",
+            "type": "string"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "impact_preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventImpactPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "market": {
+            "default": "",
+            "title": "Market",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "event_date",
+          "certainty",
+          "symbol",
+          "title"
+        ],
+        "title": "CalendarEventItem",
+        "type": "object"
+      },
       "CallTypeBreakdown": {
         "properties": {
           "call_type": {
@@ -7754,6 +7836,257 @@
           "message"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EventCalendarCoverageRow": {
+        "properties": {
+          "earnings": {
+            "title": "Earnings",
+            "type": "string"
+          },
+          "ex_dividend": {
+            "title": "Ex Dividend",
+            "type": "string"
+          },
+          "index_rebalance": {
+            "title": "Index Rebalance",
+            "type": "string"
+          },
+          "macro": {
+            "title": "Macro",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "unlock": {
+            "title": "Unlock",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "earnings",
+          "ex_dividend",
+          "unlock",
+          "index_rebalance",
+          "macro"
+        ],
+        "title": "EventCalendarCoverageRow",
+        "type": "object"
+      },
+      "EventCalendarResponse": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/EventCalendarCoverageRow"
+            },
+            "title": "Coverage",
+            "type": "array"
+          },
+          "coverage_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Coverage Notes",
+            "type": "array"
+          },
+          "date_from": {
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "title": "Date To",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "event_count": {
+            "default": 0,
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "event_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Types",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarEventItem"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "fetch_attempted": {
+            "title": "Fetch Attempted",
+            "type": "boolean"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "impact_preview_mode": {
+            "default": "build_impact_context",
+            "title": "Impact Preview Mode",
+            "type": "string"
+          },
+          "reuses_build_impact_context": {
+            "default": true,
+            "title": "Reuses Build Impact Context",
+            "type": "boolean"
+          },
+          "sources_attempted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources Attempted",
+            "type": "array"
+          },
+          "symbol_count": {
+            "default": 0,
+            "title": "Symbol Count",
+            "type": "integer"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "fetch_attempted",
+          "as_of",
+          "date_from",
+          "date_to"
+        ],
+        "title": "EventCalendarResponse",
+        "type": "object"
+      },
+      "EventImpactPreview": {
+        "properties": {
+          "affected": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affected"
+          },
+          "available": {
+            "default": false,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "event_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Category"
+          },
+          "related_analysis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Analysis"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "what_happened": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "What Happened"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters"
+          }
+        },
+        "title": "EventImpactPreview",
         "type": "object"
       },
       "ExportSystemConfigResponse": {
@@ -26350,6 +26683,158 @@
         "summary": "更新决策信号状态",
         "tags": [
           "DecisionSignals"
+        ]
+      }
+    },
+    "/api/v1/event-calendar": {
+      "get": {
+        "description": "Upcoming corporate events scoped to configured watchlist symbols and portfolio holdings. Disabled by default (EVENT_CALENDAR_ENABLED=false) with zero provider fetch. Impact preview reuses event_alerts.build_impact_context.",
+        "operationId": "getEventCalendar",
+        "parameters": [
+          {
+            "description": "Range start (default: today)",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range start (default: today)",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Range end (default: today + 90 days)",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Range end (default: today + 90 days)",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Optional comma-separated filter intersected with watchlist/holdings",
+            "in": "query",
+            "name": "symbols",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional comma-separated filter intersected with watchlist/holdings",
+              "title": "Symbols"
+            }
+          },
+          {
+            "description": "Comma-separated: earnings,ex_dividend,unlock,index_rebalance,macro",
+            "in": "query",
+            "name": "event_types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated: earnings,ex_dividend,unlock,index_rebalance,macro",
+              "title": "Event Types"
+            }
+          },
+          {
+            "description": "Attach impact preview via build_impact_context (no LLM invent)",
+            "in": "query",
+            "name": "include_impact",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Attach impact preview via build_impact_context (no LLM invent)",
+              "title": "Include Impact",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language for impact text: zh or en",
+            "in": "query",
+            "name": "report_language",
+            "required": false,
+            "schema": {
+              "default": "zh",
+              "description": "Language for impact text: zh or en",
+              "title": "Report Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventCalendarResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Event calendar failed"
+          }
+        },
+        "summary": "Get event calendar for watchlist and holdings",
+        "tags": [
+          "EventCalendar"
         ]
       }
     },

@@ -1181,6 +1181,26 @@ export interface paths {
         patch: operations["updateDecisionSignalStatus"];
         trace?: never;
     };
+    "/api/v1/event-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get event calendar for watchlist and holdings
+         * @description Upcoming corporate events scoped to configured watchlist symbols and portfolio holdings. Disabled by default (EVENT_CALENDAR_ENABLED=false) with zero provider fetch. Impact preview reuses event_alerts.build_impact_context.
+         */
+        get: operations["getEventCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -4884,6 +4904,52 @@ export interface components {
             /** File */
             file: string;
         };
+        /** CalendarEventItem */
+        CalendarEventItem: {
+            /**
+             * Certainty
+             * @description confirmed|scheduled|estimated
+             */
+            certainty: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Event Date
+             * @description ISO date YYYY-MM-DD
+             */
+            event_date: string;
+            /** Event Id */
+            event_id: string;
+            /**
+             * Event Type
+             * @description earnings|ex_dividend|unlock|index_rebalance|macro
+             */
+            event_type: string;
+            /** Fetched At */
+            fetched_at?: string | null;
+            impact_preview?: components["schemas"]["EventImpactPreview"] | null;
+            /**
+             * Market
+             * @default
+             */
+            market: string;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /** Symbol */
+            symbol: string;
+            /** Title */
+            title: string;
+        };
         /** CallTypeBreakdown */
         CallTypeBreakdown: {
             /**
@@ -6019,6 +6085,96 @@ export interface components {
              * @description Diagnostic trace ID
              */
             trace_id?: string | null;
+        };
+        /** EventCalendarCoverageRow */
+        EventCalendarCoverageRow: {
+            /** Earnings */
+            earnings: string;
+            /** Ex Dividend */
+            ex_dividend: string;
+            /** Index Rebalance */
+            index_rebalance: string;
+            /** Macro */
+            macro: string;
+            /** Market */
+            market: string;
+            /** Unlock */
+            unlock: string;
+        };
+        /** EventCalendarResponse */
+        EventCalendarResponse: {
+            /** As Of */
+            as_of: string;
+            /** Coverage */
+            coverage?: components["schemas"]["EventCalendarCoverageRow"][];
+            /** Coverage Notes */
+            coverage_notes?: string[];
+            /** Date From */
+            date_from: string;
+            /** Date To */
+            date_to: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Errors */
+            errors?: string[];
+            /**
+             * Event Count
+             * @default 0
+             */
+            event_count: number;
+            /** Event Types */
+            event_types?: string[];
+            /** Events */
+            events?: components["schemas"]["CalendarEventItem"][];
+            /** Fetch Attempted */
+            fetch_attempted: boolean;
+            /** Fetched At */
+            fetched_at?: string | null;
+            /**
+             * Impact Preview Mode
+             * @default build_impact_context
+             */
+            impact_preview_mode: string;
+            /**
+             * Reuses Build Impact Context
+             * @default true
+             */
+            reuses_build_impact_context: boolean;
+            /** Sources Attempted */
+            sources_attempted?: string[];
+            /**
+             * Symbol Count
+             * @default 0
+             */
+            symbol_count: number;
+            /** Symbols */
+            symbols?: string[];
+        };
+        /** EventImpactPreview */
+        EventImpactPreview: {
+            /** Affected */
+            affected?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Error */
+            error?: string | null;
+            /** Event Category */
+            event_category?: string | null;
+            /** Related Analysis */
+            related_analysis?: string | null;
+            /** Source */
+            source?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
         };
         /**
          * ExportSystemConfigResponse
@@ -15054,6 +15210,66 @@ export interface operations {
                 };
             };
             /** @description 更新失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getEventCalendar: {
+        parameters: {
+            query?: {
+                /** @description Range start (default: today) */
+                date_from?: string | null;
+                /** @description Range end (default: today + 90 days) */
+                date_to?: string | null;
+                /** @description Optional comma-separated filter intersected with watchlist/holdings */
+                symbols?: string | null;
+                /** @description Comma-separated: earnings,ex_dividend,unlock,index_rebalance,macro */
+                event_types?: string | null;
+                /** @description Attach impact preview via build_impact_context (no LLM invent) */
+                include_impact?: boolean;
+                /** @description Language for impact text: zh or en */
+                report_language?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventCalendarResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Event calendar failed */
             500: {
                 headers: {
                     [name: string]: unknown;
