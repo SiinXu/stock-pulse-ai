@@ -74,6 +74,9 @@ type StartStreamOptions = {
   appendUserMessage?: boolean;
 };
 
+/** Per-call result of startStream. Private to each invocation (no shared store field). */
+export type StreamOutcome = 'completed' | 'failed' | 'aborted' | 'skipped';
+
 type StreamFailureEvent = {
   type: string;
   success?: boolean;
@@ -155,7 +158,11 @@ interface AgentChatActions {
   loadInitialSession: (preferredSessionId?: string) => Promise<void>;
   switchSession: (targetSessionId: string) => Promise<boolean>;
   startNewChat: () => string;
-  startStream: (payload: ChatStreamRequest, meta?: StreamMeta, options?: StartStreamOptions) => Promise<void>;
+  startStream: (
+    payload: ChatStreamRequest,
+    meta?: StreamMeta,
+    options?: StartStreamOptions,
+  ) => Promise<StreamOutcome>;
   retryLastStream: () => Promise<void>;
   stopStream: () => void;
   resetSessionState: () => void;
@@ -377,7 +384,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   },
 
   startStream: async (payload, meta, options) => {
-    if (get().loading) return;
+    // Concurrent-send guard: a stream is already in flight.
+    if (get().loading) return 'skipped';
     const { abortController: prevAc, sessionId: storeSessionId } = get();
     prevAc?.abort();
 
@@ -421,6 +429,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           ],
     }));
 
+    // Outcome is local to this invocation so a superseded stream cannot pollute a newer one.
+    let outcome: StreamOutcome = 'completed';
     try {
       const response = await agentApi.chatStream(payload, { signal: ac.signal });
       const reader = response.body!.getReader();
@@ -494,6 +504,12 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         });
       }
 
+      // Clean close after user/session abort without an AbortError throw.
+      if (ac.signal.aborted) {
+        outcome = 'aborted';
+        return outcome;
+      }
+
       const { sessionId: currentSessionId, currentRoute } = get();
       const shouldAppend =
         currentSessionId === streamSessionId && !ac.signal.aborted;
@@ -519,9 +535,12 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       if (currentRoute !== APP_ROUTE_PATHS.agent) {
         set({ completionBadge: true });
       }
+      outcome = 'completed';
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
-        // User-initiated abort: silent, no badge
+        // User-initiated abort: silent, no badge, no retry entry.
+        // lastFailedRequest stays null so retryLastStream remains inert after Stop.
+        outcome = 'aborted';
       } else if (
         get().sessionId === streamSessionId
         && get().abortController === ac
@@ -534,6 +553,11 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         if (currentRoute !== APP_ROUTE_PATHS.agent) {
           set({ completionBadge: true });
         }
+        outcome = 'failed';
+      } else {
+        // Stale non-abort error after session/controller identity no longer matches
+        // (superseded stream / switchSession). Not a backend acceptance of this turn.
+        outcome = 'failed';
       }
     } finally {
       const { abortController: currentAc } = get();
@@ -546,6 +570,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       }
       await get().loadSessions();
     }
+    return outcome;
   },
 
   retryLastStream: async () => {
@@ -553,6 +578,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     if (!lastFailedRequest || loading) {
       return;
     }
+    // Ignore StreamOutcome: retry UX is driven by lastFailedRequest / chatError only.
     await get().startStream(
       lastFailedRequest.payload,
       lastFailedRequest.meta,

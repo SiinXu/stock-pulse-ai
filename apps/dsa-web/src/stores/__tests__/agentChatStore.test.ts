@@ -346,6 +346,40 @@ describe('agentChatStore.stopStream', () => {
     expect(() => useAgentChatStore.getState().stopStream()).not.toThrow();
     expect(useAgentChatStore.getState().loading).toBe(false);
   });
+
+  it('returns aborted from startStream and keeps lastFailedRequest null when stopStream cancels the request', async () => {
+    const hang = createDeferred<Response>();
+    vi.mocked(agentApi.chatStream).mockImplementation((_payload, options) => {
+      const signal = options?.signal;
+      if (signal?.aborted) {
+        return Promise.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+      }
+      return new Promise<Response>((resolve, reject) => {
+        const onAbort = () => {
+          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+        void hang.promise.then(resolve, reject);
+      });
+    });
+
+    const outcomePromise = useAgentChatStore
+      .getState()
+      .startStream({ message: '分析茅台', session_id: 'session-test' }, { skillName: '趋势技能' });
+
+    await vi.waitFor(() => {
+      expect(useAgentChatStore.getState().loading).toBe(true);
+      expect(useAgentChatStore.getState().abortController).not.toBeNull();
+    });
+
+    useAgentChatStore.getState().stopStream();
+
+    await expect(outcomePromise).resolves.toBe('aborted');
+    const state = useAgentChatStore.getState();
+    expect(state.lastFailedRequest).toBeNull();
+    expect(state.chatError).toBeNull();
+    expect(state.loading).toBe(false);
+  });
 });
 
 describe('agentChatStore.switchSession', () => {

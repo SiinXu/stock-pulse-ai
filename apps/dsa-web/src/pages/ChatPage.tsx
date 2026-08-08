@@ -682,7 +682,8 @@ const ChatPage: React.FC = () => {
       };
       // Keep stock/name/recordId query params unsent until the stream succeeds so a
       // mid-flight refresh can restore the report→chat draft. Only mark context=active
-      // after backend persistence (stream without lastFailedRequest).
+      // after the backend accepted the turn (startStream outcome === 'completed').
+      // Abort/failed/skipped must not stamp context=active or drop the unsent draft.
       const pendingFollowUpContext = followUpContextRef.current;
       const unsentFollowUpParamsPresent = Boolean(
         sanitizeFollowUpStockCode(searchParams.get('stock'))
@@ -695,18 +696,17 @@ const ChatPage: React.FC = () => {
       setInput('');
       setMobileSkillPickerOpen(false);
       requestScrollToBottom('smooth');
-      await startStream(payload, {
+      const streamOutcome = await startStream(payload, {
         skillNames: usedSkillNames,
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
 
-      const { lastFailedRequest } = useAgentChatStore.getState();
-      if (!lastFailedRequest) {
+      if (streamOutcome === 'completed') {
         persistActiveContextInUrl(nextActiveStockContext);
         return;
       }
 
-      // Stream failed: restore draft + pending context so refresh can retry.
+      // Stream failed or was aborted/skipped: restore draft + pending context so refresh can retry.
       followUpContextRef.current = pendingFollowUpContext ?? contextForSend ?? null;
       if (unsentFollowUpParamsPresent || pendingFollowUpContext) {
         setInput(msgText);
