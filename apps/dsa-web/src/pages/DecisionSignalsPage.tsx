@@ -14,6 +14,7 @@ import {
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
 import {
+  ApiErrorAlert,
   AppPage,
   Button,
   ConfirmDialog,
@@ -370,6 +371,7 @@ const DecisionSignalsPage: React.FC = () => {
     const item = nextItems.find((candidate) => candidate.id === pendingId);
     if (!item) return null;
     pendingSelectedSignalIdRef.current = null;
+    selectedSignalIdRef.current = item.id;
     return { source, item };
   }, []);
 
@@ -389,31 +391,46 @@ const DecisionSignalsPage: React.FC = () => {
       const item = source.items.find((candidate) => candidate.id === routeSignalId);
       if (!item) continue;
       pendingSelectedSignalIdRef.current = null;
+      selectedSignalIdRef.current = item.id;
       setSelected({ source: source.source, item });
       return;
     }
-    setSelected(null);
-  }, [routeLocation.key, routeLocation.search]);
+    // Memory miss fallback: get() by id (source 'outcome' so list refresh won't drop off-page).
+    if (selectedSignalIdRef.current !== null) setSelected(null);
+    void decisionSignalsApi.get(routeSignalId).then((item) => {
+      if (!mountedRef.current || pendingSelectedSignalIdRef.current !== routeSignalId) return;
+      pendingSelectedSignalIdRef.current = null;
+      selectedSignalIdRef.current = item.id;
+      setStatusError(null);
+      setSelected({ source: 'outcome', item });
+    }).catch((err) => {
+      if (!mountedRef.current || pendingSelectedSignalIdRef.current !== routeSignalId) return;
+      pendingSelectedSignalIdRef.current = null;
+      selectedSignalIdRef.current = null;
+      setSelected(null);
+      setStatusError(getParsedApiError(err));
+      updateDecisionSignalSearchParams({ signal: null });
+    });
+  }, [routeLocation.key, routeLocation.search, updateDecisionSignalSearchParams]);
 
   const handleSelectSignal = useCallback((source: SelectedSignal['source'], item: DecisionSignalItem) => {
     pendingSelectedSignalIdRef.current = null;
+    selectedSignalIdRef.current = item.id;
     setSelected({ source, item });
     updateDecisionSignalSearchParams({ signal: item.id });
   }, [updateDecisionSignalSearchParams]);
-
   const handleOpenOutcomeSignal = useCallback(async (signalId: number) => {
     const item = await decisionSignalsApi.get(signalId);
     if (!mountedRef.current) return;
     handleSelectSignal('outcome', item);
   }, [handleSelectSignal]);
-
   const handleCloseSignal = useCallback(() => {
     pendingSelectedSignalIdRef.current = null;
+    selectedSignalIdRef.current = null;
     setStatusError(null);
     setSelected(null);
     updateDecisionSignalSearchParams({ signal: null });
   }, [updateDecisionSignalSearchParams]);
-
   const popularCandidates = useMemo(
     () => toPopularCandidates(stockIndex, STOCK_CANDIDATE_LIMIT),
     [stockIndex],
@@ -862,11 +879,8 @@ const DecisionSignalsPage: React.FC = () => {
       const authoritativeItem = response.item;
       const shouldOptimisticallyUpsert = response.persistStatus !== 'existing';
       reassessDispatch({ type: 'persistSuccess', response });
-      setSelected((current) => (
-        current
-          ? { source: 'persisted', item: authoritativeItem }
-          : null
-      ));
+      selectedSignalIdRef.current = authoritativeItem.id;
+      setSelected((current) => (current ? { source: 'persisted', item: authoritativeItem } : null));
       if (
         shouldOptimisticallyUpsert
         &&
@@ -1463,6 +1477,8 @@ const DecisionSignalsPage: React.FC = () => {
           />
         </ToastViewport>
       ) : null}
+
+      {statusError && !selected ? <ApiErrorAlert error={statusError} onDismiss={() => setStatusError(null)} /> : null}
 
       <ConfirmDialog
         isOpen={reassessPersistConfirm}
