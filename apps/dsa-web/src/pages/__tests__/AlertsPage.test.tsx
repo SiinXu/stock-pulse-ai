@@ -413,7 +413,9 @@ describe('AlertsPage', () => {
 
     renderAlertsPage();
 
-    chooseOption(screen.getByLabelText('启停状态'), 'disabled');
+    fireEvent.click(screen.getByRole('button', { name: /筛选/ }));
+    const filterDialog = await screen.findByRole('dialog', { name: '筛选' });
+    chooseOption(within(filterDialog).getByLabelText('启停状态'), 'disabled');
     await waitFor(() => expect(listRules).toHaveBeenCalledTimes(2));
 
     filteredRequest.resolve({ items: [filteredRule], total: 1, page: 1, pageSize: 20 });
