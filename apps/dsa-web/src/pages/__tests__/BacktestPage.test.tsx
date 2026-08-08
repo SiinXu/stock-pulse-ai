@@ -179,7 +179,8 @@ describe('BacktestPage', () => {
     expect(filterInput).toHaveAttribute('aria-autocomplete', 'none');
     expect(windowInput).toHaveAttribute('data-control', 'input');
     expect(windowInput).toHaveAttribute('data-size', 'default');
-    expect(windowInput).toHaveAccessibleName('窗口天数');
+    // Accessible name tracks BACKTEST_TEXT.evalWindow (评估窗口), not a stale synonym.
+    expect(windowInput).toHaveAccessibleName('评估窗口');
     expect(screen.queryByRole('button', { name: '筛选' })).not.toBeInTheDocument();
     expect(screen.getByTestId('backtest-stock-filter')).toHaveClass('flex', 'flex-col', '[&>div]:h-8');
     expect(screen.getByText('股票', { selector: 'label' })).toHaveAttribute('for', 'backtest-stock-filter');
@@ -192,6 +193,10 @@ describe('BacktestPage', () => {
     expect(dateRangeInput.parentElement).toHaveAttribute('data-size', 'compact');
     expect(screen.queryByLabelText('分析开始日期')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('分析结束日期')).not.toBeInTheDocument();
+
+    // #879 B5: one page-level H1 from PageHeader.
+    expect(screen.getByRole('heading', { level: 1, name: '策略回测' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -752,7 +757,7 @@ describe('BacktestPage', () => {
 
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('radio', { name: '次日验证' });
-    expect(screen.getByRole('radiogroup', { name: '窗口天数 / 次日验证' })).toHaveClass(
+    expect(screen.getByRole('radiogroup', { name: '评估窗口 / 次日验证' })).toHaveClass(
       '[&_.segmented-control-tab]:font-medium',
       'dark:!bg-foreground/10',
       'dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground',
@@ -823,7 +828,17 @@ describe('BacktestPage', () => {
     renderPage();
     await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
 
+    // The legacy apply-filters button is gone; mobile disclosure uses a page-scoped name.
     expect(screen.queryByRole('button', { name: '筛选' })).not.toBeInTheDocument();
+    const mobileFiltersToggle = screen.getByTestId('backtest-mobile-filters-toggle');
+    expect(mobileFiltersToggle).toHaveAttribute('aria-label', '策略回测 · 筛选');
+    expect(mobileFiltersToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(mobileFiltersToggle).toHaveClass('md:hidden');
+    expect(screen.getByTestId('backtest-run-filters')).toHaveClass('max-md:hidden');
+
+    fireEvent.click(mobileFiltersToggle);
+    expect(mobileFiltersToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('backtest-run-filters')).not.toHaveClass('max-md:hidden');
   });
 
   it('shows a compact run-error toast without changing the header layout', async () => {
