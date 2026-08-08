@@ -404,9 +404,10 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     }
   };
 
-  const loadEditRuleById = useCallback(async (ruleId: number) => {
+  const loadEditRuleById = useCallback(async (ruleId: number, options: { fromUrl?: boolean } = {}) => {
     const requestId = editRequestIdRef.current + 1;
     editRequestIdRef.current = requestId;
+    deepLinkAlertIdRef.current = ruleId;
     setEditError(null);
     setEditRule(null);
     setEditModalOpen(true);
@@ -419,16 +420,12 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       // response seed the form with the wrong rule.
       if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
       setEditRule(fresh);
-      deepLinkAlertIdRef.current = ruleId;
     } catch (error) {
       if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
       const parsed = getParsedApiError(error);
       setEditError(parsed);
-      // Deep-link 404/forbidden: clear the param so refresh/share does not loop.
-      if (
-        urlOwned
-        && (parsed.status === 404 || parsed.status === 403 || parsed.code === 'not_found' || parsed.code === 'forbidden')
-      ) {
+      // Deep-link failures: clear the param so refresh/share does not loop or blank the page.
+      if (urlOwned && options.fromUrl) {
         deepLinkAlertIdRef.current = null;
         setEditModalOpen(false);
         setEditRule(null);
@@ -474,11 +471,12 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       }
       return;
     }
-    if (deepLinkAlertIdRef.current === selectedAlertId && (editModalOpen || editOpening)) {
+    // Already loading or showing this id — avoid duplicate getRule calls (Strict Mode / remounts).
+    if (deepLinkAlertIdRef.current === selectedAlertId) {
       return;
     }
-    void loadEditRuleById(selectedAlertId);
-  }, [editLoading, editModalOpen, editOpening, loadEditRuleById, selectedAlertId, urlOwned]);
+    void loadEditRuleById(selectedAlertId, { fromUrl: true });
+  }, [editLoading, editModalOpen, loadEditRuleById, selectedAlertId, urlOwned]);
 
   // Trigger deep links only highlight rows already on the loaded page.
   // There is no get-trigger-by-id API; missing ids clear the param with a visible error.

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Notifications hub: channel cards show config + last-test status, read-only event routing map, and actionable test-to-bind guidance (#866).
 - [Added] Alerts workspace URL contract: standalone filters/tabs/pagination and `?alert=` edit deep links restore from the query string with replace/push history, and missing deep links clear the param without a blank page (#879 A1).
 - [Added] Shared Web URL state helper (`urlState`) with typed schemas, replace/push history rules, unknown-param preservation, Decision Signals schema example, and unit tests (UI-03A / #879 A1 foundation; no page wiring yet).
 - [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).

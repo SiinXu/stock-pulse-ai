@@ -479,7 +479,7 @@ describe('AlertsPage URL contract', () => {
   });
 
   it('clears a 404 deep-link alert param without blanking the page', async () => {
-    getRule.mockRejectedValueOnce(
+    getRule.mockRejectedValue(
       createApiError(
         createParsedApiError({
           title: '未找到请求的内容',
