@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Complete Simplified Chinese settings-help source parity for RSS feeds and multi-strategy deliberation, refresh locale bundles, and re-freeze identical-to-English baseline so web-gate `test:i18n` can pass after the previously blocked resource extract.
 - [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
 
 - [Added] Shared Web URL state helper (`urlState`) with typed schemas, replace/push history rules, unknown-param preservation, Decision Signals schema example, and unit tests (UI-03A / #879 A1 foundation; no page wiring yet).
