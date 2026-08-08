@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Restore the shared UI i18n source/inventory prerequisite for Settings mounts: fill missing Simplified Chinese settingsHelp entries and regenerate stable-key locale inventory for RSS feeds, multi-strategy/committee agent fields, and local-runtime detect keys (does not by itself complete auth or tooltip e2e contracts).
+- [Fixed] Restore Settings page load in Vite DEV/e2e by syncing missing UI i18n inventory keys (systemConfig field titles + settingsHelp) so auth credential-boundary and disable-reconfirm e2e can run against a real Settings surface.
+- [Chore] Added Web production bundle gzip size budgets and `npm run build:check` gate (baseline = measured size + 10%; no business-code slimming in this change).
 - [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
 - [Added] Web multi-market number/timezone/change-color formatting contract module (`marketFormat`) with semantic matrix unit tests (issue #889).
 - [Fixed] Keep report→Chat stock/record URL context until the chat stream succeeds so a mid-flight refresh can restore the unsent follow-up draft (#879 A5).
