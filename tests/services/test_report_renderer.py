@@ -754,6 +754,113 @@ class TestDecisionCardRendering(unittest.TestCase):
             # Card appears before stock-local strata or trailing sections.
             card_idx = out.find("🃏")
             self.assertGreaterEqual(card_idx, 0, name)
+            if name == "wechat":
+                trail_idx = out.find("📌")
+            else:
+                trail_idx = out.find("不构成投资建议")
+            self.assertGreater(
+                trail_idx,
+                card_idx,
+                f"{name}: Decision Card must appear before trailing stock-local / footer content",
+            )
+
+    def test_brief_decision_card_respects_push_length_budget(self) -> None:
+        """Brief Decision Card must honor the documented push length budget.
+
+        Contract (templates/_macros.j2 decision_card compact='brief' + report_brief.j2):
+        - At most 2 non-empty body lines per stock (1 primary + optional 1 supplementary).
+        - Primary line keeps origin/main parity fields: signal_emoji, signal_text,
+          score label + sentiment_score, and one-sentence conclusion.
+        - After markdown_to_plain_text, a 10-stock watchlist must fit in one
+          Pushover message (src/notification_parts/senders/pushover_sender.py
+          max_length = 1024).
+        """
+        from src.formatters import markdown_to_plain_text
+
+        results = []
+        for i in range(10):
+            r = _make_result(
+                code=str(600519 + i),
+                name="贵州茅台",
+                sentiment_score=72,
+                operation_advice="买入",
+                analysis_summary="等待放量确认后再加仓",
+                decision_type="buy",
+                dashboard={
+                    "core_conclusion": {
+                        "one_sentence": "等待放量确认后再加仓",
+                        "time_sensitivity": "今日内",
+                        "position_advice": {
+                            "no_position": "观望",
+                            "has_position": "继续持有",
+                        },
+                    },
+                    "intelligence": {
+                        "risk_alerts": ["业绩不及预期", "板块轮动风险"],
+                    },
+                    "phase_decision": {
+                        "immediate_action": "等待确认",
+                        "watch_conditions": ["放量突破前高", "跌破支撑离场"],
+                        "confidence_reason": "数据质量可用",
+                    },
+                    "battle_plan": {
+                        "sniper_points": {
+                            "stop_loss": "110",
+                            "take_profit": "130",
+                        }
+                    },
+                },
+            )
+            r.confidence_level = "中"
+            results.append(r)
+
+        out = render("brief", results)
+        self.assertIsNotNone(out)
+        assert out is not None
+
+        # Per-stock line budget: body lines between first stock marker and
+        # the disclaimer line (exclude footer lines that start with '*').
+        body_start = out.find("**贵州茅台")
+        self.assertGreaterEqual(body_start, 0, out)
+        disclaimer_line_idx = out.find("*AI生成")
+        if disclaimer_line_idx < 0:
+            disclaimer_line_idx = out.find("不构成投资建议")
+        self.assertGreater(disclaimer_line_idx, body_start, out)
+        body = out[body_start:disclaimer_line_idx]
+        # Split into per-stock blocks on the stock name marker.
+        blocks = [b for b in body.split("**贵州茅台") if b.strip()]
+        self.assertEqual(len(blocks), 10, body)
+        for i, block in enumerate(blocks):
+            stock_block = "**贵州茅台" + block
+            non_empty = [
+                ln
+                for ln in stock_block.splitlines()
+                if ln.strip()
+                # Exclude italic footer lines (*disclaimer*) but keep **name** primaries.
+                and not (
+                    ln.strip().startswith("*") and not ln.strip().startswith("**")
+                )
+            ]
+            self.assertLessEqual(
+                len(non_empty),
+                2,
+                f"stock[{i}] exceeds 2-line brief budget ({len(non_empty)} lines):\n"
+                + "\n".join(non_empty),
+            )
+            # Primary-line parity with origin/main one-liner fields.
+            primary = non_empty[0]
+            self.assertRegex(primary, r"🟢|🟡|🔴")
+            self.assertIn("评分", primary)
+            self.assertIn("72", primary)
+            self.assertIn("等待放量确认后再加仓", primary)
+
+        plain = markdown_to_plain_text(out)
+        self.assertLessEqual(
+            len(plain),
+            1024,
+            f"brief plain text for 10 stocks exceeds Pushover max_length=1024 "
+            f"(len={len(plain)}):\n{plain}",
+        )
 
     def test_english_decision_card_reuses_existing_labels(self) -> None:
         r = _make_result(
