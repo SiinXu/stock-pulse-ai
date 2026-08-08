@@ -1050,5 +1050,50 @@ describe('BacktestPage', () => {
     expect(applied).toHaveTextContent(/Candidate limit 50/i);
     expect(applied).toHaveTextContent(/Engine v1/i);
     expect(screen.getByText(/Insufficient:/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get('minAge')).toBe('7');
+      expect(search.get('limit')).toBe('50');
+    });
+  });
+
+  it('restores strategy run options (minAge, limit) from the URL via urlState', async () => {
+    const search = new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'AAPL',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '15',
+      minAge: '7',
+      limit: '50',
+    });
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchBacktest}?${search}`,
+    );
+
+    renderEnglishPage();
+
+    expect(await screen.findByLabelText('Min age (days)')).toHaveValue(7);
+    expect(screen.getByLabelText('Candidate limit')).toHaveValue(50);
+    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveValue('AAPL');
+    expect(screen.getByPlaceholderText('10')).toHaveValue(15);
+  });
+
+  it('does not use native title on resolution-note cells (Tooltip owns the accessible description)', async () => {
+    mockGetResults.mockResolvedValueOnce({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [{
+        ...baseResultItem,
+        resolutionNotes: 'missing_daily_bars,legacy_analysis_date',
+      }],
+    });
+
+    renderEnglishPage();
+
+    const notes = await screen.findAllByTestId('backtest-resolution-notes');
+    expect(notes[0]).not.toHaveAttribute('title');
+    expect(notes[0]).toHaveTextContent(/Missing usable daily bars/i);
   });
 });
