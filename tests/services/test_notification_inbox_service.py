@@ -223,12 +223,13 @@ def test_retention_drops_orphan_read_markers() -> None:
     orphan_id = build_inbox_item_id("analysis_complete", "999")
     read_repo.read[orphan_id] = "analysis_complete"
     service = _service(analysis=[_analysis(record_id=1)], read_repo=read_repo)
+    # mark_all_read opportunistically applies retention and removes orphans.
     service.mark_all_read()
-    assert orphan_id in read_repo.read
-    result = service.apply_retention()
-    assert result.deleted_count >= 1
     assert orphan_id not in read_repo.read
-    # Current window item remains marked.
+    assert build_inbox_item_id("analysis_complete", "1") in read_repo.read
+    # Explicit retention remains idempotent.
+    result = service.apply_retention()
+    assert result.deleted_count == 0
     assert build_inbox_item_id("analysis_complete", "1") in read_repo.read
 
 

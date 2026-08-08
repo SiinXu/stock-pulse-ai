@@ -178,6 +178,17 @@ class NotificationInboxService:
         projected = self._project_window(kind_filter=kind_filter)
         pairs = [(item.item_id, item.kind) for item in projected]
         marked_count = self.repository.mark_read(pairs)
+        # Opportunistic cleanup of stale/orphan read markers when the admin
+        # explicitly clears the current window.
+        try:
+            self.apply_retention()
+        except Exception as exc:  # broad-exception: fallback_recorded - mark-all success must not fail on cleanup
+            log_safe_exception(
+                logger,
+                "Notification inbox retention during mark-all-read failed",
+                exc,
+                error_code="notification_inbox_retention_on_mark_all_failed",
+            )
         unread = self.get_unread_count(kind=kind_filter)
         return NotificationInboxMarkAllReadResult(
             marked_count=marked_count,
