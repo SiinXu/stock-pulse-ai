@@ -11126,6 +11126,42 @@
         "title": "LocalModelUpstream",
         "type": "object"
       },
+      "LocalOnlyModeStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_destination_classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Destination Classes",
+            "type": "array"
+          },
+          "blocked_error_reason": {
+            "default": "local_only_mode_blocked",
+            "title": "Blocked Error Reason",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "env_key": {
+            "default": "LOCAL_ONLY_MODE",
+            "title": "Env Key",
+            "type": "string"
+          },
+          "policy": {
+            "default": "non_loopback_denied",
+            "title": "Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "LocalOnlyModeStatus",
+        "type": "object"
+      },
       "LoginRequest": {
         "description": "Login request body. For first-time setup use password + password_confirm.",
         "properties": {
@@ -12290,6 +12326,103 @@
           "detail"
         ],
         "title": "OnboardingWeekStep",
+        "type": "object"
+      },
+      "OutboundActivityItem": {
+        "additionalProperties": false,
+        "properties": {
+          "allowlisted": {
+            "title": "Allowlisted",
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "allowed",
+              "blocked"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "destination_class": {
+            "title": "Destination Class",
+            "type": "string"
+          },
+          "host_type": {
+            "title": "Host Type",
+            "type": "string"
+          },
+          "local_only_mode": {
+            "title": "Local Only Mode",
+            "type": "boolean"
+          },
+          "occurred_at": {
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "scheme": {
+            "title": "Scheme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "decision",
+          "destination_class",
+          "scheme",
+          "host_type",
+          "reason",
+          "correlation_id",
+          "local_only_mode",
+          "allowlisted"
+        ],
+        "title": "OutboundActivityItem",
+        "type": "object"
+      },
+      "OutboundActivityPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OutboundActivityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "local_only_mode": {
+            "title": "Local Only Mode",
+            "type": "boolean"
+          },
+          "max_retained": {
+            "title": "Max Retained",
+            "type": "integer"
+          },
+          "returned": {
+            "minimum": 0.0,
+            "title": "Returned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "local_only_mode",
+          "limit",
+          "returned",
+          "max_retained"
+        ],
+        "title": "OutboundActivityPage",
         "type": "object"
       },
       "PaperTradeCreateRequest": {
@@ -31766,7 +31899,6 @@
     },
     "/api/v1/security/audit-events": {
       "get": {
-        "description": "Return a bounded page only to an authenticated administrator session.",
         "operationId": "list_security_audit_events_api_v1_security_audit_events_get",
         "parameters": [
           {
@@ -31950,6 +32082,92 @@
           }
         },
         "summary": "List privileged-operation security audit events",
+        "tags": [
+          "SecurityAudit"
+        ]
+      }
+    },
+    "/api/v1/security/local-only": {
+      "get": {
+        "operationId": "get_local_only_mode_status_api_v1_security_local_only_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalOnlyModeStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "Read LOCAL_ONLY_MODE enforcement status",
+        "tags": [
+          "SecurityAudit"
+        ]
+      }
+    },
+    "/api/v1/security/outbound-activity": {
+      "get": {
+        "operationId": "list_outbound_activity_api_v1_security_outbound_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundActivityPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List recent outbound HTTP policy decisions",
         "tags": [
           "SecurityAudit"
         ]
