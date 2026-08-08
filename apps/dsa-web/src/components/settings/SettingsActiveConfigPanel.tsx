@@ -18,6 +18,7 @@ import {
   DataProvidersPanel,
   isNotificationChannelKey,
 } from './index';
+import { AgentBehaviorPanel } from './AgentBehaviorPanel';
 
 export type FieldGroupDescriptor = {
   id: string;
@@ -101,6 +102,15 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
     return null;
   }
 
+  // Agent Behavior (execution) gets preset-first progressive disclosure.
+  // Conversation still maps to category `agent` but only context keys —
+  // keep the generic grouped renderer there so compression fields stay flat.
+  const isAgentBehaviorPanel = activeCategory === 'agent'
+    && subFilteredItems.some((item) => {
+      const upper = item.key.toUpperCase();
+      return !upper.startsWith('AGENT_CONTEXT_') && !upper.startsWith('AGENT_EVENT_');
+    });
+
   const content = (
     <>
       {isNotificationChannelsSub ? (
@@ -118,6 +128,15 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           onChange={setDraftValue}
           issueByKey={issueByKey}
           configuredOverrides={{ alphasift: alphasiftEnabled }}
+        />
+      ) : isAgentBehaviorPanel ? (
+        <AgentBehaviorPanel
+          items={subFilteredItems}
+          disabled={isSaving}
+          onChange={setDraftValue}
+          issueByKey={issueByKey}
+          allValuesByKey={allValuesByKey}
+          readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
         />
       ) : activeFieldGroupOrder ? (
         <div className="space-y-4">
