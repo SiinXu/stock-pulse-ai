@@ -100,12 +100,7 @@ import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSou
 import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
-<<<<<<< HEAD
 import SystemSecurityPanels from '../components/settings/SystemSecurityPanels';
-=======
-import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
-import OutboundActivityPanel from '../components/settings/OutboundActivityPanel';
->>>>>>> origin/main
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
@@ -1592,27 +1587,11 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {activeCategory === 'system' && activeView === 'security' ? (
-<<<<<<< HEAD
               <SystemSecurityPanels
                 disabled={isSaving || isLoading}
                 t={t}
                 language={uiLanguage}
               />
-=======
-              <>
-                <AuthSettingsCard />
-                <OutboundActivityPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-                <SecurityAuditPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-              </>
->>>>>>> origin/main
             ) : null}
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
             {activeCategory === 'system' && activeView === 'runtime' ? (
