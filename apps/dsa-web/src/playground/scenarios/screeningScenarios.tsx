@@ -31,7 +31,7 @@ const ScreeningConfigurationModalStory = () => {
       formId="playground-screening-config"
       description={text.strategyDescription}
       loading={false}
-      capability="ready"
+      isScreeningEnabled
       configurationError=""
       market="cn"
       markets={[{ id: 'cn', label: text.marketCn }]}
@@ -53,7 +53,7 @@ const ScreeningHotspotsSectionStory = () => {
     <ScreeningHotspotsSection
       text={text}
       language="en"
-      capability="ready"
+      isScreeningEnabled
       hotspots={empty ? [] : [{
         topic: 'ai-compute',
         name: 'AI Compute',
