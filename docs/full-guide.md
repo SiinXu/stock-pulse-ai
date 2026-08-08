@@ -166,6 +166,8 @@ stock-pulse-ai/
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search（结构化搜索结果） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
+| `RSS_NEWS_FEED_URLS` | 可选 RSS/Atom feed URL（逗号分隔），按需新闻搜索免费补充源；留空则惰性关闭。详见「搜索服务配置」与 [出站 HTTP 安全策略](security-outbound-policy.md) | 可选 |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | 按需 RSS/Atom 单源拉取超时秒数（默认 8） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
 | `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`），可通过 Web 设置或 `.env` 配置；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | 可选 |
@@ -366,11 +368,15 @@ stock-pulse-ai/
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API 地址（默认 `https://api.adanos.org`） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
+| `RSS_NEWS_FEED_URLS` | 可选 RSS/Atom feed URL 列表（逗号分隔），作为按需新闻搜索链路的免费补充源（**不是** SearXNG/付费搜索的替代，也不同于本地资讯池 `NEWS_INTEL_*`）。留空时功能完全惰性。Feed 拉取走 fail-closed 出站策略；公网源无需 allowlist，私网/回环需精确 `OUTBOUND_HTTP_ALLOWLIST` 条目，详见 [出站 HTTP 安全策略](security-outbound-policy.md) | 可选 |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | 按需 RSS/Atom 单源拉取超时（秒，1–30）；默认 `8`。与 `NEWS_INTEL_FETCH_TIMEOUT_SEC` 独立 | 可选 |
 | `NEWS_STRATEGY_PROFILE` | 新闻策略窗口档位：`ultra_short`(1天)/`short`(3天)/`medium`(7天)/`long`(30天)；实际窗口取与 `NEWS_MAX_AGE_DAYS` 的最小值 | 默认 `short` |
 | `NEWS_MAX_AGE_DAYS` | 新闻最大时效（天），搜索时限制结果在近期内 | 默认 `3` |
 | `BIAS_THRESHOLD` | 乖离率阈值（%），超过提示不追高；强势趋势股自动放宽到 1.5 倍 | 默认 `5.0` |
 
 > 行为说明：搜索服务与社交舆情服务为可选增强链路。任一服务初始化失败时，系统会记录 warning 并降级为跳过该服务，仅影响对应环节，不会阻塞技术面主链路和主任务流。
+
+> RSS/Atom 补充说明：条目进入与其他搜索引擎相同的去重、时效过滤、相关度排序与 run diagnostics 路径；单 feed 失败只记日志/诊断并继续，不中断整次搜索。源归属会保留在结果的 `source` 字段中并进入报告上下文。
 
 > 外股英文资讯：对已收录的美股/港股，`AAPL.US` / `HK00700` / `00700.HK` 等形式会先归一到标准 ticker。即使展示名为“苹果”或“腾讯控股”，新闻查询、事件/多维情报查询与相关度评分仍会使用统一英文别名；未收录的 ticker 保持原有降级行为。
 
