@@ -114,6 +114,7 @@ def test_environment_defaults_enable_bounded_layered_cache(monkeypatch) -> None:
         "PROVIDER_DAILY_CACHE_PERSISTENT_TTL_SECONDS",
         "PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS",
         "PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES",
+        "PROVIDER_MARKET_DATA_MODE",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -125,6 +126,7 @@ def test_environment_defaults_enable_bounded_layered_cache(monkeypatch) -> None:
     assert config.persistent_ttl_seconds == 3600.0
     assert config.stale_if_error_seconds == 86400.0
     assert config.memory_max_entries == 256
+    assert config.fetch_mode.value == "auto"
 
 
 def test_memory_and_persistent_hits_return_isolated_frames(tmp_path: Path) -> None:
