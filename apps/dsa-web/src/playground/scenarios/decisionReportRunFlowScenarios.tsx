@@ -544,13 +544,14 @@ const ChatThinkingToggleStory = () => {
   );
 };
 
-const WhatIfScenarioPanelStory = ({ scenarioId }: { scenarioId: string }) => {
+const WhatIfScenarioPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
   const t = (key: string) => key;
-  const enabled = scenarioId !== 'default';
+  const enabled = scenario === 'states' || scenario === 'empty';
   const draft = {
     ...DEFAULT_WHAT_IF_DRAFT,
     enabled,
-    turnCount: scenarioId === 'limit' ? 5 : 1,
+    turnCount: scenario === 'empty' ? 5 : scenario === 'states' ? 1 : 0,
   };
   return (
     <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
