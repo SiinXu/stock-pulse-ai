@@ -407,6 +407,42 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_INVESTMENT_COMMITTEE_MODE": {
+        "title": "Investment Committee Mode",
+        "description": (
+            "Default-off preset that activates curated investment-persona Skills "
+            "through the existing multi-agent specialist path and StrategyEngine "
+            "synthesis. Does not replace Single/Multi analysis when disabled. "
+            "Expect higher token cost when enabled. Requires AGENT_ARCH=multi and "
+            "AGENT_ORCHESTRATOR_MODE=specialist for persona specialists to run."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 64,
+        "help_key": "settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE",
+        "examples": [
+            "AGENT_INVESTMENT_COMMITTEE_MODE=false",
+            "AGENT_INVESTMENT_COMMITTEE_MODE=true",
+        ],
+        "docs": [
+            {
+                "label": "Investment Committee Mode",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investment-committee-mode_EN.md",
+            },
+            {
+                "label": "投资委员会模式",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investment-committee-mode.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_RISK_OVERRIDE": {
         "title": "Risk Agent Override",
         "description": "Allow the risk agent to veto buy signals when critical risk flags are detected.",

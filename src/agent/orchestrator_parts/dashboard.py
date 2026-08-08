@@ -94,6 +94,26 @@ class _DashboardMethods:
         if "report_language" not in ctx.meta:
             ctx.meta["report_language"] = "zh"
 
+        # Investment Committee preset (#545): default-off; different seam from
+        # pipeline weight aggregation. Injects persona skills_requested only.
+        try:
+            from src.agent.committee_mode import apply_committee_mode
+
+            apply_committee_mode(
+                ctx,
+                getattr(self, "config", None),
+                request_context=context,
+                skill_manager=getattr(self, "skill_manager", None),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Committee activation is optional; failures keep non-committee analysis.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] investment committee mode apply failed",
+                exc,
+                error_code="agent_committee_mode_apply_failed",
+                level=logging.WARNING,
+            )
+
         return ctx
 
     @staticmethod
@@ -460,6 +480,28 @@ class _DashboardMethods:
         strategy_synthesis = self._collect_strategy_synthesis(ctx, dashboard_block)
         if strategy_synthesis:
             dashboard_block["strategy_synthesis"] = strategy_synthesis
+
+        # Committee deliberation section (#545): additive, only when mode active.
+        # Strip any model-authored committee payload; deterministic builder only.
+        dashboard_block.pop("committee_deliberation", None)
+        try:
+            from src.agent.committee_report import maybe_build_committee_section_for_context
+
+            committee_section = maybe_build_committee_section_for_context(
+                ctx,
+                strategy_synthesis=strategy_synthesis,
+                language=str(ctx.meta.get("report_language") or "zh"),
+            )
+            if committee_section:
+                dashboard_block["committee_deliberation"] = committee_section
+        except Exception as exc:  # broad-exception: fallback_recorded - Committee report section is optional presentation.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] investment committee report section failed",
+                exc,
+                error_code="agent_committee_report_section_failed",
+                level=logging.WARNING,
+            )
 
         dashboard_block["core_conclusion"] = core
         dashboard_block["intelligence"] = intelligence

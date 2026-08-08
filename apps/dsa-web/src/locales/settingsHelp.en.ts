@@ -1040,16 +1040,13 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
-  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
-    title: 'Skill Opinion Outcome Weights',
-    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
-    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
-    valueNotes: [
-      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
-      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
-    ],
-    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
-    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: 'Investment Committee Mode',
+    summary: 'Run multi-role investment committee style analysis with structured dissent.',
+    usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
+    valueNotes: ['Off preserves the existing single-path analysis behavior.'],
+    impact: ['Affects agent orchestration depth and report committee sections.'],
+    notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
   },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
@@ -1063,11 +1060,26 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds an optional profile_calibration object to outcome stats; Web shows the calibration card when the field is present.'],
     notes: ['Does not change outcome evaluation, persistence, or reassessment lifecycle.'],
   },
-  'settings.agent.event_impact_context': {
-    title: 'Alert Impact Context',
-    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
-    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
-    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: 'Skill Opinion Outcome Weights',
+    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
+    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
+      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
+    ],
+    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
+    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: 'Enable Valuation Agent Tool',
+    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
+    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
+    notes: [
+      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
+      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
+      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
+    ],
   },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
@@ -1487,15 +1499,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
-  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
-    title: 'Enable Valuation Agent Tool',
-    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
-    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
-    notes: [
-      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
-      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
-      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
-    ],
+  'settings.agent.event_impact_context': {
+    title: 'Alert Impact Context',
+    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
+    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
   },
 };
 
