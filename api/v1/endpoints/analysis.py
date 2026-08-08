@@ -163,13 +163,8 @@ def _coalesce_text(*values: Any) -> Optional[str]:
     return _analysis_api_service_cls().coalesce_text(*values)
 
 
-<<<<<<< HEAD
 def _invalid_analysis_input_error() -> HTTPException:
     return api_error(400, "invalid_stock_or_name", "请输入有效的股票代码或股票名称")
-=======
-def _invalid_analysis_input_error():
-    return _analysis_api_service_cls().invalid_analysis_input_error()
->>>>>>> origin/main
 
 
 def _is_obviously_invalid_analysis_input(text: str) -> bool:
@@ -313,7 +308,6 @@ def trigger_analysis(
         config: Config = Depends(get_config_dep),
         security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> Union[AnalysisResultResponse, JSONResponse]:
-<<<<<<< HEAD
     """
     触发股票分析
     
@@ -389,10 +383,6 @@ def trigger_analysis(
     # Async mode submits one task per stock.
     return _handle_async_analysis_batch(
         stock_codes,
-=======
-    """Trigger stock analysis (sync or async)."""
-    return _analysis_api_service().trigger_analysis(
->>>>>>> origin/main
         request,
         config=config,
         security_audit=security_audit,
