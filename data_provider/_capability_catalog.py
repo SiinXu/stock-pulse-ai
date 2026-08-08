@@ -54,6 +54,8 @@ def _reset_capability_inventory() -> Tuple[str, ...]:
         "LongbridgeFetcher": {"hk", "us"},
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
+        # Crypto-only; not auto-wired in DataFetcherManager (see Integration Point).
+        "CryptoCoingeckoFetcher": {"crypto"},
     }
     _BUILTIN_DATA_PROVIDER_IDS = {
         "EfinanceFetcher": "efinance",
@@ -67,9 +69,10 @@ def _reset_capability_inventory() -> Tuple[str, ...]:
         "LongbridgeFetcher": "longbridge",
         "FinnhubFetcher": "finnhub",
         "AlphaVantageFetcher": "alphavantage",
+        "CryptoCoingeckoFetcher": "crypto_coingecko",
     }
     _BUILTIN_DATA_PROVIDER_PLUGIN_ID = "stockpulse.builtin.data-providers"
-    _DAILY_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
+    _DAILY_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw", "crypto"})
     return (
         "_DAILY_MARKET_FETCHER_SUPPORT",
         "_BUILTIN_DATA_PROVIDER_IDS",
