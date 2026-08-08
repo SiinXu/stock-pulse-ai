@@ -240,19 +240,15 @@ class _ConfigLoadingMethods:
             os.getenv('ANSPIRE_LLM_BASE_URL') or ANSPIRE_LLM_BASE_URL_DEFAULT
         ).strip()
         _anspire_llm_model_env = os.getenv('ANSPIRE_LLM_MODEL', '').strip()
-        anspire_channel_disabled = False
+        anspire_channel_declared = False
         for _raw_channel in os.getenv('LLM_CHANNELS', '').split(','):
             if _raw_channel.strip().lower() != "anspire":
                 continue
-            _channel_enabled_raw = os.getenv('LLM_ANSPIRE_ENABLED')
-            if _channel_enabled_raw is not None and _channel_enabled_raw.strip():
-                anspire_channel_disabled = not parse_env_bool(_channel_enabled_raw, default=True)
-            else:
-                anspire_channel_disabled = not anspire_llm_enabled
+            anspire_channel_declared = True
             break
         using_anspire_llm_legacy = bool(
             anspire_llm_enabled
-            and not anspire_channel_disabled
+            and not anspire_channel_declared
             and anspire_api_keys
             and not openai_api_keys
         )
@@ -515,6 +511,31 @@ class _ConfigLoadingMethods:
             default=True,
         )
 
+        # Optional RSS/Atom feeds for on-demand news search (supplement; empty = inert)
+        _raw_rss_urls = [
+            u.strip() for u in os.getenv('RSS_NEWS_FEED_URLS', '').split(',') if u.strip()
+        ]
+        rss_news_feed_urls = []
+        invalid_rss_urls = []
+        for u in _raw_rss_urls:
+            p = urlparse(u)
+            if p.scheme in ('http', 'https') and p.netloc:
+                rss_news_feed_urls.append(u)
+            else:
+                invalid_rss_urls.append(u)
+        if invalid_rss_urls:
+            logger.warning(
+                "RSS_NEWS_FEED_URLS 中存在无效 URL，已忽略: %s",
+                ", ".join(invalid_rss_urls[:3]),
+            )
+        rss_news_fetch_timeout_sec = parse_env_float(
+            os.getenv('RSS_NEWS_FETCH_TIMEOUT_SEC'),
+            8.0,
+            field_name='RSS_NEWS_FETCH_TIMEOUT_SEC',
+            minimum=1.0,
+            maximum=30.0,
+        )
+
         # WeCom Message Type and Maximum Byte Count Logic
         wechat_msg_type = os.getenv('WECHAT_MSG_TYPE', 'markdown')
         wechat_msg_type_lower = wechat_msg_type.lower()
@@ -678,6 +699,8 @@ class _ConfigLoadingMethods:
             serpapi_keys=serpapi_keys,
             searxng_base_urls=searxng_base_urls,
             searxng_public_instances_enabled=searxng_public_instances_enabled,
+            rss_news_feed_urls=rss_news_feed_urls,
+            rss_news_fetch_timeout_sec=rss_news_fetch_timeout_sec,
             social_sentiment_api_key=os.getenv('SOCIAL_SENTIMENT_API_KEY') or None,
             social_sentiment_api_url=os.getenv('SOCIAL_SENTIMENT_API_URL', 'https://api.adanos.org').rstrip('/'),
             news_max_age_days=parse_env_int(os.getenv('NEWS_MAX_AGE_DAYS'), 3, field_name='NEWS_MAX_AGE_DAYS', minimum=1),
@@ -736,8 +759,20 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            agent_investment_committee_mode=parse_env_bool(
+                os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
+                False,
+            ),
             skill_opinion_recording_enabled=parse_env_bool(
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
+                False,
+            ),
+            skill_opinion_outcome_weights_enabled=parse_env_bool(
+                os.getenv('SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED'),
+                False,
+            ),
+            decision_profile_calibration_enabled=parse_env_bool(
+                os.getenv('DECISION_PROFILE_CALIBRATION_ENABLED'),
                 False,
             ),
             agent_technical_agent_timeout_s=parse_env_float(
@@ -765,6 +800,7 @@ class _ConfigLoadingMethods:
                 field_name='AGENT_SKILL_AGENT_TIMEOUT_S', minimum=0,
             ),
             agent_risk_override=os.getenv('AGENT_RISK_OVERRIDE', 'true').lower() == 'true',
+            agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
                 30000,
@@ -793,6 +829,8 @@ class _ConfigLoadingMethods:
             agent_context_compression_profile=agent_context_compression_profile,
             agent_context_compression_trigger_tokens=agent_context_compression_trigger_tokens,
             agent_context_protected_turns=agent_context_protected_turns,
+            agent_observability_enabled=os.getenv('AGENT_OBSERVABILITY_ENABLED', 'true').lower() == 'true',
+            agent_observability_deep_payload=os.getenv('AGENT_OBSERVABILITY_DEEP_PAYLOAD', 'false').lower() == 'true',
             agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_interval_minutes=parse_env_int(
                 os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES'),
@@ -801,6 +839,10 @@ class _ConfigLoadingMethods:
                 minimum=1,
             ),
             agent_event_alert_rules_json=os.getenv('AGENT_EVENT_ALERT_RULES_JSON', ''),
+            agent_event_impact_context_enabled=os.getenv(
+                'AGENT_EVENT_IMPACT_CONTEXT_ENABLED',
+                'true',
+            ).lower() == 'true',
             wechat_webhook_url=os.getenv('WECHAT_WEBHOOK_URL'),
             feishu_webhook_url=os.getenv('FEISHU_WEBHOOK_URL'),
             feishu_webhook_secret=os.getenv('FEISHU_WEBHOOK_SECRET'),
@@ -1093,6 +1135,13 @@ class _ConfigLoadingMethods:
                 or _KRONOS_MODEL_SIZE_DEFAULT
             ),
             kronos_weights_dir=os.getenv('KRONOS_WEIGHTS_DIR', '').strip() or None,
+            multimodal_agent_tools_enabled=parse_env_bool(
+                os.getenv('MULTIMODAL_AGENT_TOOLS_ENABLED'), default=False
+            ),
+            valuation_agent_tool_enabled=parse_env_bool(
+                os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
+            ),
+            multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
@@ -1108,6 +1157,27 @@ class _ConfigLoadingMethods:
             ),
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
+            ),
+            daily_brief_enabled=parse_env_bool(
+                os.getenv('DAILY_BRIEF_ENABLED'), default=False
+            ),
+            daily_brief_schedule_time=(
+                os.getenv('DAILY_BRIEF_SCHEDULE_TIME', '08:30').strip() or '08:30'
+            ),
+            daily_brief_timezone=(
+                os.getenv('DAILY_BRIEF_TIMEZONE', 'Asia/Shanghai').strip() or 'Asia/Shanghai'
+            ),
+            daily_brief_min_samples=parse_env_int(
+                os.getenv('DAILY_BRIEF_MIN_SAMPLES'), 10, field_name='DAILY_BRIEF_MIN_SAMPLES', minimum=1
+            ),
+            daily_brief_notify=parse_env_bool(
+                os.getenv('DAILY_BRIEF_NOTIFY'), default=True
+            ),
+            daily_brief_persist_history=parse_env_bool(
+                os.getenv('DAILY_BRIEF_PERSIST_HISTORY'), default=True
+            ),
+            daily_brief_save_report_file=parse_env_bool(
+                os.getenv('DAILY_BRIEF_SAVE_REPORT_FILE'), default=True
             ),
             paper_portfolio_initial_cash=parse_env_float(
                 os.getenv('PAPER_PORTFOLIO_INITIAL_CASH'), 1_000_000.0, field_name='PAPER_PORTFOLIO_INITIAL_CASH', minimum=0.0

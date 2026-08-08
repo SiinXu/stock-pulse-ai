@@ -182,6 +182,41 @@
 
 {% endif %}
 
+{% set committee = dashboard.get('committee_deliberation') if dashboard else none %}
+{% if committee and committee.get('members') %}
+### 🏛 {{ labels.committee_deliberation_heading }}
+
+**{{ labels.committee_members_label }}**
+{% for member in (committee.get('members') or [])[:5] %}
+- {{ member.get('display_name') or member.get('persona_id') }}: {{ labels.committee_persona_signal_label }} {{ localize_strategy_signal(member.get('signal') or 'N/A', report_language) }} | {{ labels.committee_persona_confidence_label }} {{ '%.0f%%' | format((member.get('confidence') or 0) * 100) if member.get('confidence') is number else 'N/A' }}{% if member.get('invalid') %} ({{ member.get('invalid_reason') or 'invalid' }}){% endif %}{% if member.get('reasoning_excerpt') %} — {{ member.get('reasoning_excerpt') }}{% endif %}
+{% endfor %}
+{% if committee.get('personas_invalid') %}
+- {{ labels.committee_invalid_personas_label }}: {{ (committee.get('personas_invalid') or []) | join(', ') }}
+{% endif %}
+{% if committee.get('personas_truncated') %}
+- {{ labels.committee_truncated_personas_label }}: {{ (committee.get('personas_truncated') or []) | join(', ') }}
+{% endif %}
+{% if committee.get('missing_or_conflicts') %}
+**{{ labels.committee_gaps_label }}**
+{% for gap in (committee.get('missing_or_conflicts') or [])[:5] %}
+- {{ gap.get('description') or gap }}
+{% endfor %}
+{% endif %}
+{% if committee.get('model_inference') %}
+**{{ labels.model_inference_heading }}**
+{% for line in (committee.get('model_inference') or [])[:5] %}
+- {{ line }}
+{% endfor %}
+{% endif %}
+{% if committee.get('risks_counter_evidence') %}
+**{{ labels.risks_counter_evidence_heading }}**
+{% for line in (committee.get('risks_counter_evidence') or [])[:5] %}
+- {{ line }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
 {% if battle %}
 ### 🎯 {{ labels.battle_plan_heading }}
 

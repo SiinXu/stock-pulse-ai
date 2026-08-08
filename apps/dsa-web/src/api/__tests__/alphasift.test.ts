@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alphasiftApi } from '../alphasift';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, post, getConfig, updateConfig } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -293,5 +294,39 @@ describe('alphasiftApi', () => {
     expect(result.result?.dailyEnriched).toBe(true);
     expect(result.result?.dailyEnrichCount).toBe(4);
     expect(result.result?.postAnalyzers).toEqual(['scorecard']);
+  });
+
+  it('preserves extra keys on valid status payloads (toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        enabled: true,
+        available: true,
+        install_spec_is_default: true,
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const status = await alphasiftApi.getStatus();
+    expect(status).toEqual({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+      unexpectedServerField: 'keep-me',
+    });
+  });
+
+  it('surfaces status shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        enabled: true,
+        install_spec_is_default: true,
+      },
+    });
+    await expect(alphasiftApi.getStatus()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('AlphaSiftStatusResponse');
+      return true;
+    });
   });
 });

@@ -23,6 +23,7 @@ import { ReportSummary } from '../components/report/ReportSummary';
 import { RunFlowPanel } from '../components/run-flow';
 import {
   useHomeUrlState,
+  useMarketReviewHistoryQuery,
   useMarketReviewRunner,
   useMarketReviewState,
 } from '../hooks';
@@ -142,22 +143,11 @@ const MarketReviewPage: React.FC = () => {
     document.title = t('home.marketReviewPageTitle');
   }, [t]);
 
-  useEffect(() => {
-    void loadMarketReviewHistory();
-    const intervalId = window.setInterval(() => {
-      void refreshMarketReviewHistory(true);
-    }, 30_000);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshMarketReviewHistory(true);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [loadMarketReviewHistory, refreshMarketReviewHistory]);
+  // History list fetch + 30s poll + focus refresh via TanStack Query pilot.
+  useMarketReviewHistoryQuery({
+    loadMarketReviewHistory,
+    refreshMarketReviewHistory,
+  });
 
   useEffect(() => {
     if (
@@ -317,8 +307,8 @@ const MarketReviewPage: React.FC = () => {
         <HistoryList
           className={
             marketReviewHistoryHasMore
-              ? 'h-[min(36rem,calc(100dvh-10rem))] min-h-72'
-              : 'h-full'
+              ? 'h-[min(36rem,calc(100dvh-10rem))] min-h-72 [&_[data-testid=history-card-meta]]:flex-nowrap [&_[data-testid=history-card-meta]]:gap-1 [&_[data-testid=history-card-meta]>span]:whitespace-nowrap'
+              : 'h-full [&_[data-testid=history-card-meta]]:flex-nowrap [&_[data-testid=history-card-meta]]:gap-1 [&_[data-testid=history-card-meta]>span]:whitespace-nowrap'
           }
           title={t('home.marketReviewHistoryTitle')}
           emptyTitle={t('home.marketReviewHistoryEmptyTitle')}

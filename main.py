@@ -36,17 +36,9 @@ from dotenv import dotenv_values
 from src.config import setup_env
 
 _INITIAL_PROCESS_ENV = dict(os.environ)
+# setup_env also applies USE_PROXY/PROXY_HOST/PROXY_PORT onto process http(s)_proxy
+# (skipped under GitHub Actions). Full disable still requires process restart.
 setup_env()
-
-# Proxy configuration - Controlled by the USE_PROXY environment variable, default is disabled
-# GitHub Actions automatically skips proxy configuration
-if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
-    # Local development environment, enable proxy (can be configured in .env with PROXY_HOST and PROXY_PORT).
-    proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
-    proxy_port = os.getenv("PROXY_PORT", "10809")
-    proxy_url = f"http://{proxy_host}:{proxy_port}"
-    os.environ["http_proxy"] = proxy_url
-    os.environ["https_proxy"] = proxy_url
 
 _packaged_import_probe = os.getenv("DSA_PACKAGED_IMPORT_PROBE")
 if _packaged_import_probe:
@@ -62,7 +54,7 @@ if _packaged_import_probe:
             ]
             if not migration_ids or migration_ids[-1] != target_version:
                 raise RuntimeError("Migration registry target is inconsistent")
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: optional_metadata - package import probe stays dependency-light
         print(
             f"ERROR: packaged import failed for {_packaged_import_probe}: {exc}",
             file=sys.stderr,
@@ -113,7 +105,7 @@ def _read_active_env_values() -> Optional[Dict[str, str]]:
 
     try:
         values = dotenv_values(env_path)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Environment file read failed; keeping current process environment",
@@ -152,14 +144,8 @@ def _bootstrap_environment() -> None:
 
     from src.config import setup_env
 
+    # setup_env re-applies USE_PROXY → http_proxy/https_proxy for API/bot paths.
     setup_env()
-
-    if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
-        proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
-        proxy_port = os.getenv("PROXY_PORT", "10809")
-        proxy_url = f"http://{proxy_host}:{proxy_port}"
-        os.environ["http_proxy"] = proxy_url
-        os.environ["https_proxy"] = proxy_url
 
     _env_bootstrapped = True
 
@@ -472,7 +458,7 @@ def main() -> int:
     # Initialize bootstrap logs before loading, ensuring early failures are logged.
     try:
         _setup_bootstrap_logging(debug=args.debug)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         logging.basicConfig(
             level=logging.DEBUG if getattr(args, "debug", False) else logging.INFO,
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -495,7 +481,7 @@ def main() -> int:
     # Load configuration (execute after bootstrap logging, ensure exceptions are logged)
     try:
         config = get_config()
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Configuration loading failed",
@@ -511,7 +497,7 @@ def main() -> int:
     # Configure logging (output to console and file)
     try:
         _setup_runtime_logging(config.log_dir, debug=args.debug)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Configured runtime logging setup failed",

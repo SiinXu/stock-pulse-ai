@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
@@ -13,6 +15,26 @@ import {
 } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import MarketReviewPage from '../MarketReviewPage';
+
+
+function createTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = createTestQueryClient();
+  return (
+    <QueryClientProvider client={client}>
+      {ui}
+    </QueryClientProvider>
+  );
+}
+
 
 vi.mock('../../api/history', () => ({
   historyApi: {
@@ -94,12 +116,14 @@ function MarketReviewRoute() {
 
 function renderMarketReview(initialEntry: string = APP_ROUTE_PATHS.researchMarket) {
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <Routes>
-        <Route path={APP_ROUTE_PATHS.researchMarket} element={<MarketReviewRoute />} />
-        <Route path={APP_ROUTE_PATHS.home} element={<LocationProbe />} />
-      </Routes>
-    </MemoryRouter>,
+    wrapWithQueryClient(
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path={APP_ROUTE_PATHS.researchMarket} element={<MarketReviewRoute />} />
+          <Route path={APP_ROUTE_PATHS.home} element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    ),
   );
 }
 
@@ -165,6 +189,9 @@ describe('MarketReviewPage', () => {
     expect(historyRail).toHaveClass(
       'h-[min(36rem,calc(100dvh-10rem))]',
       'min-h-72',
+      '[&_[data-testid=history-card-meta]]:flex-nowrap',
+      '[&_[data-testid=history-card-meta]]:gap-1',
+      '[&_[data-testid=history-card-meta]>span]:whitespace-nowrap',
     );
     expect(historyRail).not.toHaveClass('self-start');
   });

@@ -334,6 +334,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects AlphaSift adapter source validation and explicit repair installs.'],
     notes: ['Use a trusted source only. AlphaSift is an experimental screening capability, so understand the risk before enabling it.'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom News Feeds',
+    summary: 'Optional free RSS or Atom feed URLs used as a supplement in on-demand news search.',
+    usage: 'Provide comma-separated http(s) feed URLs. Leave empty to keep the feature inert. Feed fetching follows the fail-closed outbound policy.',
+    valueNotes: [
+      'This supplements SearXNG or paid search; it is not a full replacement.',
+      'Private or loopback hosts require an exact OUTBOUND_HTTP_ALLOWLIST entry.',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC controls per-feed timeout (1-30 seconds, default 8).',
+    ],
+    impact: ['Affects on-demand news search coverage when configured feeds return items.'],
+    notes: ['A single feed failure should not halt the rest of the news pipeline.'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: 'Realtime Source Priority',
     summary: 'Configures the provider order for realtime quotes.',
@@ -389,6 +401,48 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Separate multiple servers with English commas; runtime data-source logic tries them as configured.'],
     impact: ['Affects quote connectivity and availability when the Pytdx data source is used.'],
     notes: ['If a server is unreachable, rely on data-source fallback and avoid a single unstable endpoint.'],
+  },
+
+  'settings.data_source.FUTU_OPEND_HOST': {
+    title: 'Futu OpenD Host',
+    summary: 'IPv4 host for the local Futu OpenD gateway used by analysis scope and portfolio position import.',
+    usage: 'Keep 127.0.0.1 for a local OpenD process, or set a trusted LAN IP when OpenD runs on another machine.',
+    valueNotes: [
+      'OpenD uses a local TCP protocol, not HTTP, so OUTBOUND_HTTP_ALLOWLIST does not apply.',
+      'The bundled Futu SDK requires IPv4 or an IPv4-resolving hostname.',
+    ],
+    impact: ['Affects --portfolio futu analysis scope and POST /api/v1/portfolio/imports/futu.'],
+    notes: [
+      'Inside Docker, 127.0.0.1 is the container itself; point at a reachable host on the container network.',
+      'See docs/futu-opend-portfolio-import_EN.md.',
+    ],
+    examples: ['127.0.0.1', '192.168.1.20'],
+  },
+  'settings.data_source.FUTU_OPEND_PORT': {
+    title: 'Futu OpenD Port',
+    summary: 'TCP port for the Futu OpenD gateway.',
+    usage: 'Match the port configured in OpenD. Default is 11111.',
+    valueNotes: ['Valid range is 1–65535.'],
+    impact: ['Affects Futu OpenD connectivity for analysis scope and portfolio import.'],
+    notes: ['Changing the port requires OpenD to listen on the same value.'],
+    examples: ['11111'],
+  },
+  'settings.data_source.FUTU_ACC_ID': {
+    title: 'Futu Account ID',
+    summary: 'Optional live securities account filter for OpenD position queries.',
+    usage: 'Leave empty to merge eligible ACTIVE REAL NORMAL/MASTER accounts, or set one account id.',
+    valueNotes: ['Must be a positive integer when set.'],
+    impact: ['Controls which Futu real accounts contribute positions to analysis and import.'],
+    notes: ['Simulate/paper accounts are never imported.'],
+  },
+  'settings.data_source.FUTU_SECURITY_FIRM': {
+    title: 'Futu Security Firm',
+    summary: 'Futu SecurityFirm enum used when opening the OpenD trade context.',
+    usage: 'Use NONE for SDK auto-detection unless your brokerage requires an explicit firm.',
+    valueNotes: ['Common values include NONE, FUTUSECURITIES, and FUTUSG.'],
+    impact: ['Affects account discovery when multiple Futu security firms are present.'],
+    notes: ['Unsupported enum names fail with a clear configuration error before any import write.'],
+    examples: ['NONE', 'FUTUSECURITIES'],
   },
   'settings.data_source.news_window': {
     title: 'News Window',
@@ -618,7 +672,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Before disabling it in Docker or packages, make sure the built assets are already included.',
     ],
   },
+  'settings.system.LOCAL_ONLY_MODE': {
+    title: 'Local Only Mode',
+    summary: 'Fail-closed privacy mode that blocks every non-loopback outbound HTTP destination.',
+    usage: 'Enable only when you intentionally run with local models and cached data. Cloud LLM, search, news, remote data providers, and notification webhooks are denied with coded LOCAL_ONLY_MODE errors. Pure loopback remains allowed.',
+    valueNotes: ['Default is false.', 'OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.', 'Blocked calls never silently fall through.'],
+    impact: ['Remote-dependent analysis fails visibly unless local backends and cache cover the path.'],
+    notes: ['Restart after changing. See docs/local-only-mode_EN.md.'],
+  },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
+
     title: 'Web Login Protection',
     summary: 'Enables admin password protection for WebUI.',
     usage: 'Use the WebUI auth settings entry to enable or disable this. Reset with python -m src.auth reset_password if needed.',
@@ -691,11 +755,59 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.USE_PROXY': {
+    title: 'Enable Local Proxy',
+    summary:
+      'Mainland-friendly switch that maps PROXY_HOST and PROXY_PORT onto process http_proxy/https_proxy.',
+    usage:
+      'Turn on when local outbound traffic must go through a local proxy (for example Gemini/OpenAI from mainland China). Set PROXY_HOST and PROXY_PORT together. GitHub Actions always ignores this switch.',
+    valueNotes: [
+      'Previously hidden as a low-frequency ops key because proxy env is applied at process bootstrap; Settings now exposes it with an honest restart requirement.',
+      'Saving reloads setup_env and re-applies USE_PROXY for libraries that re-read process env; a full process restart is still required to drop a previously applied proxy or refresh long-lived HTTP clients.',
+    ],
+    impact: ['Affects outbound data-source, LLM, search, and notification HTTP calls that honor process proxy env.'],
+    notes: [
+      'Prefer HTTP_PROXY when you need a full proxy URL with credentials or when libraries only honor standard HTTP_PROXY/HTTPS_PROXY.',
+      'Inside containers, 127.0.0.1 points to the container, not the host machine (use host.docker.internal or the host LAN IP).',
+    ],
+    examples: ['USE_PROXY=true', 'PROXY_HOST=127.0.0.1', 'PROXY_PORT=10809'],
+  },
+  'settings.system.PROXY_HOST': {
+    title: 'Proxy Host',
+    summary: 'Host used with USE_PROXY to build http://{PROXY_HOST}:{PROXY_PORT}.',
+    usage:
+      'Enter a hostname or IP. Values may embed credentials as user:pass@host; Settings masks this field because of that risk.',
+    valueNotes: [
+      'Default is 127.0.0.1. Only used when USE_PROXY is enabled.',
+      'Requires process restart for full, reliable effect together with USE_PROXY.',
+    ],
+    impact: ['Changes the proxy endpoint applied to process http_proxy/https_proxy when USE_PROXY is on.'],
+    notes: [
+      'Do not paste proxy credentials into screenshots, logs, issues, or shared profile exports.',
+      'Inside containers, 127.0.0.1 is the container itself.',
+    ],
+    examples: ['PROXY_HOST=127.0.0.1', 'PROXY_HOST=host.docker.internal'],
+  },
+  'settings.system.PROXY_PORT': {
+    title: 'Proxy Port',
+    summary: 'Port used with USE_PROXY to build http://{PROXY_HOST}:{PROXY_PORT}.',
+    usage: 'Enter a port from 1 to 65535. Default is 10809. Only used when USE_PROXY is enabled.',
+    valueNotes: [
+      'Requires process restart for full, reliable effect together with USE_PROXY.',
+    ],
+    impact: ['Changes the proxy endpoint applied to process http_proxy/https_proxy when USE_PROXY is on.'],
+    notes: ['Common local proxy ports include 10809, 7890, and 1080.'],
+    examples: ['PROXY_PORT=10809', 'PROXY_PORT=7890'],
+  },
   'settings.system.HTTP_PROXY': {
     title: 'Network Proxy',
-    summary: 'Sets a proxy for external API, model, or search requests.',
-    usage: 'Use http://host:port format. HTTPS_PROXY can be used for HTTPS proxying.',
-    valueNotes: ['Whether it applies depends on the underlying library and environment handling.'],
+    summary: 'Sets a standard HTTP proxy URL for external API, model, or search requests.',
+    usage:
+      'Use http://host:port format. HTTPS_PROXY can be used for HTTPS proxying. Prefer this over USE_PROXY when you need a full URL (including credentials) or library-standard env vars.',
+    valueNotes: [
+      'Whether it applies depends on the underlying library and environment handling.',
+      'URL userinfo credentials are redacted in diagnostics; do not share unredacted export dumps.',
+    ],
     impact: ['Affects data sources, LLM, search, and notification network calls.'],
     notes: ['Inside containers, 127.0.0.1 points to the container, not the host machine.'],
   },
@@ -928,6 +1040,58 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: 'Multi-Strategy Deliberation',
+    summary: 'Enable concurrent multi-strategy specialist scheduling with a final disagreement explanation.',
+    usage: 'Default off. When true, Native Multi can schedule strategy specialists and surface disagreement explanations without changing the Phase-1 synthesis path when off.',
+    valueNotes: [
+      'Off preserves the previous synthesis behavior byte-for-byte.',
+      'On enables multi-strategy deliberation and final disagreement explanation.',
+    ],
+    impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
+    notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
+  },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: 'Investment Committee Mode',
+    summary: 'Run multi-role investment committee style analysis with structured dissent.',
+    usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
+    valueNotes: ['Off preserves the existing single-path analysis behavior.'],
+    impact: ['Affects agent orchestration depth and report committee sections.'],
+    notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
+  },
+  'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
+    title: 'Decision Profile Outcome Calibration',
+    summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
+    usage: 'Keep off for API compatibility. Enable only when operators need profile, action, horizon, market-phase, data-quality, and profile-source calibration on GET /api/v1/decision-signals/outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off stats responses omit profile_calibration.',
+      'Each exact bucket needs at least 30 completed outcomes before rates or max adverse excursion are published.',
+      'Uses only persisted outcome prices; never triggers market reads.',
+    ],
+    impact: ['Adds an optional profile_calibration object to outcome stats; Web shows the calibration card when the field is present.'],
+    notes: ['Does not change outcome evaluation, persistence, or reassessment lifecycle.'],
+  },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: 'Skill Opinion Outcome Weights',
+    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
+    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
+      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
+    ],
+    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
+    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: 'Enable Valuation Agent Tool',
+    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
+    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
+    notes: [
+      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
+      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
+      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
+    ],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
@@ -1002,6 +1166,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'It only affects visible ask-stock history compression; it does not change LLM provider, model, Base URL, save cleanup, or runtime priority semantics.',
     ],
   },
+  'settings.agent.observability': {
+    title: 'Agent Observability',
+    summary: 'Lightweight structured agent run events with trace/span ids for the run-flow view.',
+    usage: 'AGENT_OBSERVABILITY_ENABLED toggles lightweight events (default on). AGENT_OBSERVABILITY_DEEP_PAYLOAD optionally captures sanitized tool argument/result previews (default off).',
+    valueNotes: [
+      'Events persist through run diagnostics and appear in the existing run-flow panel.',
+      'Deep payloads remain redacted for prompts, keys, and secrets.',
+    ],
+    impact: ['Adds low-overhead agent timeline detail for debugging multi-step runs.'],
+    notes: ['See docs/agent-observability_EN.md for privacy and overhead notes.'],
+  },
   'settings.agent.event_monitor': {
     title: 'Event Monitor',
     summary: 'Enables background event monitoring in schedule mode with periodic rule polling.',
@@ -1023,6 +1198,31 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Affects background alert detection and notification delivery.'],
     notes: ['This is a legacy configuration method. For advanced rules, use the alert center.'],
+  },
+  'settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED': {
+    title: 'Enable Multimodal Agent Tools',
+    summary: 'Opt-in PDF parsing and chart-reading Agent Tools with a local file sandbox.',
+    usage: 'Leave disabled for default installs. Enable only with MULTIMODAL_FILE_ROOT set, then restart so parse_financial_pdf and read_price_chart can register.',
+    valueNotes: [
+      'Default is off; the process tool registry does not include the tools until enabled, rooted, and restarted.',
+      'PDF parsing is local-first; chart reading uses VISION_MODEL and degrades honestly when vision is unavailable.',
+    ],
+    impact: ['Affects optional Agent tool availability only; default analysis reports stay unchanged when disabled.'],
+    notes: [
+      'See docs/multimodal-parsing_EN.md for the phase-1 contract and rollback steps.',
+      'HTTP upload UI and transcript analysis are deferred to later phases.',
+    ],
+  },
+  'settings.agent.MULTIMODAL_FILE_ROOT': {
+    title: 'Multimodal File Root',
+    summary: 'Local directory that may contain user-provided PDF and chart files for multimodal tools.',
+    usage: 'Set an absolute local path. Agent tool file_path values must resolve inside this root; URLs and path traversal are rejected.',
+    valueNotes: [
+      'Required when MULTIMODAL_AGENT_TOOLS_ENABLED=true; missing root keeps tools unregistered.',
+      'Content is never executed; only bounded read/parse paths are used.',
+    ],
+    impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
+    notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
   // ------------------------------------------------------------------
   // Backtest configuration
@@ -1234,6 +1434,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects total analysis time.'],
     notes: ['Total time ≈ stock count × per-stock time + (count-1) × ANALYSIS_DELAY.'],
   },
+  'settings.system.daily_brief': {
+    title: 'Daily Brief',
+    summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
+    usage: 'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown.',
+    valueNotes: [
+      'Default off keeps existing schedules unchanged.',
+      'Accuracy review is informational and does not auto-trade.',
+    ],
+    impact: ['Affects scheduled brief generation and accuracy review panels.'],
+    notes: ['Requires schedule mode for timed delivery.'],
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: 'Save Context Snapshot',
     summary: 'Controls whether the full analysis history context_snapshot is persisted to the database.',
@@ -1299,6 +1510,34 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
+  'settings.agent.event_impact_context': {
+    title: 'Alert Impact Context',
+    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
+    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
+  },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: 'Local Runtime Auto-Detect',
+    summary: 'Fast loopback-only probe for a local Ollama runtime during setup readiness.',
+    usage:
+      'Leave enabled for zero-config first success. The probe only targets loopback ' +
+      '(127.0.0.0/8, ::1, localhost), never blocks startup, and logs failures only. ' +
+      'When Ollama is reachable, setup readiness offers non-secret local-zero-cost fields.',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
+  },
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: 'Local Runtime Detect Timeout',
+    summary: 'Per-request timeout for the loopback local-runtime detect probe.',
+    usage: 'Keep this low (default 0.35s, clamped to 0.05–2.0) so setup status stays fast when Ollama is down.',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
 };
 
 export default settingsHelpEnUS;

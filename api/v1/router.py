@@ -19,6 +19,7 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    config_profiles,
     decision_signals,
     health,
     history,
@@ -27,7 +28,9 @@ from api.v1.endpoints import (
     local_models,
     model_packs,
     plugins,
+    onboarding,
     portfolio,
+    portfolio_risk_metrics,
     scheduled_tasks,
     scorecard,
     security_audit,
@@ -102,6 +105,12 @@ router.include_router(
 )
 
 router.include_router(
+    portfolio_risk_metrics.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
@@ -135,6 +144,12 @@ router.include_router(
     investment_framework.router,
     prefix="/investment-framework",
     tags=["InvestmentFramework"]
+)
+
+router.include_router(
+    onboarding.router,
+    prefix="/onboarding",
+    tags=["Onboarding"],
 )
 
 router.include_router(
@@ -174,6 +189,12 @@ router.include_router(
     tags=["Plugins"],
 )
 
+
+router.include_router(
+    config_profiles.router,
+    prefix="/config-profiles",
+    tags=["ConfigProfiles"],
+)
 
 router.include_router(
     health.router,

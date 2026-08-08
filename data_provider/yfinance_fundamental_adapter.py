@@ -28,6 +28,7 @@ mark the block as ``partial`` when only some fields are populated.
 from __future__ import annotations
 
 import logging
+from src.utils.sanitize import log_safe_exception
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -157,7 +158,8 @@ class YfinanceFundamentalAdapter:
 
         try:
             import yfinance as yf
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"import_yfinance:{type(exc).__name__}")
             return result
 
@@ -172,7 +174,8 @@ class YfinanceFundamentalAdapter:
             info = ticker.get_info() if hasattr(ticker, "get_info") else (ticker.info or {})
             if not isinstance(info, dict):
                 info = {}
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"info:{type(exc).__name__}:{exc}")
             info = {}
 
@@ -204,7 +207,8 @@ class YfinanceFundamentalAdapter:
 
         try:
             income_df = ticker.quarterly_income_stmt
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"quarterly_income_stmt:{type(exc).__name__}")
             income_df = None
         if income_df is not None and not income_df.empty:
@@ -215,7 +219,8 @@ class YfinanceFundamentalAdapter:
                 ts = pd.to_datetime(first_col, errors="coerce")
                 if pd.notna(ts):
                     report_date = ts.date().isoformat()
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 pass
             revenue_row = _pick_row(income_df, _INCOME_REVENUE_KEYS)
             net_profit_row = _pick_row(income_df, _INCOME_NET_PROFIT_KEYS)
@@ -224,7 +229,8 @@ class YfinanceFundamentalAdapter:
 
         try:
             cashflow_df = ticker.quarterly_cashflow
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"quarterly_cashflow:{type(exc).__name__}")
             cashflow_df = None
         if cashflow_df is not None and not cashflow_df.empty:
@@ -263,6 +269,47 @@ class YfinanceFundamentalAdapter:
             "currency": financial_currency,
         }
         if any(v is not None and v != "" for v in financial_report.values()):
+            # Additive sufficiency / recency metadata (issue #235 honesty contract).
+            try:
+                from src.services.financial_reports_service import build_financial_report_payload
+
+                yf_periods = []
+                if any(
+                    v is not None
+                    for v in (revenue_latest, net_profit_latest, operating_cash_flow_latest, report_date)
+                ):
+                    yf_periods.append(
+                        {
+                            "report_date": report_date,
+                            "revenue": revenue_latest,
+                            "net_profit_parent": net_profit_latest,
+                            "operating_cash_flow": operating_cash_flow_latest,
+                            "roe": growth_payload.get("roe"),
+                        }
+                    )
+                financial_report = build_financial_report_payload(
+                    periods=yf_periods,
+                    seed_summary=financial_report,
+                    sources=["earnings.financial_report:yfinance"],
+                    currency=financial_currency or "USD",
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure path for continuous merge
+                log_safe_exception(logger, "handler failed", exc, error_code="internal_error")
+                result["errors"].append(f"financial_report_enrich:{type(exc).__name__}")
+                financial_report["sufficiency"] = {
+                    "level": "partial" if any(
+                        financial_report.get(k) is not None
+                        for k in ("revenue", "net_profit_parent", "operating_cash_flow")
+                    ) else "insufficient",
+                    "message": "partial fundamentals: enrichment unavailable",
+                    "core_fields_present": [
+                        k for k in ("report_date", "revenue", "net_profit_parent", "operating_cash_flow")
+                        if financial_report.get(k) is not None
+                    ],
+                    "missing_fields": [],
+                    "period_count": 0,
+                    "has_multi_period_history": False,
+                }
             result.setdefault("earnings", {})["financial_report"] = financial_report
             result["source_chain"].append("earnings.financial_report:yfinance")
 
@@ -270,7 +317,8 @@ class YfinanceFundamentalAdapter:
         events: List[Dict[str, Any]] = []
         try:
             div_series = ticker.dividends
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+            log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
             result["errors"].append(f"dividends:{type(exc).__name__}")
             div_series = None
         if div_series is not None and not div_series.empty:
@@ -289,7 +337,8 @@ class YfinanceFundamentalAdapter:
                         continue
                     try:
                         event_date = pd.Timestamp(ts).date().isoformat()
-                    except Exception:
+                    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                         continue
                     events.append({
                         "event_date": event_date,
@@ -303,11 +352,13 @@ class YfinanceFundamentalAdapter:
                 for item in events:
                     try:
                         event_ts = pd.Timestamp(item["event_date"]).tz_localize(div_series.index.tz)
-                    except Exception:
+                    except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                        log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                         continue
                     if event_ts >= cutoff:
                         ttm_events.append(item)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
                 result["errors"].append(f"dividend_window:{type(exc).__name__}")
                 ttm_events = []
         else:
