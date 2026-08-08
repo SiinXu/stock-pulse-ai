@@ -18,6 +18,7 @@ import {
   CredentialInput,
   DataTable,
   DatePicker,
+  DateRangePicker,
   Drawer,
   EmptyState,
   EyeToggleIcon,
@@ -861,6 +862,24 @@ const DatePickerStory = () => {
   return <Surface className="max-w-sm"><DatePicker value={value} onChange={setValue} label={text.fieldLabel} ariaLabel={text.fieldLabel} error={scenario === 'states' ? text.fieldError : undefined} disabled={scenario === 'states'} /></Surface>;
 };
 
+const DateRangePickerStory = () => {
+  const text = useSampleText();
+  const { scenario } = usePlaygroundScenario();
+  const [value, setValue] = useState({ start: '2026-07-01', end: '2026-07-20' });
+  return (
+    <Surface className="max-w-sm">
+      <DateRangePicker
+        value={value}
+        onChange={setValue}
+        label={text.fieldLabel}
+        ariaLabel={text.fieldLabel}
+        error={scenario === 'states' ? text.fieldError : undefined}
+        disabled={scenario === 'states'}
+      />
+    </Surface>
+  );
+};
+
 const TimePickerStory = () => {
   const text = useSampleText();
   const { scenario } = usePlaygroundScenario();
@@ -1092,6 +1111,7 @@ export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   input: InputStory,
   'credential-input': CredentialInputStory,
   'date-picker': DatePickerStory,
+  'date-range-picker': DateRangePickerStory,
   'time-picker': TimePickerStory,
   'eye-toggle-icon': EyeToggleIconStory,
   loading: LoadingStory,
