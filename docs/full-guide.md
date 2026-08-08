@@ -987,6 +987,7 @@ P3 当时不新增 API/Web/Bot 参数，不写入 history/task status/report met
 #### Multi-Agent 决策分歧摘要输入（Issue #1904 P1 plumbing）
 
 Multi-agent 在进入 `DecisionAgent` 前会构造内部低敏 `agent_disagreement_summary`，用于提示前序 Agent opinion 的方向分歧、风险 override 证据、风险 override 是否受当前 `AGENT_RISK_OVERRIDE` 配置启用，以及非关键阶段降级信息。该摘要只包含 agent name、signal、confidence、conflict type、decision path hint、低敏 risk control 状态和 degraded stage marker，不包含 reasoning、raw_data、原始错误文本、token 或私密 payload。
+- `AGENT_MULTI_STRATEGY_DELIBERATION=false` — 默认关闭的多策略审议集群。
 
 该能力当前只是 `DecisionAgent` 的内部 Prompt 输入管线：摘要写入运行态 `ctx.meta`，不进入 Agent pre-fetched data，不新增 public API、Web/Desktop 展示、history/task status/report metadata、dashboard schema 或最终解释字段。`risk_level=high` 只作为风险证据，不会单独触发 override；summary 与最终 `_apply_risk_override()` 复用同一套 override 判断，并尊重 `AGENT_RISK_OVERRIDE=false`。非关键降级阶段沿用 orchestrator 的 `intel`、`risk` 和 specialist/skill agent 降级契约，避免把单一方向意见误描述成 multi-agent 共识。#1904 的用户可见最终解释输出仍属于后续阶段。
 

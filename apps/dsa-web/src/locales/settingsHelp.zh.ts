@@ -1082,16 +1082,16 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
-  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
-    title: '技能观点后验加权',
-    summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
-    usage: '默认关闭以保持聚合路径字节级一致。仅在完成样本记录/评估（或回填）并检查 GET /api/v1/skill-outcomes/stats 后再开启。',
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略合议',
+    summary: '启用并发多策略专家调度，并生成最终分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并输出分歧说明；关闭时保持 Phase-1 合成路径不变。',
     valueNotes: [
-      '默认关闭；关闭时聚合路径与既有回测/记忆加权行为一致。',
-      '开启后每个 skill_id+horizon+engine_version 桶需独立达到 30 条 evaluated 样本；因子限制在 [1/1.2, 1.2]，不足或失败时中性 1.0。',
+      '关闭时保持既有合成行为字节级一致。',
+      '开启后启用多策略合议与最终分歧说明。',
     ],
-    impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
-    notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
+    impact: ['影响 Agent 流水线专家调度和分歧说明字段。'],
+    notes: ['多策略约定见 docs/multi-strategy-contract.md。'],
   },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: '投委会模式',
@@ -1113,11 +1113,16 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
     notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
   },
-  'settings.agent.event_impact_context': {
-    title: '告警影响上下文',
-    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
-    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
-    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: '技能观点后验加权',
+    summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
+    usage: '默认关闭以保持聚合路径字节级一致。仅在完成样本记录/评估（或回填）并检查 GET /api/v1/skill-outcomes/stats 后再开启。',
+    valueNotes: [
+      '默认关闭；关闭时聚合路径与既有回测/记忆加权行为一致。',
+      '开启后每个 skill_id+horizon+engine_version 桶需独立达到 30 条 evaluated 样本；因子限制在 [1/1.2, 1.2]，不足或失败时中性 1.0。',
+    ],
+    impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
+    notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
   },
   'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
     title: '启用估值 Agent 工具',
@@ -1546,7 +1551,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['决定 Kronos Agent Tool 能否注册并做本地推理。'],
     notes: ['示例：/absolute/path/to/kronos-weights，内含 Kronos-mini/ 与 Kronos-Tokenizer-2k/。'],
   },
-
+  'settings.agent.event_impact_context': {
+    title: '告警影响上下文',
+    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
+    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  },
   'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
     title: '本地运行时自动探测',
     summary: '就绪检查时对本机 Ollama 做快速回环探测（零配置首次成功）。',
