@@ -13,6 +13,8 @@ from typing import Any, Callable, Iterable, Literal
 from src.utils.sanitize import log_safe_exception
 
 from .errors import PluginError
+from .health import PluginHealthReport, build_plugin_health_report
+from .lifecycle_audit import LifecycleAuditRecorder, PluginLifecycleAuditor
 from .manifest import API_MAJOR_PATTERN, PluginManifest, parse_semver
 from .plugin import Plugin
 from .registry import ExtensionPoint, ExtensionRegistration, ExtensionRegistry, PluginContext, RegistrationHandle
@@ -75,6 +77,7 @@ class PluginSnapshot:
     package_root: str | None = None
     reloadable: bool = False
     extension_points: tuple[ExtensionPoint, ...] = ()
+    last_error_code: str | None = None
 
 
 @dataclass(slots=True)
@@ -88,6 +91,7 @@ class _ManagedPlugin:
     cleanup_pending: bool = False
     package_root: Path | None = None
     module_name: str | None = None
+    last_error_code: str | None = None
 
 
 class PluginManager:
@@ -100,6 +104,8 @@ class PluginManager:
         supported_api_versions: Iterable[str] = ("1",),
         registry: ExtensionRegistry | None = None,
         state_store: PluginLifecycleStateStore | None = None,
+        audit: LifecycleAuditRecorder | None = None,
+        audit_enabled: bool = True,
     ) -> None:
         self._application_version = parse_semver(application_version)
         if isinstance(supported_api_versions, str):
@@ -130,6 +136,12 @@ class PluginManager:
         self._lifecycle_boundary_state = threading.local()
         self._state_store = (
             state_store if state_store is not None else PluginLifecycleStateStore.from_env()
+        )
+        # Best-effort auditor: never fail-closes lifecycle (see lifecycle_audit).
+        # audit_enabled=False disables lazy process-service lookup (tests).
+        self._lifecycle_audit_disabled = not audit_enabled
+        self._lifecycle_auditor = PluginLifecycleAuditor(
+            recorder=None if self._lifecycle_audit_disabled else audit,
         )
 
     def _bind_lifecycle_boundary(
@@ -347,7 +359,79 @@ class PluginManager:
             package_root=package_root,
             reloadable=reloadable,
             extension_points=extension_points,
+            last_error_code=record.last_error_code,
         )
+
+    def health_check(self) -> PluginHealthReport:
+        """Return a read-only health report for every registered plugin."""
+
+        return build_plugin_health_report(self)
+
+    def bind_lifecycle_auditor(
+        self,
+        recorder: LifecycleAuditRecorder | None,
+    ) -> None:
+        """Attach or replace the best-effort lifecycle audit recorder."""
+
+        if self._lifecycle_audit_disabled:
+            return
+        self._lifecycle_auditor.bind_recorder(recorder)
+
+    def _audit_metadata_for(self, record: _ManagedPlugin) -> dict[str, Any]:
+        return {
+            "plugin_version": record.manifest.version,
+            "plugin_source": record.source,
+            "extension_points": [
+                handle.extension_point
+                for handle in record.handles
+                if handle.active
+            ],
+        }
+
+    def _audit_begin(
+        self,
+        record: _ManagedPlugin | None,
+        *,
+        plugin_id: str,
+        operation: str,
+    ) -> str | None:
+        if self._lifecycle_audit_disabled:
+            return None
+        metadata = None if record is None else self._audit_metadata_for(record)
+        return self._lifecycle_auditor.begin(
+            plugin_id=plugin_id,
+            operation=operation,
+            metadata=metadata,
+        )
+
+    def _audit_complete(
+        self,
+        record: _ManagedPlugin | None,
+        *,
+        plugin_id: str,
+        operation: str,
+        success: bool,
+        correlation_id: str | None,
+        error_code: str | None,
+    ) -> None:
+        if self._lifecycle_audit_disabled or correlation_id is None:
+            return
+        metadata = None if record is None else self._audit_metadata_for(record)
+        self._lifecycle_auditor.complete(
+            plugin_id=plugin_id,
+            operation=operation,
+            success=success,
+            correlation_id=correlation_id,
+            error_code=error_code,
+            metadata=metadata,
+        )
+
+    def _set_last_error(
+        self,
+        record: _ManagedPlugin,
+        error_code: str | None,
+    ) -> None:
+        record.last_error_code = error_code
 
     def registrations(
         self,
@@ -443,10 +527,14 @@ class PluginManager:
         """Perform the first ``registered -> enabled`` transition."""
 
         return self._run_lifecycle_boundary(
-            lambda: self._enable(
+            lambda: self._audited_operation(
                 plugin_id,
-                operation="load",
-                required_state="registered",
+                "load",
+                lambda: self._enable(
+                    plugin_id,
+                    operation="load",
+                    required_state="registered",
+                ),
             )
         )
 
@@ -454,12 +542,49 @@ class PluginManager:
         """Perform ``disabled -> enabled`` and remain idempotent when enabled."""
 
         return self._run_lifecycle_boundary(
-            lambda: self._enable(
+            lambda: self._audited_operation(
                 plugin_id,
-                operation="enable",
-                required_state="disabled",
+                "enable",
+                lambda: self._enable(
+                    plugin_id,
+                    operation="enable",
+                    required_state="disabled",
+                ),
             )
         )
+
+    def _audited_operation(
+        self,
+        plugin_id: str,
+        operation: str,
+        run: Callable[[], PluginOperationResult],
+    ) -> PluginOperationResult:
+        """Run one lifecycle operation with best-effort audit + last-error tracking."""
+
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+        correlation_id = self._audit_begin(
+            record,
+            plugin_id=plugin_id,
+            operation=operation,
+        )
+        result = run()
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            if record is not None:
+                if result.success and result.error_code is None:
+                    self._set_last_error(record, None)
+                elif result.error_code is not None:
+                    self._set_last_error(record, result.error_code)
+        self._audit_complete(
+            record,
+            plugin_id=plugin_id,
+            operation=operation,
+            success=result.success,
+            correlation_id=correlation_id,
+            error_code=result.error_code,
+        )
+        return result
 
     def _enable(
         self,
@@ -600,7 +725,9 @@ class PluginManager:
                 lambda: self._disable(plugin_id),
             )
 
-        return self._run_lifecycle_boundary(run_disable)
+        return self._run_lifecycle_boundary(
+            lambda: self._audited_operation(plugin_id, "disable", run_disable)
+        )
 
     def _disable(self, plugin_id: str) -> PluginOperationResult:
         """Perform one disable transition inside the outer lifecycle boundary."""
@@ -817,7 +944,35 @@ class PluginManager:
         code and never auto-enables a plugin that is persisted as disabled.
         """
 
-        return self._run_lifecycle_boundary(lambda: self._reload(plugin_id))
+        return self._run_lifecycle_boundary(
+            lambda: self._audited_reload(plugin_id)
+        )
+
+    def _audited_reload(self, plugin_id: str) -> PluginReloadResult:
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+        correlation_id = self._audit_begin(
+            record,
+            plugin_id=plugin_id,
+            operation="reload",
+        )
+        result = self._reload(plugin_id)
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            if record is not None:
+                if result.success and result.error_code is None:
+                    self._set_last_error(record, None)
+                elif result.error_code is not None:
+                    self._set_last_error(record, result.error_code)
+        self._audit_complete(
+            record,
+            plugin_id=plugin_id,
+            operation="reload",
+            success=result.success,
+            correlation_id=correlation_id,
+            error_code=result.error_code,
+        )
+        return result
 
     def _reload(self, plugin_id: str) -> PluginReloadResult:
         snapshot = self.snapshot(plugin_id)

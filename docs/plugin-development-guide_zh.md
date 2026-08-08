@@ -164,6 +164,55 @@ class Plugin(BasePlugin):
 | 运维安全边界 | [安全基线](security-baseline.md#operator-security-boundaries) |
 | 扩展面冻结与通知参考测试 | `tests/plugins/test_extension_surface_v1.py` |
 
+
+## 运维视角
+
+本节面向部署与值班运维，而非插件作者。
+
+### 生命周期审计
+
+enable / disable / reload / load 会通过既有安全审计设施写入 best-effort 事件
+（`event_type=plugin.lifecycle`）。可通过管理员安全审计 API 查询。审计写入失败
+仅记录日志，**不会**阻断插件启动或其它插件。
+
+### Data Provider 自动绑定（显式开关）
+
+| 配置项 | 默认 | 效果 |
+| --- | --- | --- |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 组合根可调用 helper 取得目标 `DataFetcherManager.plugin_registry`，使已注册 provider 无需额外手工胶水即可被发现 |
+
+未准备具体 `DataFetcherManager` 实例时请保持关闭。默认进程根仍不会凭空创建
+进程级 provider 管理器。
+
+```python
+from data_provider import DataFetcherManager
+from src.plugins import (
+    PLUGIN_APPLICATION_VERSION,
+    PluginManager,
+    try_build_auto_bound_registry,
+)
+
+providers = DataFetcherManager()
+registry, error = try_build_auto_bound_registry(providers)
+if error:
+    raise RuntimeError(error)
+plugins = PluginManager(
+    application_version=PLUGIN_APPLICATION_VERSION,
+    registry=registry or providers.plugin_registry,  # 关闭开关时需显式绑定
+)
+```
+
+### 健康检查
+
+```python
+report = plugin_manager.health_check()
+for entry in report.plugins:
+    print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
+```
+
+失败插件查看 `last_error_code`（例如 `plugin_onload_failed`）。单个插件失败不得
+影响其它插件与核心启动。
+
 ## 验证命令
 
 离线插件套件（本主题首选本地门禁）：

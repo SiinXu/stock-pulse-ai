@@ -159,6 +159,31 @@ implementation. A composition caller must construct `PluginManager` with the
 exact target `DataFetcherManager.plugin_registry`; no default process-wide
 provider manager is fabricated for external plugins.
 
+### Opt-in Data Provider auto-bind
+
+`PLUGIN_DATA_PROVIDER_AUTO_BIND` (default off) does not change process startup by
+itself. When a composition root opts in, it may call
+`try_build_auto_bound_registry(data_fetcher_manager)` (or
+`resolve_data_provider_registry`) to obtain the **exact** manager-owned
+`plugin_registry` instance and pass it into `PluginManager`. Rebuilding a new
+`ExtensionRegistry` that only shares the native backend is not sufficient:
+`DataFetcherManager` discovers providers from its own registry registrations.
+
+Binding failures surface stable error codes
+(`data_provider_bind_interface_invalid`, `data_provider_bind_priority_conflict`,
+`data_provider_bind_unavailable`) and must not be silently ignored by the
+composition root.
+
+### Lifecycle audit and health
+
+Privileged plugin lifecycle operations (`load` / `enable` / `disable` /
+`reload`) emit best-effort security-audit events with `event_type=plugin.lifecycle`
+through the existing `SecurityAuditService` contract. Audit write failures never
+block plugin load or process startup. `PluginManager.health_check()` returns a
+read-only snapshot of each plugin's state, extension points, and last
+`error_code` for diagnostics consumers (loaded-extensions UI is a separate
+frontend task).
+
 ## Startup Composition
 
 `main.py` and `server.py` already install an `ApplicationServices` root after

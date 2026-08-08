@@ -172,6 +172,57 @@ inline documentation; prefer the `examples/plugins/` package for new work.
 | Operator security boundaries | [Security baseline](security-baseline.md#operator-security-boundaries) |
 | Surface freeze + reference notification tests | `tests/plugins/test_extension_surface_v1.py` |
 
+
+## Operator / Operations View
+
+This section is for deployers and on-call operators, not plugin authors.
+
+### Lifecycle audit trail
+
+Enable/disable/reload/load transitions record best-effort security-audit events
+(`event_type=plugin.lifecycle`) via the existing security-audit store. Query them
+through the administrator security-audit API. A failed audit write is logged and
+**does not** block plugin startup or other plugins.
+
+### Data Provider auto-bind (opt-in)
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | off | Composition helpers may return the target `DataFetcherManager.plugin_registry` for `PluginManager` construction so registered providers route without extra glue |
+
+Leave the flag unset unless a composition root is prepared to supply a concrete
+`DataFetcherManager` instance. The default process root still does not invent a
+process-wide manager.
+
+```python
+from data_provider import DataFetcherManager
+from src.plugins import (
+    PLUGIN_APPLICATION_VERSION,
+    PluginManager,
+    try_build_auto_bound_registry,
+)
+
+providers = DataFetcherManager()
+registry, error = try_build_auto_bound_registry(providers)
+if error:
+    raise RuntimeError(error)
+plugins = PluginManager(
+    application_version=PLUGIN_APPLICATION_VERSION,
+    registry=registry or providers.plugin_registry,  # explicit when flag off
+)
+```
+
+### Health check
+
+```python
+report = plugin_manager.health_check()
+for entry in report.plugins:
+    print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
+```
+
+Use `last_error_code` for failed plugins (for example `plugin_onload_failed`).
+A single failed plugin must not prevent other plugins or core startup.
+
 ## Verification Commands
 
 Offline plugin suite (preferred local gate for this topic):
