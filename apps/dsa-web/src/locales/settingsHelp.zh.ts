@@ -1569,6 +1569,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
     notes: ['需要 Agent multi 能力。'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略审议',
+    summary: '启用并发多策略专家调度，并在最终输出中给出分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持既有 Phase-1 合成路径。',
+    valueNotes: [
+      '关闭时与既有合成行为保持一致。',
+      '开启后启用多策略审议与最终分歧说明。',
+    ],
+    impact: ['影响 Agent 流水线中的专家调度与分歧说明字段。'],
+    notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
+  },
+
 
 };
 
