@@ -179,8 +179,9 @@ def assess_ocr_dependencies(
     if not pytesseract_ok or not pil_ok:
         reason = "python_deps_missing"
         message = (
-            "Install optional OCR packages: "
-            "python -m pip install -r requirements-ocr.txt "
+            "Install optional OCR packages with: "
+            "python -m pip install --constraint constraints.txt "
+            "--build-constraint build-constraints.txt -r requirements-ocr.txt "
             "(Pillow + pytesseract)."
         )
     elif not binary_ok:
