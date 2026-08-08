@@ -9,23 +9,48 @@ Provides:
    historical accuracy (only after sufficient sample count).
 3. **Skill performance tracking** — per-skill win-rate and
    signal accuracy for auto-weighting.
+4. **Layered retrieval (episodic + semantic)** — structured by default,
+   optional lightweight vector re-ranking when
+   ``AGENT_MEMORY_VECTOR_ENABLED=true``.
 
 Storage uses the existing SQLAlchemy database layer
 (``AnalysisHistory`` + ``BacktestResult`` tables) rather than
-introducing a new store.
+introducing a new store. Vector ranking is derived in-process and does
+not persist a separate embedding table.
+
+Layer scope for this release
+----------------------------
+* **Delivered**: episodic (past analyses) + semantic (cross-episode patterns)
+* **Deferred**: short-term working memory (still ``AgentContext``), long-term
+  user preference profiles
 
 .. note::
    Memory features are gated behind ``AGENT_MEMORY_ENABLED=true``.
-   When disabled, all methods return neutral/default values.
+   When disabled, all methods return neutral/default values identical to
+   the pre-layered API. Vector ranking is independently gated by
+   ``AGENT_MEMORY_VECTOR_ENABLED`` (default off) and falls back to
+   structured retrieval when off or empty.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from src.agent.memory_layers import (
+    MAX_EPISODIC_INJECTION,
+    MAX_SEMANTIC_INJECTION,
+    EpisodicMemoryEntry,
+    LayeredMemoryBundle,
+    SemanticMemoryEntry,
+)
+from src.agent.memory_retrieval import (
+    StructuredMemoryRetriever,
+    format_layered_prompt_context,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -34,6 +59,13 @@ logger = logging.getLogger(__name__)
 _MIN_CALIBRATION_SAMPLES = 30
 # Rolling window size for recent accuracy calculation
 _ROLLING_WINDOW = 50
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
 @dataclass
@@ -71,25 +103,41 @@ class AgentMemory:
         past = memory.get_stock_history("600519", limit=5)
         # Calibrate confidence
         cal = memory.get_calibration("technical", stock_code="600519")
+        # Layered prompt block (episodic + semantic)
+        block = memory.format_prompt_context("600519", query="earnings risk")
     """
 
-    def __init__(self, enabled: bool = False, min_samples: int = _MIN_CALIBRATION_SAMPLES):
+    def __init__(
+        self,
+        enabled: bool = False,
+        min_samples: int = _MIN_CALIBRATION_SAMPLES,
+        vector_enabled: bool = False,
+    ):
         self.enabled = enabled
         self.min_samples = min_samples
+        self.vector_enabled = bool(vector_enabled) and bool(enabled)
+        self._retriever = StructuredMemoryRetriever(vector_enabled=self.vector_enabled)
 
     @classmethod
     def from_config(cls) -> "AgentMemory":
-        """Create an AgentMemory from the current config."""
+        """Create an AgentMemory from the current config / environment."""
+        # Vector flag is env-first so this task does not need to own
+        # config_registry_parts (owned by another parallel task). Also
+        # accept a future config attribute if present.
+        vector_enabled = _env_flag("AGENT_MEMORY_VECTOR_ENABLED", default=False)
         try:
             from src.config import get_config
             config = get_config()
-            enabled = getattr(config, "agent_memory_enabled", False)
-            return cls(enabled=enabled)
-        except Exception:
-            return cls(enabled=False)
+            enabled = bool(getattr(config, "agent_memory_enabled", False))
+            if hasattr(config, "agent_memory_vector_enabled"):
+                vector_enabled = bool(getattr(config, "agent_memory_vector_enabled"))
+        except Exception:  # broad-exception: optional_metadata - Config load failure keeps memory disabled via env flag.
+            enabled = _env_flag("AGENT_MEMORY_ENABLED", default=False)
+
+        return cls(enabled=enabled, vector_enabled=vector_enabled)
 
     # -----------------------------------------------------------------
-    # Analysis history retrieval
+    # Analysis history retrieval (legacy compatible)
     # -----------------------------------------------------------------
 
     def get_stock_history(
@@ -136,7 +184,7 @@ class AgentMemory:
                     was_correct=None,
                 ))
             return entries
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - History lookup failures return empty memory.
             log_safe_exception(
                 logger,
                 "Agent memory stock history lookup failed",
@@ -146,6 +194,107 @@ class AgentMemory:
                 context={"stock_code": stock_code},
             )
             return []
+
+    # -----------------------------------------------------------------
+    # Layered retrieval (episodic + semantic)
+    # -----------------------------------------------------------------
+
+    def retrieve_episodic(
+        self,
+        stock_code: str,
+        limit: int = 5,
+        query: Optional[str] = None,
+    ) -> List[EpisodicMemoryEntry]:
+        """Retrieve episodic memories for a stock (structured ± vector rank)."""
+        if not self.enabled:
+            return []
+        try:
+            return self._retriever.retrieve_episodic(
+                stock_code=stock_code, limit=limit, query=query
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Episodic retrieval failures return empty list.
+            log_safe_exception(
+                logger,
+                "Episodic memory retrieval failed",
+                exc,
+                error_code="agent_memory_episodic_failed",
+                level=logging.DEBUG,
+                context={"stock_code": stock_code},
+            )
+            return []
+
+    def retrieve_semantic(
+        self,
+        query: Optional[str] = None,
+        stock_code: Optional[str] = None,
+        limit: int = MAX_SEMANTIC_INJECTION,
+    ) -> List[SemanticMemoryEntry]:
+        """Retrieve semantic patterns distilled from past analyses."""
+        if not self.enabled:
+            return []
+        try:
+            return self._retriever.retrieve_semantic(
+                query=query, stock_code=stock_code, limit=limit
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Semantic retrieval failures return empty list.
+            log_safe_exception(
+                logger,
+                "Semantic memory retrieval failed",
+                exc,
+                error_code="agent_memory_semantic_failed",
+                level=logging.DEBUG,
+                context={"stock_code": stock_code},
+            )
+            return []
+
+    def retrieve_layered(
+        self,
+        stock_code: str,
+        query: Optional[str] = None,
+        episodic_limit: int = MAX_EPISODIC_INJECTION,
+        semantic_limit: int = MAX_SEMANTIC_INJECTION,
+    ) -> LayeredMemoryBundle:
+        """Retrieve episodic + semantic layers as one bundle."""
+        if not self.enabled:
+            return LayeredMemoryBundle()
+        try:
+            return self._retriever.retrieve_layered(
+                stock_code=stock_code,
+                query=query,
+                episodic_limit=episodic_limit,
+                semantic_limit=semantic_limit,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Layered retrieval failures return empty bundle.
+            log_safe_exception(
+                logger,
+                "Layered memory retrieval failed",
+                exc,
+                error_code="agent_memory_layered_failed",
+                level=logging.DEBUG,
+                context={"stock_code": stock_code},
+            )
+            return LayeredMemoryBundle()
+
+    def format_prompt_context(
+        self,
+        stock_code: str,
+        query: Optional[str] = None,
+        episodic_limit: int = MAX_EPISODIC_INJECTION,
+        semantic_limit: int = MAX_SEMANTIC_INJECTION,
+    ) -> str:
+        """Build a low-sensitivity prompt block for agent injection.
+
+        Returns an empty string when memory is disabled or nothing is found.
+        """
+        if not self.enabled or not stock_code:
+            return ""
+        bundle = self.retrieve_layered(
+            stock_code=stock_code,
+            query=query,
+            episodic_limit=episodic_limit,
+            semantic_limit=semantic_limit,
+        )
+        return format_layered_prompt_context(bundle)
 
     # -----------------------------------------------------------------
     # Confidence calibration
@@ -192,7 +341,7 @@ class AgentMemory:
                 result.calibrated = False
                 result.calibration_factor = 1.0
 
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Calibration failures keep neutral factor 1.0.
             log_safe_exception(
                 logger,
                 "Agent memory confidence calibration failed",
@@ -245,7 +394,7 @@ class AgentMemory:
                     "sufficient_samples": summary.get("total_evaluations", 0) >= self.min_samples,
                 }
             return {"available": False}
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - Skill performance lookup fails closed as unavailable.
             return {"available": False}
 
     def get_strategy_performance(self, strategy_id: str) -> Dict[str, Any]:
@@ -327,6 +476,6 @@ class AgentMemory:
                     "direction_accuracy": summary.get("direction_accuracy", 0.5),
                     "avg_confidence": 0.6,  # approximate from historical data
                 }
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - Accuracy stats fail closed to zero samples.
             pass
         return {"total": 0, "accuracy": 0.5, "direction_accuracy": 0.5, "avg_confidence": 0.5}

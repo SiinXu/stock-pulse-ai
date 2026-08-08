@@ -298,9 +298,39 @@ class BaseAgent(ABC):
         return filtered
 
     def _build_memory_context(self, ctx: AgentContext) -> str:
-        """Summarise recent analysis history for prompt injection."""
+        """Summarise recent analysis history for prompt injection.
+
+        Prefers ``AgentMemory.format_prompt_context`` (episodic + semantic
+        layers) when it returns a real string. Falls back to the legacy
+        ``get_stock_history`` formatting so tests and older mocks keep working.
+        """
         if not self.memory.enabled or not ctx.stock_code:
             return ""
+
+        # Layered formatter (T04). Only accept an actual str so MagicMock
+        # stubs that auto-create attributes do not break legacy tests.
+        formatter = getattr(self.memory, "format_prompt_context", None)
+        if callable(formatter):
+            try:
+                layered = formatter(
+                    ctx.stock_code,
+                    query=getattr(ctx, "query", None) or "",
+                )
+            except TypeError:
+                # Signature mismatch on unexpected stubs
+                layered = None
+            except Exception as exc:  # broad-exception: fallback_recorded - Layered format failures fall back to legacy history injection.
+                log_safe_exception(
+                    logger,
+                    "Layered memory context formatting failed",
+                    exc,
+                    error_code="agent_memory_format_prompt_failed",
+                    level=logging.DEBUG,
+                    context={"stock_code": ctx.stock_code, "agent": self.agent_name},
+                )
+                layered = None
+            if isinstance(layered, str) and layered:
+                return layered
 
         entries = self.memory.get_stock_history(ctx.stock_code, limit=3)
         if not entries:
