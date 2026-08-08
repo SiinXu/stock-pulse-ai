@@ -395,8 +395,9 @@ const HomePage: React.FC = () => {
           error={setupStatusError}
           lastSuccess={lastSuccessSignal}
           onRefresh={() => { void loadSetupStatus(); }}
-          onDismiss={handleDismissOnboarding}
-          dismissible={Boolean(setupStatus && !setupStatus.isComplete)}
+          // Incomplete-setup dismiss lives only on HomeOnboardingSection so Home
+          // does not render two identical "Close" controls at once (#879 B6 spirit).
+          dismissible={false}
           t={t}
         />
       ) : null}
@@ -424,7 +425,9 @@ const HomePage: React.FC = () => {
         />
       ) : null}
 
-      <div data-testid="home-core-blocks" className="grid gap-4 xl:grid-cols-3">
+      {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
+          avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
+      <div data-testid="home-core-blocks" className="grid min-w-0 gap-4 xl:grid-cols-3">
         <Section
           title={t('home.todayFocus')}
           description={t('home.todayFocusDescription')}
