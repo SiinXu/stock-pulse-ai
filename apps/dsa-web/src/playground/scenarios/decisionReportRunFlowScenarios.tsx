@@ -1,7 +1,17 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/common';
+import { ChatComposer } from '../../components/chat/ChatComposer';
+import { ChatMessageList } from '../../components/chat/ChatMessageList';
+import { ChatSessionSidebar } from '../../components/chat/ChatSessionSidebar';
+import {
+  ChatThinkingDetails,
+  ChatThinkingToggle,
+} from '../../components/chat/ChatThinkingDetails';
 import { DeepResearchPanel } from '../../components/chat/DeepResearchPanel';
+import type { ChatSessionItem, SkillInfo } from '../../api/agent';
+import { createParsedApiError } from '../../api/error';
+import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import { DecisionSignalCreateDrawer } from '../../components/decision-signals/DecisionSignalCreateDrawer';
 import {
   DecisionSignalCard,
@@ -337,6 +347,201 @@ const DecisionSignalProfileCalibrationStory = () => {
   return <DecisionSignalProfileCalibration calibration={fixtureProfileCalibration} />;
 };
 
+const FIXTURE_SKILLS: SkillInfo[] = [
+  { id: 'skill-a', name: 'Fixture Skill A', description: 'Playground skill A' },
+  { id: 'skill-b', name: 'Fixture Skill B', description: 'Playground skill B' },
+];
+
+const FIXTURE_SESSIONS: ChatSessionItem[] = [
+  {
+    session_id: 'session-1',
+    title: 'Fixture session one',
+    message_count: 4,
+    created_at: '2026-07-20T10:00:00Z',
+    last_active: '2026-07-20T11:00:00Z',
+  },
+  {
+    session_id: 'session-2',
+    title: 'Fixture session two',
+    message_count: 1,
+    created_at: '2026-07-19T09:00:00Z',
+    last_active: '2026-07-19T09:30:00Z',
+  },
+];
+
+const FIXTURE_CHAT_MESSAGES: Message[] = [
+  { id: 'msg-user-1', role: 'user', content: 'Summarize 600519 risk factors.' },
+  {
+    id: 'msg-assistant-1',
+    role: 'assistant',
+    content: 'Fixture assistant reply with a short risk summary.',
+    thinkingSteps: [
+      { type: 'thinking', step: 1, message: 'Gathering report context' },
+      { type: 'tool_done', tool: 'lookup', display_name: 'Lookup', duration: 0.4, success: true },
+    ],
+  },
+];
+
+const FIXTURE_PROGRESS_STEPS: ProgressStep[] = [
+  { type: 'thinking', step: 1, message: 'Planning next action' },
+  { type: 'tool_start', tool: 'search', display_name: 'Search' },
+  { type: 'tool_done', tool: 'search', display_name: 'Search', duration: 1.2, success: true },
+];
+
+const useChatTranslate = () => {
+  const { t } = useUiLanguage();
+  return t;
+};
+
+const ChatComposerStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = useChatTranslate();
+  const { language } = useUiLanguage();
+  const samples = useSamples();
+  const skillPickerRef = useRef<HTMLDivElement | null>(null);
+  const [input, setInput] = useState(scenario === 'error' ? '' : samples.preview);
+  const selectedSkillIds = scenario === 'empty' ? [] : [FIXTURE_SKILLS[0].id];
+  return (
+    <div className="max-w-3xl rounded-xl border border-border bg-card">
+      <ChatComposer
+        language={language}
+        t={t}
+        sessionError={scenario === 'error' ? createParsedApiError({ title: samples.fieldError, message: samples.fieldError, status: 500, code: 'fixture' }) : null}
+        sessionLoading={scenario === 'loading'}
+        chatError={null}
+        lastFailedRequest={null}
+        onRetryLastStream={() => undefined}
+        isFollowUpContextLoading={false}
+        contextCompressionEnabled={false}
+        contextCompressionLoaded
+        contextCompressionSaving={false}
+        contextCompressionError={null}
+        onContextCompressionChange={() => undefined}
+        skills={FIXTURE_SKILLS}
+        selectedSkillIds={selectedSkillIds}
+        selectedSkillIdSet={new Set(selectedSkillIds)}
+        skillLimitReached={false}
+        selectedSkillSummary={selectedSkillIds.length ? FIXTURE_SKILLS[0].name : samples.preview}
+        mobileSkillPickerOpen={false}
+        onMobileSkillPickerOpenChange={() => undefined}
+        skillPickerRef={skillPickerRef}
+        showSkillDesc={null}
+        onShowSkillDesc={() => undefined}
+        onToggleSkill={() => undefined}
+        onClearSkills={() => undefined}
+        activeStockCode="600519"
+        stockInWatchlist={false}
+        isWatchlistActioning={false}
+        watchlistMessage={null}
+        onToggleWatchlist={() => undefined}
+        input={input}
+        onInputChange={setInput}
+        onKeyDown={() => undefined}
+        loading={scenario === 'loading'}
+        isSkillsLoading={false}
+        onStop={() => undefined}
+        onSend={() => undefined}
+      />
+    </div>
+  );
+};
+
+const ChatMessageListStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = useChatTranslate();
+  const { language } = useUiLanguage();
+  const samples = useSamples();
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messages = scenario === 'empty' ? [] : FIXTURE_CHAT_MESSAGES;
+  const [expandedThinking, setExpandedThinking] = useState(() => new Set(['msg-assistant-1']));
+  return (
+    <div className="flex h-[28rem] max-w-3xl flex-col rounded-xl border border-border bg-card">
+      <ChatMessageList
+        language={language}
+        t={t}
+        text={{ copied: samples.preview, copy: samples.secondaryAction }}
+        messages={messages}
+        loading={scenario === 'loading'}
+        progressSteps={scenario === 'loading' ? FIXTURE_PROGRESS_STEPS : []}
+        agentUnavailable={false}
+        quickQuestions={[{ label: samples.primaryAction, skill: 'skill-a' }]}
+        onQuickQuestion={() => undefined}
+        quickQuestionsDisabled={false}
+        expandedThinking={expandedThinking}
+        onToggleThinking={(messageId) => {
+          setExpandedThinking((current) => {
+            const next = new Set(current);
+            if (next.has(messageId)) next.delete(messageId);
+            else next.add(messageId);
+            return next;
+          });
+        }}
+        copiedMessages={new Set()}
+        onCopyMessage={() => undefined}
+        onDownloadMessage={() => undefined}
+        messagesViewportRef={messagesViewportRef}
+        messagesEndRef={messagesEndRef}
+        onScroll={() => undefined}
+      />
+    </div>
+  );
+};
+
+const ChatSessionSidebarStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = useChatTranslate();
+  const { language } = useUiLanguage();
+  const samples = useSamples();
+  const [search, setSearch] = useState('');
+  const sessions = scenario === 'empty' ? [] : FIXTURE_SESSIONS;
+  return (
+    <div className="flex h-[28rem] w-80 flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <ChatSessionSidebar
+        language={language}
+        t={t}
+        sessionSearch={search}
+        onSessionSearchChange={setSearch}
+        sessions={sessions}
+        filteredSessions={sessions}
+        sessionsLoading={scenario === 'loading'}
+        sessionsError={scenario === 'error' ? createParsedApiError({ title: samples.fieldError, message: samples.fieldError, status: 500, code: 'fixture' }) : null}
+        sessionLoading={false}
+        sessionId={sessions[0]?.session_id ?? ''}
+        onNewChat={() => undefined}
+        onRetryLoadSessions={() => undefined}
+        onSwitchSession={() => undefined}
+        onRequestDelete={() => undefined}
+      />
+    </div>
+  );
+};
+
+const ChatThinkingDetailsStory = () => {
+  const t = useChatTranslate();
+  return (
+    <div className="max-w-xl rounded-xl border border-border bg-card p-4">
+      <ChatThinkingDetails steps={FIXTURE_PROGRESS_STEPS} t={t} />
+    </div>
+  );
+};
+
+const ChatThinkingToggleStory = () => {
+  const samples = useSamples();
+  const [expanded, setExpanded] = useState(true);
+  return (
+    <div className="max-w-xl rounded-xl border border-border bg-card p-4">
+      <ChatThinkingToggle
+        isExpanded={expanded}
+        summary={samples.preview}
+        onToggle={() => setExpanded((value) => !value)}
+        thinkingProcessLabel={samples.details}
+      />
+      {expanded ? <p className="mt-2 text-sm text-secondary-text">{samples.preview}</p> : null}
+    </div>
+  );
+};
+
 const DeepResearchPanelStory = () => {
   const { scenario, profile } = usePlaygroundScenario();
   const text = useSamples();
@@ -617,6 +822,11 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-structured-insights': ReportStructuredInsightsStory,
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,
+  'chat-composer': ChatComposerStory,
+  'chat-message-list': ChatMessageListStory,
+  'chat-session-sidebar': ChatSessionSidebarStory,
+  'chat-thinking-details': ChatThinkingDetailsStory,
+  'chat-thinking-toggle': ChatThinkingToggleStory,
   'run-flow-event-list': RunFlowEventListStory,
   'run-flow-graph': RunFlowGraphStory,
   'run-flow-node-details': RunFlowNodeDetailsStory,

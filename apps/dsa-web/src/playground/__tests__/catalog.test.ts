@@ -6,10 +6,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PLAYGROUND_CATALOG, PLAYGROUND_CATEGORIES } from '../catalog';
-import { getMissingPlaygroundRendererIds } from '../scenarios';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const componentsRoot = path.join(sourceRoot, 'components');
+const scenariosRoot = path.join(sourceRoot, 'playground/scenarios');
 
 function componentSourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry: { name: string; isDirectory: () => boolean; isFile: () => boolean }) => {
@@ -28,12 +28,39 @@ function exportedVisualComponentNames(): string[] {
   return names.filter((name) => name !== 'ThemeProvider').sort();
 }
 
+/**
+ * Collect playground renderer ids by scanning scenario registry modules.
+ *
+ * Intentionally avoids importing `../scenarios` so this contract test does not
+ * load the full component graph (and its i18n/source inventory side effects).
+ * Runtime rendering still goes through the real RENDERERS map in scenarios/.
+ */
+function registeredRendererIds(): string[] {
+  const ids: string[] = [];
+  for (const entry of fs.readdirSync(scenariosRoot, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('Scenarios.tsx')) continue;
+    const source = fs.readFileSync(path.join(scenariosRoot, entry.name), 'utf8');
+    const registry = source.match(/export const \w+_SCENARIOS(?::[^=]+)?=\s*\{([\s\S]*?)\n\};/);
+    if (!registry) continue;
+    for (const match of registry[1].matchAll(/(?:^|\n)\s*(?:'([^']+)'|([A-Za-z0-9_-]+))\s*:/g)) {
+      ids.push(match[1] ?? match[2]);
+    }
+  }
+  return ids;
+}
+
+function missingRendererIds(): string[] {
+  const registered = new Set(registeredRendererIds());
+  return PLAYGROUND_CATALOG
+    .map((entry) => entry.id)
+    .filter((id) => !registered.has(id));
+}
+
 describe('playground catalog', () => {
   it('uses stable, unique ids and valid source paths', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PLAYGROUND_CATALOG).toHaveLength(170);
-    expect(PLAYGROUND_CATALOG).toHaveLength(165);
+    expect(PLAYGROUND_CATALOG).toHaveLength(186);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);
@@ -48,7 +75,7 @@ describe('playground catalog', () => {
   });
 
   it('has a real renderer for every catalog entry and entries in every category', () => {
-    expect(getMissingPlaygroundRendererIds()).toEqual([]);
+    expect(missingRendererIds()).toEqual([]);
     for (const category of PLAYGROUND_CATEGORIES) {
       expect(PLAYGROUND_CATALOG.some((entry) => entry.category === category)).toBe(true);
     }
