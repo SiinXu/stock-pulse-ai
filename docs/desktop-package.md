@@ -57,16 +57,19 @@ npm run dev
 
 当前桌面壳固定依赖（见 `apps/dsa-desktop/package.json`）：
 
-- Electron `43.3.0`（开发依赖，但作为打包运行时随应用分发）
-- electron-builder `26.15.7`（打包）
-- electron-updater `6.8.9`（自动更新）
+- Electron `43.3.0`（开发依赖，但作为打包运行时随应用分发；`latest` / `43-x-y` 当前稳定线）
+- electron-builder `26.15.7`（打包；`v26` dist-tag；`next` 为 27 alpha，不作为本仓库默认）
+- electron-updater `6.8.9`（自动更新；生产依赖）
 - `app-builder-lib` 的 `tar` override `7.5.22`（构建链审计修复，保留与 archive 路径的兼容性探测）
+- 顶层 `js-yaml` override `4.3.1`（覆盖 `electron-updater` 与 builder 链的 `^4.1.0` / `^4.3.0`，关闭 GHSA-5p4m-2wfm-xmqj / CVE-2026-59870；`npm audit` 与 `npm audit --omit=dev` 均应报告 0 vulnerabilities）
 
 本地校验：
 
 ```bash
 cd apps/dsa-desktop
 npm install
+npm audit
+npm audit --omit=dev
 npm run lint
 npm test
 # optional diagnostic: incomplete JSDoc types currently report under // @ts-check
@@ -75,7 +78,7 @@ npm run typecheck
 
 `npm run lint` 使用 ESLint flat config（`eslint.config.js`），覆盖 main/preload/renderer/scripts/tests。`main.js` 启用 `// @ts-check` 供编辑器与 `npm run typecheck` 诊断使用；现有 JSDoc 缺口属于类型标注不完整，不在本升级中做语义改写。
 
-从 Electron 31 / electron-builder 24 升级时需注意：自动更新与 NSIS/DMG 打包语义、沙箱与 contextIsolation 默认值，以及 builder 26 的 archive API（options object）。Windows 协议注册仍依赖 `installer.nsh`，不依赖 builder 的 protocols 字段。
+从 Electron 31 / electron-builder 24 升级时需注意：自动更新与 NSIS/DMG 打包语义、沙箱与 contextIsolation 默认值，以及 builder 26 的 archive API（options object）。Windows 协议注册仍依赖 `installer.nsh`，不依赖 builder 的 protocols 字段。Electron 44 仍为 beta，未纳入本仓库固定栈。
 
 
 ## 桌面深链协议

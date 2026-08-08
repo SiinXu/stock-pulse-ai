@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
 - [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
