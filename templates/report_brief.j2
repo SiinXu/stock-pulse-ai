@@ -8,8 +8,7 @@
 
 {% for e in enriched %}
 {% set dash = e.result.dashboard or {} %}
-**{{ e.stock_name }}({{ e.result.code }})**
-{{ decision_card(e, compact=true) }}
+{{ decision_card(e, compact='brief') }}
 {%- set strata = e.report_strata or (dash.get('report_strata') if dash else none) %}
 {% if strata %}
 {{ report_strata_section(strata, compact=true) }}
