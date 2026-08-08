@@ -241,7 +241,11 @@ If there is a corresponding CI result on the existing PR, you can directly quote
   - `.claude/skills/analyze-issue/SKILL.md`
   - `.claude/skills/analyze-pr/SKILL.md`
   - `.claude/skills/fix-issue/SKILL.md`
-- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`.
+  - `.claude/skills/develop-feature/SKILL.md`
+  - `.claude/skills/run-verification/SKILL.md`
+  - `.claude/skills/draft-issue/SKILL.md`
+  - `.claude/skills/handle-review-feedback/SKILL.md`
+- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`. For planned development tasks prefer `develop-feature` (which embeds `run-verification` and the `analyze-pr` review order); for responding to review feedback on your own PR follow `handle-review-feedback`. Skill selection guidance lives in `docs/claude-skills-guide.md`.
 - Commands, templates, validation order, and delivery structure in these skills must remain consistent with `AGENTS.md`.
 - Before creating or updating a PR, reviewing a PR, or analyzing an issue, synchronize the latest codebase: first check the workspace status and execute `git fetch --all --prune`; if the workspace is clean and the current branch can be fast-forwarded, execute `git pull --ff-only`. If there are local modifications, conflict states, untracked risk files, or inability to fast-forward, do not forcibly switch branches, stash, reset, or overwrite local status; PR review/issue analysis can use the fetched remote refs/PR head for analysis and clearly record the reason for not updating the local working tree and the current local HEAD with the remote baseline in the analysis document; PR creation/update should first explain the difference between the current branch and the target baseline, and request user confirmation to rebase, merge, or continue based on the current branch.
 - Skills should inspect CI and workflow evidence before deciding whether additional local validation is needed.
