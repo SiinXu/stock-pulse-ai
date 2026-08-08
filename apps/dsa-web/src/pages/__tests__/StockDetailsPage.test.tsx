@@ -1,5 +1,7 @@
 import type React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StockDetailsPage from '../StockDetailsPage';
@@ -70,17 +72,29 @@ function makeHistory(): StockHistoryResponse {
   };
 }
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 function renderPage(code = '600519') {
   render(
-    <UiLanguageProvider initialLanguage="en">
-      <MemoryRouter initialEntries={[`/stocks/${code}`]}>
-        <Routes>
-          <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
-          <Route path="/" element={<div>home-route</div>} />
-          <Route path={APP_ROUTE_PATHS.signals} element={<SignalLocationProbe />} />
-        </Routes>
-      </MemoryRouter>
-    </UiLanguageProvider>,
+    wrapWithQueryClient(
+      <UiLanguageProvider initialLanguage="en">
+        <MemoryRouter initialEntries={[`/stocks/${code}`]}>
+          <Routes>
+            <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
+            <Route path="/" element={<div>home-route</div>} />
+            <Route path={APP_ROUTE_PATHS.signals} element={<SignalLocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    ),
   );
 }
 

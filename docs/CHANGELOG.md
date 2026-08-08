@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Docs] Add GitHub Actions three-step quickstart (`docs/actions-quickstart.md` / `docs/actions-quickstart_CN.md`) and a README Quick start entry link (#852).
+- [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
+- [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
 - [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
 - [Added] Zero-config first success: loopback Ollama auto-detect for setup readiness, data-only dry-run guidance when no model is configured, and LOCAL_RUNTIME_AUTO_DETECT* settings.
