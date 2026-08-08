@@ -75,8 +75,13 @@ export type UrlParamDef<T> = {
   history: UrlHistoryMode;
 };
 
-/** Page-level schema: each key is a typed field owned by that page. */
-export type UrlStateSchema = Record<string, UrlParamDef<unknown>>;
+/**
+ * Page-level schema: each key is a typed field owned by that page.
+ * Uses `any` (not `unknown`) so per-field `UrlParamDef<T>` values remain
+ * assignable under TypeScript's function parameter contravariance rules.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type UrlStateSchema = Record<string, UrlParamDef<any>>;
 
 /** Infer the typed values object from a schema. */
 export type InferUrlState<S extends UrlStateSchema> = {
