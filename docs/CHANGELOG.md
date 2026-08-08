@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
 - [Added] Zero-config first success: loopback Ollama auto-detect for setup readiness, data-only dry-run guidance when no model is configured, and LOCAL_RUNTIME_AUTO_DETECT* settings.
 - [Added] Optional RSS/Atom market-news feeds (`RSS_NEWS_FEED_URLS`) as a free supplement in the on-demand search pipeline; empty config stays inert, per-feed failures degrade without aborting the run, and fetch uses the fail-closed outbound policy.

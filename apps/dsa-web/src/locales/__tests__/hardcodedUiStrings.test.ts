@@ -79,19 +79,19 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'SI-compatible milliseconds unit appended to a numeric latency.',
   },
   {
-    file: 'pages/ChatPage.tsx',
+    file: 'components/chat/ChatMessageList.tsx',
     text: 'U',
     context: 'jsx-expression',
     purpose: 'Locale-independent one-letter user avatar marker.',
   },
   {
-    file: 'pages/ChatPage.tsx',
+    file: 'components/chat/ChatMessageList.tsx',
     text: 'AI',
     context: 'jsx-expression',
     purpose: 'Established technical acronym used as the assistant avatar marker.',
   },
   {
-    file: 'pages/ChatPage.tsx',
+    file: 'components/chat/ChatMessageList.tsx',
     text: 'AI',
     context: 'jsx-text',
     purpose: 'Established technical acronym used as the loading assistant avatar marker.',
