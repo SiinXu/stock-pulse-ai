@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] Sync Web Settings i18n inventory for local-runtime/RSS/multi-strategy help keys so the Settings lazy chunk loads in DEV/e2e and Usage deep links render English chrome and document titles.
 - [Added] Shared Web URL state helper (`urlState`) with typed schemas, replace/push history rules, unknown-param preservation, Decision Signals schema example, and unit tests (UI-03A / #879 A1 foundation; no page wiring yet).
 - [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).
 - [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).

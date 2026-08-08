@@ -927,8 +927,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
-    await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
+    // Usage is hosted under Settings; chrome text is usage.title and document title is usage.documentTitle.
+    await assertRouteChrome(
+      page,
+      usageSettingsHref,
+      UI_TEXT.en['usage.title'],
+      UI_TEXT.en['usage.documentTitle'],
+    );
+    await assertRouteChrome(
+      page,
+      APP_ROUTE_PATHS.settings,
+      UI_TEXT.en['settings.pageTitle'],
+      UI_TEXT.en['settings.pageTitleDocument'],
+    );
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
   });
 
@@ -936,11 +947,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto(`${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#recent`);
 
+    // Settings is a large lazy chunk; wait for the embedded usage heading before URL checks.
     await expect(page.getByRole('heading', {
       level: 2,
       name: UI_TEXT.en['usage.title'],
       exact: true,
-    })).toBeVisible();
+    })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1')).toHaveCount(1);
     const redirectedUrl = new URL(page.url());
     expect(redirectedUrl.pathname).toBe(APP_ROUTE_PATHS.settings);
@@ -951,6 +963,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: 'Usage & cost' }))
       .toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
+    await expect(page).toHaveTitle(
+      new RegExp(UI_TEXT.en['usage.documentTitle'].replace(/[.*+?^${}()|[\]\]/g, '\$&'), 'i'),
+    );
+
+    // replace (not push): back must not return to the retired /usage route.
+    await page.goBack();
+    await expect.poll(() => new URL(page.url()).pathname).not.toBe(LEGACY_ROUTE_PATHS.usage);
   });
 
   test('05b legacy Research deep links preserve context and replace into canonical routes', async ({ page }) => {
@@ -1393,7 +1412,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(LEGACY_ROUTE_PATHS.alerts);
-    await page.getByRole('button', { name: '创建告警规则' }).click();
+    // Signal Center can render multiple primary "创建告警规则" CTAs (header + empty state).
+    // Scope to main so the open action stays unambiguous without weakening failure-preservation checks.
+    const main = page.locator('main');
+    await main.getByRole('button', { name: '创建告警规则' }).first().click();
     const dialog = page.getByRole('dialog', { name: '创建告警规则' });
     await dialog.getByLabel('规则名称').fill('保留输入的失败规则');
     await dialog.getByLabel('标的代码').fill('AAPL');
