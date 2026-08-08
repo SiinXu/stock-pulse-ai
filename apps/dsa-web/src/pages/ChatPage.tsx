@@ -16,16 +16,7 @@ import {
 } from '../components/chat/chatActiveStock';
 import { getMessageSkillLabel } from '../components/chat/chatMessageMeta';
 import { useChatPageUiState } from '../components/chat/useChatPageUiState';
-import {
-  DEFAULT_WHAT_IF_DRAFT,
-  DEFAULT_WHAT_IF_MAX_TURNS,
-  HYPOTHETICAL_ASSUMPTION_MARKER,
-  buildWhatIfAssumption,
-  countWhatIfTurnsInMessages,
-  isWhatIfLimitReached,
-  mergeWhatIfIntoContext,
-  type WhatIfDraftState,
-} from '../components/chat/whatIfScenario';
+import { useChatWhatIf } from '../components/chat/useChatWhatIf';
 import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -153,7 +144,6 @@ const ChatPage: React.FC = () => {
   const [activeStockCode, setActiveStockCode] = useState<string | null>(null);
   const [activeStockContext, setActiveStockContext] = useState<ActiveStockContext | null>(null);
   const activeStockContextRef = useRef<ActiveStockContext | null>(null);
-  const [whatIfDraft, setWhatIfDraft] = useState<WhatIfDraftState>(DEFAULT_WHAT_IF_DRAFT);
   const watchlistMessageTimerRef = useRef<number | null>(null);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
   const messagesViewportRef = useRef<HTMLDivElement>(null);
@@ -308,11 +298,8 @@ const ChatPage: React.FC = () => {
     stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
+  const { whatIfDraft, setWhatIfDraft, planWhatIfSend } = useChatWhatIf(messages);
   const selectedSkillIds = sessionSelectedSkillIds ?? defaultSkillIds;
-  useEffect(() => {
-    const used = countWhatIfTurnsInMessages(messages);
-    setWhatIfDraft((prev) => (prev.turnCount === used ? prev : { ...prev, turnCount: used }));
-  }, [messages]);
   const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -679,16 +666,6 @@ const ChatPage: React.FC = () => {
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
       if (!msgText || loading || sessionLoading || isFollowUpContextLoading || isSkillsLoading) return;
-      if (whatIfDraft.enabled) {
-        if (isWhatIfLimitReached(whatIfDraft)) {
-          showSendFeedback({ type: 'error', message: t('chat.whatIf.limitMessage', { max: DEFAULT_WHAT_IF_MAX_TURNS }) }, 5000);
-          return;
-        }
-        if (!buildWhatIfAssumption(whatIfDraft)) {
-          showSendFeedback({ type: 'error', message: t('chat.whatIf.magnitudeInvalid') }, 5000);
-          return;
-        }
-      }
       const requestedSkillIds = overrideSkillIds ?? sessionSelectedSkillIds;
       const usedSkillIds = normalizeSelectedSkillIds(
         requestedSkillIds ?? selectedSkillIds,
@@ -708,15 +685,23 @@ const ChatPage: React.FC = () => {
       const baseContextForSend = useActiveContextForThisSend
         ? nextActiveStockContext
         : followUpContextRef.current ?? nextActiveStockContext ?? undefined;
-      const contextForSend = mergeWhatIfIntoContext(
+      const whatIfPlan = planWhatIfSend(
+        msgText,
         baseContextForSend as Record<string, unknown> | null | undefined,
-        whatIfDraft,
       );
-      const outboundMessage = whatIfDraft.enabled && buildWhatIfAssumption(whatIfDraft)
-        ? `${HYPOTHETICAL_ASSUMPTION_MARKER}\n${msgText}`
-        : msgText;
+      if (!whatIfPlan.ok) {
+        showSendFeedback(
+          {
+            type: 'error',
+            message: t(whatIfPlan.errorKey, whatIfPlan.errorParams),
+          },
+          5000,
+        );
+        return;
+      }
+      const contextForSend = whatIfPlan.context;
       const payload = {
-        message: outboundMessage,
+        message: whatIfPlan.message,
         session_id: sessionId,
         ...(requestedSkillIds !== null
           ? { skills: normalizeSelectedSkillIds(requestedSkillIds) }
@@ -755,7 +740,7 @@ const ChatPage: React.FC = () => {
         setInput(msgText);
       }
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, showSendFeedback, startStream, t, whatIfDraft],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, showSendFeedback, startStream, planWhatIfSend, t],
   );
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
