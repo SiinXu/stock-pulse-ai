@@ -15108,6 +15108,78 @@
         "title": "PortfolioTradeListResponse",
         "type": "object"
       },
+      "ReasoningTraceExportResponse": {
+        "description": "JSON export envelope for ``reasoning-trace-v1``.",
+        "properties": {
+          "agents": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "coverage": {
+            "additionalProperties": true,
+            "title": "Coverage",
+            "type": "object"
+          },
+          "data_sources": {
+            "additionalProperties": true,
+            "title": "Data Sources",
+            "type": "object"
+          },
+          "markdown": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional human-readable markdown companion (redacted)",
+            "title": "Markdown"
+          },
+          "run": {
+            "additionalProperties": true,
+            "title": "Run",
+            "type": "object"
+          },
+          "schema_version": {
+            "description": "Export contract version",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "synthesis": {
+            "additionalProperties": true,
+            "title": "Synthesis",
+            "type": "object"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "truncation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation"
+          }
+        },
+        "required": [
+          "schema_version"
+        ],
+        "title": "ReasoningTraceExportResponse",
+        "type": "object"
+      },
       "ReportDetails": {
         "description": "报告详情区",
         "properties": {
@@ -31370,6 +31442,117 @@
         "summary": "Delete trade event",
         "tags": [
           "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/reasoning-trace/{record_id}": {
+      "get": {
+        "description": "Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Secrets are never exported.",
+        "operationId": "exportReasoningTrace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "json returns the package envelope; markdown returns text/markdown body",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "description": "json returns the package envelope; markdown returns text/markdown body",
+              "enum": [
+                "json",
+                "markdown"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "When format=json, also embed a redacted markdown companion field",
+            "in": "query",
+            "name": "include_markdown",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "When format=json, also embed a redacted markdown companion field",
+              "title": "Include Markdown",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasoningTraceExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Export multi-agent reasoning trace for an analysis history record",
+        "tags": [
+          "ReasoningTrace"
         ]
       }
     },

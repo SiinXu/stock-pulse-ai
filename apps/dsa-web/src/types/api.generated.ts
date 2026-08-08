@@ -2260,6 +2260,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reasoning-trace/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export multi-agent reasoning trace for an analysis history record
+         * @description Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Secrets are never exported.
+         */
+        get: operations["exportReasoningTrace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/scheduled-tasks": {
         parameters: {
             query?: never;
@@ -9028,6 +9048,51 @@ export interface components {
             page_size: number;
             /** Total */
             total: number;
+        };
+        /**
+         * ReasoningTraceExportResponse
+         * @description JSON export envelope for ``reasoning-trace-v1``.
+         */
+        ReasoningTraceExportResponse: {
+            /** Agents */
+            agents?: {
+                [key: string]: unknown;
+            }[];
+            /** Coverage */
+            coverage?: {
+                [key: string]: unknown;
+            };
+            /** Data Sources */
+            data_sources?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Markdown
+             * @description Optional human-readable markdown companion (redacted)
+             */
+            markdown?: string | null;
+            /** Run */
+            run?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Schema Version
+             * @description Export contract version
+             */
+            schema_version: string;
+            /** Synthesis */
+            synthesis?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /** Truncation */
+            truncation?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * ReportDetails
@@ -18418,6 +18483,78 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exportReasoningTrace: {
+        parameters: {
+            query?: {
+                /** @description json returns the package envelope; markdown returns text/markdown body */
+                format?: "json" | "markdown";
+                /** @description When format=json, also embed a redacted markdown companion field */
+                include_markdown?: boolean;
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReasoningTraceExportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
