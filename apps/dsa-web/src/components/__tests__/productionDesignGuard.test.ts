@@ -105,15 +105,12 @@ const MAX_BUTTON_VISUAL_OVERRIDE_ALLOWANCES = 0;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([]);
 const MAX_STATE_SURFACE_VISUAL_OVERRIDE_ALLOWANCES = 14;
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
-<<<<<<< HEAD
   ['../common/ApiErrorAlert.tsx', [71, 83].map((line) => ({
     line,
     owner: 'UIUX-HARNESS' as const,
     removeWhen: 'ApiErrorAlert callers no longer need layout className pass-through after migration to external wrappers.',
     tokens: ['dynamic:className'],
   }))],
-=======
->>>>>>> origin/main
   ['../common/Card.tsx', [{
     line: 43,
     owner: 'UIUX-HARNESS',
