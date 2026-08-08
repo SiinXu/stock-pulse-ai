@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Restore Settings page load in Vite DEV/e2e by syncing missing UI i18n inventory keys (systemConfig field titles + settingsHelp) so auth credential-boundary and disable-reconfirm e2e can run against a real Settings surface.
+- [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
 - [Added] Web multi-market number/timezone/change-color formatting contract module (`marketFormat`) with semantic matrix unit tests (issue #889).
 - [Fixed] Keep report→Chat stock/record URL context until the chat stream succeeds so a mid-flight refresh can restore the unsent follow-up draft (#879 A5).
 - [Fixed] Collapse Alerts rule filters behind AdvancedFilterSheet on mobile/desktop breakpoints and distinguish true-empty vs filtered-empty states with clear/create actions (#879 B2).
