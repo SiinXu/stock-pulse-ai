@@ -635,3 +635,147 @@ class TestReportStrataRendering(unittest.TestCase):
         assert out is not None
         self.assertEqual(out.count("不构成投资建议"), 1)
 
+class TestDecisionCardRendering(unittest.TestCase):
+    """Issue #861 Phase 1: Decision Card pin + missing-field degradation."""
+
+    def test_markdown_decision_card_pinned_above_existing_sections(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {
+                    "one_sentence": "等待放量确认",
+                    "time_sensitivity": "今日内",
+                    "position_advice": {
+                        "no_position": "观望",
+                        "has_position": "继续持有",
+                    },
+                },
+                "intelligence": {"risk_alerts": ["业绩不及预期", "板块轮动风险"]},
+                "phase_decision": {
+                    "action_window": "盘中跟踪",
+                    "immediate_action": "等待确认",
+                    "watch_conditions": ["放量突破", "跌破支撑离场"],
+                    "confidence_reason": "数据质量可用",
+                },
+                "battle_plan": {
+                    "sniper_points": {
+                        "stop_loss": "110",
+                        "take_profit": "130",
+                    }
+                },
+            }
+        )
+        r.confidence_level = "高"
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        card_idx = out.find("### 🃏")
+        core_idx = out.find("### 📌 核心结论")
+        intel_idx = out.find("### 📰 重要信息速览")
+        self.assertGreaterEqual(card_idx, 0, out)
+        self.assertGreater(core_idx, card_idx, "core conclusion must stay after Decision Card")
+        self.assertGreater(intel_idx, card_idx, "intel section must stay after Decision Card")
+        self.assertIn("一句话决策", out)
+        self.assertIn("等待放量确认", out)
+        self.assertIn("置信度", out)
+        self.assertIn("高", out)
+        self.assertIn("风险警报", out)
+        self.assertIn("业绩不及预期", out)
+        self.assertIn("观察条件", out)
+        self.assertIn("放量突破", out)
+        self.assertIn("止损位", out)
+        # Original sections preserved (not deleted).
+        self.assertIn("核心结论", out)
+        self.assertIn("作战计划", out)
+
+    def test_decision_card_degrades_when_optional_fields_missing(self) -> None:
+        r = _make_result(
+            analysis_summary="仅有摘要",
+            dashboard={},
+        )
+        r.confidence_level = ""
+        r.risk_warning = ""
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("仅有摘要", out)
+        # Missing optional rows must not render empty labels.
+        self.assertNotIn("**风险警报**:", out)
+        self.assertNotIn("**观察条件**:", out)
+        self.assertNotIn("**置信度理由**:", out)
+        self.assertNotIn("**操作点位**:", out)
+
+    def test_decision_card_uses_risk_warning_when_alerts_missing(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "谨慎持有"},
+                "intelligence": {},
+            }
+        )
+        r.risk_warning = "流动性风险"
+        r.confidence_level = "中"
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("风险提示", out)
+        self.assertIn("流动性风险", out)
+        self.assertNotIn("**风险警报**:", out)
+
+    def test_brief_and_wechat_lead_with_compact_decision_card(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "持有观望等待确认信号"},
+                "intelligence": {"risk_alerts": ["波动加大"]},
+                "phase_decision": {
+                    "watch_conditions": ["跌破前低失效"],
+                    "confidence_reason": "盘中数据可用",
+                },
+                "battle_plan": {"sniper_points": {"stop_loss": "100", "take_profit": "120"}},
+            }
+        )
+        r.confidence_level = "中"
+
+        brief = render("brief", [r])
+        wechat = render("wechat", [r], summary_only=False)
+
+        for out, name in ((brief, "brief"), (wechat, "wechat")):
+            self.assertIsNotNone(out, name)
+            assert out is not None
+            self.assertIn("🃏", out, name)
+            self.assertIn("持有观望", out, name)
+            self.assertIn("风险警报", out, name)
+            self.assertIn("观察条件", out, name)
+            # Card appears before stock-local strata or trailing sections.
+            card_idx = out.find("🃏")
+            self.assertGreaterEqual(card_idx, 0, name)
+
+    def test_english_decision_card_reuses_existing_labels(self) -> None:
+        r = _make_result(
+            name="Apple",
+            operation_advice="Buy",
+            analysis_summary="Momentum remains constructive.",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Buy on pullbacks"},
+                "intelligence": {"risk_alerts": ["Macro risk"]},
+                "phase_decision": {"watch_conditions": ["Break of support"]},
+            },
+        )
+        r.confidence_level = "High"
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("One-line Decision", out)
+        self.assertIn("Buy on pullbacks", out)
+        self.assertIn("Confidence", out)
+        self.assertIn("Risk Alerts", out)
+        self.assertIn("Watch Conditions", out)

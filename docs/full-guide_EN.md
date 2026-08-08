@@ -922,6 +922,22 @@ Signal attribution analysis is rendered in all report paths:
 - `templates/report_markdown.j2` (Jinja2 template)
 - `HistoryService._generate_single_stock_markdown()` (Web history drawer)
 
+### Report Decision Card Front-Load (Issue #861 Phase 1)
+
+Phase 1 is presentation-only: each per-stock Jinja report section starts with a Decision Card assembled from **existing** fields (direction/score, one-line conclusion, confidence, key risks, watch/invalidation conditions, stop-loss / take-profit).
+
+| Template | Behavior |
+| --- | --- |
+| `templates/report_markdown.j2` | Full Decision Card immediately under each stock `##` heading; existing sections (Key Updates / Core Conclusion / Phase Guardrail / Battle Plan, etc.) move down but are not removed. |
+| `templates/report_wechat.j2` | Compact Decision Card is the first content inside each stock block; original compact follow-up lines remain. |
+| `templates/report_brief.j2` | Compact Decision Card is the primary per-stock content. |
+| Shared macro | `decision_card` in `templates/_macros.j2`; missing fields are omitted (no empty card rows). |
+
+Boundary and compatibility:
+- Does not change extractors, prompts, schemas, or the notification send chain — templates only.
+- Affects only the Jinja path when `REPORT_RENDERER_ENABLED=true`; the hard-coded fallback in `src/notification_parts/rendering.py` remains the default when disabled.
+- Notification chunking still keys off stock heading blocks (`###` / `---`). Markdown uses `### 🃏` for the card; wechat/brief use compact inline blocks. Data contracts are unchanged.
+
 Normalization functions are explicitly called in `_parse_response()` and `parse_dashboard_json()` to ensure:
 - String percentages are converted to int (e.g., `"35%"` → `35`)
 - Negative numbers are clamped to 0

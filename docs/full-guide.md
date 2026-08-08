@@ -1043,6 +1043,22 @@ Issue #1742 在个股分析报告的 `dashboard.signal_attribution` 中新增信
 - `templates/report_markdown.j2`（Jinja2 模板）
 - `HistoryService._generate_single_stock_markdown()`（Web 历史抽屉）
 
+#### 报告 Decision Card 前置（Issue #861 Phase 1）
+
+Phase 1 只做呈现层重排：在 Jinja 报告模板的每只股票详情中，将「方向/评分、一句话结论、置信度、关键风险、观察/失效条件、止损止盈」等**已有字段**聚合成 Decision Card 并置顶展示。
+
+| 模板 | 行为 |
+| --- | --- |
+| `templates/report_markdown.j2` | 每只股票 `##` 标题下先渲染完整 Decision Card；原有「重要信息 / 核心结论 / 盘中护栏 / 作战计划」等段落整体后移，不删除。 |
+| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card 作为首屏内容；后续原有精简段落保留。 |
+| `templates/report_brief.j2` | 每只股票以紧凑 Decision Card 作为主内容。 |
+| 共享宏 | `templates/_macros.j2` 的 `decision_card`；字段缺失时省略对应行，不输出空卡字段。 |
+
+边界与兼容：
+- 不改上游提取器、Prompt、Schema 或 notification 发送链；仅模板呈现。
+- 仅影响 `REPORT_RENDERER_ENABLED=true` 时的 Jinja 路径；默认关闭时仍走 `src/notification_parts/rendering.py` 硬编码 fallback。
+- 通知按 `###` / `---` 切块的逻辑仍以股票标题块为边界；Decision Card 使用 `### 🃏`（markdown）或紧凑行内块（wechat/brief），不改变数据契约。
+
 归一化函数在 `_parse_response()` 和 `parse_dashboard_json()` 中显式调用，确保：
 - 字符串百分比转为 int（如 `"35%"` → `35`）
 - 负数转为 0

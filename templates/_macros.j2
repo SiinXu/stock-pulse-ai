@@ -1,5 +1,70 @@
 {# Shared macros for report templates #}
 
+{# Decision Card (Issue #861 Phase 1): presentation-only assembly from existing
+   dashboard/result fields. Missing fields are omitted (no empty rows). Original
+   sections remain below in full templates for backward compatibility. #}
+{% macro decision_card(e, compact=false) -%}
+{%- set result = e.result -%}
+{%- set dashboard = result.dashboard if result.dashboard else {} -%}
+{%- set core = dashboard.get('core_conclusion') or {} -%}
+{%- set intel = dashboard.get('intelligence') or {} -%}
+{%- set battle = dashboard.get('battle_plan') or {} -%}
+{%- set phase_decision = dashboard.get('phase_decision') or {} -%}
+{%- set sniper = battle.get('sniper_points') or {} -%}
+{%- set pos_advice = core.get('position_advice') or {} -%}
+{%- set one_sentence = core.get('one_sentence') or result.analysis_summary or '' -%}
+{%- set confidence_level = (result.confidence_level or '')|string|trim -%}
+{%- set confidence_reason = phase_decision.get('confidence_reason') or '' -%}
+{%- set watch_conditions = phase_decision.get('watch_conditions') or [] -%}
+{%- set risk_alerts = intel.get('risk_alerts') or [] -%}
+{%- set risk_warning = result.risk_warning or '' -%}
+{%- set time_sensitivity = core.get('time_sensitivity') or '' -%}
+{%- set stop_loss = sniper.get('stop_loss') if sniper else none -%}
+{%- set take_profit = sniper.get('take_profit') if sniper else none -%}
+{%- set immediate_action = phase_decision.get('immediate_action') or '' -%}
+{%- if compact -%}
+**🃏 {{ e.signal_emoji }} {{ e.signal_text }} | {{ labels.score_label }} {{ result.sentiment_score }}**{% if one_sentence %} · {{ one_sentence[:50] }}{{ '…' if one_sentence|length > 50 else '' }}{% endif %}{% if e.localized_trend_prediction %} · {{ labels.trend_label }}: {{ e.localized_trend_prediction }}{% endif %}{% if confidence_level %} · {{ labels.strategy_confidence_label }}: {{ confidence_level }}{% endif %}
+{%- if risk_alerts %}
+· {{ labels.risk_alerts_label }}: {% for r in risk_alerts[:2] %}{{ (r|string)[:40] }}{{ '…' if (r|string)|length > 40 else '' }}{{ '; ' if not loop.last else '' }}{% endfor %}
+{%- elif risk_warning %}
+· {{ labels.risk_warning_label }}: {{ (risk_warning|string)[:40] }}{{ '…' if (risk_warning|string)|length > 40 else '' }}
+{%- endif %}
+{%- if watch_conditions %}
+· {{ labels.watch_conditions_label }}: {% for c in watch_conditions[:2] %}{{ (c|string)[:40] }}{{ '…' if (c|string)|length > 40 else '' }}{{ '; ' if not loop.last else '' }}{% endfor %}
+{%- endif %}
+{%- if stop_loss or take_profit %}
+· {% if stop_loss %}{{ labels.stop_loss_label }}: {{ clean_sniper(stop_loss) }}{% endif %}{% if stop_loss and take_profit %} | {% endif %}{% if take_profit %}{{ labels.take_profit_label }}: {{ clean_sniper(take_profit) }}{% endif %}
+{%- endif %}
+{%- else -%}
+### 🃏 {{ e.signal_emoji }} **{{ e.signal_text }}** | {{ labels.score_label }} {{ result.sentiment_score }}
+{% if one_sentence %}- **{{ labels.one_sentence_label }}**: {{ one_sentence }}
+{% endif -%}
+{% if e.localized_trend_prediction %}- **{{ labels.trend_label }}**: {{ e.localized_trend_prediction }}
+{% endif -%}
+{% if confidence_level %}- **{{ labels.strategy_confidence_label }}**: {{ confidence_level }}
+{% endif -%}
+{% if confidence_reason %}- **{{ labels.confidence_reason_label }}**: {{ confidence_reason }}
+{% endif -%}
+{% if immediate_action %}- **{{ labels.immediate_action_label }}**: {{ immediate_action }}
+{% endif -%}
+{% if time_sensitivity %}- **{{ labels.time_sensitivity_label }}**: {{ time_sensitivity }}
+{% endif -%}
+{% if pos_advice.get('no_position') or pos_advice.get('has_position') %}- **{{ labels.position_advice_heading }}**: {% if pos_advice.get('no_position') %}{{ labels.no_position_label }}: {{ pos_advice.get('no_position') }}{% endif %}{% if pos_advice.get('no_position') and pos_advice.get('has_position') %} · {% endif %}{% if pos_advice.get('has_position') %}{{ labels.has_position_label }}: {{ pos_advice.get('has_position') }}{% endif %}
+{% endif -%}
+{% if risk_alerts %}- **{{ labels.risk_alerts_label }}**:
+{% for r in risk_alerts[:3] %}  - {{ r }}
+{% endfor -%}
+{% elif risk_warning %}- **{{ labels.risk_warning_label }}**: {{ risk_warning }}
+{% endif -%}
+{% if watch_conditions %}- **{{ labels.watch_conditions_label }}**:
+{% for c in watch_conditions[:3] %}  - {{ c }}
+{% endfor -%}
+{% endif -%}
+{% if stop_loss or take_profit %}- **{{ labels.action_points_heading }}**: {% if stop_loss %}{{ labels.stop_loss_label }} {{ clean_sniper(stop_loss) }}{% endif %}{% if stop_loss and take_profit %} · {% endif %}{% if take_profit %}{{ labels.take_profit_label }} {{ clean_sniper(take_profit) }}{% endif %}
+{% endif -%}
+{%- endif %}
+{%- endmacro %}
+
 {% macro report_strata_section(strata, compact=false) -%}
 {% if strata %}
 {% if not compact %}
