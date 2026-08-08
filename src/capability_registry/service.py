@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+
+from src.utils.sanitize import log_safe_exception
 from dataclasses import dataclass
 from types import MappingProxyType, SimpleNamespace
 from typing import Any, Callable, Iterable, Optional, Sequence
@@ -56,8 +58,14 @@ def _module_available(module_name: str) -> bool:
         return importlib.util.find_spec(module_name) is not None
     except (ImportError, ModuleNotFoundError, ValueError):
         return False
-    except Exception:  # broad-exception: fallback_recorded - hostile module names stay unavailable
-        logger.debug("dependency probe failed for module=%s", module_name, exc_info=True)
+    except Exception as exc:  # broad-exception: fallback_recorded - hostile module names stay unavailable
+        log_safe_exception(
+            logger,
+            'dependency probe failed for module=%s',
+            exc,
+            error_code='dependency_probe_failed_for_module_s',
+            level=logging.DEBUG,
+        )
         return False
 
 def _config_attr_present(config: ConfigLike, attr: str) -> bool:
@@ -91,10 +99,17 @@ def _resolve_config(config: ConfigLike | None) -> ConfigLike:
     if config is not None:
         return config
     try:
-        from src.config import get_config
-        return get_config()
-    except Exception:  # broad-exception: fallback_recorded - view still returns static catalog
-        logger.debug("capability registry could not load application config", exc_info=True)
+        from src.application_services import get_application_services
+
+        return get_application_services().config
+    except Exception as exc:  # broad-exception: fallback_recorded - view still returns static catalog
+        log_safe_exception(
+            logger,
+            'capability registry could not load application config',
+            exc,
+            error_code='capability_registry_could_not_load_application_c',
+            level=logging.DEBUG,
+        )
         return _empty_config()
 
 def _collect_data_records(*, config: ConfigLike, dependency_probe: DependencyProbe) -> list[CapabilityRecord]:
@@ -143,15 +158,27 @@ def _tool_names(tool_registry: Any | None) -> set[str]:
     if callable(list_names):
         try:
             return {str(n) for n in list_names()}
-        except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-            logger.debug("tool registry list_names failed", exc_info=True)
+        except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+            log_safe_exception(
+                logger,
+                'tool registry list_names failed',
+                exc,
+                error_code='tool_registry_list_names_failed',
+                level=logging.DEBUG,
+            )
             return set()
     list_tools = getattr(tool_registry, "list_tools", None)
     if callable(list_tools):
         try:
             return {str(getattr(t, "name", "")) for t in list_tools() if getattr(t, "name", None)}
-        except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-            logger.debug("tool registry list_tools failed", exc_info=True)
+        except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+            log_safe_exception(
+                logger,
+                'tool registry list_tools failed',
+                exc,
+                error_code='tool_registry_list_tools_failed',
+                level=logging.DEBUG,
+            )
             return set()
     return set()
 
@@ -163,8 +190,14 @@ def _list_tool_definitions(tool_registry: Any | None) -> list[Any]:
         return []
     try:
         return list(list_tools())
-    except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-        logger.debug("tool registry list_tools failed", exc_info=True)
+    except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+        log_safe_exception(
+            logger,
+            'tool registry list_tools failed',
+            exc,
+            error_code='tool_registry_list_tools_failed',
+            level=logging.DEBUG,
+        )
         return []
 
 def _collect_registered_tools(tool_registry: Any | None) -> list[CapabilityRecord]:
@@ -243,8 +276,14 @@ def _collect_optional_tool_readiness(*, config: ConfigLike, registered_names: se
                 display_name="Kronos Forecast Tool",
                 details=MappingProxyType({"kind": "optional_tool", "tool": kronos_name, "assessed_reason": reason}),
             ))
-        except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-            logger.debug("kronos availability assessment failed", exc_info=True)
+        except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+            log_safe_exception(
+                logger,
+                'kronos availability assessment failed',
+                exc,
+                error_code='kronos_availability_assessment_failed',
+                level=logging.DEBUG,
+            )
             if getattr(config, "kronos_enabled", False) is not True:
                 records.append(CapabilityRecord(
                     capability_id="tool.optional:kronos", domain="tool", provider="kronos_tools", available=False,
@@ -301,8 +340,14 @@ def _collect_extension_records(plugin_manager: Any | None) -> list[CapabilityRec
         return records
     try:
         snapshots = list(list_snapshots())
-    except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-        logger.debug("plugin manager list_snapshots failed", exc_info=True)
+    except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+        log_safe_exception(
+            logger,
+            'plugin manager list_snapshots failed',
+            exc,
+            error_code='plugin_manager_list_snapshots_failed',
+            level=logging.DEBUG,
+        )
         return records
     for snapshot in snapshots:
         manifest = getattr(snapshot, "manifest", None)
@@ -347,8 +392,14 @@ def _collect_extension_records(plugin_manager: Any | None) -> list[CapabilityRec
     if callable(snapshot_fn):
         try:
             registrations = list(snapshot_fn())
-        except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-            logger.debug("extension registrations_snapshot failed", exc_info=True)
+        except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+            log_safe_exception(
+                logger,
+                'extension registrations_snapshot failed',
+                exc,
+                error_code='extension_registrations_snapshot_failed',
+                level=logging.DEBUG,
+            )
             registrations = []
         for registration in registrations:
             point = str(getattr(registration, "extension_point", "") or "")
@@ -379,15 +430,27 @@ def collect_capability_records(
         try:
             from src.agent.runtime_assembly import get_tool_registry
             tool_registry = get_tool_registry()
-        except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-            logger.debug("capability registry could not resolve tool registry", exc_info=True)
+        except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+            log_safe_exception(
+                logger,
+                'capability registry could not resolve tool registry',
+                exc,
+                error_code='capability_registry_could_not_resolve_tool_regis',
+                level=logging.DEBUG,
+            )
             tool_registry = None
     if plugin_manager is None:
         try:
             from src.application_services import get_application_services
             plugin_manager = get_application_services().plugin_manager
-        except Exception:  # broad-exception: fallback_recorded - defensive aggregation boundary
-            logger.debug("capability registry could not resolve plugin manager", exc_info=True)
+        except Exception as exc:  # broad-exception: fallback_recorded - defensive aggregation boundary
+            log_safe_exception(
+                logger,
+                'capability registry could not resolve plugin manager',
+                exc,
+                error_code='capability_registry_could_not_resolve_plugin_man',
+                level=logging.DEBUG,
+            )
             plugin_manager = None
     allowed: Optional[set[str]] = None
     if domains is not None:
