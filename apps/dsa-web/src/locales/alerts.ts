@@ -5,10 +5,10 @@ import type { AlertTargetScope, AlertType, MarketLightStatus, MarketRegion, Port
 import type { UiLanguage } from '../i18n/uiText';
 
 type Option<T extends string = string> = { value: T; label: string };
-const alertTypes: AlertType[] = ['price_cross', 'price_change_percent', 'volume_spike', 'ma_price_cross', 'rsi_threshold', 'macd_cross', 'kdj_cross', 'cci_threshold', 'corporate_event', 'portfolio_stop_loss', 'portfolio_concentration', 'portfolio_drawdown', 'portfolio_price_stale', 'market_light_status', 'market_light_score_drop'];
-const symbolAlertTypes = alertTypes.slice(0, 9);
-const portfolioAlertTypes = alertTypes.slice(9, 13);
-const marketAlertTypes = alertTypes.slice(13);
+const alertTypes: AlertType[] = ['price_cross', 'price_change_percent', 'volume_spike', 'ma_price_cross', 'rsi_threshold', 'macd_cross', 'kdj_cross', 'cci_threshold', 'portfolio_stop_loss', 'portfolio_concentration', 'portfolio_drawdown', 'portfolio_price_stale', 'market_light_status', 'market_light_score_drop', 'corporate_event'];
+const symbolAlertTypes = [...alertTypes.slice(0, 8), 'corporate_event'] as AlertType[];
+const portfolioAlertTypes = alertTypes.slice(8, 12);
+const marketAlertTypes = alertTypes.slice(12, 14);
 
 export const ALERT_TYPE_LABELS: Record<UiLanguage, Record<AlertType, string>> = createUiLanguageRecord("locales.alerts.ALERT_TYPE_LABELS", {
   zh: { price_cross: '价格突破', price_change_percent: '涨跌幅', volume_spike: '成交量放大', ma_price_cross: '价格均线穿越', rsi_threshold: 'RSI 阈值', macd_cross: 'MACD 金叉/死叉', kdj_cross: 'KDJ 金叉/死叉', cci_threshold: 'CCI 阈值', corporate_event: '企业事件', portfolio_stop_loss: '组合止损', portfolio_concentration: '组合集中度', portfolio_drawdown: '组合回撤', portfolio_price_stale: '组合价格状态', market_light_status: '大盘红绿灯状态', market_light_score_drop: '大盘红绿灯分数下降' },

@@ -3456,8 +3456,22 @@ export interface components {
             } | null;
             /** Diagnostics */
             diagnostics?: string | null;
+            /**
+             * Event Context
+             * @description Structured event block (issue #241 Web)
+             */
+            event_context?: {
+                [key: string]: unknown;
+            } | null;
             /** Id */
             id: number;
+            /**
+             * Impact Context
+             * @description Structured impact block (issue #241 Web)
+             */
+            impact_context?: {
+                [key: string]: unknown;
+            } | null;
             market_phase_summary?: components["schemas"]["MarketPhaseSummary"] | null;
             /** Observed Value */
             observed_value?: number | null;

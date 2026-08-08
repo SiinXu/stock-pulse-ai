@@ -831,9 +831,35 @@
             ],
             "title": "Diagnostics"
           },
+          "event_context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured event block (issue #241 Web)",
+            "title": "Event Context"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "impact_context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured impact block (issue #241 Web)",
+            "title": "Impact Context"
           },
           "market_phase_summary": {
             "anyOf": [
