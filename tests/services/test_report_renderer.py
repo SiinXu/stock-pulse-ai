@@ -443,7 +443,7 @@ class TestReportRenderer(unittest.TestCase):
         )
 
         for platform in ("markdown", "wechat"):
-            out = render(platform, [result], summary_only=False)
+            out = render(platform, [result], summary_only=False, extra_context={"report_mode": "standard"})
 
             self.assertIsNotNone(out)
             self.assertIn("Supporting Strategies: None", out)
@@ -467,7 +467,7 @@ class TestReportRenderer(unittest.TestCase):
                     }
                 )
 
-                out = render(platform, [result], summary_only=False)
+                out = render(platform, [result], summary_only=False, extra_context={"report_mode": "standard"})
 
                 self.assertIsNotNone(out)
                 self.assertNotIn("多策略综合", out)
@@ -490,7 +490,7 @@ class TestReportRenderer(unittest.TestCase):
                 }
             )
 
-            out = render(platform, [result], summary_only=False)
+            out = render(platform, [result], summary_only=False, extra_context={"report_mode": "standard"})
 
             self.assertIsNotNone(out)
             self.assertIn("多策略综合", out)
@@ -574,7 +574,12 @@ class TestReportStrataRendering(unittest.TestCase):
 
     def test_markdown_renders_six_strata_and_keeps_inference_out_of_facts(self) -> None:
         r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
-        out = render("markdown", [r], summary_only=False)
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "research"},
+        )
         self.assertIsNotNone(out)
         assert out is not None
         self.assertIn("Evidence Strata", out)
@@ -605,28 +610,55 @@ class TestReportStrataRendering(unittest.TestCase):
             self.assertIn("不构成投资建议", out)
             self.assertNotIn("证据分层", out)
 
-    def test_brief_and_wechat_render_compact_strata(self) -> None:
+    def test_brief_and_wechat_default_brief_mode_omits_strata(self) -> None:
         r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
         brief = render("brief", [r])
         wechat = render("wechat", [r])
         for out in (brief, wechat):
             self.assertIsNotNone(out)
             assert out is not None
-            self.assertIn("Evidence Strata", out)
+            self.assertNotIn("Evidence Strata", out)
             self.assertIn("Not investment advice", out)
+            self.assertIn("🃏", out)
+
+    def test_brief_and_wechat_research_mode_renders_strata(self) -> None:
+        r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
+        brief = render("brief", [r], extra_context={"report_mode": "research"})
+        wechat = render("wechat", [r], extra_context={"report_mode": "research"})
+        for out in (brief, wechat):
+            self.assertIsNotNone(out)
+            assert out is not None
+            self.assertIn("Evidence Strata", out)
 
 
     def test_markdown_disclaimer_once_with_strata(self) -> None:
         r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
-        out = render("markdown", [r], summary_only=False)
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "research"},
+        )
         self.assertIsNotNone(out)
         assert out is not None
         self.assertIn("Evidence Strata", out)
         self.assertIn("Verified Facts", out)
-        # Section 6 is report-level only (footer); body must not re-title disclaimer.
         self.assertNotIn("Non-Investment-Advice Disclaimer", out)
         count = out.count("Not investment advice")
         self.assertEqual(count, 1, out)
+
+    def test_markdown_standard_mode_uses_compact_strata(self) -> None:
+        r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "standard"},
+        )
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("Evidence Strata", out)
+        self.assertNotIn("#### 1. Verified Facts", out)
 
     def test_markdown_disclaimer_once_without_strata(self) -> None:
         r = _make_result()
@@ -635,3 +667,160 @@ class TestReportStrataRendering(unittest.TestCase):
         assert out is not None
         self.assertEqual(out.count("不构成投资建议"), 1)
 
+
+
+
+class TestReportModesAndDecisionCard(unittest.TestCase):
+    def _rich_dashboard(self) -> dict:
+        return {
+            "core_conclusion": {
+                "one_sentence": "等待放量确认后再加仓并且继续观察板块轮动与业绩指引变化",
+                "time_sensitivity": "本周内",
+                "position_advice": {"no_position": "观望等待", "has_position": "继续持有"},
+            },
+            "intelligence": {
+                "sentiment_summary": "中性",
+                "risk_alerts": [
+                    "业绩波动风险提示较长文本需要被截断处理一二三四五六七八九十",
+                    "板块轮动",
+                    "流动性收紧",
+                    "估值偏高",
+                    "外资流出",
+                ],
+                "positive_catalysts": ["催化A", "催化B", "催化C", "催化D"],
+            },
+            "phase_decision": {
+                "action_window": "盘中跟踪",
+                "immediate_action": "等待确认",
+                "watch_conditions": ["放量突破前高并且站稳均线", "跌破支撑离场", "成交量持续萎缩"],
+                "confidence_reason": "数据质量可用",
+            },
+            "battle_plan": {
+                "sniper_points": {"stop_loss": "1580", "take_profit": "1780"},
+                "action_checklist": ["✅ 检查支撑", "⚠️ 观察量能", "❌ 避免追高", "extra1", "extra2"],
+            },
+            "data_perspective": {
+                "trend_status": {"ma_alignment": "多头", "is_bullish": True, "trend_score": 70},
+            },
+            "report_strata": {
+                "verified_facts": [
+                    {"statement": f"fact-{i}", "source_id": f"s{i}", "as_of": "2026-08-01"}
+                    for i in range(10)
+                ],
+                "missing_or_conflicts": [],
+                "model_inference": [f"inference-{i}" for i in range(6)],
+                "risks_counter_evidence": [f"risk-{i}" for i in range(5)],
+                "framework_alignment": {"status": "partial", "summary": "partial align"},
+            },
+        }
+
+    def _rich_result(self):
+        r = _make_result(
+            sentiment_score=72,
+            operation_advice="买入",
+            decision_type="buy",
+            dashboard=self._rich_dashboard(),
+        )
+        r.confidence_level = "高"
+        return r
+
+    def test_markdown_standard_pins_decision_card_and_keeps_main_sections(self) -> None:
+        r = self._rich_result()
+        out = render("markdown", [r], summary_only=False, extra_context={"report_mode": "standard"})
+        self.assertIsNotNone(out)
+        assert out is not None
+        card_idx = out.find("### 🃏")
+        core_idx = out.find("核心结论")
+        self.assertGreaterEqual(card_idx, 0)
+        self.assertGreater(core_idx, card_idx)
+        self.assertIn("评分 72", out)
+        self.assertIn("作战计划", out)
+
+    def test_markdown_brief_mode_is_card_only_with_notice(self) -> None:
+        r = self._rich_result()
+        out = render("markdown", [r], summary_only=False, extra_context={"report_mode": "brief"})
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("已省略", out)
+        self.assertNotIn("作战计划", out)
+        self.assertNotIn("证据分层", out)
+        self.assertIn("评分 72", out)
+
+    def test_markdown_research_shows_full_strata_and_more_risks(self) -> None:
+        r = self._rich_result()
+        out = render("markdown", [r], summary_only=False, extra_context={"report_mode": "research"})
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("证据分层", out)
+        self.assertIn("已核实事实", out)
+        self.assertIn("估值偏高", out)
+
+    def test_hard_limits_cap_risks_and_annotate(self) -> None:
+        r = self._rich_result()
+        out = render("markdown", [r], summary_only=False, extra_context={"report_mode": "standard"})
+        self.assertIsNotNone(out)
+        assert out is not None
+        # standard max_risks=3 drops lower-priority risks with explicit notice
+        self.assertNotIn("外资流出", out)
+        self.assertIn("已省略", out)
+        self.assertIn("流动性收紧", out)  # third risk kept
+
+    def test_decision_card_never_dropped_when_fields_missing(self) -> None:
+        r = _make_result(dashboard={"core_conclusion": {}}, analysis_summary="")
+        out = render("markdown", [r], summary_only=False, extra_context={"report_mode": "brief"})
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("评分", out)
+
+    def test_brief_platform_defaults_to_brief_mode(self) -> None:
+        r = self._rich_result()
+        out = render("brief", [r])
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("🃏", out)
+        self.assertNotIn("证据分层", out)
+        self.assertIn("已省略", out)
+
+    def test_wechat_platform_defaults_to_brief_mode(self) -> None:
+        r = self._rich_result()
+        out = render("wechat", [r])
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("🃏", out)
+        self.assertNotIn("证据分层", out)
+
+    def test_explicit_research_on_brief_platform(self) -> None:
+        r = self._rich_result()
+        out = render("brief", [r], extra_context={"report_mode": "research"})
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("🃏", out)
+        self.assertIn("证据分层", out)
+
+    def test_config_research_forces_wechat_research(self) -> None:
+        r = self._rich_result()
+        cfg = _make_renderer_config(True)
+        cfg.report_mode = "research"
+        with patch("src.services.report_renderer.get_config", return_value=cfg):
+            out = render("wechat", [r])
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("证据分层", out)
+
+
+class TestReportModeHelpers(unittest.TestCase):
+    def test_normalize_aliases(self) -> None:
+        from src.services.report_mode import normalize_report_mode, resolve_report_mode
+        self.assertEqual(normalize_report_mode("minimal"), "brief")
+        self.assertEqual(normalize_report_mode("full"), "research")
+        self.assertEqual(normalize_report_mode("nope"), "standard")
+        self.assertEqual(resolve_report_mode("markdown", config_mode="standard"), "standard")
+        self.assertEqual(resolve_report_mode("wechat", config_mode="standard"), "brief")
+        self.assertEqual(resolve_report_mode("wechat", config_mode="research"), "research")
+        self.assertEqual(
+            resolve_report_mode("wechat", explicit="standard", config_mode="research"),
+            "standard",
+        )

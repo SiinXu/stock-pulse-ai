@@ -130,6 +130,7 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `SINGLE_STOCK_NOTIFY` | Single stock push mode: set to `true` to push immediately after each stock analysis | Optional |
 | `REPORT_TYPE` | Report type: `simple` (concise), `full` (complete), `brief` (3-5 sentences), Docker recommended: `full` | Optional |
 | `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
+| `REPORT_MODE` | Jinja report presentation mode (`brief` / `standard` / `research`, default `standard`). `brief` keeps Decision Card + key risk; `standard` is Decision Card + main analysis; `research` is full detail + complete strata. Hard limits apply; Decision Card is never dropped. Per-request override: `extra_context.report_mode`. When global mode is `standard`, push platforms brief/wechat still default to brief. Presentation only when `REPORT_RENDERER_ENABLED=true`. | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
 | `REPORT_RENDERER_ENABLED` | Enable Jinja2 template rendering (default `false`, zero regression) | Optional |
@@ -911,6 +912,18 @@ Regular LLM, single Agent, and multi-agent prompts receive the low-sensitivity s
 P5 adds a phase-aware decision block under `dashboard.phase_decision` for individual stock analysis reports: `phase_context`, `action_window`, `immediate_action`, `watch_conditions`, `next_check_time`, `confidence_reason`, and `data_limitations`. This is a backward-compatible report JSON addition stored in historical `raw_result`; it does not add an `analysis_phase` API parameter, change Web phase entrypoints, add configuration, or change the default post-market daily review behavior.
 
 Regular analysis and Agent analysis now apply lightweight guardrails before history is saved, using the current `market_phase_summary` and `analysis_context_pack_overview.data_quality`. If core quote / daily_bars / technical data is stale, fallback, missing, fetch_failed, partial, or estimated, high-confidence conclusions are capped. Pre-market, non-trading, or unknown phases must not emit high-confidence intraday buy/sell actions. Intraday, lunch-break, and near-close outputs are scanned for post-market recap wording such as "after today's close" or "focus tomorrow" in the main conclusion and action fields, and obvious violations are replaced with phase-safe wait/watch wording. The guardrail only fills low-sensitivity `phase_context` and data limitations; it does not invent watch conditions or next-check times. Notification summaries, alerts, holdings, and backtest linkage remain later P6 work.
+
+### Report Modes And Decision Card (Issue #861)
+
+When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports support three presentation modes via `REPORT_MODE` (or per-request `extra_context.report_mode`):
+
+| Mode | Content | Typical use |
+|------|---------|-------------|
+| `brief` | Decision Card + key risk + disclaimer; detail sections omitted with explicit truncation notice | Push / mobile |
+| `standard` (default) | Decision Card pinned first, then main analysis sections; compact strata; hard list/char limits | Daily default |
+| `research` | Full sections + complete strata; soft limits only | Deep review |
+
+The Decision Card is assembled only from existing dashboard/result fields. Missing fields omit their rows. Hard limits never drop the Decision Card block; omitted lower-priority items are annotated. Unconfigured `REPORT_MODE` keeps `standard`. When global mode is `standard`, push platforms (`brief`/`wechat`) still default to `brief`. The hard-coded notification fallback path (`REPORT_RENDERER_ENABLED=false`) is unchanged.
 
 ### Signal Attribution Analysis (Issue #1742)
 

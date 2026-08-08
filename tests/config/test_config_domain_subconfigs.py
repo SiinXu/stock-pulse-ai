@@ -188,6 +188,7 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'report_summary_only',
     'report_show_llm_model',
     'report_templates_dir',
+    'report_mode',
     'report_renderer_enabled',
     'report_integrity_enabled',
     'report_integrity_retry',

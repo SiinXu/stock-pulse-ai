@@ -45,6 +45,13 @@ from src.schemas.decision_action import (
     localize_action_label,
 )
 from src.schemas.report_strata import resolve_report_strata
+from src.services.report_mode import (
+    apply_list_limits_to_dashboard_view,
+    build_decision_card_payload,
+    get_mode_limits,
+    resolve_report_mode,
+    truncation_notice,
+)
 from src.utils.data_processing import (
     normalize_model_used,
     signal_attribution_has_content,
@@ -279,6 +286,15 @@ def render(
     )
     labels = get_report_labels(report_language)
 
+    # Issue #861 Phase 2: brief / standard / research modes + hard limits.
+    config = get_config()
+    report_mode = resolve_report_mode(
+        platform,
+        explicit=(extra_context or {}).get("report_mode"),
+        config_mode=getattr(config, "report_mode", None),
+    )
+    mode_limits = get_mode_limits(report_mode)
+
     sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
     sorted_enriched = []
     for r in sorted_results:
@@ -303,15 +319,56 @@ def render(
         _, se, _ = get_signal_level(signal_action or display_advice, r.sentiment_score, report_language)
         rn = get_localized_stock_name(r.name, r.code, report_language)
         strata_model = resolve_report_strata(r, language=report_language)
+        strata_public = strata_model.to_public_dict() if strata_model else None
+        localized_trend = localize_trend_prediction(r.trend_prediction, report_language)
+        decision_card = build_decision_card_payload(
+            r,
+            signal_text=display_advice,
+            signal_emoji=se,
+            localized_trend=localized_trend,
+            limits=mode_limits,
+        )
+        raw_dashboard = getattr(r, "dashboard", None) or {}
+        if strata_public is not None and isinstance(raw_dashboard, dict):
+            merged_dashboard = dict(raw_dashboard)
+            merged_dashboard.setdefault("report_strata", strata_public)
+        else:
+            merged_dashboard = raw_dashboard if isinstance(raw_dashboard, dict) else {}
+        limited_dashboard, list_omitted = apply_list_limits_to_dashboard_view(
+            merged_dashboard,
+            mode_limits,
+        )
+        limited_strata = limited_dashboard.get("report_strata") if limited_dashboard else strata_public
+        if mode_limits.get("strata_style") == "none":
+            limited_strata = None
+        total_omitted = int(decision_card.get("omitted_count") or 0) + int(list_omitted)
+        if not mode_limits.get("include_detail_sections"):
+            detail_present = any(
+                [
+                    bool((merged_dashboard.get("intelligence") or {})),
+                    bool((merged_dashboard.get("data_perspective") or {})),
+                    bool((merged_dashboard.get("phase_decision") or {})),
+                    bool((merged_dashboard.get("signal_attribution") or {})),
+                    bool((merged_dashboard.get("strategy_synthesis") or {})),
+                    bool((merged_dashboard.get("committee_deliberation") or {})),
+                    bool((merged_dashboard.get("battle_plan") or {})),
+                    bool(strata_public),
+                ]
+            )
+            if detail_present:
+                total_omitted += 1
         sorted_enriched.append({
             "result": r,
             "signal_text": display_advice,
             "signal_emoji": se,
             "stock_name": _escape_md(rn),
             "localized_operation_advice": display_advice,
-            "localized_trend_prediction": localize_trend_prediction(r.trend_prediction, report_language),
-            # Issue #616: optional strata dict for templates; None keeps historical path quiet.
-            "report_strata": strata_model.to_public_dict() if strata_model else None,
+            "localized_trend_prediction": localized_trend,
+            "report_strata": limited_strata,
+            "decision_card": decision_card,
+            "dashboard_view": limited_dashboard,
+            "omitted_count": total_omitted,
+            "truncation_notice": truncation_notice(total_omitted, report_language),
         })
 
     display_buckets = [
@@ -321,7 +378,7 @@ def render(
     buy_count = sum(1 for bucket in display_buckets if bucket == "buy")
     sell_count = sum(1 for bucket in display_buckets if bucket == "sell")
     hold_count = len(display_buckets) - buy_count - sell_count
-    show_llm_model = bool(getattr(get_config(), "report_show_llm_model", True))
+    show_llm_model = bool(getattr(config, "report_show_llm_model", True))
     models_used: List[str] = []
     if show_llm_model:
         for result in results:
@@ -365,6 +422,8 @@ def render(
         "hold_count": hold_count,
         "labels": labels,
         "report_language": report_language,
+        "report_mode": report_mode,
+        "mode_limits": mode_limits,
         "models_used": models_used,
         "show_llm_model": show_llm_model,
         "market_status_line": market_status_line(),
@@ -395,6 +454,7 @@ def render(
         safe_extra_context = dict(extra_context)
         safe_extra_context.pop("labels", None)
         safe_extra_context.pop("report_language", None)
+        safe_extra_context.pop("report_mode", None)
         context.update(safe_extra_context)
 
     try:

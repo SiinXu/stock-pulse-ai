@@ -1,4 +1,4 @@
-{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line with context %}
+{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line, decision_card with context %}
 # 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ labels.analyzed_prefix }} **{{ results|length }}** {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -16,7 +16,7 @@
 {% if not summary_only %}
 {% for e in enriched %}
 {% set result = e.result %}
-{% set dashboard = result.dashboard if result.dashboard else {} %}
+{% set dashboard = e.dashboard_view if e.dashboard_view is defined and e.dashboard_view else (result.dashboard if result.dashboard else {}) %}
 {% set intel = dashboard.get('intelligence') or {} %}
 {% set core = dashboard.get('core_conclusion') or {} %}
 {% set battle = dashboard.get('battle_plan') or {} %}
@@ -24,7 +24,13 @@
 
 ## {{ e.signal_emoji }} {{ e.stock_name }} ({{ result.code }})
 
-{% if intel %}
+{{ decision_card(e, compact=false) }}
+{% if e.truncation_notice %}
+{{ e.truncation_notice }}
+{% endif %}
+
+{% if mode_limits.include_detail_sections %}
+{% if mode_limits.include_intelligence and intel %}
 ### 📰 {{ labels.info_heading }}
 
 {% if intel.get('sentiment_summary') %}
@@ -54,6 +60,7 @@
 
 {% endif %}
 
+{% if mode_limits.include_core_duplicate %}
 ### 📌 {{ labels.core_conclusion_heading }}
 
 **{{ e.signal_emoji }} {{ e.signal_text }}** | {{ localize_trend_prediction(result.trend_prediction, report_language) }}
@@ -70,9 +77,13 @@
 | 💼 **{{ labels.has_position_label }}** | {{ pos_advice.get('has_position', labels.continue_holding) }} |
 {% endif %}
 
-{{ market_snapshot(result) }}
+{% endif %}
 
-{% if data_persp %}
+{% if mode_limits.include_market_snapshot %}
+{{ market_snapshot(result) }}
+{% endif %}
+
+{% if mode_limits.include_data_perspective and data_persp %}
 ### 📊 {{ labels.data_perspective_heading }}
 
 {% set trend_data = data_persp.get('trend_status', {}) %}
@@ -115,7 +126,7 @@
 {% set phase_decision_has_content = phase_decision_has_content or phase_decision.get('next_check_time') %}
 {% set phase_decision_has_content = phase_decision_has_content or phase_decision.get('confidence_reason') %}
 {% set phase_decision_has_content = phase_decision_has_content or phase_decision.get('data_limitations') %}
-{% if phase_decision_has_content %}
+{% if mode_limits.include_phase_decision and phase_decision_has_content %}
 ### 🛡️ {{ labels.phase_decision_heading }}
 
 | {{ labels.action_window_label }} | {{ labels.immediate_action_label }} | {{ labels.next_check_time_label }} |
@@ -142,7 +153,7 @@
 
 {% set signal_attr = dashboard.get('signal_attribution') or {} %}
 {% set signal_attr_weights = signal_attribution_weight_items(signal_attr) %}
-{% if signal_attribution_has_content(signal_attr) %}
+{% if mode_limits.include_signal_attribution and signal_attribution_has_content(signal_attr) %}
 ### 🎯 {{ labels.signal_attribution_heading }}
 
 {% if signal_attr_weights %}
@@ -165,7 +176,7 @@
 {% endif %}
 
 {% set strategy_synthesis = normalize_strategy_synthesis_payload(dashboard.get('strategy_synthesis')) %}
-{% if strategy_synthesis %}
+{% if mode_limits.include_strategy_synthesis and strategy_synthesis %}
 ### 🧩 {{ labels.strategy_synthesis_heading }}
 
 {% set strategy_confidence = strategy_synthesis.get('confidence') %}
@@ -183,11 +194,11 @@
 {% endif %}
 
 {% set committee = dashboard.get('committee_deliberation') if dashboard else none %}
-{% if committee and committee.get('members') %}
+{% if mode_limits.include_committee and committee and committee.get('members') %}
 ### 🏛 {{ labels.committee_deliberation_heading }}
 
 **{{ labels.committee_members_label }}**
-{% for member in (committee.get('members') or [])[:5] %}
+{% for member in (committee.get('members') or []) %}
 - {{ member.get('display_name') or member.get('persona_id') }}: {{ labels.committee_persona_signal_label }} {{ localize_strategy_signal(member.get('signal') or 'N/A', report_language) }} | {{ labels.committee_persona_confidence_label }} {{ '%.0f%%' | format((member.get('confidence') or 0) * 100) if member.get('confidence') is number else 'N/A' }}{% if member.get('invalid') %} ({{ member.get('invalid_reason') or 'invalid' }}){% endif %}{% if member.get('reasoning_excerpt') %} — {{ member.get('reasoning_excerpt') }}{% endif %}
 {% endfor %}
 {% if committee.get('personas_invalid') %}
@@ -204,7 +215,7 @@
 {% endif %}
 {% if committee.get('model_inference') %}
 **{{ labels.model_inference_heading }}**
-{% for line in (committee.get('model_inference') or [])[:5] %}
+{% for line in (committee.get('model_inference') or []) %}
 - {{ line }}
 {% endfor %}
 {% endif %}
@@ -217,7 +228,7 @@
 
 {% endif %}
 
-{% if battle %}
+{% if mode_limits.include_battle_plan and battle %}
 ### 🎯 {{ labels.battle_plan_heading }}
 
 {% set sniper = battle.get('sniper_points', {}) %}
@@ -258,7 +269,7 @@
 {% endif %}
 
 {% set hist = history_by_code.get(result.code, []) %}
-{% if hist %}
+{% if mode_limits.include_history and hist %}
 ### 📜 {{ labels.history_compare_heading }}
 | {{ labels.time_label }} | {{ labels.score_label }} | {{ labels.advice_label }} | {{ labels.trend_label }} |
 |------|------|------|------|
@@ -268,7 +279,10 @@
 {% endif %}
 
 {% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
-{{ report_strata_section(strata, compact=false) }}
+{% if mode_limits.strata_style != 'none' %}
+{{ report_strata_section(strata, compact=(mode_limits.strata_style != 'full')) }}
+{% endif %}
+{% endif %}
 
 ---
 {% endfor %}
