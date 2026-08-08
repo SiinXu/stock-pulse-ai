@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Fixed] Restore the shared UI i18n source/inventory prerequisite for Settings mounts: fill missing Simplified Chinese settingsHelp entries and regenerate stable-key locale inventory for RSS feeds, multi-strategy/committee agent fields, and local-runtime detect keys (does not by itself complete auth or tooltip e2e contracts).
 - [Fixed] Restore Settings page load in Vite DEV/e2e by syncing missing UI i18n inventory keys (systemConfig field titles + settingsHelp) so auth credential-boundary and disable-reconfirm e2e can run against a real Settings surface.
+- [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).
 - [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).
 - [Fixed] Signal Center deep links with `?signal=<id>` fall back to fetch-by-id when the signal is not on the currently loaded list/latest/timeline page, and clear the URL param on 404/forbidden without a blank page.
 - [Fixed] Home setup dismiss uses a single Close control, Home core blocks stay single-column below xl, and shared ScrollArea/StockBar height chains gain min-h-0 so constrained stock rails can scroll on mobile (#879 B1/B6).
