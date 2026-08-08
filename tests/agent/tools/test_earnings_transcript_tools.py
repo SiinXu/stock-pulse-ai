@@ -105,3 +105,26 @@ def test_handler_parses_path(tmp_path: Path) -> None:
     result = tools[0].handler(file_path="call.txt")
     assert result["status"] in {"available", "degraded"}
     assert result["qa_items"]
+
+
+def test_handler_accepts_empty_path_with_text(tmp_path: Path) -> None:
+    """Optional file_path default must not fail tool-parameter pattern validation."""
+    tools = build_earnings_transcript_tools(
+        SimpleNamespace(
+            multimodal_agent_tools_enabled=True,
+            multimodal_file_root=str(tmp_path),
+        )
+    )
+    assert tools is not None
+    # Simulate schema-level pattern check used by ToolParameter.
+    pattern = None
+    for param in tools[0].parameters:
+        if param.name == "file_path":
+            pattern = param.pattern
+            break
+    assert pattern is not None
+    import re
+    assert re.match(pattern, "") is not None
+    result = tools[0].handler(file_path="", text="Revenue was $10 million.")
+    assert result["status"] in {"available", "degraded"}
+    assert result["metrics"]

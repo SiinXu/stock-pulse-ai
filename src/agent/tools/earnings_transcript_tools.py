@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 PARSE_EARNINGS_TRANSCRIPT_TOOL_NAME = "parse_earnings_transcript"
 
-_RELATIVE_PATH_PATTERN = r"^(?!.*\.\.)(?!.*://)[A-Za-z0-9_./\- ()\[\]]{1,512}$"
+_RELATIVE_PATH_PATTERN = r"^(?:$|(?!.*\.\.)(?!.*://)[A-Za-z0-9_./\- ()\[\]]{1,512})$"
 
 _TRANSCRIPT_TOOL_POLICY = ToolPolicy.declared(
     read_only=True,
