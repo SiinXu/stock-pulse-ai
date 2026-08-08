@@ -60,7 +60,7 @@ export function useAlertsWorkspaceUrlState(options: UseAlertsWorkspaceUrlStateOp
   const [localSuccessFilter, setLocalSuccessFilter] = useState<NotificationSuccessFilter>('all');
 
   const activeView: AlertsUrlView = controlledActiveView
-    ?? (urlOwned && urlState ? urlState.view : localView);
+    ?? (urlOwned && urlState ? (urlState.view as AlertsUrlView) : localView);
 
   const setActiveView = useCallback((view: AlertsUrlView) => {
     if (controlledActiveView === undefined) {
@@ -71,10 +71,10 @@ export function useAlertsWorkspaceUrlState(options: UseAlertsWorkspaceUrlStateOp
   }, [controlledActiveView, onActiveViewChange, patchUrl, urlOwned]);
 
   const enabledFilter: AlertRuleEnabledFilter = urlOwned && urlState
-    ? urlState.enabled
+    ? (urlState.enabled as AlertRuleEnabledFilter)
     : localEnabledFilter;
   const alertTypeFilter: AlertTypeFilter = urlOwned && urlState
-    ? urlState.type
+    ? (urlState.type as AlertTypeFilter)
     : localAlertTypeFilter;
   const rulesPage = urlOwned && urlState ? (urlState.page ?? 1) : localRulesPage;
   const triggersPage = urlOwned && urlState ? (urlState.historyPage ?? 1) : localTriggersPage;
@@ -85,7 +85,7 @@ export function useAlertsWorkspaceUrlState(options: UseAlertsWorkspaceUrlStateOp
     ? urlState.channel
     : localChannelFilter;
   const notificationSuccessFilter: NotificationSuccessFilter = urlOwned && urlState
-    ? urlState.success
+    ? (urlState.success as NotificationSuccessFilter)
     : localSuccessFilter;
   const selectedAlertId = urlOwned && urlState ? urlState.alert : null;
   const selectedTriggerId = selectedTriggerIdProp
