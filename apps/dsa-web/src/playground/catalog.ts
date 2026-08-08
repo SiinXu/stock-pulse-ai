@@ -222,6 +222,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
 
+  entry('reports', 'dcf-sensitivity-panel', 'DcfSensitivityPanel', 'components/valuation/DcfSensitivityPanel.tsx', ['default', 'empty', 'interactive']),
+
   entry('stockSearch', 'mini-sparkline', 'MiniSparkline', 'components/screening/MiniSparkline.tsx'),
   entry('stockSearch', 'screen-alert-message', 'ScreenAlertMessage', 'components/screening/ScreenAlertMessage.tsx'),
   entry('stockSearch', 'screening-configuration-modal', 'ScreeningConfigurationModal', 'components/screening/ScreeningConfigurationModal.tsx', ['interactive']),

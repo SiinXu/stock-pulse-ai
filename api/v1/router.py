@@ -38,6 +38,7 @@ from api.v1.endpoints import (
     stocks,
     system_config,
     usage,
+    valuation,
 )
 
 # Create v1 main route.
@@ -78,6 +79,12 @@ router.include_router(
     stocks.router,
     prefix="/stocks",
     tags=["Stocks"]
+)
+
+router.include_router(
+    valuation.router,
+    prefix="/valuation",
+    tags=["Valuation"],
 )
 
 router.include_router(

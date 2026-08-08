@@ -9,6 +9,7 @@ import { SETTINGS_SCENARIOS } from './settingsScenarios';
 import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
+import { VALUATION_SCENARIOS } from './valuationScenarios';
 
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
@@ -19,6 +20,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
+  ...VALUATION_SCENARIOS,
 };
 
 /**
