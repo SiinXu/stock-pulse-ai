@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
 - [Added] Exposed `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` in Web Settings (system network group) with restart help, sensitive host masking, and setup_env re-application on config reload.
 
 - [Added] Added fail-closed `LOCAL_ONLY_MODE` outbound gate with redacted outbound-activity API/panel and bilingual local-only threat-model docs (issue #218).
