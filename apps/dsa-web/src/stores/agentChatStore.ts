@@ -130,6 +130,7 @@ function getStreamFailureError(
 
 interface AgentChatState {
   messages: Message[];
+  selectedSkillIds: string[] | null;
   loading: boolean;
   progressSteps: ProgressStep[];
   sessionId: string;
@@ -147,6 +148,7 @@ interface AgentChatState {
 }
 
 interface AgentChatActions {
+  setSelectedSkillIds: (skillIds: string[]) => void;
   setCurrentRoute: (path: string) => void;
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
@@ -167,6 +169,7 @@ let sessionListGeneration = 0;
 
 export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set, get) => ({
   messages: [],
+  selectedSkillIds: null,
   loading: false,
   progressSteps: [],
   sessionId: getInitialSessionId(),
@@ -181,6 +184,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   hasInitialLoad: false,
   abortController: null,
   lastFailedRequest: null,
+
+  setSelectedSkillIds: (skillIds) => set({ selectedSkillIds: skillIds }),
 
   setCurrentRoute: (path) => set({ currentRoute: path }),
 
@@ -239,7 +244,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       if (!sessionExists && !preferred) {
         if (generation === sessionHistoryGeneration) {
           const newId = generateUUID();
-          set({ sessionId: newId });
+          set({ sessionId: newId, selectedSkillIds: null });
           writeSessionItem(CHAT_SESSION_STORAGE_KEY, newId);
         }
         return;
@@ -247,7 +252,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
 
       set({ sessionId: savedId });
       writeSessionItem(CHAT_SESSION_STORAGE_KEY, savedId);
-      const msgs = await agentApi.getChatSessionMessages(savedId);
+      const detail = await agentApi.getChatSessionMessages(savedId);
       if (
         generation !== sessionHistoryGeneration
         || get().sessionId !== savedId
@@ -255,7 +260,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         return;
       }
       set({
-        messages: msgs.map(fromSessionMessage),
+        messages: detail.messages.map(fromSessionMessage),
+        selectedSkillIds: detail.session_state.selected_skill_ids,
       });
     } catch (error) {
       if (generation === sessionHistoryGeneration) {
@@ -289,13 +295,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     });
 
     try {
-      const msgs = await agentApi.getChatSessionMessages(targetSessionId);
+      const detail = await agentApi.getChatSessionMessages(targetSessionId);
       if (generation !== sessionHistoryGeneration) {
         return false;
       }
       set({
         sessionId: targetSessionId,
-        messages: msgs.map(fromSessionMessage),
+        messages: detail.messages.map(fromSessionMessage),
+        selectedSkillIds: detail.session_state.selected_skill_ids,
         sessionError: null,
       });
       writeSessionItem(CHAT_SESSION_STORAGE_KEY, targetSessionId);
@@ -329,6 +336,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     removeSessionItem(CHAT_SESSION_STORAGE_KEY);
     set({
       messages: [],
+      selectedSkillIds: null,
       loading: false,
       progressSteps: [],
       sessionId: generateUUID(),
@@ -354,6 +362,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     set({
       sessionId: newId,
       messages: [],
+      selectedSkillIds: null,
       loading: false,
       sessionsLoading: false,
       sessionLoading: false,

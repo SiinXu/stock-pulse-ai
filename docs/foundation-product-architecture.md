@@ -1,7 +1,7 @@
 # Foundation Pipeline And Product Layer
 
 - Status: `Living`
-- Last verified: 2026-07-21
+- Last verified: 2026-08-05
 - Scope: contribution placement, contract direction, upstream porting, and provenance
 
 StockPulse uses two architectural responsibility tracks inside one repository:
@@ -104,12 +104,19 @@ work that claims no behavior change follows
 
 `SiinXu/stock-pulse-ai` and its `main` branch are the integration authority for
 StockPulse. `ZhuLinsen/daily_stock_analysis` is a read-only source and reference
-for this project. The repository has no tracked automatic upstream-sync
-workflow, and contributors must not assume that an `upstream` Git remote exists.
+for this project. The repository does **not** automatically merge or sync
+upstream. Contributors must not assume that an `upstream` Git remote exists
+locally. A scheduled **drift report** (not a sync) is provided by
+`.github/workflows/upstream-parity.yml` and `scripts/check_upstream_parity.py`;
+see [Upstream Parity Checker](upstream-parity.md) for whitelist semantics and
+triage.
 
 Port an upstream-compatible foundation fix deliberately:
 
 1. Record the source repository and commit or PR so provenance is reviewable.
+   Prefer a commit trailer of the form
+   `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>` so the parity checker can
+   mark the upstream commit as already ported.
 2. Isolate the relevant behavior in a focused change; do not wholesale-merge or
    overwrite StockPulse product work.
 3. Adapt the fix to current StockPulse schemas, task and pipeline contracts,
@@ -124,6 +131,20 @@ dependencies so they stay portable. Product-only work is not an upstream-port
 candidate by default. Any proposal to send a change to the upstream project is
 a separate maintainer decision and is never a prerequisite for merging a
 StockPulse fix.
+
+### Parity whitelist and triage (summary)
+
+- **Whitelist** (`scripts/upstream_parity_whitelist.json`): path prefixes that
+  StockPulse deliberately diverges on. Upstream-only commits whose paths all
+  match the whitelist are **informational**.
+- **Shared paths** (anything outside the whitelist): **attention** unless a
+  local `Ported-from:` trailer matches the upstream SHA.
+- **Triage**: work attention items first; port with a `Ported-from:` trailer;
+  expand the whitelist only for intentional non-ports. The weekly workflow
+  updates a single `upstream-parity` tracking issue and never opens spam issues.
+
+Full detail: [upstream-parity.md](upstream-parity.md) /
+[upstream-parity_CN.md](upstream-parity_CN.md).
 
 ## License And Provenance Boundary
 

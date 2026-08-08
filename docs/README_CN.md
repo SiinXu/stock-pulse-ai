@@ -179,7 +179,11 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 
 `Actions` 标签 → `I understand my workflows, go ahead and enable them`
 
-#### 4. 手动测试
+#### 4. 先跑配置自检（推荐）
+
+`Actions` → **Config Check** → `Run workflow`：只检查 Secrets/Variables 是否齐备（不跑分析、不打印 Secret 值）。通过后再跑日推。详见 [部署文档 · GitHub Actions](DEPLOY.md#️-方案四github-actions-部署免服务器)。
+
+#### 5. 手动测试日推
 
 `Actions` → `StockPulse Daily Analysis` → `Run workflow` → `Run workflow`
 

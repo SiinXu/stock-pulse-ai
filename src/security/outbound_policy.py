@@ -9,10 +9,12 @@ import socket
 import threading
 import unicodedata
 import uuid
+from collections import deque
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from typing import Any, Deque, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -23,10 +25,13 @@ from src.utils.sanitize import sanitize_diagnostic_text
 logger = logging.getLogger(__name__)
 
 OUTBOUND_HTTP_ALLOWLIST_ENV = "OUTBOUND_HTTP_ALLOWLIST"
+LOCAL_ONLY_MODE_ENV = "LOCAL_ONLY_MODE"
 DEFAULT_OUTBOUND_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+OUTBOUND_ACTIVITY_MAX_RECORDS = 100
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
 _REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
+_TRUE_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 _METADATA_HOSTS = frozenset(
     {
         "instance-data.ec2.internal",
@@ -72,8 +77,14 @@ class OutboundPolicyError(requests.RequestException):
     def __init__(self, reason: str, correlation_id: str):
         self.reason = reason
         self.correlation_id = correlation_id
-        super().__init__(f"Outbound request rejected by security policy ({reason})")
-
+        if reason == "local_only_mode_blocked":
+            message = (
+                f"Outbound request rejected by LOCAL_ONLY_MODE ({reason}): "
+                "non-loopback egress is denied while local-only mode is enabled"
+            )
+        else:
+            message = f"Outbound request rejected by security policy ({reason})"
+        super().__init__(message)
 
 @dataclass(frozen=True)
 class _AllowlistEntry:
@@ -97,6 +108,24 @@ class OutboundTarget:
 
 
 @dataclass(frozen=True)
+class OutboundActivityRecord:
+    """Redacted, operator-safe record of one outbound policy decision."""
+
+    occurred_at: str
+    decision: str
+    destination_class: str
+    scheme: str
+    host_type: str
+    reason: str
+    correlation_id: str
+    local_only_mode: bool
+    allowlisted: bool
+
+    def as_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class _DNSGuardContext:
     targets: Tuple[OutboundTarget, ...]
     strict: bool
@@ -106,6 +135,91 @@ _DNS_GUARD_CONTEXTS: ContextVar[Tuple[_DNSGuardContext, ...]] = ContextVar(
     "outbound_dns_guard_contexts",
     default=(),
 )
+_ACTIVITY_LOCK = threading.Lock()
+_ACTIVITY_RECORDS: Deque[OutboundActivityRecord] = deque(maxlen=OUTBOUND_ACTIVITY_MAX_RECORDS)
+
+
+def is_local_only_mode() -> bool:
+    """Return whether LOCAL_ONLY_MODE is enabled (env-driven, fail-closed gate)."""
+    raw = str(os.getenv(LOCAL_ONLY_MODE_ENV, "") or "").strip().lower()
+    return raw in _TRUE_ENV_VALUES
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _record_activity(
+    *,
+    decision: str,
+    destination_class: str,
+    scheme: str,
+    host_type: str,
+    reason: str,
+    correlation_id: str,
+    local_only_mode: bool,
+    allowlisted: bool,
+) -> None:
+    record = OutboundActivityRecord(
+        occurred_at=_utc_now_iso(),
+        decision=sanitize_diagnostic_text(decision, max_length=16),
+        destination_class=sanitize_diagnostic_text(destination_class, max_length=32),
+        scheme=sanitize_diagnostic_text(
+            scheme if scheme in _ALLOWED_SCHEMES else "other",
+            max_length=16,
+        ),
+        host_type=sanitize_diagnostic_text(
+            host_type if host_type in {"hostname", "ip"} else "unknown",
+            max_length=16,
+        ),
+        reason=sanitize_diagnostic_text(reason, max_length=64),
+        correlation_id=sanitize_diagnostic_text(correlation_id, max_length=32),
+        local_only_mode=bool(local_only_mode),
+        allowlisted=bool(allowlisted),
+    )
+    with _ACTIVITY_LOCK:
+        _ACTIVITY_RECORDS.append(record)
+
+
+def get_outbound_activity(*, limit: int = 50) -> List[OutboundActivityRecord]:
+    """Return recent outbound decisions, newest first, without host/URL fields."""
+    capped = max(1, min(int(limit or 1), OUTBOUND_ACTIVITY_MAX_RECORDS))
+    with _ACTIVITY_LOCK:
+        items = list(_ACTIVITY_RECORDS)
+    items.reverse()
+    return items[:capped]
+
+
+def clear_outbound_activity_for_tests() -> None:
+    """Clear the in-memory activity buffer (tests only)."""
+    with _ACTIVITY_LOCK:
+        _ACTIVITY_RECORDS.clear()
+
+
+def _classify_destination(
+    hostname: str,
+    literal_ip: Optional[ipaddress._BaseAddress],
+) -> str:
+    if not hostname:
+        return "invalid"
+    if hostname in _METADATA_HOSTS or hostname.endswith(".metadata.google.internal"):
+        return "metadata"
+    if literal_ip is not None:
+        if _is_loopback_ip(literal_ip):
+            return "loopback"
+        if _is_metadata_ip(literal_ip):
+            return "metadata"
+        if _is_hard_blocked_ip(literal_ip):
+            return "restricted"
+        if _is_private_ip(literal_ip):
+            return "private"
+        return "public"
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return "loopback"
+    if hostname.endswith(".local"):
+        return "local_mdns"
+    return "public_hostname"
+
 
 
 def _reject(
@@ -114,6 +228,7 @@ def _reject(
     scheme: str = "unknown",
     host_type: str = "unknown",
     allowlisted: bool = False,
+    destination_class: str = "unknown",
 ) -> None:
     safe_scheme = sanitize_diagnostic_text(
         scheme if scheme in _ALLOWED_SCHEMES else "other",
@@ -129,17 +244,30 @@ def _reject(
     )
     correlation_id = uuid.uuid4().hex[:16]
     safe_reason = sanitize_diagnostic_text(reason, max_length=64)
+    local_only = is_local_only_mode()
+    safe_destination_class = sanitize_diagnostic_text(destination_class, max_length=32)
     logger.warning(
         "Outbound request rejected event=outbound_request_rejected correlation_id=%s reason=%s "
-        "scheme=%s host_type=%s allowlisted=%s",
+        "scheme=%s host_type=%s allowlisted=%s local_only_mode=%s destination_class=%s",
         correlation_id,
         safe_reason,
         safe_scheme,
         safe_host_type,
         safe_allowlisted,
+        sanitize_diagnostic_text(local_only, max_length=8),
+        safe_destination_class,
+    )
+    _record_activity(
+        decision="blocked",
+        destination_class=destination_class or "unknown",
+        scheme=scheme,
+        host_type=host_type,
+        reason=reason,
+        correlation_id=correlation_id,
+        local_only_mode=local_only,
+        allowlisted=allowlisted,
     )
     raise OutboundPolicyError(reason, correlation_id)
-
 
 def _reject_target(reason: str, target: OutboundTarget) -> None:
     _reject(
@@ -147,8 +275,8 @@ def _reject_target(reason: str, target: OutboundTarget) -> None:
         scheme=target.scheme,
         host_type=target.host_type,
         allowlisted=target.allowlisted,
+        destination_class=_classify_destination(target.hostname, target.literal_ip),
     )
-
 
 def _normalize_hostname(value: Any) -> str:
     if isinstance(value, bytes):
@@ -295,40 +423,37 @@ def _inspect_target(
     allowlist: Optional[Iterable[str]] = None,
     allow_admin_loopback: bool = False,
 ) -> OutboundTarget:
+    local_only = is_local_only_mode()
+    effective_admin_loopback = allow_admin_loopback or local_only
     value = str(raw_url or "")
     if not value or any(
         char == "\\" or char.isspace() or ord(char) < 32 or ord(char) == 127
         for char in value
     ):
-        _reject("invalid_url")
-
+        _reject("invalid_url", destination_class="invalid")
     try:
         parsed = urlsplit(value)
         scheme = parsed.scheme.lower()
         parsed_hostname = str(parsed.hostname or "")
         if "%" in parsed_hostname:
-            _reject("invalid_url", scheme=scheme)
+            _reject("invalid_url", scheme=scheme, destination_class="invalid")
         hostname = _normalize_hostname(parsed_hostname)
         port = parsed.port
     except ValueError:
-        _reject("invalid_url")
-
+        _reject("invalid_url", destination_class="invalid")
     if scheme not in _ALLOWED_SCHEMES:
-        _reject("scheme_not_allowed", scheme=scheme)
+        _reject("scheme_not_allowed", scheme=scheme, destination_class="invalid")
     if not parsed.netloc or not hostname:
-        _reject("host_missing", scheme=scheme)
+        _reject("host_missing", scheme=scheme, destination_class="invalid")
     if parsed.username is not None or parsed.password is not None or "@" in parsed.netloc:
-        _reject("credentials_not_allowed", scheme=scheme)
-
+        _reject("credentials_not_allowed", scheme=scheme, destination_class="invalid")
     literal_ip = _literal_ip(hostname)
+    destination_class = _classify_destination(hostname, literal_ip)
     normalized_host = str(literal_ip) if literal_ip is not None else hostname
     entries = _allowlist_entries(allowlist)
     allowlisted = _is_allowlisted(normalized_host, scheme, port, entries)
-    if (
-        allow_admin_loopback
-        and not allowlisted
-        and _is_admin_loopback_hostname(hostname, literal_ip)
-    ):
+    is_loopback = _is_admin_loopback_hostname(hostname, literal_ip)
+    if effective_admin_loopback and not allowlisted and is_loopback:
         allowlisted = True
     target = OutboundTarget(
         scheme=scheme,
@@ -337,7 +462,8 @@ def _inspect_target(
         allowlisted=allowlisted,
         literal_ip=literal_ip,
     )
-
+    if local_only and not is_loopback:
+        _reject_target("local_only_mode_blocked", target)
     if hostname in _METADATA_HOSTS or hostname.endswith(".metadata.google.internal"):
         _reject_target("metadata_host_blocked", target)
     if hostname == "localhost" or hostname.endswith(".localhost") or hostname.endswith(".local"):
@@ -345,17 +471,26 @@ def _inspect_target(
             _reject_target("local_host_blocked", target)
     if literal_ip is not None:
         if _is_hard_blocked_ip(literal_ip):
-            # IPv6 loopback (::1) is also flagged reserved by ipaddress; still
-            # allow pure loopback under the narrow admin-loopback exemption.
-            if not (allow_admin_loopback and _is_loopback_ip(literal_ip)):
+            if not (effective_admin_loopback and _is_loopback_ip(literal_ip)):
                 _reject_target("restricted_ip_blocked", target)
         if _is_private_ip(literal_ip) and not target.allowlisted:
             _reject_target("private_ip_blocked", target)
+    correlation_id = uuid.uuid4().hex[:16]
+    _record_activity(
+        decision="allowed",
+        destination_class=destination_class,
+        scheme=target.scheme,
+        host_type=target.host_type,
+        reason="policy_ok" if not local_only else "local_only_loopback_ok",
+        correlation_id=correlation_id,
+        local_only_mode=local_only,
+        allowlisted=target.allowlisted,
+    )
     return target
-
 
 def _validate_addrinfos(addr_infos: Iterable[Any], target: OutboundTarget) -> None:
     usable_addresses: List[ipaddress._BaseAddress] = []
+    local_only = is_local_only_mode()
     for info in addr_infos or []:
         try:
             raw_address = str(info[4][0]).split("%", 1)[0]
@@ -363,13 +498,14 @@ def _validate_addrinfos(addr_infos: Iterable[Any], target: OutboundTarget) -> No
         except (IndexError, TypeError, ValueError):
             continue
         usable_addresses.append(address)
+        if local_only and not _is_loopback_ip(address):
+            _reject_target("local_only_mode_blocked", target)
         if _is_hard_blocked_ip(address):
             _reject_target("restricted_dns_address", target)
         if _is_private_ip(address) and not target.allowlisted:
             _reject_target("private_dns_address", target)
     if not usable_addresses:
         _reject_target("dns_no_usable_address", target)
-
 
 def validate_outbound_url(
     raw_url: str,

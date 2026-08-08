@@ -94,6 +94,7 @@ class AlphaSiftHotspotRouteResponse(AlphaSiftResponseModel):
     time: Optional[str] = None
     published_at: Optional[str] = None
     url: Optional[str] = None
+    search_result: Optional[bool] = None
 
 
 class AlphaSiftHotspotStockResponse(AlphaSiftResponseModel):
@@ -133,6 +134,8 @@ class AlphaSiftHotspotDetailResponse(AlphaSiftResponseModel):
     cache_used: Optional[bool] = None
     cached_at: Optional[str] = None
     resolver_candidates: Optional[List[Dict[str, Any]]] = None
+    news_search_requested: Optional[bool] = None
+    news_search_status: Optional[str] = None
 
 
 class AlphaSiftHotspotsResponse(AlphaSiftResponseModel):

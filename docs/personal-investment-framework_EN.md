@@ -10,9 +10,11 @@ Issue #465 started as a **backend** slice. Current `main` also wires a **partial
 
 - Versioned local storage, CRUD/history APIs, optimistic concurrency
 - Stable `InvestmentFrameworkContextReader` read adapter
-- **Settings → Agent Behavior** structured editor: create, versioned save, deactivate, delete, decision-tree and evaluation-dimension editing, plus immutable history inspection
-- **Stock analysis path** inject: active framework is attached as **read-only research context** via `inject_framework_into_analysis_context` (`src/core/stages/analysis_stock.py` → analyzer prompt key `personal_investment_framework_prompt`)
+- **Settings → Agent Behavior → Investment Framework** structured editor: create, versioned save, deactivate, delete, decision-tree and evaluation-dimension editing, immutable history inspection, plus a **live analysis-context preview** (client mirror of `format_investment_framework_prompt_section`)
+- Deep link: `buildInvestmentFrameworkSettingsHref()` → `/settings?section=agent_behavior&view=investment_framework`
+- **Stock analysis path** inject: active framework is attached as **read-only research context** via `inject_framework_into_analysis_context` (`src/core/stages/analysis_stock.py` → analyzer prompt key `personal_investment_framework_prompt`); the prompt section includes title, free-form/risk/tracking rules, evaluation dimensions, and a **bounded decision-tree summary**
 - Report-strata **alignment slot enrichment** when a framework is active (`enrich_dashboard_framework_alignment`); otherwise `framework_alignment.status=not_configured` with a localized empty-slot summary
+- **Default unchanged when no framework is active** (parity): inject is a no-op and does not write `personal_investment_framework_prompt`
 
 **Not shipped / not full product:**
 
@@ -85,6 +87,8 @@ Settings → **Agent Behavior → Investment Framework** exposes a dedicated hor
 
 The editor supports title, description, free-form rules, line-based risk/tracking criteria, decision-tree roots, node IDs, questions, conditional target/outcome branches, and evaluation-dimension names, weights, descriptions, and criteria. Before save it checks unique IDs/names, valid targets and root, reachability, cycles, and `0..100` weights. It also mirrors backend collection limits: 100 nodes, 20 branches per node, 50 dimensions, 30 criteria per dimension, 100 risk rules, and 100 tracking criteria. Node questions, branch conditions/outcomes, dimension criteria, risk rules, and tracking criteria each allow 1–1000 characters; titles, descriptions, dimension names, and free-form rules retain their separate schema limits. Line-based fields retain transient editing text such as a trailing newline, then canonicalize to trimmed non-empty entries on blur or save. Node renaming follows the identity captured when editing begins, so entering another existing ID temporarily cannot steal that node's root or inbound references. A root or inbound-referenced node cannot be deleted; the UI names its localized dependencies.
 
+**Analysis-context preview:** the editor shows a live read-only phrasing of how the current draft will appear in the stock-analysis prompt section (`apps/dsa-web/src/components/settings/investmentFrameworkPromptPreviewModel.ts`, budgets and section order aligned with `src/services/investment_framework_prompt.py`). Draft meta uses placeholders for id/version; live inject still happens only when a framework is **active** and is loaded server-side from the persisted aggregate. Empty drafts show an empty-state message instead of a prompt body.
+
 Both the history list and read-only inspector display each version's `created_at`. The list marks latest and active versions independently, so the latest snapshot remains identifiable after deactivation. History is never restored or edited in place. “Copy into current draft” copies content only; the following save still uses the current aggregate revision and creates a new version. An HTTP 409 conflict preserves the draft and offers an explicit “Load latest server version” action instead of silently overwriting it. If that explicit refresh fails, the page hides the stale editor and shows a retryable load error so outdated content cannot be edited further. Backend 422 validation remains authoritative: duplicate nodes, unknown targets, cycles, unreachable nodes, and duplicate dimensions expose stable `investment_framework_*` types with field-addressable `details.issues[].loc` values. The Web maps those public sanitized locations to the related node or dimension while retaining a localized global error; unknown server diagnostics remain in error details instead of becoming primary product copy. Known-field edits use object merges, and the transport preserves unknown future fields so rolling upgrades do not silently drop server-owned content.
 
 The page always shows a research-only disclaimer: not investment advice.
@@ -94,9 +98,11 @@ The page always shows a research-only disclaimer: not investment advice.
 The stock analysis pipeline (`src/core/stages/analysis_stock.py`, decision-dashboard Single path):
 
 1. Calls `inject_framework_into_analysis_context` for the active framework.
-2. **Fails soft** when none is configured or deactivated (same analysis behavior as before).
-3. When active, writes `personal_investment_framework_prompt` plus a JSON snapshot; prompt formatting appends the read-only section.
+2. **Fails soft / no-op** when none is configured or deactivated: does not write `personal_investment_framework_prompt` or the context snapshot (parity with pre-framework analysis).
+3. When active, writes `personal_investment_framework_prompt` plus a JSON snapshot; `format_investment_framework_prompt_section` builds a bounded read-only section (free-form, risk/tracking, dimensions, decision-tree summary; oversized fields clipped). The analyzer prompt appends that section.
 4. After successful JSON parse, `enrich_dashboard_framework_alignment` fills report strata `framework_alignment` (default `partial` with title/version; preserves model `aligned`/`conflict` when already present).
+
+Compatibility: this path only **appends** a prompt section and strata slot fields; it does not change existing analysis API response contracts, does not alter the prompt when no framework is active, and does not add a general `AnalysisContextPack` field.
 
 Implementation: `src/services/investment_framework_prompt.py` and `InvestmentFrameworkContextReader`.
 

@@ -11,6 +11,8 @@ const zh = {
   loadFailedSuffix: '加载失败', runtimeError: '该设置区域发生前端运行时异常，页面其他设置仍可继续使用。', diagnosticHint: '请补充 release 版本、运行环境和触发入口，便于定位问题。', errorSummaryPrefix: '错误摘要：',
   overviewTitle: '任务路由总览', overviewDescription: '每个任务当前的执行方式与生效模型，无需查看环境变量即可判断实际路径。', colTask: '任务', colBackend: '执行方式', colPrimary: '主要模型', colFallback: '备用模型', colStatus: '状态', inherited: '继承报告模型', none: '未配置', failover: '失败切换', editRouting: '前往任务路由',
   beginnerModeLabel: '新手模式', beginnerModeHint: '仅显示上手所需的核心设置，随时可展开高级项。', showAdvanced: '显示高级设置',
+  settingsModeLabel: '设置模式', settingsModeHint: '精简模式只显示上手所需的核心分区；专家模式显示全部（含默认关闭的高级能力开关）。',
+  essentialsModeLabel: '精简', expertModeLabel: '专家',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -21,6 +23,8 @@ const en: Record<keyof typeof zh, string> = {
   loadFailedSuffix: ' failed to load', runtimeError: 'This settings area hit a frontend runtime error. Other settings remain usable.', diagnosticHint: 'Provide the release version, runtime environment, and trigger path to help diagnose the issue.', errorSummaryPrefix: 'Error summary: ',
   overviewTitle: 'Task routing overview', overviewDescription: 'The execution backend and effective model for each task, without exposing environment variables.', colTask: 'Task', colBackend: 'Execution backend', colPrimary: 'Primary model', colFallback: 'Fallback models', colStatus: 'Status', inherited: 'inherits report model', none: 'not configured', failover: 'failover', editRouting: 'Edit task routing',
   beginnerModeLabel: 'Beginner mode', beginnerModeHint: 'Show only the essentials to get started; reveal advanced options anytime.', showAdvanced: 'Show advanced settings',
+  settingsModeLabel: 'Settings mode', settingsModeHint: 'Essentials shows only the core sections needed to get started. Expert reveals everything, including implemented but default-off capability flags.',
+  essentialsModeLabel: 'Essentials', expertModeLabel: 'Expert',
 };
 
 export const SETTINGS_MISC_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsMisc.SETTINGS_MISC_TEXT", { zh, en });

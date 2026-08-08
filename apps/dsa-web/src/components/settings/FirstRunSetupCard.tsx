@@ -9,24 +9,12 @@ import type {
 } from '../../types/systemConfig';
 import type { UiTextKey } from '../../i18n/uiText';
 import { ApiErrorAlert, Button, Loading, Surface } from '../common';
+import {
+  resolveSetupCheckLabel,
+  resolveSetupCheckStatusLabel,
+} from '../home/setupStatusPresentation';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
-
-const SETUP_CHECK_LABEL_KEYS: Record<string, UiTextKey> = {
-  llm_primary: 'home.setupCheck.llm_primary',
-  llm_agent: 'home.setupCheck.llm_agent',
-  stock_list: 'home.setupCheck.stock_list',
-  notification: 'home.setupCheck.notification',
-  storage: 'home.setupCheck.storage',
-};
-
-function resolveSetupCheckLabel(
-  check: Pick<SetupStatusCheck, 'key' | 'title'>,
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
-): string {
-  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
-  return textKey ? t(textKey) : check.title;
-}
 
 type FirstRunSetupCardProps = {
   status: SetupStatusResponse | null;
@@ -56,16 +44,6 @@ function getSetupCheckIcon(check: SetupStatusCheck) {
     return <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />;
   }
   return <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />;
-}
-
-function getSetupCheckStatusLabel(
-  check: SetupStatusCheck,
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
-) {
-  if (check.status === 'configured') return t('settings.setupStatusConfigured');
-  if (check.status === 'inherited') return t('settings.setupStatusInherited');
-  if (check.status === 'needs_action') return t('settings.setupStatusNeedsAction');
-  return t('settings.setupStatusOptional');
 }
 
 const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
@@ -190,7 +168,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{resolveSetupCheckLabel(check, t)}</p>
                       <span className="rounded-full border settings-border bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-text">
-                        {getSetupCheckStatusLabel(check, t)}
+                        {resolveSetupCheckStatusLabel(check, t)}
                       </span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-muted-text">{check.message}</p>

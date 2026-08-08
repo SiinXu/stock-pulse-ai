@@ -417,6 +417,48 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响使用 Pytdx 数据源时的行情连接目标和可用性。'],
     notes: ['服务器不可达时应依赖数据源 fallback，不建议只配置单个不稳定地址。'],
   },
+
+  'settings.data_source.FUTU_OPEND_HOST': {
+    title: 'Futu OpenD 主机',
+    summary: '本地 Futu OpenD 网关 IPv4 地址，用于分析范围与组合持仓导入。',
+    usage: '本机 OpenD 保持 127.0.0.1；OpenD 在其他机器时填写受信局域网 IP。',
+    valueNotes: [
+      'OpenD 使用本地 TCP 协议而非 HTTP，因此不受 OUTBOUND_HTTP_ALLOWLIST 约束。',
+      '当前内置 Futu SDK 需要 IPv4 或可解析到 IPv4 的主机名。',
+    ],
+    impact: ['影响 --portfolio futu 分析范围与 POST /api/v1/portfolio/imports/futu。'],
+    notes: [
+      'Docker 中 127.0.0.1 指向容器自身，需配置容器网络可达的 OpenD 主机。',
+      '详见 docs/futu-opend-portfolio-import.md。',
+    ],
+    examples: ['127.0.0.1', '192.168.1.20'],
+  },
+  'settings.data_source.FUTU_OPEND_PORT': {
+    title: 'Futu OpenD 端口',
+    summary: 'Futu OpenD 网关 TCP 端口。',
+    usage: '与 OpenD 监听端口保持一致，默认 11111。',
+    valueNotes: ['有效范围为 1–65535。'],
+    impact: ['影响分析范围与组合导入对 OpenD 的连接。'],
+    notes: ['修改端口后需同步调整 OpenD 配置。'],
+    examples: ['11111'],
+  },
+  'settings.data_source.FUTU_ACC_ID': {
+    title: 'Futu 账户 ID',
+    summary: '可选的真实证券账户过滤条件。',
+    usage: '留空则合并符合条件的 ACTIVE REAL NORMAL/MASTER 账户；也可填写单一账户 ID。',
+    valueNotes: ['填写时必须为正整数。'],
+    impact: ['控制哪些 Futu 真实账户参与分析范围与持仓导入。'],
+    notes: ['模拟/纸交易账户不会被导入。'],
+  },
+  'settings.data_source.FUTU_SECURITY_FIRM': {
+    title: 'Futu 券商主体',
+    summary: '打开 OpenD 交易上下文时使用的 SecurityFirm 枚举名。',
+    usage: '一般使用 NONE 让 SDK 自动识别；仅在需要时填写明确主体。',
+    valueNotes: ['常见取值包括 NONE、FUTUSECURITIES、FUTUSG。'],
+    impact: ['在存在多个 Futu 主体时影响账户发现结果。'],
+    notes: ['不支持的枚举名会在写入任何持仓前给出明确配置错误。'],
+    examples: ['NONE', 'FUTUSECURITIES'],
+  },
   'settings.data_source.news_window': {
     title: '新闻时间窗口',
     summary: '控制纳入分析上下文的新闻时效范围。',
@@ -577,10 +619,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.notification.report_output': {
     title: '报告输出设置',
-    summary: '控制通知报告的详细程度、语言和模板输出。',
-    usage: 'REPORT_TYPE 可选 simple/full/brief，REPORT_LANGUAGE 可选 zh/en。',
-    valueNotes: ['报告语言影响默认模板和通知文案，不等同于前端界面语言。'],
-    impact: ['影响通知正文长度、语言和阅读体验。'],
+    summary: '控制通知报告的详细程度、默认输出语言和模板输出。',
+    usage: 'REPORT_TYPE 可选 simple/full/brief，REPORT_LANGUAGE 可选 zh/en/ko；Agent Chat 只有在未显式传入 context.report_language 时才继承这里的默认语言。',
+    valueNotes: ['报告语言会影响默认模板、通知文案，以及未单独指定语言的 Agent Chat 回复；它不等同于前端界面语言。'],
+    impact: ['影响通知正文长度、语言和未显式指定语言的 Agent Chat 阅读体验。'],
     notes: ['full 报告可能更长，部分平台可能触发分段发送。'],
   },
   'settings.system.WEBUI_HOST': {
@@ -661,7 +703,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '在 Docker 或发布包中关闭前，请确认构建产物已经随镜像或安装包提供。',
     ],
   },
+  'settings.system.LOCAL_ONLY_MODE': {
+    title: '本地专用模式',
+    summary: '失败即关闭的隐私模式：拦截所有非回环出站 HTTP 目标。',
+    usage: '仅在明确使用本地模型与缓存时启用。云端 LLM/搜索/新闻/远程数据源/通知以 LOCAL_ONLY_MODE 编码错误拒绝。纯回环仍可用。',
+    valueNotes: ['默认 false。', '开启后 allowlist 不能扩到回环以外。', '拦截不会静默放行。'],
+    impact: ['依赖远程的分析会显式失败，除非本地后端与缓存覆盖。'],
+    notes: ['修改后重启。见 docs/local-only-mode.md。'],
+  },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
+
     title: 'Web 登录保护',
     summary: '启用 WebUI 管理员密码保护。',
     usage: '请通过 WebUI 的认证设置入口启用或关闭；忘记密码可运行 python -m src.auth reset_password。',
@@ -734,11 +786,58 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.USE_PROXY': {
+    title: '启用本地代理',
+    summary: '大陆用户友好开关：将 PROXY_HOST 与 PROXY_PORT 映射为进程级 http_proxy/https_proxy。',
+    usage:
+      '本地出站需要走代理（例如在大陆访问 Gemini/OpenAI）时开启，并同时设置 PROXY_HOST 与 PROXY_PORT。GitHub Actions 会忽略该开关。',
+    valueNotes: [
+      '此前作为低频运维项隐藏，因代理环境变量在进程启动时应用；现已在设置页展示，并如实标注需要重启。',
+      '保存后会重载 setup_env 并对会重新读取进程环境的库重新应用 USE_PROXY；彻底关闭此前已应用的代理，或刷新已缓存代理的长连接客户端，仍需重启进程。',
+    ],
+    impact: ['影响遵循进程代理环境变量的数据源、LLM、搜索和通知等出站 HTTP 请求。'],
+    notes: [
+      '需要完整代理 URL（含凭据）或仅识别标准 HTTP_PROXY/HTTPS_PROXY 时，优先使用 HTTP_PROXY。',
+      '容器内 127.0.0.1 指向容器自身，应使用 host.docker.internal 或宿主机局域网 IP。',
+    ],
+    examples: ['USE_PROXY=true', 'PROXY_HOST=127.0.0.1', 'PROXY_PORT=10809'],
+  },
+  'settings.system.PROXY_HOST': {
+    title: '代理主机',
+    summary: '与 USE_PROXY 一起用于构建 http://{PROXY_HOST}:{PROXY_PORT} 的主机名。',
+    usage:
+      '填写主机名或 IP。可写成 user:pass@host 嵌入凭据；因存在凭据风险，设置页对该字段脱敏显示。',
+    valueNotes: [
+      '默认 127.0.0.1。仅在 USE_PROXY 开启时生效。',
+      '与 USE_PROXY 一起使用时，完整可靠生效通常需要重启进程。',
+    ],
+    impact: ['在 USE_PROXY 开启时，改变写入进程 http_proxy/https_proxy 的代理端点。'],
+    notes: [
+      '不要把代理凭据贴进截图、日志、Issue 或共享配置导出。',
+      '容器内 127.0.0.1 指向容器自身。',
+    ],
+    examples: ['PROXY_HOST=127.0.0.1', 'PROXY_HOST=host.docker.internal'],
+  },
+  'settings.system.PROXY_PORT': {
+    title: '代理端口',
+    summary: '与 USE_PROXY 一起用于构建 http://{PROXY_HOST}:{PROXY_PORT} 的端口。',
+    usage: '填写 1–65535 之间的端口，默认 10809。仅在 USE_PROXY 开启时生效。',
+    valueNotes: [
+      '与 USE_PROXY 一起使用时，完整可靠生效通常需要重启进程。',
+    ],
+    impact: ['在 USE_PROXY 开启时，改变写入进程 http_proxy/https_proxy 的代理端点。'],
+    notes: ['常见本地代理端口包括 10809、7890、1080。'],
+    examples: ['PROXY_PORT=10809', 'PROXY_PORT=7890'],
+  },
   'settings.system.HTTP_PROXY': {
     title: '网络代理',
-    summary: '为外部 API、模型服务或搜索请求配置代理地址。',
-    usage: '填写 http://host:port 形式；HTTPS_PROXY 可用于 HTTPS 请求代理。',
-    valueNotes: ['代理是否生效取决于底层库和运行环境变量读取方式。'],
+    summary: '为外部 API、模型服务或搜索请求配置标准 HTTP 代理 URL。',
+    usage:
+      '填写 http://host:port 形式；HTTPS_PROXY 可用于 HTTPS 请求代理。需要完整 URL（含凭据）或库仅识别标准环境变量时，优先于 USE_PROXY。',
+    valueNotes: [
+      '代理是否生效取决于底层库和运行环境变量读取方式。',
+      'URL 中的用户名密码会在诊断信息中脱敏；不要分享未脱敏的导出内容。',
+    ],
     impact: ['影响数据源、LLM、搜索和通知等外部网络请求。'],
     notes: ['不要把代理地址写成只在本机可见但容器不可达的 127.0.0.1。'],
   },
@@ -971,6 +1070,35 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: '技能观点后验加权',
+    summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
+    usage: '默认关闭以保持聚合路径字节级一致。仅在完成样本记录/评估（或回填）并检查 GET /api/v1/skill-outcomes/stats 后再开启。',
+    valueNotes: [
+      '默认关闭；关闭时聚合路径与既有回测/记忆加权行为一致。',
+      '开启后每个 skill_id+horizon+engine_version 桶需独立达到 30 条 evaluated 样本；因子限制在 [1/1.2, 1.2]，不足或失败时中性 1.0。',
+    ],
+    impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
+    notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
+  },
+  'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
+    title: '决策风格后验校准',
+    summary: '在决策信号后验统计中追加决策风格校准分组。',
+    usage: '默认关闭以保持接口兼容。仅在运营需要查看风格、动作、周期、市场阶段、数据质量与 profile_source 校准分组时开启（GET /api/v1/decision-signals/outcomes/stats）。',
+    valueNotes: [
+      '默认关闭；关闭时 stats 响应不包含 profile_calibration。',
+      '每个精确 bucket 至少 30 个已完成样本后才发布比率或最大不利波动。',
+      '只使用已持久化价格，不会触发行情读取。',
+    ],
+    impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
+    notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
+  },
+  'settings.agent.event_impact_context': {
+    title: '告警影响上下文',
+    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
+    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
@@ -1045,6 +1173,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '该配置只影响问股可见历史压缩，不改变 LLM provider、模型、Base URL、保存清理或运行时优先级语义。',
     ],
   },
+  'settings.agent.observability': {
+    title: 'Agent 可观测性',
+    summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',
+    usage: 'AGENT_OBSERVABILITY_ENABLED 控制轻量事件（默认开启）。AGENT_OBSERVABILITY_DEEP_PAYLOAD 可选记录脱敏后的工具参数/结果预览（默认关闭）。',
+    valueNotes: [
+      '事件写入运行诊断，并展示在既有运行流面板中。',
+      '深度 payload 仍会脱敏 prompt、密钥与敏感字段。',
+    ],
+    impact: ['为多步骤 Agent 排障提供低开销时间线细节。'],
+    notes: ['隐私与开销说明见 docs/agent-observability.md。'],
+  },
   'settings.agent.event_monitor': {
     title: '事件监控',
     summary: '在定时模式下启用后台事件监控，定期轮询告警规则。',
@@ -1066,6 +1205,31 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响后台告警检测和通知推送。'],
     notes: ['该字段为 Legacy 配置方式，高级规则请使用告警中心。'],
+  },
+  'settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED': {
+    title: '启用多模态 Agent Tools',
+    summary: '可选的 PDF 解析与图表阅读 Agent Tools，配合本地文件沙箱，默认关闭。',
+    usage: '默认安装请保持关闭。仅在已设置 MULTIMODAL_FILE_ROOT 且需要 Agent 调用 parse_financial_pdf / read_price_chart 时开启，并在保存后重启进程以完成注册。',
+    valueNotes: [
+      '默认关闭；启用、配置根目录并重启前，进程工具目录不包含这些工具。',
+      'PDF 以本地文本抽取为主；图表阅读依赖 VISION_MODEL，不可用时诚实降级。',
+    ],
+    impact: ['仅影响可选 Agent 工具可用性；关闭时默认分析报告路径不变。'],
+    notes: [
+      '契约与回滚见 docs/multimodal-parsing.md。',
+      'HTTP 上传 UI 与纪要/电话会分析刻意留到后续阶段。',
+    ],
+  },
+  'settings.agent.MULTIMODAL_FILE_ROOT': {
+    title: '多模态文件根目录',
+    summary: '允许存放用户提供的 PDF 与图表文件的本地目录，作为多模态工具的路径沙箱。',
+    usage: '填写绝对本地路径。Agent 工具的 file_path 必须解析到该根目录内；拒绝 URL 与路径穿越。',
+    valueNotes: [
+      '当 MULTIMODAL_AGENT_TOOLS_ENABLED=true 时必填；根目录缺失时工具不会注册。',
+      '文件内容永不执行，仅走有界读取与解析路径。',
+    ],
+    impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
+    notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
   // ------------------------------------------------------------------
   // Backtest configuration
@@ -1277,6 +1441,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响分析总耗时。'],
     notes: ['总耗时 ≈ 股票数 × 单股耗时 + (股票数-1) × ANALYSIS_DELAY。'],
   },
+  'settings.system.daily_brief': {
+    title: '每日简报',
+    summary: '按计划生成每日简报，并回顾历史简报准确率。',
+    usage: 'DAILY_BRIEF_ENABLED 控制开关；DAILY_BRIEF_SCHEDULE_TIME 与 DAILY_BRIEF_TIMEZONE 控制计划时间；DAILY_BRIEF_MIN_SAMPLES 控制展示准确率前的最小样本数。',
+    valueNotes: [
+      '默认关闭，不影响既有计划任务。',
+      '准确率回顾仅供参考，不会自动交易。',
+    ],
+    impact: ['影响计划简报生成与准确率回顾展示。'],
+    notes: ['定时投递需要 schedule 模式。'],
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: '保存分析上下文快照',
     summary: '控制是否将分析历史的整份 context_snapshot 持久化到数据库。',
@@ -1342,6 +1517,47 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['决定 Kronos Agent Tool 能否注册并做本地推理。'],
     notes: ['示例：/absolute/path/to/kronos-weights，内含 Kronos-mini/ 与 Kronos-Tokenizer-2k/。'],
   },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: '启用估值 Agent 工具',
+    summary: '可选的 DCF / 相对估值 Agent 工具，输出透明假设。',
+    usage: '默认关闭。仅在希望 Agent 调用 estimate_stock_valuation 时开启，并需重启进程。',
+    notes: [
+      '关闭时工具不会注册到进程内工具表。',
+      '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+      '第一阶段契约与回滚步骤见 docs/valuation-models.md。',
+    ],
+  },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: '本地运行时自动探测',
+    summary: '就绪检查时对本机 Ollama 做快速回环探测（零配置首次成功）。',
+    usage:
+      '默认开启。仅探测回环地址（127.0.0.0/8、::1、localhost），失败只写日志、不阻塞启动。' +
+      '探测成功时会提示本地零成本路径的非密钥字段。',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
+  },
+
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: '本地运行时探测超时',
+    summary: '本地运行时探测单次请求超时（秒）。',
+    usage: '保持较短（默认 0.35，限制 0.05–2.0），避免 Ollama 未启动时拖慢就绪检查。',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: '投委会模式',
+    summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
+    usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
+    valueNotes: ['关闭时保持既有单路径分析行为。'],
+    impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
+    notes: ['需要 Agent multi 能力。'],
+  },
+
 };
 
 export default settingsHelpZhCN;

@@ -1419,13 +1419,17 @@ class TestOrchestratorExecution(unittest.TestCase):
         technical.run.side_effect = _run_technical
         intel = MagicMock(agent_name="intel", tool_names=["news_search"])
         intel.run.side_effect = AssertionError("intel should be skipped due to budget guard")
-        times = iter([0.0, 0.2, 0.3, 14.6, 14.7])
+        # Scripted clock: after the first stage, stay in the budget-skip band
+        # (0 < remaining < min stage budget) forever. A default of 100.0 used to
+        # exhaust into a hard run_timeout on noisy/slow runners once extra
+        # time.time() probes (logging, guards, coverage) drained the iterator.
+        stage_times = iter([0.0, 0.2, 0.3, 14.6, 14.7])
 
-        def _next_time():
-            return next(times, 100.0)
+        def _clock():
+            return next(stage_times, 14.7)
 
         with patch.object(orch, "_build_agent_chain", return_value=[technical, intel]):
-            with patch("src.agent.orchestrator.time.time", side_effect=_next_time):
+            with patch("src.agent.orchestrator.time.time", side_effect=_clock):
                 result = orch._execute_pipeline(ctx)
 
         self.assertTrue(result.success)
@@ -1465,13 +1469,15 @@ class TestOrchestratorExecution(unittest.TestCase):
             return self._stage_result("decision")
 
         decision.run.side_effect = _run_decision
-        times = iter([0.0, 0.2, 0.3, 14.6, 14.7])
+        # Same stable budget-skip clock as the sibling stage-skip case: never
+        # jump past the orchestrator timeout into run_timeout (CI flake #785).
+        stage_times = iter([0.0, 0.2, 0.3, 14.6, 14.7])
 
-        def _next_time():
-            return next(times, 100.0)
+        def _clock():
+            return next(stage_times, 14.7)
 
         with patch.object(orch, "_build_agent_chain", return_value=[technical, decision]):
-            with patch("src.agent.orchestrator.time.time", side_effect=_next_time):
+            with patch("src.agent.orchestrator.time.time", side_effect=_clock):
                 result = orch._execute_pipeline(ctx)
 
         self.assertTrue(result.success)
@@ -1868,13 +1874,16 @@ class TestOrchestratorExecution(unittest.TestCase):
         fake_result = OrchestratorResult(success=True, content="assistant reply")
 
         with patch.object(orch, "_execute_pipeline", return_value=fake_result):
-            with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
+            with patch(
+                "src.agent.conversation.conversation_manager.add_user_message"
+            ) as add_user_message, patch(
+                "src.agent.conversation.conversation_manager.add_message"
+            ) as add_message:
                 result = orch.chat("hello", "session-1")
 
         self.assertTrue(result.success)
-        self.assertEqual(add_message.call_count, 2)
-        add_message.assert_any_call("session-1", "user", "hello")
-        add_message.assert_any_call("session-1", "assistant", "assistant reply")
+        add_user_message.assert_called_once_with("session-1", "hello", None)
+        add_message.assert_called_once_with("session-1", "assistant", "assistant reply")
 
     def test_chat_persists_failure_message(self):
         from src.agent.orchestrator import OrchestratorResult

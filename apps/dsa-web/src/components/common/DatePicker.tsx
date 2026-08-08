@@ -28,6 +28,23 @@ interface DatePickerProps {
   'data-testid'?: string;
 }
 
+export type DateRangeValue = {
+  start: string;
+  end: string;
+};
+
+interface DateRangePickerProps extends Omit<DatePickerProps, 'value' | 'onChange'> {
+  value: DateRangeValue;
+  onChange: (value: DateRangeValue) => void;
+}
+
+interface DatePickerControlProps extends DatePickerProps {
+  range?: {
+    endValue: string;
+    onChange: (start: string, end: string) => void;
+  };
+}
+
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_PICKER_SIZE_STYLES = {
   compact: {
@@ -58,7 +75,7 @@ function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export const DatePicker = ({
+const DatePickerControl = ({
   id,
   value,
   onChange,
@@ -75,7 +92,8 @@ export const DatePicker = ({
   triggerClassName,
   size = 'default',
   'data-testid': testId,
-}: DatePickerProps) => {
+  range,
+}: DatePickerControlProps) => {
   const { language, t } = useUiLanguage();
   const generatedId = useId();
   const resolvedId = id ?? generatedId;
@@ -88,13 +106,18 @@ export const DatePicker = ({
     [],
   );
   const [isOpen, setIsOpen] = useState(false);
-  const selectedDate = parseIsoDate(value);
+  const rangeEndValue = range?.endValue ?? '';
+  const isRangePicker = Boolean(range);
+  const selectedStartDate = parseIsoDate(value);
+  const selectedEndDate = isRangePicker ? parseIsoDate(rangeEndValue) : null;
+  const selectedDate = selectedStartDate ?? selectedEndDate;
   const today = useMemo(() => new Date(), []);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const initialDate = selectedDate ?? today;
     return new Date(initialDate.getFullYear(), initialDate.getMonth(), 1);
   });
   const [focusedDateIso, setFocusedDateIso] = useState(() => toIsoDate(selectedDate ?? today));
+  const [rangeAnchorIso, setRangeAnchorIso] = useState<string | null>(null);
   const { portalHost, popupStyle, prepareForOpen, resetPosition } = useFixedPopup({
     isOpen,
     triggerRef,
@@ -118,19 +141,21 @@ export const DatePicker = ({
 
   const openPicker = useCallback(() => {
     if (isControlDisabled()) return;
-    const initialDate = parseIsoDate(value) ?? today;
+    const initialDate = parseIsoDate(value) ?? parseIsoDate(rangeEndValue) ?? today;
     let initialIso = toIsoDate(initialDate);
     if (min && initialIso < min) initialIso = min;
     if (max && initialIso > max) initialIso = max;
     const focusDate = parseIsoDate(initialIso) ?? initialDate;
     setVisibleMonth(new Date(focusDate.getFullYear(), focusDate.getMonth(), 1));
     setFocusedDateIso(initialIso);
+    setRangeAnchorIso(null);
     prepareForOpen();
     setIsOpen(true);
-  }, [isControlDisabled, max, min, prepareForOpen, today, value]);
+  }, [isControlDisabled, max, min, prepareForOpen, rangeEndValue, today, value]);
 
   const closePicker = useCallback((restoreFocus = false) => {
     setIsOpen(false);
+    setRangeAnchorIso(null);
     resetPosition();
     if (restoreFocus) {
       requestAnimationFrame(() => {
@@ -200,13 +225,27 @@ export const DatePicker = ({
   const resolvedAriaLabel = ariaLabel ?? label;
   const resolvedPlaceholder = placeholder ?? t('common.selectPlaceholder');
   const resolvedFieldLabel = resolvedAriaLabel ?? resolvedPlaceholder;
+  const displayValue = isRangePicker
+    ? value && rangeEndValue
+      ? `${value} – ${rangeEndValue}`
+      : value
+        ? `${value} –`
+        : rangeEndValue
+          ? `– ${rangeEndValue}`
+          : ''
+    : value;
   const errorId = error ? `${resolvedId}-error` : undefined;
   const describedBy = [ariaDescribedBy, errorId].filter(Boolean).join(' ') || undefined;
-  const isValueInvalid = value !== '' && (
-    !selectedDate
+  const isValueInvalid = (value !== '' && (
+    !selectedStartDate
     || Boolean(min && value < min)
     || Boolean(max && value > max)
-  );
+  )) || (isRangePicker && rangeEndValue !== '' && (
+    !selectedEndDate
+    || Boolean(min && rangeEndValue < min)
+    || Boolean(max && rangeEndValue > max)
+    || Boolean(value && value > rangeEndValue)
+  ));
 
   useEffect(() => {
     inputRef.current?.setCustomValidity(isValueInvalid ? (error ?? 'YYYY-MM-DD') : '');
@@ -269,7 +308,7 @@ export const DatePicker = ({
       ) : null}
       <div
         ref={triggerRef}
-        data-control="date-picker"
+        data-control={isRangePicker ? 'date-range-picker' : 'date-picker'}
         data-size={size}
         onClick={() => (isOpen ? closePicker() : openPicker())}
         className={cn(
@@ -284,11 +323,13 @@ export const DatePicker = ({
           id={resolvedId}
           type="text"
           data-testid={testId}
-          data-value={value}
-          value={value}
+          data-value={displayValue}
+          data-start-value={isRangePicker ? value : undefined}
+          data-end-value={isRangePicker ? rangeEndValue : undefined}
+          value={displayValue}
           disabled={disabled}
           required={required}
-          pattern="\d{4}-\d{2}-\d{2}"
+          pattern={isRangePicker ? undefined : '\\d{4}-\\d{2}-\\d{2}'}
           aria-label={resolvedAriaLabel}
           aria-readonly="true"
           aria-invalid={Boolean(error || isValueInvalid) || undefined}
@@ -302,7 +343,7 @@ export const DatePicker = ({
           onCut={(event) => event.preventDefault()}
           onDrop={(event) => event.preventDefault()}
           onChange={(event) => {
-            event.currentTarget.value = value;
+            event.currentTarget.value = displayValue;
           }}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && isOpen) {
@@ -329,14 +370,18 @@ export const DatePicker = ({
           }}
           className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-base text-foreground outline-none placeholder:text-muted-text tabular-nums sm:text-xs"
         />
-        {!required && value && !disabled ? (
+        {!required && (value || rangeEndValue) && !disabled ? (
           <button
             type="button"
             aria-label={`${t('common.clear')} ${resolvedFieldLabel}`}
             onClick={(event) => {
               event.stopPropagation();
               if (isControlDisabled()) return;
-              onChange('');
+              if (range) {
+                range.onChange('', '');
+              } else {
+                onChange('');
+              }
               closePicker();
               inputRef.current?.focus();
             }}
@@ -410,7 +455,11 @@ export const DatePicker = ({
             {calendarDays.map((date, index) => {
               if (!date) return <span key={`empty-${index}`} className="h-9 w-9" aria-hidden="true" />;
               const isoDate = toIsoDate(date);
-              const isSelected = isoDate === value;
+              const isRangeStart = isRangePicker && isoDate === value;
+              const isRangeEnd = isRangePicker && isoDate === rangeEndValue;
+              const isSelected = isRangePicker ? isRangeStart || isRangeEnd : isoDate === value;
+              const isWithinRange = isRangePicker
+                && Boolean(value && rangeEndValue && isoDate > value && isoDate < rangeEndValue);
               const isToday = isoDate === toIsoDate(today);
               const isDisabled = Boolean((min && isoDate < min) || (max && isoDate > max));
               return (
@@ -430,12 +479,26 @@ export const DatePicker = ({
                       closePicker();
                       return;
                     }
+                    if (range) {
+                      if (!rangeAnchorIso) {
+                        setRangeAnchorIso(isoDate);
+                        range.onChange(isoDate, '');
+                        return;
+                      }
+                      const [start, end] = rangeAnchorIso <= isoDate
+                        ? [rangeAnchorIso, isoDate]
+                        : [isoDate, rangeAnchorIso];
+                      range.onChange(start, end);
+                      closePicker(true);
+                      return;
+                    }
                     onChange(isoDate);
                     closePicker(true);
                   }}
                   className={cn(
                     'flex h-9 w-9 items-center justify-center rounded-lg text-xs tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20',
                     isSelected ? 'bg-foreground font-semibold text-background' : 'text-foreground hover:bg-hover',
+                    isWithinRange && 'bg-primary/15 text-foreground hover:bg-primary/20',
                     isToday && !isSelected && 'ring-1 ring-border',
                     isDisabled && 'cursor-not-allowed opacity-30',
                   )}
@@ -452,3 +515,19 @@ export const DatePicker = ({
     </div>
   );
 };
+
+export const DatePicker = (props: DatePickerProps) => (
+  <DatePickerControl {...props} />
+);
+
+export const DateRangePicker = ({ value, onChange, ...props }: DateRangePickerProps) => (
+  <DatePickerControl
+    {...props}
+    value={value.start}
+    onChange={() => undefined}
+    range={{
+      endValue: value.end,
+      onChange: (start, end) => onChange({ start, end }),
+    }}
+  />
+);
