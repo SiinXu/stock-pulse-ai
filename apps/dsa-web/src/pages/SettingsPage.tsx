@@ -102,6 +102,7 @@ import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
 import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
+import OutboundActivityPanel from '../components/settings/OutboundActivityPanel';
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
@@ -1590,6 +1591,11 @@ const SettingsPage: React.FC = () => {
             {activeCategory === 'system' && activeView === 'security' ? (
               <>
                 <AuthSettingsCard />
+                <OutboundActivityPanel
+                  disabled={isSaving || isLoading}
+                  t={t}
+                  language={uiLanguage}
+                />
                 <SecurityAuditPanel
                   disabled={isSaving || isLoading}
                   t={t}

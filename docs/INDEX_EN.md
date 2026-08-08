@@ -20,6 +20,8 @@ This is the entry point for project documentation. The README covers the project
 | **Confirm security boundaries before a public or non-local bind** | [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) | [Deploy Guide (EN)](DEPLOY_EN.md), [Outbound HTTP Policy](security-outbound-policy.md) |
 | Understand the plugin trust model (not a marketplace sandbox) | [Plugin extension contract](plugin-extension-contract.md) | [Plugin development guide](plugin-development-guide.md) ([中文](plugin-development-guide_zh.md)), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) |
 | **Author or load a system plugin** | [Plugin development guide](plugin-development-guide.md) ([中文](plugin-development-guide_zh.md)) | [Plugin extension contract](plugin-extension-contract.md), [examples/plugins](../examples/plugins/) |
+| [Local Only Mode](local-only-mode_EN.md) | Fail-closed non-loopback egress gate, threat model, and verification surfaces (#218) |
+| Understand the plugin trust model (not a marketplace sandbox) | [Plugin extension contract](plugin-extension-contract.md) | [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) |
 | Use Bot / IM integrations | [Bot Commands (EN)](bot-command_EN.md) | [Bot Platform Docs](bot/) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
 | Troubleshoot data-source failures | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | [FAQ (EN)](FAQ_EN.md), [Chinese version](data-source-stability.md) |
