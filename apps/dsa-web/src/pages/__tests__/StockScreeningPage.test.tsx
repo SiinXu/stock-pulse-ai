@@ -165,7 +165,7 @@ describe('StockScreeningPage', () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.researchDiscover);
   });
 
-  it('offers a primary configuration action from the empty results state', async () => {
+  it('offers a primary run action from the never-run empty results state', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,
       available: true,
@@ -179,15 +179,58 @@ describe('StockScreeningPage', () => {
       'px-3',
       'py-2',
     );
-    const emptyTitle = screen.getByText('暂无结果');
+    const emptyTitle = screen.getByText('尚未运行选股');
     const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
     expect(emptyPanel).not.toBeNull();
+    expect(within(emptyPanel as HTMLElement).getByText(/本页通过 AlphaSift 策略生成候选股票/)).toBeInTheDocument();
     const emptyAction = within(emptyPanel as HTMLElement).getByRole('button', {
-      name: '运行选股 · 暂无结果',
+      name: '运行选股 · 尚未运行选股',
     });
     expect(emptyAction).toHaveAttribute('data-variant', 'primary');
     fireEvent.click(emptyAction);
     expect(screen.getByRole('dialog', { name: '参数设置' })).toBeInTheDocument();
+  });
+
+  it('shows adjust-filters CTAs when a completed run returns no candidates', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0, snapshotCount: 120, afterFilterCount: 0 });
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    const emptyTitle = await screen.findByText('没有符合条件的股票');
+    const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
+    expect(emptyPanel).not.toBeNull();
+    expect(within(emptyPanel as HTMLElement).getByRole('button', { name: '调整条件 · 没有符合条件的股票' })).toBeInTheDocument();
+    expect(within(emptyPanel as HTMLElement).getByRole('button', { name: '运行选股 · 没有符合条件的股票' })).toBeInTheDocument();
+    expect(screen.getAllByText('没有符合条件的股票')).toHaveLength(1);
+  });
+
+  it('links full data-source failure empty state to Settings data sources', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0, snapshotCount: 0, afterFilterCount: 0, sourceErrors: ['tushare: timeout', 'akshare_em: network'] });
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    const emptyTitle = await screen.findByText('无法获取行情快照');
+    const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
+    expect(emptyPanel).not.toBeNull();
+    fireEvent.click(within(emptyPanel as HTMLElement).getByRole('button', { name: '打开数据源设置 · 无法获取行情快照' }));
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
+  });
+
+  it('shows adapter-unavailable once with a data-sources CTA and neutral empty results', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: true });
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('适配层不可用')).toBeInTheDocument();
+    expect(screen.getAllByText('AlphaSift 适配层不可用')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '打开数据源设置' })).toBeInTheDocument();
+    const emptyTitle = screen.getByText('暂无结果');
+    const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
+    expect(emptyPanel).not.toBeNull();
+    expect(within(emptyPanel as HTMLElement).queryByRole('button')).toBeNull();
+    expect(screen.queryByText('等待开启')).not.toBeInTheDocument();
   });
 
   it('re-syncs enabled state when AlphaSift availability check fails after config is enabled', async () => {
@@ -216,7 +259,8 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '开启 AlphaSift' }));
 
     await waitFor(() => expect(getAlphaSiftStatus).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('选股未开启')).toBeInTheDocument();
+    expect(screen.getByText('适配层不可用')).toBeInTheDocument();
+    expect(screen.getAllByText('AlphaSift 适配层不可用')).toHaveLength(1);
     openScreeningConfiguration();
     expect(screen.getByRole('button', { name: /运行选股/ })).toBeDisabled();
     expect(screen.getByText(/适配层当前不可用/)).toBeInTheDocument();

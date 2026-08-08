@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] Clarify Discover/screening empty and degraded states: never-run guide, no-hits vs full data-source failure, single capability banner, and Settings data-sources CTA (#871).
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
 - [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.

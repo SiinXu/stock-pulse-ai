@@ -31,7 +31,7 @@ const ScreeningConfigurationModalStory = () => {
       formId="playground-screening-config"
       description={text.strategyDescription}
       loading={false}
-      isScreeningEnabled
+      capability="ready"
       configurationError=""
       market="cn"
       markets={[{ id: 'cn', label: text.marketCn }]}
@@ -53,7 +53,7 @@ const ScreeningHotspotsSectionStory = () => {
     <ScreeningHotspotsSection
       text={text}
       language="en"
-      isScreeningEnabled
+      capability="ready"
       hotspots={empty ? [] : [{
         topic: 'ai-compute',
         name: 'AI Compute',
@@ -113,6 +113,7 @@ const ScreeningResultsSectionStory = () => {
       expandedCode={empty ? null : '600519'}
       llmDegraded={false}
       loading={false}
+      emptyKind={empty ? 'never_run' : null}
       onExpandedCodeChange={() => undefined}
       onOpenConfiguration={() => undefined}
     />
@@ -126,7 +127,7 @@ const ScreeningRunStatusCardStory = () => {
     <ScreeningRunStatusCard
       text={text}
       loading={loading}
-      isScreeningEnabled
+      capability="ready"
       candidatesCount={loading ? 0 : 3}
       taskMessage={loading ? text.runningTask : ''}
       taskProgress={loading ? 42 : 100}

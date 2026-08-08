@@ -12,15 +12,20 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage } from '../api/error';
-import { AppPage, Button, InlineAlert, Surface } from '../components/common';
-import { ScreenAlertMessage } from '../components/screening/ScreenAlertMessage';
+import { AppPage, Surface } from '../components/common';
 import { ScreeningConfigurationModal } from '../components/screening/ScreeningConfigurationModal';
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
+import { ScreeningPageAlerts } from '../components/screening/ScreeningPageAlerts';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
 import { formatHotspotEmptyMessage } from '../components/screening/hotspotModel';
 import { getScreenMessages } from '../components/screening/screeningMessages';
+import {
+  getScreeningCapabilityState,
+  getScreeningResultsEmptyKind,
+  isPartialDegradedScreen,
+} from '../components/screening/screeningPageState';
 import {
   SCREEN_TASK_POLL_INTERVAL_MS,
   clearPersistedScreenTask,
@@ -39,6 +44,7 @@ import { formatUiText } from '../i18n/uiText';
 import {
   RESEARCH_DISCOVER_LIMITS,
   RESEARCH_DISCOVER_MARKET_VALUES,
+  buildSettingsHref,
 } from '../routing/routes';
 import {
   DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE,
@@ -124,8 +130,15 @@ const StockScreeningPage: React.FC = () => {
       ? screenMessages
       : [text.localRankingNotice]
     : screenMessages;
-  const isScreeningEnabled = enabled && available;
-  const statusText = statusLoading ? text.statusLoading : isScreeningEnabled ? text.enabled : text.disabled;
+  const capability = useMemo(() => getScreeningCapabilityState({ statusLoading, enabled, available }), [available, enabled, statusLoading]);
+  const isScreeningEnabled = capability === 'ready';
+  const resultsEmptyKind = useMemo(
+    () => getScreeningResultsEmptyKind({ capability, loading, candidatesCount: candidates.length, screenMeta }),
+    [candidates.length, capability, loading, screenMeta],
+  );
+  const partialDegraded = isPartialDegradedScreen({ screenMeta, candidatesCount: candidates.length, alertMessages, llmDegraded });
+  const statusText = ({ loading: text.statusLoading, ready: text.enabled, unavailable: text.statusUnavailable, disabled: text.disabled } as const)[capability === 'loading' ? 'loading' : capability];
+  const handleOpenDataSources = useCallback(() => { navigate(buildSettingsHref({ section: 'data_sources', view: 'providers' })); }, [navigate]);
 
   useEffect(() => {
     document.title = text.documentTitle;
@@ -559,42 +572,22 @@ const StockScreeningPage: React.FC = () => {
         </Surface>
       </div>
 
-      {!statusLoading && !enabled ? (
-        <InlineAlert
-          variant="info"
-          title={text.notEnabledTitle}
-          message={text.notEnabledMessage}
-          action={
-            <Button variant="primary" size="default" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
-              {text.enable}
-            </Button>
-          }
-        />
-      ) : null}
-
-      {!statusLoading && enabled && !available ? (
-        <InlineAlert
-          variant="warning"
-          title={text.unavailableTitle}
-          message={text.unavailableMessage}
-        />
-      ) : null}
-
-      <InlineAlert
-        variant="warning"
-        title={text.riskTitle}
-        message={text.riskMessage}
+      <ScreeningPageAlerts
+        text={text}
+        capability={capability}
+        enabling={enabling}
+        loading={loading}
+        error={error}
+        taskMessage={taskMessage}
+        activeTaskId={activeTaskId}
+        partialDegraded={partialDegraded}
+        llmDegraded={llmDegraded}
+        alertMessages={alertMessages}
+        screenMeta={screenMeta}
+        candidatesCount={candidates.length}
+        onEnable={() => void handleEnable()}
+        onOpenDataSources={handleOpenDataSources}
       />
-
-      {loading ? (
-        <InlineAlert
-          variant="info"
-          title={text.taskRunningTitle}
-          message={`${taskMessage || text.runningTask}. ${text.taskId}: ${activeTaskId ? activeTaskId.slice(0, 12) : '-'}`}
-        />
-      ) : null}
-
-      {error ? <InlineAlert variant="danger" title={text.callFailed} message={error} /> : null}
 
       <ScreeningHotspotsSection
         text={text}
@@ -652,7 +645,7 @@ const StockScreeningPage: React.FC = () => {
       <ScreeningRunStatusCard
         text={text}
         loading={loading}
-        isScreeningEnabled={isScreeningEnabled}
+        capability={capability}
         candidatesCount={candidates.length}
         taskMessage={taskMessage}
         taskProgress={taskProgress}
@@ -662,14 +655,6 @@ const StockScreeningPage: React.FC = () => {
         screenMeta={screenMeta}
       />
 
-      {screenMeta && alertMessages.length > 0 ? (
-        <InlineAlert
-          variant={llmDegraded ? 'warning' : 'info'}
-          title={llmDegraded ? text.llmDegraded : text.alphaSiftNotice}
-          message={<ScreenAlertMessage messages={alertMessages} />}
-        />
-      ) : null}
-
       <ScreeningResultsSection
         text={text}
         language={language}
@@ -677,8 +662,10 @@ const StockScreeningPage: React.FC = () => {
         expandedCode={expandedCode}
         llmDegraded={llmDegraded}
         loading={loading}
+        emptyKind={resultsEmptyKind}
         onExpandedCodeChange={setExpandedCode}
         onOpenConfiguration={handleOpenConfiguration}
+        onOpenDataSources={handleOpenDataSources}
       />
     </AppPage>
   );
