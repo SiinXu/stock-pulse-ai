@@ -10,15 +10,17 @@ import {
   type WhatIfDraftState,
 } from './whatIfScenario';
 
-export interface ChatWhatIfSendPlan {
-  ok: true;
-  message: string;
-  context: Record<string, unknown> | undefined;
-} | {
-  ok: false;
-  errorKey: 'chat.whatIf.limitMessage' | 'chat.whatIf.magnitudeInvalid';
-  errorParams?: Record<string, string | number>;
-}
+export type ChatWhatIfSendPlan =
+  | {
+      ok: true;
+      message: string;
+      context: Record<string, unknown> | undefined;
+    }
+  | {
+      ok: false;
+      errorKey: 'chat.whatIf.limitMessage' | 'chat.whatIf.magnitudeInvalid';
+      errorParams?: Record<string, string | number>;
+    };
 
 export function useChatWhatIf(messages: Array<{ role: string; content: string }>) {
   const [whatIfDraft, setWhatIfDraft] = useState<WhatIfDraftState>(DEFAULT_WHAT_IF_DRAFT);
