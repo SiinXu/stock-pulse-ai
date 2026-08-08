@@ -25,14 +25,12 @@ import {
   SCREEN_TASK_POLL_INTERVAL_MS,
   clearPersistedScreenTask,
   formatRecoverableScreenTaskPollingError,
-  getScreeningRunParametersLocation,
   isRunningScreenTask,
   isUnrecoverableScreenTaskError,
   persistScreenTask,
   readPersistedScreenTask,
   readScreeningRunParameters,
   type PersistedScreenTask,
-  type ScreeningRunParameters,
 } from '../components/screening/screeningRunState';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
@@ -44,15 +42,13 @@ import {
   DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE,
 } from '../routing/researchRouteState';
 import { SCREENING_TEXT } from '../locales/screening';
+import { buildDeepLink } from '../utils/deepLink';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
+import { useScreeningUrlState } from './useScreeningUrlState';
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
-  const syncScreeningRunParameters = useCallback((parameters: ScreeningRunParameters) => {
-    const location = getScreeningRunParametersLocation(parameters);
-    if (location) navigate(location, { replace: true });
-  }, [navigate]);
   const { language, t } = useUiLanguage();
   const configurationFormId = useId();
   const text = SCREENING_TEXT[language];
@@ -61,7 +57,7 @@ const StockScreeningPage: React.FC = () => {
     [text.marketCn],
   );
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
-  const [initialRunParameters] = useState<ScreeningRunParameters>(() => readScreeningRunParameters(restoredTask));
+  const [initialRunParameters] = useState(() => readScreeningRunParameters(restoredTask));
   const [statusLoading, setStatusLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [available, setAvailable] = useState(false);
@@ -76,9 +72,6 @@ const StockScreeningPage: React.FC = () => {
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
-  const [hotspotsExpanded, setHotspotsExpanded] = useState(false);
-  const [selectedHotspotTopic, setSelectedHotspotTopic] = useState<string | null>(null);
-  const selectedHotspotTopicRef = useRef<string | null>(null);
   const strategiesRequestIdRef = useRef(0);
   const hotspotsRequestIdRef = useRef(0);
   const hotspotDetailRequestIdRef = useRef(0);
@@ -90,7 +83,6 @@ const StockScreeningPage: React.FC = () => {
   const [loadingHotspots, setLoadingHotspots] = useState(false);
   const [hotspotError, setHotspotError] = useState('');
   const [screenMeta, setScreenMeta] = useState<AlphaSiftScreenResponse | null>(null);
-  const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(restoredTask?.taskId));
   const [enabling, setEnabling] = useState(false);
   const [loadingStrategies, setLoadingStrategies] = useState(false);
@@ -99,6 +91,22 @@ const StockScreeningPage: React.FC = () => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(restoredTask?.taskId ?? null);
   const [taskProgress, setTaskProgress] = useState(restoredTask?.taskId ? 10 : 0);
   const [taskMessage, setTaskMessage] = useState(restoredTask?.taskId ? text.restoringTask : '');
+
+  const {
+    expandedCode,
+    setExpandedCode,
+    hotspotsExpanded,
+    selectedHotspotTopic,
+    setSelectedHotspotTopic,
+    selectedHotspotTopicRef,
+    handleExpandedCodeChange,
+    handleHotspotSelect: selectHotspotInUrl,
+    toggleHotspotsExpanded: toggleHotspotsInUrl,
+    clearCandidateFromUrl,
+  } = useScreeningUrlState(
+    { market, strategy, maxResults },
+    { setMarket, setStrategy, setMaxResults, setMaxResultsDraft },
+  );
 
   const selectedStrategy = useMemo(() => strategies.find((item) => item.id === strategy), [strategies, strategy]);
   const selectedStrategyDisplay = useMemo(
@@ -131,27 +139,25 @@ const StockScreeningPage: React.FC = () => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
 
-  useEffect(() => {
-    syncScreeningRunParameters({ market, strategy, maxResults });
-  }, [market, maxResults, strategy, syncScreeningRunParameters]);
-
   const applyScreenResult = useCallback((result: AlphaSiftScreenResponse) => {
     const nextCandidates = result.candidates || [];
     setScreenMeta(result);
     setCandidates(nextCandidates);
-    setExpandedCode(nextCandidates[0]?.code ?? null);
-  }, []);
+    setExpandedCode((current) => {
+      if (current && nextCandidates.some((item) => item.code === current)) return current;
+      return nextCandidates[0]?.code ?? null;
+    });
+  }, [setExpandedCode]);
 
   const clearScreeningResults = () => {
     setCandidates([]);
     setScreenMeta(null);
     setExpandedCode(null);
+    clearCandidateFromUrl();
   };
 
   const loadHotspotDetail = useCallback(async (topic: string, options: { refresh?: boolean } = {}) => {
-    if (!topic) {
-      return;
-    }
+    if (!topic) return;
     const cachedDetail = !options.refresh ? hotspotDetailsByTopicRef.current[topic] : null;
     if (cachedDetail) {
       setHotspotDetail(cachedDetail);
@@ -168,26 +174,17 @@ const StockScreeningPage: React.FC = () => {
     setHotspotDetailError('');
     try {
       const detail = await alphasiftApi.getHotspotDetail({ topic, provider: 'akshare', refresh: options.refresh ?? false });
-      if (!canApplyRequest()) {
-        return;
-      }
-      hotspotDetailsByTopicRef.current = {
-        ...hotspotDetailsByTopicRef.current,
-        [topic]: detail,
-      };
+      if (!canApplyRequest()) return;
+      hotspotDetailsByTopicRef.current = { ...hotspotDetailsByTopicRef.current, [topic]: detail };
       setHotspotDetail(detail);
     } catch (err) {
-      if (!canApplyRequest()) {
-        return;
-      }
+      if (!canApplyRequest()) return;
       setHotspotDetail(null);
       setHotspotDetailError(toApiErrorMessage(err, text.hotspotDetailLoadFailed, language));
     } finally {
-      if (isCurrentRequest()) {
-        setLoadingHotspotDetail(false);
-      }
+      if (isCurrentRequest()) setLoadingHotspotDetail(false);
     }
-  }, [language, text.hotspotDetailLoadFailed]);
+  }, [language, selectedHotspotTopicRef, text.hotspotDetailLoadFailed]);
 
   const loadStrategies = useCallback(async () => {
     const requestId = strategiesRequestIdRef.current + 1;
@@ -218,17 +215,18 @@ const StockScreeningPage: React.FC = () => {
       if (!isLatestRequest()) return;
       const nextHotspots = result.hotspots || [];
       const nextDetails = result.details || {};
-      hotspotDetailsByTopicRef.current = {
-        ...hotspotDetailsByTopicRef.current,
-        ...nextDetails,
-      };
+      hotspotDetailsByTopicRef.current = { ...hotspotDetailsByTopicRef.current, ...nextDetails };
       const currentTopic = selectedHotspotTopicRef.current;
       const retainedTopic = Boolean(currentTopic && nextHotspots.some((item) => item.topic === currentTopic));
       const nextTopic = retainedTopic ? currentTopic : null;
       setHotspots(nextHotspots);
       setHotspotsUpdatedAt(result.cachedAt || (nextHotspots.length > 0 ? new Date().toISOString() : null));
-      setSelectedHotspotTopic(nextTopic);
-      selectedHotspotTopicRef.current = nextTopic;
+      if (!retainedTopic) {
+        selectedHotspotTopicRef.current = null;
+        setSelectedHotspotTopic(null);
+      } else {
+        setSelectedHotspotTopic(nextTopic);
+      }
       if (nextTopic && nextDetails[nextTopic]) {
         setHotspotDetail(nextDetails[nextTopic]);
         setLoadingHotspotDetail(false);
@@ -247,12 +245,11 @@ const StockScreeningPage: React.FC = () => {
     } finally {
       if (isLatestRequest()) setLoadingHotspots(false);
     }
-  }, [language, loadHotspotDetail, text]);
+  }, [language, loadHotspotDetail, selectedHotspotTopicRef, setSelectedHotspotTopic, text]);
 
   const handleHotspotSelect = useCallback((topic: string) => {
-    selectedHotspotTopicRef.current = topic;
-    setSelectedHotspotTopic(topic);
     const cachedDetail = hotspotDetailsByTopicRef.current[topic];
+    selectHotspotInUrl(topic);
     if (cachedDetail) {
       setHotspotDetail(cachedDetail);
       setHotspotDetailError('');
@@ -260,45 +257,33 @@ const StockScreeningPage: React.FC = () => {
     } else {
       setHotspotDetail((currentDetail) => (currentDetail?.topic === topic ? currentDetail : null));
     }
-  }, []);
+  }, [selectHotspotInUrl]);
 
   const toggleHotspotsExpanded = useCallback(() => {
-    setHotspotsExpanded((expanded) => {
-      const nextExpanded = !expanded;
-      if (!nextExpanded) {
-        selectedHotspotTopicRef.current = null;
-        setSelectedHotspotTopic(null);
-        setHotspotDetail(null);
-        setHotspotDetailError('');
-      }
-      return nextExpanded;
-    });
-  }, []);
+    toggleHotspotsInUrl();
+    if (hotspotsExpanded) {
+      setHotspotDetail(null);
+      setHotspotDetailError('');
+    }
+  }, [hotspotsExpanded, toggleHotspotsInUrl]);
 
   const handleAnalyzeHotspotStock = useCallback((stock: AlphaSiftHotspotDetail['stocks'][number]) => {
     const stockCode = String(stock.code || '').trim();
-    if (!stockCode) {
-      return;
+    if (!stockCode) return;
+    // #879 A4: shareable Home stock intent via query (not location.state).
+    try {
+      navigate(buildDeepLink({ page: 'home', stockCode }));
+    } catch {
+      navigate(`/?stock=${encodeURIComponent(stockCode)}`);
     }
-    const stockName = String(stock.name || stockCode).trim();
-    navigate('/', {
-      state: {
-        stockCode,
-        stockName,
-        autoAnalyze: true,
-        selectionSource: 'alphasift_hotspot',
-      },
-    });
   }, [navigate]);
 
   useEffect(() => {
     selectedHotspotTopicRef.current = selectedHotspotTopic;
-  }, [selectedHotspotTopic]);
+  }, [selectedHotspotTopic, selectedHotspotTopicRef]);
 
   useEffect(() => {
-    if (!selectedHotspotTopic) {
-      return;
-    }
+    if (!selectedHotspotTopic) return;
     void loadHotspotDetail(selectedHotspotTopic);
   }, [loadHotspotDetail, selectedHotspotTopic]);
 
@@ -307,9 +292,7 @@ const StockScreeningPage: React.FC = () => {
     alphasiftApi
       .getStatus()
       .then((status) => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setEnabled(status.enabled);
         setAvailable(status.available);
         setStatusLoading(false);
@@ -325,9 +308,7 @@ const StockScreeningPage: React.FC = () => {
           setStatusLoading(false);
         }
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [loadHotspots, loadStrategies]);
 
   useEffect(() => {
@@ -341,10 +322,7 @@ const StockScreeningPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!activeTaskId) {
-      return undefined;
-    }
-
+    if (!activeTaskId) return undefined;
     const pollingTaskId = activeTaskId;
     let active = true;
     let timer: number | undefined;
@@ -399,14 +377,10 @@ const StockScreeningPage: React.FC = () => {
     async function pollTask() {
       try {
         const task = await alphasiftApi.getScreenTask(pollingTaskId);
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         applyTaskStatus(task);
       } catch (err) {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         const parsedError = getParsedApiError(err, language);
         if (isUnrecoverableScreenTaskError(parsedError)) {
           setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
@@ -422,14 +396,11 @@ const StockScreeningPage: React.FC = () => {
     }
 
     void pollTask();
-
     return () => {
       active = false;
-      if (timer) {
-        window.clearTimeout(timer);
-      }
+      if (timer) window.clearTimeout(timer);
     };
-  }, [activeTaskId, applyScreenResult, language, text]);
+  }, [activeTaskId, applyScreenResult, language, setExpandedCode, text]);
 
   const handleEnable = async () => {
     setEnabling(true);
@@ -461,23 +432,17 @@ const StockScreeningPage: React.FC = () => {
   };
 
   const handleStrategyChange = (nextStrategy: string) => {
-    if (nextStrategy !== strategy) {
-      clearScreeningResults();
-    }
+    if (nextStrategy !== strategy) clearScreeningResults();
     setStrategy(nextStrategy);
   };
 
   const handleMarketChange = (nextMarket: string) => {
-    if (nextMarket !== market) {
-      clearScreeningResults();
-    }
+    if (nextMarket !== market) clearScreeningResults();
     setMarket(nextMarket);
   };
 
   const handleMaxResultsChange = (nextMaxResults: string) => {
-    if (nextMaxResults !== String(maxResults)) {
-      clearScreeningResults();
-    }
+    if (nextMaxResults !== String(maxResults)) clearScreeningResults();
     setMaxResultsDraft(nextMaxResults);
     setMaxResultsError('');
   };
@@ -677,13 +642,11 @@ const StockScreeningPage: React.FC = () => {
         expandedCode={expandedCode}
         llmDegraded={llmDegraded}
         loading={loading}
-        onExpandedCodeChange={setExpandedCode}
+        onExpandedCodeChange={handleExpandedCodeChange}
         onOpenConfiguration={handleOpenConfiguration}
       />
     </AppPage>
   );
 };
-
-
 
 export default StockScreeningPage;

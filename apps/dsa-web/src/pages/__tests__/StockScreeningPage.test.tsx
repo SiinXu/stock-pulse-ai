@@ -84,6 +84,13 @@ vi.mock('react-router-dom', async () => {
   return {
     ...actual,
     useNavigate: () => navigate,
+    useLocation: () => ({
+      pathname: window.location.pathname || '/',
+      search: window.location.search || '',
+      hash: window.location.hash || '',
+      state: null,
+      key: 'test',
+    }),
   };
 });
 
@@ -295,14 +302,7 @@ describe('StockScreeningPage', () => {
     const analyzeButton = screen.getByRole('button', { name: '分析 中际旭创' });
     expect(analyzeButton).toHaveClass('min-h-11', 'min-w-11');
     fireEvent.click(analyzeButton);
-    expect(navigate).toHaveBeenCalledWith('/', {
-      state: {
-        stockCode: '300000',
-        stockName: '中际旭创',
-        autoAnalyze: true,
-        selectionSource: 'alphasift_hotspot',
-      },
-    });
+    expect(navigate).toHaveBeenCalledWith('/?stock=300000');
   });
 
   it('localizes backend hotspot no-cache hint on initial load', async () => {
@@ -869,6 +869,178 @@ describe('StockScreeningPage', () => {
     expect(marketField).toHaveClass('flex-row', 'items-center');
     expect(strategyField).toHaveClass('flex-row', 'items-center');
     expect(resultCountField).toHaveClass('flex-row', 'items-center');
+  });
+
+
+  it('restores candidate and hotspot selection from the URL (share/refresh contract)', async () => {
+    const search = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'dual_low',
+      candidate: '600519',
+      hotspot: 'AI算力',
+      hotspots: '1',
+      source: 'share',
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchDiscover}?${search.toString()}#details`,
+    );
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getHotspots.mockResolvedValueOnce({
+      enabled: true,
+      provider: 'akshare',
+      hotspots: [{ topic: 'AI算力', name: 'AI算力', heatScore: 88, stage: '加速主升' }],
+      hotspotCount: 1,
+      details: {
+        'AI算力': {
+          enabled: true,
+          provider: 'akshare',
+          topic: 'AI算力',
+          name: 'AI算力',
+          route: [],
+          stocks: [{ code: '300000', name: '中际旭创', role: '核心龙头' }],
+          stockCount: 1,
+        },
+      },
+    });
+    screenStocks.mockResolvedValue({
+      enabled: true,
+      candidates: [
+        { code: '600519', name: '贵州茅台', score: 90, reason: 'r1', raw: {} },
+        { code: '000001', name: '平安银行', score: 80, reason: 'r2', raw: {} },
+      ],
+      candidateCount: 2,
+    });
+    // complete an active task so candidates render with the URL candidate retained
+    window.sessionStorage.setItem(SCREEN_TASK_SESSION_STORAGE_KEY, JSON.stringify({
+      taskId: 'screen-task-1',
+      market: 'cn',
+      strategy: 'dual_low',
+      maxResults: 3,
+    }));
+    getScreenTask.mockResolvedValue({
+      taskId: 'screen-task-1',
+      traceId: 'screen-task-1',
+      status: 'completed',
+      progress: 100,
+      message: 'done',
+      result: {
+        enabled: true,
+        candidates: [
+          { code: '600519', name: '贵州茅台', score: 90, reason: 'r1', raw: {} },
+          { code: '000001', name: '平安银行', score: 80, reason: 'r2', raw: {} },
+        ],
+        candidateCount: 2,
+      },
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getScreenTask).toHaveBeenCalled());
+    // Candidate from URL should remain expanded (not forced to first-only when present)
+    expect(await screen.findByText('贵州茅台')).toBeInTheDocument();
+    // Hotspot section restored open with selected topic
+    expect(await screen.findByText('中际旭创')).toBeInTheDocument();
+  });
+
+  it('writes candidate selection to the URL with push history', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    screenStocks.mockResolvedValue({
+      enabled: true,
+      candidates: [
+        { code: '600519', name: '贵州茅台', score: 90, reason: 'r1', raw: {} },
+        { code: '000001', name: '平安银行', score: 80, reason: 'r2', raw: {} },
+      ],
+      candidateCount: 2,
+    });
+    startScreenTask.mockResolvedValueOnce({
+      taskId: 'screen-task-1',
+      traceId: 'screen-task-1',
+      status: 'pending',
+      message: 'submitted',
+      strategy: 'dual_low',
+      market: 'cn',
+      maxResults: 3,
+    });
+    getScreenTask.mockResolvedValue({
+      taskId: 'screen-task-1',
+      traceId: 'screen-task-1',
+      status: 'completed',
+      progress: 100,
+      message: 'done',
+      result: {
+        enabled: true,
+        candidates: [
+          { code: '600519', name: '贵州茅台', score: 90, reason: 'r1', raw: {} },
+          { code: '000001', name: '平安银行', score: 80, reason: 'r2', raw: {} },
+        ],
+        candidateCount: 2,
+      },
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('贵州茅台')).toBeInTheDocument();
+
+    navigate.mockClear();
+    // Expand the second candidate via its detail toggle
+    const expandButtons = screen.getAllByRole('button', { name: '展开查看' });
+    // First row is auto-expanded on result apply, so its button may say 收起; pick expand for second
+    const expandTarget = expandButtons[0] ?? screen.getAllByRole('button', { name: /展开查看|收起/ })[1];
+    fireEvent.click(expandTarget);
+
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalled();
+      const calls = navigate.mock.calls.map((call) => String(call[0]));
+      expect(calls.some((href) => /candidate=/.test(href))).toBe(true);
+    });
+    const candidateCall = navigate.mock.calls.find((call) => /candidate=/.test(String(call[0])));
+    // candidate selection uses push history
+    expect(candidateCall?.[1]).toEqual({ replace: false });
+  });
+
+  it('writes hotspot expansion to the URL and clears it when collapsed', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getHotspots.mockResolvedValue({
+      enabled: true,
+      provider: 'akshare',
+      hotspots: [{ topic: 'AI算力', name: 'AI算力', heatScore: 88, stage: '加速主升' }],
+      hotspotCount: 1,
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+
+    navigate.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
+    await waitFor(() => {
+      const calls = navigate.mock.calls.map((call) => String(call[0]));
+      expect(calls.some((href) => href.includes('hotspots=1'))).toBe(true);
+    });
+
+    navigate.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /收起热点题材/ }));
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalled();
+      const last = String(navigate.mock.calls.at(-1)?.[0] ?? '');
+      expect(last.includes('hotspots=1')).toBe(false);
+      expect(last.includes('hotspot=')).toBe(false);
+    });
   });
 
   it('restores strategy, market, and result count run parameters from the URL', async () => {
