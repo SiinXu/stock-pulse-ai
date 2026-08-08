@@ -334,6 +334,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 TickFlow 批量预取的请求次数和单次请求压力。'],
     notes: ['该配置仅影响 TickFlow 批量路径。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS 或 Atom 订阅地址，作为按需新闻搜索的补充来源。',
+    usage: '填写逗号分隔的 http(s) 订阅 URL。留空则功能保持惰性。抓取遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '用于补充 SearXNG 或付费搜索，不是完整替代方案。',
+      '私网或回环主机需要 OUTBOUND_HTTP_ALLOWLIST 中的精确条目。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制每个源的超时（1–30 秒，默认 8）。',
+    ],
+    impact: ['在已配置源返回条目时，影响按需新闻搜索的覆盖范围。'],
+    notes: ['单个源失败不应阻断其余新闻流水线。'],
+  },
   'settings.data_source.stock_index_remote': {
     title: '股票索引远程更新',
     summary: '从 GitHub main 分支获取最新股票自动补全索引，并缓存到本地。',
@@ -1549,6 +1561,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
 
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略合议',
+    summary: '启用并发多策略 specialist 调度，并在结果中给出最终分歧说明。',
+    usage: '默认关闭。为 true 时，Native Multi 可调度策略 specialist 并展示分歧说明；关闭时不改变 Phase-1 合成路径。',
+    valueNotes: [
+      '关闭时尽量保持既有合成行为。',
+      '开启后启用多策略合议与最终分歧说明。',
+    ],
+    impact: ['影响 agent 管线 specialist 调度与分歧说明字段。'],
+    notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
+  },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: '投委会模式',
     summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',

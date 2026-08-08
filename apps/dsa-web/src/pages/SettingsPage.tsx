@@ -103,6 +103,7 @@ import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard'
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
 import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
 import OutboundActivityPanel from '../components/settings/OutboundActivityPanel';
+import LoadedExtensionsPanel from '../components/settings/LoadedExtensionsPanel';
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
@@ -1347,7 +1348,7 @@ const SettingsPage: React.FC = () => {
     && !isInvestmentFrameworkView
     && !isTopLevelAdvanced
     && !(isAlertsSection && activeView === 'events')
-    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
+    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about' || activeView === 'extensions'));
   const showActiveConfigEmptyState = !(
     activeSection === 'overview'
     || activeSection === 'ai_models'
@@ -1641,6 +1642,13 @@ const SettingsPage: React.FC = () => {
             ) : null}
             {activeCategory === 'system' && activeView === 'about' ? (
               <SystemAboutCard />
+            ) : null}
+            {activeCategory === 'system' && activeView === 'extensions' ? (
+              <LoadedExtensionsPanel
+                disabled={isSaving || isLoading}
+                t={t}
+                language={uiLanguage}
+              />
             ) : null}
             {isTopLevelAdvanced && activeView === 'backup' ? (
               <>
