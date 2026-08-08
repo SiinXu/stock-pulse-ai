@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Docs] Add GitHub Actions three-step quickstart (`docs/actions-quickstart.md` / `docs/actions-quickstart_CN.md`) and a README Quick start entry link (#852).
+- [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).
 - [Fixed] Signal Center deep links with `?signal=<id>` fall back to fetch-by-id when the signal is not on the currently loaded list/latest/timeline page, and clear the URL param on 404/forbidden without a blank page.
 - [Fixed] Home setup dismiss uses a single Close control, Home core blocks stay single-column below xl, and shared ScrollArea/StockBar height chains gain min-h-0 so constrained stock rails can scroll on mobile (#879 B1/B6).
 - [Tests] Sync the Web playground catalog and scenario renderers with 14 newly exported visual components so catalog coverage stays complete.
