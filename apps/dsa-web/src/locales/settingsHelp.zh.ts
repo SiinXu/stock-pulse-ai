@@ -1254,6 +1254,53 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: '启用离线 OCR Agent 工具',
+    summary: '可选的本地 Tesseract OCR Agent 工具，用于对账单与密集截图文字提取，默认关闭。',
+    usage: '默认安装请保持关闭。仅在已设置 OCR_FILE_ROOT 或 MULTIMODAL_FILE_ROOT、并安装 requirements-ocr.txt 与系统 Tesseract 后开启，保存后重启以注册 extract_image_text。',
+    valueNotes: [
+      '默认关闭；启用、配置文件根、依赖就绪并重启前，进程工具目录不包含 OCR。',
+      '纯本地：图片字节不上传。隐私敏感表格优先 OCR；语义读 K 线请用 read_price_chart。',
+    ],
+    impact: ['仅影响可选 Agent 工具可用性；关闭时默认分析报告路径不变。'],
+    notes: [
+      '安装、中文语言包与回滚见 docs/agent-ocr-tool.md。',
+      '与离线/隐私诉求 #218 部分相关。',
+    ],
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR 文件根目录',
+    summary: '离线 OCR 使用的用户图片本地目录。',
+    usage: '填写绝对本地路径。Agent 工具的 file_path 必须解析到该根目录内；拒绝 URL 与路径穿越。留空时回退 MULTIMODAL_FILE_ROOT。',
+    valueNotes: [
+      '当 OCR_AGENT_TOOL_ENABLED=true 时需直接设置或可回退到 multimodal 根；缺失则工具不注册。',
+      '文件内容永不执行，仅走有界读取与 OCR 路径。',
+    ],
+    impact: ['控制 extract_image_text 的文件系统沙箱边界。'],
+    notes: ['示例：/var/stockpulse/ocr-uploads'],
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR 语言',
+    summary: 'Tesseract 语言码，以 + 连接，用于中英混排对账单等。',
+    usage: '中英混排用 chi_sim+eng，纯英文用 eng。需安装对应系统语言包。',
+    valueNotes: [
+      '默认 chi_sim+eng。非法 token 运行时回退默认值。',
+      '变更语言需对应 Tesseract traineddata。',
+    ],
+    impact: ['仅影响 OCR 识别质量与可用文字脚本。'],
+    notes: ['安装示例见 docs/agent-ocr-tool.md。'],
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR 超时秒数',
+    summary: '单次本地 OCR 处理超时。',
+    usage: '范围 1–120 秒，默认 30。值越小卡住时更快失败，值越大可处理更密页面。',
+    valueNotes: [
+      '超时返回 status=unavailable 且 reason_code=ocr_timeout。',
+      '工具未启用或未注册时不适用。',
+    ],
+    impact: ['限制单次 OCR 调用的 CPU 时间。'],
+    notes: ['进程级默认值在重启后对新构建的工具生效。'],
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------

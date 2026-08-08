@@ -1224,6 +1224,53 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: 'Enable Offline OCR Agent Tool',
+    summary: 'Opt-in local Tesseract OCR Agent Tool for statements and dense screenshots.',
+    usage: 'Leave disabled for default installs. Enable only with OCR_FILE_ROOT or MULTIMODAL_FILE_ROOT, install requirements-ocr.txt plus system Tesseract, then restart so extract_image_text can register.',
+    valueNotes: [
+      'Default is off; the process tool catalog does not include OCR until enabled, rooted, dependencies ready, and restarted.',
+      'Local only — image bytes are never uploaded. Prefer OCR for privacy-sensitive tables; use read_price_chart for semantic chart understanding.',
+    ],
+    impact: ['Affects optional Agent tool availability only; default analysis reports stay unchanged when disabled.'],
+    notes: [
+      'See docs/agent-ocr-tool_EN.md for install, Chinese language packs, and rollback.',
+      'Related offline/privacy posture: issue #218 (partial coverage).',
+    ],
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR File Root',
+    summary: 'Local directory for user-provided images used by offline OCR.',
+    usage: 'Set an absolute local path. Agent tool file_path values must resolve inside this root; URLs and path traversal are rejected. Empty falls back to MULTIMODAL_FILE_ROOT.',
+    valueNotes: [
+      'Required (directly or via multimodal root) when OCR_AGENT_TOOL_ENABLED=true; missing root keeps the tool unregistered.',
+      'Content is never executed; only bounded read/OCR paths are used.',
+    ],
+    impact: ['Controls the filesystem sandbox for extract_image_text.'],
+    notes: ['Example: /var/stockpulse/ocr-uploads'],
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR Languages',
+    summary: 'Tesseract language codes joined by + for mixed-language statements.',
+    usage: 'Use chi_sim+eng for Chinese/English statements, or eng for English-only. Matching system traineddata packs must be installed.',
+    valueNotes: [
+      'Default chi_sim+eng. Invalid tokens fall back to the default at runtime.',
+      'Changing languages requires the corresponding Tesseract language packs.',
+    ],
+    impact: ['Affects OCR recognition quality and available scripts only.'],
+    notes: ['See docs/agent-ocr-tool_EN.md for install examples.'],
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR Timeout Seconds',
+    summary: 'Per-call timeout for local OCR processing.',
+    usage: 'Set 1–120 seconds. Default 30. Lower values fail faster on stuck engines; higher values allow denser pages.',
+    valueNotes: [
+      'Timeouts return status unavailable with reason_code ocr_timeout.',
+      'Does not apply when the tool is disabled or unregistered.',
+    ],
+    impact: ['Bounds CPU time spent on a single OCR call.'],
+    notes: ['Restart required for process-level default to take effect on new tool builds.'],
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
