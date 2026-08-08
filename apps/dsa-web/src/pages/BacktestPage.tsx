@@ -1,6 +1,6 @@
 import type React from 'react';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Inbox, Minus, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useId, useRef } from 'react';
+import { Check, ChevronDown, Inbox, Minus, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
@@ -37,6 +37,7 @@ import type {
   BacktestPhaseFilter,
 } from '../types/backtest';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
+import { cn } from '../utils/cn';
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_COMPACT_INPUT_CLASS =
@@ -376,6 +377,8 @@ const BacktestPage: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<BacktestFilterSnapshot>(initialFilters);
   const [forceRerun, setForceRerun] = useState(false);
   const [pendingForceRun, setPendingForceRun] = useState<BacktestFilterSnapshot | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false); // mobile filters collapsed by default (#879 B2)
+  const filtersPanelId = useId();
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
   const [runError, setRunError] = useState<ParsedApiError | null>(null);
@@ -807,163 +810,105 @@ const BacktestPage: React.FC = () => {
     },
   ];
 
+  const mobileFiltersToggleLabel = `${text.pageTitle} · ${text.filter}`;
+
   return (
     <AppPage className="flex min-h-full flex-col">
       <PageHeader className="shrink-0" title={text.pageTitle} />
       <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
-          <div
-            data-testid="backtest-stock-filter"
-            className="relative flex w-64 min-w-0 shrink-0 flex-col [&>div]:h-8 [&>div>p]:sr-only"
-          >
-            <label htmlFor="backtest-stock-filter" className="mb-1.5 text-xs font-medium text-secondary-text">
-              {text.stock}
-            </label>
-            <StockAutocomplete
-              id="backtest-stock-filter"
-              value={codeFilter}
-              onChange={(value) => setCodeFilter(value.toUpperCase())}
-              onSubmit={(stockCode, _stockName, _selectionSource, metadata) => {
-                setCodeFilter((metadata?.displayCode ?? stockCode).toUpperCase());
-                handleFilter(stockCode);
-              }}
-              placeholder={text.codePlaceholder}
-              ariaLabel={text.codePlaceholder}
-              disabled={isRunning}
-              suggestionDensity="compact"
-              className="h-8 min-h-8 min-w-0 sm:h-8 sm:min-h-8 sm:min-w-0"
-            />
-          </div>
-          <Input
-            id="backtest-eval-window"
-            label={text.evalWindow}
-            type="number"
-            size="default"
-            min={1}
-            max={RESEARCH_BACKTEST_LIMITS.maxWindowDays}
-            value={evalDays}
-            onChange={(e) => {
-              const nextValue = e.target.value;
-              const parsedValue = parseEvalWindowDays(nextValue);
-              if (parsedValue && parsedValue > 1) {
-                lastRegularWindowRef.current = parsedValue;
-              }
-              setEvalDays(nextValue);
-              setEvalDaysError('');
-            }}
-            placeholder="10"
-            disabled={isRunning}
-            fieldClassName="w-24"
-            aria-invalid={evalDaysError ? true : undefined}
-            aria-describedby={evalDaysError ? 'backtest-eval-window-error' : undefined}
-            className={`text-center tabular-nums ${evalDaysError ? 'border-danger/40 focus:border-danger' : ''}`}
-          />
-          {evalDaysError ? (
-            <span id="backtest-eval-window-error" role="alert" className="sr-only">
-              {evalDaysError}
-            </span>
-          ) : null}
-          <DateRangePicker
-            id="backtest-date-range"
-            size="compact"
-            label={text.analysisDate}
-            ariaLabel={`${text.startDateAria} – ${text.endDateAria}`}
-            placeholder={`${text.startDate} – ${text.endDate}`}
-            value={{ start: analysisDateFrom, end: analysisDateTo }}
-            onChange={({ start, end }) => {
-              setAnalysisDateFrom(start);
-              setAnalysisDateTo(end);
-              setDateFromError('');
-              setDateToError('');
-            }}
-            error={dateFromError || dateToError}
-            disabled={isRunning}
-            className="w-64 whitespace-nowrap"
-            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-64 !rounded-xl text-center tabular-nums`}
-          />
-          <SegmentedControl
-            value={isNextDayValidation ? 'oneDay' : 'window'}
-            options={[
-              { value: 'window', label: formatUiText(text.dayWindow, { days: lastRegularWindowRef.current }), disabled: isRunning },
-              { value: 'oneDay', label: text.nextDayValidation, disabled: isRunning },
-            ]}
-            onChange={handleValidationModeChange}
-            ariaLabel={`${text.evalWindow} / ${text.nextDayValidation}`}
-            semantics="single-select"
-            className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
-          />
-          <Tooltip content={text.minAgeDescription}>
-            <Input
-              id="backtest-min-age"
-              label={text.minAge}
-              type="number"
-              size="default"
-              min={0}
-              max={365}
-              value={minAgeDays}
-              onChange={(e) => {
-                setMinAgeDays(e.target.value);
-                setMinAgeError('');
-              }}
-              placeholder="14"
-              disabled={isRunning}
-              fieldClassName="w-24"
-              aria-invalid={minAgeError ? true : undefined}
-              aria-describedby={minAgeError ? 'backtest-min-age-error' : undefined}
-              className={`text-center tabular-nums ${minAgeError ? 'border-danger/40 focus:border-danger' : ''}`}
-            />
-          </Tooltip>
-          {minAgeError ? (
-            <span id="backtest-min-age-error" role="alert" className="sr-only">
-              {minAgeError}
-            </span>
-          ) : null}
-          <Tooltip content={text.candidateLimitDescription}>
-            <Input
-              id="backtest-candidate-limit"
-              label={text.candidateLimit}
-              type="number"
-              size="default"
-              min={1}
-              max={2000}
-              value={candidateLimit}
-              onChange={(e) => {
-                setCandidateLimit(e.target.value);
-                setCandidateLimitError('');
-              }}
-              placeholder="200"
-              disabled={isRunning}
-              fieldClassName="w-24"
-              aria-invalid={candidateLimitError ? true : undefined}
-              aria-describedby={candidateLimitError ? 'backtest-candidate-limit-error' : undefined}
-              className={`text-center tabular-nums ${candidateLimitError ? 'border-danger/40 focus:border-danger' : ''}`}
-            />
-          </Tooltip>
-          {candidateLimitError ? (
-            <span id="backtest-candidate-limit-error" role="alert" className="sr-only">
-              {candidateLimitError}
-            </span>
-          ) : null}
-          <div className="flex h-8 items-center gap-1.5">
-            <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
-            <Tooltip content={text.forceRerunDescription}>
-              <Switch
-                checked={forceRerun}
+          {/* #879 B2: mobile disclosure; page-scoped name avoids legacy "筛选" action. */}
+          <Button type="button" variant="secondary" size="default" aria-expanded={mobileFiltersOpen} aria-controls={filtersPanelId} aria-label={mobileFiltersToggleLabel} data-testid="backtest-mobile-filters-toggle" onClick={() => setMobileFiltersOpen((open) => !open)} className="min-h-11 whitespace-nowrap text-xs md:hidden">
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            <span aria-hidden="true">{text.filter}</span>
+            <ChevronDown className={cn('h-4 w-4 transition-transform', mobileFiltersOpen && 'rotate-180')} aria-hidden="true" />
+          </Button>
+          <div id={filtersPanelId} data-testid="backtest-run-filters" className={cn('flex min-w-0 flex-1 flex-wrap items-end gap-1.5', !mobileFiltersOpen && 'max-md:hidden')}>
+            <div data-testid="backtest-stock-filter" className="relative flex w-64 min-w-0 shrink-0 flex-col [&>div]:h-8 [&>div>p]:sr-only">
+              <label htmlFor="backtest-stock-filter" className="mb-1.5 text-xs font-medium text-secondary-text">{text.stock}</label>
+              <StockAutocomplete
+                id="backtest-stock-filter"
+                value={codeFilter}
+                onChange={(value) => setCodeFilter(value.toUpperCase())}
+                onSubmit={(stockCode, _stockName, _selectionSource, metadata) => {
+                  setCodeFilter((metadata?.displayCode ?? stockCode).toUpperCase());
+                  handleFilter(stockCode);
+                }}
+                placeholder={text.codePlaceholder}
+                ariaLabel={text.codePlaceholder}
                 disabled={isRunning}
-                onCheckedChange={setForceRerun}
-                aria-label={text.forceRerun}
+                suggestionDensity="compact"
+                className="h-8 min-h-8 min-w-0 sm:h-8 sm:min-h-8 sm:min-w-0"
+              />
+            </div>
+            <Input
+              id="backtest-eval-window" label={text.evalWindow} type="number" size="default" min={1}
+              max={RESEARCH_BACKTEST_LIMITS.maxWindowDays} value={evalDays}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                const parsedValue = parseEvalWindowDays(nextValue);
+                if (parsedValue && parsedValue > 1) lastRegularWindowRef.current = parsedValue;
+                setEvalDays(nextValue);
+                setEvalDaysError('');
+              }}
+              placeholder="10" disabled={isRunning} fieldClassName="w-24"
+              aria-invalid={evalDaysError ? true : undefined}
+              aria-describedby={evalDaysError ? 'backtest-eval-window-error' : undefined}
+              className={`text-center tabular-nums ${evalDaysError ? 'border-danger/40 focus:border-danger' : ''}`}
+            />
+            {evalDaysError ? <span id="backtest-eval-window-error" role="alert" className="sr-only">{evalDaysError}</span> : null}
+            <DateRangePicker
+              id="backtest-date-range" size="compact" label={text.analysisDate}
+              ariaLabel={`${text.startDateAria} – ${text.endDateAria}`}
+              placeholder={`${text.startDate} – ${text.endDate}`}
+              value={{ start: analysisDateFrom, end: analysisDateTo }}
+              onChange={({ start, end }) => {
+                setAnalysisDateFrom(start); setAnalysisDateTo(end); setDateFromError(''); setDateToError('');
+              }}
+              error={dateFromError || dateToError} disabled={isRunning} className="w-64 whitespace-nowrap"
+              triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-64 !rounded-xl text-center tabular-nums`}
+            />
+            <SegmentedControl
+              value={isNextDayValidation ? 'oneDay' : 'window'}
+              options={[
+                { value: 'window', label: formatUiText(text.dayWindow, { days: lastRegularWindowRef.current }), disabled: isRunning },
+                { value: 'oneDay', label: text.nextDayValidation, disabled: isRunning },
+              ]}
+              onChange={handleValidationModeChange}
+              ariaLabel={`${text.evalWindow} / ${text.nextDayValidation}`}
+              semantics="single-select"
+              className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
+            />
+            <Tooltip content={text.minAgeDescription}>
+              <Input
+                id="backtest-min-age" label={text.minAge} type="number" size="default" min={0} max={365}
+                value={minAgeDays} onChange={(e) => { setMinAgeDays(e.target.value); setMinAgeError(''); }}
+                placeholder="14" disabled={isRunning} fieldClassName="w-24"
+                aria-invalid={minAgeError ? true : undefined}
+                aria-describedby={minAgeError ? 'backtest-min-age-error' : undefined}
+                className={`text-center tabular-nums ${minAgeError ? 'border-danger/40 focus:border-danger' : ''}`}
               />
             </Tooltip>
+            {minAgeError ? <span id="backtest-min-age-error" role="alert" className="sr-only">{minAgeError}</span> : null}
+            <Tooltip content={text.candidateLimitDescription}>
+              <Input
+                id="backtest-candidate-limit" label={text.candidateLimit} type="number" size="default" min={1} max={2000}
+                value={candidateLimit} onChange={(e) => { setCandidateLimit(e.target.value); setCandidateLimitError(''); }}
+                placeholder="200" disabled={isRunning} fieldClassName="w-24"
+                aria-invalid={candidateLimitError ? true : undefined}
+                aria-describedby={candidateLimitError ? 'backtest-candidate-limit-error' : undefined}
+                className={`text-center tabular-nums ${candidateLimitError ? 'border-danger/40 focus:border-danger' : ''}`}
+              />
+            </Tooltip>
+            {candidateLimitError ? <span id="backtest-candidate-limit-error" role="alert" className="sr-only">{candidateLimitError}</span> : null}
+            <div className="flex h-8 items-center gap-1.5">
+              <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
+              <Tooltip content={text.forceRerunDescription}>
+                <Switch checked={forceRerun} disabled={isRunning} onCheckedChange={setForceRerun} aria-label={text.forceRerun} />
+              </Tooltip>
+            </div>
           </div>
-          <Button
-            type="button"
-            onClick={handleRun}
-            variant="primary"
-            size="primary"
-            isLoading={isRunning}
-            loadingText={text.running}
-            className="whitespace-nowrap text-xs"
-          >
+          <Button type="button" onClick={handleRun} variant="primary" size="primary" isLoading={isRunning} loadingText={text.running} className="min-h-11 whitespace-nowrap text-xs">
             {text.runBacktest}
           </Button>
         </div>
