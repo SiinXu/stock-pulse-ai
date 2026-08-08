@@ -81,4 +81,10 @@ Notification content appends a public impact excerpt after the existing phase an
 - LLM-generated impact write-ups
 - New tables or migrations
 
+
+### Web follow-up (issue #241)
+
+- Dedicated `/event-alerts` view renders fired corporate-event triggers using backend-owned `why_it_matters` and impact context.
+- `GET /api/v1/alerts/triggers` exposes first-class `impact_context` / `event_context`.
+
 See the Chinese [alerts.md](alerts.md) for full P0–P8 contracts, storage, cooldown, and Market Light details.

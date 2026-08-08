@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Web event-driven corporate alert view with list/detail, major/routine grading, backend-owned why-it-matters/impact context, and first-class trigger API fields (`impact_context` / `event_context`) for issue #241.
+- [Added] Reusable Web financial chart components: KlineChart (volume + MA overlays + zoom, dirty OHLC guards) and RiskHeatmap (score + level labels; color not sole carrier), with playground previews and unit tests; no page wiring (#142).
 - [Fixed] Treat non-finite numbers (±Infinity) as missing values in marketFormat price and change-color guards so sentinel/overflow inputs never render as prices or paint as up/down moves.
 - [Added] Report templates pin a Decision Card (direction/score, conclusion, confidence, key risks, watch/invalidation conditions) at the top of each stock section using existing dashboard fields only; brief uses a 1+1 line push length budget so a typical 10-stock brief stays within Pushover max_length=1024 (#861 Phase 1).
 - [Fixed] Restore Simplified Chinese Settings help source for RSS news feeds and multi-strategy deliberation so UI i18n resource extraction no longer fails at import.

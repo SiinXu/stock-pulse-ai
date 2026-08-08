@@ -118,6 +118,8 @@ class AlertTriggerItem(BaseModel):
         ),
     )
     decision_signal_summary: Optional[Dict[str, Any]] = None
+    impact_context: Optional[Dict[str, Any]] = Field(None, description="Structured impact block (issue #241 Web)")
+    event_context: Optional[Dict[str, Any]] = Field(None, description="Structured event block (issue #241 Web)")
 
 
 class AlertTriggerListResponse(BaseModel):

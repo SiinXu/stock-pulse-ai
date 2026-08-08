@@ -10,6 +10,7 @@ export type AlertType =
   | 'macd_cross'
   | 'kdj_cross'
   | 'cci_threshold'
+  | 'corporate_event'
   | 'portfolio_stop_loss'
   | 'portfolio_concentration'
   | 'portfolio_drawdown'
@@ -44,6 +45,9 @@ export interface AlertRuleParameters {
   mode?: PortfolioStopLossMode;
   statuses?: MarketLightStatus[];
   minDrop?: number;
+  eventCategories?: string[];
+  lookbackHours?: number;
+  minItems?: number;
 }
 
 export interface AlertRuleItem {
@@ -132,6 +136,8 @@ export interface AlertTriggerItem {
   analysisContextPackOverview?: AnalysisContextPackOverview | null;
   analysisVisibilitySource?: string | null;
   decisionSignalSummary?: Partial<DecisionSignalItem> | null;
+  impactContext?: Record<string, unknown> | null;
+  eventContext?: Record<string, unknown> | null;
 }
 
 export interface AlertTriggerListResponse {

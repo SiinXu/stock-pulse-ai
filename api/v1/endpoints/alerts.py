@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -19,6 +19,7 @@ from api.v1.schemas.alerts import (
     AlertTriggerListResponse,
 )
 from api.v1.schemas.common import ErrorResponse
+from api.v1.services.alert_event_context import enrich_trigger_items_with_event_contexts
 from src.services.alert_service import (
     AlertNotFoundError,
     AlertService,
@@ -227,15 +228,17 @@ def list_triggers(
 ) -> AlertTriggerListResponse:
     service = AlertService()
     try:
-        return AlertTriggerListResponse(
-            **service.list_triggers(
-                rule_id=rule_id,
-                target=target,
-                status=status,
-                page=page,
-                page_size=page_size,
-            )
+        payload: Dict[str, Any] = service.list_triggers(
+            rule_id=rule_id, target=target, status=status, page=page, page_size=page_size,
         )
+        rows, _total = service.repo.list_triggers(
+            rule_id=rule_id, target=target, status=status, page=page, page_size=page_size,
+        )
+        raw_by_id = {int(row.id): row.diagnostics for row in rows if getattr(row, "id", None) is not None}
+        items = payload.get("items") or []
+        if isinstance(items, list):
+            payload["items"] = enrich_trigger_items_with_event_contexts(items, raw_diagnostics_by_id=raw_by_id)
+        return AlertTriggerListResponse(**payload)
     except Exception as exc:
         raise _internal_error("List alert triggers failed", exc)
 

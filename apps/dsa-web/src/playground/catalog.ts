@@ -132,6 +132,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alert-trigger-history', 'AlertTriggerHistory', 'components/alerts/AlertTriggerHistory.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alerts-workspace', 'AlertsWorkspace', 'components/alerts/AlertsWorkspace.tsx', ['default'], 'full'),
+  entry('alerts', 'event-alert-list', 'EventAlertList', 'components/event-alerts/EventAlertList.tsx', ['default', 'loading', 'empty']),
+  entry('alerts', 'event-alert-detail', 'EventAlertDetail', 'components/event-alerts/EventAlertDetail.tsx', ['default', 'empty']),
+  entry('alerts', 'event-alerts-panel', 'EventAlertsPanel', 'components/event-alerts/EventAlertsPanel.tsx', ['default', 'loading', 'empty'], 'full'),
 
   entry('history', 'history-list', 'HistoryList', 'components/history/HistoryList.tsx', ['default', 'loading', 'empty']),
   entry('history', 'history-list-item', 'HistoryListItem', 'components/history/HistoryListItem.tsx', ['default', 'states']),
@@ -221,6 +224,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-view-tabs', 'SettingsViewTabs', 'components/settings/SettingsNavigation.tsx', ['interactive']),
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
+
+  entry('stockSearch', 'kline-chart', 'KlineChart', 'components/charts/KlineChart.tsx', ['default', 'empty', 'states']),
+  entry('stockSearch', 'risk-heatmap', 'RiskHeatmap', 'components/charts/RiskHeatmap.tsx', ['default', 'empty']),
 
   entry('stockSearch', 'mini-sparkline', 'MiniSparkline', 'components/screening/MiniSparkline.tsx'),
   entry('stockSearch', 'screen-alert-message', 'ScreenAlertMessage', 'components/screening/ScreenAlertMessage.tsx'),
