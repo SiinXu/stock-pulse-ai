@@ -156,6 +156,7 @@ vi.mock('../../stores/agentChatStore', () => {
   };
 
   useAgentChatStore.getState = () => ({
+    ...mockStoreState,
     startNewChat: mockStartNewChat,
   });
 
@@ -241,6 +242,8 @@ beforeEach(() => {
   mockFormatSessionAsMarkdown.mockReturnValue('# exported session');
   mockStartNewChat.mockReturnValue('session-new');
   mockSwitchSession.mockResolvedValue(true);
+  mockStartStream.mockReset();
+  mockStartStream.mockResolvedValue(undefined);
 });
 
 describe('ChatPage', () => {
@@ -297,9 +300,10 @@ describe('ChatPage', () => {
     );
     expect(screen.getByTestId('chat-session-trigger')).toHaveClass('xl:hidden');
     expect(screen.getByTestId('chat-session-trigger')).not.toHaveClass('md:hidden');
+    // Session rail header is owned by ChatSessionSidebar (bordered history strip).
     const historyHeader = screen.getByRole('heading', { name: '历史对话' }).parentElement;
-    expect(historyHeader).toHaveClass('rounded-lg');
-    expect(historyHeader).not.toHaveClass('border-b', 'border-subtle');
+    expect(historyHeader).toHaveClass('border-b', 'border-subtle');
+    expect(historyHeader).not.toHaveClass('rounded-3xl', 'shadow-soft-card');
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
   });
@@ -371,11 +375,10 @@ describe('ChatPage', () => {
     );
 
     const retry = await screen.findByRole('button', { name: '重试' });
-    const alert = screen.getByText('历史记录加载失败').closest('[role="alert"]');
-
-    expect(retry).toHaveAttribute('data-control', 'button');
-    expect(retry).toHaveAttribute('data-variant', 'ghost');
-    expect(alert?.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    // ApiErrorAlert surfaces the failure in a toast; retry is a compact IconButton beside it.
+    expect(screen.getByText('历史记录加载失败').closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(retry).toHaveAttribute('data-control', 'icon-button');
+    expect(retry).toHaveAttribute('data-variant', 'danger');
   });
 
   it('uses the shared mobile history drawer and restores focus after Escape', async () => {
@@ -1205,11 +1208,10 @@ describe('ChatPage', () => {
     );
 
     const retry = await screen.findByRole('button', { name: '重试' });
-    const alert = screen.getByText('请求失败').closest('[role="alert"]');
-
-    expect(retry).toHaveAttribute('data-control', 'button');
-    expect(retry).toHaveAttribute('data-variant', 'ghost');
-    expect(alert?.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    // Stream failures toast via ApiErrorAlert; ChatComposer attaches a danger IconButton retry.
+    expect(screen.getByText('请求失败').closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(retry).toHaveAttribute('data-control', 'icon-button');
+    expect(retry).toHaveAttribute('data-variant', 'danger');
     fireEvent.click(retry);
 
     expect(mockRetryLastStream).toHaveBeenCalledTimes(1);
@@ -1339,6 +1341,7 @@ describe('ChatPage', () => {
     expect(persistedParams.get('stock')).toBe('AAPL');
     expect(persistedParams.get('name')).toBe('Apple');
     expect(persistedParams.get(REPORT_ROUTE_QUERY_KEYS.recordId)).toBe('2');
+    expect(persistedParams.get('context')).toBeNull();
     firstRender.unmount();
 
     const refreshedRouter = createMemoryRouter(
@@ -1382,6 +1385,65 @@ describe('ChatPage', () => {
     await screen.findByRole('heading', { name: '问股' });
     expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
     expect(historyApi.getDetail).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps unsent report query params and restores the draft when the stream fails', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 3,
+        queryId: 'q-3',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T10:00:00Z',
+        currentPrice: 210,
+        changePct: 1.1,
+      },
+      summary: {
+        analysisSummary: 'Stable',
+        operationAdvice: 'Hold',
+        trendPrediction: 'Range',
+        sentimentScore: 70,
+      },
+      strategy: {
+        stopLoss: '200',
+      },
+    });
+
+    mockStartStream.mockImplementationOnce(async () => {
+      mockStoreState.lastFailedRequest = {
+        payload: { message: '请深入分析 Apple(AAPL)', session_id: 'session-1' },
+      };
+      mockStoreState.chatError = createParsedApiError({
+        title: '请求失败',
+        message: '流式响应中断',
+        rawMessage: 'upstream disconnected',
+        category: 'upstream_network',
+      });
+    });
+
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toContain('session=session-1'));
+    fireEvent.click(await getReadySendButton());
+
+    await waitFor(() => {
+      expect(mockStartStream).toHaveBeenCalled();
+      expect(screen.getByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+      const params = Object.fromEntries(new URLSearchParams(router.state.location.search));
+      expect(params).toMatchObject({
+        stock: 'AAPL',
+        name: 'Apple',
+        recordId: '3',
+        session: 'session-1',
+      });
+      expect(params.context).toBeUndefined();
+    });
   });
 
   it('finishes report context hydration after StrictMode replays mount effects', async () => {
