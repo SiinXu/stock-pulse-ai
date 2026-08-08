@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { skillOutcomesApi } from '../../api/skillOutcomes';
@@ -26,15 +28,27 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   return () => {};
 });
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 function renderPage() {
   return render(
-    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-      <UiLanguageProvider initialLanguage="en">
-        <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchSkillOutcomes]}>
-          <SkillOutcomesPage />
-        </MemoryRouter>
-      </UiLanguageProvider>
-    </RouteFocusRegistrationContext.Provider>,
+    wrapWithQueryClient(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider initialLanguage="en">
+          <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchSkillOutcomes]}>
+            <SkillOutcomesPage />
+          </MemoryRouter>
+        </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>,
+    ),
   );
 }
 

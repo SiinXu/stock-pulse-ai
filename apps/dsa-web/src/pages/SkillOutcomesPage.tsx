@@ -30,6 +30,7 @@ import {
   SkillOutcomeRunPanel,
 } from '../components/skill-outcomes';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useSkillOutcomesQuery } from '../hooks';
 import { formatUiText } from '../i18n/uiText';
 import { SKILL_OUTCOMES_TEXT } from '../locales/skillOutcomes';
 import {
@@ -101,12 +102,17 @@ const SkillOutcomesPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    void load('initial');
-    return () => {
+  const loadInitial = useCallback(async () => {
+    await load('initial');
+  }, [load]);
+
+  useSkillOutcomesQuery({
+    reloadToken,
+    loadInitial,
+    onCancelInFlight: () => {
       requestIdRef.current += 1;
-    };
-  }, [load, reloadToken]);
+    },
+  });
 
   const buckets: SkillOutcomePerformanceBucket[] = useMemo(
     () => stats?.buckets ?? [],
