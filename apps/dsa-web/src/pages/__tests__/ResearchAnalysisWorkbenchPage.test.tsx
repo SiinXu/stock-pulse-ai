@@ -433,6 +433,43 @@ describe('ResearchAnalysisWorkbenchPage', () => {
         .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
     expect(await screen.findByText('AAPL 已有分析任务，请等待当前任务完成。')).toBeInTheDocument();
+    expect(screen.getByTestId('actionable-api-error-inline')).toHaveAttribute(
+      'data-error-class',
+      'busy',
+    );
+    expect(screen.getByRole('button', { name: '运行中任务' })).toBeInTheDocument();
+  });
+
+  it('renders llm_not_configured launch failures as actionable inline errors', async () => {
+    const { createApiError, createParsedApiError } = await import('../../api/error');
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
+      createApiError(createParsedApiError({
+        title: '尚未配置 LLM 模型',
+        message: '请在设置中配置主要模型、模型连接或 API Key。',
+        code: 'llm_not_configured',
+        category: 'llm_not_configured',
+        status: 422,
+      })),
+    );
+    useStockPoolStore.setState({ query: 'AAPL', selectionSource: 'manual' });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+    }));
+
+    const analyzeButton = (await screen.findAllByRole('button', { name: '分析' })).at(-1)!;
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+
+    expect(await screen.findByTestId('actionable-api-error-inline')).toHaveAttribute(
+      'data-error-class',
+      'llm_not_configured',
+    );
+    expect(screen.getByText('尚未配置 LLM 模型')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '去配置' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    expect(screen.getByTestId('actionable-error-technical')).toHaveTextContent(
+      'code: llm_not_configured',
+    );
   });
 
   it('does not navigate back to tasks when a reanalysis finishes after leaving the workbench', async () => {
@@ -798,8 +835,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     await waitFor(() => {
       expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBeNull();
     });
-    expect(screen.getByRole('alert').closest('[data-overlay-root="toast"]')).not.toBeNull();
-    expect(screen.getByRole('alert')).not.toHaveTextContent('The requested report is unavailable.');
+    // Form-primary error contract (#885): inline alert, not toast dual-feedback.
+    const errorAlert = await screen.findByTestId('actionable-api-error-inline');
+    expect(errorAlert.closest('[data-overlay-root="toast"]')).toBeNull();
+    expect(errorAlert).not.toHaveTextContent('The requested report is unavailable.');
     expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
     expect(useStockPoolStore.getState().selectedRecordId).toBeNull();
   });
