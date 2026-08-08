@@ -189,3 +189,17 @@
 - 未经负责人明确确认，不执行 `git commit` / `push` / `tag`。
 - commit message 用英文，不加 `Co-Authored-By`。
 - 截图只放 PR 描述/评论，不作为文件合入仓库。
+
+## 10. 交互与表面角色（跨文档）
+
+本文件只约束 **token / 视觉**（颜色、字体、圆角、禁 glow/glass、组件外观规格）。
+
+**Page / Drawer / Modal / Wizard / 页内 rail 的允许与禁止清单、密度规则、工作区断点、
+Loading/Empty/Error/Partial 结构与 CTA、以及文字按钮 vs IconButton 动作分类矩阵**
+的规范性契约写在：
+
+- [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md) → **Surface Roles And Density Contract**
+
+该章同时标注 **Immediate**（新代码即刻生效）与 **Progressive**（存量渐进迁移）符合度。
+结构性 UI PR（hubs、Settings 单区渲染、抽屉瘦身等）以 foundation 该章为验收判据；
+不得与本指南 §1 的禁 glow/glass 等视觉铁律冲突。
