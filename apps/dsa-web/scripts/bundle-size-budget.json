@@ -122,8 +122,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 56433,
-      "measuredGzipBytes": 51302
+      "maxGzipBytes": 67671,
+      "measuredGzipBytes": 61519,
+      "note": "Raised for T24 financial chart playground registration (KlineChart + RiskHeatmap pure-SVG components)."
     },
     {
       "id": "SettingsPage",
