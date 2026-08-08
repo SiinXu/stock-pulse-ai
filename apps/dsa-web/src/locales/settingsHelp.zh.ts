@@ -1524,6 +1524,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: [
       '关闭时工具不会注册到进程内工具表。',
       '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+      '第一阶段契约与回滚步骤见 docs/valuation-models.md。',
     ],
   },
 };

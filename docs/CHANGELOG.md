@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
 - [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
 - [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
+- [Fixed] Restored the Web UI i18n resource contract that a concurrent-merge race had broken: added the missing Simplified Chinese source note for `VALUATION_AGENT_TOOL_ENABLED`, regenerated the duplicated English key inventory, and backfilled 62 drifted proxy / observability / daily-brief / valuation keys across all eight locale bundles.
+- [Fixed] Corrected stale localized Settings copy that no longer matched its English source: `HTTP_PROXY` summary and usage, the restructured `VALUATION_AGENT_TOOL_ENABLED` notes, the zh-TW `LOCAL_ONLY_MODE` allowlist reference, and the untranslated investment-framework preview description.
 - [Fixed] Reduced the screening availability status surface to a compact size.
 - [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.
 - [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.
