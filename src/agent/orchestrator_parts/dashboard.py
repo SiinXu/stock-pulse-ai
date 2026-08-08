@@ -9,11 +9,20 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.protocols import AgentContext, normalize_decision_signal
+from src.agent.committee_mode import META_COMMITTEE_MODE as _META_COMMITTEE_MODE
 from src.agent.risk_override import (
+    EXIT_COMMITTEE_MODE as _EXIT_COMMITTEE_MODE,
+    EXIT_ORCHESTRATOR_MULTI_AGENT as _EXIT_ORCHESTRATOR_MULTI_AGENT,
+    META_RISK_GATE_RESULT as _META_RISK_GATE_RESULT,
+    RiskGateOutcome as _RiskGateOutcome,
+    RiskGateResult as _RiskGateResult,
     RiskOverrideApplication,
+    apply_risk_manager_gate as _apply_risk_manager_gate,
     build_approved_risk_bypass_application as _build_approved_risk_bypass_application,
     build_risk_override_application,
     build_risk_override_plan,
+    get_risk_gate_result as _get_risk_gate_result,
+    resolve_risk_gate_flags as _resolve_risk_gate_flags,
 )
 from src.schemas.approvals import (
     ApprovalContext as _ApprovalContext,
@@ -766,23 +775,63 @@ class _DashboardMethods:
         return tagged
 
     def _apply_risk_override(self, ctx: AgentContext) -> Optional[RiskOverrideApplication]:
-        """Apply risk rules and retain their validated actual outcome."""
+        """Apply risk rules and retain their validated actual outcome.
+
+        Always runs the mandatory Risk Manager gate (warn / downgrade / pass)
+        so this multi-agent decision exit cannot skip risk evaluation. Existing
+        ``AGENT_RISK_OVERRIDE`` force-downgrade and HITL bypass remain the
+        signal-mutation authority when the override plan ``will_apply``.
+        """
         dashboard = ctx.get_data("final_dashboard")
         if not isinstance(dashboard, dict):
             return None
 
         current_signal = normalize_decision_signal(dashboard.get("decision_type", "hold"))
+        gate_enabled, gate_strict, _ = _resolve_risk_gate_flags(self.config)
+        override_enabled = getattr(self.config, "agent_risk_override", True)
+        exit_id = (
+            _EXIT_COMMITTEE_MODE
+            if ctx.meta.get(_META_COMMITTEE_MODE) is True
+            else _EXIT_ORCHESTRATOR_MULTI_AGENT
+        )
+
         existing = ctx.meta.get("risk_override_application")
         if (
             isinstance(existing, RiskOverrideApplication)
             and existing.post_risk_signal.value == current_signal
         ):
+            # Already finalized for this signal — do not re-mutate the dashboard
+            # (keeps risk_warning / signal idempotent on re-entry).
+            if _get_risk_gate_result(ctx) is None:
+                _apply_risk_manager_gate(
+                    ctx,
+                    current_signal=current_signal,
+                    exit_id=exit_id,
+                    override_enabled=bool(override_enabled),
+                    gate_enabled=gate_enabled,
+                    gate_strict=gate_strict,
+                    dashboard=None,
+                )
             return existing
+
+        # Evaluate + record the mandatory gate against the pre-override signal.
+        # Do not let the gate mutate the signal yet when override will apply —
+        # HITL / application below owns that transition.
+        gate_result = _apply_risk_manager_gate(
+            ctx,
+            current_signal=current_signal,
+            exit_id=exit_id,
+            override_enabled=bool(override_enabled),
+            gate_enabled=gate_enabled,
+            gate_strict=gate_strict,
+            dashboard=None,
+        )
+        ctx.meta[_META_RISK_GATE_RESULT] = gate_result
 
         plan = build_risk_override_plan(
             ctx,
             current_signal=current_signal,
-            override_enabled=getattr(self.config, "agent_risk_override", True),
+            override_enabled=bool(override_enabled),
         )
         if plan.will_apply:
             import uuid
@@ -857,15 +906,46 @@ class _DashboardMethods:
                     trigger.value,
                     approved.id,
                 )
+                self._annotate_dashboard_with_risk_gate(dashboard, gate_result)
+                ctx.set_data("final_dashboard", dashboard)
                 return application
         application = build_risk_override_application(plan)
         ctx.meta["risk_override_application"] = application
         if not application.applied:
+            # Override did not change the signal — apply gate warn/strict downgrade.
+            if (
+                gate_result.outcome is _RiskGateOutcome.DOWNGRADE
+                and gate_result.final_signal != gate_result.original_signal
+            ):
+                dashboard["decision_type"] = gate_result.final_signal
+                # Record a synthetic applied application so downstream consumers
+                # see the post-gate signal consistently.
+                strict_plan = build_risk_override_plan(
+                    ctx,
+                    current_signal=gate_result.original_signal,
+                    override_enabled=True,
+                )
+                if strict_plan.will_apply:
+                    application = build_risk_override_application(strict_plan)
+                    ctx.meta["risk_override_application"] = application
+                    ctx.set_data(
+                        "risk_override_applied",
+                        {
+                            "from": gate_result.original_signal,
+                            "to": gate_result.final_signal,
+                            "adjustment": strict_plan.adjustment
+                            or ("veto" if strict_plan.veto_buy else "gate_strict"),
+                            "reason": "risk_gate_strict",
+                        },
+                    )
+            self._annotate_dashboard_with_risk_gate(dashboard, gate_result)
+            ctx.set_data("final_dashboard", dashboard)
             return application
 
         current_signal = application.from_signal.value
         new_signal = application.to_signal.value
         dashboard["decision_type"] = new_signal
+        self._annotate_dashboard_with_risk_gate(dashboard, gate_result)
 
         ctx.set_data("final_dashboard", dashboard)
         ctx.set_data("risk_override_applied", {
@@ -883,6 +963,25 @@ class _DashboardMethods:
             plan.has_high_flag,
         )
         return application
+
+    @staticmethod
+    def _annotate_dashboard_with_risk_gate(
+        dashboard: Dict[str, Any],
+        gate_result: _RiskGateResult,
+    ) -> None:
+        """Attach mandatory gate warnings onto existing risk_warning text only.
+
+        Gate machine facts stay in ctx.meta / runtime data — they must not alter
+        the final report JSON schema.
+        """
+        if not gate_result.warnings:
+            return
+        existing = str(dashboard.get("risk_warning") or "").strip()
+        for note in gate_result.warnings:
+            text = str(note or "").strip()
+            if text and text not in existing:
+                existing = f"{existing} {text}".strip() if existing else text
+        dashboard["risk_warning"] = existing
 
     @staticmethod
     def _merge_risk_warning(

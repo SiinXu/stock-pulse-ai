@@ -72,7 +72,7 @@ The page states default preconditions honestly instead of looking “broken”:
 
 ## Execution semantics
 
-The single gate is `AgentOrchestrator._apply_risk_override`. The rule is consulted only when the existing risk plan actually `will_apply`. An off rule or unselected risk category preserves historical behavior. When matched, the worker creates or reuses a proposal and polls while Web/API decisions complete asynchronously:
+The multi-agent decision exit still runs through `AgentOrchestrator._apply_risk_override`, which now always evaluates the mandatory Risk Manager gate first (see `docs/risk-manager-gate_EN.md`) and then applies the existing `AGENT_RISK_OVERRIDE` plan. The HITL approval rule is consulted only when the existing risk plan actually `will_apply`. An off rule or unselected risk category preserves historical behavior. When matched, the worker creates or reuses a proposal and polls while Web/API decisions complete asynchronously:
 
 1. `approved` plus successful CAS consumption preserves the original, more aggressive recommendation and records the consumed proposal id in internal runtime facts.
 2. `rejected`, `cancelled`, `expired`, missing, stale, foreign-owner, replayed consumption, audit failure, or concurrency failure applies the existing conservative recommendation.

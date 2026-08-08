@@ -72,7 +72,7 @@ Web 页面位于 `/approvals`，从 Home 的“待办”卡片进入，不新增
 
 ## 执行语义
 
-唯一门禁位于 `AgentOrchestrator._apply_risk_override`。只有既有风险计划确实 `will_apply` 时才查询规则。规则关闭或风险来源未选中时，行为与历史版本相同。规则命中时 worker 创建或复用提案并轮询；Web/API 可以异步决策：
+多 Agent 决策出口仍经过 `AgentOrchestrator._apply_risk_override`：该路径会先执行强制 Risk Manager 决策门（见 `docs/risk-manager-gate.md`），再应用既有 `AGENT_RISK_OVERRIDE` 计划。HITL 审批规则仅在既有风险计划确实 `will_apply` 时查询。规则关闭或风险来源未选中时，行为与历史版本相同。规则命中时 worker 创建或复用提案并轮询；Web/API 可以异步决策：
 
 1. `approved` 且 CAS 消费成功：保留原始、更激进的建议，并在内部 runtime facts 中记录已消费的 proposal id。
 2. `rejected`、`cancelled`、`expired`、缺失、失效、跨 owner、重复消费、审计失败或并发失败：应用原有保守建议。

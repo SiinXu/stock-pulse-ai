@@ -194,6 +194,48 @@ class _ChatMethods:
                 AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
             )
 
+        # Agent Chat decision exit: mandatory Risk Manager gate when a structured
+        # dashboard decision is present; unstructured replies still leave a gate
+        # trace so the exit is never skipped.
+        try:
+            from src.agent.protocols import AgentContext
+            from src.agent.risk_override import (
+                EXIT_AGENT_CHAT,
+                apply_risk_manager_gate_from_config,
+            )
+
+            chat_dashboard = (
+                orch_result.dashboard
+                if isinstance(orch_result.dashboard, dict)
+                else None
+            )
+            signal = "hold"
+            if chat_dashboard is not None:
+                signal = chat_dashboard.get("decision_type", "hold")
+            gate_ctx = AgentContext(
+                query=message,
+                stock_code=str(
+                    (scope_resolution.effective_context or {}).get("stock_code") or ""
+                ),
+            )
+            apply_risk_manager_gate_from_config(
+                gate_ctx,
+                current_signal=signal,
+                exit_id=EXIT_AGENT_CHAT,
+                config=config,
+                dashboard=chat_dashboard,
+            )
+            if chat_dashboard is not None:
+                orch_result.dashboard = chat_dashboard
+        except Exception as gate_exc:  # broad-exception: fallback_recorded - chat must not fail closed on gate errors
+            log_safe_exception(
+                logger,
+                "Agent chat risk gate failed safe",
+                gate_exc,
+                error_code="agent_chat_risk_gate_failed_safe",
+                context={"session_id": session_id},
+            )
+
         return AgentResult(
             success=orch_result.success,
             content=orch_result.content,

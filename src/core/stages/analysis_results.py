@@ -101,6 +101,27 @@ class _AnalysisResultStageMixin:
 
         if agent_result.success and agent_result.dashboard:
             dash = agent_result.dashboard
+            # Single-agent decision exit: mandatory Risk Manager gate when the
+            # multi-agent path has not already evaluated risk override.
+            runtime_facts = getattr(agent_result, "runtime_facts", None)
+            if (
+                isinstance(dash, dict)
+                and getattr(runtime_facts, "risk_override_application", None) is None
+            ):
+                from src.agent.protocols import AgentContext
+                from src.agent.risk_override import (
+                    EXIT_SINGLE_AGENT,
+                    apply_risk_manager_gate_from_config,
+                )
+
+                gate_ctx = AgentContext(query="", stock_code=code)
+                apply_risk_manager_gate_from_config(
+                    gate_ctx,
+                    current_signal=dash.get("decision_type", "hold"),
+                    exit_id=EXIT_SINGLE_AGENT,
+                    config=getattr(self, "config", None),
+                    dashboard=dash,
+                )
             ai_stock_name = str(dash.get("stock_name", "")).strip()
             if ai_stock_name and self._is_placeholder_stock_name(stock_name, code):
                 result.name = ai_stock_name

@@ -497,6 +497,30 @@ class _AgentAnalysisStageMixin:
                             risk_application = getattr(runtime_facts, "risk_override_application", None)
                             if risk_application is not None:
                                 pipeline_start_signal = risk_application.post_risk_signal.value
+                            # Deliberation projection exit: re-run mandatory Risk Manager gate
+                            # on the published final signal using projected base opinions.
+                            from src.agent.protocols import AgentContext, AgentOpinion
+                            from src.agent.risk_override import (
+                                EXIT_DELIBERATION_PROJECTION,
+                                apply_risk_manager_gate_from_config,
+                            )
+
+                            deliberation_ctx = AgentContext(query="", stock_code=code)
+                            for fact in getattr(runtime_facts, "base_agent_opinions", ()) or ():
+                                deliberation_ctx.add_opinion(
+                                    AgentOpinion(
+                                        agent_name=str(getattr(fact, "agent", "") or "unknown"),
+                                        signal=str(getattr(fact, "signal", "") or "hold"),
+                                        confidence=float(getattr(fact, "confidence", 0.0) or 0.0),
+                                    )
+                                )
+                            apply_risk_manager_gate_from_config(
+                                deliberation_ctx,
+                                current_signal=pipeline_start_signal,
+                                exit_id=EXIT_DELIBERATION_PROJECTION,
+                                config=self.config,
+                                dashboard=None,
+                            )
                             result.dashboard["agent_disagreement_explanation"] = (
                                 build_pipeline_final_explanation(
                                     runtime_facts=runtime_facts,
