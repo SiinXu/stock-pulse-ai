@@ -114,8 +114,73 @@ export const TRADING_CALENDAR_DEPENDENCY = {
 
 const EMPTY_PRICE = '—';
 
+/** CSS design tokens for red/green paint (names follow CN convention; map by color token, not direction). */
+export const CHANGE_COLOR_CSS_VAR: Readonly<Record<Exclude<ChangeColor, 'neutral'>, string>> = {
+  // --home-price-up is the red hue; --home-price-down is the green hue (DESIGN_GUIDE §2.4).
+  red: 'var(--home-price-up)',
+  green: 'var(--home-price-down)',
+};
+
 function isMarketId(value: string): value is MarketId {
   return value === 'cn' || value === 'hk' || value === 'us';
+}
+
+/**
+ * Infer cn/hk/us from a stock code for formatting adoption.
+ *
+ * Mirrors `src/market/context.py` `detect_market` for the three markets this
+ * module supports. Returns `null` for empty input, JP/KR/TW suffix symbols, and
+ * unrecognized forms — callers must not guess a MarketId.
+ */
+export function resolveMarketIdFromStockCode(code: string | null | undefined): MarketId | null {
+  if (!code || !code.trim()) return null;
+  const normalized = code.trim().toUpperCase();
+
+  // HK: HK00700, HK.00700, 00700.HK, or pure 5-digit
+  if (/^HK\.?\d{1,5}$/.test(normalized) || normalized.endsWith('.HK')) {
+    return 'hk';
+  }
+  if (/^\d{5}$/.test(normalized)) {
+    return 'hk';
+  }
+
+  // JP / KR / TW Yahoo suffixes — supported by backend detect_market but not by MarketId.
+  if (/\.(?:T|KS|KQ|TW|TWO)$/.test(normalized)) {
+    return null;
+  }
+
+  // US: 1–5 letters, optional class suffix (AAPL, BRK.B)
+  if (/^[A-Z]{1,5}(?:\.[A-Z]{1,2})?$/.test(normalized)) {
+    return 'us';
+  }
+
+  // A-share 6-digit (with optional SH/SZ/BJ prefix/suffix)
+  if (/^\d{6}$/.test(normalized)) {
+    return 'cn';
+  }
+  if (/^(?:SH|SZ|BJ)\d{6}$/.test(normalized)) {
+    return 'cn';
+  }
+  if (/^\d{6}\.(?:SH|SS|SZ|BJ)$/.test(normalized)) {
+    return 'cn';
+  }
+
+  return null;
+}
+
+/**
+ * Coerce a raw config/settings string into a known ChangeColorPreference.
+ * Unknown or empty values → null (caller uses market convention).
+ */
+export function parseChangeColorPreference(
+  value: string | null | undefined,
+): ChangeColorPreference | null {
+  if (value === null || value === undefined) return null;
+  const normalized = value.trim().toLowerCase().replace(/-/g, '_');
+  if (normalized === 'red_up' || normalized === 'green_up') {
+    return normalized;
+  }
+  return null;
 }
 
 /**
@@ -138,6 +203,58 @@ export function resolveChangeColorPreference(
     return userPref;
   }
   return defaultChangeColorPreference(market);
+}
+
+/**
+ * Map `changeSemantics(...).color` paint token to a CSS color value.
+ * Uses design tokens (red/green hues). Never encode direction by color alone.
+ */
+export function changeColorCssVar(color: ChangeColor): string | undefined {
+  if (color === 'red' || color === 'green') {
+    return CHANGE_COLOR_CSS_VAR[color];
+  }
+  return undefined;
+}
+
+/**
+ * Signed change percent for display (e.g. `+1.25%`, `-0.50%`). Missing → em dash.
+ */
+export function formatSignedChangePercent(
+  value: number | null | undefined,
+  fractionDigits = 2,
+): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return EMPTY_PRICE;
+  }
+  const numeric = Number(value);
+  const sign = numeric > 0 ? '+' : '';
+  return `${sign}${numeric.toFixed(fractionDigits)}%`;
+}
+
+/**
+ * Signed absolute change amount using market price precision (no currency code).
+ * Prefer pairing with `formatPrice` for the absolute level and this for the delta.
+ */
+export function formatSignedChangeAmount(
+  value: number | null | undefined,
+  market: MarketId,
+  language: UiLanguage = 'en',
+): string {
+  if (!isMarketId(market)) {
+    throw new Error(`Unsupported market for formatSignedChangeAmount: ${String(market)}`);
+  }
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return EMPTY_PRICE;
+  }
+  const numeric = Number(value);
+  const digits = MARKET_PRICE_FRACTION_DIGITS[market];
+  const amount = formatUiNumber(Math.abs(numeric), language, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  if (numeric > 0) return `+${amount}`;
+  if (numeric < 0) return `-${amount}`;
+  return amount;
 }
 
 /**

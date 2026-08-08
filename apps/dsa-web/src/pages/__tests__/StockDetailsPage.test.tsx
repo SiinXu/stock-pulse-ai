@@ -20,7 +20,10 @@ vi.mock('../../api/stocks', () => ({
 }));
 
 vi.mock('../../api/systemConfig', () => ({
-  systemConfigApi: { addToWatchlist: vi.fn() },
+  systemConfigApi: {
+    addToWatchlist: vi.fn(),
+    getConfig: vi.fn().mockResolvedValue({ configVersion: 'test', maskToken: '******', items: [] }),
+  },
 }));
 
 vi.mock('recharts', () => ({
@@ -113,10 +116,68 @@ describe('StockDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
     expect(screen.getByText(/Latest available quote/)).toBeTruthy();
+    // CN market: currency code + 2dp from marketFormat
+    expect(screen.getByText('CNY 1,700.00')).toBeTruthy();
+    // CN convention red_up: positive change uses red paint token
+    const changeNode = screen.getByText(/\+20\.00/);
+    expect(changeNode.getAttribute('data-change-color')).toBe('red');
+    expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
     // history table rows
     expect(screen.getByText('2026-01-05')).toBeTruthy();
     expect(screen.getByText('2026-01-06')).toBeTruthy();
     expect(getHistoryMock).toHaveBeenCalledWith('600519', 90);
+  });
+
+  it('formats US quotes with green_up convention and USD currency', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote({
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      currentPrice: 189.1,
+      change: 1.25,
+      changePercent: 0.66,
+    }));
+    getHistoryMock.mockResolvedValue({
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      period: 'daily',
+      data: [
+        { date: '2026-01-05', open: 180, high: 190, low: 179, close: 189.1, volume: 100, changePercent: 0.66 },
+      ],
+    });
+
+    renderPage('AAPL');
+
+    await waitFor(() => expect(screen.getByText('Apple')).toBeTruthy());
+    expect(screen.getAllByText('USD 189.10').length).toBeGreaterThanOrEqual(1);
+    const changeNode = screen.getByText(/\+1\.25/);
+    expect(changeNode.getAttribute('data-change-color')).toBe('green');
+    expect(changeNode.getAttribute('data-change-pref')).toBe('green_up');
+  });
+
+  it('formats HK quotes with HKD 3dp and red_up convention', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote({
+      stockCode: 'HK00700',
+      stockName: 'Tencent',
+      currentPrice: 321.12345,
+      change: -1.5,
+      changePercent: -0.46,
+    }));
+    getHistoryMock.mockResolvedValue({
+      stockCode: 'HK00700',
+      stockName: 'Tencent',
+      period: 'daily',
+      data: [
+        { date: '2026-01-05', open: 320, high: 322, low: 319, close: 321.123, volume: 100, changePercent: -0.46 },
+      ],
+    });
+
+    renderPage('HK00700');
+
+    await waitFor(() => expect(screen.getByText('Tencent')).toBeTruthy());
+    expect(screen.getAllByText('HKD 321.123').length).toBeGreaterThanOrEqual(1);
+    const changeNode = screen.getByText(/-1\.500/);
+    expect(changeNode.getAttribute('data-change-color')).toBe('green');
+    expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
   });
 
   it('fails quote and history independently', async () => {
@@ -127,8 +188,9 @@ describe('StockDetailsPage', () => {
 
     // history still renders despite quote failure
     await waitFor(() => expect(screen.getByText('2026-01-05')).toBeTruthy());
-    // quote price not shown
-    expect(screen.queryByText('1,700')).toBeNull();
+    // quote price not shown (currency-formatted form either)
+    expect(screen.queryByText('CNY 1,700.00')).toBeNull();
+    expect(screen.queryByText(/1,700/)).toBeNull();
   });
 
   it('adds the canonical code to the watchlist', async () => {

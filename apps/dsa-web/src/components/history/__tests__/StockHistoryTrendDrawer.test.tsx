@@ -74,6 +74,44 @@ describe('StockHistoryTrendDrawer', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('openai/gpt-test');
   });
 
+  it('adopts marketFormat price currency and change-color semantics by stock market', () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <StockHistoryTrendDrawer
+          report={{
+            ...report,
+            meta: { ...report.meta, stockCode: 'AAPL', stockName: 'Apple' },
+          }}
+          items={[
+            {
+              ...items[0],
+              stockCode: 'AAPL',
+              stockName: 'Apple',
+              currentPrice: 189.1,
+              changePct: 1.25,
+            },
+          ]}
+          total={1}
+          hasMore={false}
+          isLoading={false}
+          isLoadingMore={false}
+          filters={{ range: 'all', model: 'all', sort: 'desc' }}
+          onClose={vi.fn()}
+          onRangeChange={vi.fn()}
+          onLoadMore={vi.fn()}
+          onSelectRecord={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByText('USD 189.10')).toBeTruthy();
+    const changeNode = screen.getByText('+1.25%');
+    expect(changeNode.getAttribute('data-change-color')).toBe('green');
+    expect(changeNode).toHaveStyle({ color: 'var(--home-price-down)' });
+  });
+
   it('keeps fixed proportional columns, keyboard row selection, and nested report actions isolated', () => {
     const onClose = vi.fn();
     const onSelectRecord = vi.fn();

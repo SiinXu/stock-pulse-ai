@@ -2,16 +2,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  CHANGE_COLOR_CSS_VAR,
   MARKET_CURRENCY,
   MARKET_IANA_TIMEZONE,
   MARKET_PRICE_FRACTION_DIGITS,
   TRADING_CALENDAR_DEPENDENCY,
+  changeColorCssVar,
   changeSemantics,
   defaultChangeColorPreference,
   formatMarketTime,
   formatPrice,
+  formatSignedChangeAmount,
+  formatSignedChangePercent,
   isTradingDay,
+  parseChangeColorPreference,
   resolveChangeColorPreference,
+  resolveMarketIdFromStockCode,
   type ChangeColorPreference,
   type MarketId,
 } from '../marketFormat';
@@ -166,6 +172,84 @@ describe('marketFormat contract', () => {
       });
       expect(isTradingDay('cn', '2026-03-19')).toBeNull();
       expect(isTradingDay('us', '2026-07-04')).toBeNull();
+    });
+  });
+
+  describe('resolveMarketIdFromStockCode', () => {
+    it('resolves cn / hk / us codes used by quote surfaces', () => {
+      expect(resolveMarketIdFromStockCode('600519')).toBe('cn');
+      expect(resolveMarketIdFromStockCode('SH600519')).toBe('cn');
+      expect(resolveMarketIdFromStockCode('000001.SZ')).toBe('cn');
+      expect(resolveMarketIdFromStockCode('HK00700')).toBe('hk');
+      expect(resolveMarketIdFromStockCode('00700.HK')).toBe('hk');
+      expect(resolveMarketIdFromStockCode('00700')).toBe('hk');
+      expect(resolveMarketIdFromStockCode('AAPL')).toBe('us');
+      expect(resolveMarketIdFromStockCode('BRK.B')).toBe('us');
+    });
+
+    it('returns null when market is outside the cn/hk/us contract or unknown', () => {
+      expect(resolveMarketIdFromStockCode(null)).toBeNull();
+      expect(resolveMarketIdFromStockCode('')).toBeNull();
+      expect(resolveMarketIdFromStockCode('7203.T')).toBeNull();
+      expect(resolveMarketIdFromStockCode('005930.KS')).toBeNull();
+      expect(resolveMarketIdFromStockCode('2330.TW')).toBeNull();
+      expect(resolveMarketIdFromStockCode('???')).toBeNull();
+    });
+  });
+
+  describe('parseChangeColorPreference + paint tokens', () => {
+    it('parses Settings MARKET_REVIEW_COLOR_SCHEME values only', () => {
+      expect(parseChangeColorPreference('red_up')).toBe('red_up');
+      expect(parseChangeColorPreference('green_up')).toBe('green_up');
+      expect(parseChangeColorPreference('RED-UP')).toBe('red_up');
+      expect(parseChangeColorPreference('')).toBeNull();
+      expect(parseChangeColorPreference('rainbow')).toBeNull();
+    });
+
+    it('maps paint tokens to design-token CSS vars (hue, not direction name)', () => {
+      expect(CHANGE_COLOR_CSS_VAR.red).toBe('var(--home-price-up)');
+      expect(CHANGE_COLOR_CSS_VAR.green).toBe('var(--home-price-down)');
+      expect(changeColorCssVar('red')).toBe('var(--home-price-up)');
+      expect(changeColorCssVar('green')).toBe('var(--home-price-down)');
+      expect(changeColorCssVar('neutral')).toBeUndefined();
+    });
+
+    it.each(
+      MARKETS.flatMap((market) =>
+        PREFS.flatMap((pref) =>
+          DIRECTION_CASES.filter((c) => c.direction !== 'flat').map(({ value, direction }) => ({
+            market,
+            pref,
+            value,
+            direction,
+          })),
+        ),
+      ),
+    )(
+      'adoption matrix $market / $direction / $pref → paint CSS var',
+      ({ market, pref, value }) => {
+        const { color } = changeSemantics(value, market, pref);
+        const css = changeColorCssVar(color);
+        expect(css).toBe(
+          color === 'red' ? 'var(--home-price-up)' : 'var(--home-price-down)',
+        );
+      },
+    );
+  });
+
+  describe('signed change formatters', () => {
+    it('formats percent with explicit sign', () => {
+      expect(formatSignedChangePercent(1.25)).toBe('+1.25%');
+      expect(formatSignedChangePercent(-0.5)).toBe('-0.50%');
+      expect(formatSignedChangePercent(0)).toBe('0.00%');
+      expect(formatSignedChangePercent(null)).toBe('—');
+    });
+
+    it('formats signed amount with market precision', () => {
+      expect(formatSignedChangeAmount(20, 'cn', 'en')).toBe('+20.00');
+      expect(formatSignedChangeAmount(-1.2345, 'hk', 'en')).toBe('-1.235');
+      expect(formatSignedChangeAmount(0.1, 'us', 'en')).toBe('+0.10');
+      expect(formatSignedChangeAmount(undefined, 'cn')).toBe('—');
     });
   });
 });

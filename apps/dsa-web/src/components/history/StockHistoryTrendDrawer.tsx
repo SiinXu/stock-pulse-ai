@@ -9,6 +9,16 @@ import {
   type DecisionActionLabelMap,
 } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
+import {
+  changeColorCssVar,
+  changeSemantics,
+  formatPrice,
+  formatSignedChangePercent,
+  resolveMarketIdFromStockCode,
+  type ChangeColorPreference,
+  type MarketId,
+} from '../../utils/marketFormat';
+import { formatUiNumber } from '../../utils/uiLocale';
 import { Badge, Button, Card, DataTable, type DataTableColumn, Surface, Tooltip } from '../common';
 import { DashboardStateBlock } from '../dashboard';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -23,6 +33,11 @@ interface StockHistoryTrendDrawerProps {
   isLoadingMore: boolean;
   error?: unknown;
   filters: StockHistoryFilters;
+  /**
+   * Optional Settings MARKET_REVIEW_COLOR_SCHEME override.
+   * When omitted, market convention defaults apply (cn/hk red_up, us green_up).
+   */
+  changeColorPref?: ChangeColorPreference | null;
   onClose: () => void;
   onRangeChange: (range: StockHistoryRange) => void;
   onLoadMore: () => void;
@@ -39,15 +54,23 @@ const RANGE_OPTIONS: Array<{ value: StockHistoryRange; labelKey: UiTextKey }> = 
 const isPresent = <T,>(value: T | null | undefined): value is T =>
   value !== undefined && value !== null && value !== '';
 
-const formatNumber = (value?: number, digits = 2): string =>
-  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '--';
+const formatNumber = (value?: number, digits = 2, language: UiLanguage = 'en'): string => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return formatUiNumber(value, language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+};
 
-const formatChangePct = (value?: number): string => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return '--';
+const formatHistoryPrice = (
+  value: number | undefined,
+  market: MarketId | null,
+  language: UiLanguage,
+): string => {
+  if (market && typeof value === 'number' && Number.isFinite(value)) {
+    return formatPrice(value, market, language);
   }
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)}%`;
+  return formatNumber(value, 2, language);
 };
 
 const formatHistoryTime = (value: string | null | undefined, language: UiLanguage): string => {
@@ -55,11 +78,21 @@ const formatHistoryTime = (value: string | null | undefined, language: UiLanguag
   return formatted.length > 11 ? formatted.slice(5) : formatted;
 };
 
-const getPriceChangeStyle = (value?: number): React.CSSProperties | undefined => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
+const getPriceChangeStyle = (
+  value: number | undefined,
+  market: MarketId | null,
+  userPref?: ChangeColorPreference | null,
+): React.CSSProperties | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     return undefined;
   }
-  return { color: value > 0 ? 'var(--home-price-up)' : 'var(--home-price-down)' };
+  if (!market) {
+    // Unknown market: keep prior CN-convention CSS vars (do not invent a MarketId).
+    if (value === 0) return undefined;
+    return { color: value > 0 ? 'var(--home-price-up)' : 'var(--home-price-down)' };
+  }
+  const color = changeColorCssVar(changeSemantics(value, market, userPref).color);
+  return color ? { color } : undefined;
 };
 
 const formatModelName = (value: string | undefined, t: (key: UiTextKey, params?: Record<string, string | number>) => string): string => {
@@ -181,6 +214,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
   isLoadingMore,
   error,
   filters,
+  changeColorPref = null,
   onClose,
   onRangeChange,
   onLoadMore,
@@ -191,6 +225,10 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
   const currentRecordId = report.meta.id;
   const [selectedRecordId, setSelectedRecordId] = useState(currentRecordId);
   const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
+  const marketId = useMemo(
+    () => resolveMarketIdFromStockCode(report.meta.stockCode),
+    [report.meta.stockCode],
+  );
   const summary = useMemo(
     () => summarizeView(items, report, t, actionLabels, language, currentRecordId),
     [actionLabels, currentRecordId, items, language, report, t],
@@ -241,7 +279,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
             className="font-mono text-lg font-semibold"
             style={sentimentColor ? { color: sentimentColor } : undefined}
           >
-            {formatNumber(item.sentimentScore, 0)}
+            {formatNumber(item.sentimentScore, 0, language)}
           </span>
         );
       },
@@ -250,15 +288,27 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
       id: 'price',
       header: t('stockTrend.stockPrice'),
       widthPercent: 9,
-      cell: (item) => <span className="font-mono">{formatNumber(item.currentPrice, 2)}</span>,
+      cell: (item) => (
+        <span className="font-mono">{formatHistoryPrice(item.currentPrice, marketId, language)}</span>
+      ),
     },
     {
       id: 'change',
       header: t('stockTrend.changePct'),
       widthPercent: 9,
       cell: (item) => (
-        <span className="font-mono font-semibold" style={getPriceChangeStyle(item.changePct)}>
-          {formatChangePct(item.changePct)}
+        <span
+          className="font-mono font-semibold"
+          style={getPriceChangeStyle(item.changePct, marketId, changeColorPref)}
+          data-change-color={
+            marketId && typeof item.changePct === 'number'
+              ? changeSemantics(item.changePct, marketId, changeColorPref).color
+              : undefined
+          }
+        >
+          {typeof item.changePct === 'number' && Number.isFinite(item.changePct)
+            ? formatSignedChangePercent(item.changePct)
+            : '—'}
         </span>
       ),
     },
@@ -266,7 +316,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
       id: 'volume-ratio',
       header: t('stockTrend.volumeRatio'),
       widthPercent: 7,
-      cell: (item) => <span className="font-mono">{formatNumber(item.volumeRatio, 2)}</span>,
+      cell: (item) => <span className="font-mono">{formatNumber(item.volumeRatio, 2, language)}</span>,
     },
     {
       id: 'turnover-rate',
@@ -274,7 +324,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
       widthPercent: 9,
       cell: (item) => (
         <span className="font-mono">
-          {formatNumber(item.turnoverRate, 2)}{isPresent(item.turnoverRate) ? '%' : ''}
+          {formatNumber(item.turnoverRate, 2, language)}{isPresent(item.turnoverRate) ? '%' : ''}
         </span>
       ),
     },
