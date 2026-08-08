@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Raise backend-gate job timeout to 45 minutes so broad PR selective offline suites are not cancelled at the 30-minute job ceiling.
 - [Changed] ApplicationServices composition root calls data-provider auto-bind when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled so provider plugins route through the process PluginManager.
 
 - [Added] Plugin lifecycle security-audit trail (load/enable/disable/reload), opt-in Data Provider auto-bind helper (`PLUGIN_DATA_PROVIDER_AUTO_BIND`), plugin health_check snapshots with last error codes, and GET `/api/v1/plugins/health` plus list `last_error_code` for diagnostics consumers.
