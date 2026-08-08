@@ -47,8 +47,13 @@ export function useChatWhatIf(messages: Array<{ role: string; content: string }>
     setDraftBase((prevBase) => {
       const prev: WhatIfDraftState = { ...prevBase, turnCount };
       const resolved = typeof next === 'function' ? next(prev) : next;
-      const { turnCount: _ignored, ...rest } = resolved;
-      return rest;
+      return {
+        enabled: resolved.enabled,
+        dimension: resolved.dimension,
+        direction: resolved.direction,
+        magnitude: resolved.magnitude,
+        currencyPair: resolved.currencyPair,
+      };
     });
   };
 
