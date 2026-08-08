@@ -1093,6 +1093,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 流水线专家调度和分歧说明字段。'],
     notes: ['多策略约定见 docs/multi-strategy-contract.md。'],
   },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: '投委会模式',
+    summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
+    usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
+    valueNotes: ['关闭时保持既有单路径分析行为。'],
+    impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
+    notes: ['需要 Agent multi 能力。'],
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: '决策风格后验校准',
     summary: '在决策信号后验统计中追加决策风格校准分组。',
