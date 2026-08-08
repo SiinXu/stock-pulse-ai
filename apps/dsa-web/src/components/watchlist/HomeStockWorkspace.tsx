@@ -328,7 +328,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         onItemClick={onHistoryItemClick}
         onDeleteStock={onDeleteStock}
         isDeleting={isDeleting}
-        className="flex-1 overflow-hidden"
+        className="min-h-0 flex-1 overflow-hidden"
       />,
     );
   }
