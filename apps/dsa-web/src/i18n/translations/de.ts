@@ -4861,7 +4861,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "Nur kollaborative Szenario-Vorschau; andert nicht die endgultige Systemempfehlung. Schreibt nie Analysehistorie, DecisionSignal oder Agent-Speicher.",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "Hypothetisches Szenario (zusatzliche Runde)",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.earnings": "Ergebnisausblick",
-  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "Wechselkurs",
+  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "FX-Wechselkurs",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.index": "Indexbewegung",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.rate": "Zinssatz",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimensionLabel": "Annahmedimension",

@@ -4861,7 +4861,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "結論は協調推演プレビューのみで、システムの最終推奨を変更しません。分析履歴・DecisionSignal・Agent メモリには書き込まれません。",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "仮定推演（追加ターン）",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.earnings": "決算見通し",
-  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "為替の変動",
+  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "FX 為替の変動",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.index": "指数の変動",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.rate": "金利の変動",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimensionLabel": "仮定の次元",

@@ -4861,7 +4861,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "結論僅為協同推演預覽，不改變系統最終建議；不會寫入分析歷史、DecisionSignal 或 Agent 記憶。",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "假設推演（額外一輪）",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.earnings": "財報預期",
-  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "匯率變動",
+  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "FX 匯率變動",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.index": "指數漲跌",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.rate": "利率變動",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimensionLabel": "假設維度",

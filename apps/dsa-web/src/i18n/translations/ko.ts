@@ -4861,7 +4861,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "결론은 협업 시나리오 미리보기일 뿐이며 시스템의 최종 권고를 바꾸지 않습니다. 분석 이력·DecisionSignal·Agent 메모리에 기록되지 않습니다.",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "가정 추론(추가 턴)",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.earnings": "실적 전망",
-  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "환율 변동",
+  "i18n.uiText.UI_TEXT.chat.whatIf.dimension.fx": "FX 환율 변동",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.index": "지수 변동",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimension.rate": "금리 변동",
   "i18n.uiText.UI_TEXT.chat.whatIf.dimensionLabel": "가정 차원",
