@@ -511,6 +511,31 @@ class _ConfigLoadingMethods:
             default=True,
         )
 
+        # Optional RSS/Atom feeds for on-demand news search (supplement; empty = inert)
+        _raw_rss_urls = [
+            u.strip() for u in os.getenv('RSS_NEWS_FEED_URLS', '').split(',') if u.strip()
+        ]
+        rss_news_feed_urls = []
+        invalid_rss_urls = []
+        for u in _raw_rss_urls:
+            p = urlparse(u)
+            if p.scheme in ('http', 'https') and p.netloc:
+                rss_news_feed_urls.append(u)
+            else:
+                invalid_rss_urls.append(u)
+        if invalid_rss_urls:
+            logger.warning(
+                "RSS_NEWS_FEED_URLS 中存在无效 URL，已忽略: %s",
+                ", ".join(invalid_rss_urls[:3]),
+            )
+        rss_news_fetch_timeout_sec = parse_env_float(
+            os.getenv('RSS_NEWS_FETCH_TIMEOUT_SEC'),
+            8.0,
+            field_name='RSS_NEWS_FETCH_TIMEOUT_SEC',
+            minimum=1.0,
+            maximum=30.0,
+        )
+
         # WeCom Message Type and Maximum Byte Count Logic
         wechat_msg_type = os.getenv('WECHAT_MSG_TYPE', 'markdown')
         wechat_msg_type_lower = wechat_msg_type.lower()
@@ -674,6 +699,8 @@ class _ConfigLoadingMethods:
             serpapi_keys=serpapi_keys,
             searxng_base_urls=searxng_base_urls,
             searxng_public_instances_enabled=searxng_public_instances_enabled,
+            rss_news_feed_urls=rss_news_feed_urls,
+            rss_news_fetch_timeout_sec=rss_news_fetch_timeout_sec,
             social_sentiment_api_key=os.getenv('SOCIAL_SENTIMENT_API_KEY') or None,
             social_sentiment_api_url=os.getenv('SOCIAL_SENTIMENT_API_URL', 'https://api.adanos.org').rstrip('/'),
             news_max_age_days=parse_env_int(os.getenv('NEWS_MAX_AGE_DAYS'), 3, field_name='NEWS_MAX_AGE_DAYS', minimum=1),

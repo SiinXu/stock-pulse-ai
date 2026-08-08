@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Market Wire RSS</title>
+    <link>https://feeds.example.com/market</link>
+    <description>Market news</description>
+    <item>
+      <title>AAPL reports quarterly earnings beat</title>
+      <link>https://news.example.com/aapl-earnings</link>
+      <description>Apple Inc stock rose after stronger iPhone revenue guidance.</description>
+      <pubDate>Wed, 05 Aug 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Oil futures climb on supply risk</title>
+      <link>https://news.example.com/oil</link>
+      <description>Commodity markets react to inventory draws.</description>
+      <pubDate>Tue, 04 Aug 2026 09:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>AAPL supplier capacity expansion</title>
+      <link>https://news.example.com/aapl-supply</link>
+      <description>Apple supply chain partners add capacity in Asia.</description>
+      <pubDate>Mon, 03 Aug 2026 08:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

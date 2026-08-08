@@ -202,6 +202,9 @@ class Config:
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
     searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
+    # Optional RSS/Atom feeds for on-demand news search (supplement to SearXNG; empty = inert)
+    rss_news_feed_urls: List[str] = field(default_factory=list)
+    rss_news_fetch_timeout_sec: float = 8.0  # Per-feed pull timeout for search-pipeline RSS/Atom
 
     # === Social Sentiment (US stocks only, api.adanos.org) ===
     social_sentiment_api_key: Optional[str] = None
@@ -548,6 +551,7 @@ _CONFIG_METHOD_GROUPS = (
         (
             "reset_instance",
             "has_searxng_enabled",
+            "has_rss_news_feeds_enabled",
             "has_search_capability_enabled",
             "is_agent_available",
             "refresh_stock_list",
