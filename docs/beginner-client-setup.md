@@ -9,13 +9,14 @@ English: [beginner-client-setup_EN.md](beginner-client-setup_EN.md). 装好后�
 
 ## 零配置首次成功（无 API Key）
 
-不必先准备云端 Key 也能完成第一次有用的运行：
+不必先准备云端 Key 也能完成第一次有用的运行。**本地 / 零成本路径是主路径**，云端 Key 是可选升级。
 
-1. **data-only（与 `--dry-run` 产物一致）**：配置好自选股后执行 `python main.py --dry-run`，只拉行情数据、不调用 LLM。
-2. **本机 Ollama 自动探测**：就绪检查默认对回环地址（`127.0.0.1` / `localhost` / `::1`）做快速探测；失败只写日志，**不阻塞启动**。探测成功时会提示本地零成本路径的非密钥字段（如 `LLM_CHANNELS=ollama`）。
-3. 关闭探测：`LOCAL_RUNTIME_AUTO_DETECT=false`。超时：`LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35`（默认）。
+1. **本机 Ollama 自动探测**：就绪检查与 `GET /api/v1/onboarding/first-run` 默认对回环地址（`127.0.0.1` / `localhost` / `::1`）做快速探测；失败只写日志，**不阻塞启动**。探测成功时主按钮为「用本地模型开始」，并走官方 `local-first` 预设的非密钥字段（不会伪造 Key）。
+2. **离线示例分析**：没有模型、也没有 Ollama 时，可打开内置**示例分析**（`GET /api/v1/onboarding/demo-analysis`）。界面会明确标注 **示例数据 — 非实时分析**，只用于熟悉报告布局。
+3. **data-only（与 `--dry-run` 产物一致）**：配置好自选股后执行 `python main.py --dry-run`，只拉行情数据、不调用 LLM。
+4. 关闭探测：`LOCAL_RUNTIME_AUTO_DETECT=false`。超时：`LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35`（默认）。
 
-完整 AI 分析仍需要主要模型（云端 Key 或已应用的本地 Ollama 配置）。云端配置见下文「配置 AI 模型」。
+**已有配置不会被首次运行逻辑改写。** 仅在未配置主要模型（且判定为全新环境）时推荐新手视图。完整 AI 分析仍需要主要模型（云端 Key 或已应用的本地 Ollama 配置）。云端配置见下文「配置 AI 模型」。
 
 ## 先准备
 

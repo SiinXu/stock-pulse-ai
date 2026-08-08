@@ -13,6 +13,8 @@ from api.deps import get_system_config_service
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.onboarding import (
+    DemoAnalysisResponse,
+    FirstRunReadinessResponse,
     OnboardingApplyRequest,
     OnboardingApplyResponse,
     OnboardingPlanRequest,
@@ -153,6 +155,63 @@ def apply_onboarding_plan(
             error_code="onboarding_apply_internal_error",
         )
         raise api_error(500, "internal_error", "Failed to apply onboarding plan") from exc
+
+
+
+@router.get(
+    "/first-run",
+    response_model=FirstRunReadinessResponse,
+    responses={500: {"model": ErrorResponse}},
+    summary="Zero-config first-run readiness (read-only)",
+    description=(
+        "Returns fresh-environment detection, beginner-mode recommendation, "
+        "fast loopback Ollama detect results, and the primary CTA path "
+        "(local preset vs offline demo). Never mutates configuration."
+    ),
+)
+def get_first_run_readiness(
+    system_config: SystemConfigService = Depends(get_system_config_service),
+) -> FirstRunReadinessResponse:
+    service = _plan_service(system_config)
+    try:
+        payload = service.get_first_run_readiness()
+        return FirstRunReadinessResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(
+            logger,
+            "First-run readiness failed",
+            exc,
+            error_code="onboarding_first_run_internal_error",
+        )
+        raise api_error(500, "internal_error", "Failed to load first-run readiness") from exc
+
+
+@router.get(
+    "/demo-analysis",
+    response_model=DemoAnalysisResponse,
+    responses={500: {"model": ErrorResponse}},
+    summary="Offline sample analysis for zero-config first success",
+    description=(
+        "Returns a fixed offline sample analysis. Always is_sample=true with a "
+        "visible sample banner. No network, LLM, or paid data is used."
+    ),
+)
+def get_demo_analysis(
+    report_language: str = "zh",
+    system_config: SystemConfigService = Depends(get_system_config_service),
+) -> DemoAnalysisResponse:
+    service = _plan_service(system_config)
+    try:
+        payload = service.get_demo_analysis(report_language=report_language)
+        return DemoAnalysisResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(
+            logger,
+            "Demo analysis load failed",
+            exc,
+            error_code="onboarding_demo_analysis_internal_error",
+        )
+        raise api_error(500, "internal_error", "Failed to load demo analysis") from exc
 
 
 @router.get(

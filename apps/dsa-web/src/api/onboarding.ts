@@ -4,6 +4,8 @@ import apiClient from './index';
 import { getParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type {
+  DemoAnalysisPayload,
+  FirstRunReadiness,
   OnboardingApplyResult,
   OnboardingPlan,
   OnboardingState,
@@ -78,6 +80,26 @@ export const onboardingApi = {
     try {
       const response = await apiClient.delete(`${BASE_PATH}/state`);
       return toCamelCase(response.data);
+    } catch (error) {
+      throw getParsedApiError(error);
+    }
+  },
+
+  async getFirstRunReadiness(): Promise<FirstRunReadiness> {
+    try {
+      const response = await apiClient.get(`${BASE_PATH}/first-run`);
+      return toCamelCase<FirstRunReadiness>(response.data);
+    } catch (error) {
+      throw getParsedApiError(error);
+    }
+  },
+
+  async getDemoAnalysis(reportLanguage = 'zh'): Promise<DemoAnalysisPayload> {
+    try {
+      const response = await apiClient.get(`${BASE_PATH}/demo-analysis`, {
+        params: { report_language: reportLanguage },
+      });
+      return toCamelCase<DemoAnalysisPayload>(response.data);
     } catch (error) {
       throw getParsedApiError(error);
     }

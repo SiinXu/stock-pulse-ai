@@ -115,3 +115,71 @@ export const DEFAULT_ONBOARDING_PROFILE: UserOnboardingProfile = {
 
 export const ONBOARDING_DRAFT_STORAGE_KEY = 'dsa-onboarding-draft-v1';
 export const ONBOARDING_PLAN_STORAGE_KEY = 'dsa-onboarding-plan-v1';
+
+/** Server first-run readiness path (zero-config #796). */
+export type FirstRunPrimaryPath = 'configured' | 'local_ollama' | 'demo';
+export type FirstRunPrimaryCta = 'continue' | 'start_with_local' | 'view_demo';
+
+export interface LocalRuntimeSnapshot {
+  available: boolean;
+  backend?: string | null;
+  baseUrl?: string | null;
+  models: string[];
+  suggestedProfile: Record<string, string>;
+  reason: string;
+  detectEnabled: boolean;
+}
+
+export interface FirstRunReadiness {
+  schemaVersion: number;
+  isFreshEnvironment: boolean;
+  hasPrimaryModel: boolean;
+  beginnerModeRecommended: boolean;
+  primaryPath: FirstRunPrimaryPath | string;
+  primaryCta: FirstRunPrimaryCta | string;
+  headline: string;
+  localRuntime: LocalRuntimeSnapshot;
+  recommendedPresetId?: string | null;
+  recommendedPresetName?: string | null;
+  suggestedProfile: Record<string, string>;
+  demoAvailable: boolean;
+  configMutated: boolean;
+  existingConfigUntouched: boolean;
+  generatedAt: string;
+}
+
+export interface DemoAnalysisPayload {
+  schemaVersion: number;
+  isSample: boolean;
+  sampleBanner: string;
+  sampleDisclaimer: string;
+  queryId: string;
+  stockCode: string;
+  stockName: string;
+  createdAt: string;
+  report: {
+    meta: {
+      queryId?: string;
+      stockCode: string;
+      stockName: string;
+      reportType: string;
+      reportLanguage?: string;
+      createdAt: string;
+      currentPrice?: number | null;
+      changePct?: number | null;
+      modelUsed?: string | null;
+    };
+    summary: {
+      analysisSummary: string;
+      operationAdvice: string;
+      action?: string | null;
+      actionLabel?: string | null;
+      trendPrediction: string;
+      sentimentScore: number;
+      sentimentLabel?: string;
+    };
+    strategy?: Record<string, unknown>;
+    details?: Record<string, unknown>;
+  };
+}
+

@@ -1845,6 +1845,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onboarding/demo-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offline sample analysis for zero-config first success
+         * @description Returns a fixed offline sample analysis. Always is_sample=true with a visible sample banner. No network, LLM, or paid data is used.
+         */
+        get: operations["get_demo_analysis_api_v1_onboarding_demo_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/first-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Zero-config first-run readiness (read-only)
+         * @description Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (local preset vs offline demo). Never mutates configuration.
+         */
+        get: operations["get_first_run_readiness_api_v1_onboarding_first_run_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/plan": {
         parameters: {
             query?: never;
@@ -5873,6 +5913,38 @@ export interface components {
             deleted: number;
         };
         /**
+         * DemoAnalysisResponse
+         * @description Offline sample analysis. Always ``is_sample=True``.
+         */
+        DemoAnalysisResponse: {
+            /** Created At */
+            created_at: string;
+            /**
+             * Is Sample
+             * @default true
+             */
+            is_sample: boolean;
+            /** Query Id */
+            query_id: string;
+            /** Report */
+            report: {
+                [key: string]: unknown;
+            };
+            /** Sample Banner */
+            sample_banner: string;
+            /** Sample Disclaimer */
+            sample_disclaimer: string;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name: string;
+        };
+        /**
          * DiscoverLLMChannelModelsRequest
          * @description Request payload for discovering models from one LLM channel.
          */
@@ -6074,6 +6146,61 @@ export interface components {
              * @description 股票名称（如有）
              */
             name?: string | null;
+        };
+        /**
+         * FirstRunReadinessResponse
+         * @description Zero-config first-run readiness snapshot (read-only; never mutates config).
+         */
+        FirstRunReadinessResponse: {
+            /** Beginner Mode Recommended */
+            beginner_mode_recommended: boolean;
+            /**
+             * Config Mutated
+             * @default false
+             */
+            config_mutated: boolean;
+            /**
+             * Demo Available
+             * @default true
+             */
+            demo_available: boolean;
+            /**
+             * Existing Config Untouched
+             * @default true
+             */
+            existing_config_untouched: boolean;
+            /** Generated At */
+            generated_at: string;
+            /** Has Primary Model */
+            has_primary_model: boolean;
+            /** Headline */
+            headline: string;
+            /** Is Fresh Environment */
+            is_fresh_environment: boolean;
+            local_runtime: components["schemas"]["LocalRuntimeSnapshot"];
+            /**
+             * Primary Cta
+             * @description continue | start_with_local | view_demo
+             */
+            primary_cta: string;
+            /**
+             * Primary Path
+             * @description configured | local_ollama | demo
+             */
+            primary_path: string;
+            /** Recommended Preset Id */
+            recommended_preset_id?: string | null;
+            /** Recommended Preset Name */
+            recommended_preset_name?: string | null;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
         };
         /**
          * GenerationBackendStatus
@@ -7418,6 +7545,37 @@ export interface components {
              * @default non_loopback_denied
              */
             policy: string;
+        };
+        /**
+         * LocalRuntimeSnapshot
+         * @description Public, non-secret local-runtime detect projection.
+         */
+        LocalRuntimeSnapshot: {
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Backend */
+            backend?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /**
+             * Detect Enabled
+             * @default true
+             */
+            detect_enabled: boolean;
+            /** Models */
+            models?: string[];
+            /**
+             * Reason
+             * @default not_probed
+             */
+            reason: string;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
         };
         /**
          * LoginRequest
@@ -16836,6 +16994,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_demo_analysis_api_v1_onboarding_demo_analysis_get: {
+        parameters: {
+            query?: {
+                report_language?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoAnalysisResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_first_run_readiness_api_v1_onboarding_first_run_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirstRunReadinessResponse"];
                 };
             };
             /** @description Internal Server Error */

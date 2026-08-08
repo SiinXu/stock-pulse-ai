@@ -152,3 +152,50 @@ class OnboardingResetResponse(BaseModel):
     success: bool
     reset: bool
     message: str
+
+
+class LocalRuntimeSnapshot(BaseModel):
+    """Public, non-secret local-runtime detect projection."""
+
+    available: bool = False
+    backend: Optional[str] = None
+    base_url: Optional[str] = None
+    models: List[str] = Field(default_factory=list)
+    suggested_profile: Dict[str, str] = Field(default_factory=dict)
+    reason: str = "not_probed"
+    detect_enabled: bool = True
+
+
+class FirstRunReadinessResponse(BaseModel):
+    """Zero-config first-run readiness snapshot (read-only; never mutates config)."""
+
+    schema_version: int = 1
+    is_fresh_environment: bool
+    has_primary_model: bool
+    beginner_mode_recommended: bool
+    primary_path: str = Field(description="configured | local_ollama | demo")
+    primary_cta: str = Field(description="continue | start_with_local | view_demo")
+    headline: str
+    local_runtime: LocalRuntimeSnapshot
+    recommended_preset_id: Optional[str] = None
+    recommended_preset_name: Optional[str] = None
+    suggested_profile: Dict[str, str] = Field(default_factory=dict)
+    demo_available: bool = True
+    config_mutated: bool = False
+    existing_config_untouched: bool = True
+    generated_at: str
+
+
+class DemoAnalysisResponse(BaseModel):
+    """Offline sample analysis. Always ``is_sample=True``."""
+
+    schema_version: int = 1
+    is_sample: bool = True
+    sample_banner: str
+    sample_disclaimer: str
+    query_id: str
+    stock_code: str
+    stock_name: str
+    created_at: str
+    report: Dict[str, Any]
+

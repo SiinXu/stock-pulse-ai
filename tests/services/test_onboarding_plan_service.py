@@ -10,10 +10,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.services.local_runtime_detect import LocalRuntimeDetectResult
 from src.services.onboarding_plan_service import (
     OnboardingPlanService,
     OnboardingProfileValidationError,
     OnboardingSecretRejectedError,
+    has_primary_model_configured,
+    is_fresh_environment,
     is_secret_config_key,
     normalize_profile,
     resolve_feature_stage,
@@ -212,3 +215,89 @@ def test_apply_rejects_secret_items_if_injected(tmp_path: Path, monkeypatch: pyt
     with pytest.raises(OnboardingSecretRejectedError):
         service.apply_plan(_profile(), config_version="v1", confirm=True)
     service._system_config.update.assert_not_called()
+
+
+def test_is_fresh_environment_conservative() -> None:
+    assert is_fresh_environment({}) is True
+    assert is_fresh_environment({"ADMIN_AUTH_ENABLED": "false", "DATABASE_PATH": "/tmp/x.db"}) is True
+    assert is_fresh_environment({}, onboarding_applied=True) is False
+    assert is_fresh_environment({"LITELLM_MODEL": "gpt-4o-mini"}) is False
+    assert is_fresh_environment({"STOCK_LIST": "600519"}) is False
+    assert is_fresh_environment({"OPENAI_API_KEY": "sk-test"}) is False
+
+
+def test_has_primary_model_configured_signals() -> None:
+    assert has_primary_model_configured({}) is False
+    assert has_primary_model_configured({"LITELLM_MODEL": "ollama/qwen"}) is True
+    assert has_primary_model_configured({"GENERATION_BACKEND": "codex_cli"}) is True
+    assert has_primary_model_configured({"OPENAI_API_KEY": "sk-x"}) is True
+
+
+def test_first_run_readiness_configured_user_not_forced(tmp_path: Path) -> None:
+    service = _service(tmp_path, current={"LITELLM_MODEL": "gpt-4o-mini", "STOCK_LIST": "AAPL"})
+    offline = LocalRuntimeDetectResult(available=False, reason="unreachable", detect_enabled=True)
+    import src.services.onboarding_plan_service as mod
+    original = mod.detect_local_runtime_from_config_map
+    mod.detect_local_runtime_from_config_map = MagicMock(return_value=offline)  # type: ignore[assignment]
+    try:
+        readiness = service.get_first_run_readiness()
+    finally:
+        mod.detect_local_runtime_from_config_map = original  # type: ignore[assignment]
+    assert readiness["is_fresh_environment"] is False
+    assert readiness["has_primary_model"] is True
+    assert readiness["beginner_mode_recommended"] is False
+    assert readiness["primary_path"] == "configured"
+    assert readiness["config_mutated"] is False
+    assert readiness["existing_config_untouched"] is True
+
+
+def test_first_run_readiness_local_ollama_primary_cta(tmp_path: Path) -> None:
+    service = _service(tmp_path, current={})
+    detected = LocalRuntimeDetectResult(
+        available=True,
+        backend="ollama",
+        base_url="http://127.0.0.1:11434",
+        models=["qwen3:8b"],
+        suggested_profile={
+            "LLM_CHANNELS": "ollama",
+            "LITELLM_MODEL": "ollama/qwen3:8b",
+            "LLM_OLLAMA_BASE_URL": "http://127.0.0.1:11434",
+        },
+        reason="ollama_reachable",
+        detect_enabled=True,
+    )
+    import src.services.onboarding_plan_service as mod
+    original = mod.detect_local_runtime_from_config_map
+    mod.detect_local_runtime_from_config_map = MagicMock(return_value=detected)  # type: ignore[assignment]
+    try:
+        readiness = service.get_first_run_readiness()
+    finally:
+        mod.detect_local_runtime_from_config_map = original  # type: ignore[assignment]
+    assert readiness["primary_path"] == "local_ollama"
+    assert readiness["primary_cta"] == "start_with_local"
+    assert readiness["recommended_preset_id"] == "local-first"
+    assert readiness["suggested_profile"].get("LITELLM_MODEL") == "ollama/qwen3:8b"
+
+
+def test_first_run_readiness_demo_when_detect_unavailable(tmp_path: Path) -> None:
+    service = _service(tmp_path, current={})
+    offline = LocalRuntimeDetectResult(available=False, reason="unreachable", detect_enabled=True)
+    import src.services.onboarding_plan_service as mod
+    original = mod.detect_local_runtime_from_config_map
+    mod.detect_local_runtime_from_config_map = MagicMock(return_value=offline)  # type: ignore[assignment]
+    try:
+        readiness = service.get_first_run_readiness()
+    finally:
+        mod.detect_local_runtime_from_config_map = original  # type: ignore[assignment]
+    assert readiness["primary_path"] == "demo"
+    assert readiness["primary_cta"] == "view_demo"
+    assert readiness["demo_available"] is True
+
+
+def test_demo_analysis_always_marked_sample(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    payload = service.get_demo_analysis(report_language="en")
+    assert payload["is_sample"] is True
+    assert "sample" in payload["sample_banner"].lower()
+    assert payload["report"]["meta"]["stock_code"] == "600519"
+

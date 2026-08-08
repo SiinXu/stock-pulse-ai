@@ -7,6 +7,7 @@ import { HomeReadinessCard } from '../../components/home/HomeReadinessCard';
 import { AgentOnboardingWizard } from '../../components/onboarding/AgentOnboardingWizard';
 import { HomeOnboardingSection } from '../../components/onboarding/HomeOnboardingSection';
 import { OnboardingTodayPlanCard } from '../../components/onboarding/OnboardingTodayPlanCard';
+import { ZeroConfigFirstRunPanel } from '../../components/onboarding/ZeroConfigFirstRunPanel';
 import { TaskPanel } from '../../components/tasks/TaskPanel';
 import {
   HomeStockWorkspace,
@@ -18,7 +19,11 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
-import { DEFAULT_ONBOARDING_PROFILE, type OnboardingPlan } from '../../types/onboarding';
+import {
+  DEFAULT_ONBOARDING_PROFILE,
+  type FirstRunReadiness,
+  type OnboardingPlan,
+} from '../../types/onboarding';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
 import { usePlaygroundScenario } from '../scenarioContext';
@@ -271,6 +276,54 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
+const FIXTURE_FIRST_RUN_DEMO: FirstRunReadiness = {
+  schemaVersion: 1,
+  isFreshEnvironment: true,
+  hasPrimaryModel: false,
+  beginnerModeRecommended: true,
+  primaryPath: 'demo',
+  primaryCta: 'view_demo',
+  headline: 'Playground fixture: no model detected — open the offline sample analysis.',
+  localRuntime: {
+    available: false,
+    models: [],
+    suggestedProfile: {},
+    reason: 'unreachable',
+    detectEnabled: true,
+  },
+  suggestedProfile: {},
+  demoAvailable: true,
+  configMutated: false,
+  existingConfigUntouched: true,
+  generatedAt: '2026-08-09T00:00:00Z',
+};
+
+const FIXTURE_FIRST_RUN_CONFIGURED: FirstRunReadiness = {
+  ...FIXTURE_FIRST_RUN_DEMO,
+  isFreshEnvironment: false,
+  hasPrimaryModel: true,
+  beginnerModeRecommended: false,
+  primaryPath: 'configured',
+  primaryCta: 'continue',
+  headline: 'Playground fixture: model already configured; settings untouched.',
+};
+
+const ZeroConfigFirstRunPanelStory = () => {
+  const { t } = useUiLanguage();
+  const { scenario } = usePlaygroundScenario();
+  const readiness = scenario === 'empty' ? FIXTURE_FIRST_RUN_CONFIGURED : FIXTURE_FIRST_RUN_DEMO;
+  return (
+    <div className="max-w-2xl">
+      <ZeroConfigFirstRunPanel
+        readiness={readiness}
+        autoLoad={false}
+        reportLanguage="en"
+        t={t}
+      />
+    </div>
+  );
+};
+
 export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'stock-autocomplete': StockAutocompleteStory,
   'suggestions-list': SuggestionsListStory,
@@ -280,4 +333,6 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
+  'zero-config-first-run-panel': ZeroConfigFirstRunPanelStory,
 };
+

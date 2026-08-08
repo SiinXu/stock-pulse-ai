@@ -23,6 +23,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from src.services.demo_analysis_fixture import build_demo_analysis
+from src.services.local_runtime_detect import (
+    LocalRuntimeDetectResult,
+    detect_local_runtime_from_config_map,
+)
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
@@ -34,7 +39,42 @@ logger = logging.getLogger(__name__)
 
 PROFILE_SCHEMA_VERSION = 1
 PLAN_SCHEMA_VERSION = 1
+FIRST_RUN_READINESS_SCHEMA_VERSION = 1
 ONBOARDING_STATE_FILENAME = "onboarding_state.json"
+
+_FRESH_ENV_IGNORED_KEYS = frozenset(
+    {
+        "ADMIN_AUTH_ENABLED",
+        "DATABASE_PATH",
+        "ENV_FILE",
+        "HOST",
+        "PORT",
+        "LOG_LEVEL",
+        "LOG_DIR",
+        "LOCAL_RUNTIME_AUTO_DETECT",
+        "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS",
+    }
+)
+
+_PRIMARY_MODEL_SIGNAL_KEYS = frozenset(
+    {
+        "LITELLM_MODEL",
+        "AGENT_LITELLM_MODEL",
+        "LLM_OLLAMA_MODELS",
+        "OPENCODE_CLI_MODEL",
+        "LLM_CHANNELS",
+    }
+)
+
+_CONFIGURED_GENERATION_BACKENDS = frozenset(
+    {
+        "codex_cli",
+        "claude_code",
+        "opencode",
+        "gemini_cli",
+        "hermes_agent",
+    }
+)
 
 EXPERIENCE_STAGES = frozenset({"beginner", "report_reader", "has_system"})
 MARKETS = frozenset({"cn", "hk", "us"})
@@ -159,6 +199,72 @@ def is_secret_config_key(key: str) -> bool:
     if any(marker in normalized for marker in _SECRET_KEY_MARKERS):
         return True
     return False
+
+
+def has_primary_model_configured(config_map: Mapping[str, str] | None) -> bool:
+    """Return True when the config map already signals a usable primary model path."""
+    values = {
+        str(key).strip().upper(): str(value or "").strip()
+        for key, value in dict(config_map or {}).items()
+    }
+    for key in _PRIMARY_MODEL_SIGNAL_KEYS:
+        if values.get(key):
+            return True
+    backend = values.get("GENERATION_BACKEND", "").lower()
+    if backend in _CONFIGURED_GENERATION_BACKENDS:
+        return True
+    ollama_enabled = values.get("LLM_OLLAMA_ENABLED", "").lower()
+    if ollama_enabled in {"1", "true", "yes", "on"} and values.get("LLM_OLLAMA_BASE_URL"):
+        return True
+    for key, value in values.items():
+        if value and is_secret_config_key(key):
+            return True
+    return False
+
+
+def is_fresh_environment(
+    config_map: Mapping[str, str] | None,
+    *,
+    onboarding_applied: bool = False,
+) -> bool:
+    """Return True only when we are confident this install has no prior product setup.
+
+    Conservative by design: any evidence of prior configuration returns False so
+    existing users are never force-switched into beginner first-run defaults.
+    """
+    if onboarding_applied:
+        return False
+    values = {
+        str(key).strip().upper(): str(value or "").strip()
+        for key, value in dict(config_map or {}).items()
+    }
+    if not values:
+        return True
+    if has_primary_model_configured(values):
+        return False
+    for key, value in values.items():
+        if not value:
+            continue
+        if key in _FRESH_ENV_IGNORED_KEYS:
+            continue
+        if is_secret_config_key(key):
+            return False
+        if key in {
+            "STOCK_LIST",
+            "REPORT_LANGUAGE",
+            "GENERATION_BACKEND",
+            "GENERATION_FALLBACK_BACKEND",
+            "LLM_CONFIG_MODE",
+            "NEWS_STRATEGY_PROFILE",
+            "LLM_OLLAMA_ENABLED",
+            "LLM_OLLAMA_BASE_URL",
+            "LLM_OLLAMA_DISPLAY_NAME",
+            "MARKET_REVIEW_ENABLED",
+            "MARKET_REVIEW_REGION",
+        }:
+            return False
+        return False
+    return True
 
 
 def _utc_now_iso() -> str:
@@ -609,6 +715,15 @@ class OnboardingPlanService:
         if not (current.get("STOCK_LIST") or "").strip():
             desired["STOCK_LIST"] = _seed_stock_list(profile["markets"])
 
+        if preset_id == "local-first":
+            detect = detect_local_runtime_from_config_map(current)
+            if detect.available:
+                for key, value in dict(detect.suggested_profile or {}).items():
+                    key_u = str(key or "").strip().upper()
+                    val = str(value or "").strip()
+                    if key_u and val and not is_secret_config_key(key_u):
+                        desired[key_u] = val
+
         # Never include secrets in the plan.
         for key in list(desired.keys()):
             if is_secret_config_key(key):
@@ -765,6 +880,124 @@ class OnboardingPlanService:
         if not isinstance(payload, dict):
             return None
         return payload
+
+    def get_first_run_readiness(
+        self,
+        *,
+        detect_requester: Any = None,
+    ) -> Dict[str, Any]:
+        """Compose zero-config first-run guidance without mutating configuration.
+
+        Detection uses the existing loopback Ollama probe with a short timeout.
+        Failures degrade to the offline demo path; this method never writes
+        ``.env`` or onboarding state.
+        """
+        current = self._read_current_config_map()
+        state = self.get_state()
+        onboarding_applied = bool(
+            isinstance(state, dict) and str(state.get("status") or "") == "applied"
+        )
+        fresh = is_fresh_environment(current, onboarding_applied=onboarding_applied)
+        has_model = has_primary_model_configured(current)
+
+        try:
+            detect = detect_local_runtime_from_config_map(
+                current,
+                requester=detect_requester,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - first-run must not fail hard
+            log_safe_exception(
+                logger,
+                "First-run local runtime detect raised; degrading to demo path",
+                exc,
+                error_code="onboarding_first_run_detect_failed",
+            )
+            detect = LocalRuntimeDetectResult(
+                available=False,
+                reason="probe_failed",
+                detect_enabled=True,
+            )
+
+        preset_configs, preset_meta = _load_preset_catalog()
+        local_meta = dict(preset_meta.get("local-first") or {})
+        local_preset_values = {
+            str(k).upper(): str(v)
+            for k, v in dict(preset_configs.get("local-first") or {}).items()
+            if not is_secret_config_key(str(k))
+        }
+
+        suggested_profile: Dict[str, str] = {}
+        recommended_preset_id: Optional[str] = None
+        recommended_preset_name: Optional[str] = None
+
+        if has_model:
+            primary_path = "configured"
+            beginner_mode_recommended = False
+            primary_cta = "continue"
+            headline = (
+                "A primary model is already configured. Existing settings were not changed."
+            )
+        elif detect.available:
+            primary_path = "local_ollama"
+            beginner_mode_recommended = True
+            primary_cta = "start_with_local"
+            recommended_preset_id = "local-first"
+            recommended_preset_name = str(
+                local_meta.get("display_name") or "Local-first (Ollama / Model Pack)"
+            )
+            suggested_profile = dict(local_preset_values)
+            for key, value in dict(detect.suggested_profile or {}).items():
+                key_u = str(key or "").strip().upper()
+                val = str(value or "").strip()
+                if key_u and val and not is_secret_config_key(key_u):
+                    suggested_profile[key_u] = val
+            models = list(detect.models or [])
+            model_hint = (
+                f" Detected models: {', '.join(models[:3])}."
+                if models
+                else " Start Ollama models if the list is empty."
+            )
+            headline = (
+                f"Local Ollama is reachable at {detect.base_url or 'loopback'}."
+                f"{model_hint} Primary CTA: start with a local zero-cost profile "
+                "(calls official local-first preset fields only; no secrets)."
+            )
+        else:
+            primary_path = "demo"
+            beginner_mode_recommended = True
+            primary_cta = "view_demo"
+            headline = (
+                "No API key and no local model detected. "
+                "You can open the built-in offline sample analysis (clearly labeled) "
+                "or start a data-only dry-run later."
+            )
+
+        if has_model:
+            beginner_mode_recommended = False
+        elif fresh or not has_model:
+            beginner_mode_recommended = True
+
+        return {
+            "schema_version": FIRST_RUN_READINESS_SCHEMA_VERSION,
+            "is_fresh_environment": fresh,
+            "has_primary_model": has_model,
+            "beginner_mode_recommended": beginner_mode_recommended,
+            "primary_path": primary_path,
+            "primary_cta": primary_cta,
+            "headline": headline,
+            "local_runtime": detect.to_public_dict(),
+            "recommended_preset_id": recommended_preset_id,
+            "recommended_preset_name": recommended_preset_name,
+            "suggested_profile": suggested_profile,
+            "demo_available": True,
+            "config_mutated": False,
+            "existing_config_untouched": True,
+            "generated_at": _utc_now_iso(),
+        }
+
+    def get_demo_analysis(self, *, report_language: str = "zh") -> Dict[str, Any]:
+        """Return the offline sample analysis fixture (always ``is_sample=True``)."""
+        return build_demo_analysis(report_language=report_language)
 
     def reset_state(self) -> Dict[str, Any]:
         """Delete persisted profile/plan; does not roll back config writes."""
