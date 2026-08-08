@@ -832,6 +832,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List aggregated agent capabilities (read-only)
+         * @description Return a read-only aggregation of capabilities from the existing data-provider catalog, agent tool registry, and plugin extension surface. Does not change registration behavior. available=false includes a stable reason_code such as feature_disabled, missing_config, or missing_dependency.
+         */
+        get: operations["listCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-profiles/export": {
         parameters: {
             query?: never;
@@ -4905,6 +4925,53 @@ export interface components {
             prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+        };
+        /**
+         * CapabilityItem
+         * @description One aggregated capability observation.
+         */
+        CapabilityItem: {
+            /** Available */
+            available: boolean;
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "data" | "tool" | "extension";
+            /**
+             * Id
+             * @description Stable capability id (domain-prefixed)
+             */
+            id: string;
+            /** Provider */
+            provider: string;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Reason Message */
+            reason_message?: string | null;
+        };
+        /**
+         * CapabilityListResponse
+         * @description GET /api/v1/capabilities response.
+         */
+        CapabilityListResponse: {
+            /** Available Count */
+            available_count: number;
+            /** Items */
+            items?: components["schemas"]["CapabilityItem"][];
+            /** Total */
+            total: number;
+            /** Unavailable Count */
+            unavailable_count: number;
         };
         /**
          * ChangePasswordRequest
@@ -13811,6 +13878,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listCapabilities: {
+        parameters: {
+            query?: {
+                /** @description Optional domain filter. Allowed values: data, tool, extension. */
+                domain?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityListResponse"];
+                };
+            };
+            /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

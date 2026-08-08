@@ -4569,6 +4569,109 @@
         "title": "CallTypeBreakdown",
         "type": "object"
       },
+      "CapabilityItem": {
+        "additionalProperties": false,
+        "description": "One aggregated capability observation.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "extension"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable capability id (domain-prefixed)",
+            "title": "Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "reason_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Message"
+          }
+        },
+        "required": [
+          "id",
+          "domain",
+          "provider",
+          "available"
+        ],
+        "title": "CapabilityItem",
+        "type": "object"
+      },
+      "CapabilityListResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/capabilities response.",
+        "properties": {
+          "available_count": {
+            "minimum": 0.0,
+            "title": "Available Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "unavailable_count": {
+            "minimum": 0.0,
+            "title": "Unavailable Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "available_count",
+          "unavailable_count"
+        ],
+        "title": "CapabilityListResponse",
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "description": "Change password request body.",
         "properties": {
@@ -24318,6 +24421,86 @@
         "summary": "触发回测",
         "tags": [
           "Backtest"
+        ]
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "description": "Return a read-only aggregation of capabilities from the existing data-provider catalog, agent tool registry, and plugin extension surface. Does not change registration behavior. available=false includes a stable reason_code such as feature_disabled, missing_config, or missing_dependency.",
+        "operationId": "listCapabilities",
+        "parameters": [
+          {
+            "description": "Optional domain filter. Allowed values: data, tool, extension.",
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional domain filter. Allowed values: data, tool, extension.",
+              "title": "Domain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid domain filter"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List aggregated agent capabilities (read-only)",
+        "tags": [
+          "Capabilities"
         ]
       }
     },
