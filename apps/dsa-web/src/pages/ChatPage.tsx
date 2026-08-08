@@ -8,6 +8,7 @@ import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
 import { ChatComposer } from '../components/chat/ChatComposer';
+import { WhatIfScenarioPanel } from '../components/chat/WhatIfScenarioPanel';
 import {
   resolveActiveStockContextFromMessage,
   restoreActiveStockContextFromMessages,
@@ -15,6 +16,16 @@ import {
 } from '../components/chat/chatActiveStock';
 import { getMessageSkillLabel } from '../components/chat/chatMessageMeta';
 import { useChatPageUiState } from '../components/chat/useChatPageUiState';
+import {
+  DEFAULT_WHAT_IF_DRAFT,
+  DEFAULT_WHAT_IF_MAX_TURNS,
+  HYPOTHETICAL_ASSUMPTION_MARKER,
+  buildWhatIfAssumption,
+  countWhatIfTurnsInMessages,
+  isWhatIfLimitReached,
+  mergeWhatIfIntoContext,
+  type WhatIfDraftState,
+} from '../components/chat/whatIfScenario';
 import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -142,6 +153,7 @@ const ChatPage: React.FC = () => {
   const [activeStockCode, setActiveStockCode] = useState<string | null>(null);
   const [activeStockContext, setActiveStockContext] = useState<ActiveStockContext | null>(null);
   const activeStockContextRef = useRef<ActiveStockContext | null>(null);
+  const [whatIfDraft, setWhatIfDraft] = useState<WhatIfDraftState>(DEFAULT_WHAT_IF_DRAFT);
   const watchlistMessageTimerRef = useRef<number | null>(null);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
   const messagesViewportRef = useRef<HTMLDivElement>(null);
@@ -297,6 +309,10 @@ const ChatPage: React.FC = () => {
     clearCompletionBadge,
   } = useAgentChatStore();
   const selectedSkillIds = sessionSelectedSkillIds ?? defaultSkillIds;
+  useEffect(() => {
+    const used = countWhatIfTurnsInMessages(messages);
+    setWhatIfDraft((prev) => (prev.turnCount === used ? prev : { ...prev, turnCount: used }));
+  }, [messages]);
   const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -649,10 +665,30 @@ const ChatPage: React.FC = () => {
       }
     });
   }, [searchParams, sessionId]);
+  const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {
+    if (sendToastTimerRef.current !== null) {
+      window.clearTimeout(sendToastTimerRef.current);
+    }
+    setSendToast(nextToast);
+    sendToastTimerRef.current = window.setTimeout(() => {
+      setSendToast(null);
+      sendToastTimerRef.current = null;
+    }, durationMs);
+  }, []);
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
       if (!msgText || loading || sessionLoading || isFollowUpContextLoading || isSkillsLoading) return;
+      if (whatIfDraft.enabled) {
+        if (isWhatIfLimitReached(whatIfDraft)) {
+          showSendFeedback({ type: 'error', message: t('chat.whatIf.limitMessage', { max: DEFAULT_WHAT_IF_MAX_TURNS }) }, 5000);
+          return;
+        }
+        if (!buildWhatIfAssumption(whatIfDraft)) {
+          showSendFeedback({ type: 'error', message: t('chat.whatIf.magnitudeInvalid') }, 5000);
+          return;
+        }
+      }
       const requestedSkillIds = overrideSkillIds ?? sessionSelectedSkillIds;
       const usedSkillIds = normalizeSelectedSkillIds(
         requestedSkillIds ?? selectedSkillIds,
@@ -669,11 +705,18 @@ const ChatPage: React.FC = () => {
         setActiveStockContext(nextActiveStockContext);
         setActiveStockCode(nextActiveStockContext.stock_code);
       }
-      const contextForSend = useActiveContextForThisSend
+      const baseContextForSend = useActiveContextForThisSend
         ? nextActiveStockContext
         : followUpContextRef.current ?? nextActiveStockContext ?? undefined;
+      const contextForSend = mergeWhatIfIntoContext(
+        baseContextForSend as Record<string, unknown> | null | undefined,
+        whatIfDraft,
+      );
+      const outboundMessage = whatIfDraft.enabled && buildWhatIfAssumption(whatIfDraft)
+        ? `${HYPOTHETICAL_ASSUMPTION_MARKER}\n${msgText}`
+        : msgText;
       const payload = {
-        message: msgText,
+        message: outboundMessage,
         session_id: sessionId,
         ...(requestedSkillIds !== null
           ? { skills: normalizeSelectedSkillIds(requestedSkillIds) }
@@ -712,7 +755,7 @@ const ChatPage: React.FC = () => {
         setInput(msgText);
       }
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, showSendFeedback, startStream, t, whatIfDraft],
   );
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
@@ -730,16 +773,6 @@ const ChatPage: React.FC = () => {
     setSelectedSkillIds(quickSkillIds);
     handleSend(q.label, quickSkillIds);
   };
-  const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {
-    if (sendToastTimerRef.current !== null) {
-      window.clearTimeout(sendToastTimerRef.current);
-    }
-    setSendToast(nextToast);
-    sendToastTimerRef.current = window.setTimeout(() => {
-      setSendToast(null);
-      sendToastTimerRef.current = null;
-    }, durationMs);
-  }, []);
   const toggleThinking = (msgId: string) => {
     dispatchUi({ type: 'toggleThinking', messageId: msgId });
   };
@@ -1027,6 +1060,13 @@ const ChatPage: React.FC = () => {
               </button>
             </div>
           )}
+
+          <WhatIfScenarioPanel
+            t={t}
+            draft={whatIfDraft}
+            onChange={setWhatIfDraft}
+            disabled={loading || sessionLoading || isSkillsLoading}
+          />
 
           <ChatComposer
             language={language}
