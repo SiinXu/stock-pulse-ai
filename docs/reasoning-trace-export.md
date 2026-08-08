@@ -25,8 +25,10 @@ When the flag is off, `GET /api/v1/reasoning-trace/{record_id}` returns
 GET /api/v1/reasoning-trace/{record_id}?format=json|markdown&include_markdown=false
 ```
 
-- **Auth**: when administrator authentication is enabled, a valid session cookie
-  is required (same class of gate as security diagnostics).
+- **Auth**: fail-closed. Administrator authentication must be enabled, and a
+  valid admin session cookie is required (same sensitivity class as security
+  audit diagnostics). If auth is disabled, the endpoint returns
+  `403 reasoning_trace_auth_required`.
 - **`format=json`** (default): response body is the `reasoning-trace-v1` package
   (optionally with an embedded `markdown` field when `include_markdown=true`).
 - **`format=markdown`**: response body is `text/markdown` with redacted content;

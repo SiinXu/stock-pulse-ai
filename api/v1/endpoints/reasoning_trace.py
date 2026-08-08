@@ -35,9 +35,18 @@ router = APIRouter()
 
 
 def _require_export_access(request: Request) -> None:
-    """Mirror security-audit style admin gate when authentication is enabled."""
+    """Fail-closed admin gate for export (mirrors security-audit sensitivity).
+
+    Reasoning traces may contain full decision context. When administrator
+    authentication is disabled, refuse export rather than exposing the package
+    without a session boundary.
+    """
     if not is_auth_enabled():
-        return
+        raise api_error(
+            403,
+            "reasoning_trace_auth_required",
+            "Reasoning trace export requires enabled administrator authentication",
+        )
     session_cookie = request.cookies.get(COOKIE_NAME)
     if not session_cookie or not verify_session(session_cookie):
         raise api_error(401, "unauthorized", "Administrator authentication required")

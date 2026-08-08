@@ -43,6 +43,15 @@ def test_export_disabled_returns_404_without_side_effects() -> None:
     assert body["error"] == "reasoning_trace_export_disabled"
 
 
+def test_export_requires_auth_enabled() -> None:
+    with _patch_services_config(enabled=True), patch.object(
+        endpoint, "is_auth_enabled", return_value=False
+    ):
+        response = _client().get("/api/v1/reasoning-trace/1")
+    assert response.status_code == 403
+    assert response.json()["error"] == "reasoning_trace_auth_required"
+
+
 def test_export_requires_admin_session_when_auth_enabled() -> None:
     with _patch_services_config(enabled=True), patch.object(
         endpoint, "is_auth_enabled", return_value=True
@@ -72,10 +81,10 @@ def test_export_json_success() -> None:
         truncated=False,
     )
     with _patch_services_config(enabled=True), patch.object(
-        endpoint, "is_auth_enabled", return_value=False
-    ), patch.object(endpoint, "HistoryService", return_value=MagicMock()), patch.object(
-        endpoint, "ReasoningTraceExportService", return_value=service
-    ):
+        endpoint, "is_auth_enabled", return_value=True
+    ), patch.object(endpoint, "verify_session", return_value=True), patch.object(
+        endpoint, "HistoryService", return_value=MagicMock()
+    ), patch.object(endpoint, "ReasoningTraceExportService", return_value=service):
         app = FastAPI()
         app.include_router(endpoint.router, prefix="/api/v1/reasoning-trace")
         add_error_handlers(app)
@@ -83,7 +92,10 @@ def test_export_json_success() -> None:
 
         app.dependency_overrides[api_deps.get_database_manager] = lambda: MagicMock()
         client = TestClient(app)
-        response = client.get("/api/v1/reasoning-trace/42")
+        response = client.get(
+            "/api/v1/reasoning-trace/42",
+            cookies={"dsa_session": "valid"},
+        )
 
     assert response.status_code == 200
     body = response.json()
@@ -96,17 +108,20 @@ def test_export_not_found() -> None:
     service = MagicMock()
     service.export_for_record.side_effect = ReasoningTraceNotFound()
     with _patch_services_config(enabled=True), patch.object(
-        endpoint, "is_auth_enabled", return_value=False
-    ), patch.object(endpoint, "HistoryService", return_value=MagicMock()), patch.object(
-        endpoint, "ReasoningTraceExportService", return_value=service
-    ):
+        endpoint, "is_auth_enabled", return_value=True
+    ), patch.object(endpoint, "verify_session", return_value=True), patch.object(
+        endpoint, "HistoryService", return_value=MagicMock()
+    ), patch.object(endpoint, "ReasoningTraceExportService", return_value=service):
         app = FastAPI()
         app.include_router(endpoint.router, prefix="/api/v1/reasoning-trace")
         add_error_handlers(app)
         from api import deps as api_deps
 
         app.dependency_overrides[api_deps.get_database_manager] = lambda: MagicMock()
-        response = TestClient(app).get("/api/v1/reasoning-trace/999")
+        response = TestClient(app).get(
+            "/api/v1/reasoning-trace/999",
+            cookies={"dsa_session": "valid"},
+        )
     assert response.status_code == 404
     assert response.json()["error"] == "not_found"
 
@@ -127,10 +142,10 @@ def test_export_markdown_format() -> None:
         truncated=False,
     )
     with _patch_services_config(enabled=True), patch.object(
-        endpoint, "is_auth_enabled", return_value=False
-    ), patch.object(endpoint, "HistoryService", return_value=MagicMock()), patch.object(
-        endpoint, "ReasoningTraceExportService", return_value=service
-    ):
+        endpoint, "is_auth_enabled", return_value=True
+    ), patch.object(endpoint, "verify_session", return_value=True), patch.object(
+        endpoint, "HistoryService", return_value=MagicMock()
+    ), patch.object(endpoint, "ReasoningTraceExportService", return_value=service):
         app = FastAPI()
         app.include_router(endpoint.router, prefix="/api/v1/reasoning-trace")
         add_error_handlers(app)
@@ -140,6 +155,7 @@ def test_export_markdown_format() -> None:
         response = TestClient(app).get(
             "/api/v1/reasoning-trace/1",
             params={"format": "markdown"},
+            cookies={"dsa_session": "valid"},
         )
     assert response.status_code == 200
     assert "text/markdown" in response.headers.get("content-type", "")
