@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).
+- [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).
 - [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).
 - [Fixed] Signal Center deep links with `?signal=<id>` fall back to fetch-by-id when the signal is not on the currently loaded list/latest/timeline page, and clear the URL param on 404/forbidden without a blank page.
 - [Fixed] Home setup dismiss uses a single Close control, Home core blocks stay single-column below xl, and shared ScrollArea/StockBar height chains gain min-h-0 so constrained stock rails can scroll on mobile (#879 B1/B6).
