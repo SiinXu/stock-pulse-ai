@@ -20,6 +20,9 @@ flowchart TD
   H --> I[9 Optional strategy synthesis]
 ```
 
+> **Service note (delta vs prior run)**  
+> Backend history comparison can compute a deterministic field-level delta between two stored runs (`compare_analyses` / `get_latest_delta`). See [Analysis Delta Comparison](../analysis-delta-comparison.md). Web “since last analysis” presentation is a separate UI task; when only one history row exists the service returns **no baseline**, not “no change.”
+
 | Step | What | Concepts | Plain meaning |
 | --- | --- | --- | --- |
 | 1 | Conclusion / action | `operation_advice`, structured `action` | Buy / add / hold / watch / reduce / sell / avoid |
