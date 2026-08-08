@@ -5,6 +5,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SetURLSearchParams } from 'react-router-dom';
 import { analysisApi } from '../../api/analysis';
+import {
+  getParsedApiError,
+  isPermanentlyUnavailableResourceError,
+} from '../../api/error';
 import { useTaskStream } from '../../hooks/useTaskStream';
 import type {
   AnalysisPhase,
@@ -184,7 +188,11 @@ export function usePortfolioAnalysisTasks({
     syncPersistence(tasks);
   }, [hasHydrated, syncPersistence, tasks]);
 
-  const dismissTask = useCallback((taskId: string) => {
+  /**
+   * Drop a task the backend has confirmed is gone (or never confirmed exists).
+   * Clears panel state, tracked id, session persistence, and `?task=` when needed.
+   */
+  const dropUnrecoverableTask = useCallback((taskId: string) => {
     trackedIdsRef.current.delete(taskId);
     setTasks((prev) => {
       const next = prev.filter((task) => task.taskId !== taskId);
@@ -205,6 +213,10 @@ export function usePortfolioAnalysisTasks({
     setRunFlowTaskId((current) => (current === taskId ? null : current));
   }, []);
 
+  const dismissTask = useCallback((taskId: string) => {
+    dropUnrecoverableTask(taskId);
+  }, [dropUnrecoverableTask]);
+
   const acceptTask = useCallback((
     accepted: TaskAccepted,
     stockCode: string,
@@ -215,6 +227,37 @@ export function usePortfolioAnalysisTasks({
     persistPortfolioAnalysisTasks(
       upsertPersistedPortfolioAnalysisTask(readPersistedPortfolioAnalysisTasks(), toPersisted(info)),
     );
+  }, [upsertLocalTask]);
+
+  /**
+   * Provisional panel entry so a recoverable restore/poll failure can be retried
+   * without claiming the backend confirmed a queued task.
+   */
+  const keepRecoverablePlaceholder = useCallback((
+    taskId: string,
+    stockCode: string,
+    analysisPhase?: AnalysisPhase,
+  ) => {
+    const existing = tasksRef.current.find((task) => task.taskId === taskId);
+    if (existing) {
+      // Already on the panel — leave last-known status; poll/SSE will refresh.
+      trackedIdsRef.current.add(taskId);
+      return;
+    }
+    // First restore under a transient failure: keep id tracked so the 2s poll can retry.
+    upsertLocalTask({
+      taskId,
+      stockCode,
+      status: 'pending',
+      progress: 0,
+      reportType: 'detailed',
+      createdAt: new Date().toISOString(),
+      originalQuery: stockCode,
+      selectionSource: 'manual',
+      messageCode: 'task.queued',
+      messageParams: { stockCode },
+      ...(analysisPhase ? { analysisPhase } : {}),
+    });
   }, [upsertLocalTask]);
 
   const attachExistingTask = useCallback(async (
@@ -246,41 +289,24 @@ export function usePortfolioAnalysisTasks({
     try {
       const status = await analysisApi.getStatus(taskId);
       if (!status?.taskId || !status.status) {
-        upsertLocalTask({
-          taskId,
-          stockCode: placeholderStock,
-          status: 'pending',
-          progress: 10,
-          reportType: 'detailed',
-          createdAt: new Date().toISOString(),
-          originalQuery: placeholderStock,
-          selectionSource: 'manual',
-          messageCode: 'task.queued',
-          messageParams: { stockCode: placeholderStock },
-          ...(analysisPhase ? { analysisPhase } : {}),
-        });
+        // Empty body is not evidence the task exists — treat as unrecoverable.
+        dropUnrecoverableTask(taskId);
         return;
       }
       upsertLocalTask(taskStatusToInfo(status, {
         stockCode: placeholderStock,
         analysisPhase,
       }));
-    } catch {
-      upsertLocalTask({
-        taskId,
-        stockCode: placeholderStock,
-        status: 'pending',
-        progress: 10,
-        reportType: 'detailed',
-        createdAt: new Date().toISOString(),
-        originalQuery: placeholderStock,
-        selectionSource: 'manual',
-        messageCode: 'task.queued',
-        messageParams: { stockCode: placeholderStock },
-        ...(analysisPhase ? { analysisPhase } : {}),
-      });
+    } catch (error) {
+      const parsed = getParsedApiError(error);
+      if (isPermanentlyUnavailableResourceError(parsed)) {
+        dropUnrecoverableTask(taskId);
+        return;
+      }
+      // Transient/network/5xx: keep tracking + persistence; poll/SSE can recover.
+      keepRecoverablePlaceholder(taskId, placeholderStock, analysisPhase);
     }
-  }, [upsertLocalTask]);
+  }, [dropUnrecoverableTask, keepRecoverablePlaceholder, upsertLocalTask]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -334,14 +360,25 @@ export function usePortfolioAnalysisTasks({
       await Promise.all(running.map(async (task) => {
         try {
           const status = await analysisApi.getStatus(task.taskId);
-          if (cancelled || !status?.status) return;
+          if (cancelled) return;
+          if (!status?.status) {
+            // Resolved empty status is not a confirmed running task.
+            dropUnrecoverableTask(task.taskId);
+            return;
+          }
           upsertLocalTask(taskStatusToInfo(status, {
             stockCode: task.stockCode,
             analysisPhase: task.analysisPhase,
             reportType: task.reportType,
           }));
-        } catch {
-          // Keep the last known panel state when a poll fails.
+        } catch (error) {
+          if (cancelled) return;
+          const parsed = getParsedApiError(error);
+          if (isPermanentlyUnavailableResourceError(parsed)) {
+            dropUnrecoverableTask(task.taskId);
+            return;
+          }
+          // Recoverable poll failure: keep the last known panel state.
         }
       }));
       if (!cancelled) {
@@ -354,7 +391,7 @@ export function usePortfolioAnalysisTasks({
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [enabled, upsertLocalTask]);
+  }, [dropUnrecoverableTask, enabled, upsertLocalTask]);
 
   const openRunFlow = useCallback((task: TaskInfo) => {
     setRunFlowTaskId(task.taskId);
