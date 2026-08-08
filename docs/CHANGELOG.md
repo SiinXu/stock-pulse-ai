@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
 - [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
 - [Added] Zero-config first success: loopback Ollama auto-detect for setup readiness, data-only dry-run guidance when no model is configured, and LOCAL_RUNTIME_AUTO_DETECT* settings.
