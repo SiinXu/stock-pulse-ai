@@ -75,7 +75,20 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 7. Confirm browser security headers (CSP, nosniff, frame deny, referrer) are present on the FastAPI origin; reverse proxies may tighten further but should not strip them unintentionally. See [Browser response headers (CSP)](#browser-response-headers-csp).
 8. Assume a single shared admin: anyone with the password or a stolen session cookie is the administrator.
 
-### 5. Related documents
+### 5. Optional MCP server surface
+
+| Fact | Meaning |
+| --- | --- |
+| Safe default | `MCP_SERVER_ENABLED` is **false**; the main API/Web process does **not** start MCP |
+| How to enable | Explicit operator process: `MCP_SERVER_ENABLED=true python -m src.mcp_server` |
+| Auth model | Reuses administrator session verification (`verify_session`); does **not** introduce a parallel token scheme |
+| Bind policy | HTTP transport defaults to `127.0.0.1` and reuses the same non-local bind fail-closed policy as the HTTP API (`src/security/http_bind.py`) |
+| Capability scope | Curated read-only tools plus a guarded `trigger_analysis` tool; **configuration, secrets, auth admin, audit admin, plugins, watchlist mutation, and portfolio writes are not MCP tools** |
+| Trust model | Still the single-administrator deployment model (`AUTH-05`); MCP is not multi-tenant isolation |
+
+Full inventory, client headers, and rollback: [MCP server integration (EN)](mcp-server-integration_EN.md) / [MCP server integration (ZH)](mcp-server-integration.md).
+
+### 6. Related documents
 
 | Topic | Document |
 | --- | --- |
@@ -85,6 +98,7 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 | Browser response headers (CSP) | [Browser response headers](#browser-response-headers-csp) |
 | Durable audit Phase 1 | [Security audit](security-audit.md) |
 | Sensitive log/export redaction | [Sensitive-data redaction](security-sensitive-data-redaction.md) |
+| Optional MCP server adapter | [mcp-server-integration_EN.md](mcp-server-integration_EN.md), [mcp-server-integration.md](mcp-server-integration.md) |
 | Deploy bind notes | [DEPLOY.md](DEPLOY.md), [DEPLOY_EN.md](DEPLOY_EN.md) |
 
 ## Threat Model
