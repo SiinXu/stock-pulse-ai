@@ -398,3 +398,62 @@ def test_build_data_provider_bound_registry_requires_live_backend() -> None:
     )
     assert error is None
     assert bound is providers.plugin_registry
+
+def test_application_services_auto_bind_composition_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Default ApplicationServices must call auto-bind when the flag is on."""
+
+    from src.application_services import ApplicationServices
+
+    example = (
+        Path(__file__).resolve().parents[2]
+        / "examples"
+        / "plugins"
+        / "example-provider"
+    )
+    import shutil
+
+    shutil.copytree(example, tmp_path / "example-provider")
+    monkeypatch.setenv("PLUGINS_DIR", str(tmp_path))
+    monkeypatch.setenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, "true")
+    monkeypatch.setenv("PROVIDER_ADAPTIVE_PRIORITY_ENABLED", "false")
+    monkeypatch.setenv("PROVIDER_CIRCUIT_BREAKER_ENABLED", "false")
+    monkeypatch.setenv("PROVIDER_DAILY_CACHE_ENABLED", "false")
+    DataFetcherManager.reset_daily_source_health()
+
+    # Inject a manager with one fallback so offline daily data still resolves.
+    providers = DataFetcherManager(fetchers=[_FallbackProvider()])
+    services = ApplicationServices(
+        data_fetcher_manager=providers,
+        plugins_dir=tmp_path,
+    )
+    try:
+        assert services.data_fetcher_manager is providers
+        assert services.plugin_manager.registry is providers.plugin_registry
+        loads = services.start_plugins()
+        assert any(result.success for result in loads)
+        assert "ExampleReferenceProvider" in providers.available_fetchers
+        frame, source = providers.get_daily_data("600519")
+        assert source == "ExampleReferenceProvider"
+        assert len(frame) == 2
+    finally:
+        services.close()
+        DataFetcherManager.reset_daily_source_health()
+
+
+def test_application_services_auto_bind_defaults_off_keeps_unbound_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.application_services import ApplicationServices
+
+    monkeypatch.delenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, raising=False)
+    services = ApplicationServices(builtin_plugins=())
+    try:
+        assert services.data_fetcher_manager is None
+        # Unbound process registry is not a DataFetcherManager registry.
+        assert services.plugin_manager.registry is not None
+    finally:
+        services.close()
+

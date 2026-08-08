@@ -188,11 +188,12 @@ through the administrator security-audit API. A failed audit write is logged and
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | off | Composition helpers may return the target `DataFetcherManager.plugin_registry` for `PluginManager` construction so registered providers route without extra glue |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | off | When enabled, the default `ApplicationServices` composition root binds `PluginManager` to a process `DataFetcherManager.plugin_registry` (created or injected) so registered providers route without extra glue |
 
-Leave the flag unset unless a composition root is prepared to supply a concrete
-`DataFetcherManager` instance. The default process root still does not invent a
-process-wide manager.
+Leave the flag unset to keep historical manual mode. When enabled without an
+injected manager, `ApplicationServices` constructs one `DataFetcherManager` and
+exposes it as `services.data_fetcher_manager`. Custom roots may still call
+`try_build_auto_bound_registry` directly.
 
 ```python
 from data_provider import DataFetcherManager

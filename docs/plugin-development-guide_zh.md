@@ -179,10 +179,11 @@ enable / disable / reload / load 会通过既有安全审计设施写入 best-ef
 
 | 配置项 | 默认 | 效果 |
 | --- | --- | --- |
-| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 组合根可调用 helper 取得目标 `DataFetcherManager.plugin_registry`，使已注册 provider 无需额外手工胶水即可被发现 |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 开启后，默认 `ApplicationServices` 组合根会将 `PluginManager` 绑定到进程级 `DataFetcherManager.plugin_registry`（注入或自动创建），使已注册 provider 无需额外胶水即可路由 |
 
-未准备具体 `DataFetcherManager` 实例时请保持关闭。默认进程根仍不会凭空创建
-进程级 provider 管理器。
+保持关闭即可维持历史手动模式。开启且未注入 manager 时，`ApplicationServices`
+会构造一个 `DataFetcherManager` 并通过 `services.data_fetcher_manager` 暴露。
+自定义组合根仍可直接调用 `try_build_auto_bound_registry`。
 
 ```python
 from data_provider import DataFetcherManager

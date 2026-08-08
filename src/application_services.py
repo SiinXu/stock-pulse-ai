@@ -104,6 +104,7 @@ class ApplicationServices:
         notification_channel_registry: Optional[
             "NotificationChannelRegistry"
         ] = None,
+        data_fetcher_manager: Any | None = None,
         builtin_plugins: Optional[Iterable["Plugin"]] = None,
         plugins_dir: str | Path | None = None,
         plugin_application_version: str = PLUGIN_APPLICATION_VERSION,
@@ -112,6 +113,7 @@ class ApplicationServices:
         self._database = database
         self._search = search
         self._task_queue = task_queue
+        self._data_fetcher_manager = data_fetcher_manager
         from src.plugins import (
             AnalysisStrategyRegistry,
             NotificationChannelRegistry,
@@ -131,9 +133,13 @@ class ApplicationServices:
         if plugin_manager is None:
             from src.plugins import (
                 PluginManager,
+                build_agent_tool_extension_contract,
                 build_analysis_strategy_extension_contract,
                 build_application_extension_registry,
                 build_notification_channel_extension_contract,
+                data_provider_auto_bind_enabled,
+                event_hook_extension_contract,
+                try_build_auto_bound_registry,
             )
 
             if analysis_strategy_registry is None:
@@ -144,23 +150,52 @@ class ApplicationServices:
                 notification_channel_registry = NotificationChannelRegistry(
                     lambda: self.config
                 )
+            process_contracts = {
+                "analysis_strategy": (
+                    build_analysis_strategy_extension_contract(
+                        analysis_strategy_registry
+                    )
+                ),
+                "notification_channel": (
+                    build_notification_channel_extension_contract(
+                        notification_channel_registry
+                    )
+                ),
+                "agent_tool": build_agent_tool_extension_contract(
+                    _get_process_agent_tool_registry
+                ),
+                "event_hook": event_hook_extension_contract(),
+            }
+            registry = None
+            if data_provider_auto_bind_enabled():
+                # Opt-in process composition: bind PluginManager to the exact
+                # DataFetcherManager.plugin_registry so provider plugins route.
+                from data_provider import DataFetcherManager
+
+                if self._data_fetcher_manager is None:
+                    self._data_fetcher_manager = DataFetcherManager(
+                        extension_contracts=process_contracts,
+                    )
+                bound_registry, bind_error = try_build_auto_bound_registry(
+                    self._data_fetcher_manager
+                )
+                if bound_registry is not None:
+                    registry = bound_registry
+                elif bind_error is not None:
+                    log_safe_exception(
+                        logger,
+                        "Data provider auto-bind unavailable; using unbound plugin registry",
+                        RuntimeError(bind_error),
+                        error_code=bind_error,
+                    )
+            if registry is None:
+                registry = build_application_extension_registry(
+                    _get_process_agent_tool_registry,
+                    additional_contracts=process_contracts,
+                )
             plugin_manager = PluginManager(
                 application_version=plugin_application_version,
-                registry=build_application_extension_registry(
-                    _get_process_agent_tool_registry,
-                    additional_contracts={
-                        "analysis_strategy": (
-                            build_analysis_strategy_extension_contract(
-                                analysis_strategy_registry
-                            )
-                        ),
-                        "notification_channel": (
-                            build_notification_channel_extension_contract(
-                                notification_channel_registry
-                            )
-                        ),
-                    },
-                ),
+                registry=registry,
             )
         else:
             configured_backend = plugin_manager.registry.native_backend(
@@ -276,6 +311,12 @@ class ApplicationServices:
         """Return the process plugin lifecycle and registration authority."""
 
         return self._plugin_manager
+
+    @property
+    def data_fetcher_manager(self) -> Any | None:
+        """Return the process data-fetcher manager when auto-bind owns one."""
+
+        return self._data_fetcher_manager
 
     @property
     def analysis_strategy_registry(self) -> Optional["AnalysisStrategyRegistry"]:
