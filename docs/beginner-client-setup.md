@@ -6,6 +6,17 @@ English: [beginner-client-setup_EN.md](beginner-client-setup_EN.md). 装好后�
 
 > 本项目生成的是辅助分析报告，不构成投资建议。真实交易请自行判断风险。
 
+
+## 零配置首次成功（无 API Key）
+
+不必先准备云端 Key 也能完成第一次有用的运行：
+
+1. **data-only（与 `--dry-run` 产物一致）**：配置好自选股后执行 `python main.py --dry-run`，只拉行情数据、不调用 LLM。
+2. **本机 Ollama 自动探测**：就绪检查默认对回环地址（`127.0.0.1` / `localhost` / `::1`）做快速探测；失败只写日志，**不阻塞启动**。探测成功时会提示本地零成本路径的非密钥字段（如 `LLM_CHANNELS=ollama`）。
+3. 关闭探测：`LOCAL_RUNTIME_AUTO_DETECT=false`。超时：`LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35`（默认）。
+
+完整 AI 分析仍需要主要模型（云端 Key 或已应用的本地 Ollama 配置）。云端配置见下文「配置 AI 模型」。
+
 ## 先准备
 
 1. Windows 或 macOS 电脑。

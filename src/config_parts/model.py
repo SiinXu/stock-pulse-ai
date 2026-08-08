@@ -202,6 +202,9 @@ class Config:
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
     searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
+    # Optional RSS/Atom feeds for on-demand news search (supplement to SearXNG; empty = inert)
+    rss_news_feed_urls: List[str] = field(default_factory=list)
+    rss_news_fetch_timeout_sec: float = 8.0  # Per-feed pull timeout for search-pipeline RSS/Atom
 
     # === Social Sentiment (US stocks only, api.adanos.org) ===
     social_sentiment_api_key: Optional[str] = None
@@ -230,6 +233,7 @@ class Config:
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
@@ -240,6 +244,7 @@ class Config:
     agent_portfolio_agent_timeout_s: float = 0
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
+    agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
@@ -546,6 +551,7 @@ _CONFIG_METHOD_GROUPS = (
         (
             "reset_instance",
             "has_searxng_enabled",
+            "has_rss_news_feeds_enabled",
             "has_search_capability_enabled",
             "is_agent_available",
             "refresh_stock_list",

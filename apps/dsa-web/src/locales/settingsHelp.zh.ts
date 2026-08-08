@@ -358,6 +358,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 AlphaSift 适配层来源校验和显式修复安装。'],
     notes: ['请确认来源可信；AlphaSift 是实验性质选股能力，启用前应理解相关风险。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS/Atom 订阅源，作为按需新闻检索的补充来源。',
+    usage: '使用英文逗号分隔的 http(s) 订阅源 URL；留空则功能保持关闭。抓取遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '仅作为 SearXNG 或付费搜索的补充，不是完整替代。',
+      '私有或回环地址需要 OUTBOUND_HTTP_ALLOWLIST 精确放行。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制单源超时（1-30 秒，默认 8）。',
+    ],
+    impact: ['配置后会影响按需新闻检索的覆盖面。'],
+    notes: ['单个订阅源失败不应阻断其余新闻链路。'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: '实时行情源优先级',
     summary: '配置多个实时行情源的尝试顺序。',
@@ -1070,16 +1082,24 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
-  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
-    title: '技能观点后验加权',
-    summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
-    usage: '默认关闭以保持聚合路径字节级一致。仅在完成样本记录/评估（或回填）并检查 GET /api/v1/skill-outcomes/stats 后再开启。',
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略合议',
+    summary: '启用并发多策略专家调度，并生成最终分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并输出分歧说明；关闭时保持 Phase-1 合成路径不变。',
     valueNotes: [
-      '默认关闭；关闭时聚合路径与既有回测/记忆加权行为一致。',
-      '开启后每个 skill_id+horizon+engine_version 桶需独立达到 30 条 evaluated 样本；因子限制在 [1/1.2, 1.2]，不足或失败时中性 1.0。',
+      '关闭时保持既有合成行为字节级一致。',
+      '开启后启用多策略合议与最终分歧说明。',
     ],
-    impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
-    notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
+    impact: ['影响 Agent 流水线专家调度和分歧说明字段。'],
+    notes: ['多策略约定见 docs/multi-strategy-contract.md。'],
+  },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: '投委会模式',
+    summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
+    usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
+    valueNotes: ['关闭时保持既有单路径分析行为。'],
+    impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
+    notes: ['需要 Agent multi 能力。'],
   },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: '决策风格后验校准',
@@ -1093,11 +1113,25 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
     notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
   },
-  'settings.agent.event_impact_context': {
-    title: '告警影响上下文',
-    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
-    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
-    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: '技能观点后验加权',
+    summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
+    usage: '默认关闭以保持聚合路径字节级一致。仅在完成样本记录/评估（或回填）并检查 GET /api/v1/skill-outcomes/stats 后再开启。',
+    valueNotes: [
+      '默认关闭；关闭时聚合路径与既有回测/记忆加权行为一致。',
+      '开启后每个 skill_id+horizon+engine_version 桶需独立达到 30 条 evaluated 样本；因子限制在 [1/1.2, 1.2]，不足或失败时中性 1.0。',
+    ],
+    impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
+    notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
+  },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: '启用估值 Agent 工具',
+    summary: '可选的 DCF / 相对估值 Agent 工具，输出透明假设。',
+    usage: '默认关闭。仅在希望 Agent 调用 estimate_stock_valuation 时开启，并需重启进程。',
+    notes: [
+      '关闭时工具不会注册到进程内工具表。',
+      '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+    ],
   },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
@@ -1517,15 +1551,33 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['决定 Kronos Agent Tool 能否注册并做本地推理。'],
     notes: ['示例：/absolute/path/to/kronos-weights，内含 Kronos-mini/ 与 Kronos-Tokenizer-2k/。'],
   },
-  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
-    title: '启用估值 Agent 工具',
-    summary: '可选的 DCF / 相对估值 Agent 工具，输出透明假设。',
-    usage: '默认关闭。仅在希望 Agent 调用 estimate_stock_valuation 时开启，并需重启进程。',
-    notes: [
-      '关闭时工具不会注册到进程内工具表。',
-      '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+  'settings.agent.event_impact_context': {
+    title: '告警影响上下文',
+    summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
+    usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
+    notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
+  },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: '本地运行时自动探测',
+    summary: '就绪检查时对本机 Ollama 做快速回环探测（零配置首次成功）。',
+    usage:
+      '默认开启。仅探测回环地址（127.0.0.0/8、::1、localhost），失败只写日志、不阻塞启动。' +
+      '探测成功时会提示本地零成本路径的非密钥字段。',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
     ],
   },
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: '本地运行时探测超时',
+    summary: '本地运行时探测单次请求超时（秒）。',
+    usage: '保持较短（默认 0.35，限制 0.05–2.0），避免 Ollama 未启动时拖慢就绪检查。',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
 };
 
 export default settingsHelpZhCN;
