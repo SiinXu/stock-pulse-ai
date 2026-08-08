@@ -4843,7 +4843,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PROXY_PORT": "Puerto del proxy",
   "utils.systemConfigI18n.fieldTitleMaps.USE_PROXY": "Activar proxy local",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.extensions.label": "Extensions",
-  "i18n.uiText.UI_TEXT.runFlow.nodeDetails.toolSequence": "Tool call sequence",
   "i18n.uiText.UI_TEXT.settings.loadedExtensionsColCapabilities": "Extension points",
   "i18n.uiText.UI_TEXT.settings.loadedExtensionsColName": "Name",
   "i18n.uiText.UI_TEXT.settings.loadedExtensionsColNotes": "Failure / notes",
