@@ -30,4 +30,21 @@ describe('StockBar', () => {
     expect(screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' }).closest('label')).toHaveClass('h-11', 'w-11');
     expect(screen.getByRole('button', { name: '删除' })).toHaveAttribute('data-control', 'icon-button');
   });
+
+  it('exposes a min-h-0 height chain for the stock-bar scroll viewport', () => {
+    const { container } = render(
+      <StockBar
+        items={[item]}
+        isLoading={false}
+        onItemClick={vi.fn()}
+        className="min-h-0 flex-1 overflow-hidden"
+      />,
+    );
+
+    const root = container.firstElementChild;
+    expect(root).toHaveClass('min-h-0');
+    const viewport = screen.getByTestId('home-stock-bar-scroll');
+    expect(viewport).toHaveClass('min-h-0', 'overflow-y-auto');
+    expect(viewport.parentElement).toHaveClass('min-h-0', 'flex-1');
+  });
 });
