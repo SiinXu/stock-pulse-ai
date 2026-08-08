@@ -1057,6 +1057,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
     notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
   },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: 'Enable Valuation Agent Tool',
+    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
+    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
+    notes: [
+      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
+      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
+      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
+    ],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
