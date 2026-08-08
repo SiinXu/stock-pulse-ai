@@ -1892,9 +1892,29 @@ export interface paths {
         };
         /**
          * List registered plugins and lifecycle state
-         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
+         * @description Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.
          */
         get: operations["listPlugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read-only plugin health snapshot
+         * @description Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.
+         */
+        get: operations["getPluginHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8117,6 +8137,56 @@ export interface components {
             win_rate_pct?: number | null;
         };
         /**
+         * PluginHealthEntryResponse
+         * @description One plugin health row for operator diagnostics consumers.
+         */
+        PluginHealthEntryResponse: {
+            /** Desired Enabled */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /** Last Error Code */
+            last_error_code?: string | null;
+            /** Name */
+            name: string;
+            /** Package Root */
+            package_root?: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloadable
+             * @default false
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginHealthResponse
+         * @description GET /api/v1/plugins/health — read-only plugin health snapshot.
+         */
+        PluginHealthResponse: {
+            /**
+             * Generated At
+             * @description UTC ISO-8601 timestamp when the snapshot was built
+             */
+            generated_at: string;
+            /** Plugins */
+            plugins?: components["schemas"]["PluginHealthEntryResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
          * PluginInfo
          * @description One registered plugin and its lifecycle state.
          */
@@ -8143,6 +8213,11 @@ export interface components {
              * @description Stable plugin id from the manifest
              */
             id: string;
+            /**
+             * Last Error Code
+             * @description Stable last lifecycle failure code when the plugin is degraded
+             */
+            last_error_code?: string | null;
             /** Name */
             name: string;
             /**
@@ -16983,6 +17058,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginListResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPluginHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginHealthResponse"];
                 };
             };
             /** @description Login required when ADMIN_AUTH_ENABLED=true */

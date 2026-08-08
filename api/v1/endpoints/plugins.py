@@ -11,6 +11,8 @@ from fastapi.security import APIKeyCookie
 
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.plugins import (
+    PluginHealthEntryResponse,
+    PluginHealthResponse,
     PluginInfo,
     PluginLifecycleRequest,
     PluginLifecycleResponse,
@@ -57,6 +59,7 @@ def _to_info(snapshot: PluginSnapshot) -> PluginInfo:
         extension_points=list(snapshot.extension_points),
         description=snapshot.manifest.description,
         author=snapshot.manifest.author,
+        last_error_code=snapshot.last_error_code,
     )
 
 
@@ -67,7 +70,8 @@ def _to_info(snapshot: PluginSnapshot) -> PluginInfo:
     summary="List registered plugins and lifecycle state",
     description=(
         "Return every plugin registered on the process composition root, including "
-        "runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this."
+        "runtime state, last failure codes, and persisted desired_enabled intent. "
+        "PLUG-02 UI and loaded-extensions consumers use this list."
     ),
     operation_id="listPlugins",
 )
@@ -75,6 +79,41 @@ def list_plugins() -> PluginListResponse:
     manager = _plugin_manager()
     items = [_to_info(snapshot) for snapshot in manager.list_snapshots()]
     return PluginListResponse(items=items, total=len(items))
+
+
+@router.get(
+    "/health",
+    response_model=PluginHealthResponse,
+    responses={**AUTH_RESPONSE},
+    summary="Read-only plugin health snapshot",
+    description=(
+        "Return each registered plugin's load state, extension points, and last "
+        "stable failure code. Backs operator diagnostics and the loaded-extensions "
+        "panel without introducing a new API version surface."
+    ),
+    operation_id="getPluginHealth",
+)
+def get_plugin_health() -> PluginHealthResponse:
+    report = _plugin_manager().health_check()
+    return PluginHealthResponse(
+        generated_at=report.generated_at,
+        total=report.total,
+        plugins=[
+            PluginHealthEntryResponse(
+                plugin_id=entry.plugin_id,
+                name=entry.name,
+                version=entry.version,
+                source=entry.source,
+                state=entry.state,
+                desired_enabled=entry.desired_enabled,
+                extension_points=list(entry.extension_points),
+                last_error_code=entry.last_error_code,
+                package_root=entry.package_root,
+                reloadable=entry.reloadable,
+            )
+            for entry in report.plugins
+        ],
+    )
 
 
 @router.post(

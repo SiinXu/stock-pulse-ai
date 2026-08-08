@@ -353,6 +353,16 @@ def test_plugins_api_list_and_toggle(tmp_path: Path) -> None:
         assert body["total"] == 1
         assert body["items"][0]["id"] == "api-plugin"
         assert body["items"][0]["state"] == "enabled"
+        assert body["items"][0]["last_error_code"] is None
+
+        health = client.get("/api/v1/plugins/health")
+        assert health.status_code == 200
+        health_body = health.json()
+        assert health_body["total"] == 1
+        assert health_body["plugins"][0]["plugin_id"] == "api-plugin"
+        assert health_body["plugins"][0]["state"] == "enabled"
+        assert health_body["plugins"][0]["last_error_code"] is None
+        assert "generated_at" in health_body
 
         disabled = client.post(
             "/api/v1/plugins/api-plugin/lifecycle",

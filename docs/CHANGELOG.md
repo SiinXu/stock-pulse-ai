@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Changed] ApplicationServices composition root calls data-provider auto-bind when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled so provider plugins route through the process PluginManager.
 
-- [Added] Plugin lifecycle security-audit trail (load/enable/disable/reload), opt-in Data Provider auto-bind helper (`PLUGIN_DATA_PROVIDER_AUTO_BIND`), and plugin health_check snapshots with last error codes.
+- [Added] Plugin lifecycle security-audit trail (load/enable/disable/reload), opt-in Data Provider auto-bind helper (`PLUGIN_DATA_PROVIDER_AUTO_BIND`), plugin health_check snapshots with last error codes, and GET `/api/v1/plugins/health` plus list `last_error_code` for diagnostics consumers.
 - [Docs] Add GitHub Actions three-step quickstart (`docs/actions-quickstart.md` / `docs/actions-quickstart_CN.md`) and a README Quick start entry link (#852).
 - [Fixed] Daily provider all-empty/all-None failures now include per-provider detail lines in DataFetchError (no longer a bare failure header).
 - [Tests] Offline provider fallback contract suite with failure-mode fixtures (empty/rate-limit/missing-field/malformed) covering single-source failover, all-fail DataFetchError, STANDARD_COLUMNS normalization, and bounded retry.
