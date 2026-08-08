@@ -19,23 +19,26 @@ ensure_litellm_stub()
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL AGENT_CHAT_FAILURE_MESSAGE
-    AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT AgentContext
-    AgentOrchestrator AgentRunStats AgentRuntimeFacts Any Callable
-    DegradationBoundary DegradedEvent Dict ExecutionState FuturesTimeoutError
-    LLMToolAdapter List NON_CRITICAL_BASE_STAGES Optional OrchestratorResult
+    AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT
+    AgentContext AgentOrchestrator AgentRunStats AgentRuntimeFacts
+    AgentSkillScheduler Any Callable DegradationBoundary DegradedEvent
+    Dict ExecutionState FuturesTimeoutError LLMToolAdapter List
+    NON_CRITICAL_BASE_STAGES Optional OrchestratorResult
     PipelineTerminationFact RiskOverrideApplication RuntimeGuardPolicy
-    StageFailurePolicy StageFailureReason StageResult StageStatus StockScope
-    StrategyEngine StrategyResultStatus TYPE_CHECKING ThreadPoolExecutor
-    ToolRegistry VALID_MODES annotations build_agent_chat_market_context
+    SkillBatchResult StageFailurePolicy StageFailureReason StageResult
+    StageStatus StockScope StrategyEngine StrategyResultStatus
+    TYPE_CHECKING ThreadPoolExecutor ToolRegistry VALID_MODES
+    annotations build_agent_chat_market_context
     build_agent_chat_tool_registry build_agent_disagreement_summary
     build_agent_runtime_facts build_risk_override_application
     build_risk_override_plan build_visible_chat_history
-    classify_result_terminal_state contextvars copy dataclass dataclass_fields
-    field get_config inspect json log_runtime_guard_event log_safe_exception
-    logger logging normalize_decision_signal normalize_report_language
-    normalize_stage_failure_reason parse_dashboard_json re resolve_stock_scope
-    run_agent_loop sanitize_agent_dashboard_payload sanitize_agent_diagnostic
-    stream_event threading time
+    classify_result_terminal_state contextvars copy dataclass
+    dataclass_fields field get_config inspect json
+    log_runtime_guard_event log_safe_exception logger logging
+    normalize_decision_signal normalize_report_language
+    normalize_stage_failure_reason parse_dashboard_json re
+    resolve_stock_scope run_agent_loop sanitize_agent_dashboard_payload
+    sanitize_agent_diagnostic stream_event threading time
     """.split()
 )
 
@@ -70,6 +73,8 @@ EXPECTED_PIPELINE_METHODS = (
     "_tool_registry_for_context",
     "_trim_agent_tool_names",
     "_build_agent_chain",
+    "_run_specialist_agent_batch",
+    "_skill_batch_timeout_slice",
     "_build_specialist_agents",
     "_build_skill_agents",
     "_build_strategy_agents",
@@ -109,7 +114,7 @@ EXPECTED_DASHBOARD_METHODS = (
 EXPECTED_AST_HASHES = {
     "_ExecutionMethods": "353d048051f1e3c3459a836a41481d45d35c0b3c064c06f459670209414c28e6",
     "_ChatMethods": "d4ea52031305b07db97efc6b1dab61e558c3afb3d7e82bb966274116028f478d",
-    "_PipelineMethods": "6e10755890c212c3cb3cf2598b39ed19e20fa7be897cd4cfeefab121409d772b",
+    "_PipelineMethods": "4611d9230b5c31e916ef72fc5125fafd580a4f5ee002e3ddee8b615352c7914e",
     "_DashboardMethods": "095aa23fecba4620e07e25f2b7dc3f6836fb4786dbdc239a1543311d707060f8",
 }
 
