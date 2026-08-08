@@ -269,7 +269,7 @@ The `changes` job in `.github/workflows/ci.yml` emits two independent filters:
 
 | Output | Consumed by | Paths (summary) |
 | --- | --- | --- |
-| `frontend` | `web-gate` on PR and push (lint / i18n / unit / build) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
+| `frontend` | `web-gate` on PR and push (lint / i18n / unit / build / bundle size) | `apps/dsa-web/**`, `.github/workflows/ci.yml` |
 | `web_e2e` | `web-e2e` on **push-to-main only** (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
 
 PR runs keep the ruleset-required backend/docker/openapi gates (plus path-filtered `web-gate` for frontend). `web-e2e` and `api-real-client` are observation jobs after merge. The auxiliary `PR Review` workflow is opt-in via `workflow_dispatch` and does not auto-run on every PR.

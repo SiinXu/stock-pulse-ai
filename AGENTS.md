@@ -164,7 +164,7 @@ The current repository CI mainly contains:
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
-| `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test`, and `npm run build` during frontend changes | Yes on PR when frontend paths change (not a ruleset required name; still the frontend quality gate) |
+| `web-gate` | `.github/workflows/ci.yml` | Executes `npm run lint`, `npm run test:i18n`, `npm run test`, `npm run build`, and the bundle size budget check during frontend changes | Yes on PR when frontend paths change (not a ruleset required name; still the frontend quality gate) |
 | `web-e2e` | `.github/workflows/ci.yml` | Real backend + Vite + Playwright smoke | No on PR; observation on push-to-main when path filter matches |
 | `api-real-client` | `.github/workflows/ci.yml` | `tests/api` with real Starlette TestClient | No on PR; observation on push-to-main |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
