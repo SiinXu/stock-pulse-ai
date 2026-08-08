@@ -9,7 +9,7 @@
 后端配置注册表在 `src/core/config_registry.py` 中为字段追加帮助元数据：
 
 - `help_key`：前端多语言帮助文案的稳定 key。
-- `examples`：可直接展示的配置样例。敏感字段只能使用占位符，例如 `sk-xxxx`、`your_token`。
+- `examples`：配置样例**字面量**（`KEY=value`、URL、端口等），保存在中英文 source 中且必须逐字节一致；**不进入** UI 翻译 inventory，也不是按语言翻译的文案。当前 Settings 字段日常 UI **不渲染** raw examples（见 `SettingsField` / 相关测试）；它们是 source metadata，供校验、文档与将来显式展示使用。敏感字段只能使用占位符，例如 `sk-xxxx`、`your_token`。
 - `docs`：相关文档链接，优先指向仓库内已有专题文档或完整指南。
 - `warning_codes`：面向前端或后续校验扩展的稳定提示 code。
 
