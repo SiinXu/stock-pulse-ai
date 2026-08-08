@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Signal Center deep links with `?signal=<id>` fall back to fetch-by-id when the signal is not on the currently loaded list/latest/timeline page, and clear the URL param on 404/forbidden without a blank page.
+- [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
 - [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
