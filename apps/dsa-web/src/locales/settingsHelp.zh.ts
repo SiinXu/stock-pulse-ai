@@ -269,6 +269,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 OpenAI-compatible legacy 配置路径下的模型请求。'],
     notes: ['连接模式下优先维护各连接自己的 LLM_<NAME>_BASE_URL。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS 或 Atom 订阅地址，作为按需新闻搜索的补充。',
+    usage: '填写逗号分隔的 http(s) 订阅地址。留空则保持关闭。抓取遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '这是对 SearXNG 或付费搜索的补充，不是完整替代。',
+      '私有或环回主机需要在 OUTBOUND_HTTP_ALLOWLIST 中精确列出。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制单源超时（1-30 秒，默认 8）。',
+    ],
+    impact: ['配置后且源可返回条目时，影响按需新闻搜索覆盖面。'],
+    notes: ['单个订阅失败不应中断其余新闻链路。'],
+  },
   'settings.data_source.TUSHARE_TOKEN': {
     title: 'Tushare Token',
     summary: '用于访问 Tushare Pro 数据接口。',
