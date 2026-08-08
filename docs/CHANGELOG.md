@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
+- [Added] Investment Committee analysis mode (default-off `AGENT_INVESTMENT_COMMITTEE_MODE`): curated persona Skill preset via the existing specialist path + StrategyEngine, with a structured `committee_deliberation` report section (#545).
 - [Added] Exposed `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` in Web Settings (system network group) with restart help, sensitive host masking, and setup_env re-application on config reload.
 
 - [Added] Added fail-closed `LOCAL_ONLY_MODE` outbound gate with redacted outbound-activity API/panel and bilingual local-only threat-model docs (issue #218).

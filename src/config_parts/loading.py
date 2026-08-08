@@ -732,6 +732,10 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            agent_investment_committee_mode=parse_env_bool(
+                os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
+                False,
+            ),
             skill_opinion_recording_enabled=parse_env_bool(
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
                 False,
