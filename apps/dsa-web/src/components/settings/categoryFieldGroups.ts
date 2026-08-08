@@ -139,6 +139,7 @@ const SYSTEM_GROUPS: CategoryFieldGroup[] = [
       'WEBUI_AUTO_BUILD',
       'WEBUI_HOST',
       'WEBUI_PORT',
+      'LOCAL_ONLY_MODE',
       'ADMIN_AUTH_ENABLED',
       'TRUST_X_FORWARDED_FOR',
       'USE_PROXY',

@@ -256,13 +256,15 @@ const fieldTitleMapZh = {
   ANTHROPIC_MODEL: 'Anthropic 模型',
   ANTHROPIC_TEMPERATURE: 'Anthropic 温度参数',
   ANTHROPIC_MAX_TOKENS: 'Anthropic 最大输出 Token 数',
+  LOCAL_ONLY_MODE: '仅本地模式',
+  FEISHU_CHAT_ID: '飞书会话 ID',
+  FEISHU_RECEIVE_ID_TYPE: '飞书接收 ID 类型',
+  FEISHU_DOMAIN: '飞书 API 域名',
   DAILY_BRIEF_ENABLED: '启用每日简报',
   DAILY_BRIEF_SCHEDULE_TIME: '每日简报计划时间',
   DAILY_BRIEF_TIMEZONE: '每日简报时区',
   DAILY_BRIEF_MIN_SAMPLES: '每日简报最小样本数',
-  FEISHU_CHAT_ID: '飞书会话 ID',
-  FEISHU_RECEIVE_ID_TYPE: '飞书接收 ID 类型',
-  FEISHU_DOMAIN: '飞书 API 域名',
+
 } as const;
 
 type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
@@ -478,13 +480,15 @@ const fieldTitleMapEn = {
   ANTHROPIC_MODEL: 'Anthropic Model',
   ANTHROPIC_TEMPERATURE: 'Anthropic Temperature',
   ANTHROPIC_MAX_TOKENS: 'Anthropic Max Tokens',
+  LOCAL_ONLY_MODE: 'Local Only Mode',
+  FEISHU_CHAT_ID: 'Feishu Chat ID',
+  FEISHU_RECEIVE_ID_TYPE: 'Feishu Receive ID Type',
+  FEISHU_DOMAIN: 'Feishu Domain',
   DAILY_BRIEF_ENABLED: 'Daily Brief Enabled',
   DAILY_BRIEF_SCHEDULE_TIME: 'Daily Brief Schedule Time',
   DAILY_BRIEF_TIMEZONE: 'Daily Brief Timezone',
   DAILY_BRIEF_MIN_SAMPLES: 'Daily Brief Min Samples',
-  FEISHU_CHAT_ID: 'Feishu Chat ID',
-  FEISHU_RECEIVE_ID_TYPE: 'Feishu Receive ID Type',
-  FEISHU_DOMAIN: 'Feishu Domain',
+
 } satisfies Record<SystemConfigFieldTitleKey, string>;
 
 const fieldTitleMaps: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord(
