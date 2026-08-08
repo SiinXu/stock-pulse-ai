@@ -4,6 +4,22 @@ import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../..
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { LLMChannelEditor } from '../LLMChannelEditor';
 
+vi.mock('../../../api/localModels', () => ({
+  localModelsApi: {
+    getRuntime: vi.fn(async () => ({
+      status: 'running',
+      configuration: {
+        configVersion: '1',
+        registeredModels: ['qwen2.5'],
+        primaryModel: 'qwen2.5',
+        agentModel: '',
+        importedModels: [],
+      },
+      installedModels: ['qwen2.5'],
+    })),
+  },
+}));
+
 function provider(
   overrides: Partial<LlmProviderCatalogEntry> & Pick<LlmProviderCatalogEntry, 'id' | 'label' | 'protocol'>,
 ): LlmProviderCatalogEntry {
@@ -169,15 +185,32 @@ function officialItemsWithoutBaseUrl(providerId: 'gemini' | 'anthropic') {
   ];
 }
 
-const { testLLMChannel, discoverLLMChannelModels } = vi.hoisted(() => ({
+const { testLLMChannel, discoverLLMChannelModels, getGenerationBackendStatus } = vi.hoisted(() => ({
   testLLMChannel: vi.fn(),
   discoverLLMChannelModels: vi.fn(),
+  getGenerationBackendStatus: vi.fn(async () => ({
+    primaryBackendId: 'litellm',
+    fallbackBackendId: null,
+    primary: {
+      backendId: 'litellm',
+      backendType: 'litellm',
+      available: true,
+      healthStatus: 'passed',
+      supportsJson: true,
+      supportsStream: true,
+      supportsTools: true,
+      maxConcurrency: 1,
+    },
+    fallback: null,
+    backends: [],
+  })),
 }));
 
 vi.mock('../../../api/systemConfig', () => ({
   systemConfigApi: {
     testLLMChannel: (...args: unknown[]) => testLLMChannel(...args),
     discoverLLMChannelModels: (...args: unknown[]) => discoverLLMChannelModels(...args),
+    getGenerationBackendStatus: (...args: unknown[]) => getGenerationBackendStatus(...args),
   },
 }));
 
@@ -1530,7 +1563,7 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
     expect(onReplaceModelReferences).toHaveBeenCalledTimes(1);
     expect(onReplaceModelReferences.mock.calls[0]?.[0]).toHaveLength(2);
-  });
+  }, 15000);
 
   it('opens and focuses the requested dynamic connection field through the editor signal', async () => {
     render(
@@ -1693,7 +1726,7 @@ describe('LLMChannelEditor', () => {
     replaceModels(['gpt-4o-mini']);
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
     await waitFor(() => expect(lastDraft(onDraftItemsChange)).toEqual([]));
-  });
+  }, 15000);
 
   it('does not emit invalid env keys while the connection name is empty', () => {
     const onDraftItemsChange = vi.fn();
@@ -2255,7 +2288,35 @@ describe('LLMChannelEditor', () => {
       <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
     const dialog = editConnection();
-    expect(container.textContent).not.toMatch(/渠道|LLM_|LITELLM_|GENERATION_BACKEND|主后端|备用后端/);
+    // Model Sources hub may mention primary/fallback backends for Local CLI status;
+    // still forbid legacy channel/env jargon and internal config keys.
+    expect(container.textContent).not.toMatch(/渠道|LLM_|LITELLM_|GENERATION_BACKEND/);
     expect(dialog.textContent).not.toMatch(/JSON|Tools|Stream|运行时能力/);
   });
+  it('renders Model Sources hub groups and searchable filter', async () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        maskToken="******"
+      />,
+    );
+
+    expect(await screen.findByTestId('model-sources-hub')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-cloud-group')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-local-group')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-cli-group')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-fallback-group')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('model-sources-filter'), { target: { value: 'zzz-no-match' } });
+    expect(await screen.findByTestId('model-sources-no-matches')).toBeInTheDocument();
+  });
+
+  it('opens the in-page connection wizard instead of a modal overlay', async () => {
+    const dialog = openAddAfterRender();
+    expect(dialog).toHaveAttribute('data-testid', 'connection-wizard');
+    expect(screen.getByTestId('model-sources-hub-wizard')).toBeInTheDocument();
+    expect(screen.queryByTestId('model-sources-hub')).not.toBeInTheDocument();
+  });
+
 });

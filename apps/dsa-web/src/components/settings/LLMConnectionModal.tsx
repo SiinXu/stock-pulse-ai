@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type {
   AvailableModelEntry,
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
-import { Button, CredentialInput, InlineAlert, Input, Modal, SearchableSelect, Select } from '../common';
+import { Button, CredentialInput, InlineAlert, Input, SearchableSelect, Select } from '../common';
 import type { SearchableSelectOption } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
@@ -88,9 +88,9 @@ interface ConnectionModalProps {
   onClose: () => void;
 }
 
-// Two-step connection dialog: pick a provider from the catalog, then fill in
-// only the fields that provider actually needs. Test / discovery failures stay
-// inline — the dialog never closes on error.
+// Full-page connection wizard (surface contract #877): multi-step add/edit for
+// model sources lives in the settings content region, not a long centered Modal.
+// role="dialog" + accessible name keep focus semantics and existing tests stable.
 const ConnectionModal: React.FC<ConnectionModalProps> = ({
   mode,
   initialChannel,
@@ -115,6 +115,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const text = MODEL_ACCESS_TEXT[language];
+  const titleId = useId();
+  const wizardTitle = mode === 'edit' ? text.editService : text.addService;
   const hasConnectionSchema = connectionFields !== undefined;
   const connectionSchemaFields = connectionFields ?? [];
   const [draft, setDraft] = useState<ChannelConfig | null>(initialChannel);
@@ -692,7 +694,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
   // A11y: focus the first form field (not the dialog close button) when the
   // dialog opens and when advancing from the provider step to the form step.
-  // This child effect runs after the Modal's own focus move-in, so it wins.
+  // Focus the target control after the wizard mounts so field deep-links work.
   const focusStep = draft ? 'form' : 'provider';
   useEffect(() => {
     let targetId = providerSelectId;
@@ -722,7 +724,24 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   }, [focusField, focusModels, focusStep, showManualModelInput, supportsDiscovery]);
 
   return (
-    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} size="wide">
+    <section
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby={titleId}
+      data-overlay-dialog="true"
+      data-testid="connection-wizard"
+      className="space-y-4 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card sm:p-5"
+    >
+      <header className="border-b border-[var(--settings-border)] pb-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-text">
+            {text.cloudPurpose}
+          </p>
+          <h2 id={titleId} className="text-base font-semibold text-foreground">
+            {wizardTitle}
+          </h2>
+        </div>
+      </header>
       {!draft ? (
         <div className="space-y-3">
           <p className="text-sm text-secondary-text">{text.chooseProviderDescription}</p>
@@ -1265,7 +1284,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           </div>
         </form>
       )}
-    </Modal>
+    </section>
   );
 };
 
