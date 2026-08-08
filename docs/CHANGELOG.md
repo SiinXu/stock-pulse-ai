@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] CI throughput: two-tier gates (selective pytest on PR, sharded full suite + combined coverage on merge_group), python-minimum smoke on PR, Merge Queue ready triggers.
+- [Fixed] Collapse Alerts rule filters behind AdvancedFilterSheet on mobile/desktop breakpoints and distinguish true-empty vs filtered-empty states with clear/create actions (#879 B2).
 - [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
