@@ -1101,6 +1101,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['仅在开关开启且后验数据充足时改变技能共识权重。'],
     notes: ['不改变标准信号、共识阈值或 AGENT_ARCH=single 行为。'],
   },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: '启用估值 Agent 工具',
+    summary: '可选的 DCF / 相对估值 Agent 工具，输出透明假设。',
+    usage: '默认关闭。仅在希望 Agent 调用 estimate_stock_valuation 时开启，并需重启进程。',
+    notes: [
+      '关闭时工具不会注册到进程内工具表。',
+      '估值结果包含假设与敏感区间；基本面不足时返回 insufficient_fundamentals，不编造数字。',
+    ],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',

@@ -263,6 +263,7 @@ const fieldTitleMapZh = {
   DAILY_BRIEF_SCHEDULE_TIME: '每日简报计划时间',
   DAILY_BRIEF_TIMEZONE: '每日简报时区',
   DAILY_BRIEF_MIN_SAMPLES: '每日简报最小样本数',
+  LOCAL_ONLY_MODE: '仅本地模式',
 
 } as const;
 
@@ -486,6 +487,7 @@ const fieldTitleMapEn = {
   DAILY_BRIEF_SCHEDULE_TIME: 'Daily Brief Schedule Time',
   DAILY_BRIEF_TIMEZONE: 'Daily Brief Timezone',
   DAILY_BRIEF_MIN_SAMPLES: 'Daily Brief Min Samples',
+  LOCAL_ONLY_MODE: 'Local Only Mode',
 
 } satisfies Record<SystemConfigFieldTitleKey, string>;
 
