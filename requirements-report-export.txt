@@ -1,0 +1,19 @@
+# Optional report export dependencies (PDF).
+#
+# NOT included in requirements.txt. Default StockPulse install stays free of
+# PDF tooling. Install the base application first, then:
+#
+#   python -m pip install -r requirements-report-export.txt
+#
+# or: python -m pip install 'fpdf2>=2.7.0,<3'
+#
+# Selection notes (see docs/report-export.md):
+# - fpdf2 is pure Python (no Cairo/Pango system libraries unlike WeasyPrint).
+# - No headless browser required.
+# - Chinese PDF still needs a local .ttf/.otf font (REPORT_EXPORT_PDF_FONT_PATH).
+#
+# This optional set is intentionally outside the universal constraints lock
+# surface so default CI and parallel dependency work stay unaffected. Pin the
+# package explicitly when you need a reproducible operator environment.
+
+fpdf2>=2.7.0,<3

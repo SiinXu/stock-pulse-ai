@@ -31,6 +31,7 @@ from api.v1.endpoints import (
     onboarding,
     portfolio,
     portfolio_risk_metrics,
+    report_export,
     scheduled_tasks,
     scorecard,
     security_audit,
@@ -72,6 +73,14 @@ router.include_router(
     history.router,
     prefix="/history",
     tags=["History"]
+)
+
+# Report export (Markdown / optional PDF). Same /history prefix; static
+# /export/capabilities is registered before /{record_id}/export inside the module.
+router.include_router(
+    report_export.router,
+    prefix="/history",
+    tags=["History"],
 )
 
 router.include_router(

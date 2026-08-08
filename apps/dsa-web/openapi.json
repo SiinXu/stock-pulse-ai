@@ -26651,6 +26651,26 @@
         ]
       }
     },
+    "/api/v1/history/export/capabilities": {
+      "get": {
+        "description": "Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.",
+        "operationId": "get_report_export_capabilities_api_v1_history_export_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Available report export formats and dependency status"
+          }
+        },
+        "summary": "Report export capabilities",
+        "tags": [
+          "History"
+        ]
+      }
+    },
     "/api/v1/history/stocks": {
       "get": {
         "description": "返回历史记录中每只股票的最新一条分析摘要，不包含大盘复盘（code=MARKET）。",
@@ -26866,6 +26886,94 @@
           }
         },
         "summary": "获取历史报告运行诊断摘要",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/export": {
+      "get": {
+        "description": "Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown; report structure and wording are not altered. Chart/image markdown is omitted in PDF with an explicit note. Secrets must not be present in the rendered Markdown (export does not inject credentials).",
+        "operationId": "export_history_report_api_v1_history__record_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Export format: md (default) or pdf",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "md",
+              "description": "Export format: md (default) or pdf",
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exported report file (Markdown or PDF)"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid export format"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Report not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Export or report generation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Optional export dependency or font missing"
+          }
+        },
+        "summary": "Export a history report",
         "tags": [
           "History"
         ]

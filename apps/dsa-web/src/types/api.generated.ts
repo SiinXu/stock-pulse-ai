@@ -1250,6 +1250,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/export/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report export capabilities
+         * @description Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.
+         */
+        get: operations["get_report_export_capabilities_api_v1_history_export_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history/stocks": {
         parameters: {
             query?: never;
@@ -1302,6 +1322,26 @@ export interface paths {
          * @description 根据分析历史记录 ID 或 query_id 获取用户可读诊断摘要和脱敏复制文本。
          */
         get: operations["get_history_diagnostics_api_v1_history__record_id__diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{record_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a history report
+         * @description Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown; report structure and wording are not altered. Chart/image markdown is omitted in PDF with an explicit note. Secrets must not be present in the rendered Markdown (export does not inject credentials).
+         */
+        get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -15244,6 +15284,26 @@ export interface operations {
             };
         };
     };
+    get_report_export_capabilities_api_v1_history_export_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available report export formats and dependency status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     get_stock_bar_api_v1_history_stocks_get: {
         parameters: {
             query?: {
@@ -15378,6 +15438,74 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_history_report_api_v1_history__record_id__export_get: {
+        parameters: {
+            query?: {
+                /** @description Export format: md (default) or pdf */
+                format?: string;
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exported report file (Markdown or PDF) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid export format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Report not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Export or report generation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Optional export dependency or font missing */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

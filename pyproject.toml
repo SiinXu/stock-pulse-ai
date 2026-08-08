@@ -137,6 +137,13 @@ dev = [
     "uv==0.11.31",
 ]
 
+# Optional report PDF export (mirrors requirements-report-export.txt).
+# Prefer: python -m pip install -r requirements-report-export.txt
+# Not part of the default constraints lock surface; see docs/report-export.md.
+report-export = [
+    "fpdf2>=2.7.0,<3",
+]
+
 [project.urls]
 Homepage = "https://github.com/SiinXu/stock-pulse-ai"
 Repository = "https://github.com/SiinXu/stock-pulse-ai"
