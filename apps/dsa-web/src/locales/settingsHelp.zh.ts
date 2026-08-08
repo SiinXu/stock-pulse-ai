@@ -358,6 +358,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 AlphaSift 适配层来源校验和显式修复安装。'],
     notes: ['请确认来源可信；AlphaSift 是实验性质选股能力，启用前应理解相关风险。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS 或 Atom 订阅地址，作为按需新闻搜索的补充来源。',
+    usage: '填写以英文逗号分隔的 http(s) 订阅地址；留空则功能保持关闭。抓取遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '用于补充 SearXNG 或付费搜索，不能完整替代它们。',
+      '私网或回环地址需要在 OUTBOUND_HTTP_ALLOWLIST 中精确放行。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制每个源的超时（1–30 秒，默认 8）。',
+    ],
+    impact: ['配置且源可返回条目时，会扩展按需新闻搜索的覆盖范围。'],
+    notes: ['单个源失败不应中断其余新闻流水线。'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: '实时行情源优先级',
     summary: '配置多个实时行情源的尝试顺序。',
@@ -1069,6 +1081,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
+  },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略审议',
+    summary: '启用并发多策略专家调度，并输出最终分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时不改变 Phase-1 综合路径。',
+    valueNotes: [
+      '关闭时保持既有综合行为，字节级一致。',
+      '开启后启用多策略审议与最终分歧说明。',
+    ],
+    impact: ['影响 Agent 管线中的专家调度与分歧说明字段。'],
+    notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
   },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',

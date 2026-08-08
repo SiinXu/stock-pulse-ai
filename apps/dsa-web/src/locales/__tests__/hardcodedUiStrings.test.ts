@@ -120,6 +120,25 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     context: 'jsx-text',
     purpose: 'Established technical acronym in a result-column heading.',
   },
+  {
+    file: 'playground/scenarios/workspaceScenarios.tsx',
+    text: 'Open agent onboarding wizard',
+    context: 'jsx-text',
+    purpose: 'Playground story control label for opening the agent onboarding wizard demo.',
+  },
+  {
+    file: 'playground/scenarios/settingsScenarios.tsx',
+    text: 'Open agent onboarding',
+    context: 'jsx-text',
+    purpose: 'Playground story control label for opening the settings agent onboarding host demo.',
+  },
+  {
+    file: 'playground/scenarios/settingsScenarios.tsx',
+    text: 'Open first-run wizard',
+    context: 'jsx-text',
+    purpose: 'Playground story control label for opening the first-run wizard demo.',
+  },
+
 ];
 
 function collectSourceFiles(directory: string): string[] {
