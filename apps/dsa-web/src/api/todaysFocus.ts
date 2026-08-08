@@ -42,5 +42,9 @@ export async function getTodaysFocus(query: TodaysFocusQuery = {}): Promise<Toda
       language: query.language,
     },
   });
-  return parseCamelCasePayload(todaysFocusResponseSchema, response.data) as TodaysFocusResponse;
+  return parseCamelCasePayload<TodaysFocusResponse>(
+    response.data,
+    todaysFocusResponseSchema,
+    'TodaysFocusResponse',
+  );
 }
