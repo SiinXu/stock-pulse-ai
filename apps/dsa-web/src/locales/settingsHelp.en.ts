@@ -1040,6 +1040,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: 'Skill Opinion Outcome Weights',
+    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
+    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
+      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
+    ],
+    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
+    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: 'Investment Committee Mode',
     summary: 'Run multi-role investment committee style analysis with structured dissent.',
@@ -1060,16 +1071,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds an optional profile_calibration object to outcome stats; Web shows the calibration card when the field is present.'],
     notes: ['Does not change outcome evaluation, persistence, or reassessment lifecycle.'],
   },
-  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
-    title: 'Skill Opinion Outcome Weights',
-    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
-    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
-    valueNotes: [
-      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
-      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
-    ],
-    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
-    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  'settings.agent.event_impact_context': {
+    title: 'Alert Impact Context',
+    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
+    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
   },
   'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
     title: 'Enable Valuation Agent Tool',
@@ -1499,12 +1505,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
-  'settings.agent.event_impact_context': {
-    title: 'Alert Impact Context',
-    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
-    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
-    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
+
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: 'Local Runtime Auto-Detect',
+    summary: 'Fast loopback-only probe for a local Ollama runtime during setup readiness.',
+    usage:
+      'Leave enabled for zero-config first success. The probe only targets loopback ' +
+      '(127.0.0.0/8, ::1, localhost), never blocks startup, and logs failures only. ' +
+      'When Ollama is reachable, setup readiness offers non-secret local-zero-cost fields.',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
   },
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: 'Local Runtime Detect Timeout',
+    summary: 'Per-request timeout for the loopback local-runtime detect probe.',
+    usage: 'Keep this low (default 0.35s, clamped to 0.05–2.0) so setup status stays fast when Ollama is down.',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
 };
 
 export default settingsHelpEnUS;
