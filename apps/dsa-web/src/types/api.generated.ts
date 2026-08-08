@@ -2615,6 +2615,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/watchlist/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List watchlist groups
+         * @description Return organized watchlist groups. On first access, existing STOCK_LIST symbols are seeded into the default group without loss.
+         */
+        get: operations["list_watchlist_groups_api_v1_stocks_watchlist_groups_get"];
+        put?: never;
+        /** Create a watchlist group */
+        post: operations["create_watchlist_group_api_v1_stocks_watchlist_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/move-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move or copy a symbol between groups
+         * @description Desktop drag-and-drop and mobile Move-to actions share this endpoint.
+         */
+        post: operations["move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder watchlist groups */
+        put: operations["reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a watchlist group
+         * @description Default group cannot be deleted. Exclusive members are moved to Default.
+         */
+        delete: operations["delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename a watchlist group */
+        patch: operations["rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a symbol to a group
+         * @description Supports multi-group membership. Does not remove the symbol from other groups.
+         */
+        post: operations["add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder symbols inside a group */
+        put: operations["reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/{stock_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a symbol from a group
+         * @description Removes membership from one group only. If the symbol would become ungrouped, it is re-homed into the default group. Use the global watchlist remove endpoint to drop a symbol from STOCK_LIST entirely.
+         */
+        delete: operations["remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/watchlist/remove": {
         parameters: {
             query?: never;
@@ -11718,6 +11854,167 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** WatchlistGroupCreateRequest */
+        WatchlistGroupCreateRequest: {
+            /**
+             * Name
+             * @description New group name
+             */
+            name: string;
+        };
+        /** WatchlistGroupMemberAddRequest */
+        WatchlistGroupMemberAddRequest: {
+            /**
+             * Attrs
+             * @description Optional attrs payload (T25/T26 mount). Defaults to empty object.
+             */
+            attrs?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Stock Code
+             * @description Stock code to add to the group
+             */
+            stock_code: string;
+        };
+        /** WatchlistGroupMemberMoveRequest */
+        WatchlistGroupMemberMoveRequest: {
+            /**
+             * Copy Membership
+             * @description When true, keep the source membership (multi-group). Default moves.
+             * @default false
+             */
+            copy_membership: boolean;
+            /** Source Group Id */
+            source_group_id: string;
+            /** Stock Code */
+            stock_code: string;
+            /** Target Group Id */
+            target_group_id: string;
+            /**
+             * Target Index
+             * @description Optional insert index inside the target group
+             */
+            target_index?: number | null;
+        };
+        /** WatchlistGroupMemberReorderRequest */
+        WatchlistGroupMemberReorderRequest: {
+            /**
+             * Ordered Codes
+             * @description Stock codes in desired order within the group
+             */
+            ordered_codes: string[];
+        };
+        /**
+         * WatchlistGroupMemberSchema
+         * @description One symbol membership inside a group.
+         */
+        WatchlistGroupMemberSchema: {
+            /**
+             * Attrs
+             * @description Extensible computed-attribute mount point for future watchlist features (e.g. AI score, focus flag). Empty object by default.
+             */
+            attrs?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Sort Order
+             * @description Order inside the group (ascending)
+             */
+            sort_order: number;
+            /**
+             * Stock Code
+             * @description Stock code as stored in the watchlist
+             */
+            stock_code: string;
+        };
+        /** WatchlistGroupRenameRequest */
+        WatchlistGroupRenameRequest: {
+            /**
+             * Name
+             * @description Updated group name
+             */
+            name: string;
+        };
+        /** WatchlistGroupReorderRequest */
+        WatchlistGroupReorderRequest: {
+            /**
+             * Ordered Ids
+             * @description Group ids in desired order
+             */
+            ordered_ids: string[];
+        };
+        /**
+         * WatchlistGroupSchema
+         * @description Watchlist group with ordered members.
+         */
+        WatchlistGroupSchema: {
+            /**
+             * Created At
+             * @description ISO created timestamp
+             */
+            created_at: string;
+            /**
+             * Id
+             * @description Stable group key
+             */
+            id: string;
+            /**
+             * Is Default
+             * @description Whether this is the auto-seeded default group
+             */
+            is_default: boolean;
+            /** Members */
+            members?: components["schemas"]["WatchlistGroupMemberSchema"][];
+            /**
+             * Name
+             * @description Display name
+             */
+            name: string;
+            /**
+             * Sort Order
+             * @description Group order (ascending)
+             */
+            sort_order: number;
+            /**
+             * Updated At
+             * @description ISO updated timestamp
+             */
+            updated_at: string;
+        };
+        /**
+         * WatchlistGroupsResponse
+         * @description List of watchlist groups.
+         * @example {
+         *       "groups": [
+         *         {
+         *           "created_at": "2026-08-09T00:00:00",
+         *           "id": "default",
+         *           "is_default": true,
+         *           "members": [
+         *             {
+         *               "attrs": {},
+         *               "sort_order": 0,
+         *               "stock_code": "600519"
+         *             }
+         *           ],
+         *           "name": "Default",
+         *           "sort_order": 0,
+         *           "updated_at": "2026-08-09T00:00:00"
+         *         }
+         *       ],
+         *       "message": "2 groups"
+         *     }
+         */
+        WatchlistGroupsResponse: {
+            /** Groups */
+            groups?: components["schemas"]["WatchlistGroupSchema"][];
+            /**
+             * Message
+             * @description Operation result description
+             */
+            message: string;
+        };
         /**
          * WatchlistRequest
          * @description 自选队列操作请求
@@ -19393,6 +19690,482 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_watchlist_groups_api_v1_stocks_watchlist_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Watchlist groups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_watchlist_group_api_v1_stocks_watchlist_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Group created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Member moved or copied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Groups reordered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Group deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Group renamed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Member added */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Members reordered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Member removed from group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;

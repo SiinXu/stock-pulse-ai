@@ -10,3 +10,25 @@ export interface HomeWatchlistRow {
   isTodayStatusUnknown?: boolean;
   activeTask?: TaskInfo;
 }
+
+/**
+ * Per-member computed-attribute mount for T25 (scores) / T26 (focus).
+ * Empty by default; consumers may attach arbitrary JSON fields.
+ */
+export type WatchlistMemberAttrs = Record<string, unknown>;
+
+export interface WatchlistGroupMember {
+  stockCode: string;
+  sortOrder: number;
+  attrs: WatchlistMemberAttrs;
+}
+
+export interface WatchlistGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  members: WatchlistGroupMember[];
+}
