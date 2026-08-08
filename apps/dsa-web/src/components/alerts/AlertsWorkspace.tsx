@@ -645,6 +645,11 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             onEdit={(rule) => void handleEditOpen(rule)}
             onTest={(rule) => void handleTestRule(rule)}
             busyRules={busyRules}
+            onCreateRule={() => {
+              setCreateError(null);
+              setCreateRuleModalOpen(true);
+            }}
+            createRuleLabel={text.createRule}
           />
           {testResult ? (
             <InlineAlert
