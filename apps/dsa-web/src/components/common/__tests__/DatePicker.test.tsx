@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { DatePicker } from '../DatePicker';
+import { DatePicker, DateRangePicker } from '../DatePicker';
 
 describe('DatePicker', () => {
   it('opens the shared calendar and commits a selected ISO date', () => {
@@ -172,5 +172,37 @@ describe('DatePicker', () => {
     expect(trigger).not.toHaveClass('min-h-11');
     expect(action).toHaveClass('h-8', 'w-8');
     expect(action).not.toHaveClass('h-11', 'w-11');
+  });
+
+  it('selects an ordered range from one shared calendar trigger', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <DateRangePicker
+        value={{ start: '2026-07-18', end: '2026-07-20' }}
+        onChange={onChange}
+        ariaLabel="分析日期范围"
+      />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '分析日期范围' });
+    expect(input.parentElement).toHaveAttribute('data-control', 'date-range-picker');
+    expect(input).toHaveValue('2026-07-18 – 2026-07-20');
+
+    fireEvent.click(input);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-date="2026-07-22"]')!);
+    expect(onChange).toHaveBeenLastCalledWith({ start: '2026-07-22', end: '' });
+    expect(screen.getByRole('dialog', { name: '分析日期范围' })).toBeInTheDocument();
+
+    rerender(
+      <DateRangePicker
+        value={{ start: '2026-07-22', end: '' }}
+        onChange={onChange}
+        ariaLabel="分析日期范围"
+      />,
+    );
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-date="2026-07-10"]')!);
+
+    expect(onChange).toHaveBeenLastCalledWith({ start: '2026-07-10', end: '2026-07-22' });
+    expect(screen.queryByRole('dialog', { name: '分析日期范围' })).not.toBeInTheDocument();
   });
 });

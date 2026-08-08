@@ -135,15 +135,14 @@ describe('ShareImageButton', () => {
     renderShareButton({ recordId: 19, reportTitle: '中钨高新' });
 
     fireEvent.click(screen.getByRole('button', { name: '分享' }));
-    const errorRegion = await screen.findByTestId('share-image-error');
-    // Share button + ApiErrorAlert action both use the Retry label.
+    const errorToast = await screen.findByRole('alert');
+    expect(screen.queryByTestId('share-image-error')).not.toBeInTheDocument();
+    // Share button + error toast action both use the Retry label.
     expect(screen.getAllByRole('button', { name: '重试' }).length).toBeGreaterThanOrEqual(1);
-    expect(errorRegion).toHaveTextContent('报告内容过长，无法生成分享图片');
-    expect(errorRegion).toHaveTextContent('120000');
-    expect(errorRegion).toHaveTextContent('100000');
-    expect(errorRegion).toHaveTextContent('SHARE_IMAGE_MAX_CHARS');
-    // Visual evidence substitute (AGENTS.md): component-test rendered DOM for the 413 state.
-    expect(errorRegion).toMatchSnapshot('share-image-413-content-too-large');
+    expect(errorToast).toHaveTextContent('报告内容过长，无法生成分享图片');
+    expect(errorToast).toHaveTextContent('120000');
+    expect(errorToast).toHaveTextContent('100000');
+    expect(errorToast).toHaveTextContent('SHARE_IMAGE_MAX_CHARS');
   });
 
   it('shows localized 503 share_image_unavailable install guidance', async () => {
@@ -162,10 +161,10 @@ describe('ShareImageButton', () => {
     renderShareButton({ recordId: 24, reportTitle: '中钨高新' });
 
     fireEvent.click(screen.getByRole('button', { name: '分享' }));
-    const errorRegion = await screen.findByTestId('share-image-error');
-    expect(errorRegion).toHaveTextContent('分享图片引擎不可用');
-    expect(errorRegion).toHaveTextContent('playwright install chromium');
-    expect(errorRegion).toMatchSnapshot('share-image-503-renderer-unavailable');
+    const errorToast = await screen.findByRole('alert');
+    expect(screen.queryByTestId('share-image-error')).not.toBeInTheDocument();
+    expect(errorToast).toHaveTextContent('分享图片引擎不可用');
+    expect(errorToast).toHaveTextContent('playwright install chromium');
   });
 
   it('shows timeout guidance when share-image generation times out', async () => {
@@ -184,19 +183,49 @@ describe('ShareImageButton', () => {
     renderShareButton({ recordId: 25, reportTitle: '中钨高新' });
 
     fireEvent.click(screen.getByRole('button', { name: '分享' }));
-    const errorRegion = await screen.findByTestId('share-image-error');
-    expect(errorRegion).toHaveTextContent('超时');
-    expect(errorRegion).toMatchSnapshot('share-image-timeout');
+    const errorToast = await screen.findByRole('alert');
+    expect(screen.queryByTestId('share-image-error')).not.toBeInTheDocument();
+    expect(errorToast).toHaveTextContent('超时');
   });
 
-  it('does not render or prefetch share images during desktop runtime', () => {
+  it('renders in desktop runtime without mount-time prefetch, then downloads via blob on click', async () => {
     mockedGetShareImage.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
     Object.defineProperty(window, 'dsaDesktop', {
       configurable: true,
       value: { version: '1.0.0' },
     });
+    // Desktop WebView typically lacks navigator.share file support → download path.
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
+    const removeSpy = vi.spyOn(document.body, 'removeChild');
 
     renderShareButton({ recordId: 23, reportTitle: '桌面端报告' });
+
+    expect(screen.getByRole('button', { name: '分享' })).toBeInTheDocument();
+    expect(mockedGetShareImage).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    await waitFor(() => expect(mockedGetShareImage).toHaveBeenCalledWith(23));
+    await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled());
+    expect(appendSpy).toHaveBeenCalled();
+    expect(removeSpy).toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:share-image');
+    expect(screen.getByRole('button', { name: '已生成' })).toBeInTheDocument();
+  });
+
+  it('does not render when recordId is missing (web and desktop)', () => {
+    Object.defineProperty(window, 'dsaDesktop', {
+      configurable: true,
+      value: { version: '1.0.0' },
+    });
+
+    render(
+      <UiLanguageProvider initialLanguage="zh">
+        <ShareImageButton reportTitle="无记录" reportLanguage="zh" />
+      </UiLanguageProvider>,
+    );
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(mockedGetShareImage).not.toHaveBeenCalled();

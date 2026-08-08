@@ -19,6 +19,13 @@ from src.agent.runtime.guards import (
 from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import StockScope
+from src.agent.observability import (
+    emit_decision,
+    emit_model_end,
+    emit_model_start,
+    emit_phase_end,
+    emit_phase_start,
+)
 from src.agent.stream_events import stream_event
 from src.agent.tools.execution import _build_tool_cache_key
 from src.agent.tools.registry import ToolRegistry
@@ -150,6 +157,21 @@ def run_agent_loop(
         # (e.g. a timed-out worker) is dropped behind the late-result fence and
         # can never re-enter the loop or a persisted success.
         tool_session.close()
+        phase_status = (
+            "cancelled" if getattr(result, "cancelled", False)
+            else ("timeout" if getattr(result, "timed_out", False)
+                  else ("success" if result.success else "failed"))
+        )
+        emit_phase_end(
+            "agent_loop",
+            status=phase_status,
+            duration_ms=max(0, int((time.time() - start_time) * 1000)),
+            attrs={
+                "success": bool(result.success),
+                "total_steps": getattr(result, "total_steps", None),
+                "total_tokens": getattr(result, "total_tokens", None),
+            },
+        )
         if progress_callback and emit_stage_events:
             progress_callback(
                 stream_event(
@@ -169,6 +191,7 @@ def run_agent_loop(
                 message="Starting agent analysis...",
             )
         )
+    emit_phase_start("agent_loop")
 
     for step in range(max_steps):
         if cancelled_check is not None and cancelled_check():
@@ -242,6 +265,9 @@ def run_agent_loop(
             progress_callback(stream_event("thinking", step=step + 1, message=thinking_msg))
 
         # --- LLM call ---
+        model_label = getattr(llm_adapter, "model", None) or "model"
+        emit_model_start(str(model_label), step=step + 1)
+        model_started = time.perf_counter()
         response = llm_adapter.call_with_tools(
             messages,
             tool_decls,
@@ -255,6 +281,16 @@ def run_agent_loop(
         model_for_usage = m or response.provider
         if model_for_usage and model_for_usage != "error":
             recorder.record(response.usage, model_for_usage, call_type="agent")
+        emit_model_end(
+            str(m or model_label or "model"),
+            success=getattr(response, "provider", None) != "error",
+            duration_ms=max(0, int((time.perf_counter() - model_started) * 1000)),
+            step=step + 1,
+            attrs={
+                "provider": provider_used,
+                "tokens": (response.usage or {}).get("total_tokens"),
+            },
+        )
 
         if cancelled_check is not None and cancelled_check():
             logger.info("Agent loop cancelled after LLM call at step %d", step + 1)
@@ -443,6 +479,12 @@ def run_agent_loop(
 
             final_content = response.content or ""
             is_error = response.provider == "error"
+            emit_decision(
+                "final_answer" if not is_error else "model_error",
+                status="failed" if is_error else "success",
+                step=step + 1,
+                attrs={"has_content": bool(final_content)},
+            )
 
             return _finish(RunLoopResult(
                 success=not is_error and bool(final_content),

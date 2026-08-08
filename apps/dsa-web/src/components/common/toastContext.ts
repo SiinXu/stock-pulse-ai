@@ -17,6 +17,8 @@ export interface ToastInput {
   tone?: ToastTone;
   durationMs?: number;
   action?: ToastAction;
+  closeLabel?: string;
+  onDismiss?: () => void;
 }
 
 export interface ToastContextValue {

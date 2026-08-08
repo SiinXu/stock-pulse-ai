@@ -260,12 +260,22 @@ class _SystemConfigCoreMethods:
     def get_setup_status(self) -> Dict[str, Any]:
         """Return read-only first-run setup status without mutating runtime state."""
         effective_map = self._build_setup_effective_config_map()
-        llm_check = self._build_setup_primary_llm_check(effective_map)
+        # One fast loopback probe per readiness call (never blocks startup).
+        local_detect = self._detect_local_runtime_for_setup(effective_map)
+        llm_check = self._build_setup_primary_llm_check(
+            effective_map,
+            local_detect=local_detect,
+        )
         agent_check = self._build_setup_agent_llm_check(effective_map, llm_check)
         checks = [
             llm_check,
             agent_check,
             self._build_setup_stock_list_check(effective_map),
+            self._build_setup_data_only_check(effective_map),
+            self._build_setup_local_runtime_check(
+                effective_map,
+                local_detect=local_detect,
+            ),
             self._build_setup_notification_check(effective_map),
             self._build_setup_storage_check(effective_map),
         ]

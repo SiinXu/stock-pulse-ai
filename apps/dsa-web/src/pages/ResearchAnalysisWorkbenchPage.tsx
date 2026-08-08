@@ -830,7 +830,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       label: (
         <span className="flex items-center gap-2">
           {t('analysisWorkbench.tasks')}
-          {runningTaskCount > 0 ? <Badge variant="info">{runningTaskCount}</Badge> : null}
+          {runningTaskCount > 0 ? <Badge variant="info" className="h-4 min-w-4 justify-center px-1 py-0 text-xxs leading-none">{runningTaskCount}</Badge> : null}
         </span>
       ),
     },

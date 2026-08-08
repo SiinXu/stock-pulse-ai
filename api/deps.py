@@ -21,6 +21,7 @@ from src.config import get_config, Config
 from src.model_pack import ModelPackRegistry
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
+from src.services.agent_chat_session_service import AgentChatSessionService
 from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
 from src.services.model_pack_import_service import ModelPackImportService
 from src.services.security_audit_service import (
@@ -32,6 +33,7 @@ from src.services.security_audit_service import (
 )
 from src.services.approval_service import ApprovalService
 from src.services.scheduled_task_service import ScheduledTaskService
+from src.services.config_profile_service import ConfigProfileService
 from src.services.task_queue import get_task_queue
 
 
@@ -86,6 +88,11 @@ def get_database_manager() -> DatabaseManager:
         DatabaseManager: 数据库管理器单例对象
     """
     return DatabaseManager.get_instance()
+
+
+def get_agent_chat_session_service() -> AgentChatSessionService:
+    """Build an Agent Chat session service for the current database manager."""
+    return AgentChatSessionService(DatabaseManager.get_instance())
 
 
 def get_approval_service() -> ApprovalService:
@@ -287,6 +294,17 @@ def get_scheduled_task_service(request: Request) -> ScheduledTaskService:
     if service is None:
         service = ScheduledTaskService()
         request.app.state.scheduled_task_service = service
+    return service
+
+
+def get_config_profile_service(request: Request) -> ConfigProfileService:
+    """Get the app-lifecycle shared ConfigProfileService instance."""
+    service = getattr(request.app.state, "config_profile_service", None)
+    if service is None:
+        service = ConfigProfileService(
+            system_config_service=get_system_config_service(request),
+        )
+        request.app.state.config_profile_service = service
     return service
 
 

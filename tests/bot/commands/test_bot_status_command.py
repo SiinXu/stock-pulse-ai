@@ -212,25 +212,49 @@ def test_status_command_supports_legacy_key_compatibility_without_explicit_litel
         "DEEPSEEK_API_KEYS",
         "DEEPSEEK_API_KEY",
         "OPENAI_API_KEYS",
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL",
+        "OPENAI_BASE_URL",
         "AIHUBMIX_KEY",
         "LITELLM_MODEL",
+        "LITELLM_FALLBACK_MODELS",
         "LLM_CHANNELS",
         "LITELLM_CONFIG",
+        "MINIMAX_API_KEYS",
+        "ANSPIRE_LLM_ENABLED",
     ):
         monkeypatch.delenv(key, raising=False)
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-legacy-test-key")
     monkeypatch.setenv("OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.delenv("REPORT_LANGUAGE", raising=False)
 
     Config.reset_instance()
     try:
         config = Config.get_instance()
+        # Seed the full legacy OpenAI compatibility surface used by /status.
+        # Status availability requires a primary model plus either a direct-env
+        # provider or a non-empty reachable model list.
+        config.openai_api_key = "sk-legacy-test-key"
+        config.openai_api_keys = ["sk-legacy-test-key"]
+        config.openai_model = "gpt-4o-mini"
+        config.litellm_model = "openai/gpt-4o-mini"
+        config.llm_model_list = [
+            {
+                "model_name": "openai/gpt-4o-mini",
+                "litellm_params": {
+                    "model": "openai/gpt-4o-mini",
+                    "api_key": "sk-legacy-test-key",
+                },
+            }
+        ]
+        config.llm_models_source = "env"
         command = StatusCommand()
 
         status = command._collect_status(config)
         text = command._format_status(status, "telegram")
 
-        assert status["ai_available"] is True
+        assert status["ai_available"] is True, status
         assert "主模型: openai/gpt-4o-mini" in text
         assert "AI 服务未配置" not in text
     finally:

@@ -36,11 +36,30 @@ logger = logging.getLogger(__name__)
 class BacktestValidationError(ValueError):
     """Controlled validation failure that is safe to expose to API clients."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "invalid_params",
+        params: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = str(code or "invalid_params")
+        self.params: Dict[str, Any] = dict(params or {})
+
 
 class BacktestService:
     """Service layer to run and query backtests."""
 
     MAX_DYNAMIC_SUMMARY_ROWS = 2000
+    # Keep aligned with api/v1/schemas/backtest.BacktestRunRequest field bounds.
+    MIN_EVAL_WINDOW_DAYS = 1
+    MAX_EVAL_WINDOW_DAYS = 120
+    MIN_AGE_DAYS = 0
+    MAX_AGE_DAYS = 365
+    MIN_RUN_LIMIT = 1
+    MAX_RUN_LIMIT = 2000
+    DEFAULT_RUN_LIMIT = 200
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         self.db = db_manager or DatabaseManager.get_instance()
@@ -56,37 +75,33 @@ class BacktestService:
         min_age_days: Optional[int] = None,
         analysis_date_from: Optional[date] = None,
         analysis_date_to: Optional[date] = None,
-        limit: int = 200,
+        limit: int = DEFAULT_RUN_LIMIT,
     ) -> Dict[str, Any]:
         config = get_config()
 
-        if analysis_date_from and analysis_date_to and analysis_date_from > analysis_date_to:
-            raise BacktestValidationError("analysis_date_from cannot be after analysis_date_to")
+        self._validate_analysis_date_range(analysis_date_from, analysis_date_to)
 
         query_code = self._normalize_code(code)
         diagnostic_code = self._normalize_code_for_display(code)
 
         if eval_window_days is None:
             eval_window_days = getattr(config, "backtest_eval_window_days", 10)
-        if (
-            isinstance(eval_window_days, bool)
-            or not isinstance(eval_window_days, int)
-            or eval_window_days <= 0
-        ):
-            raise BacktestValidationError("eval_window_days must be a positive integer")
+        eval_window_days = self._validate_eval_window_days(eval_window_days)
+
         if min_age_days is None:
             min_age_days = getattr(config, "backtest_min_age_days", 14)
+        min_age_days = self._validate_min_age_days(min_age_days)
 
-        engine_version = getattr(config, "backtest_engine_version", "v1")
+        engine_version = str(getattr(config, "backtest_engine_version", "v1") or "v1")
         neutral_band_pct = float(getattr(config, "backtest_neutral_band_pct", 2.0))
 
         eval_config = EvaluationConfig(
             eval_window_days=int(eval_window_days),
             neutral_band_pct=neutral_band_pct,
-            engine_version=str(engine_version),
+            engine_version=engine_version,
         )
 
-        limit_int = int(limit)
+        limit_int = self._validate_run_limit(limit)
         candidates = self._get_run_candidates(
             code=query_code,
             min_age_days=int(min_age_days),
@@ -199,7 +214,10 @@ class BacktestService:
                             eval_status="insufficient_data",
                             evaluated_at=datetime.now(),
                             operation_advice=analysis.operation_advice,
-                            resolution_notes=resolution_notes or None,
+                            resolution_notes=self._append_resolution_note(
+                                resolution_notes,
+                                "missing_daily_bars",
+                            ),
                         )
                     )
                     continue
@@ -227,6 +245,10 @@ class BacktestService:
                 status = evaluation.get("eval_status")
                 if status == "insufficient_data":
                     insufficient += 1
+                    resolution_notes_value = self._append_resolution_note(
+                        resolution_notes_value,
+                        "insufficient_forward_bars",
+                    )
                 elif status == "completed":
                     completed += 1
                 else:
@@ -327,11 +349,26 @@ class BacktestService:
                 analysis_date_to=analysis_date_to,
             )
 
+        applied_config = {
+            "code": diagnostic_code,
+            "force": bool(force),
+            "eval_window_days": int(eval_window_days),
+            "min_age_days": int(min_age_days),
+            "limit": limit_int,
+            "engine_version": engine_version,
+            "neutral_band_pct": float(neutral_band_pct),
+            "analysis_date_from": analysis_date_from.isoformat() if analysis_date_from else None,
+            "analysis_date_to": analysis_date_to.isoformat() if analysis_date_to else None,
+        }
+
         diagnostics = self._build_run_diagnostics(
             code=diagnostic_code,
+            force=bool(force),
             eval_window_days=int(eval_window_days),
             min_age_days=int(min_age_days),
             limit=limit_int,
+            engine_version=engine_version,
+            neutral_band_pct=float(neutral_band_pct),
             analysis_date_from=analysis_date_from,
             analysis_date_to=analysis_date_to,
             processed=processed,
@@ -350,6 +387,7 @@ class BacktestService:
             "insufficient": insufficient,
             "errors": errors,
             "applied_eval_window_days": int(eval_window_days),
+            "applied_config": applied_config,
             "message": diagnostics.get("message"),
             "diagnostics": diagnostics,
         }
@@ -467,6 +505,100 @@ class BacktestService:
             filtered.append(analysis)
         return filtered
 
+    @classmethod
+    def _validate_analysis_date_range(
+        cls,
+        analysis_date_from: Optional[date],
+        analysis_date_to: Optional[date],
+    ) -> None:
+        if analysis_date_from and analysis_date_to and analysis_date_from > analysis_date_to:
+            raise BacktestValidationError(
+                "analysis_date_from cannot be after analysis_date_to",
+                code="invalid_analysis_date_range",
+                params={
+                    "analysis_date_from": analysis_date_from.isoformat(),
+                    "analysis_date_to": analysis_date_to.isoformat(),
+                },
+            )
+
+    @classmethod
+    def _validate_eval_window_days(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise BacktestValidationError(
+                "eval_window_days must be a positive integer",
+                code="invalid_eval_window_days",
+                params={
+                    "min": cls.MIN_EVAL_WINDOW_DAYS,
+                    "max": cls.MAX_EVAL_WINDOW_DAYS,
+                },
+            )
+        if value < cls.MIN_EVAL_WINDOW_DAYS:
+            raise BacktestValidationError(
+                "eval_window_days must be a positive integer",
+                code="invalid_eval_window_days",
+                params={
+                    "min": cls.MIN_EVAL_WINDOW_DAYS,
+                    "max": cls.MAX_EVAL_WINDOW_DAYS,
+                    "value": value,
+                },
+            )
+        if value > cls.MAX_EVAL_WINDOW_DAYS:
+            raise BacktestValidationError(
+                (
+                    f"eval_window_days must be between {cls.MIN_EVAL_WINDOW_DAYS} "
+                    f"and {cls.MAX_EVAL_WINDOW_DAYS}"
+                ),
+                code="invalid_eval_window_days",
+                params={
+                    "min": cls.MIN_EVAL_WINDOW_DAYS,
+                    "max": cls.MAX_EVAL_WINDOW_DAYS,
+                    "value": value,
+                },
+            )
+        return int(value)
+
+    @classmethod
+    def _validate_min_age_days(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise BacktestValidationError(
+                "min_age_days must be a non-negative integer",
+                code="invalid_min_age_days",
+                params={"min": cls.MIN_AGE_DAYS, "max": cls.MAX_AGE_DAYS},
+            )
+        if value < cls.MIN_AGE_DAYS or value > cls.MAX_AGE_DAYS:
+            raise BacktestValidationError(
+                f"min_age_days must be between {cls.MIN_AGE_DAYS} and {cls.MAX_AGE_DAYS}",
+                code="invalid_min_age_days",
+                params={"min": cls.MIN_AGE_DAYS, "max": cls.MAX_AGE_DAYS, "value": value},
+            )
+        return int(value)
+
+    @classmethod
+    def _validate_run_limit(cls, value: Any) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise BacktestValidationError(
+                "limit must be a positive integer",
+                code="invalid_run_limit",
+                params={"min": cls.MIN_RUN_LIMIT, "max": cls.MAX_RUN_LIMIT},
+            )
+        if value < cls.MIN_RUN_LIMIT or value > cls.MAX_RUN_LIMIT:
+            raise BacktestValidationError(
+                f"limit must be between {cls.MIN_RUN_LIMIT} and {cls.MAX_RUN_LIMIT}",
+                code="invalid_run_limit",
+                params={"min": cls.MIN_RUN_LIMIT, "max": cls.MAX_RUN_LIMIT, "value": value},
+            )
+        return int(value)
+
+    @staticmethod
+    def _append_resolution_note(existing: Optional[str], note: str) -> Optional[str]:
+        marker = str(note or "").strip()
+        if not marker:
+            return existing or None
+        notes = [part for part in str(existing or "").split(",") if part]
+        if marker not in notes:
+            notes.append(marker)
+        return ",".join(notes) or None
+
     @staticmethod
     def _normalize_code(code: Optional[str]) -> Optional[str]:
         if not code:
@@ -474,7 +606,11 @@ class BacktestService:
 
         identity = resolve_daily_stock_identity(str(code).strip())
         if identity is None:
-            raise BacktestValidationError(f"非法股票代码格式: {code}")
+            raise BacktestValidationError(
+                f"非法股票代码格式: {code}",
+                code="invalid_stock_code",
+                params={"stock_code": str(code)},
+            )
         return identity.normalized_code
 
     @staticmethod
@@ -496,16 +632,23 @@ class BacktestService:
 
         identity = resolve_daily_stock_identity(str(code).strip())
         if identity is None:
-            raise BacktestValidationError(f"非法股票代码格式: {code}")
+            raise BacktestValidationError(
+                f"非法股票代码格式: {code}",
+                code="invalid_stock_code",
+                params={"stock_code": str(code)},
+            )
         return identity.normalized_code
 
     @staticmethod
     def _build_run_diagnostics(
         *,
         code: Optional[str],
+        force: bool,
         eval_window_days: int,
         min_age_days: int,
         limit: int,
+        engine_version: str,
+        neutral_band_pct: float,
         analysis_date_from: Optional[date],
         analysis_date_to: Optional[date],
         processed: int,
@@ -518,11 +661,18 @@ class BacktestService:
     ) -> Dict[str, Any]:
         diagnostics: Dict[str, Any] = {
             "code": code,
+            "force": force,
             "eval_window_days": eval_window_days,
             "min_age_days": min_age_days,
             "limit": limit,
+            "engine_version": engine_version,
+            "neutral_band_pct": neutral_band_pct,
             "analysis_date_from": analysis_date_from.isoformat() if analysis_date_from else None,
             "analysis_date_to": analysis_date_to.isoformat() if analysis_date_to else None,
+            "completed": completed,
+            "insufficient": insufficient,
+            "errors": errors,
+            "skipped_count": int(insufficient) + int(errors),
         }
         if aligned_existing_result_dates:
             diagnostics["aligned_existing_result_dates"] = aligned_existing_result_dates
@@ -648,10 +798,14 @@ class BacktestService:
                 if phase_bucket is not None:
                     raise BacktestValidationError(
                         "Phase-filtered summary candidate set matches too many rows; "
-                        "narrow the analysis date range, stock code, or evaluation window."
+                        "narrow the analysis date range, stock code, or evaluation window.",
+                        code="summary_candidate_set_too_large",
+                        params={"max_rows": self.MAX_DYNAMIC_SUMMARY_ROWS},
                     )
                 raise BacktestValidationError(
-                    "Date-filtered summary matches too many rows; narrow the analysis date range or stock code."
+                    "Date-filtered summary matches too many rows; narrow the analysis date range or stock code.",
+                    code="summary_candidate_set_too_large",
+                    params={"max_rows": self.MAX_DYNAMIC_SUMMARY_ROWS},
                 )
             if phase_bucket is not None:
                 rows_with_context = self.repo.list_results_with_context(
@@ -664,7 +818,10 @@ class BacktestService:
                 )
                 if len(rows_with_context) > self.MAX_DYNAMIC_SUMMARY_ROWS:
                     raise BacktestValidationError(
-                        "Phase-filtered summary matches too many rows; narrow the analysis date range or stock code."
+                        "Phase-filtered summary matches too many rows; "
+                        "narrow the analysis date range or stock code.",
+                        code="summary_candidate_set_too_large",
+                        params={"max_rows": self.MAX_DYNAMIC_SUMMARY_ROWS},
                     )
                 filtered_pairs = [
                     (row, snapshot)
@@ -790,7 +947,10 @@ class BacktestService:
             remaining_probe_rows = self.MAX_DYNAMIC_SUMMARY_ROWS + 1 - scanned
             if remaining_probe_rows <= 0:
                 raise BacktestValidationError(
-                    "Phase-filtered results match too many rows; narrow the analysis date range or stock code."
+                    "Phase-filtered results match too many rows; "
+                    "narrow the analysis date range or stock code.",
+                    code="summary_candidate_set_too_large",
+                    params={"max_rows": self.MAX_DYNAMIC_SUMMARY_ROWS},
                 )
             batch_limit = min(batch_size, remaining_probe_rows)
             batch = self.repo.get_results_with_context_batch(
@@ -808,7 +968,10 @@ class BacktestService:
             scanned += len(batch)
             if scanned > self.MAX_DYNAMIC_SUMMARY_ROWS:
                 raise BacktestValidationError(
-                    "Phase-filtered results match too many rows; narrow the analysis date range or stock code."
+                    "Phase-filtered results match too many rows; "
+                    "narrow the analysis date range or stock code.",
+                    code="summary_candidate_set_too_large",
+                    params={"max_rows": self.MAX_DYNAMIC_SUMMARY_ROWS},
                 )
             sql_offset += len(batch)
             for (
@@ -855,7 +1018,11 @@ class BacktestService:
             return None
         allowed = {"premarket", "intraday", "postmarket", "unknown"}
         if text not in allowed:
-            raise BacktestValidationError("analysis_phase must be one of premarket, intraday, postmarket, unknown")
+            raise BacktestValidationError(
+                "analysis_phase must be one of premarket, intraday, postmarket, unknown",
+                code="invalid_analysis_phase",
+                params={"analysis_phase": text, "allowed": sorted(allowed)},
+            )
         return text
 
     @staticmethod

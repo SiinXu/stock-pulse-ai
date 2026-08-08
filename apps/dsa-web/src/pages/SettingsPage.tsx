@@ -1,13 +1,12 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker, useNavigate, useSearchParams } from 'react-router-dom';
+import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
-  buildAnalysisWorkbenchHref,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
@@ -17,8 +16,8 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
-import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, Surface, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
   AuthSettingsCard,
   InvestmentFrameworkSettingsCard,
@@ -45,7 +44,6 @@ import {
   SettingsSectionCard,
   SettingsErrorSummary,
   type ErrorSummaryEntry,
-  FirstRunWizard,
   type WizardDraftItem,
   type WizardCompleteResult,
   type ModelReferenceReplacement,
@@ -55,6 +53,7 @@ import { connectionItemsRespectSchema } from '../components/settings/settingsCon
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import SystemAboutCard from '../components/settings/SystemAboutCard';
 import ConfigBackupCard from '../components/settings/ConfigBackupCard';
+import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
 import AlphaSiftSettingsCard from '../components/settings/AlphaSiftSettingsCard';
 import {
   AiOverviewCard,
@@ -77,6 +76,7 @@ import {
 } from '../components/settings/settingsGenerationDraftModel';
 import SettingsConflictPanel from '../components/settings/SettingsConflictPanel';
 import SettingsActiveConfigPanel from '../components/settings/SettingsActiveConfigPanel';
+import { SettingsOnboardingHosts } from '../components/onboarding/SettingsOnboardingHosts';
 import {
   SETTINGS_SECTIONS,
   getDefaultView,
@@ -102,6 +102,7 @@ import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
 import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
+import OutboundActivityPanel from '../components/settings/OutboundActivityPanel';
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
@@ -149,7 +150,6 @@ function parseSetupStockList(value: unknown) {
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
-  const navigate = useNavigate();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -158,17 +158,18 @@ const SettingsPage: React.FC = () => {
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(false);
   const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
-  const { beginnerMode, setBeginnerMode } = useBeginnerMode();
+  const { beginnerMode, mode: settingsMode, setMode: setSettingsMode } = useBeginnerMode();
   // Advanced sections stay hidden until the user reveals them; re-hiding on
-  // enabling beginner mode keeps the simplified navigation predictable.
+  // Essentials mode keeps the simplified navigation predictable.
   const [advancedRevealed, setAdvancedRevealed] = useState(false);
-  const handleBeginnerModeChange = useCallback((next: boolean) => {
-    setBeginnerMode(next);
-    if (next) {
+  const handleSettingsModeChange = useCallback((next: 'essentials' | 'expert') => {
+    setSettingsMode(next);
+    if (next === 'essentials') {
       setAdvancedRevealed(false);
     }
-  }, [setBeginnerMode]);
+  }, [setSettingsMode]);
   const [isRefreshingSetupStatus, setIsRefreshingSetupStatus] = useState(false);
   const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [isRunningSetupSmoke, setIsRunningSetupSmoke] = useState(false);
@@ -1485,7 +1486,7 @@ const SettingsPage: React.FC = () => {
       {isLoading && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <SettingsLoading />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-4 lg:self-start space-y-3">
             <SettingsSectionNav
               activeSection={activeSection}
@@ -1498,26 +1499,11 @@ const SettingsPage: React.FC = () => {
               advancedRevealed={advancedRevealed}
               onRevealAdvanced={() => setAdvancedRevealed(true)}
             />
-            <Surface
-              level="interactive"
-              className="flex items-start justify-between gap-3 px-3 py-2.5"
-            >
-              <label htmlFor="settings-beginner-mode" className="min-w-0">
-                <span className="block text-sm font-medium text-foreground">
-                  {SETTINGS_MISC_TEXT[uiLanguage].beginnerModeLabel}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-text">
-                  {SETTINGS_MISC_TEXT[uiLanguage].beginnerModeHint}
-                </span>
-              </label>
-              <Switch
-                id="settings-beginner-mode"
-                testId="settings-beginner-mode"
-                checked={beginnerMode}
-                onCheckedChange={handleBeginnerModeChange}
-                aria-label={SETTINGS_MISC_TEXT[uiLanguage].beginnerModeLabel}
-              />
-            </Surface>
+            <SettingsModeToggle
+              mode={settingsMode}
+              onModeChange={handleSettingsModeChange}
+              language={uiLanguage}
+            />
           </aside>
 
           <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">
@@ -1605,6 +1591,11 @@ const SettingsPage: React.FC = () => {
             {activeCategory === 'system' && activeView === 'security' ? (
               <>
                 <AuthSettingsCard />
+                <OutboundActivityPanel
+                  disabled={isSaving || isLoading}
+                  t={t}
+                  language={uiLanguage}
+                />
                 <SecurityAuditPanel
                   disabled={isSaving || isLoading}
                   t={t}
@@ -1652,19 +1643,10 @@ const SettingsPage: React.FC = () => {
               <SystemAboutCard />
             ) : null}
             {isTopLevelAdvanced && activeView === 'backup' ? (
-              <ConfigBackupCard
-                configVersion={configVersion}
-                hasDirty={hasDirty}
-                disabled={isSaving || isLoading}
-                load={load}
-                onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((current) => current + 1)}
-                onRefreshSetupStatus={() => { void refreshSetupStatus(); }}
-                onRolledBack={async (result) => {
-                  await refreshAfterExternalSave(result.updatedKeys);
-                  applyPostSaveEffects();
-                }}
-                onReloadLatest={() => refreshAfterExternalSave([])}
-              />
+              <>
+                <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
+                <ConfigBackupCard configVersion={configVersion} hasDirty={hasDirty} disabled={isSaving || isLoading} load={load} onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((c) => c + 1)} onRefreshSetupStatus={() => { void refreshSetupStatus(); }} onRolledBack={async (result) => { await refreshAfterExternalSave(result.updatedKeys); applyPostSaveEffects(); }} onReloadLatest={() => refreshAfterExternalSave([])} />
+              </>
             ) : null}
             {activeCategory === 'base' ? (
               <>
@@ -1992,37 +1974,27 @@ const SettingsPage: React.FC = () => {
           leaveBlocker.reset?.();
         }}
       />
-      {isWizardOpen ? (
-        <FirstRunWizard
-          onComplete={handleWizardComplete}
-          onClose={() => setIsWizardOpen(false)}
-          isSaving={isSaving}
-          language={uiLanguage}
-          existingChannelNames={existingChannelNames}
-          providers={providerCatalog}
-          connectionFields={providerConnectionFields}
-          emptyApiKeyHosts={providerEmptyApiKeyHosts}
-          routingOptions={modelSelectorOptions}
-          initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '')
-            .split(',')
-            .map((entry) => resolveConfiguredModelRef(entry))
-            .filter(Boolean)
-            .join(',')}
-          initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
-          onViewRouting={() => {
-            setIsWizardOpen(false);
-            selectSectionView('ai_models', 'task_routing');
-          }}
-          onLocalModelConfigurationChanged={async () => {
-            await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
-            applyPostSaveEffects();
-          }}
-          onStartFirstAnalysis={() => {
-            setIsWizardOpen(false);
-            navigate(buildAnalysisWorkbenchHref());
-          }}
-        />
-      ) : null}
+      <SettingsOnboardingHosts
+        isWizardOpen={isWizardOpen}
+        isAgentOnboardingOpen={isAgentOnboardingOpen}
+        setIsWizardOpen={setIsWizardOpen}
+        setIsAgentOnboardingOpen={setIsAgentOnboardingOpen}
+        handleWizardComplete={handleWizardComplete}
+        isSaving={isSaving}
+        uiLanguage={uiLanguage}
+        existingChannelNames={existingChannelNames}
+        providerCatalog={providerCatalog}
+        providerConnectionFields={providerConnectionFields}
+        providerEmptyApiKeyHosts={providerEmptyApiKeyHosts}
+        modelSelectorOptions={modelSelectorOptions}
+        initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '').split(',').map((entry) => resolveConfiguredModelRef(entry)).filter(Boolean).join(',')}
+        initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
+        onViewRouting={() => { setIsWizardOpen(false); selectSectionView('ai_models', 'task_routing'); }}
+        onLocalModelConfigurationChanged={async () => { await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS); applyPostSaveEffects(); }}
+        onAgentApplied={() => { void refreshAfterExternalSave([]); applyPostSaveEffects(); }}
+        setupStatus={setupStatus}
+        t={t}
+      />
     </AppPage>
   );
 };

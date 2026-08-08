@@ -461,6 +461,72 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {},
         "display_order": 53,
     },
+    "RSS_NEWS_FEED_URLS": {
+        "title": "RSS/Atom News Feed URLs",
+        "description": (
+            "Optional comma-separated RSS or Atom feed URLs used as a free "
+            "supplement in the on-demand news search pipeline (not a replacement "
+            "for SearXNG or paid search). Empty keeps the feature inert. Feed "
+            "fetching uses the fail-closed outbound policy; private/loopback hosts "
+            "require an exact OUTBOUND_HTTP_ALLOWLIST entry."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "multi_value": True,
+            "delimiter": ",",
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+        },
+        "display_order": 54,
+        "help_key": "settings.data_source.RSS_NEWS_FEED_URLS",
+        "examples": [
+            "RSS_NEWS_FEED_URLS=https://www.sec.gov/news/pressreleases.rss",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：搜索服务配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#搜索服务配置",
+            },
+            {
+                "label": "出站 HTTP 安全策略",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md",
+            },
+        ],
+    },
+    "RSS_NEWS_FETCH_TIMEOUT_SEC": {
+        "title": "RSS/Atom Feed Fetch Timeout",
+        "description": (
+            "Per-feed timeout in seconds for on-demand RSS/Atom news search "
+            "(1-30). Default 8. Independent of NEWS_INTEL_FETCH_TIMEOUT_SEC."
+        ),
+        "category": "data_source",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8",
+        "options": [],
+        "validation": {"min": 1, "max": 30},
+        "display_order": 55,
+        "help_key": "settings.data_source.RSS_NEWS_FEED_URLS",
+        "examples": [
+            "RSS_NEWS_FETCH_TIMEOUT_SEC=8",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：搜索服务配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#搜索服务配置",
+            },
+        ],
+    },
     "ENABLE_REALTIME_QUOTE": {
         "title": "Enable Realtime Quote",
         "description": "Enable realtime market quotes. Disable to only use historical close prices.",
@@ -620,5 +686,120 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 57,
+    },
+
+    "FUTU_OPEND_HOST": {
+        "title": "Futu OpenD Host",
+        "description": (
+            "IPv4 host for the local Futu OpenD gateway used by --portfolio futu and "
+            "portfolio Futu position import. Default 127.0.0.1. OpenD uses a local TCP "
+            "protocol (not HTTP); loopback or a trusted LAN address is expected, "
+            "matching other local-runtime gateways such as Pytdx."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "127.0.0.1",
+        "options": [],
+        "validation": {},
+        "display_order": 70,
+        "help_key": "settings.data_source.FUTU_OPEND_HOST",
+        "examples": [
+            "FUTU_OPEND_HOST=127.0.0.1",
+            "FUTU_OPEND_HOST=192.168.1.20",
+        ],
+        "docs": [
+            {
+                "label": "Futu OpenD portfolio import",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/futu-opend-portfolio-import_EN.md",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+    },
+    "FUTU_OPEND_PORT": {
+        "title": "Futu OpenD Port",
+        "description": "TCP port for the Futu OpenD gateway. Default 11111.",
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "11111",
+        "options": [],
+        "validation": {"min": 1, "max": 65535},
+        "display_order": 71,
+        "help_key": "settings.data_source.FUTU_OPEND_PORT",
+        "examples": [
+            "FUTU_OPEND_PORT=11111",
+        ],
+        "docs": [
+            {
+                "label": "Futu OpenD portfolio import",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/futu-opend-portfolio-import_EN.md",
+            },
+        ],
+    },
+    "FUTU_ACC_ID": {
+        "title": "Futu Account ID",
+        "description": (
+            "Optional live securities account ID. Leave empty to merge eligible "
+            "ACTIVE REAL NORMAL/MASTER accounts."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {},
+        "display_order": 72,
+        "help_key": "settings.data_source.FUTU_ACC_ID",
+        "examples": [
+            "FUTU_ACC_ID=",
+            "FUTU_ACC_ID=1001",
+        ],
+        "docs": [
+            {
+                "label": "Futu OpenD portfolio import",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/futu-opend-portfolio-import_EN.md",
+            },
+        ],
+    },
+    "FUTU_SECURITY_FIRM": {
+        "title": "Futu Security Firm",
+        "description": (
+            "Futu SecurityFirm enum name. NONE uses SDK auto-detection. "
+            "Common values include FUTUSECURITIES and FUTUSG."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "NONE",
+        "options": [],
+        "validation": {},
+        "display_order": 73,
+        "help_key": "settings.data_source.FUTU_SECURITY_FIRM",
+        "examples": [
+            "FUTU_SECURITY_FIRM=NONE",
+            "FUTU_SECURITY_FIRM=FUTUSECURITIES",
+        ],
+        "docs": [
+            {
+                "label": "Futu OpenD portfolio import",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/futu-opend-portfolio-import_EN.md",
+            },
+        ],
     },
 }
