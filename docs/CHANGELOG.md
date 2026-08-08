@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Changed] Mechanically split the Web Settings page into section modules under `components/settings/sections/` with zero intentional behavior change; fixed Advanced env-import tests targeting the wrong file input and restored missing field-title i18n inventory keys needed for Settings tests to load.
 - [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
 - [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
 - [Added] Zero-config first success: loopback Ollama auto-detect for setup readiness, data-only dry-run guidance when no model is configured, and LOCAL_RUNTIME_AUTO_DETECT* settings.

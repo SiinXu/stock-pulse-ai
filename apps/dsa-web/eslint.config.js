@@ -17,7 +17,6 @@ const pageLineBaselines = {
   'src/pages/DecisionSignalsPage.tsx': 1513,
   'src/pages/HomePage.tsx': 833,
   'src/pages/ResearchAnalysisWorkbenchPage.tsx': 1406,
-  'src/pages/SettingsPage.tsx': 2030,
   'src/pages/StockScreeningPage.tsx': 689,
 }
 
