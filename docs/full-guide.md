@@ -1050,14 +1050,19 @@ Phase 1 只做呈现层重排：在 Jinja 报告模板的每只股票详情中�
 | 模板 | 行为 |
 | --- | --- |
 | `templates/report_markdown.j2` | 每只股票 `##` 标题下先渲染完整 Decision Card；原有「重要信息 / 核心结论 / 盘中护栏 / 作战计划」等段落整体后移，不删除。 |
-| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card 作为首屏内容；后续原有精简段落保留。 |
-| `templates/report_brief.j2` | 每只股票以紧凑 Decision Card 作为主内容。 |
-| 共享宏 | `templates/_macros.j2` 的 `decision_card`；字段缺失时省略对应行，不输出空卡字段。 |
+| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card（约 4–5 行）作为首屏内容；后续原有精简段落保留。 |
+| `templates/report_brief.j2` | 使用 brief 专用长度预算形态（`decision_card(..., compact='brief')`）：每股 **1 行主行 + 至多 1 行补充行**。主行保留与 `origin/main` 单行 brief 同等字段（信号 emoji/文案、评分、一句话结论），并标记 🃏；补充行最多打包 1 条风险 + 1 条观察条件（硬截断）。不输出 wechat 风格 5 行卡，也不在 brief 中重复止损/目标位（留给 wechat/markdown）。 |
+| 共享宏 | `templates/_macros.j2` 的 `decision_card`；`compact=false` 完整卡、`compact=true` 推送紧凑卡、`compact='brief'` 推送预算形态；字段缺失时省略对应行，不输出空卡字段。 |
+
+**brief 长度预算与体积影响**（相对未预算的 5 行紧凑卡）：
+- 契约依据：`ReportType.BRIEF`（3–5 句、适合移动端/推送）与 Pushover `max_length = 1024`（超长按 `\n\n` 分片）。
+- 目标：典型 10 只自选股的 brief 经 `markdown_to_plain_text` 后落在单条 Pushover 消息内；回归测试以 ≥10 只 fixture 锁定每股 ≤2 行与 plain 总长 ≤1024。
+- WeCom markdown 默认约 4000 字节：wechat 仍保留完整紧凑卡作首屏，常规 5–10 只规模可能比无卡时多 1 个分片，属有意取舍（首屏完整性优先），见 PR 证据中的字节/分片对照。
 
 边界与兼容：
 - 不改上游提取器、Prompt、Schema 或 notification 发送链；仅模板呈现。
 - 仅影响 `REPORT_RENDERER_ENABLED=true` 时的 Jinja 路径；默认关闭时仍走 `src/notification_parts/rendering.py` 硬编码 fallback。
-- 通知按 `###` / `---` 切块的逻辑仍以股票标题块为边界；Decision Card 使用 `### 🃏`（markdown）或紧凑行内块（wechat/brief），不改变数据契约。
+- 通知按 `###` / `---` 切块的逻辑仍以股票标题块为边界；Decision Card 使用 `### 🃏`（markdown）、wechat 紧凑多行块或 brief 预算行，不改变数据契约。
 
 归一化函数在 `_parse_response()` 和 `parse_dashboard_json()` 中显式调用，确保：
 - 字符串百分比转为 int（如 `"35%"` → `35`）
