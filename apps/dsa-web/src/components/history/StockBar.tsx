@@ -107,12 +107,17 @@ export const StockBar: React.FC<StockBarProps> = ({
   })();
 
   return (
-    <div className={className}>
-      <Surface as="aside" level="interactive" className="flex h-full flex-col overflow-hidden">
-        <ScrollArea
-        viewportClassName="p-4"
-        testId="home-stock-bar-scroll"
+    <div className={`flex min-h-0 min-w-0 flex-col ${className}`.trim()}>
+      <Surface
+        as="aside"
+        level="interactive"
+        className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       >
+        <ScrollArea
+          className="min-h-0 flex-1"
+          viewportClassName="p-4"
+          testId="home-stock-bar-scroll"
+        >
         <div className="mb-4 space-y-3">
           <DashboardPanelHeader
             className="mb-1"
