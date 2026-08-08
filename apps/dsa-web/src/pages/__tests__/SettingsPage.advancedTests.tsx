@@ -419,7 +419,7 @@ export function registerSettingsPageAdvancedTests(): void {
 
     vi.clearAllMocks();
 
-    const input = document.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"][accept=".env,.txt"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input as HTMLInputElement, {
@@ -493,7 +493,7 @@ export function registerSettingsPageAdvancedTests(): void {
 
     vi.clearAllMocks();
 
-    const input = document.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"][accept=".env,.txt"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input as HTMLInputElement, {
@@ -517,7 +517,7 @@ export function registerSettingsPageAdvancedTests(): void {
     vi.clearAllMocks();
     load.mockResolvedValue(false);
 
-    const input = document.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"][accept=".env,.txt"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input as HTMLInputElement, {
