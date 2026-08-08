@@ -680,10 +680,17 @@ const ChatPage: React.FC = () => {
           : {}),
         context: contextForSend ?? undefined,
       };
+      // Keep stock/name/recordId query params unsent until the stream succeeds so a
+      // mid-flight refresh can restore the report→chat draft. Only mark context=active
+      // after backend persistence (stream without lastFailedRequest).
+      const pendingFollowUpContext = followUpContextRef.current;
+      const unsentFollowUpParamsPresent = Boolean(
+        sanitizeFollowUpStockCode(searchParams.get('stock'))
+        && searchParams.get(CHAT_CONTEXT_STATE_QUERY_KEY) !== CHAT_ACTIVE_CONTEXT_STATE,
+      );
       followUpHydrationTokenRef.current += 1;
       followUpContextRef.current = null;
       setIsFollowUpContextLoading(false);
-      persistActiveContextInUrl(nextActiveStockContext);
 
       setInput('');
       setMobileSkillPickerOpen(false);
@@ -692,8 +699,20 @@ const ChatPage: React.FC = () => {
         skillNames: usedSkillNames,
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
+
+      const { lastFailedRequest } = useAgentChatStore.getState();
+      if (!lastFailedRequest) {
+        persistActiveContextInUrl(nextActiveStockContext);
+        return;
+      }
+
+      // Stream failed: restore draft + pending context so refresh can retry.
+      followUpContextRef.current = pendingFollowUpContext ?? contextForSend ?? null;
+      if (unsentFollowUpParamsPresent || pendingFollowUpContext) {
+        setInput(msgText);
+      }
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, startStream, t],
   );
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
