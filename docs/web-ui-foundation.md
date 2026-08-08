@@ -538,6 +538,162 @@ selector has been deleted after its final consumers migrated.
 `gradient` map to `interactive`. New production code should choose `Surface`
 or `Section` directly instead of adding another `Card` variant.
 
+## Surface Roles And Density Contract
+
+This section is the **normative acceptance contract** for choosing and filling
+Page, Drawer, Modal, full-page Wizard, and in-page rail surfaces. It codifies
+the product rules from issues #877 (surface density) and #878 (action control
+matrix). Visual tokens, glow/glass bans, and radius rules remain in
+[`apps/dsa-web/DESIGN_GUIDE.md`](../apps/dsa-web/DESIGN_GUIDE.md). Overlay
+focus, Escape, scroll lock, and z-index remain owned by the shared Overlay
+primitives (`Modal`, `Drawer`, `ConfirmDialog`, `Sheet`, `Popover`)—this
+section tightens **content policy**, not a second overlay stack.
+
+**Enforcement model**
+
+| Tag | Meaning |
+| --- | --- |
+| **Immediate** | Binding for all new production surfaces and any PR that adds or substantially reworks a surface. Reviewers may block on violation. |
+| **Progressive** | Existing surfaces may still violate today. Owning domain PRs migrate when they touch that surface; no silent expansion of debt. |
+
+Reviewers use the allow/deny lists and numeric limits below as pass/fail
+criteria. Prefer words such as “must / must not / at most N” over aspirational
+language.
+
+### Surface role table
+
+| Role | Allowed | Forbidden | Required chrome | Size / scroll limit | Compliance |
+| --- | --- | --- | --- | --- | --- |
+| **Page** | Owns the primary task for the route; durable URL state; durable multi-field configuration that the user scans and edits in place | Hosting a multi-step connect/import flow that belongs in a Wizard; dumping every Settings category’s fields into one scroll when section routing exists | Exactly one visible `PageHeader` H1 per route; optional `Toolbar`; task states via shared patterns | Full main canvas under Shell; at most two visible surface boundaries on a normal page (see Surface Hierarchy) | **Immediate** for new routes. **Progressive**: Settings multi-section long scrolls, Portfolio stacked write entry points, Discover long expansion, report strata fully open by default |
+| **Drawer** (`variant="detail"`) | Single-object detail; short read; ≤ few actions (open full page, copy, simple status change); filter/history side panels that stay contextual | Multi-step wizards; long settings forms; nested tables whose primary job is horizontal exploration; entire settings categories | Visible title; object subtitle when an id/time/stock exists; primary action when the detail has one; **Open full page** (or equivalent deep link) when the object can grow beyond detail | Content height target **≤ ~1.5 viewports**. If content predictably exceeds that, use a Page or Wizard instead. Body scrolls inside the drawer; background scroll locked by the shared primitive | **Immediate** for new drawers. **Progressive**: signal/report drawers that host edit-scale content; any drawer that grew into a workflow without a full-page escape |
+| **Drawer** (`variant="navigation"`) | Global product navigation only (Shell mobile nav) | Business detail, forms, or page-local tools | Product route list and close control; focus return to opener | Shell-owned width (`max-w-xs`); one global nav control on mobile | **Immediate** keep Shell as sole navigation drawer owner |
+| **Modal** | Confirmations; short forms of **≤ 5–7 fields**; test-connection / single-entity add-edit (intelligence source, provider, channel, auth/password, notification test); comparable discrete submissions | Multi-step flows; entire settings categories; regular configuration that Settings keeps in page flow | Title; action footer owned by the shared `Modal`; danger confirms use `danger` / `ConfirmDialog` with consequence copy | Size tiers only: `compact` / `default` / `wide` / `fullscreen` as defined by the primitive. Scroll **only** the modal body; header/footer fixed; background locked. Prefer `compact`/`default` for ≤7 fields; `fullscreen` is reserved for graph-scale inspection such as Run Flow, not for long forms | **Immediate** for new modals. **Progressive**: Portfolio / Settings modals that exceed field limits; nested page+modal scroll without body-only scroll |
+| **Full-page Wizard** | Multi-step flows; forms with **> 7 fields**; Integrations connect flows; portfolio import; first-run / agent onboarding | Hosting the same flow inside a Drawer or a short Modal | Step progress or explicit step labels; one primary forward action per step; cancel/back that restores a clear prior state | Full route or full main canvas; not an overlay series of pages | **Immediate** for new multi-step product flows. Existing: `FirstRunWizard`, `AgentOnboardingWizard`, settings wizard locales |
+| **In-page panel / rail** | Context only: session list, outline, filters, secondary metrics | Equal weight to the main canvas; a third persistent column beside global nav + main + rail | Labelled region (`ResponsiveRail` H2 or equivalent); collapsible below its breakpoint | At wide desktop the rail may stay visible; narrower breakpoints use one labelled disclosure. Third surface must be overlay or bottom sheet, not a third persistent column | **Immediate** for new workspace layouts. **Progressive**: mid-width layouts that keep expanded global labels **and** page rail **and** dense main |
+
+**Hard stacking rule:** do not open a product Drawer and a product Modal for the
+same task at once. If a drawer action needs confirmation, use `ConfirmDialog`
+or replace the drawer content—do not stack a second full form modal on top of a
+workflow drawer without an explicit, reviewed exception.
+
+**Overlay stack rule:** the shared foundation Overlay system remains the only
+overlay stack. Page-local portal systems, one-off z-index ladders, and duplicate
+focus traps are out of contract.
+
+### Density and hierarchy rules
+
+| ID | Rule | Compliance |
+| --- | --- | --- |
+| D1 | **One H1 per route.** Hierarchy is Title → section heading → field label. Do not introduce a second page-level H1 inside drawers, modals, or nested cards. | **Immediate** for new pages (matches `PageHeader` / route-focus contract). **Progressive** for any legacy dual-heading surfaces |
+| D2 | **Secondary blocks default collapsed.** Advanced / governance / rarely edited groups and full report strata below the Decision Card start collapsed on first visit of that section/view. User expand state may be remembered later; first paint must not show every block open. | **Progressive** on Settings advanced groups, Discover strategy copy blocks, report strata; **Immediate** when a PR adds a new advanced block |
+| D3 | **Card-in-card limit.** Nested bordered surfaces are allowed only when the inner piece is independently interactive (selectable row, activatable card). Prefer section spacing, dividers, and heading hierarchy over nested `interactive` boxes. | **Immediate** for new composition. Aligns with Surface Hierarchy “at most two visible surface boundaries” |
+| D4 | **Help text is secondary.** Helper copy must not share equal visual weight with the control row (no competing primary emphasis in the same band). | **Immediate** for new fields; **Progressive** for dense Settings rows |
+| D5 | **No per-page spacing invention.** Use shared size tiers and existing spacing scale until a product-wide density token ships. | **Immediate** |
+
+### Working-region breakpoints
+
+Shell navigation breakpoints in Application Shell And Navigation remain
+authoritative for sidebar width and mobile nav. The table below governs the
+**page working region** (main canvas + optional page rail), complementary to
+Shell rules:
+
+| Viewport width | Working-region rule | Compliance |
+| --- | --- | --- |
+| **≥ 1280px** | Main canvas may pair with one optional collapsible context rail. Global sidebar expanded preference is independent but must not create three dense equal columns of content. | **Immediate** for new layouts |
+| **~1024px (1024–1279px)** | At most **two** full-width competing surfaces in the working region: at most one of (expanded global nav labels **or** expanded page rail) may sit beside a dense main column. If both would clip core content, collapse the page rail to disclosure (or compact the nav per Shell defaults). | **Progressive** for Home / Analysis / Chat mid-width; **Immediate** when adding a new dual-rail layout |
+| **< 768px** | Single column. Secondary content uses Drawer, sheet, or labelled disclosure. One global nav control (Shell). Page tools stay in the page header tool group, not a second global menu. | **Immediate** for new mobile layouts |
+
+**Scroll rule:** prefer one primary vertical scroll owner per view. Multiple
+independent `overflow-y` regions require a product reason (for example Run Flow
+event rail + graph). Mid-width clipping of core content due to three full
+columns is a contract defect (issue #877 I4).
+
+### Task state structure (Loading / Empty / Error / Partial)
+
+Component APIs live in State And Alert Semantics. This table adds **structure
+and CTA** requirements used in PR review:
+
+| State | Structure requirements | CTA rules | Compliance |
+| --- | --- | --- | --- |
+| **Loading** | Block-level skeleton or shared `Progress` / `Spinner` path; labelled busy state (`aria-busy` / `role="status"` as owned by `StatePanel`) | No competing primary CTA that implies the task is ready | **Immediate** for new task regions. **Progressive**: pages still inventing local spinners |
+| **Empty** | Shared empty pattern (`StatePanel` empty or `EmptyState` adapter): short plain-language copy; optional illustration; single clear next step | **Exactly one** primary CTA (text `Button`). Secondary links optional and quieter | **Immediate** for new empty states. **Progressive**: Discover / Today / Portfolio pilots |
+| **Error** | Plain-language failure; reuse `StatePanel` error or `Alert` for refresh-over-stale; no raw stack traces in product UI | **Retry** when retry is meaningful; optional link to Integrations, security, or Settings when that is the fix path (see error-class issues) | **Immediate** for new error paths. **Progressive**: divergent per-page error layouts |
+| **Partial / stale** | Keep last good content readable when possible; show a banner or `partial` state with as-of / completeness context | One action to refresh or complete missing setup; do not hide partial data behind a full-page empty | **Immediate** for new partial surfaces. **Progressive**: as-of banners on hubs |
+
+Do not render a second loading card, empty card, or alert for the same task
+identity. Refresh failure over existing results uses `Alert` while results stay
+visible (existing foundation rule).
+
+### Action control matrix (#878)
+
+This matrix is the single documented rule for text buttons vs icon tools. It
+extends Button Intent and IconButton primitive contracts; it does not add new
+Button variants.
+
+| Kind | Control | Examples | Forbidden patterns |
+| --- | --- | --- | --- |
+| **Primary task** | Labeled `Button` (`primary` or one task-region primary). Optional leading icon inside the same Button | Save, Run analysis, Connect, Import, Apply filters | Icon-only for irreversible money/account destruction; multiple `primary` buttons in one task region |
+| **Secondary task command** | Labeled `Button` (`secondary` / `outline`) | Cancel, Edit, View details when the label is the task | Styling secondary tools as a second primary |
+| **Secondary chrome tool** | `IconButton` + accessible name + tooltip | Refresh, Filter, More/overflow, Close, Collapse, History, Copy, Export | Full label `Button` rows that only wrap the toolbar; icon-only without accessible name |
+| **Tertiary / inline** | Ghost `IconButton` or quiet text link | Inline dismiss affordances, low-emphasis row tools | Elevating tertiary tools to primary |
+| **Destructive** | Labeled `Button` with `danger` / `danger-subtle`, or `ConfirmDialog` with consequence copy | Delete account, remove channel | Icon-only destructive for irreversible actions unless a reviewed product pattern already confirms with a labeled dialog |
+
+**No double frame (R2):** do not wrap each `IconButton` in its own bordered or
+padded card. Allowed: a toolbar row with gap only; one shared segmented track
+for a tool group; selected state on the group, not a per-icon default box.
+
+**Header band layout (R4):**
+
+```text
+[ Title + meta .................... [icon tools] [optional primary Button] ]
+[ optional secondary toolbar ]
+[ content ]
+```
+
+Icon tools share one tool group on a single baseline. The primary CTA is
+optically separate from the icon cluster (not mixed into the same chip row as
+Refresh).
+
+**Elevation usage (R3 / R5):** use Surface Hierarchy levels only. Nested content
+inside a section must not add another card border unless independently
+interactive. Overlays (`Modal` / `Drawer` / menus) must read above page section
+via the shared overlay surface, backdrop, and elevated shadow tokens. Only
+semantic shadow tokens from `index.css`—no glow, glass, or decorative colored
+shadows (DESIGN_GUIDE).
+
+| Action-matrix rule | Compliance |
+| --- | --- |
+| Text vs IconButton classification | **Immediate** for new toolbars, drawer headers, and table row chrome. **Progressive**: existing pages still using labeled Refresh/Filter |
+| No double frame around IconButton | **Immediate** for new chrome. **Progressive**: audited heavy wrappers |
+| Header band separation of tools vs primary CTA | **Immediate** for new headers. **Progressive**: workbench / signals / settings headers |
+| Overlay elevation via shared tokens | **Immediate** keep shared primitives; **Progressive** any custom elevated boxes |
+
+### Mapping to existing code
+
+| Existing surface | Contract stance |
+| --- | --- |
+| Shared `Drawer` / `Modal` / `ConfirmDialog` + `overlayZ` | **Keep** the system; tighten content policy only |
+| Settings `section` / `view` routes | **Lean into** single active section content; do not paint every group when section routing exists |
+| Portfolio multi-modal writes | Short modals only; long import → full-page wizard track |
+| Signal / report drawers | Detail + link to full report / workbench; not full edit workflows |
+| Foundation `StatePanel` / `EmptyState` / `Alert` | Extend adoption; stop page-local empty/error reinvention |
+| `PageHeader` one H1 + route focus | Already foundational; surface contract restates as density D1 |
+| DESIGN_GUIDE tokens / no glow / no glass | Unchanged; hierarchy comes from layout and Surface levels, not new colors |
+| Shell breakpoints (1024 / 1280) | Unchanged; working-region table above is complementary content policy |
+
+### Review checklist (executable)
+
+A PR that introduces or reworks a surface fails this contract when any apply:
+
+1. New multi-step or >7-field flow ships in a Drawer or short Modal without exception approval.
+2. New Drawer content is expected to exceed ~1.5 viewports with no full-page escape.
+3. New Modal scrolls the page behind or uses header/footer scroll instead of body-only scroll.
+4. New route renders more than one H1, or adds nested bordered cards without independent interaction.
+5. New empty/error/loading region omits the required structure or CTA rules above.
+6. New toolbar uses labeled Buttons for recurrent chrome tools that the matrix assigns to `IconButton`, or wraps each icon in its own border frame.
+7. New mid-width layout keeps three dense full columns that clip core content.
+8. Any new glow, glass, or non-semantic shadow treatment (also a DESIGN_GUIDE failure).
+
 ## State And Alert Semantics
 
 `StatePanel.state` is typed as `loading`, `blocked`, `partial`, `empty`,
