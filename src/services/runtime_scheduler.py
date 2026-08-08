@@ -81,7 +81,7 @@ def build_agent_event_monitor_background_tasks(
     interval_seconds = _agent_event_monitor_interval_seconds(config)
     try:
         alert_worker = AlertWorker(config_provider=config_provider)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Event monitor alert worker initialization failed",
@@ -103,6 +103,32 @@ def build_agent_event_monitor_background_tasks(
         "run_immediately": True,
         "name": "agent_event_monitor",
     }]
+
+
+def build_daily_brief_scheduler_background_tasks(
+    config: Config,
+    *,
+    config_provider: Callable[[], Config],
+) -> List[Dict[str, Any]]:
+    """Build the config-gated daily brief background task (Issue #466)."""
+    if not getattr(config, "daily_brief_enabled", False):
+        return []
+    try:
+        from src.services.daily_brief_service import build_daily_brief_background_tasks
+
+        return build_daily_brief_background_tasks(
+            config,
+            config_provider=config_provider,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(
+            logger,
+            "Daily brief background task initialization failed",
+            exc,
+            error_code="daily_brief_background_task_init_failed",
+            level=logging.WARNING,
+        )
+        return []
 
 
 class RuntimeSchedulerService:
@@ -201,7 +227,7 @@ class RuntimeSchedulerService:
                 raise RuntimeError("runtime scheduled analysis reported failure")
             self._last_success_at = datetime.now().isoformat()
             self._last_error = None
-        except Exception as exc:  # noqa: BLE001 - scheduled runs must not kill API process.
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             self._last_error = sanitize_exception_chain(exc)
             log_safe_exception(
                 logger,
@@ -249,6 +275,7 @@ class RuntimeSchedulerService:
             tasks = list(self._background_tasks_provider(config))
         else:
             tasks = self._current_agent_event_monitor_background_tasks(config)
+            tasks.extend(self._current_daily_brief_background_tasks(config))
         if self._scheduled_task_service is not None and self._personalized_schedule_enabled:
             from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
 
@@ -296,13 +323,52 @@ class RuntimeSchedulerService:
             "name": name,
         }]
 
+    def _current_daily_brief_background_tasks(self, config: Config) -> List[Dict[str, Any]]:
+        name = "daily_brief"
+        if not getattr(config, "daily_brief_enabled", False):
+            self._background_task_cache.pop(name, None)
+            self._background_task_registered_names.discard(name)
+            return []
+
+        cached = self._background_task_cache.get(name)
+        if cached is None:
+            entries = build_daily_brief_scheduler_background_tasks(
+                config,
+                config_provider=self._reload_config,
+            )
+            if not entries:
+                self._background_task_cache.pop(name, None)
+                self._background_task_registered_names.discard(name)
+                return []
+            cached = dict(entries[0])
+            cached["name"] = name
+            self._background_task_cache[name] = cached
+            interval_seconds = int(cached["interval_seconds"])
+        else:
+            from src.services.daily_brief_service import DAILY_BRIEF_POLL_INTERVAL_SECONDS
+
+            interval_seconds = int(DAILY_BRIEF_POLL_INTERVAL_SECONDS)
+
+        run_immediately = (
+            bool(cached.get("run_immediately", False))
+            and name not in self._background_task_registered_names
+        )
+        self._background_task_registered_names.add(name)
+        return [{
+            "task": cached["task"],
+            "interval_seconds": interval_seconds,
+            "run_immediately": run_immediately,
+            "name": name,
+        }]
+
     @staticmethod
     def _run_in_background_thread(target: Callable[[], None]) -> None:
         """Run a callback in a background thread without blocking startup."""
         try:
             _thread.start_new_thread(target, ())
             return
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             # Best-effort fallback for environments where the low-level thread API
             # is unavailable or restricted.
             thread = threading.Thread(target=target, daemon=True)
@@ -430,7 +496,8 @@ class RuntimeSchedulerService:
         )
         try:
             worker.start()
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             self._run_lock.release()
             raise
         return {"accepted": True, "running": True}
@@ -446,7 +513,8 @@ class RuntimeSchedulerService:
         else:
             try:
                 schedule_times = self._current_times()
-            except Exception:  # pragma: no cover - defensive status fallback
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 schedule_times = []
         running = self._run_lock.locked()
         return {

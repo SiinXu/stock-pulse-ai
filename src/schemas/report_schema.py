@@ -234,6 +234,7 @@ class Dashboard(BaseModel):
     signal_attribution: Optional[SignalAttribution] = None
     # Issue #616: additive evidence strata; historical payloads omit this field.
     report_strata: Optional[ReportStrata] = None
+    agent_disagreement_explanation: Optional[Any] = None
 
 
 class AnalysisReportSchema(BaseModel):

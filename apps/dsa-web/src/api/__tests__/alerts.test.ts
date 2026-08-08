@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alertsApi } from '../alerts';
+import { getParsedApiError, isApiRequestError } from '../error';
 
 const { get, post, patch, deleteRequest } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -466,5 +467,49 @@ describe('alertsApi', () => {
     expect(triggers.items[0].ruleId).toBe(3);
     expect(notifications.items[0].triggerId).toBe(10);
     expect(notifications.items[0].errorCode).toBe('timeout');
+  });
+
+  it('preserves extra keys on valid rule payloads (toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        id: 1,
+        name: 'r',
+        target_scope: 'single_symbol',
+        target: '600519',
+        alert_type: 'price_cross',
+        parameters: { direction: 'above', price: 1 },
+        severity: 'warning',
+        enabled: true,
+        source: 'api',
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const rule = await alertsApi.getRule(1);
+    expect(rule).toEqual(expect.objectContaining({
+      id: 1,
+      alertType: 'price_cross',
+      unexpectedServerField: 'keep-me',
+    }));
+  });
+
+  it('surfaces rule shape mismatches through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        id: 1,
+        target_scope: 'single_symbol',
+        target: '600519',
+        alert_type: 'price_cross',
+        severity: 'warning',
+        enabled: true,
+        source: 'api',
+      },
+    });
+    await expect(alertsApi.getRule(1)).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('AlertRuleItem');
+      return true;
+    });
   });
 });

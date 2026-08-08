@@ -56,15 +56,11 @@ _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
 WEB_SETTINGS_HIDDEN_FROM_UI = {
     "ALLOW_INSECURE_PUBLIC_BIND",
     "DATABASE_PATH",
-    "FUTU_ACC_ID",
-    "FUTU_OPEND_HOST",
-    "FUTU_OPEND_PORT",
-    "FUTU_SECURITY_FIRM",
     "SQLITE_WAL_ENABLED",
     "SQLITE_BUSY_TIMEOUT_MS",
     "SQLITE_WRITE_RETRY_MAX",
     "SQLITE_WRITE_RETRY_BASE_DELAY",
-    "USE_PROXY",
-    "PROXY_HOST",
-    "PROXY_PORT",
+    # USE_PROXY / PROXY_HOST / PROXY_PORT are Web-editable (system network
+    # section). Previously hidden as low-frequency ops keys applied only at
+    # process bootstrap; remain restart-gated via warning_codes + field help.
 }

@@ -832,6 +832,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config-profiles/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export stockpulse-profile YAML
+         * @description Export non-secret configuration as stockpulse-profile v1 YAML. Secret keys (API keys, tokens, passwords, extra headers) are never included.
+         */
+        get: operations["export_config_profile_api_v1_config_profiles_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/import/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply stockpulse-profile YAML import
+         * @description Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply.
+         */
+        post: operations["apply_config_profile_import_api_v1_config_profiles_import_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview stockpulse-profile YAML import
+         * @description Validate profile YAML (schema + no secrets) and return a non-secret diff. Does not write configuration.
+         */
+        post: operations["preview_config_profile_import_api_v1_config_profiles_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List recommended configuration presets
+         * @description Return official named presets with local-first recommendation ranking. Detection prefers healthy Ollama / Model Pack, then CLI backends, then cloud.
+         */
+        get: operations["list_config_presets_api_v1_config_profiles_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/presets/{preset_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a configuration preset
+         * @description Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm.
+         */
+        post: operations["apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/config-profiles/presets/{preset_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview applying a configuration preset */
+        post: operations["preview_config_preset_api_v1_config_profiles_presets__preset_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decision-signals": {
         parameters: {
             query?: never;
@@ -1708,6 +1825,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onboarding/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply non-secret onboarding config recommendations
+         * @description Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.
+         */
+        post: operations["apply_onboarding_plan_api_v1_onboarding_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate an agent-guided onboarding plan
+         * @description Rule-based plan generation is the default. When prefer_llm is true but no model is available, the response stays engine=rules with an honest llm_note (no fake AI).
+         */
+        post: operations["generate_onboarding_plan_api_v1_onboarding_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get persisted onboarding profile and last plan */
+        get: operations["get_onboarding_state_api_v1_onboarding_state_get"];
+        put?: never;
+        post?: never;
+        /** Reset persisted onboarding profile (keeps already written config) */
+        delete: operations["reset_onboarding_state_api_v1_onboarding_state_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List registered plugins and lifecycle state
+         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
+         */
+        get: operations["listPlugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable, disable, or hot-reload one plugin
+         * @description Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.
+         */
+        post: operations["updatePluginLifecycle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/accounts": {
         parameters: {
             query?: never;
@@ -1899,6 +2114,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/imports/futu": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Futu OpenD real positions into a portfolio account
+         * @description Import live Futu positions via the shared trade-record commit path.
+         *
+         *     Portfolio Web UI for this action is a follow-up; this endpoint is the backend
+         *     seam for API clients and future UI wiring.
+         */
+        post: operations["commit_futu_import_api_v1_portfolio_imports_futu_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/imports/futu/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Futu OpenD real positions as import trade records */
+        post: operations["preview_futu_import_api_v1_portfolio_imports_futu_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/positions/{symbol}/analysis": {
         parameters: {
             query?: never;
@@ -1925,6 +2180,26 @@ export interface paths {
         };
         /** Get portfolio risk report */
         get: operations["get_risk_report_api_v1_portfolio_risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/risk-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get portfolio risk metrics
+         * @description Historical VaR, pairwise return correlation, and concentration/diversification metrics from stored daily closes and current holdings. Never calls market data providers. Insufficient history is reported explicitly (never silent zeros).
+         */
+        get: operations["getPortfolioRiskMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2136,11 +2411,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List privileged-operation security audit events
-         * @description Return a bounded page only to an authenticated administrator session.
-         */
+        /** List privileged-operation security audit events */
         get: operations["list_security_audit_events_api_v1_security_audit_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/local-only": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read LOCAL_ONLY_MODE enforcement status */
+        get: operations["get_local_only_mode_status_api_v1_security_local_only_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/outbound-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent outbound HTTP policy decisions */
+        get: operations["list_outbound_activity_api_v1_security_outbound_activity_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3274,6 +3580,10 @@ export interface components {
             missing_fields?: string[] | null;
             /** Name */
             name?: string | null;
+            /** News Search Requested */
+            news_search_requested?: boolean | null;
+            /** News Search Status */
+            news_search_status?: string | null;
             /** Provider */
             provider: string;
             /** Quality Status */
@@ -3368,6 +3678,8 @@ export interface components {
             description: string;
             /** Published At */
             published_at?: string | null;
+            /** Search Result */
+            search_result?: boolean | null;
             /** Source */
             source?: string | null;
             /** Time */
@@ -4171,6 +4483,58 @@ export interface components {
             /** Passwordconfirm */
             passwordConfirm?: string | null;
         };
+        /**
+         * BacktestAppliedConfig
+         * @description Echo of the effective run configuration used for evaluation honesty.
+         */
+        BacktestAppliedConfig: {
+            /**
+             * Analysis Date From
+             * @description Analysis date start filter (inclusive)
+             */
+            analysis_date_from?: string | null;
+            /**
+             * Analysis Date To
+             * @description Analysis date end filter (inclusive)
+             */
+            analysis_date_to?: string | null;
+            /**
+             * Code
+             * @description Normalized stock filter, if any
+             */
+            code?: string | null;
+            /**
+             * Engine Version
+             * @description Effective backtest engine version label
+             */
+            engine_version: string;
+            /**
+             * Eval Window Days
+             * @description Effective evaluation window in trading days
+             */
+            eval_window_days: number;
+            /**
+             * Force
+             * @description Whether force re-evaluation was requested
+             * @default false
+             */
+            force: boolean;
+            /**
+             * Limit
+             * @description Maximum candidate analysis rows processed
+             */
+            limit: number;
+            /**
+             * Min Age Days
+             * @description Effective minimum analysis age in calendar days
+             */
+            min_age_days: number;
+            /**
+             * Neutral Band Pct
+             * @description Neutral outcome band percentage
+             */
+            neutral_band_pct: number;
+        };
         /** BacktestResultItem */
         BacktestResultItem: {
             /** Action */
@@ -4303,6 +4667,8 @@ export interface components {
         };
         /** BacktestRunResponse */
         BacktestRunResponse: {
+            /** @description Echo of the effective run configuration (window, universe limit, engine, dates) */
+            applied_config?: components["schemas"]["BacktestAppliedConfig"] | null;
             /**
              * Applied Eval Window Days
              * @description 实际生效的评估窗口（交易日数）
@@ -4585,6 +4951,274 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+        };
+        /**
+         * ConfigPresetApplyRequest
+         * @description Apply or preview an official preset against the current config version.
+         */
+        ConfigPresetApplyRequest: {
+            /** Config Version */
+            config_version: string;
+            /**
+             * Reload Now
+             * @default true
+             */
+            reload_now: boolean;
+        };
+        /**
+         * ConfigPresetApplyResponse
+         * @description Result of applying an official preset.
+         */
+        ConfigPresetApplyResponse: {
+            /** Applied */
+            applied: boolean;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /** Display Name */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /** New Config Version */
+            new_config_version: string;
+            /** Preset Id */
+            preset_id: string;
+            /** Updated Keys */
+            updated_keys?: string[];
+        };
+        /**
+         * ConfigPresetItem
+         * @description One official recommended configuration preset.
+         */
+        ConfigPresetItem: {
+            /** Config Values */
+            config_values?: {
+                [key: string]: string;
+            };
+            /** Description */
+            description: string;
+            /** Display Name */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: string;
+            /**
+             * Meets Requirements
+             * @default true
+             */
+            meets_requirements: boolean;
+            /** Preference Order */
+            preference_order?: string[];
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /** Requirements */
+            requirements?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** Strategies */
+            strategies?: {
+                [key: string]: unknown;
+            };
+            /** Tags */
+            tags?: string[];
+        };
+        /**
+         * ConfigPresetListResponse
+         * @description Official presets with recommendation ranking.
+         */
+        ConfigPresetListResponse: {
+            detection?: components["schemas"]["ConfigProfileDetection"];
+            /** Presets */
+            presets?: components["schemas"]["ConfigPresetItem"][];
+            /** Recommended Preset Id */
+            recommended_preset_id?: string | null;
+        };
+        /**
+         * ConfigPresetPreviewResponse
+         * @description Preview of applying an official preset.
+         */
+        ConfigPresetPreviewResponse: {
+            /**
+             * Change Count
+             * @default 0
+             */
+            change_count: number;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /** Display Name */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Preset Id */
+            preset_id: string;
+        };
+        /**
+         * ConfigProfileChange
+         * @description One non-secret configuration key change.
+         */
+        ConfigProfileChange: {
+            /**
+             * From Value
+             * @description Previous non-secret value
+             */
+            from_value: string;
+            /** Key */
+            key: string;
+            /**
+             * To
+             * @description Next non-secret value
+             */
+            to: string;
+        };
+        /**
+         * ConfigProfileDetection
+         * @description Local-first detection signals used for preset ranking.
+         */
+        ConfigProfileDetection: {
+            /** Cli Detected */
+            cli_detected?: string[];
+            /**
+             * Cloud Ready
+             * @default false
+             */
+            cloud_ready: boolean;
+            /**
+             * Model Pack Present
+             * @default false
+             */
+            model_pack_present: boolean;
+            /**
+             * Ollama Healthy
+             * @default false
+             */
+            ollama_healthy: boolean;
+        };
+        /**
+         * ConfigProfileExportResponse
+         * @description Exported stockpulse-profile YAML (secrets stripped).
+         */
+        ConfigProfileExportResponse: {
+            /** Config Version */
+            config_version: string;
+            /** Content */
+            content: string;
+            /** Filename */
+            filename: string;
+            /** Keys Exported */
+            keys_exported?: string[];
+            /**
+             * Keys Redacted
+             * @default 0
+             */
+            keys_redacted: number;
+        };
+        /**
+         * ConfigProfileImportApplyResponse
+         * @description Result of applying an imported stockpulse-profile YAML.
+         */
+        ConfigProfileImportApplyResponse: {
+            /** Applied */
+            applied: boolean;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** New Config Version */
+            new_config_version: string;
+            /** Updated Keys */
+            updated_keys?: string[];
+        };
+        /**
+         * ConfigProfileImportPreviewResponse
+         * @description Validated profile import preview with non-secret diff.
+         */
+        ConfigProfileImportPreviewResponse: {
+            /**
+             * Change Count
+             * @default 0
+             */
+            change_count: number;
+            /** Changes */
+            changes?: components["schemas"]["ConfigProfileChange"][];
+            /** Config Version */
+            config_version: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /** Features */
+            features?: {
+                [key: string]: unknown;
+            };
+            /** Issues */
+            issues?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /**
+         * ConfigProfileImportRequest
+         * @description Import or preview a stockpulse-profile YAML document.
+         */
+        ConfigProfileImportRequest: {
+            /** Config Version */
+            config_version: string;
+            /** Content */
+            content: string;
+            /**
+             * Reload Now
+             * @default true
+             */
+            reload_now: boolean;
         };
         /**
          * ConfigValidationIssue
@@ -5029,6 +5663,7 @@ export interface components {
             miss: number;
             /** Neutral */
             neutral: number;
+            profile_calibration?: components["schemas"]["DecisionSignalProfileCalibration"] | null;
             /** Statuses */
             statuses?: string[];
             /** Total */
@@ -5091,6 +5726,58 @@ export interface components {
             target_price?: number | null;
             /** Watch Conditions */
             watch_conditions?: string | null;
+        };
+        /** DecisionSignalProfileCalibration */
+        DecisionSignalProfileCalibration: {
+            breakdowns: components["schemas"]["DecisionSignalProfileCalibrationBreakdowns"];
+            /** Minimum Completed Sample Size */
+            minimum_completed_sample_size: number;
+        };
+        /** DecisionSignalProfileCalibrationBreakdowns */
+        DecisionSignalProfileCalibrationBreakdowns: {
+            /** Decision Profile */
+            decision_profile?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Action */
+            decision_profile_action?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Data Quality Level */
+            decision_profile_data_quality_level?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Horizon */
+            decision_profile_horizon?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Decision Profile Market Phase */
+            decision_profile_market_phase?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+            /** Profile Source */
+            profile_source?: components["schemas"]["DecisionSignalProfileCalibrationBucket"][];
+        };
+        /** DecisionSignalProfileCalibrationBucket */
+        DecisionSignalProfileCalibrationBucket: {
+            /** Avg Stock Return Pct */
+            avg_stock_return_pct?: number | null;
+            /** Completed */
+            completed: number;
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: string;
+            };
+            /** Hit */
+            hit: number;
+            /** Hit Rate Pct */
+            hit_rate_pct?: number | null;
+            /** Max Adverse Excursion Pct */
+            max_adverse_excursion_pct?: number | null;
+            /** Miss */
+            miss: number;
+            /** Miss Rate Pct */
+            miss_rate_pct?: number | null;
+            /** Neutral */
+            neutral: number;
+            /** Sample Sufficient */
+            sample_sufficient: boolean;
+            /** Total */
+            total: number;
+            /** Unable */
+            unable: number;
+            /** Unable Rate Pct */
+            unable_rate_pct?: number | null;
         };
         /** DecisionSignalReassessErrorResponse */
         DecisionSignalReassessErrorResponse: {
@@ -6710,6 +7397,28 @@ export interface components {
             /** Revision */
             revision: string;
         };
+        /** LocalOnlyModeStatus */
+        LocalOnlyModeStatus: {
+            /** Allowed Destination Classes */
+            allowed_destination_classes?: string[];
+            /**
+             * Blocked Error Reason
+             * @default local_only_mode_blocked
+             */
+            blocked_error_reason: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Env Key
+             * @default LOCAL_ONLY_MODE
+             */
+            env_key: string;
+            /**
+             * Policy
+             * @default non_loopback_denied
+             */
+            policy: string;
+        };
         /**
          * LoginRequest
          * @description Login request body. For first-time setup use password + password_confirm.
@@ -7068,6 +7777,252 @@ export interface components {
             /** Target */
             target?: string | null;
         };
+        /**
+         * OnboardingApplyRequest
+         * @description Apply non-secret recommended config after explicit user confirmation.
+         */
+        OnboardingApplyRequest: {
+            /** Config Version */
+            config_version: string;
+            /**
+             * Confirm
+             * @description Must be true to apply.
+             * @default true
+             */
+            confirm: boolean;
+            /**
+             * Model Available
+             * @default false
+             */
+            model_available: boolean;
+            /**
+             * Prefer Llm
+             * @default false
+             */
+            prefer_llm: boolean;
+            profile?: components["schemas"]["UserOnboardingProfile"];
+        };
+        /** OnboardingApplyResponse */
+        OnboardingApplyResponse: {
+            /**
+             * Applied Count
+             * @default 0
+             */
+            applied_count: number;
+            /** Applied Keys */
+            applied_keys?: string[];
+            /** Config Version */
+            config_version: string;
+            /** Message */
+            message: string;
+            plan: components["schemas"]["OnboardingPlanResponse"];
+            /** Profile */
+            profile: {
+                [key: string]: unknown;
+            };
+            /** Success */
+            success: boolean;
+            /** Update */
+            update?: {
+                [key: string]: unknown;
+            };
+        };
+        /** OnboardingConfigItem */
+        OnboardingConfigItem: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+        };
+        /** OnboardingFeaturePath */
+        OnboardingFeaturePath: {
+            /** Defer */
+            defer?: string[];
+            /** Emphasize */
+            emphasize?: string[];
+            /** Label */
+            label: string;
+            /** Primary Path */
+            primary_path?: string[];
+            /** Stage */
+            stage: string;
+        };
+        /**
+         * OnboardingPlanRequest
+         * @description Generate a rule-based (optionally LLM-refined) onboarding plan.
+         */
+        OnboardingPlanRequest: {
+            /**
+             * Model Available
+             * @description Whether a usable model is already configured (client-reported or server-known).
+             * @default false
+             */
+            model_available: boolean;
+            /**
+             * Prefer Llm
+             * @description Request LLM refinement when a model is available. When false or when no model is available, the engine stays rule-based honestly.
+             * @default false
+             */
+            prefer_llm: boolean;
+            profile?: components["schemas"]["UserOnboardingProfile"];
+        };
+        /** OnboardingPlanResponse */
+        OnboardingPlanResponse: {
+            /**
+             * Beginner Mode Recommended
+             * @default true
+             */
+            beginner_mode_recommended: boolean;
+            /** Config Changes */
+            config_changes?: {
+                [key: string]: unknown;
+            }[];
+            /** Config Items */
+            config_items?: components["schemas"]["OnboardingConfigItem"][];
+            /** Disclaimer */
+            disclaimer: string;
+            /** Engine */
+            engine: string;
+            feature_path: components["schemas"]["OnboardingFeaturePath"];
+            /** Feature Stage */
+            feature_stage: string;
+            /** Generated At */
+            generated_at: string;
+            /** Llm Note */
+            llm_note: string;
+            /**
+             * Model Available
+             * @default false
+             */
+            model_available: boolean;
+            /**
+             * Prefer Llm
+             * @default false
+             */
+            prefer_llm: boolean;
+            /** Profile */
+            profile: {
+                [key: string]: unknown;
+            };
+            /** Recommended Preset Id */
+            recommended_preset_id: string;
+            /** Recommended Preset Name */
+            recommended_preset_name: string;
+            /** Schema Version */
+            schema_version: number;
+            /** Today Plan */
+            today_plan?: components["schemas"]["OnboardingPlanStep"][];
+            /** Todos */
+            todos?: components["schemas"]["OnboardingTodoItem"][];
+            /** Week Plan */
+            week_plan?: components["schemas"]["OnboardingWeekStep"][];
+        };
+        /** OnboardingPlanStep */
+        OnboardingPlanStep: {
+            /** Detail */
+            detail: string;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** OnboardingResetResponse */
+        OnboardingResetResponse: {
+            /** Message */
+            message: string;
+            /** Reset */
+            reset: boolean;
+            /** Success */
+            success: boolean;
+        };
+        /**
+         * OnboardingStateResponse
+         * @description Persisted profile + last plan (may be null fields when unset).
+         */
+        OnboardingStateResponse: {
+            /** Applied At */
+            applied_at?: string | null;
+            /** Applied Keys */
+            applied_keys?: string[];
+            /** Config Version */
+            config_version?: string | null;
+            /** Exists */
+            exists: boolean;
+            plan?: components["schemas"]["OnboardingPlanResponse"] | null;
+            /** Profile */
+            profile?: {
+                [key: string]: unknown;
+            } | null;
+            /** Status */
+            status?: string | null;
+        };
+        /** OnboardingTodoItem */
+        OnboardingTodoItem: {
+            /** Description */
+            description: string;
+            /** Href */
+            href?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @default setup
+             */
+            kind: string;
+            /**
+             * Priority
+             * @default 1
+             */
+            priority: number;
+            /** Title */
+            title: string;
+        };
+        /** OnboardingWeekStep */
+        OnboardingWeekStep: {
+            /** Day */
+            day: string;
+            /** Detail */
+            detail: string;
+            /** Title */
+            title: string;
+        };
+        /** OutboundActivityItem */
+        OutboundActivityItem: {
+            /** Allowlisted */
+            allowlisted: boolean;
+            /** Correlation Id */
+            correlation_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "allowed" | "blocked";
+            /** Destination Class */
+            destination_class: string;
+            /** Host Type */
+            host_type: string;
+            /** Local Only Mode */
+            local_only_mode: boolean;
+            /** Occurred At */
+            occurred_at: string;
+            /** Reason */
+            reason: string;
+            /** Scheme */
+            scheme: string;
+        };
+        /** OutboundActivityPage */
+        OutboundActivityPage: {
+            /** Items */
+            items?: components["schemas"]["OutboundActivityItem"][];
+            /** Limit */
+            limit: number;
+            /** Local Only Mode */
+            local_only_mode: boolean;
+            /** Max Retained */
+            max_retained: number;
+            /** Returned */
+            returned: number;
+        };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
             /** Note */
@@ -7160,6 +8115,115 @@ export interface components {
             win_count: number;
             /** Win Rate Pct */
             win_rate_pct?: number | null;
+        };
+        /**
+         * PluginInfo
+         * @description One registered plugin and its lifecycle state.
+         */
+        PluginInfo: {
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Desired Enabled
+             * @description Persisted operator intent (False means disabled across restarts)
+             */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /**
+             * Id
+             * @description Stable plugin id from the manifest
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Package Root
+             * @description Absolute package directory for external plugins when known
+             */
+            package_root?: string | null;
+            /**
+             * Reloadable
+             * @description True when in-process hot-reload is attempted for this plugin
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginLifecycleRequest
+         * @description POST /api/v1/plugins/{plugin_id}/lifecycle body.
+         */
+        PluginLifecycleRequest: {
+            /**
+             * Action
+             * @description enable/disable toggles runtime state and persistence; reload re-imports code
+             * @enum {string}
+             */
+            action: "enable" | "disable" | "reload";
+        };
+        /**
+         * PluginLifecycleResponse
+         * @description Result of one lifecycle action.
+         */
+        PluginLifecycleResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "enable" | "disable" | "reload";
+            /** Error Code */
+            error_code?: string | null;
+            /** Message */
+            message?: string | null;
+            plugin?: components["schemas"]["PluginInfo"] | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloaded
+             * @default false
+             */
+            reloaded: boolean;
+            /**
+             * Restart Required
+             * @default false
+             */
+            restart_required: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Success */
+            success: boolean;
+        };
+        /**
+         * PluginListResponse
+         * @description GET /api/v1/plugins response.
+         */
+        PluginListResponse: {
+            /** Items */
+            items?: components["schemas"]["PluginInfo"][];
+            /** Total */
+            total: number;
         };
         /** PortfolioAccountCreateRequest */
         PortfolioAccountCreateRequest: {
@@ -7334,6 +8398,38 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PortfolioConcentrationBlock */
+        PortfolioConcentrationBlock: {
+            /**
+             * Diversification Score
+             * @description Normalized diversification score in [0, 1]; equal-weight → 1.0
+             */
+            diversification_score?: number | null;
+            /**
+             * Effective N
+             * @description 1 / HHI
+             */
+            effective_n?: number | null;
+            /**
+             * Hhi
+             * @description Herfindahl-Hirschman index of weights
+             */
+            hhi?: number | null;
+            /**
+             * Position Count
+             * @default 0
+             */
+            position_count: number;
+            /**
+             * Status
+             * @description 'ok' or 'empty_portfolio'
+             */
+            status: string;
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioRiskWeightItem"][];
+        };
         /** PortfolioCorporateActionCreateRequest */
         PortfolioCorporateActionCreateRequest: {
             /** Account Id */
@@ -7402,6 +8498,28 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PortfolioCorrelationBlock */
+        PortfolioCorrelationBlock: {
+            /**
+             * Matrix
+             * @description Pairwise Pearson correlation matrix aligned with symbols
+             */
+            matrix?: (number | null)[][];
+            /**
+             * Observation Count
+             * @default 0
+             */
+            observation_count: number;
+            /**
+             * Status
+             * @description 'ok', 'insufficient_history', or 'unavailable'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /** Symbols */
+            symbols?: string[];
+        };
         /** PortfolioDecisionSignalRiskBlock */
         PortfolioDecisionSignalRiskBlock: {
             /** Actions */
@@ -7444,6 +8562,30 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** PortfolioFutuImportRequest */
+        PortfolioFutuImportRequest: {
+            /**
+             * Account Id
+             * @description Target portfolio account id
+             */
+            account_id: number;
+            /**
+             * As Of
+             * @description Synthetic buy trade date for imported positions; defaults to today
+             */
+            as_of?: string | null;
+            /**
+             * Dry Run
+             * @description Preview insert counts without writing trades
+             * @default false
+             */
+            dry_run: boolean;
+            /**
+             * Operation Id
+             * @description Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).
+             */
+            operation_id?: string | null;
+        };
         /** PortfolioFxRefreshResponse */
         PortfolioFxRefreshResponse: {
             /** Account Count */
@@ -7462,6 +8604,39 @@ export interface components {
             stale_count: number;
             /** Updated Count */
             updated_count: number;
+        };
+        /** PortfolioHistoricalVaRBlock */
+        PortfolioHistoricalVaRBlock: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Horizon Days */
+            horizon_days?: number | null;
+            /**
+             * Observation Count
+             * @default 0
+             */
+            observation_count: number;
+            /** One Day Var Pct */
+            one_day_var_pct?: number | null;
+            /** Percentile Used */
+            percentile_used?: number | null;
+            /**
+             * Status
+             * @description 'ok', 'insufficient_history', or 'unavailable'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /**
+             * Var Pct
+             * @description Historical VaR as positive loss percentage points (e.g. 3.5 means 3.5%)
+             */
+            var_pct?: number | null;
+            /**
+             * Var Value
+             * @description Historical VaR in portfolio currency units
+             */
+            var_value?: number | null;
         };
         /** PortfolioImportBrokerItem */
         PortfolioImportBrokerItem: {
@@ -7606,6 +8781,93 @@ export interface components {
             /** Valuation Currency */
             valuation_currency: string;
         };
+        /** PortfolioRiskAssumptions */
+        PortfolioRiskAssumptions: {
+            /** Cash Excluded */
+            cash_excluded: boolean;
+            /** Concentration Metrics */
+            concentration_metrics: string;
+            /** Confidence */
+            confidence: number;
+            /** Correlation Method */
+            correlation_method: string;
+            /** Data Source */
+            data_source: string;
+            /** Distribution Assumption */
+            distribution_assumption: string;
+            /** Horizon Days */
+            horizon_days: number;
+            /** Horizon Scaling */
+            horizon_scaling: string;
+            /** Lookback Trading Days */
+            lookback_trading_days: number;
+            /** Min Correlation Observations */
+            min_correlation_observations: number;
+            /** Min Return Observations */
+            min_return_observations: number;
+            /** Portfolio Aggregation */
+            portfolio_aggregation: string;
+            /** Provider Calls On Hot Path */
+            provider_calls_on_hot_path: boolean;
+            /** Return Definition */
+            return_definition: string;
+            /** Var Method */
+            var_method: string;
+            /** Weight Basis */
+            weight_basis: string;
+        };
+        /** PortfolioRiskHistoryMeta */
+        PortfolioRiskHistoryMeta: {
+            /** Aligned End */
+            aligned_end?: string | null;
+            /** Aligned Start */
+            aligned_start?: string | null;
+            /**
+             * Aligned Trading Days
+             * @default 0
+             */
+            aligned_trading_days: number;
+            /**
+             * Lookback Trading Days Requested
+             * @default 0
+             */
+            lookback_trading_days_requested: number;
+            /** Price Series Symbols */
+            price_series_symbols?: string[];
+        };
+        /** PortfolioRiskMetricsResponse */
+        PortfolioRiskMetricsResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /** As Of */
+            as_of: string;
+            assumptions: components["schemas"]["PortfolioRiskAssumptions"];
+            concentration: components["schemas"]["PortfolioConcentrationBlock"];
+            correlation: components["schemas"]["PortfolioCorrelationBlock"];
+            /** Cost Method */
+            cost_method: string;
+            /** Currency */
+            currency: string;
+            history?: components["schemas"]["PortfolioRiskHistoryMeta"] | null;
+            /**
+             * Portfolio Value
+             * @default 0
+             */
+            portfolio_value: number;
+            /**
+             * Positions Used
+             * @default 0
+             */
+            positions_used: number;
+            /**
+             * Status
+             * @description 'ok', 'empty_portfolio', 'insufficient_history', or 'partial'
+             */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            var: components["schemas"]["PortfolioHistoricalVaRBlock"];
+        };
         /** PortfolioRiskResponse */
         PortfolioRiskResponse: {
             /** Account Id */
@@ -7637,6 +8899,13 @@ export interface components {
             thresholds?: {
                 [key: string]: unknown;
             };
+        };
+        /** PortfolioRiskWeightItem */
+        PortfolioRiskWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
         };
         /** PortfolioSnapshotResponse */
         PortfolioSnapshotResponse: {
@@ -8921,6 +10190,12 @@ export interface components {
             messages: components["schemas"]["SessionMessage"][];
             /** Session Id */
             session_id: string;
+            session_state: components["schemas"]["SessionStateResponse"];
+        };
+        /** SessionStateResponse */
+        SessionStateResponse: {
+            /** Selected Skill Ids */
+            selected_skill_ids: string[] | null;
         };
         /** SessionsResponse */
         SessionsResponse: {
@@ -10359,6 +11634,60 @@ export interface components {
             total_tokens: number;
         };
         /**
+         * UserOnboardingProfile
+         * @description Versioned structured intake profile (not free-form chat memory).
+         */
+        UserOnboardingProfile: {
+            /**
+             * Experience Stage
+             * @description beginner | report_reader | has_system
+             * @default beginner
+             */
+            experience_stage: string;
+            /** Goals */
+            goals?: string[];
+            /**
+             * Holdings
+             * @description none | watchlist | bookkeeping
+             * @default none
+             */
+            holdings: string;
+            /**
+             * Infrastructure
+             * @description cloud_key | local_models | free_only
+             * @default cloud_key
+             */
+            infrastructure: string;
+            /**
+             * Interaction
+             * @description push | web | chat
+             * @default web
+             */
+            interaction: string;
+            /**
+             * Markets
+             * @description cn | hk | us (multi-select)
+             */
+            markets?: string[];
+            /**
+             * Report Language
+             * @description zh | en | ko | ja
+             * @default zh
+             */
+            report_language: string;
+            /**
+             * Risk Tone
+             * @description conservative | balanced | assertive (tone only, not advice)
+             * @default balanced
+             */
+            risk_tone: string;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+        };
+        /**
          * ValidateSystemConfigRequest
          * @description Validation request payload.
          */
@@ -11255,6 +12584,8 @@ export interface operations {
             query?: {
                 provider?: string;
                 refresh?: boolean;
+                /** @description When true (default), auto-attach bounded news-search catalysts if the structured route has no external event. Search is response-only and is never written to the shared hotspot detail cache. */
+                include_search?: boolean;
             };
             header?: never;
             path: {
@@ -12474,6 +13805,335 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_config_profile_api_v1_config_profiles_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigProfileExportResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_config_profile_import_api_v1_config_profiles_import_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigProfileImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigProfileImportApplyResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_config_profile_import_api_v1_config_profiles_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigProfileImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigProfileImportPreviewResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_config_presets_api_v1_config_profiles_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigPresetListResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigPresetApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigPresetApplyResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_config_preset_api_v1_config_profiles_presets__preset_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigPresetApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigPresetPreviewResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -15129,6 +16789,284 @@ export interface operations {
             };
         };
     };
+    apply_onboarding_plan_api_v1_onboarding_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingApplyResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_onboarding_plan_api_v1_onboarding_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingPlanResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_onboarding_state_api_v1_onboarding_state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingStateResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reset_onboarding_state_api_v1_onboarding_state_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingResetResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listPlugins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginListResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updatePluginLifecycle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginLifecycleResponse"];
+                };
+            };
+            /** @description Invalid lifecycle request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Lifecycle operation failed unexpectedly */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_accounts_api_v1_portfolio_accounts_get: {
         parameters: {
             query?: {
@@ -15952,6 +17890,137 @@ export interface operations {
             };
         };
     };
+    commit_futu_import_api_v1_portfolio_imports_futu_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default). */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioFutuImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioImportCommitResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_futu_import_api_v1_portfolio_imports_futu_preview_post: {
+        parameters: {
+            query?: {
+                /** @description Synthetic buy trade date; default today */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioImportParseResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     analyze_position_api_v1_portfolio_positions__symbol__analysis_post: {
         parameters: {
             query?: never;
@@ -16069,6 +18138,66 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioRiskMetrics: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                /** @description Cost method: fifo or avg */
+                cost_method?: string;
+                /** @description VaR confidence level exclusive of 0.5 and 1.0 (default 0.95) */
+                confidence?: number;
+                /** @description VaR horizon in trading days (1-day base; multi-day uses sqrt-time scaling) */
+                horizon_days?: number;
+                /** @description Number of trading-day closes requested for the history window */
+                lookback_trading_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRiskMetricsResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Risk metrics computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -16780,6 +18909,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_local_only_mode_status_api_v1_security_local_only_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalOnlyModeStatus"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_outbound_activity_api_v1_security_outbound_activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundActivityPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

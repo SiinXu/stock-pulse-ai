@@ -1,0 +1,24 @@
+apiVersion: stockpulse/v1
+kind: Profile
+metadata:
+  name: cloud-balanced
+  displayName: Cloud balanced
+  description: Balanced cloud defaults without credentials
+  version: "1.0.0"
+  tags: [cloud, balanced]
+spec:
+  llm:
+    preferenceOrder: [cloud, cli, ollama, model_pack]
+    config:
+      GENERATION_BACKEND: litellm
+      GENERATION_FALLBACK_BACKEND: litellm
+      LLM_CONFIG_MODE: channels
+      AGENT_GENERATION_BACKEND: auto
+      NEWS_STRATEGY_PROFILE: short
+  strategies:
+    enabled: [bull_trend, growth_quality]
+  features:
+    beginnerMode: true
+  requirements:
+    minRamGb: 2
+    needsCloudKey: true

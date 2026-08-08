@@ -206,6 +206,7 @@ export const SettingsViewTabs: React.FC<SettingsViewTabsProps> = ({
       }))}
       onChange={onSelectView}
       ariaLabel={tabsLabel}
+      className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
       semantics="single-select"
     />
   );

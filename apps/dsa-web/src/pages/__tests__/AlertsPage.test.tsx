@@ -327,7 +327,8 @@ describe('AlertsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('加载失败')).toBeInTheDocument();
+    expect(await screen.findByText('加载失败')).toBeInTheDocument();
+    expect(within(dialog).queryByText('加载失败')).not.toBeInTheDocument();
     expect(screen.getByLabelText('标的代码')).toHaveValue('aapl');
     expect(screen.getByLabelText('价格阈值')).toHaveValue(200);
   });

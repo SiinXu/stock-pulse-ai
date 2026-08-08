@@ -186,7 +186,12 @@ describe('SettingsViewTabs', () => {
       'Task Routing',
       'Reliability',
     ]);
-    expect(screen.getByRole('radiogroup', { name: 'AI & Models views' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'AI & Models views' })).toHaveClass(
+      'dark:!bg-foreground/10',
+      'dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground',
+      'dark:[&_.segmented-control-tab[aria-checked=true]]:text-background',
+      'dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70',
+    );
     expect(screen.getByRole('radio', { name: 'Task Routing' })).toHaveAttribute('aria-checked', 'true');
     for (const option of options) {
       expect(option).toHaveClass('min-h-6', 'segmented-control-tab');

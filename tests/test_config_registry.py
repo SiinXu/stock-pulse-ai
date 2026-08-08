@@ -146,7 +146,49 @@ class TestDingTalkGroupWebhookFieldsRegistered(unittest.TestCase):
         self.assertTrue(set(self._DINGTALK_GROUP_KEYS).issubset(field_keys))
 
 
+
+class TestUseProxyFieldsRegistered(unittest.TestCase):
+    """USE_PROXY / PROXY_HOST / PROXY_PORT must be Web-editable with restart help."""
+
+    _PROXY_KEYS = ("USE_PROXY", "PROXY_HOST", "PROXY_PORT")
+
+    def test_fields_are_visible_system_network_fields(self):
+        for key in self._PROXY_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "system")
+            self.assertTrue(field.get("help_key"))
+            self.assertTrue(field.get("examples"))
+            self.assertIn("restart_required", field.get("warning_codes", []))
+            self.assertNotIn(key, WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_proxy_host_is_sensitive_password_control(self):
+        host = get_field_definition("PROXY_HOST")
+        self.assertTrue(host["is_sensitive"])
+        self.assertEqual(host["ui_control"], "password")
+        self.assertIn("secret_value", host.get("warning_codes", []))
+
+    def test_use_proxy_defaults_and_port_validation(self):
+        use_proxy = get_field_definition("USE_PROXY")
+        port = get_field_definition("PROXY_PORT")
+        self.assertEqual(use_proxy["ui_control"], "switch")
+        self.assertEqual(use_proxy["default_value"], "false")
+        self.assertEqual(port["data_type"], "integer")
+        self.assertEqual(port["validation"].get("min"), 1)
+        self.assertEqual(port["validation"].get("max"), 65535)
+
+    def test_schema_response_includes_proxy_fields(self):
+        schema = build_schema_response()
+        system = next(
+            category
+            for category in schema["categories"]
+            if category["category"] == "system"
+        )
+        field_keys = {field["key"] for field in system["fields"]}
+        self.assertTrue(set(self._PROXY_KEYS).issubset(field_keys))
+
+
 class TestTushareHttpUrlRegistered(unittest.TestCase):
+
     """The optional Tushare endpoint must be explicit and Web-editable."""
 
     def test_field_contract_is_optional_non_sensitive_url(self):
@@ -460,6 +502,9 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         "AGENT_EVENT_MONITOR_ENABLED",
         "AGENT_EVENT_MONITOR_INTERVAL_MINUTES",
         "AGENT_EVENT_ALERT_RULES_JSON",
+        "MULTIMODAL_AGENT_TOOLS_ENABLED",
+        "MULTIMODAL_FILE_ROOT",
+        "AGENT_EVENT_IMPACT_CONTEXT_ENABLED",
         # PR3 Phase 2: Backtest
         "BACKTEST_ENABLED",
         "BACKTEST_EVAL_WINDOW_DAYS",

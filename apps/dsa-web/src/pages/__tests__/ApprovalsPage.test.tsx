@@ -313,7 +313,9 @@ describe('ApprovalsPage', () => {
 
     fireEvent.click(await screen.findByRole('switch', { name: 'Enable human approval' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
-    expect(await screen.findByText('Rule save failed')).toBeInTheDocument();
+    const ruleSaveToast = await screen.findByRole('alert');
+    expect(ruleSaveToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(ruleSaveToast).not.toHaveTextContent('Rule save failed');
 
     const proposalPoll = intervalSpy.mock.calls.find(([, delay]) => delay === 5_000)?.[0];
     expect(proposalPoll).toBeTypeOf('function');
@@ -321,7 +323,7 @@ describe('ApprovalsPage', () => {
       (proposalPoll as () => void)();
     });
 
-    expect(screen.getByText('Rule save failed')).toBeInTheDocument();
+    expect(ruleSaveToast).toBeInTheDocument();
     intervalSpy.mockRestore();
   });
 });

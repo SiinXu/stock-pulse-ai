@@ -128,6 +128,17 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
                   {formatDateTime(event.timestamp, language, t)}
                 </span>
                 <span className="font-mono text-xs text-muted-text">{compactText(event.type, 28)}</span>
+                {(() => {
+                  const durationRaw = event.metadata?.duration_ms ?? event.metadata?.durationMs;
+                  const durationMs = typeof durationRaw === 'number' && Number.isFinite(durationRaw)
+                    ? durationRaw
+                    : null;
+                  return durationMs !== null ? (
+                    <Badge variant="default" className="text-muted-text" data-testid="run-flow-event-duration">
+                      {t('runFlow.durationMs', { value: durationMs })}
+                    </Badge>
+                  ) : null;
+                })()}
               </div>
               <p className="mt-2 text-sm font-medium text-foreground">{event.title}</p>
               {event.message ? (

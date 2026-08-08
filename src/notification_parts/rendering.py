@@ -1437,17 +1437,49 @@ class _RenderingMethods:
         report = blocks.get("financial_report") or {}
         growth = blocks.get("growth") or {}
         currency = report.get("currency") if isinstance(report.get("currency"), str) else None
+        sufficiency = report.get("sufficiency") if isinstance(report.get("sufficiency"), dict) else {}
+        metrics = report.get("metrics") if isinstance(report.get("metrics"), dict) else {}
+        periods = report.get("periods") if isinstance(report.get("periods"), list) else []
+
+        def _metric_pct(name: str, fallback: Any = None) -> str:
+            item = metrics.get(name)
+            value = item.get("value") if isinstance(item, dict) else None
+            if value is None:
+                value = fallback
+            return self._format_percent(value)
+
         cells = {
             "report_date": self._format_text(report.get("report_date")),
             "revenue": self._format_amount_cn(report.get("revenue"), currency),
             "net_profit": self._format_amount_cn(report.get("net_profit_parent"), currency),
             "operating_cash_flow": self._format_amount_cn(report.get("operating_cash_flow"), currency),
-            "roe": self._format_percent(report.get("roe") if report.get("roe") is not None else growth.get("roe")),
-            "revenue_yoy": self._format_percent(growth.get("revenue_yoy")),
-            "net_profit_yoy": self._format_percent(growth.get("net_profit_yoy")),
-            "gross_margin": self._format_percent(growth.get("gross_margin")),
+            "roe": self._format_percent(
+                report.get("roe")
+                if report.get("roe") is not None
+                else (
+                    metrics.get("roe", {}).get("value")
+                    if isinstance(metrics.get("roe"), dict)
+                    else growth.get("roe")
+                )
+            ),
+            "revenue_yoy": _metric_pct("revenue_yoy", growth.get("revenue_yoy")),
+            "net_profit_yoy": _metric_pct("net_profit_yoy", growth.get("net_profit_yoy")),
+            "gross_margin": _metric_pct("gross_margin", growth.get("gross_margin")),
         }
-        if all(v == "N/A" for v in cells.values()):
+        all_na = all(v == "N/A" for v in cells.values())
+        level = str(sufficiency.get("level") or "").strip().lower()
+
+        # Issue #235 financial honesty: missing/partial statements never hide as empty;
+        # emit an explicit insufficient-fundamentals note instead of silent omission/zeros.
+        if all_na and level == "insufficient":
+            lines.extend([
+                f"### 💼 {labels['financial_summary_heading']}",
+                "",
+                f"> {labels.get('insufficient_fundamentals_note', 'insufficient fundamentals')}",
+                "",
+            ])
+            return
+        if all_na and not sufficiency:
             return
 
         lines.extend([
@@ -1468,6 +1500,48 @@ class _RenderingMethods:
             ),
             "",
         ])
+
+        if level in {"partial", "insufficient"} and sufficiency.get("message"):
+            lines.extend([
+                f"> {labels.get('fundamentals_sufficiency_label', 'Sufficiency')}: "
+                f"{sufficiency.get('message')}",
+                "",
+            ])
+
+        # Multi-period history (facts only; max 4 rows to keep notifications compact)
+        history_rows = [
+            p for p in periods[:4]
+            if isinstance(p, dict) and (
+                p.get("revenue") is not None
+                or p.get("net_profit_parent") is not None
+                or p.get("operating_cash_flow") is not None
+            )
+        ]
+        if len(history_rows) >= 2:
+            lines.extend([
+                f"**{labels.get('financial_history_heading', 'History')}**",
+                "",
+                (
+                    f"| {labels['report_date_label']} | {labels['revenue_label']} | "
+                    f"{labels['net_profit_label']} | {labels['operating_cash_flow_label']} |"
+                ),
+                "|:------:|-------:|-------:|-------:|",
+            ])
+            for period in history_rows:
+                lines.append(
+                    f"| {self._format_text(period.get('report_date'))} | "
+                    f"{self._format_amount_cn(period.get('revenue'), currency)} | "
+                    f"{self._format_amount_cn(period.get('net_profit_parent'), currency)} | "
+                    f"{self._format_amount_cn(period.get('operating_cash_flow'), currency)} |"
+                )
+            lines.append("")
+
+        recency = report.get("data_recency") if isinstance(report.get("data_recency"), dict) else {}
+        if recency.get("note"):
+            lines.extend([
+                f"> {labels.get('financial_recency_label', 'Recency')}: {recency.get('note')}",
+                "",
+            ])
 
     def _append_shareholder_return(
         self,

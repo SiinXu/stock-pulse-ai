@@ -1,0 +1,34 @@
+{
+  "schema_version": "agent-eval-benchmark-v0",
+  "notes": {
+    "purpose": "Offline financial agent evaluation scenarios for issue #252 V0. Scenarios reference existing agent_runtime replay fixtures and add evaluation rubrics only; they do not re-freeze AR-01 baselines.",
+    "runtime": "Scored by replaying transcripts through the existing offline ReplayLLMAdapter + deterministic tool registry (tests.agent_runtime_replay). No network and no live LLM.",
+    "ci_policy": "Marked with pytest.mark.benchmark and excluded from the blocking offline gate (not network and not benchmark)."
+  },
+  "cases": [
+    {
+      "id": "bench-a-happy-path",
+      "file": "scenarios/bench-a-happy-path.json",
+      "market": "A",
+      "profile": "normal"
+    },
+    {
+      "id": "bench-a-partial-honesty",
+      "file": "scenarios/bench-a-partial-honesty.json",
+      "market": "A",
+      "profile": "partial"
+    },
+    {
+      "id": "bench-us-happy-path",
+      "file": "scenarios/bench-us-happy-path.json",
+      "market": "US",
+      "profile": "normal"
+    },
+    {
+      "id": "bench-toolscope-unknown",
+      "file": "scenarios/bench-toolscope-unknown.json",
+      "market": "A",
+      "profile": "toolscope"
+    }
+  ]
+}
