@@ -19,6 +19,7 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    calculators,
     config_profiles,
     decision_signals,
     health,
@@ -108,6 +109,12 @@ router.include_router(
     portfolio_risk_metrics.router,
     prefix="/portfolio",
     tags=["Portfolio"]
+)
+
+router.include_router(
+    calculators.router,
+    prefix="/calculators",
+    tags=["Calculators"],
 )
 
 router.include_router(

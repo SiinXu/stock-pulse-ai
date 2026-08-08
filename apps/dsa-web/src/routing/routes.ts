@@ -18,6 +18,7 @@ export const APP_ROUTE_PATHS = {
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
   settings: '/settings',
+  calculators: '/tools/calculators',
 } as const;
 
 export const LEGACY_ROUTE_PATHS = {

@@ -4274,6 +4274,34 @@
         "title": "BacktestRunResponse",
         "type": "object"
       },
+      "BalancePoint": {
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "number"
+          },
+          "gain": {
+            "title": "Gain",
+            "type": "number"
+          },
+          "period": {
+            "title": "Period",
+            "type": "integer"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          }
+        },
+        "required": [
+          "period",
+          "balance",
+          "total_contributed",
+          "gain"
+        ],
+        "title": "BalancePoint",
+        "type": "object"
+      },
       "BatchDuplicateTaskItem": {
         "description": "批量异步任务中的重复提交项。",
         "example": {
@@ -4683,6 +4711,119 @@
           "session_id"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "CompoundGrowthRequest": {
+        "properties": {
+          "annual_rate": {
+            "description": "Nominal annual rate as a decimal (0.07 = 7%). May be zero or negative.",
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "default": 0.0,
+            "description": "End-of-period contribution (may be negative for withdrawals)",
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "description": "Compounding / contribution frequency per year",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "description": "Starting principal amount",
+            "title": "Principal",
+            "type": "number"
+          },
+          "years": {
+            "description": "Investment horizon in years",
+            "exclusiveMinimum": 0.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "CompoundGrowthRequest",
+        "type": "object"
+      },
+      "CompoundGrowthResponse": {
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "final_value": {
+            "title": "Final Value",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/BalancePoint"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "status": {
+            "description": "'ok'",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          },
+          "total_gain": {
+            "title": "Total Gain",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "principal",
+          "annual_rate",
+          "years",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "final_value",
+          "total_contributed",
+          "total_gain",
+          "series"
+        ],
+        "title": "CompoundGrowthResponse",
         "type": "object"
       },
       "ConfigPresetApplyRequest": {
@@ -19707,6 +19848,233 @@
         "title": "SystemConfigValidationErrorResponse",
         "type": "object"
       },
+      "TargetContributionRequest": {
+        "properties": {
+          "annual_rate": {
+            "description": "Nominal annual rate as a decimal",
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "description": "Starting principal amount",
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "description": "Target terminal amount",
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "description": "Investment horizon in years",
+            "exclusiveMinimum": 0.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "TargetContributionRequest",
+        "type": "object"
+      },
+      "TargetContributionResponse": {
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Per Period"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "status": {
+            "description": "'ok', 'already_met', or 'unreachable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate"
+        ],
+        "title": "TargetContributionResponse",
+        "type": "object"
+      },
+      "TargetDurationRequest": {
+        "properties": {
+          "annual_rate": {
+            "description": "Nominal annual rate as a decimal",
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "description": "End-of-period contribution (may be negative)",
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "description": "Starting principal amount",
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "description": "Target terminal amount",
+            "title": "Target",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period"
+        ],
+        "title": "TargetDurationRequest",
+        "type": "object"
+      },
+      "TargetDurationResponse": {
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "period_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Count"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "status": {
+            "description": "'ok', 'already_met', or 'unreachable'",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Years"
+          }
+        },
+        "required": [
+          "status",
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate"
+        ],
+        "title": "TargetDurationResponse",
+        "type": "object"
+      },
       "TaskAccepted": {
         "description": "异步任务接受响应",
         "example": {
@@ -24318,6 +24686,192 @@
         "summary": "触发回测",
         "tags": [
           "Backtest"
+        ]
+      }
+    },
+    "/api/v1/calculators/compound-growth": {
+      "post": {
+        "description": "Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.",
+        "operationId": "postCompoundGrowth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompoundGrowthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompoundGrowthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Compound growth calculator",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-contribution": {
+      "post": {
+        "description": "Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetContribution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetContributionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetContributionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve contribution required to reach a target",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-duration": {
+      "post": {
+        "description": "Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetDuration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetDurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetDurationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve periods required to reach a target",
+        "tags": [
+          "Calculators"
         ]
       }
     },
