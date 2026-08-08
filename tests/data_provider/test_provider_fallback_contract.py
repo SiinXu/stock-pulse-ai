@@ -266,6 +266,10 @@ def test_all_providers_empty_still_raises_not_empty_success(outcome: object) -> 
     message = str(exc_info.value)
     assert "600519" in message
     assert "失败" in message or "fail" in message.lower()
+    # After empty-result aggregation fix, per-provider lines must be present.
+    assert "EfinanceFetcher" in message
+    assert "TencentFetcher" in message
+    assert "empty" in message.lower()
 
 
 def test_no_eligible_providers_raises_readable_error() -> None:
