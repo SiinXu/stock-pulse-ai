@@ -10,6 +10,7 @@ const STOCK_CODE_PATTERNS = [
   /^\d{6}$/, // A-share 6-digit code
   /^(SH|SZ|BJ)\d{6}$/, // A-share code with exchange prefix
   /^\d{6}\.(SH|SZ|SS|BJ)$/, // A-share code with exchange suffix
+  /^\d{4}$/, // HK 4-digit bare code, for example 0001 / 0941 / 1810
   /^\d{5}$/, // HK code without prefix
   /^HK\d{1,5}$/, // HK-prefixed code, for example HK00700
   /^\d{1,5}\.HK$/, // HK suffix format, for example 00700.HK
@@ -28,15 +29,25 @@ export const looksLikeStockCode = (value: string): boolean => {
 
 /**
  * Validate common A-share, HK, US, JP, and KR stock code formats.
+ *
+ * Bare 4-digit codes are accepted as Hong Kong stocks and rewritten to the
+ * explicit ``HKxxxxx`` form so API/watchlist callers that only consume the
+ * ``normalized`` field still hit the shared HK identity (refs #2164).
  */
 export const validateStockCode = (value: string): ValidationResult => {
-  const normalized = value.trim().toUpperCase();
+  const upper = value.trim().toUpperCase();
 
-  if (!normalized) {
-    return { valid: false, message: '请输入股票代码', normalized };
+  if (!upper) {
+    return { valid: false, message: '请输入股票代码', normalized: upper };
   }
 
-  const valid = looksLikeStockCode(normalized);
+  const valid = looksLikeStockCode(upper);
+  // Promote bare 4-digit HK codes at the validation boundary. Leave other
+  // accepted forms as uppercase-only so existing 5/6-digit contracts stay
+  // stable (5-digit bare HK remains "00700" here; normalizeStockCode may
+  // still rewrite it at display/match call sites).
+  const normalized =
+    valid && /^\d{4}$/.test(upper) ? `HK${upper.padStart(5, '0')}` : upper;
 
   return {
     valid,

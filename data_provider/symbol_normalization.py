@@ -29,6 +29,7 @@ def normalize_stock_code(stock_code: str) -> str:
     - '600519.SH'   -> '600519'   (strip .SH suffix)
     - '000001.SZ'   -> '000001'   (strip .SZ suffix)
     - '920748.BJ'   -> '920748'   (strip .BJ suffix, BSE)
+    - '0001'        -> 'HK00001'  (bare 4-digit HK, e.g. CK Hutchison)
     - 'HK00700'     -> 'HK00700'  (keep HK prefix for HK stocks)
     - '1810.HK'     -> 'HK01810'  (normalize HK suffix to canonical prefix form)
     - '7203.T'      -> '7203.T'   (keep Japan Yahoo suffix form)
@@ -39,6 +40,15 @@ def normalize_stock_code(stock_code: str) -> str:
 
     This function is applied at the DataProviderManager layer so that
     all individual fetchers receive a clean 6-digit code (for A-shares/ETFs).
+
+    Priority for bare numerics (highest first):
+    1. Explicit exchange prefix/suffix forms (handled below / above bare rules)
+    2. Pure 6-digit → leave as A-share / BSE / ETF bare code (no rewrite)
+    3. Pure 5-digit → leave as historical bare HK form (analysis layer may
+       promote to ``HKxxxxx``; kept stable here to avoid double-rewrite churn)
+    4. Pure 4-digit → ``HK`` + zero-pad to 5 digits (HK bare contract;
+       A-share codes are 6 digits, so collision surface is empty; JP/KR/TW
+       bare bases require an explicit Yahoo suffix or index hit elsewhere)
     """
     code = stock_code.strip()
     upper = code.upper()
@@ -48,6 +58,13 @@ def normalize_stock_code(stock_code: str) -> str:
         candidate = upper[2:]
         if candidate.isdigit() and 1 <= len(candidate) <= 5:
             return f"HK{candidate.zfill(5)}"
+
+    # Bare 4-digit numerics are Hong Kong stocks under the shared market
+    # contract (_is_hk_market). Promote to explicit HKxxxxx so CLI/provider
+    # entry points that only run normalize_stock_code still emit the
+    # canonical form (refs upstream #2164 / #2091).
+    if upper.isdigit() and len(upper) == 4:
+        return f"HK{upper.zfill(5)}"
 
     # Strip SH/SZ/SS prefix (e.g. SH600519 -> 600519, SS600519 -> 600519)
     if upper.startswith(('SH', 'SZ', 'SS')) and not upper.startswith(('SH.', 'SZ.', 'SS.')):
@@ -219,13 +236,28 @@ def canonical_stock_code(code: str) -> str:
     which strips exchange prefixes. Apply at system input boundaries to ensure
     consistent case across BOT, WEB UI, API, and CLI paths (Issue #355).
 
+    Bare 4-digit numerics are an exception: they are rewritten to the explicit
+    ``HKxxxxx`` form so input paths that only call ``canonical_stock_code``
+    (for example CLI ``--stocks`` after index resolution) still emit the
+    shared Hong Kong identity instead of a bare digit string.
+
     Examples:
         'aapl'    -> 'AAPL'
         'AAPL'    -> 'AAPL'
         '600519'  -> '600519'  (digits are unchanged)
+        '0001'    -> 'HK00001' (bare 4-digit HK)
         'hk00700' -> 'HK00700'
     """
-    return (code or "").strip().upper()
+    text = (code or "").strip()
+    if not text:
+        return ""
+    upper = text.upper()
+    # Keep case canonicalization cheap for the common path, but promote bare
+    # 4-digit HK codes so CLI/API helpers that only uppercase still align
+    # with normalize_stock_code / _is_hk_market.
+    if upper.isdigit() and len(upper) == 4:
+        return f"HK{upper.zfill(5)}"
+    return upper
 
 
 __all__ = [

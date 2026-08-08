@@ -20,11 +20,29 @@ describe('stock code validation', () => {
     expect(isObviouslyInvalidStockQuery(input)).toBe(false);
   });
 
-  test.each(['7203', '005930.K', '035900.KRX'])(
+  test.each(['005930.K', '035900.KRX'])(
     'does not treat ambiguous JP/KR-like query %s as a valid suffix code',
     (input) => {
       const result = validateStockCode(input);
       expect(result.valid).toBe(false);
     }
   );
+
+  test('bare 4-digit 7203 is a valid HK code, not a JP suffix code', () => {
+    expect(looksLikeStockCode('7203')).toBe(true);
+    expect(validateStockCode('7203').valid).toBe(true);
+  });
+
+  test.each([
+    ['0001', 'HK00001'],
+    ['0941', 'HK00941'],
+    ['1810', 'HK01810'],
+  ])('accepts bare 4-digit HK code %s and rewrites to %s', (input, canonical) => {
+    expect(looksLikeStockCode(input)).toBe(true);
+    expect(validateStockCode(input)).toEqual({
+      valid: true,
+      normalized: canonical,
+    });
+    expect(isObviouslyInvalidStockQuery(input)).toBe(false);
+  });
 });
