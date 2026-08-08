@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterable, Literal
 
 from src.utils.sanitize import log_safe_exception
 
+from .agent_tools import agent_tool_manifest_permissions_error
 from .errors import PluginError
 from .health import PluginHealthReport, build_plugin_health_report
 from .lifecycle_audit import LifecycleAuditRecorder, PluginLifecycleAuditor
@@ -300,6 +301,13 @@ class PluginManager:
                 package_root=resolved_root,
                 module_name=resolved_module,
             )
+        logger.info(
+            "Plugin registered id=%s version=%s source=%s permissions=%s",
+            manifest.id,
+            manifest.version,
+            source,
+            list(manifest.permissions),
+        )
         return PluginOperationResult(
             plugin_id=manifest.id,
             operation="register",
@@ -381,6 +389,7 @@ class PluginManager:
         return {
             "plugin_version": record.manifest.version,
             "plugin_source": record.source,
+            "permissions": list(record.manifest.permissions),
             "extension_points": [
                 handle.extension_point
                 for handle in record.handles
@@ -680,6 +689,27 @@ class PluginManager:
             if load_error_code is None:
                 load_error_code = context.recovery_error_code
 
+            # agent_tool load-time declaration check: every ToolPolicy capability
+            # must be declared on the plugin manifest. Fail this plugin only.
+            if load_error_code is None:
+                active_registrations = tuple(
+                    registration
+                    for registration in self._registry.registrations()
+                    if registration.plugin_id == plugin_id
+                )
+                load_error_code = agent_tool_manifest_permissions_error(
+                    manifest=record.manifest,
+                    registrations=active_registrations,
+                )
+                if load_error_code is not None:
+                    logger.warning(
+                        "Plugin %s rejected: agent_tool permissions exceed "
+                        "manifest declaration (error_code=%s, declared=%s)",
+                        plugin_id,
+                        load_error_code,
+                        list(record.manifest.permissions),
+                    )
+
             if load_error_code is not None:
                 remaining, cleanup_errors = self._cleanup_handles(
                     plugin_id,
@@ -707,6 +737,17 @@ class PluginManager:
             record.state = "enabled"
             record.transition = None
             self._publish_stable_enabled_plugin_ids()
+            logger.info(
+                "Plugin enabled id=%s version=%s permissions=%s extension_points=%s",
+                plugin_id,
+                record.manifest.version,
+                list(record.manifest.permissions),
+                [
+                    handle.extension_point
+                    for handle in record.handles
+                    if handle.active
+                ],
+            )
             return PluginOperationResult(
                 plugin_id=plugin_id,
                 operation=operation,

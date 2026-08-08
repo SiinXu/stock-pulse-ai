@@ -20,8 +20,10 @@ from src.agent.tools.registry import (
     ToolRegistry,
 )
 
+from .manifest import MANIFEST_PERMISSIONS_UNDECLARED, PluginManifest
 from .registry import (
     ExtensionContract,
+    ExtensionRegistration,
     ExtensionRegistry,
     default_extension_contracts,
 )
@@ -176,6 +178,69 @@ def _valid_handler_signature(implementation: ToolDefinition) -> bool:
         ):
             return False
     return True
+
+
+
+def undeclared_agent_tool_permissions(
+    tool_permissions: list[str] | tuple[str, ...],
+    declared_permissions: tuple[str, ...] | list[str] | frozenset[str],
+) -> tuple[str, ...]:
+    """Return tool policy permissions not present in the manifest declaration.
+
+    Manifest ``permissions`` is a load-time declaration set, not a sandbox.
+    For ``agent_tool`` plugins, every ``ToolPolicy.permissions`` entry must be
+    a member of that set (tools may not require undeclared capabilities).
+    Extra manifest declarations are allowed.
+    """
+
+    declared = frozenset(declared_permissions)
+    missing = {
+        permission
+        for permission in tool_permissions
+        if type(permission) is str and permission not in declared
+    }
+    return tuple(sorted(missing))
+
+
+def find_undeclared_agent_tool_permissions(
+    *,
+    manifest: PluginManifest,
+    registrations: tuple[ExtensionRegistration, ...] | list[ExtensionRegistration],
+) -> tuple[str, ...]:
+    """Scan agent_tool registrations for capabilities missing from the manifest."""
+
+    missing: set[str] = set()
+    for registration in registrations:
+        if registration.extension_point != "agent_tool":
+            continue
+        implementation = registration.implementation
+        if not isinstance(implementation, ToolDefinition):
+            continue
+        policy = implementation.policy
+        if not isinstance(policy, ToolPolicy) or type(policy.permissions) is not list:
+            continue
+        missing.update(
+            undeclared_agent_tool_permissions(
+                policy.permissions,
+                manifest.permissions,
+            )
+        )
+    return tuple(sorted(missing))
+
+
+def agent_tool_manifest_permissions_error(
+    *,
+    manifest: PluginManifest,
+    registrations: tuple[ExtensionRegistration, ...] | list[ExtensionRegistration],
+) -> str | None:
+    """Return ``manifest_permissions_undeclared`` when tools exceed the declaration."""
+
+    if find_undeclared_agent_tool_permissions(
+        manifest=manifest,
+        registrations=registrations,
+    ):
+        return MANIFEST_PERMISSIONS_UNDECLARED
+    return None
 
 
 def validate_agent_tool_definition(implementation: object) -> bool:
