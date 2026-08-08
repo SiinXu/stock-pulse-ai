@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).
+- [Tests] Sync the Web playground catalog and scenario renderers with 14 newly exported visual components so catalog coverage stays complete.
 - [Chore] Added Web production bundle gzip size budgets and `npm run build:check` gate (baseline = measured size + 10%; no business-code slimming in this change).
 - [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
 - [Added] Web multi-market number/timezone/change-color formatting contract module (`marketFormat`) with semantic matrix unit tests (issue #889).
