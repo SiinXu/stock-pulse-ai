@@ -49,8 +49,8 @@ PDF_OPTIONAL_PACKAGE = "fpdf2"
 PDF_INSTALL_HINT = (
     "PDF export requires the optional dependency set. Install after the default "
     "StockPulse requirements:\n"
-    "  python -m pip install -r requirements-report-export.txt\n"
-    "or: python -m pip install 'fpdf2>=2.7.0,<3'\n"
+    "  python -m pip install --build-constraint build-constraints.txt "
+    "-r requirements-report-export.txt\n"
     "Default analysis, API, Web, and notifications do not need this package."
 )
 

@@ -138,7 +138,7 @@ dev = [
 ]
 
 # Optional report PDF export (mirrors requirements-report-export.txt).
-# Prefer: python -m pip install -r requirements-report-export.txt
+# Prefer: python -m pip install --build-constraint build-constraints.txt -r requirements-report-export.txt
 # Not part of the default constraints lock surface; see docs/report-export.md.
 report-export = [
     "fpdf2>=2.7.0,<3",

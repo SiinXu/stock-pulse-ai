@@ -27,9 +27,7 @@ to PDF, and missing optional deps return **HTTP 503** with an install hint.
 
 ```bash
 # After the normal StockPulse requirements install:
-python -m pip install -r requirements-report-export.txt
-# or:
-python -m pip install 'fpdf2>=2.7.0,<3'
+python -m pip install --build-constraint build-constraints.txt -r requirements-report-export.txt
 ```
 
 `requirements.txt` does **not** include fpdf2. Uninstalling the optional package
