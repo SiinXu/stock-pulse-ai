@@ -352,3 +352,15 @@ Phase 1 提供如下反例覆盖，从 SkillAgent 输入进，穿过 StrategyEng
 | Phase 2/3/4 独立回退 | 各自 Phase 的运行时改动独立回退 | 不能回退 Baseline，任何 Phase 都必须始终满足 Baseline 八条不变量 |
 
 Baseline 不新增配置项，因此无 env-level 回滚开关；这是刻意选择——契约边界应在代码中恒定生效，不通过环境变量降级。
+
+
+## Fork adaptation: multi-strategy deliberation cluster (default-off)
+
+- Config: `AGENT_MULTI_STRATEGY_DELIBERATION=false`
+- Modules: `src/agent/deliberation_mediator.py`, `src/agent/deliberation_scheduler.py`, `src/agent/deliberation_final_explanation.py`
+- Schemas: `src/schemas/strategy_evidence_contract.py`, `src/schemas/agent_disagreement_explanation.py`
+- Default off: Phase-1 synthesis byte-identical; specialist skills remain serial.
+- Enabled: mediator_v0 deliberation, concurrent specialist scheduling, optional `dashboard.agent_disagreement_explanation`.
+- Template/Web UI rendering deferred (follow-up).
+
+Ported-from: 5d98d6d7, de8aa6a0, 5af55507, 915c400b (ZhuLinsen/daily_stock_analysis).

@@ -6,6 +6,17 @@ This guide is for users who do not want to read code: download the desktop clien
 
 Chinese version: [beginner-client-setup.md](beginner-client-setup.md). After install, continue with the [UI operation manual](ui-manual/README_EN.md).
 
+
+## Zero-config first success (no API key)
+
+You can complete a useful first run without a cloud key:
+
+1. **Data-only (same artifact as `--dry-run`)**: after setting a watchlist, run `python main.py --dry-run` to fetch market data without calling an LLM.
+2. **Local Ollama auto-detect**: setup readiness probes loopback (`127.0.0.1` / `localhost` / `::1`) by default. Failures are log-only and **never block startup**. When Ollama is reachable, readiness surfaces non-secret local-zero-cost fields (for example `LLM_CHANNELS=ollama`).
+3. Turn detection off with `LOCAL_RUNTIME_AUTO_DETECT=false`. Timeout: `LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35` (default).
+
+Full AI analysis still needs a primary model (cloud key or an applied local Ollama profile). Cloud setup continues in **Configure an AI model** below.
+
 ## Before you start
 
 1. A Windows or macOS computer.
@@ -49,13 +60,15 @@ Mac chip type: Apple menu → About This Mac. M1/M2/M3/M4 → `arm64`; Intel →
 
 Before upgrading on macOS, export a configuration backup from Settings when possible.
 
+On a **first** desktop open (fresh install), StockPulse opens the guided first-run wizard automatically. You can choose a cloud API, a **local model** path (Ollama / Model Pack import with one-click runtime start), or a local CLI backend. Opening the app does not call paid cloud models until you save a cloud path. Details: [Desktop packaging (EN)](desktop-package_EN.md).
+
 ## 3. Configure an AI model
 
-In the client open:
+If the wizard is not open, go to:
 
 **Settings → AI & Models** (path labels: **System settings → AI models** / **Model Access**)
 
-Use **one** of the plans below.
+Use **one** of the plans below (or finish the wizard's local-model / CLI path instead).
 
 > Important: after every change, click **Save**. Wait for success before leaving the page or returning to Home.
 

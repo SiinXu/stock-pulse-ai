@@ -17,6 +17,7 @@
     "test:i18n": "npm run i18n:resources && npm run i18n:high-risk && vitest run src/locales/__tests__/localeConsistency.test.ts src/locales/__tests__/hardcodedUiStrings.test.ts src/i18n/__tests__/identicalToEnglishGuard.test.ts",
     "test:e2e-security-preflight": "vitest run src/utils/__tests__/playwrightTracePolicy.test.ts src/utils/__tests__/playwrightTraceSourceGuard.test.ts",
     "test:smoke": "node e2e/run-playwright-tests.mjs",
+    "test:smoke:quarantine": "DSA_WEB_E2E_QUARANTINE_LANE=1 node e2e/run-playwright-tests.mjs --project=chromium-quarantine",
     "preview": "vite preview",
     "generate:api-types": "openapi-typescript openapi.json -o src/types/api.generated.ts"
   },

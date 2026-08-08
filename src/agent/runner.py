@@ -42,6 +42,15 @@ from src.agent.dashboard_payload import (
 )
 from src.agent.llm_adapter import LLMToolAdapter, ToolCall
 from src.agent.protocols import StageFailureReason
+from src.agent.observability import (
+    emit_decision,
+    emit_model_end,
+    emit_model_start,
+    emit_phase_end,
+    emit_phase_start,
+    emit_tool_end,
+    emit_tool_start,
+)
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.execution import (
@@ -376,6 +385,13 @@ _RUNNER_COMPAT_EXPORTS = (
     sanitize_agent_dashboard_payload,
     serialize_tool_result,
     stream_event,
+    emit_decision,
+    emit_model_end,
+    emit_model_start,
+    emit_phase_end,
+    emit_phase_start,
+    emit_tool_end,
+    emit_tool_start,
     threading,
     time,
     uuid,

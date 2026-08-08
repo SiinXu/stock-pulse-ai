@@ -5,10 +5,10 @@ import {
   BarChart3,
   BellRing,
   BriefcaseBusiness,
-  ChartNoAxesCombined,
   ClipboardCheck,
   FlaskConical,
   Gauge,
+  Home,
   MessageSquareQuote,
   Search,
   Settings2,
@@ -64,19 +64,23 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [stockQuery, setStockQuery] = useState('');
 
+  // Page order follows the product IA domains, then global/admin surfaces that stay off the sidebar.
   const pages = useMemo<CommandItem[]>(() => [
-    { id: 'analysis', labelKey: 'home.startAnalysisTitle', href: analysisHref, icon: ChartNoAxesCombined },
+    { id: 'home', labelKey: 'layout.nav.home', href: APP_ROUTE_PATHS.home, icon: Home },
     { id: 'signals', labelKey: 'layout.nav.decisionSignals', href: APP_ROUTE_PATHS.signals, icon: BellRing },
-    { id: 'market', labelKey: 'home.marketReview', href: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
+    { id: 'research', labelKey: 'layout.nav.research', href: APP_ROUTE_PATHS.research, icon: Search },
+    { id: 'market', labelKey: 'layout.nav.marketReview', href: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
     { id: 'discover', labelKey: 'layout.nav.discover', href: APP_ROUTE_PATHS.researchDiscover, icon: Search },
-    { id: 'backtest', labelKey: 'layout.nav.backtest', href: APP_ROUTE_PATHS.researchBacktest, icon: FlaskConical },
+    { id: 'analysis', labelKey: 'layout.nav.analysis', href: analysisHref, icon: FlaskConical },
+    { id: 'backtest', labelKey: 'layout.nav.backtest', href: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
     { id: 'skill-outcomes', labelKey: 'layout.nav.skillOutcomes', href: APP_ROUTE_PATHS.researchSkillOutcomes, icon: Gauge },
     { id: 'portfolio', labelKey: 'layout.nav.portfolio', href: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
     { id: 'agent', labelKey: 'layout.nav.agent', href: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote },
+    { id: 'approvals', labelKey: 'layout.nav.approvals', href: APP_ROUTE_PATHS.approvals, icon: ClipboardCheck },
     { id: 'settings', labelKey: 'layout.nav.settings', href: APP_ROUTE_PATHS.settings, icon: Settings2 },
   ], [analysisHref]);
   const actions = useMemo<CommandItem[]>(() => [
-    { id: 'run-analysis', labelKey: 'home.analyze', href: analysisHref, icon: Sparkles },
+    { id: 'run-analysis', labelKey: 'home.startAnalysisTitle', href: analysisHref, icon: Sparkles },
     { id: 'create-rule', labelKey: 'decisionSignals.createFirstRule', href: buildSignalCenterHref({ createRule: true }), icon: ShieldCheck },
     { id: 'scope-all', labelKey: 'decisionSignals.scopeAllSignals', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.all }), icon: Activity },
     { id: 'scope-holdings', labelKey: 'decisionSignals.scopeHoldings', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }), icon: BriefcaseBusiness },
