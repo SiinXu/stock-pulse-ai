@@ -94,10 +94,7 @@ offline_test_suite() {
   python scripts/check_coverage_floor.py --assert-cov-flags \
     --cov src --cov api --cov data_provider --cov bot
   _run_pytest_offline "${test_data_dir}" \
-<<<<<<< HEAD
-=======
       --durations=30 --durations-min=0.5 \
->>>>>>> origin/main
       --cov=src --cov=api --cov=data_provider --cov=bot \
       --cov-report=term \
       --cov-report="json:${coverage_report}" \
@@ -123,16 +120,9 @@ offline_test_suite_selective() {
     return $?
   fi
   if [ "${selection}" = "NONE" ]; then
-<<<<<<< HEAD
-    echo "==> no backend pytest targets for changed paths — smoke collection only"
-    local test_data_dir
-    test_data_dir="$(mktemp -d)"
-    # Collection smoke: ensure the suite still imports under markers.
-=======
     echo "==> no backend pytest targets for changed paths — collection smoke only"
     local test_data_dir
     test_data_dir="$(mktemp -d)"
->>>>>>> origin/main
     DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
       python -m pytest -m "not network and not benchmark" \
         --collect-only -q \
@@ -141,13 +131,8 @@ offline_test_suite_selective() {
     rm -rf "${test_data_dir}"
     return 0
   fi
-<<<<<<< HEAD
-  # Selective path: run mapped targets without coverage floor (full rigor is
-  # merge-group only). Still enforce per-test timeouts.
-=======
   # Selective path: run mapped targets without coverage floor (full floor stays
   # on push-to-main / full offline-tests). Still enforce per-test timeouts.
->>>>>>> origin/main
   local test_data_dir
   local test_exit_code=0
   test_data_dir="$(mktemp -d)"
@@ -158,88 +143,10 @@ offline_test_suite_selective() {
   return "${test_exit_code}"
 }
 
-<<<<<<< HEAD
-offline_test_suite_shard() {
-  local splits="${PYTEST_SPLITS:?PYTEST_SPLITS is required for offline-tests-shard}"
-  local group="${PYTEST_GROUP:?PYTEST_GROUP is required for offline-tests-shard}"
-  local overhead="${PYTEST_FIRST_SHARD_OVERHEAD:-0}"
-  local out_dir="${COVERAGE_SHARD_DIR:-.}"
-  local cov_data="${out_dir}/.coverage.shard${group}"
-  local cov_json="${out_dir}/coverage-shard-${group}.json"
-  local test_data_dir
-  local test_exit_code=0
-  test_data_dir="$(mktemp -d)"
-  mkdir -p "${out_dir}"
-  echo "==> backend-gate: offline test suite shard ${group}/${splits}"
-  python scripts/check_coverage_floor.py --assert-cov-flags \
-    --cov src --cov api --cov data_provider --cov bot
-  # List shard modules, then run with an isolated coverage data file so a later
-  # combine job can enforce the floor once on the merged report.
-  shard_list_file="${test_data_dir}/shard-files.txt"
-  python scripts/ci_test_shard.py \
-    --splits "${splits}" \
-    --group "${group}" \
-    --first-shard-overhead "${overhead}" \
-    --list-only > "${shard_list_file}"
-  if [ ! -s "${shard_list_file}" ]; then
-    echo "Shard ${group}/${splits} selected zero modules" >&2
-    rm -rf "${test_data_dir}"
-    return 1
-  fi
-  shard_count="$(wc -l < "${shard_list_file}" | tr -d " ")"
-  echo "==> shard ${group} modules: ${shard_count}"
-  # coverage.py data file isolation per shard
-  export COVERAGE_FILE="${cov_data}"
-  # shellcheck disable=SC2046
-  DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
-    python -m coverage run \
-      --source=src,api,data_provider,bot \
-      -m pytest \
-      -m "not network and not benchmark" \
-      --timeout=120 --timeout-method=thread \
-      -o faulthandler_timeout=300 \
-      $(cat "${shard_list_file}") \
-    || test_exit_code=$?
-  if [ "${test_exit_code}" -eq 0 ]; then
-    python -m coverage json -o "${cov_json}"
-    python -m coverage report || true
-    echo "==> wrote ${cov_json} and ${cov_data}"
-  fi
-  rm -rf "${test_data_dir}"
-  return "${test_exit_code}"
-}
-
-offline_test_suite_combine() {
-  local data_dir="${COVERAGE_SHARD_DIR:-.}"
-  local combined_json="${data_dir}/coverage-combined.json"
-  echo "==> backend-gate: combine shard coverage data from ${data_dir}"
-  shopt -s nullglob
-  local data_files=( "${data_dir}"/.coverage.shard* )
-  shopt -u nullglob
-  if [ "${#data_files[@]}" -eq 0 ]; then
-    echo "No shard coverage data files found under ${data_dir}" >&2
-    return 1
-  fi
-  # coverage combine merges parallel data files into .coverage
-  export COVERAGE_FILE="${data_dir}/.coverage.combined"
-  rm -f "${COVERAGE_FILE}"
-  python -m coverage combine "${data_files[@]}"
-  python -m coverage json -o "${combined_json}"
-  python -m coverage report || true
-  echo "==> backend-gate: coverage floor on combined report"
-  python scripts/check_coverage_floor.py --report "${combined_json}"
-}
-
-python_min_smoke() {
-  echo "==> python-minimum: 3.10 import/schema/smoke (PR tier)"
-  # Real 3.10 execution without a second full offline suite on every PR.
-  # Merge-group runs the full offline suite on 3.10 instead.
-=======
 python_min_smoke() {
   echo "==> python-minimum: 3.10 import/schema/smoke (PR tier)"
   # Real 3.10 execution without a second full offline suite on every PR.
   # Push-to-main still runs the full offline suite on 3.10.
->>>>>>> origin/main
   python -m py_compile main.py server.py src/config.py src/storage.py
   python -c "
 from src.config import get_config
@@ -291,24 +198,11 @@ case "$phase" in
   offline-tests-selective)
     offline_test_suite_selective
     ;;
-<<<<<<< HEAD
-  offline-tests-shard)
-    offline_test_suite_shard
-    ;;
-  offline-tests-combine)
-    offline_test_suite_combine
-    ;;
-=======
->>>>>>> origin/main
   python-min-smoke)
     python_min_smoke
     ;;
   *)
-<<<<<<< HEAD
-    echo "Usage: $0 [all|syntax|flake8|deterministic|offline-tests|offline-tests-selective|offline-tests-shard|offline-tests-combine|python-min-smoke]" >&2
-=======
     echo "Usage: $0 [all|syntax|flake8|deterministic|offline-tests|offline-tests-selective|python-min-smoke]" >&2
->>>>>>> origin/main
     exit 2
     ;;
 esac

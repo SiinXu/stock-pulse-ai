@@ -28,12 +28,6 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-<<<<<<< HEAD
-      frontend: ${{ steps.flags.outputs.frontend }}
-      web_e2e: ${{ steps.flags.outputs.web_e2e }}
-      # force_full: merge_group always exercises the full matrix
-      force_full: ${{ steps.flags.outputs.force_full }}
-=======
       # Backend suite when non-web paths change, or when web paths that are
       # shared runtime/config contracts change (provider templates, help copy,
       # public assets consumed outside the SPA).
@@ -41,7 +35,6 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
       frontend: ${{ steps.filter.outputs.frontend }}
       web_e2e: ${{ steps.filter.outputs.web_e2e }}
->>>>>>> origin/main
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,23 +83,6 @@ jobs:
               - 'requirements.txt'
               - '.github/requirements-ci.txt'
               - '.github/workflows/ci.yml'
-<<<<<<< HEAD
-      - name: 🏷️ Export path flags
-        id: flags
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "merge_group" ]; then
-            # Queue-time: treat ALL paths as changed so the full matrix runs once.
-            echo "frontend=true" >> "$GITHUB_OUTPUT"
-            echo "web_e2e=true" >> "$GITHUB_OUTPUT"
-            echo "force_full=true" >> "$GITHUB_OUTPUT"
-            echo "merge_group: forcing full path matrix"
-          else
-            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
-            echo "web_e2e=${{ steps.filter.outputs.web_e2e }}" >> "$GITHUB_OUTPUT"
-            echo "force_full=false" >> "$GITHUB_OUTPUT"
-          fi
-=======
       - name: 🧭 Filter backend-safe frontend paths
         id: backend-filter
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
@@ -117,7 +93,6 @@ jobs:
             backend_non_web:
               - '**'
               - '!apps/dsa-web/**'
->>>>>>> origin/main
 
   ai-governance:
     name: ai-governance
@@ -143,23 +118,15 @@ jobs:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
-<<<<<<< HEAD
-    needs: [ai-governance]
-    if: github.event_name != 'merge_group'
-=======
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true'
->>>>>>> origin/main
     permissions:
       contents: read
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-<<<<<<< HEAD
-=======
           # Selective offline tests need merge-base vs origin/main on pull_request.
->>>>>>> origin/main
           fetch-depth: 0
       - name: 🐍 Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -210,25 +177,18 @@ jobs:
         run: ./scripts/ci_gate.sh flake8
       - name: ✅ Local deterministic checks
         run: ./scripts/ci_gate.sh deterministic
-<<<<<<< HEAD
-      - name: ✅ Selective offline tests (PR tier)
-=======
       # PR tier: path-mapped pytest (FULL fallback when infrastructure is touched).
       # Push-to-main: full offline suite + coverage floor.
       - name: ✅ Selective offline tests (PR tier)
         if: github.event_name == 'pull_request'
->>>>>>> origin/main
         env:
           CI_SELECT_BASE: origin/main
         run: |
           git fetch --no-tags --depth=1 origin main 2>/dev/null || true
           ./scripts/ci_gate.sh offline-tests-selective
-<<<<<<< HEAD
-=======
       - name: ✅ Offline test suite (push-to-main)
         if: github.event_name != 'pull_request'
         run: ./scripts/ci_gate.sh offline-tests
->>>>>>> origin/main
 
   # ---------------------------------------------------------------------------
   # Merge-queue tier: sharded full offline suite. Coverage floor runs once after
@@ -376,14 +336,9 @@ jobs:
   python-minimum:
     name: python-minimum
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    timeout-minutes: 35
-    needs: [ai-governance]
-=======
     timeout-minutes: 30
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true'
->>>>>>> origin/main
     permissions:
       contents: read
     steps:
@@ -416,13 +371,6 @@ jobs:
             sleep 15
           done
           python -m pip check
-<<<<<<< HEAD
-      - name: ✅ Minimum Python smoke (PR / push)
-        if: github.event_name != 'merge_group'
-        run: ./scripts/ci_gate.sh python-min-smoke
-      - name: ✅ Minimum Python full offline suite (merge_group)
-        if: github.event_name == 'merge_group'
-=======
       # PR tier: 3.10 import/schema smoke (not a second full offline suite).
       # Push-to-main: full offline suite on the declared Python floor.
       - name: ✅ Minimum Python smoke (PR tier)
@@ -430,7 +378,6 @@ jobs:
         run: ./scripts/ci_gate.sh python-min-smoke
       - name: ✅ Minimum Python full offline suite (push-to-main)
         if: github.event_name != 'pull_request'
->>>>>>> origin/main
         run: ./scripts/ci_gate.sh offline-tests
 
   pydanticai-installed:

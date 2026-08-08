@@ -9,13 +9,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 
 
-<<<<<<< HEAD
-def _workflow() -> dict:
-    return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
-=======
 def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
     """PR uses 3.10 smoke; push-to-main keeps a full offline suite on the floor."""
->>>>>>> origin/main
 
 
 def test_ci_triggers_include_merge_group() -> None:
@@ -62,12 +57,9 @@ def test_python_minimum_smoke_on_pr_full_on_merge_group() -> None:
 
     workflow = _workflow()
     job = workflow["jobs"]["python-minimum"]
-<<<<<<< HEAD
-=======
     backend_job = workflow["jobs"]["backend-gate"]
     changes_job = workflow["jobs"]["changes"]
 
->>>>>>> origin/main
     assert job["name"] == "python-minimum"
     assert job["needs"] == ["changes", "ai-governance"]
     assert job["if"] == "needs.changes.outputs.backend == 'true'"
@@ -115,15 +107,6 @@ def test_python_minimum_smoke_on_pr_full_on_merge_group() -> None:
     assert any("-r .github/requirements-ci.txt" in command for command in run_commands)
     assert any("python -m pip check" in command for command in run_commands)
 
-<<<<<<< HEAD
-
-def test_changes_job_forces_full_matrix_on_merge_group() -> None:
-    workflow = _workflow()
-    job = workflow["jobs"]["changes"]
-    flags_step = next(step for step in job["steps"] if step.get("id") == "flags")
-    assert "merge_group" in flags_step["run"]
-    assert "force_full=true" in flags_step["run"]
-=======
     smoke_steps = [
         step
         for step in job["steps"]
@@ -173,4 +156,3 @@ def test_ci_gate_offline_suite_emits_slow_test_durations():
 def test_pytest_testpaths_scopes_to_tests_package():
     setup_cfg = (REPOSITORY_ROOT / "setup.cfg").read_text(encoding="utf-8")
     assert "testpaths = tests" in setup_cfg
->>>>>>> origin/main

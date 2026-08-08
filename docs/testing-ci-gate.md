@@ -2,11 +2,7 @@
 
 - Status: `Living`
 - Last verified: 2026-08-06
-<<<<<<< HEAD
-- Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/ci_select_tests.py`, `scripts/ci_test_shard.py`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
-=======
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
->>>>>>> origin/main
 
 ## Purpose
 

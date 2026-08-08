@@ -159,14 +159,8 @@ The current repository CI mainly contains:
 | --- | --- | --- | --- |
 | `changes` | `.github/workflows/ci.yml` | Path-filter job for `web-gate` / `web-e2e`. On `merge_group`, forces the full path matrix | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
-<<<<<<< HEAD
-| `backend-gate` | `.github/workflows/ci.yml` | **Two-tier:** on `pull_request`/`push` runs syntax+flake8+deterministic+**selective** offline pytest (full suite when path mapping is uncertain). On `merge_group` is the summary job after **4 sharded** full offline suites with **combined** coverage floor | Yes |
-| `backend-tests` | `.github/workflows/ci.yml` | Merge-queue only: matrix-sharded full offline pytest (`scripts/ci_test_shard.py`) uploading per-shard coverage data | Yes on `merge_group` (feeds `backend-gate`) |
-| `python-minimum` | `.github/workflows/ci.yml` | Python 3.10: **PR/push** runs `python-min-smoke` (imports + small offline subset). **merge_group** runs the full offline suite so 3.10 coverage remains real once per merge | Yes |
-=======
 | `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest (FULL fallback); push-to-main: full suite + coverage floor | Yes |
 | `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: full offline suite on Python 3.10 | Yes |
->>>>>>> origin/main
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
