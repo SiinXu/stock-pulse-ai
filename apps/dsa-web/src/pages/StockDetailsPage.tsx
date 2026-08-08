@@ -30,6 +30,12 @@ import {
   Select,
 } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import {
+  buildStockDetailsHistoryQueryKey,
+  buildStockDetailsQuoteQueryKey,
+  useStockDetailsHistoryQuery,
+  useStockDetailsQuoteQuery,
+} from '../hooks';
 import type { UiTextKey } from '../i18n/uiText';
 import type {
   StockHistoryCandle,
@@ -176,13 +182,32 @@ const StockDetailsPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (canonicalCode) void loadQuote(canonicalCode);
-  }, [canonicalCode, loadQuote]);
+  const quoteQueryKey = useMemo(
+    () => buildStockDetailsQuoteQueryKey(canonicalCode || ''),
+    [canonicalCode],
+  );
+  const historyQueryKey = useMemo(
+    () => buildStockDetailsHistoryQueryKey(canonicalCode || '', days),
+    [canonicalCode, days],
+  );
 
-  useEffect(() => {
-    if (canonicalCode) void loadHistory(canonicalCode, days);
-  }, [canonicalCode, days, loadHistory]);
+  useStockDetailsQuoteQuery({
+    queryKey: quoteQueryKey,
+    enabled: Boolean(canonicalCode),
+    load: () => loadQuote(canonicalCode),
+    onCancelInFlight: () => {
+      quoteReqRef.current += 1;
+    },
+  });
+
+  useStockDetailsHistoryQuery({
+    queryKey: historyQueryKey,
+    enabled: Boolean(canonicalCode),
+    load: () => loadHistory(canonicalCode, days),
+    onCancelInFlight: () => {
+      historyReqRef.current += 1;
+    },
+  });
 
   const displayCandles = useMemo(
     () => (dailyCandles ? aggregateCandles(dailyCandles, period) : []),
