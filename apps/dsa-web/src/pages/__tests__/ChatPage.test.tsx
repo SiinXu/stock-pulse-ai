@@ -585,8 +585,8 @@ describe('ChatPage', () => {
     });
 
     expect(deleteButton).toHaveAttribute('data-control', 'icon-button');
-    expect(deleteButton).toHaveAttribute('data-size', 'navigation');
-    expect(deleteButton).toHaveClass('h-11', 'w-11');
+    expect(deleteButton).toHaveAttribute('data-size', 'compact');
+    expect(deleteButton).toHaveClass('absolute', '!h-7', '!w-7');
     fireEvent.click(deleteButton);
 
     expect(mockSwitchSession).not.toHaveBeenCalled();
