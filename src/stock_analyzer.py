@@ -18,13 +18,25 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from enum import Enum
 
 import pandas as pd
 import numpy as np
 
 from src.config import get_config
+from src.utils.indicator_periods import (
+    DEFAULT_MA_PERIODS,
+    DEFAULT_MACD_FAST,
+    DEFAULT_MACD_SIGNAL,
+    DEFAULT_MACD_SLOW,
+    DEFAULT_RSI_PERIODS,
+    IndicatorPeriodConfig,
+    format_ma_label,
+    insufficient_data_note,
+    iter_named_ma_slots,
+    periods_from_config,
+)
 from src.schemas.decision_scale import signal_key_for_score
 
 logger = logging.getLogger(__name__)
@@ -121,11 +133,17 @@ class TrendAnalysisResult:
     macd_signal: str = ""            # MACD signal description
 
     # RSI indicator
-    rsi_6: float = 0.0              # RSI(6) short-term
-    rsi_12: float = 0.0             # RSI(12) medium-term
-    rsi_24: float = 0.0             # RSI(24) long-term
+    rsi_6: float = 0.0              # RSI short-term slot (default period 6)
+    rsi_12: float = 0.0             # RSI medium-term slot (default period 12)
+    rsi_24: float = 0.0             # RSI long-term slot (default period 24)
     rsi_status: RSIStatus = RSIStatus.NEUTRAL
     rsi_signal: str = ""              # RSI Signal Description
+
+    # Full period maps (period int -> value or None when insufficient data)
+    ma_by_period: Dict[int, Any] = field(default_factory=dict)
+    ma_periods_used: List[int] = field(default_factory=list)
+    rsi_by_period: Dict[int, Any] = field(default_factory=dict)
+    rsi_periods_used: List[int] = field(default_factory=list)
 
     # Buy Signal
     buy_signal: BuySignal = BuySignal.WAIT
@@ -143,6 +161,8 @@ class TrendAnalysisResult:
             'ma10': self.ma10,
             'ma20': self.ma20,
             'ma60': self.ma60,
+            'ma_by_period': self.ma_by_period,
+            'ma_periods_used': self.ma_periods_used,
             'current_price': self.current_price,
             'bias_ma5': self.bias_ma5,
             'bias_ma10': self.bias_ma10,
@@ -164,6 +184,8 @@ class TrendAnalysisResult:
             'rsi_6': self.rsi_6,
             'rsi_12': self.rsi_12,
             'rsi_24': self.rsi_24,
+            'rsi_by_period': self.rsi_by_period,
+            'rsi_periods_used': self.rsi_periods_used,
             'rsi_status': self.rsi_status.value,
             'rsi_signal': self.rsi_signal,
         }
@@ -187,21 +209,26 @@ class StockTrendAnalyzer:
     VOLUME_HEAVY_RATIO = 1.5    # Heavy-volume threshold
     MA_SUPPORT_TOLERANCE = 0.02  # MA support judgment tolerance (2%).
 
-    # MACD parameters (standard 12/26/9)
-    MACD_FAST = 12              # Fast-line period
-    MACD_SLOW = 26             # Slow-line period
-    MACD_SIGNAL = 9             # Signal-line period
-
-    # RSI Parameters
-    RSI_SHORT = 6               # Short-term RSI period
-    RSI_MID = 12               # Medium-term RSI period
-    RSI_LONG = 24              # Long-term RSI period
-    RSI_OVERBOUGHT = 70        # Overbought threshold
-    RSI_OVERSOLD = 30          # Oversold threshold
+    # Class-level defaults kept for tests/tools that still read attributes.
+    # Runtime analysis prefers instance periods resolved from Config.
+    MACD_FAST = DEFAULT_MACD_FAST
+    MACD_SLOW = DEFAULT_MACD_SLOW
+    MACD_SIGNAL = DEFAULT_MACD_SIGNAL
+    RSI_SHORT = DEFAULT_RSI_PERIODS[0]
+    RSI_MID = DEFAULT_RSI_PERIODS[1]
+    RSI_LONG = DEFAULT_RSI_PERIODS[2]
+    RSI_OVERBOUGHT = 70
+    RSI_OVERSOLD = 30
     
-    def __init__(self):
-        """初始化分析器"""
-        pass
+    def __init__(self, periods: Optional[IndicatorPeriodConfig] = None):
+        """Initialize analyzer with optional explicit period overrides."""
+        self._periods = periods
+
+    def _resolve_periods(self) -> IndicatorPeriodConfig:
+        """Return injected periods or historical defaults (no process-config read)."""
+        if self._periods is not None:
+            return self._periods
+        return IndicatorPeriodConfig()
     
     def analyze(self, df: pd.DataFrame, code: str) -> TrendAnalysisResult:
         """
@@ -215,8 +242,13 @@ class StockTrendAnalyzer:
             TrendAnalysisResult 分析结果
         """
         result = TrendAnalysisResult(code=code)
-        
-        if df is None or df.empty or len(df) < 20:
+        periods = self._resolve_periods()
+        result.ma_periods_used = list(periods.ma_periods)
+        result.rsi_periods_used = list(periods.rsi_periods)
+
+        # Need enough bars for the three alignment MAs (defaults: 5/10/20 → 20).
+        min_bars = max(periods.ma_long, 20) if periods.ma_periods else 20
+        if df is None or df.empty or len(df) < min_bars:
             logger.warning(f"{code} 数据不足，无法进行趋势分析")
             result.risk_factors.append("数据不足，无法完成分析")
             return result
@@ -225,22 +257,19 @@ class StockTrendAnalyzer:
         df = df.sort_values('date').reset_index(drop=True)
         
         # Calculate moving average
-        df = self._calculate_mas(df)
+        df = self._calculate_mas(df, periods, result)
 
         # Calculate MACD and RSI
-        df = self._calculate_macd(df)
-        df = self._calculate_rsi(df)
+        df = self._calculate_macd(df, periods)
+        df = self._calculate_rsi(df, periods)
 
         # Get latest data
         latest = df.iloc[-1]
         result.current_price = float(latest['close'])
-        result.ma5 = float(latest['MA5'])
-        result.ma10 = float(latest['MA10'])
-        result.ma20 = float(latest['MA20'])
-        result.ma60 = float(latest.get('MA60', 0))
+        self._assign_ma_slots(latest, periods, result)
 
         # 1. Trend judgment
-        self._analyze_trend(df, result)
+        self._analyze_trend(df, result, periods)
 
         # 2. Bias ratio calculation
         self._calculate_bias(result)
@@ -252,57 +281,101 @@ class StockTrendAnalyzer:
         self._analyze_support_resistance(df, result)
 
         # 5. MACD analysis
-        self._analyze_macd(df, result)
+        self._analyze_macd(df, result, periods)
 
         # 6. RSI Analysis
-        self._analyze_rsi(df, result)
+        self._analyze_rsi(df, result, periods)
 
-        # 7. Generate buy signals
+        # 7. Generate buy signals (BIAS_THRESHOLD via existing get_config site)
         self._generate_signal(result)
 
         return result
+
+    def _assign_ma_slots(
+        self,
+        latest: pd.Series,
+        periods: IndicatorPeriodConfig,
+        result: TrendAnalysisResult,
+    ) -> None:
+        """Fill legacy ma5/ma10/ma20/ma60 slots and ma_by_period map."""
+        ma_by_period: Dict[int, Any] = {}
+        for period in periods.ma_periods:
+            col = format_ma_label(period)
+            raw = latest.get(col)
+            if raw is None or (isinstance(raw, float) and np.isnan(raw)):
+                ma_by_period[period] = None
+            else:
+                ma_by_period[period] = float(raw)
+        result.ma_by_period = ma_by_period
+
+        slot_defaults = {"ma5": 0.0, "ma10": 0.0, "ma20": 0.0, "ma60": 0.0}
+        for slot_name, period in iter_named_ma_slots(periods.ma_periods):
+            value = ma_by_period.get(period)
+            slot_defaults[slot_name] = float(value) if value is not None else 0.0
+        result.ma5 = slot_defaults["ma5"]
+        result.ma10 = slot_defaults["ma10"]
+        result.ma20 = slot_defaults["ma20"]
+        result.ma60 = slot_defaults["ma60"]
     
-    def _calculate_mas(self, df: pd.DataFrame) -> pd.DataFrame:
-        """计算均线"""
+    def _calculate_mas(
+        self,
+        df: pd.DataFrame,
+        periods: IndicatorPeriodConfig,
+        result: TrendAnalysisResult,
+    ) -> pd.DataFrame:
+        """Calculate configured moving averages without shorter-period substitution."""
         df = df.copy()
-        df['MA5'] = df['close'].rolling(window=5).mean()
-        df['MA10'] = df['close'].rolling(window=10).mean()
-        df['MA20'] = df['close'].rolling(window=20).mean()
-        if len(df) >= 60:
-            df['MA60'] = df['close'].rolling(window=60).mean()
-        else:
-            df['MA60'] = df['MA20']  # Use MA20 as a replacement when data is insufficient
+        bar_count = len(df)
+        for period in periods.ma_periods:
+            col = format_ma_label(period)
+            if bar_count >= period:
+                df[col] = df['close'].rolling(window=period).mean()
+            else:
+                # Leave column as NaN; annotate insufficient data (no MA20 substitution).
+                df[col] = np.nan
+                note = insufficient_data_note(period, bar_count)
+                if note not in result.risk_factors:
+                    result.risk_factors.append(note)
         return df
 
-    def _calculate_macd(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_macd(
+        self,
+        df: pd.DataFrame,
+        periods: Optional[IndicatorPeriodConfig] = None,
+    ) -> pd.DataFrame:
         """
         计算 MACD 指标
 
         公式：
-        - EMA(12)：12日指数移动平均
-        - EMA(26)：26日指数移动平均
-        - DIF = EMA(12) - EMA(26)
-        - DEA = EMA(DIF, 9)
+        - EMA(fast)：fast-day exponential moving average
+        - EMA(slow)：slow-day exponential moving average
+        - DIF = EMA(fast) - EMA(slow)
+        - DEA = EMA(DIF, signal)
         - MACD = (DIF - DEA) * 2
         """
+        resolved = periods or self._resolve_periods()
         df = df.copy()
 
         # Calculate fast and slow line EMA
-        ema_fast = df['close'].ewm(span=self.MACD_FAST, adjust=False).mean()
-        ema_slow = df['close'].ewm(span=self.MACD_SLOW, adjust=False).mean()
+        ema_fast = df['close'].ewm(span=resolved.macd_fast, adjust=False).mean()
+        ema_slow = df['close'].ewm(span=resolved.macd_slow, adjust=False).mean()
 
         # Calculate Quick Line DIF
         df['MACD_DIF'] = ema_fast - ema_slow
 
         # Calculate signal line DEA
-        df['MACD_DEA'] = df['MACD_DIF'].ewm(span=self.MACD_SIGNAL, adjust=False).mean()
+        df['MACD_DEA'] = df['MACD_DIF'].ewm(span=resolved.macd_signal, adjust=False).mean()
 
         # Calculate histogram
         df['MACD_BAR'] = (df['MACD_DIF'] - df['MACD_DEA']) * 2
 
         return df
 
-    def _calculate_rsi(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_rsi(
+        self,
+        df: pd.DataFrame,
+        periods: Optional[IndicatorPeriodConfig] = None,
+    ) -> pd.DataFrame:
         """
         计算 RSI 指标（Wilder's EMA / SMMA 口径）
 
@@ -311,9 +384,10 @@ class StockTrendAnalyzer:
         - RS = avg_gain / avg_loss
         - RSI = 100 - (100 / (1 + RS))
         """
+        resolved = periods or self._resolve_periods()
         df = df.copy()
 
-        for period in [self.RSI_SHORT, self.RSI_MID, self.RSI_LONG]:
+        for period in resolved.rsi_periods:
             # Calculate price change
             delta = df['close'].diff()
 
@@ -338,19 +412,29 @@ class StockTrendAnalyzer:
 
         return df
     
-    def _analyze_trend(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+    def _analyze_trend(
+        self,
+        df: pd.DataFrame,
+        result: TrendAnalysisResult,
+        periods: Optional[IndicatorPeriodConfig] = None,
+    ) -> None:
         """
         分析趋势状态
         
         核心逻辑：判断均线排列和趋势强度
         """
+        resolved = periods or self._resolve_periods()
         ma5, ma10, ma20 = result.ma5, result.ma10, result.ma20
+        short_col = format_ma_label(resolved.ma_short)
+        long_col = format_ma_label(resolved.ma_long)
         
         # Determine moving average arrangement.
-        if ma5 > ma10 > ma20:
+        if ma5 > ma10 > ma20 > 0:
             # Check if the spacing is expanding (strong)
             prev = df.iloc[-5] if len(df) >= 5 else df.iloc[-1]
-            prev_spread = (prev['MA5'] - prev['MA20']) / prev['MA20'] * 100 if prev['MA20'] > 0 else 0
+            prev_long = float(prev.get(long_col) or 0)
+            prev_short = float(prev.get(short_col) or 0)
+            prev_spread = (prev_short - prev_long) / prev_long * 100 if prev_long > 0 else 0
             curr_spread = (ma5 - ma20) / ma20 * 100 if ma20 > 0 else 0
             
             if curr_spread > prev_spread and curr_spread > 5:
@@ -359,17 +443,27 @@ class StockTrendAnalyzer:
                 result.trend_strength = 90
             else:
                 result.trend_status = TrendStatus.BULL
-                result.ma_alignment = "多头排列 MA5>MA10>MA20"
+                result.ma_alignment = (
+                    f"多头排列 {format_ma_label(resolved.ma_short)}>"
+                    f"{format_ma_label(resolved.ma_mid)}>"
+                    f"{format_ma_label(resolved.ma_long)}"
+                )
                 result.trend_strength = 75
                 
-        elif ma5 > ma10 and ma10 <= ma20:
+        elif ma5 > ma10 and ma10 <= ma20 and ma5 > 0 and ma10 > 0:
             result.trend_status = TrendStatus.WEAK_BULL
-            result.ma_alignment = "弱势多头，MA5>MA10 但 MA10≤MA20"
+            result.ma_alignment = (
+                f"弱势多头，{format_ma_label(resolved.ma_short)}>"
+                f"{format_ma_label(resolved.ma_mid)} 但 "
+                f"{format_ma_label(resolved.ma_mid)}≤{format_ma_label(resolved.ma_long)}"
+            )
             result.trend_strength = 55
             
-        elif ma5 < ma10 < ma20:
+        elif 0 < ma5 < ma10 < ma20:
             prev = df.iloc[-5] if len(df) >= 5 else df.iloc[-1]
-            prev_spread = (prev['MA20'] - prev['MA5']) / prev['MA5'] * 100 if prev['MA5'] > 0 else 0
+            prev_long = float(prev.get(long_col) or 0)
+            prev_short = float(prev.get(short_col) or 0)
+            prev_spread = (prev_long - prev_short) / prev_short * 100 if prev_short > 0 else 0
             curr_spread = (ma20 - ma5) / ma5 * 100 if ma5 > 0 else 0
             
             if curr_spread > prev_spread and curr_spread > 5:
@@ -378,12 +472,20 @@ class StockTrendAnalyzer:
                 result.trend_strength = 10
             else:
                 result.trend_status = TrendStatus.BEAR
-                result.ma_alignment = "空头排列 MA5<MA10<MA20"
+                result.ma_alignment = (
+                    f"空头排列 {format_ma_label(resolved.ma_short)}<"
+                    f"{format_ma_label(resolved.ma_mid)}<"
+                    f"{format_ma_label(resolved.ma_long)}"
+                )
                 result.trend_strength = 25
                 
-        elif ma5 < ma10 and ma10 >= ma20:
+        elif ma5 < ma10 and ma10 >= ma20 and ma5 > 0 and ma10 > 0:
             result.trend_status = TrendStatus.WEAK_BEAR
-            result.ma_alignment = "弱势空头，MA5<MA10 但 MA10≥MA20"
+            result.ma_alignment = (
+                f"弱势空头，{format_ma_label(resolved.ma_short)}<"
+                f"{format_ma_label(resolved.ma_mid)} 但 "
+                f"{format_ma_label(resolved.ma_mid)}≥{format_ma_label(resolved.ma_long)}"
+            )
             result.trend_strength = 40
             
         else:
@@ -479,7 +581,12 @@ class StockTrendAnalyzer:
             if recent_high > price:
                 result.resistance_levels.append(recent_high)
 
-    def _analyze_macd(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+    def _analyze_macd(
+        self,
+        df: pd.DataFrame,
+        result: TrendAnalysisResult,
+        periods: Optional[IndicatorPeriodConfig] = None,
+    ) -> None:
         """
         分析 MACD 指标
 
@@ -488,7 +595,8 @@ class StockTrendAnalyzer:
         - 金叉：DIF 上穿 DEA
         - 死叉：DIF 下穿 DEA
         """
-        if len(df) < self.MACD_SLOW:
+        resolved = periods or self._resolve_periods()
+        if len(df) < resolved.macd_slow:
             result.macd_signal = "数据不足"
             return
 
@@ -542,7 +650,12 @@ class StockTrendAnalyzer:
             result.macd_status = MACDStatus.BULLISH
             result.macd_signal = " MACD 中性区域"
 
-    def _analyze_rsi(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+    def _analyze_rsi(
+        self,
+        df: pd.DataFrame,
+        result: TrendAnalysisResult,
+        periods: Optional[IndicatorPeriodConfig] = None,
+    ) -> None:
         """
         分析 RSI 指标
 
@@ -551,18 +664,32 @@ class StockTrendAnalyzer:
         - RSI < 30：超卖，关注反弹
         - 40-60：中性区域
         """
-        if len(df) < self.RSI_LONG:
+        resolved = periods or self._resolve_periods()
+        rsi_long = max(resolved.rsi_periods)
+        if len(df) < rsi_long:
             result.rsi_signal = "数据不足"
             return
 
         latest = df.iloc[-1]
 
-        # Get RSI data
-        result.rsi_6 = float(latest[f'RSI_{self.RSI_SHORT}'])
-        result.rsi_12 = float(latest[f'RSI_{self.RSI_MID}'])
-        result.rsi_24 = float(latest[f'RSI_{self.RSI_LONG}'])
+        rsi_by_period: Dict[int, Any] = {}
+        for period in resolved.rsi_periods:
+            col = f"RSI_{period}"
+            if col in latest.index and latest[col] == latest[col]:
+                rsi_by_period[period] = float(latest[col])
+            else:
+                rsi_by_period[period] = None
+        result.rsi_by_period = rsi_by_period
 
-        # Use medium-term RSI(12) as the primary indicator
+        # Legacy slots: first three configured RSI periods → rsi_6/rsi_12/rsi_24
+        slot_values = list(resolved.rsi_periods[:3])
+        while len(slot_values) < 3:
+            slot_values.append(slot_values[-1] if slot_values else DEFAULT_RSI_PERIODS[0])
+        result.rsi_6 = float(rsi_by_period.get(slot_values[0]) or 0.0)
+        result.rsi_12 = float(rsi_by_period.get(slot_values[1]) or 0.0)
+        result.rsi_24 = float(rsi_by_period.get(slot_values[2]) or 0.0)
+
+        # Use medium-term RSI (second configured period, default 12) as primary
         rsi_mid = result.rsi_12
 
         # Check RSI status
@@ -729,7 +856,14 @@ class StockTrendAnalyzer:
         # === Comprehensive Assessment ===
         result.signal_score = score
         result.signal_reasons = reasons
-        result.risk_factors = risks
+        # Preserve earlier structural notes (e.g. insufficient MA data) then append
+        # signal-time risk factors without dropping pre-existing annotations.
+        preserved = [
+            note
+            for note in result.risk_factors
+            if note and note not in risks
+        ]
+        result.risk_factors = preserved + risks
 
         # Generate buy signals (consistent with canonical decision scale)
         score_signal = signal_key_for_score(score)

@@ -261,6 +261,9 @@ export function legacyToSectionView(category: string, sub: string | null): Secti
       return { section: 'agent_behavior', view: 'execution' };
     case 'backtest':
       return { section: 'backtesting', view: 'engine' };
+    case 'indicators':
+      // Trend-analysis MA/MACD/RSI periods live next to market data settings.
+      return { section: 'data_sources', view: 'sources' };
     case 'system':
       return { section: 'system_security', view: 'runtime' };
     default:

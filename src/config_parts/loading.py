@@ -101,6 +101,47 @@ def emit_legacy_schedule_deprecation_if_needed(
     )
 
 
+def _load_indicator_period_fields() -> Dict[str, Any]:
+    """Parse technical-indicator period env vars with defaults matching history."""
+    from src.utils.indicator_periods import (
+        DEFAULT_MA_PERIODS,
+        DEFAULT_RSI_PERIODS,
+        MAX_MA_PERIOD,
+        MAX_RSI_PERIOD,
+        parse_macd_periods,
+        parse_positive_int_list,
+    )
+
+    ma_periods = parse_positive_int_list(
+        os.getenv("INDICATOR_MA_PERIODS"),
+        default=DEFAULT_MA_PERIODS,
+        field_name="INDICATOR_MA_PERIODS",
+        min_items=3,
+        max_items=16,
+        maximum=MAX_MA_PERIOD,
+    )
+    rsi_periods = parse_positive_int_list(
+        os.getenv("INDICATOR_RSI_PERIODS"),
+        default=DEFAULT_RSI_PERIODS,
+        field_name="INDICATOR_RSI_PERIODS",
+        min_items=1,
+        max_items=8,
+        maximum=MAX_RSI_PERIOD,
+    )
+    macd_fast, macd_slow, macd_signal = parse_macd_periods(
+        fast_raw=os.getenv("INDICATOR_MACD_FAST"),
+        slow_raw=os.getenv("INDICATOR_MACD_SLOW"),
+        signal_raw=os.getenv("INDICATOR_MACD_SIGNAL"),
+    )
+    return {
+        "indicator_ma_periods": list(ma_periods),
+        "indicator_macd_fast": macd_fast,
+        "indicator_macd_slow": macd_slow,
+        "indicator_macd_signal": macd_signal,
+        "indicator_rsi_periods": list(rsi_periods),
+    }
+
+
 def setup_env() -> None:
     from src import config as config_module
 
@@ -604,6 +645,11 @@ class _ConfigLoadingMethods:
         if report_show_llm_model_raw is not None and not report_show_llm_model_raw.strip():
             report_show_llm_model = False
 
+        # Import inside method body: _load_from_env is cloned into src.config globals.
+        from src.config_parts.loading import _load_indicator_period_fields
+
+        _indicator_period_fields = _load_indicator_period_fields()
+
         return cls(
             stock_list=stock_list,
             feishu_app_id=os.getenv('FEISHU_APP_ID'),
@@ -734,6 +780,7 @@ class _ConfigLoadingMethods:
             ),
             newsnow_base_url=((os.getenv('NEWSNOW_BASE_URL') or '').strip().rstrip('/') or 'https://newsnow.busiyi.world'),
             bias_threshold=parse_env_float(os.getenv('BIAS_THRESHOLD'), 5.0, field_name='BIAS_THRESHOLD', minimum=1.0),
+            **_indicator_period_fields,
             agent_generation_backend=agent_generation_backend,
             agent_litellm_model=agent_litellm_model,
             agent_mode=os.getenv('AGENT_MODE', 'false').lower() == 'true',
