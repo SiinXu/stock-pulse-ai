@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
 - [Fixed] Backtest page restores evaluation-window radiogroup accessible names, keeps a single PageHeader H1, and collapses dense run filters on mobile so results lead the first screen (#879 B2+B5).
