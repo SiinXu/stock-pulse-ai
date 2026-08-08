@@ -144,6 +144,13 @@ export default defineConfig({
     // Package output to the static folder in the project root directory
     outDir: path.resolve(__dirname, '../../static'),
     emptyOutDir: true,
+    // Vendor libs are split via manualChunks below. App routes and locale
+    // packs already code-split through React.lazy / dynamic import() in src;
+    // panel-level splits (e.g. IntelligenceSourcesPanel) stay out of this
+    // config and are enforced by scripts/check-bundle-size.mjs budgets.
+    // Keep reportCompressedSize so `vite build` prints gzip sizes used when
+    // tightening scripts/bundle-size-budget.json.
+    reportCompressedSize: true,
     rollupOptions: {
       output: {
         manualChunks: getVendorChunkName,
