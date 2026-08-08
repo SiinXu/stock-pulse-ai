@@ -1,3 +1,4 @@
+import { createElement, type ReactNode } from 'react';
 import { PLAYGROUND_CATALOG } from '../catalog';
 import type { PlaygroundScenarioRenderer } from '../types';
 import { ALERT_HISTORY_SCENARIOS } from './alertHistoryScenarios';
@@ -20,6 +21,17 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...SCREENING_SCENARIOS,
 };
 
+/**
+ * Pure missing-renderer check shared by runtime and contract tests.
+ * A catalog id is missing when the runtime registry has no entry for it.
+ */
+export function listMissingPlaygroundRendererIds(
+  catalog: readonly { readonly id: string }[],
+  registry: Readonly<Record<string, unknown>>,
+): string[] {
+  return catalog.filter((entry) => !registry[entry.id]).map((entry) => entry.id);
+}
+
 export function getPlaygroundRenderer(componentId: string): PlaygroundScenarioRenderer | undefined {
   return RENDERERS[componentId];
 }
@@ -34,8 +46,5 @@ export function renderPlaygroundScenario(componentId: string): ReactNode {
 }
 
 export function getMissingPlaygroundRendererIds(): string[] {
-  return PLAYGROUND_CATALOG
-    .filter((entry) => !RENDERERS[entry.id])
-    .map((entry) => entry.id);
+  return listMissingPlaygroundRendererIds(PLAYGROUND_CATALOG, RENDERERS);
 }
-import { createElement, type ReactNode } from 'react';
