@@ -102,4 +102,5 @@ Commit `tests/agent/benchmark/baselines/v0.json` with an English changelog note 
 | #215 | Broader harness / feedback / self-improvement — out of scope |
 | #617 / analysis quality panel | Complementary: report trust vs agent-run discipline |
 | AR-01 agent_runtime fixtures | Read-only source transcripts for replay |
+| Output-quality eval service | Complementary: [agent-eval-dimensions_EN.md](agent-eval-dimensions_EN.md) scores single output artifacts (`agent_eval_service`); not shared with this runtime benchmark |
 | CI merge queue / workflow ownership | Do not wire scheduled jobs into `.github/workflows/**` in this PR |

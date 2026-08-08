@@ -1,0 +1,22 @@
+{
+  "id": "fact-grounded-pass",
+  "title": "Numeric claims grounded in context",
+  "tags": ["factuality", "pass"],
+  "dimensions": ["factuality"],
+  "context": {
+    "stock_code": "600519",
+    "quote": {"price": 1680.5, "change_pct": -1.2},
+    "fundamentals": {"revenue_yi": 326.5, "pe": 28.4}
+  },
+  "agent_output": {
+    "signal": "hold",
+    "summary": "Price at 1680.5 with change -1.2%; PE 28.4; revenue 326.5.",
+    "claims": {"price": 1680.5, "pe": 28.4}
+  },
+  "evaluation": {
+    "factuality": {
+      "require_numeric_claims": true,
+      "expected_numbers": ["1680.5", "28.4"]
+    }
+  }
+}

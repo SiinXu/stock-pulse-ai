@@ -1,0 +1,20 @@
+{
+  "id": "fact-ungrounded-fail",
+  "title": "Fabricated price not present in context",
+  "tags": ["factuality", "fail"],
+  "dimensions": ["factuality"],
+  "context": {
+    "stock_code": "600519",
+    "quote": {"price": 1680.5, "change_pct": -1.2}
+  },
+  "agent_output": {
+    "signal": "buy",
+    "summary": "Target price 9999.0 with upside to 12000 based on secret model.",
+    "claims": {"target": 9999.0, "stretch": 12000}
+  },
+  "evaluation": {
+    "factuality": {
+      "require_numeric_claims": true
+    }
+  }
+}
