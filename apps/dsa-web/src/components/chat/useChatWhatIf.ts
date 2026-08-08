@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DEFAULT_WHAT_IF_DRAFT,
   DEFAULT_WHAT_IF_MAX_TURNS,
@@ -23,12 +23,34 @@ export type ChatWhatIfSendPlan =
     };
 
 export function useChatWhatIf(messages: Array<{ role: string; content: string }>) {
-  const [whatIfDraft, setWhatIfDraft] = useState<WhatIfDraftState>(DEFAULT_WHAT_IF_DRAFT);
+  const [draftBase, setDraftBase] = useState<Omit<WhatIfDraftState, 'turnCount'>>({
+    enabled: DEFAULT_WHAT_IF_DRAFT.enabled,
+    dimension: DEFAULT_WHAT_IF_DRAFT.dimension,
+    direction: DEFAULT_WHAT_IF_DRAFT.direction,
+    magnitude: DEFAULT_WHAT_IF_DRAFT.magnitude,
+    currencyPair: DEFAULT_WHAT_IF_DRAFT.currencyPair,
+  });
 
-  useEffect(() => {
-    const used = countWhatIfTurnsInMessages(messages);
-    setWhatIfDraft((prev) => (prev.turnCount === used ? prev : { ...prev, turnCount: used }));
-  }, [messages]);
+  const turnCount = useMemo(
+    () => countWhatIfTurnsInMessages(messages),
+    [messages],
+  );
+
+  const whatIfDraft: WhatIfDraftState = useMemo(
+    () => ({ ...draftBase, turnCount }),
+    [draftBase, turnCount],
+  );
+
+  const setWhatIfDraft = (
+    next: WhatIfDraftState | ((prev: WhatIfDraftState) => WhatIfDraftState),
+  ) => {
+    setDraftBase((prevBase) => {
+      const prev: WhatIfDraftState = { ...prevBase, turnCount };
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      const { turnCount: _ignored, ...rest } = resolved;
+      return rest;
+    });
+  };
 
   const planWhatIfSend = (
     msgText: string,

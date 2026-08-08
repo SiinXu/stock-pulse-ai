@@ -735,7 +735,10 @@ const ChatPage: React.FC = () => {
       }
 
       // Stream failed: restore draft + pending context so refresh can retry.
-      followUpContextRef.current = pendingFollowUpContext ?? contextForSend ?? null;
+      // Prefer the pre-what-if stock/follow-up context; what_if payload is not ChatFollowUpContext.
+      followUpContextRef.current = pendingFollowUpContext
+        ?? (baseContextForSend as typeof followUpContextRef.current)
+        ?? null;
       if (unsentFollowUpParamsPresent || pendingFollowUpContext) {
         setInput(msgText);
       }
