@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -25,6 +25,8 @@ import { SettingsSwitch } from './SettingsSwitch';
 import { getConfigItem } from './settingsConfigItems';
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+/** Poll interval while this process reports analysis running (run-now / schedule). */
+const RUNNING_STATUS_POLL_MS = 3000;
 
 function isEnabledConfigValue(value: unknown) {
   return String(value ?? '').trim().toLowerCase() === 'true';
@@ -53,6 +55,11 @@ function serializeScheduleTimes(times: string[]) {
   return times.map((time) => time.trim()).filter(Boolean).join(',');
 }
 
+/**
+ * Format a scheduler timestamp with an explicit timezone label.
+ * Follows the marketFormat convention (date/time digits + shortOffset label)
+ * using the browser-local zone — scheduler status is process-local, not market-bound.
+ */
 function formatSchedulerTimestamp(value: string | null | undefined, language: UiLanguage) {
   if (!value) {
     return '-';
@@ -63,13 +70,37 @@ function formatSchedulerTimestamp(value: string | null | undefined, language: Ui
     return value;
   }
 
-  return new Intl.DateTimeFormat(getUiLocale(language), {
+  const locale = getUiLocale(language);
+  const parts = new Intl.DateTimeFormat(locale, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(date);
+    timeZoneName: 'shortOffset',
+  }).formatToParts(date);
+
+  const zone = parts.find((part) => part.type === 'timeZoneName')?.value?.replace('UTC', 'GMT');
+  const body = parts
+    .filter((part) => part.type !== 'timeZoneName')
+    .map((part) => part.value)
+    .join('')
+    .trim();
+
+  return zone ? `${body} ${zone}` : body;
+}
+
+function formatSkipReason(
+  reason: string | null | undefined,
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+) {
+  if (!reason) {
+    return '';
+  }
+  if (reason === 'analysis_already_running') {
+    return t('settings.schedulerSkipReasonBusy');
+  }
+  return reason;
 }
 
 type SchedulerSettingsCardProps = {
@@ -111,6 +142,14 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   // Live probe: true only when list(enabled=true) succeeds with ≥1 item.
   // null = not yet known / probe failed — never invent an overlap state.
   const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refreshVersionedTaskOverlap = useCallback(async () => {
     try {
@@ -132,11 +171,17 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
         systemConfigApi.getSchedulerStatus(),
         refreshVersionedTaskOverlap(),
       ]);
-      setStatus(payload);
+      if (mountedRef.current) {
+        setStatus(payload);
+      }
     } catch (error: unknown) {
-      setStatusError(getParsedApiError(error));
+      if (mountedRef.current) {
+        setStatusError(getParsedApiError(error));
+      }
     } finally {
-      setIsRefreshingStatus(false);
+      if (mountedRef.current) {
+        setIsRefreshingStatus(false);
+      }
     }
   }, [refreshVersionedTaskOverlap]);
 
@@ -146,6 +191,18 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     }
     void refreshSchedulerStatus();
   }, [hasSchedulerSettings, refreshSchedulerStatus, statusRefreshToken]);
+
+  // While analysis is running in this process, poll status so run-now stays trackable
+  // (accepted → running → idle with last success/error) without showing only a task id.
+  useEffect(() => {
+    if (!hasSchedulerSettings || !status?.running) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void refreshSchedulerStatus();
+    }, RUNNING_STATUS_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [hasSchedulerSettings, status?.running, refreshSchedulerStatus]);
 
   useEffect(() => {
     if (!onSchedulerStateChange) {
@@ -181,6 +238,18 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     ...(issueByKey.SCHEDULE_TIMES || []),
     ...(issueByKey.SCHEDULE_TIME || []),
   ];
+  const analysisRunning = Boolean(status?.running);
+  const runNowBlocked = disabled || isRunningNow || analysisRunning;
+  const nextRunDisplay = status?.nextRunAt
+    ? formatSchedulerTimestamp(status.nextRunAt, language)
+    : (statusEnabled ? t('settings.schedulerNoNextRun') : '-');
+  const skipReasonText = formatSkipReason(status?.lastSkipReason, t);
+  const lastSkippedDisplay = status?.lastSkippedAt
+    ? [
+        formatSchedulerTimestamp(status.lastSkippedAt, language),
+        skipReasonText,
+      ].filter(Boolean).join(' · ')
+    : (skipReasonText || null);
 
   const updateScheduleTimes = (nextTimes: string[]) => {
     if (timeTargetKey === 'SCHEDULE_TIME') {
@@ -195,13 +264,21 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     setRunNowSuccess('');
     setIsRunningNow(true);
     try {
-      await systemConfigApi.runSchedulerNow();
-      setRunNowSuccess(t('settings.schedulerRunAccepted'));
+      const result = await systemConfigApi.runSchedulerNow();
+      // Contract: accepted + running means work started in this process (no async task id).
+      if (result.accepted) {
+        setRunNowSuccess(t('settings.schedulerRunAccepted'));
+      } else if (result.running) {
+        setRunNowError(getParsedApiError(new Error(t('settings.schedulerBusyReason'))));
+      }
       await refreshSchedulerStatus();
     } catch (error: unknown) {
       setRunNowError(getParsedApiError(error));
+      await refreshSchedulerStatus();
     } finally {
-      setIsRunningNow(false);
+      if (mountedRef.current) {
+        setIsRunningNow(false);
+      }
     }
   };
 
@@ -328,8 +405,11 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             <div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
-                <span className="text-xs text-muted-text">
-                  {status?.running
+                <span
+                  className="text-xs text-muted-text"
+                  data-testid="scheduler-runtime-badge"
+                >
+                  {analysisRunning
                     ? t('settings.schedulerRunning')
                     : statusEnabled
                       ? t('settings.schedulerEnabled')
@@ -340,15 +420,34 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {t('settings.schedulerStatusScopeNote')}
               </p>
             </div>
-            <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+
+            <Surface
+              as="div"
+              level="interactive"
+              className="space-y-1 px-3 py-2"
+              data-testid="scheduler-process-mode"
+            >
+              <p className="text-xs text-muted-text">{t('settings.schedulerProcessMode')}</p>
+              <p className="text-xs font-medium text-foreground" data-testid="scheduler-process-mode-value">
+                {t('settings.schedulerProcessModeValue')}
+              </p>
+              <p
+                className="text-xs leading-5 text-muted-text"
+                data-testid="scheduler-owner-note"
+              >
+                {t('settings.schedulerOwnerNote')}
+              </p>
+            </Surface>
+
+            <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 xl:grid-cols-3">
               <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerEffectiveTimes')}</dt>
                 <dd className="mt-1 font-medium text-foreground">{effectiveStatusTimes.join(', ') || '-'}</dd>
               </Surface>
               <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerNextRun')}</dt>
-                <dd className="mt-1 font-medium text-foreground">
-                  {formatSchedulerTimestamp(status?.nextRunAt, language)}
+                <dd data-testid="scheduler-next-run" className="mt-1 font-medium text-foreground">
+                  {nextRunDisplay}
                 </dd>
               </Surface>
               <Surface as="div" level="interactive" className="px-3 py-2">
@@ -357,6 +456,14 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                   {formatSchedulerTimestamp(status?.lastSuccessAt, language)}
                 </dd>
               </Surface>
+              {lastSkippedDisplay ? (
+                <Surface as="div" level="interactive" className="px-3 py-2 sm:col-span-2 xl:col-span-3">
+                  <dt className="text-muted-text">{t('settings.schedulerLastSkipped')}</dt>
+                  <dd data-testid="scheduler-last-skipped" className="mt-1 font-medium text-foreground">
+                    {lastSkippedDisplay}
+                  </dd>
+                </Surface>
+              ) : null}
             </dl>
             {status?.lastError ? (
               <InlineAlert
@@ -385,15 +492,25 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 variant="primary"
                 size="default"
                 data-testid="scheduler-run-now-button"
-                disabled={disabled || isRunningNow}
-                isLoading={isRunningNow}
+                disabled={runNowBlocked}
+                isLoading={isRunningNow || analysisRunning}
                 loadingText={t('settings.schedulerRunningNow')}
+                aria-describedby={analysisRunning ? 'scheduler-run-now-busy-reason' : undefined}
                 onClick={() => void runSchedulerNow()}
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {t('settings.schedulerRunNow')}
               </Button>
             </div>
+            {analysisRunning ? (
+              <p
+                id="scheduler-run-now-busy-reason"
+                data-testid="scheduler-run-now-busy-reason"
+                className="text-xs leading-5 text-muted-text"
+              >
+                {t('settings.schedulerBusyReason')}
+              </p>
+            ) : null}
           </Surface>
         </div>
 
