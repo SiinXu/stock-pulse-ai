@@ -38,6 +38,7 @@ from api.v1.endpoints import (
     stocks,
     system_config,
     usage,
+    watchlist_scores,
 )
 
 # Create v1 main route.
@@ -78,6 +79,13 @@ router.include_router(
     stocks.router,
     prefix="/stocks",
     tags=["Stocks"]
+)
+
+
+router.include_router(
+    watchlist_scores.router,
+    prefix="/watchlist",
+    tags=["Watchlist"],
 )
 
 router.include_router(

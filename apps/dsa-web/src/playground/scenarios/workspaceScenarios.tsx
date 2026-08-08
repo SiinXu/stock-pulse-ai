@@ -13,6 +13,8 @@ import {
   type HomeWatchlistRow,
   type HomeWorkspaceTab,
 } from '../../components/watchlist/HomeStockWorkspace';
+import { WatchlistScoreColumn } from '../../components/watchlist/WatchlistScoreColumn';
+import type { WatchlistScoreItem } from '../../types/watchlistScore';
 import { createParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
@@ -271,6 +273,66 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
+
+const scoredFixture: WatchlistScoreItem = {
+  stockCode: '600519',
+  status: 'scored',
+  score: 72,
+  asOf: '2026-08-08T09:00:00+00:00',
+  ageDays: 1,
+  analysisId: 5,
+  operationAdvice: 'Buy',
+  freshness: '1d',
+  factors: [
+    {
+      key: 'analysis_sentiment',
+      label: 'Analysis sentiment score',
+      value: 72,
+      detail: 'advice=Buy; as_of=2026-08-08',
+    },
+    {
+      key: 'decision_signal',
+      label: 'Active decision signal',
+      value: 'buy',
+      detail: 'confidence=0.80',
+    },
+  ],
+};
+
+const unanalyzedFixture: WatchlistScoreItem = {
+  stockCode: 'AAPL',
+  status: 'unanalyzed',
+  score: null,
+  asOf: null,
+  ageDays: null,
+  factors: [],
+  freshness: 'none',
+};
+
+const WatchlistScoreColumnStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return (
+      <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreColumn item={unanalyzedFixture} />
+      </div>
+    );
+  }
+  if (scenario === 'interactive') {
+    return (
+      <div className="max-w-sm space-y-3 rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreColumn item={scoredFixture} expanded />
+        <WatchlistScoreColumn item={unanalyzedFixture} />
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+      <WatchlistScoreColumn item={scoredFixture} />
+    </div>
+  );
+};
+
 export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'stock-autocomplete': StockAutocompleteStory,
   'suggestions-list': SuggestionsListStory,
@@ -280,4 +342,5 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
+  'watchlist-score-column': WatchlistScoreColumnStory,
 };

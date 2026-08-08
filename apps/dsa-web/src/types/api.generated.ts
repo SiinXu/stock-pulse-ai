@@ -3159,6 +3159,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/watchlist/scores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score watchlist symbols from existing analysis
+         * @description Batch-aggregate AI-oriented watchlist scores from the latest analysis history and active decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Default sort=manual preserves the caller's order. No new LLM calls.
+         */
+        post: operations["scoreWatchlistSymbols"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -11744,6 +11764,80 @@ export interface components {
              * @description 当前自选队列股票代码列表
              */
             stock_codes?: string[];
+        };
+        /** WatchlistScoreFactor */
+        WatchlistScoreFactor: {
+            /** Detail */
+            detail?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: string | number;
+        };
+        /** WatchlistScoreItem */
+        WatchlistScoreItem: {
+            /** Age Days */
+            age_days?: number | null;
+            /** Analysis Id */
+            analysis_id?: number | null;
+            /** As Of */
+            as_of?: string | null;
+            /** Factors */
+            factors?: components["schemas"]["WatchlistScoreFactor"][];
+            /**
+             * Freshness
+             * @default none
+             */
+            freshness: string;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /**
+             * Score
+             * @description 0-100 composite when scored; null when unanalyzed (never invented as 0)
+             */
+            score?: number | null;
+            /**
+             * Status
+             * @description 'scored' or 'unanalyzed'
+             */
+            status: string;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistScoreQueryCount */
+        WatchlistScoreQueryCount: {
+            /** Analysis */
+            analysis: number;
+            /** Signals */
+            signals: number;
+        };
+        /** WatchlistScoreRequest */
+        WatchlistScoreRequest: {
+            /**
+             * Sort
+             * @description Sort mode: manual (default, preserve input order), score_desc, score_asc
+             * @default manual
+             */
+            sort: string;
+            /**
+             * Stock Codes
+             * @description Ordered watchlist symbols to score (max 200). Empty list returns empty items.
+             */
+            stock_codes?: string[];
+        };
+        /** WatchlistScoreResponse */
+        WatchlistScoreResponse: {
+            /** Disclaimer */
+            disclaimer: string;
+            /** Items */
+            items: components["schemas"]["WatchlistScoreItem"][];
+            query_count: components["schemas"]["WatchlistScoreQueryCount"];
+            /** Scoring Mode */
+            scoring_mode: string;
+            /** Sort */
+            sort: string;
         };
     };
     responses: never;
@@ -20566,6 +20660,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scoreWatchlistSymbols: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistScoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistScoreResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Score aggregation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

@@ -21174,6 +21174,210 @@
         ],
         "title": "WatchlistResponse",
         "type": "object"
+      },
+      "WatchlistScoreFactor": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "value"
+        ],
+        "title": "WatchlistScoreFactor",
+        "type": "object"
+      },
+      "WatchlistScoreItem": {
+        "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days"
+          },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreFactor"
+            },
+            "title": "Factors",
+            "type": "array"
+          },
+          "freshness": {
+            "default": "none",
+            "title": "Freshness",
+            "type": "string"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0-100 composite when scored; null when unanalyzed (never invented as 0)",
+            "title": "Score"
+          },
+          "status": {
+            "description": "'scored' or 'unanalyzed'",
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "status"
+        ],
+        "title": "WatchlistScoreItem",
+        "type": "object"
+      },
+      "WatchlistScoreQueryCount": {
+        "properties": {
+          "analysis": {
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreQueryCount",
+        "type": "object"
+      },
+      "WatchlistScoreRequest": {
+        "properties": {
+          "sort": {
+            "default": "manual",
+            "description": "Sort mode: manual (default, preserve input order), score_desc, score_asc",
+            "title": "Sort",
+            "type": "string"
+          },
+          "stock_codes": {
+            "description": "Ordered watchlist symbols to score (max 200). Empty list returns empty items.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Stock Codes",
+            "type": "array"
+          }
+        },
+        "title": "WatchlistScoreRequest",
+        "type": "object"
+      },
+      "WatchlistScoreResponse": {
+        "properties": {
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "query_count": {
+            "$ref": "#/components/schemas/WatchlistScoreQueryCount"
+          },
+          "scoring_mode": {
+            "title": "Scoring Mode",
+            "type": "string"
+          },
+          "sort": {
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scoring_mode",
+          "sort",
+          "items",
+          "query_count",
+          "disclaimer"
+        ],
+        "title": "WatchlistScoreResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -34396,6 +34600,68 @@
         "summary": "LLM token usage summary",
         "tags": [
           "Usage"
+        ]
+      }
+    },
+    "/api/v1/watchlist/scores": {
+      "post": {
+        "description": "Batch-aggregate AI-oriented watchlist scores from the latest analysis history and active decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Default sort=manual preserves the caller's order. No new LLM calls.",
+        "operationId": "scoreWatchlistSymbols",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Score aggregation failed"
+          }
+        },
+        "summary": "Score watchlist symbols from existing analysis",
+        "tags": [
+          "Watchlist"
         ]
       }
     },
