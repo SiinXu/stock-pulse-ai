@@ -122,7 +122,10 @@ describe('AgentBehaviorPanel', () => {
 
     // Managed keys that differ from standard → simple_qa must be written.
     const written = Object.fromEntries(
-      onChange.mock.calls.map(([key, value]: [string, string]) => [key, value]),
+      onChange.mock.calls.map((call) => {
+        const [key, value] = call as [string, string];
+        return [key, value];
+      }),
     );
     expect(written.AGENT_ARCH).toBe('single');
     expect(written.AGENT_MAX_STEPS).toBe('5');

@@ -207,6 +207,20 @@ export function normalizeAgentConfigValue(value: string | undefined | null): str
   return String(value ?? '').trim();
 }
 
+
+function asKeySet(
+  availableKeys?: ReadonlySet<string> | readonly string[] | null,
+): ReadonlySet<string> | null {
+  if (!availableKeys) {
+    return null;
+  }
+  return availableKeys instanceof Set ? availableKeys : new Set(availableKeys);
+}
+
+function keySetHas(set: ReadonlySet<string> | null, key: string): boolean {
+  return set === null || set.has(key);
+}
+
 export function getAgentSetupPreset(id: AgentSetupPresetId): AgentSetupPreset {
   const preset = AGENT_SETUP_PRESETS.find((entry) => entry.id === id);
   if (!preset) {
@@ -231,12 +245,10 @@ export function diffAgentPreset(
   availableKeys?: ReadonlySet<string> | readonly string[],
 ): AgentPresetFieldChange[] {
   const preset = getAgentSetupPreset(presetId);
-  const allowed = availableKeys
-    ? (availableKeys instanceof Set ? availableKeys : new Set(availableKeys))
-    : null;
+  const allowed = asKeySet(availableKeys);
   const changes: AgentPresetFieldChange[] = [];
   for (const key of AGENT_PRESET_MANAGED_KEYS) {
-    if (allowed && !allowed.has(key)) {
+    if (!keySetHas(allowed, key)) {
       continue;
     }
     const from = normalizeAgentConfigValue(currentValues[key]);
@@ -289,10 +301,9 @@ export function resolveAgentPresetStatus(
   let bestScore = -1;
   for (const preset of AGENT_SETUP_PRESETS) {
     const total = diffAgentPreset(preset.id, currentValues, availableKeys);
-    const managedCount = availableKeys
-      ? AGENT_PRESET_MANAGED_KEYS.filter((key) => (
-        availableKeys instanceof Set ? availableKeys.has(key) : availableKeys.includes(key)
-      )).length
+    const allowed = asKeySet(availableKeys);
+    const managedCount = allowed
+      ? AGENT_PRESET_MANAGED_KEYS.filter((key) => allowed.has(key)).length
       : AGENT_PRESET_MANAGED_KEYS.length;
     const score = managedCount - total.length;
     if (score > bestScore) {
@@ -312,7 +323,7 @@ export function buildAgentPresetUpdates(
   availableKeys: ReadonlySet<string> | readonly string[],
 ): Array<{ key: AgentPresetManagedKey; value: string }> {
   const preset = getAgentSetupPreset(presetId);
-  const allowed = availableKeys instanceof Set ? availableKeys : new Set(availableKeys);
+  const allowed = asKeySet(availableKeys) ?? new Set<string>();
   const updates: Array<{ key: AgentPresetManagedKey; value: string }> = [];
   for (const key of AGENT_PRESET_MANAGED_KEYS) {
     if (!allowed.has(key)) {
