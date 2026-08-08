@@ -33,6 +33,7 @@ from src.services.security_audit_service import (
 )
 from src.services.approval_service import ApprovalService
 from src.services.scheduled_task_service import ScheduledTaskService
+from src.services.notification_inbox_service import NotificationInboxService
 from src.services.config_profile_service import ConfigProfileService
 from src.services.task_queue import get_task_queue
 
@@ -343,9 +344,7 @@ def get_model_pack_import_service(request: Request) -> ModelPackImportService:
     return service
 
 
-def get_notification_inbox_service() -> "NotificationInboxService":
+def get_notification_inbox_service() -> NotificationInboxService:
     """Build a request-scoped in-app notification inbox service."""
-    from src.services.notification_inbox_service import NotificationInboxService
-
     return NotificationInboxService(get_database_manager())
 
