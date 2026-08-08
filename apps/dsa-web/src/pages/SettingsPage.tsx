@@ -1386,6 +1386,7 @@ const SettingsPage: React.FC = () => {
       setDraftValue={setDraftValue}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
+      maskToken={maskToken}
     />
   );
   const activeSaveGroup = activeCategory;

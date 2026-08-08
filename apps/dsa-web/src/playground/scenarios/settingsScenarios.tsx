@@ -326,10 +326,20 @@ const NotificationChannelsPanelStory = () => {
   return (
     <NotificationChannelsPanel
       items={items}
-      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom_webhook']}
+      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom']}
       disabled={false}
       issueByKey={{}}
       onChange={(key, value) => setItems((current) => current.map((item) => item.key === key ? { ...item, value } : item))}
+      eventRoutes={scenario === 'empty' ? {
+        report: [],
+        alert: [],
+        system_error: [],
+      } : {
+        report: ['email', 'custom'],
+        alert: ['email'],
+        system_error: [],
+      }}
+      maskToken={MASK_TOKEN}
     />
   );
 };

@@ -18,6 +18,7 @@ import {
   DataProvidersPanel,
   isNotificationChannelKey,
 } from './index';
+import { buildNotificationEventRoutes } from './notificationEventRoutes';
 
 export type FieldGroupDescriptor = {
   id: string;
@@ -52,6 +53,8 @@ export type SettingsActiveConfigPanelProps = {
   setDraftValue: (key: string, value: string) => void;
   readOnlyDiagnosticForItem: (item: SystemConfigItem, categoryHint?: string) => string | undefined;
   activeCategory: string;
+  /** Optional mask token so notification channel cards can run test-to-bind. */
+  maskToken?: string;
 };
 
 /**
@@ -86,6 +89,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   setDraftValue,
   readOnlyDiagnosticForItem,
   activeCategory,
+  maskToken,
 }) => {
   const { t } = useUiLanguage();
 
@@ -101,6 +105,10 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
     return null;
   }
 
+  const notificationEventRoutes = isNotificationChannelsSub
+    ? buildNotificationEventRoutes(allValuesByKey)
+    : null;
+
   const content = (
     <>
       {isNotificationChannelsSub ? (
@@ -110,6 +118,8 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           disabled={isSaving}
           onChange={setDraftValue}
           issueByKey={issueByKey}
+          eventRoutes={notificationEventRoutes}
+          maskToken={maskToken}
         />
       ) : isDataProvidersSub ? (
         <DataProvidersPanel

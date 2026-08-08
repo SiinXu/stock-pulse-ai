@@ -5,6 +5,10 @@ import { useUiLanguage, UiLanguageProvider } from '../../../contexts/UiLanguageC
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { NotificationTestPanel } from '../NotificationTestPanel';
 import { chooseOption, openListbox } from '../../../test-utils';
+import {
+  getNotificationChannelTestRecord,
+  resetNotificationChannelTestStatusForTests,
+} from '../notificationChannelTestStatus';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -21,6 +25,7 @@ vi.mock('../../../api/systemConfig', () => ({
 
 describe('NotificationTestPanel', () => {
   beforeEach(() => {
+    resetNotificationChannelTestStatusForTests();
     testNotificationChannel.mockReset();
     testNotificationChannel.mockResolvedValue({
       success: true,
@@ -79,6 +84,7 @@ describe('NotificationTestPanel', () => {
     expect(await screen.findByText('测试成功')).toBeInTheDocument();
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('https://example.com/hook?token=***')).toBeInTheDocument();
+    expect(getNotificationChannelTestRecord('custom')?.success).toBe(true);
   });
 
   it('tests a DingTalk draft while preserving masked group robot secrets', async () => {
@@ -168,11 +174,13 @@ describe('NotificationTestPanel', () => {
 
     expect(await screen.findByText('测试失败')).toBeInTheDocument();
     expect(screen.getAllByText('send_failed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/渠道拒绝了消息|rejected the message/i).length).toBeGreaterThan(0);
     expect(
       screen.getByText('https://oapi.dingtalk.com/robot/send?access_token=***'),
     ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('draft-token');
     expect(document.body).not.toHaveTextContent('SECdraft_signing_secret');
+    expect(getNotificationChannelTestRecord('dingtalk')?.success).toBe(false);
   });
 
   it('uses translated defaults when UI language changes and user has not edited fields', async () => {
@@ -348,5 +356,6 @@ describe('NotificationTestPanel', () => {
     expect(timeoutEntries[0]).toBeInTheDocument();
     expect(screen.getByText('https://qyapi.example.com/cgi-bin/webhook/send?key=***')).toBeInTheDocument();
     expect(timeoutEntries[0]).toHaveClass('text-warning');
+    expect(screen.getAllByText(/请求超时|timed out/i).length).toBeGreaterThan(0);
   });
 });
