@@ -116,3 +116,42 @@ class TestTriggerAnalysisConcurrency:
     def test_busy_error_maps_to_api_code(self):
         payload = map_exception_to_tool_result(McpBusyError())
         assert payload["structuredContent"]["error"] == "busy"
+
+
+    def test_timeout_when_analysis_hangs(self):
+        import time
+        from src.mcp_server.config import McpServerConfig
+
+        analysis = MagicMock()
+
+        def slow_trigger(*args, **kwargs):
+            time.sleep(2)
+            return {"task_id": "late"}
+
+        analysis.trigger_analysis.side_effect = slow_trigger
+
+        def fake_lock(runner, config, args, stock_codes, *, blocking=True):
+            runner(config, args, stock_codes)
+            return True
+
+        handlers = McpToolHandlers(
+            config=McpServerConfig(
+                enabled=True,
+                transport="stdio",
+                host="127.0.0.1",
+                port=8765,
+                session_token=None,
+                analysis_timeout_seconds=1,
+                analysis_max_stocks=2,
+            ),
+            analysis_api_service=analysis,
+            get_config=lambda: SimpleNamespace(),
+            run_with_lock=fake_lock,
+            security_audit=MagicMock(),
+        )
+        tool_result = call_tool(
+            handlers, "trigger_analysis", {"stock_code": "600519"}
+        )
+        assert tool_result["isError"] is True
+        assert tool_result["structuredContent"]["error"] == "timeout"
+

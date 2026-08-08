@@ -8,6 +8,7 @@ and protected by ``run_with_global_analysis_lock``.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 from datetime import date
 from types import SimpleNamespace
@@ -245,15 +246,32 @@ class McpToolHandlers:
         )
 
         result_box: Dict[str, Any] = {}
+        error_box: Dict[str, BaseException] = {}
+        timeout_s = max(1, int(self.config.analysis_timeout_seconds))
 
         def _runner(config: Any, _args: Any, _stock_codes: Optional[List[str]]) -> None:
-            service = self.analysis_api_service()
-            raw = service.trigger_analysis(
-                request,
-                config=config,
-                security_audit=self.security_audit(),
-            )
-            result_box["raw"] = raw
+            def _call() -> None:
+                service = self.analysis_api_service()
+                raw = service.trigger_analysis(
+                    request,
+                    config=config,
+                    security_audit=self.security_audit(),
+                )
+                result_box["raw"] = raw
+
+            # Bound the costly path so external MCP clients cannot hold the
+            # process indefinitely. Async submission usually returns quickly;
+            # the timeout still protects sync/long service work.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_call)
+                try:
+                    future.result(timeout=timeout_s)
+                except concurrent.futures.TimeoutError as exc:
+                    error_box["error"] = TimeoutError(
+                        f"Analysis trigger exceeded {timeout_s}s"
+                    )
+                    # Do not wait for the worker; lock is released when _runner returns.
+                    raise error_box["error"] from exc
 
         lock_fn = self.run_with_lock()
         acquired = lock_fn(
@@ -265,6 +283,8 @@ class McpToolHandlers:
         )
         if not acquired:
             raise McpBusyError("Analysis is already running; retry later")
+        if "error" in error_box:
+            raise error_box["error"]
 
         raw = result_box.get("raw")
         return _normalize_analysis_trigger_result(raw)
