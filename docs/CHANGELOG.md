@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Fixed] Restore Settings page load in Vite DEV/e2e by syncing missing UI i18n inventory keys (systemConfig field titles + settingsHelp) so auth credential-boundary and disable-reconfirm e2e can run against a real Settings surface.
 - [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
 - [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
 - [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
