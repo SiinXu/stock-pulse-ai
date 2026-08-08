@@ -468,8 +468,19 @@ describe('HomePage attention hub', () => {
     expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'System readiness' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Configurable area/ })).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    // Single dismiss owner: onboarding incomplete alert (not readiness card).
+    const closeButtons = screen.getAllByRole('button', { name: 'Close' });
+    expect(closeButtons).toHaveLength(1);
+    fireEvent.click(closeButtons[0]);
     expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
+  });
+
+  it('keeps home core blocks single-column below the xl breakpoint class', async () => {
+    renderHome();
+    const core = await screen.findByTestId('home-core-blocks');
+    expect(core).toHaveClass('xl:grid-cols-3');
+    expect(core).not.toHaveClass('lg:grid-cols-3');
+    expect(core).toHaveClass('min-w-0');
   });
 
   it('links the today scheduled-tasks card to Settings management', async () => {

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Fixed] Restore missing settingsHelp Chinese entries and UI i18n inventory keys so DEV/e2e fixtures that load Settings Help (overlay tooltip contract and Settings surfaces) can mount without stale-source throws.
+- [Fixed] Home setup dismiss uses a single Close control, Home core blocks stay single-column below xl, and shared ScrollArea/StockBar height chains gain min-h-0 so constrained stock rails can scroll on mobile (#879 B1/B6).
 - [Tests] Sync the Web playground catalog and scenario renderers with 14 newly exported visual components so catalog coverage stays complete.
 - [Chore] Added Web production bundle gzip size budgets and `npm run build:check` gate (baseline = measured size + 10%; no business-code slimming in this change).
 - [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
