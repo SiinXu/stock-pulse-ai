@@ -19,23 +19,25 @@ ensure_litellm_stub()
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL AGENT_CHAT_FAILURE_MESSAGE
-    AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT AgentContext
-    AgentOrchestrator AgentRunStats AgentRuntimeFacts Any Callable
-    DegradationBoundary DegradedEvent Dict ExecutionState FuturesTimeoutError
-    LLMToolAdapter List NON_CRITICAL_BASE_STAGES Optional OrchestratorResult
-    PipelineTerminationFact RiskOverrideApplication RuntimeGuardPolicy
-    StageFailurePolicy StageFailureReason StageResult StageStatus StockScope
-    StrategyEngine StrategyResultStatus TYPE_CHECKING ThreadPoolExecutor
-    ToolRegistry VALID_MODES annotations build_agent_chat_market_context
-    build_agent_chat_tool_registry build_agent_disagreement_summary
-    build_agent_runtime_facts build_risk_override_application
-    build_risk_override_plan build_visible_chat_history
-    classify_result_terminal_state contextvars copy dataclass dataclass_fields
-    field get_config inspect json log_runtime_guard_event log_safe_exception
-    logger logging normalize_decision_signal normalize_report_language
-    normalize_stage_failure_reason parse_dashboard_json re resolve_stock_scope
-    run_agent_loop sanitize_agent_dashboard_payload sanitize_agent_diagnostic
-    stream_event threading time
+    AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT
+    AgentContext AgentOrchestrator AgentRunStats AgentRuntimeFacts Any
+    Callable DegradationBoundary DegradedEvent Dict ExecutionState
+    FuturesTimeoutError LLMToolAdapter List NON_CRITICAL_BASE_STAGES
+    Optional OrchestratorResult PipelineTerminationFact
+    RiskOverrideApplication RuntimeGuardPolicy StageFailurePolicy
+    StageFailureReason StageResult StageStatus StockScope
+    StrategyEngine StrategyResultStatus TYPE_CHECKING
+    ThreadPoolExecutor ToolRegistry VALID_MODES annotations
+    build_agent_chat_market_context build_agent_chat_tool_registry
+    build_agent_disagreement_summary build_agent_runtime_facts
+    build_risk_override_application build_risk_override_plan
+    build_visible_chat_history classify_result_terminal_state
+    contextvars copy dataclass dataclass_fields field get_config
+    inspect json log_runtime_guard_event log_safe_exception logger
+    logging normalize_decision_signal normalize_report_language
+    normalize_stage_failure_reason parse_dashboard_json re
+    resolve_stock_scope run_agent_loop sanitize_agent_dashboard_payload
+    sanitize_agent_diagnostic stream_event threading time
     """.split()
 )
 
