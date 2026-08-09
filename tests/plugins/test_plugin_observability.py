@@ -655,6 +655,46 @@ def test_application_services_auto_bind_invalid_manager_fails_closed() -> None:
     assert captured.value.error_code == DATA_PROVIDER_BIND_ERROR_INTERFACE
 
 
+def test_application_services_auto_bind_conflicting_backend_fails_closed() -> None:
+    from src.application_services import ApplicationServices
+    from src.config import Config
+    from src.plugins import (
+        DATA_PROVIDER_BIND_ERROR_PRIORITY,
+        DataProviderAutoBindError,
+    )
+
+    class ExistingBackend:
+        def contains(self, registration_id: str) -> bool:
+            del registration_id
+            return False
+
+        def register(self, registration_id: str, implementation: object) -> None:
+            del registration_id, implementation
+
+        def unregister(self, registration_id: str, implementation: object) -> None:
+            del registration_id, implementation
+
+    providers = DataFetcherManager(
+        fetchers=[_FallbackProvider()],
+        extension_contracts={
+            "analysis_strategy": ExtensionContract(
+                identity_resolver=lambda implementation: implementation.name,
+                backend=ExistingBackend(),
+            )
+        },
+    )
+
+    with pytest.raises(DataProviderAutoBindError) as captured:
+        ApplicationServices(
+            config=Config(plugin_data_provider_auto_bind_enabled=True),
+            data_fetcher_manager=providers,
+            builtin_plugins=(),
+            plugins_dir="",
+        )
+
+    assert captured.value.error_code == DATA_PROVIDER_BIND_ERROR_PRIORITY
+
+
 def test_application_services_bound_provider_failure_uses_service_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

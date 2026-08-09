@@ -323,9 +323,22 @@ class ExtensionRegistry:
                     key[0] == extension_point for key in self._entries
                 )
                 current = configured[extension_point]
-                if has_registrations and current is not contract:
+                backend_conflicts = (
+                    current.backend is not None
+                    and current.backend is not contract.backend
+                )
+                validator_conflicts = (
+                    current.backend is None
+                    and current.validator is not _reject_unconfigured_implementation
+                    and current.validator is not contract.validator
+                )
+                if current is not contract and (
+                    has_registrations
+                    or backend_conflicts
+                    or validator_conflicts
+                ):
                     raise ValueError(
-                        "cannot replace an active extension contract"
+                        "cannot replace an active or configured extension contract"
                     )
                 configured[extension_point] = contract
             self._contracts = MappingProxyType(configured)
