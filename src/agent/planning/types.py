@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Structured plan types for the optional agent planning pre-step."""
+"""Structured types for the explicit plan-proposal foundation."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import hashlib
+import json
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 PLAN_SCHEMA_VERSION = "agent-plan-v1"
+MAX_GOAL_CHARS = 500
+MAX_CRITERIA_CHARS = 500
+MAX_TOOL_NAME_CHARS = 128
 
 
 @dataclass(frozen=True)
@@ -30,7 +35,7 @@ class PlanStep:
 
 @dataclass(frozen=True)
 class AgentPlan:
-    """Structured plan produced before the existing ReAct execution loop."""
+    """Validated proposal with no implied execution semantics."""
 
     goal: str
     steps: Tuple[PlanStep, ...]
@@ -50,6 +55,13 @@ class AgentPlan:
         return len(self.steps)
 
     @property
+    def plan_id(self) -> str:
+        payload = json.dumps(
+            self.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @property
     def expected_tool_names(self) -> Tuple[str, ...]:
         names: List[str] = []
         seen = set()
@@ -63,7 +75,7 @@ class AgentPlan:
 
 @dataclass
 class PlanningOutcome:
-    """Result of attempting the planning pre-step (applied or degraded)."""
+    """Result of attempting to produce a bounded proposal."""
 
     enabled: bool
     applied: bool
@@ -73,8 +85,8 @@ class PlanningOutcome:
     replan_attempts: int = 0
     planning_tokens: int = 0
     planning_model: str = ""
-    error: Optional[str] = None
-    attrs: Dict[str, Any] = field(default_factory=dict)
+    error_code: Optional[str] = None
+    exception_type: Optional[str] = None
 
     def to_metadata(self) -> Dict[str, Any]:
         """Trace-safe metadata (no free-form model reasoning dump)."""
@@ -89,14 +101,15 @@ class PlanningOutcome:
         }
         if self.fallback_reason:
             payload["fallback_reason"] = self.fallback_reason
-        if self.error:
-            payload["error"] = self.error
+        if self.error_code:
+            payload["error_code"] = self.error_code
+        if self.exception_type:
+            payload["exception_type"] = self.exception_type
         if self.plan is not None:
             payload["plan"] = self.plan.to_dict()
+            payload["plan_id"] = self.plan.plan_id
             payload["step_count"] = self.plan.step_count
             payload["expected_tools"] = list(self.plan.expected_tool_names)
-        if self.attrs:
-            payload["attrs"] = dict(self.attrs)
         return payload
 
 
@@ -113,10 +126,17 @@ def validate_plan_payload(
     """
     if not isinstance(payload, dict):
         raise ValueError("plan payload must be an object")
+    if set(payload) != {"version", "goal", "max_steps", "steps"}:
+        raise ValueError("plan payload fields do not match agent-plan-v1")
+    if payload.get("version") != PLAN_SCHEMA_VERSION:
+        raise ValueError(f"plan version must be {PLAN_SCHEMA_VERSION}")
 
-    goal = str(payload.get("goal") or "").strip()
-    if not goal:
-        raise ValueError("plan requires a non-empty goal")
+    goal_raw = payload.get("goal")
+    if not isinstance(goal_raw, str) or not goal_raw.strip():
+        raise ValueError("plan requires a non-empty string goal")
+    goal = goal_raw.strip()
+    if len(goal) > MAX_GOAL_CHARS:
+        raise ValueError("plan goal exceeds length limit")
 
     raw_steps = payload.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
@@ -125,37 +145,50 @@ def validate_plan_payload(
     if len(raw_steps) > max_steps:
         raise ValueError(f"plan step count {len(raw_steps)} exceeds max_steps={max_steps}")
 
-    available = {str(name) for name in available_tools}
+    if any(
+        not isinstance(name, str)
+        or not name.strip()
+        or len(name.strip()) > MAX_TOOL_NAME_CHARS
+        for name in available_tools
+    ):
+        raise ValueError("available tool names must be bounded non-empty strings")
+    available = {name.strip() for name in available_tools}
+    if len(available) != len(available_tools):
+        raise ValueError("available tool names must be unique")
     steps: List[PlanStep] = []
     for index, raw in enumerate(raw_steps, start=1):
         if not isinstance(raw, dict):
             raise ValueError(f"plan step {index} must be an object")
-        step_goal = str(raw.get("goal") or "").strip()
-        if not step_goal:
-            raise ValueError(f"plan step {index} requires a non-empty goal")
-        success = str(raw.get("success_criteria") or raw.get("success") or "").strip()
-        if not success:
+        if set(raw) != {"id", "goal", "expected_tools", "success_criteria"}:
+            raise ValueError(f"plan step {index} fields do not match schema")
+        step_goal_raw = raw.get("goal")
+        success_raw = raw.get("success_criteria")
+        if not isinstance(step_goal_raw, str) or not step_goal_raw.strip():
+            raise ValueError(f"plan step {index} requires a non-empty string goal")
+        if not isinstance(success_raw, str) or not success_raw.strip():
             raise ValueError(f"plan step {index} requires success_criteria")
+        step_goal = step_goal_raw.strip()
+        success = success_raw.strip()
+        if len(step_goal) > MAX_GOAL_CHARS or len(success) > MAX_CRITERIA_CHARS:
+            raise ValueError(f"plan step {index} text exceeds length limit")
 
-        tools_raw = raw.get("expected_tools") or raw.get("tools") or []
+        tools_raw = raw.get("expected_tools")
         if not isinstance(tools_raw, list):
             raise ValueError(f"plan step {index} expected_tools must be a list")
         tools: List[str] = []
         for tool in tools_raw:
-            name = str(tool or "").strip()
-            if not name:
-                continue
-            if available and name not in available:
-                # Unknown tools are dropped rather than inventing calls.
-                continue
-            if name not in tools:
-                tools.append(name)
+            if not isinstance(tool, str) or not tool.strip():
+                raise ValueError(f"plan step {index} has invalid expected tool")
+            name = tool.strip()
+            if len(name) > MAX_TOOL_NAME_CHARS or name not in available:
+                raise ValueError(f"plan step {index} requests unavailable tool {name!r}")
+            if name in tools:
+                raise ValueError(f"plan step {index} repeats expected tool {name!r}")
+            tools.append(name)
 
-        step_id_raw = raw.get("id", index)
-        try:
-            step_id = int(step_id_raw)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"plan step {index} has invalid id") from exc
+        step_id = raw.get("id")
+        if type(step_id) is not int or step_id != index:
+            raise ValueError("plan step ids must be positive, unique, and sequential")
 
         steps.append(
             PlanStep(
@@ -169,17 +202,12 @@ def validate_plan_payload(
     if not steps:
         raise ValueError("plan produced no valid steps after validation")
 
-    declared_max = payload.get("max_steps", max_steps)
-    try:
-        plan_max = int(declared_max)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("plan max_steps must be an integer") from exc
-    plan_max = max(1, min(plan_max, max_steps))
-
-    version = str(payload.get("version") or PLAN_SCHEMA_VERSION).strip() or PLAN_SCHEMA_VERSION
+    plan_max = payload.get("max_steps")
+    if type(plan_max) is not int or not len(steps) <= plan_max <= max_steps:
+        raise ValueError("plan max_steps must bound steps within the caller cap")
     return AgentPlan(
         goal=goal,
         steps=tuple(steps),
         max_steps=plan_max,
-        version=version,
+        version=PLAN_SCHEMA_VERSION,
     )

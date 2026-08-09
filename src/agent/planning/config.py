@@ -1,73 +1,46 @@
 # -*- coding: utf-8 -*-
-"""Environment-backed settings for the optional planning pre-step.
-
-Values are read from process environment so this module stays independent of
-``src/core/config_registry_parts/`` (owned by a parallel task). Registry UI
-wiring is documented as an Integration Point in the PR.
-"""
+"""Strict settings for the explicit plan-proposal foundation."""
 
 from __future__ import annotations
 
-import os
+import math
 from dataclasses import dataclass
 
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
-    raw = os.getenv(name)
-    if raw is None or not str(raw).strip():
-        return default
-    try:
-        value = int(str(raw).strip())
-    except (TypeError, ValueError):
-        return default
-    return max(minimum, value)
-
-
-def _env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
-    raw = os.getenv(name)
-    if raw is None or not str(raw).strip():
-        return default
-    try:
-        value = float(str(raw).strip())
-    except (TypeError, ValueError):
-        return default
-    return max(minimum, value)
+MAX_PLAN_STEPS = 16
+MAX_REPLANS = 3
+MAX_PLANNER_TOKENS = 8_192
+MAX_PLANNER_TIMEOUT_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
 class PlanningSettings:
-    """Hard cost bounds and feature gate for planning."""
+    """Finite proposal-only bounds supplied explicitly by an offline caller."""
 
     enabled: bool = False
-    strategy: str = "auto"  # auto | template | llm
+    strategy: str = "template"
     max_plan_steps: int = 8
     max_replans: int = 1
-    max_tokens: int = 1500
+    max_tokens: int = 1_500
     timeout_seconds: float = 30.0
 
+    def __post_init__(self) -> None:
+        if type(self.enabled) is not bool:
+            raise ValueError("enabled must be an exact boolean")
+        if self.strategy not in {"template", "llm"}:
+            raise ValueError("strategy must be 'template' or 'llm'")
+        _bounded_int("max_plan_steps", self.max_plan_steps, 1, MAX_PLAN_STEPS)
+        _bounded_int("max_replans", self.max_replans, 0, MAX_REPLANS)
+        _bounded_int("max_tokens", self.max_tokens, 1, MAX_PLANNER_TOKENS)
+        if type(self.timeout_seconds) not in (int, float):
+            raise ValueError("timeout_seconds must be numeric")
+        if not math.isfinite(float(self.timeout_seconds)):
+            raise ValueError("timeout_seconds must be finite")
+        if not 0.1 <= float(self.timeout_seconds) <= MAX_PLANNER_TIMEOUT_SECONDS:
+            raise ValueError(
+                f"timeout_seconds must be within [0.1, {MAX_PLANNER_TIMEOUT_SECONDS}]"
+            )
 
-def load_planning_settings() -> PlanningSettings:
-    """Load planning settings from environment (default off)."""
-    strategy = (os.getenv("AGENT_PLANNING_STRATEGY") or "auto").strip().lower()
-    if strategy not in {"auto", "template", "llm"}:
-        strategy = "auto"
-    return PlanningSettings(
-        enabled=_env_bool("AGENT_PLANNING_ENABLED", default=False),
-        strategy=strategy,
-        max_plan_steps=_env_int("AGENT_PLANNING_MAX_STEPS", 8, minimum=1),
-        max_replans=_env_int("AGENT_PLANNING_MAX_REPLANS", 1, minimum=0),
-        max_tokens=_env_int("AGENT_PLANNING_MAX_TOKENS", 1500, minimum=200),
-        timeout_seconds=_env_float("AGENT_PLANNING_TIMEOUT_S", 30.0, minimum=1.0),
-    )
 
-
-def is_planning_enabled() -> bool:
-    """Return True only when the opt-in planning gate is enabled."""
-    return load_planning_settings().enabled
+def _bounded_int(name: str, value: int, minimum: int, maximum: int) -> None:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be an integer within [{minimum}, {maximum}]")

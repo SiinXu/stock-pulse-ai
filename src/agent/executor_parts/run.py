@@ -42,24 +42,9 @@ class _RunMethods:
         Returns:
             AgentResult with parsed dashboard or error.
         """
-        # Planning pre-step (default off). Degrades to direct path on failure.
-        from src.agent.planning import prepare_run_with_planning
-
-        tool_names = []
-        registry = getattr(self, "tool_registry", None)
-        if registry is not None and hasattr(registry, "list_names"):
-            tool_names = list(registry.list_names())
-        effective_task, effective_context, planning_meta = prepare_run_with_planning(
-            task=task,
-            context=context,
-            available_tools=tool_names,
-            llm_adapter=getattr(self, "llm_adapter", None),
-            cancelled_check=cancelled_check,
-        )
-
-        scope_resolution = resolve_stock_scope(effective_task, effective_context)
+        scope_resolution = resolve_stock_scope(task, context)
         system_prompt, user_message, tool_decls = self.build_run_messages(
-            effective_task,
+            task,
             scope_resolution.effective_context,
         )
 
@@ -77,7 +62,6 @@ class _RunMethods:
             cancelled_check=cancelled_check,
         )
         result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
-        result.planning = planning_meta
         return result
 
     def build_run_messages(

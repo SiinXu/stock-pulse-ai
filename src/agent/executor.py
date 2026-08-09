@@ -118,8 +118,6 @@ class AgentResult:
     runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
-    # Optional planning pre-step metadata (not part of dashboard/report schema).
-    planning: Optional[Dict[str, Any]] = None
 
 
 # ============================================================

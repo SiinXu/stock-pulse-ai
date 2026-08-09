@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Bounded planning pre-step for AgentExecutor (plan-and-execute style).
+"""Bounded, explicit plan-proposal foundation.
 
 Role relative to existing orchestration
 ---------------------------------------
-This module is a **pre-step** in front of the single-agent ReAct loop
-(``AgentExecutor`` → ``run_agent_loop``). It does **not** replace:
+This module produces a typed proposal only. It does not execute steps, observe
+tool results, replan from observations, or hook any production runtime.
 
 - multi-agent ``AgentOrchestrator`` pipelines
 - multi-strategy deliberation scheduling
 - deep-research query decomposition in ``research.py``
 
-When ``AGENT_PLANNING_ENABLED`` is false (default), callers get an inert
-outcome and must keep the original task/context unchanged.
+Callers must supply settings explicitly. The repository has no environment
+gate or implicit runtime consumer for this foundation.
 """
 
 from __future__ import annotations
@@ -19,9 +19,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from src.agent.planning.config import PlanningSettings, load_planning_settings
+from src.agent.planning.config import PlanningSettings
 from src.agent.planning.format import inject_plan_into_context, inject_plan_into_task
 from src.agent.planning.types import AgentPlan, PlanningOutcome, validate_plan_payload
 from src.utils.sanitize import log_safe_exception
@@ -71,7 +72,7 @@ class PlanningEngine:
         *,
         llm_adapter: Any = None,
     ) -> None:
-        self.settings = settings or load_planning_settings()
+        self.settings = settings or PlanningSettings()
         self.llm_adapter = llm_adapter
 
     def plan(
@@ -94,17 +95,64 @@ class PlanningEngine:
                 strategy=settings.strategy,
                 fallback_reason="cancelled",
             )
+        if not isinstance(task, str) or not task.strip() or len(task) > 4_000:
+            return PlanningOutcome(
+                enabled=True,
+                applied=False,
+                strategy=settings.strategy,
+                fallback_reason="invalid_task",
+                error_code="invalid_task",
+            )
+        if context is not None and not isinstance(context, dict):
+            return PlanningOutcome(
+                enabled=True, applied=False, strategy=settings.strategy,
+                fallback_reason="invalid_context", error_code="invalid_context",
+            )
+        stock_code = (context or {}).get("stock_code")
+        if stock_code is not None and (
+            not isinstance(stock_code, str)
+            or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", stock_code)
+        ):
+            return PlanningOutcome(
+                enabled=True, applied=False, strategy=settings.strategy,
+                fallback_reason="invalid_context", error_code="invalid_context",
+            )
+        if (
+            isinstance(available_tools, (str, bytes))
+            or len(available_tools) > 256
+            or any(
+            not isinstance(name, str)
+            or not name.strip()
+            or len(name.strip()) > 128
+            for name in available_tools
+            )
+        ):
+            return PlanningOutcome(
+                enabled=True, applied=False, strategy=settings.strategy,
+                fallback_reason="invalid_tools", error_code="invalid_tools",
+            )
 
         strategy = self._resolve_strategy(settings.strategy)
-        tools = [str(name) for name in available_tools if str(name).strip()]
+        tools = [name.strip() for name in available_tools]
+        if len(tools) != len(set(tools)):
+            return PlanningOutcome(
+                enabled=True, applied=False, strategy=strategy,
+                fallback_reason="invalid_tools", error_code="invalid_tools",
+            )
         replan_attempts = 0
-        last_error: Optional[str] = None
+        last_error_code: Optional[str] = None
+        last_exception_type: Optional[str] = None
         planning_tokens = 0
         planning_model = ""
+        deadline = time.monotonic() + settings.timeout_seconds
 
         # Initial attempt + up to max_replans retries on validation/LLM failure.
         max_attempts = 1 + max(0, settings.max_replans)
         for attempt in range(max_attempts):
+            if time.monotonic() >= deadline:
+                last_error_code = "planner_timeout"
+                last_exception_type = "TimeoutError"
+                break
             if cancelled_check is not None and cancelled_check():
                 return PlanningOutcome(
                     enabled=True,
@@ -118,15 +166,27 @@ class PlanningEngine:
 
             try:
                 if strategy == "llm":
-                    raw, tokens, model = self._plan_with_llm(
+                    remaining_tokens = settings.max_tokens - planning_tokens
+                    if remaining_tokens <= 0:
+                        raise ValueError("planner_token_budget_exhausted")
+                    content, tokens, model, provider = self._call_planner_llm(
                         task,
                         available_tools=tools,
                         context=context,
                         settings=settings,
+                        max_tokens=remaining_tokens,
+                        timeout_seconds=max(0.001, deadline - time.monotonic()),
                     )
                     planning_tokens += tokens
                     if model:
                         planning_model = model
+                    if planning_tokens > settings.max_tokens:
+                        raise ValueError("planner_token_budget_exhausted")
+                    if provider == "error":
+                        raise RuntimeError("planner_provider_error")
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("planner deadline exceeded")
+                    raw = _parse_json_object(content)
                 else:
                     raw = self._plan_with_template(
                         task,
@@ -135,6 +195,16 @@ class PlanningEngine:
                         max_steps=settings.max_plan_steps,
                     )
 
+                if cancelled_check is not None and cancelled_check():
+                    return PlanningOutcome(
+                        enabled=True,
+                        applied=False,
+                        strategy=strategy,
+                        replan_attempts=replan_attempts,
+                        planning_tokens=planning_tokens,
+                        planning_model=planning_model,
+                        fallback_reason="cancelled",
+                    )
                 plan = validate_plan_payload(
                     raw,
                     available_tools=tools,
@@ -143,6 +213,16 @@ class PlanningEngine:
                 if plan.step_count > settings.max_plan_steps:
                     raise ValueError("plan exceeds max_plan_steps after validation")
 
+                if cancelled_check is not None and cancelled_check():
+                    return PlanningOutcome(
+                        enabled=True,
+                        applied=False,
+                        strategy=strategy,
+                        replan_attempts=replan_attempts,
+                        planning_tokens=planning_tokens,
+                        planning_model=planning_model,
+                        fallback_reason="cancelled",
+                    )
                 return PlanningOutcome(
                     enabled=True,
                     applied=True,
@@ -153,7 +233,8 @@ class PlanningEngine:
                     planning_model=planning_model,
                 )
             except Exception as exc:  # broad-exception: fallback_recorded - degrade to direct path
-                last_error = str(exc)
+                last_error_code = _planning_error_code(exc)
+                last_exception_type = type(exc).__name__
                 replan_attempts = attempt
                 log_safe_exception(
                     logger,
@@ -169,7 +250,7 @@ class PlanningEngine:
                     continue
 
         reason = "max_replans_exceeded" if replan_attempts >= settings.max_replans else "planning_failed"
-        if last_error and "exceeds max_steps" in last_error:
+        if last_error_code == "max_plan_steps_exceeded":
             reason = "max_plan_steps_exceeded"
         return PlanningOutcome(
             enabled=True,
@@ -179,20 +260,12 @@ class PlanningEngine:
             planning_tokens=planning_tokens,
             planning_model=planning_model,
             fallback_reason=reason,
-            error=last_error,
+            error_code=last_error_code,
+            exception_type=last_exception_type,
         )
 
     def _resolve_strategy(self, strategy: str) -> str:
-        if strategy == "template":
-            return "template"
-        if strategy == "llm":
-            if self.llm_adapter is None:
-                return "template"
-            return "llm"
-        # auto
-        if self.llm_adapter is not None:
-            return "llm"
-        return "template"
+        return strategy
 
     def _plan_with_template(
         self,
@@ -265,14 +338,16 @@ class PlanningEngine:
             "steps": steps[:max_steps],
         }
 
-    def _plan_with_llm(
+    def _call_planner_llm(
         self,
         task: str,
         *,
         available_tools: Sequence[str],
         context: Optional[Dict[str, Any]],
         settings: PlanningSettings,
-    ) -> Tuple[Dict[str, Any], int, str]:
+        max_tokens: int,
+        timeout_seconds: float,
+    ) -> Tuple[str, int, str, str]:
         if self.llm_adapter is None:
             raise RuntimeError("llm strategy requires llm_adapter")
 
@@ -294,12 +369,10 @@ class PlanningEngine:
             messages,
             tools=None,
             temperature=0.2,
-            max_tokens=settings.max_tokens,
-            timeout=settings.timeout_seconds,
+            max_tokens=max_tokens,
+            timeout=timeout_seconds,
         )
-        content = getattr(response, "content", None) or ""
-        if getattr(response, "provider", "") == "error":
-            raise RuntimeError(content or "planner LLM configuration error")
+        content = str(getattr(response, "content", None) or "")
 
         usage = getattr(response, "usage", None) or {}
         tokens = 0
@@ -308,14 +381,11 @@ class PlanningEngine:
                 tokens = int(usage.get("total_tokens") or 0)
             except (TypeError, ValueError):
                 tokens = 0
-        if tokens > settings.max_tokens * 4:
-            # Soft guard: absurd usage figures are ignored; hard stop is max_tokens request bound.
-            tokens = settings.max_tokens
+        tokens = max(0, min(tokens, 1_000_000))
 
-        model = str(getattr(response, "model", "") or "")
-        payload = _parse_json_object(content)
-        payload.setdefault("max_steps", settings.max_plan_steps)
-        return payload, tokens, model
+        model = _safe_model_name(getattr(response, "model", ""))
+        provider = str(getattr(response, "provider", "") or "")
+        return content, tokens, model, provider
 
 
 def prepare_run_with_planning(
@@ -328,13 +398,13 @@ def prepare_run_with_planning(
     settings: Optional[PlanningSettings] = None,
     engine: Optional[PlanningEngine] = None,
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, Any]]:
-    """Run the planning pre-step and return (task, context, planning_meta).
+    """Explicitly propose and project a plan into copied caller inputs.
 
     When planning is disabled or degrades, ``task`` and ``context`` are returned
     unchanged (same object identity for context when disabled) so the default
     path stays byte-stable aside from the metadata dict always returned for traces.
     """
-    resolved_settings = settings or load_planning_settings()
+    resolved_settings = settings or PlanningSettings()
     if not resolved_settings.enabled:
         meta = PlanningOutcome(enabled=False, applied=False, strategy="none").to_metadata()
         return task, context, meta
@@ -359,6 +429,8 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
     text = (raw or "").strip()
     if not text:
         raise ValueError("empty planner response")
+    if len(text) > 50_000:
+        raise ValueError("planner response exceeds size limit")
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
@@ -372,3 +444,26 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("planner response must be a JSON object")
     return parsed
+
+
+def _planning_error_code(exc: Exception) -> str:
+    """Map failures to stable, non-sensitive reason codes."""
+    message = str(exc)
+    if "exceeds max_steps" in message:
+        return "max_plan_steps_exceeded"
+    if message in {"planner_token_budget_exhausted", "planner_provider_error"}:
+        return message
+    if isinstance(exc, json.JSONDecodeError):
+        return "invalid_planner_json"
+    if isinstance(exc, ValueError):
+        return "invalid_plan"
+    if isinstance(exc, TimeoutError):
+        return "planner_timeout"
+    return "planner_failed"
+
+
+def _safe_model_name(value: Any) -> str:
+    text = str(value or "")
+    if re.fullmatch(r"[A-Za-z0-9._:/-]{1,128}", text):
+        return text
+    return "unknown" if text else ""
