@@ -654,6 +654,10 @@ class _ConfigLoadingMethods:
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
                 default=True,
             ),
+            plugin_data_provider_auto_bind_enabled=parse_env_bool(
+                os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
+                default=False,
+            ),
             generation_backend=generation_backend,
             generation_fallback_backend=generation_fallback_backend,
             generation_backend_timeout_seconds=generation_backend_timeout_seconds,

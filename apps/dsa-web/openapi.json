@@ -13117,6 +13117,119 @@
         "title": "PerformanceMetrics",
         "type": "object"
       },
+      "PluginHealthEntryResponse": {
+        "additionalProperties": false,
+        "description": "One plugin health row for operator diagnostics consumers.",
+        "properties": {
+          "desired_enabled": {
+            "title": "Desired Enabled",
+            "type": "boolean"
+          },
+          "extension_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Extension Points",
+            "type": "array"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "package_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Root"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "reloadable": {
+            "default": false,
+            "title": "Reloadable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "builtin",
+              "external"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "name",
+          "version",
+          "source",
+          "state",
+          "desired_enabled"
+        ],
+        "title": "PluginHealthEntryResponse",
+        "type": "object"
+      },
+      "PluginHealthResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/plugins/health — read-only plugin health snapshot.",
+        "properties": {
+          "generated_at": {
+            "description": "UTC ISO-8601 timestamp when the snapshot was built",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHealthEntryResponse"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generated_at",
+          "total"
+        ],
+        "title": "PluginHealthResponse",
+        "type": "object"
+      },
       "PluginInfo": {
         "additionalProperties": false,
         "description": "One registered plugin and its lifecycle state.",
@@ -13147,6 +13260,18 @@
             "description": "Stable plugin id from the manifest",
             "title": "Id",
             "type": "string"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable last lifecycle failure code when the plugin is degraded",
+            "title": "Last Error Code"
           },
           "name": {
             "title": "Name",
@@ -30743,7 +30868,7 @@
     },
     "/api/v1/plugins": {
       "get": {
-        "description": "Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.",
+        "description": "Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.",
         "operationId": "listPlugins",
         "responses": {
           "200": {
@@ -30773,6 +30898,43 @@
           }
         ],
         "summary": "List registered plugins and lifecycle state",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/health": {
+      "get": {
+        "description": "Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.",
+        "operationId": "getPluginHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Read-only plugin health snapshot",
         "tags": [
           "Plugins"
         ]
@@ -30863,6 +31025,16 @@
               }
             },
             "description": "Lifecycle operation failed unexpectedly"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable"
           }
         },
         "security": [
