@@ -59,14 +59,19 @@ npm run dev
 
 - Electron `43.3.0`（开发依赖，但作为打包运行时随应用分发）
 - electron-builder `26.15.7`（打包）
-- electron-updater `6.8.9`（自动更新）
+- electron-updater `6.8.9`（自动更新；生产依赖）
 - `app-builder-lib` 的 `tar` override `7.5.22`（构建链审计修复，保留与 archive 路径的兼容性探测）
+- 顶层 `js-yaml` override `4.3.1`（覆盖 `electron-updater` 与 builder 链的 `^4.1.0` / `^4.3.0`，关闭 4.x 受影响范围 `<4.3.1` 的 [GHSA-5p4m-2wfm-xmqj](https://github.com/advisories/GHSA-5p4m-2wfm-xmqj)；该记录无独立 CVE ID，CVE-2026-59870 属于另一条 5.x 记录 [GHSA-724g-mxrg-4qvm](https://github.com/advisories/GHSA-724g-mxrg-4qvm)）
 
 本地校验：
 
 ```bash
 cd apps/dsa-desktop
-npm install
+npm ci
+npm audit
+npm audit --omit=dev
+npm ls js-yaml
+npm explain js-yaml
 npm run lint
 npm test
 # optional diagnostic: incomplete JSDoc types currently report under // @ts-check
