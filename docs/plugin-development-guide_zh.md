@@ -185,8 +185,11 @@ fail-closed 方式返回错误；如果操作完成后 completion 写入失败�
 
 保持关闭即可维持历史手动模式。开启且未注入 manager 时，`ApplicationServices`
 会构造一个 `DataFetcherManager` 并通过 `services.data_fetcher_manager` 暴露。
-股票行情与历史服务会解析这个已安装 owner，因此插件 provider 与内置 fallback
-共用同一个 registry。自定义组合根仍可直接调用
+股票行情与历史服务及主分析流水线会解析这个已安装 owner，因此插件 provider
+与内置 fallback 共用同一个 registry。注入 manager 时，组合根会在任何相关
+插件注册之前原子补齐 Analysis Strategy、Notification Channel、Agent Tool 与
+Event Hook 合同；无效或已冲突的 registry 会以稳定错误码阻断进程组合，绝不
+静默退化为孤立 registry。自定义组合根仍可直接调用
 `try_build_auto_bound_registry`。
 
 ```python
@@ -216,8 +219,9 @@ for entry in report.plugins:
 ```
 
 `last_error_code` 表示最近一次稳定失败（例如 `plugin_onload_failed`）；禁用或
-修改意图不会清除它，成功 load / reload 才表示恢复并清除。单个插件失败不得
-影响其它插件与核心启动。
+修改意图不会清除它，真正改变状态且成功的 load / reload 才表示恢复并清除；
+幂等 enable 不会抹掉仍需运维处理的 reload 失败。单个插件失败不得影响其它
+插件与核心启动。
 
 ## 验证命令
 

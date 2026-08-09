@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -381,6 +382,25 @@ def test_last_error_survives_disable_and_clears_after_successful_recovery() -> N
     assert manager.health_check().plugins[0].last_error_code is None
 
 
+def test_noop_enable_does_not_clear_reload_restart_error() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("stockpulse.noop-enable"))
+    manager.register(plugin, source="builtin")
+    assert manager.load("stockpulse.noop-enable").success is True
+
+    reload_result = manager.reload("stockpulse.noop-enable")
+    assert reload_result.success is False
+    assert reload_result.error_code == "plugin_reload_restart_required"
+    assert manager.snapshot("stockpulse.noop-enable").state == "enabled"
+
+    enable_result = manager.enable("stockpulse.noop-enable")
+    assert enable_result.success is True
+    assert (
+        manager.health_check().plugins[0].last_error_code
+        == "plugin_reload_restart_required"
+    )
+
+
 def test_single_plugin_failure_does_not_block_other_plugins() -> None:
     manager = _manager()
     failing = _RecordingPlugin(
@@ -541,6 +561,7 @@ def test_application_services_auto_bind_composition_root(
         set_application_services,
     )
     from src.config import Config
+    from src.core.pipeline import StockAnalysisPipeline
     from src.services.stock_service import StockService
 
     example = (
@@ -572,14 +593,66 @@ def test_application_services_auto_bind_composition_root(
     try:
         assert services.data_fetcher_manager is providers
         assert services.plugin_manager.registry is providers.plugin_registry
+        assert (
+            providers.plugin_registry.native_backend("analysis_strategy")
+            is services.analysis_strategy_registry
+        )
+        assert (
+            providers.plugin_registry.native_backend("notification_channel")
+            is services.notification_channel_registry
+        )
+        assert providers.plugin_registry.native_backend("agent_tool") is not None
         loads = services.start_plugins()
         assert any(result.success for result in loads)
         assert "ExampleReferenceProvider" in providers.available_fetchers
         result = StockService().get_history_data("600519")
         assert [item["close"] for item in result["data"]] == [100.5, 101.25]
+
+        search_service = MagicMock()
+        search_service.is_available = False
+        social_service = MagicMock()
+        social_service.is_available = False
+        with patch("src.core.pipeline.get_db", return_value=MagicMock()), patch(
+            "src.core.pipeline.DataFetcherManager",
+            side_effect=AssertionError("pipeline constructed an orphan manager"),
+        ), patch(
+            "src.core.pipeline.StockTrendAnalyzer", return_value=MagicMock()
+        ), patch(
+            "src.core.pipeline.GeminiAnalyzer", return_value=MagicMock()
+        ), patch(
+            "src.core.pipeline.NotificationService", return_value=MagicMock()
+        ), patch(
+            "src.core.pipeline.SearchService", return_value=search_service
+        ), patch(
+            "src.core.pipeline.SocialSentimentService", return_value=social_service
+        ):
+            pipeline = StockAnalysisPipeline(config=services.config)
+        assert pipeline.fetcher_manager is providers
+        frame, source = pipeline.fetcher_manager.get_daily_data("600519")
+        assert source == "ExampleReferenceProvider"
+        assert frame["close"].tolist() == [100.5, 101.25]
     finally:
         reset_application_services()
         DataFetcherManager.reset_daily_source_health()
+
+
+def test_application_services_auto_bind_invalid_manager_fails_closed() -> None:
+    from src.application_services import ApplicationServices
+    from src.config import Config
+    from src.plugins import (
+        DATA_PROVIDER_BIND_ERROR_INTERFACE,
+        DataProviderAutoBindError,
+    )
+
+    with pytest.raises(DataProviderAutoBindError) as captured:
+        ApplicationServices(
+            config=Config(plugin_data_provider_auto_bind_enabled=True),
+            data_fetcher_manager=object(),
+            builtin_plugins=(),
+            plugins_dir="",
+        )
+
+    assert captured.value.error_code == DATA_PROVIDER_BIND_ERROR_INTERFACE
 
 
 def test_application_services_bound_provider_failure_uses_service_fallback(

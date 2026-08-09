@@ -470,6 +470,10 @@ def test_plugins_api_completion_audit_failure_reports_real_outcome(
         assert detail["operation_completed"] is True
         assert detail["operation_success"] is True
         assert detail["state"] == "disabled"
+        assert detail["error_code"] is None
+        assert detail["message"] is None
+        assert detail["restart_required"] is False
+        assert detail["reloaded"] is False
         assert manager.snapshot("audit-completion-plugin").state == "disabled"
         assert plugin.unload_count == 1
         operator_attempts = audit.attempts[attempts_before:]
@@ -477,5 +481,47 @@ def test_plugins_api_completion_audit_failure_reports_real_outcome(
         assert operator_attempts[0]["action"] == "plugin.disable"
         assert operator_attempts[0]["actor_type"] == "administrator"
         assert operator_attempts[0]["actor_id"] == "local_operator"
+    finally:
+        reset_application_services()
+
+
+def test_plugins_api_completion_audit_failure_preserves_reload_result() -> None:
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+
+    class FailingCompletionAudit(SecurityAuditRecorderStub):
+        def record_completion(self, **fields) -> None:
+            raise SecurityAuditUnavailable()
+
+    reset_application_services()
+    manager, _ = _manager()
+    plugin = _RecordingPlugin(_manifest("audit-reload-plugin"))
+    manager.register(plugin, source="builtin")
+    manager.load("audit-reload-plugin")
+    manager.bind_lifecycle_auditor(FailingCompletionAudit())
+    set_application_services(
+        ApplicationServices(plugin_manager=manager, plugins_dir="")
+    )
+    try:
+        app = FastAPI()
+        app.include_router(plugins_endpoint.router, prefix="/api/v1/plugins")
+        response = TestClient(app).post(
+            "/api/v1/plugins/audit-reload-plugin/lifecycle",
+            json={"action": "reload"},
+        )
+
+        assert response.status_code == 503
+        detail = response.json()["detail"]
+        assert detail["error"] == "security_audit_unavailable"
+        assert detail["operation_completed"] is True
+        assert detail["operation_success"] is False
+        assert detail["state"] == "enabled"
+        assert detail["error_code"] == "plugin_reload_restart_required"
+        assert detail["restart_required"] is True
+        assert detail["reloaded"] is False
+        assert "process restart" in detail["message"]
     finally:
         reset_application_services()

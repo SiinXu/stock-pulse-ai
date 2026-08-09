@@ -230,9 +230,11 @@ def update_plugin_lifecycle(
             "operation_completed": True,
             "operation_success": result.success,
             "state": result.state,
+            "error_code": result.error_code,
+            "message": getattr(result, "message", None),
+            "restart_required": getattr(result, "restart_required", False),
+            "reloaded": getattr(result, "reloaded", False),
         }
-        if hasattr(result, "reloaded"):
-            detail["reloaded"] = result.reloaded
         raise HTTPException(status_code=503, detail=detail) from None
     except SecurityAuditUnavailable:
         raise HTTPException(

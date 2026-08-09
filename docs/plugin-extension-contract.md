@@ -148,7 +148,8 @@ X3 exposes its configured unified registry as
 exact registry to `PluginManager`; the provider manager and plugin manager must
 not be given separate registries. Manual mode preserves existing independently
 owned provider managers. Auto-bind mode establishes an explicit process owner
-in `ApplicationServices` and routes the stock quote/history service through it.
+in `ApplicationServices` and routes the stock quote/history service plus the
+primary stock-analysis pipeline through it.
 
 Consequently, setting only `PLUGINS_DIR` discovers and loads plugin lifecycle
 objects but does not activate a Data Provider implementation in standalone
@@ -160,7 +161,10 @@ managers. Activation through the default process path also requires
 `PLUGIN_DATA_PROVIDER_AUTO_BIND` defaults off. When the default composition root
 opts in, it constructs or accepts one `DataFetcherManager`, shares its exact
 registry with `PluginManager`, and exposes that owner to `StockService` quote
-and history calls. Custom composition roots may call
+and history calls plus the primary analysis pipeline. If a manager is injected,
+the root atomically binds the other process extension contracts into that exact
+registry before those points have registrations; an active conflicting contract
+fails closed. Custom composition roots may call
 `try_build_auto_bound_registry(data_fetcher_manager)` (or
 `resolve_data_provider_registry`) to obtain the **exact** manager-owned
 `plugin_registry` instance and pass it into `PluginManager`. Rebuilding a new
@@ -183,8 +187,11 @@ the truthful completed state. One reload emits one correlated reload pair;
 internal disable/load steps are subordinate and are not separate operator
 events. `PluginManager.health_check()` returns a read-only snapshot of each
 plugin's state, extension points, and most recent stable `error_code`. Disable
-preserves that diagnostic; successful load/reload establishes recovery and
-clears it. The loaded-extensions UI is a separate frontend task.
+preserves that diagnostic; only a successful state-changing load/reload
+establishes recovery and clears it. An already-enabled no-op cannot erase a
+restart-required reload failure. Completion-audit 503 responses preserve the
+underlying error code, message, reload flag, and restart requirement. The
+loaded-extensions UI is a separate frontend task.
 
 ## Startup Composition
 

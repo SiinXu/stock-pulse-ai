@@ -196,9 +196,13 @@ state; it does not claim rollback.
 Leave the flag unset to keep historical manual mode. When enabled without an
 injected manager, `ApplicationServices` constructs one `DataFetcherManager` and
 exposes it as `services.data_fetcher_manager`. Stock quote/history service calls
-resolve this installed owner, so plugin providers and built-in fallback use the
-same registry. Custom roots may still call `try_build_auto_bound_registry`
-directly.
+and the primary analysis pipeline resolve this installed owner, so plugin
+providers and built-in fallback use the same registry. For an injected manager,
+the composition root atomically adds the Analysis Strategy, Notification
+Channel, Agent Tool, and Event Hook contracts before those points can register.
+An invalid or already-conflicting registry fails process composition with a
+stable bind code; auto-bind never silently falls back to an orphan registry.
+Custom roots may still call `try_build_auto_bound_registry` directly.
 
 ```python
 from data_provider import DataFetcherManager
@@ -228,8 +232,9 @@ for entry in report.plugins:
 
 Use `last_error_code` for the most recent stable failure (for example
 `plugin_onload_failed`). Disable/intent changes preserve it; a successful
-load/reload clears it as recovered. A single failed plugin must not prevent
-other plugins or core startup.
+state-changing load/reload clears it as recovered. An idempotent enable does not
+erase a reload failure that still requires operator action. A single failed
+plugin must not prevent other plugins or core startup.
 
 ## Verification Commands
 

@@ -621,6 +621,7 @@ class PluginManager:
 
         with self._lock:
             record = self._plugins.get(plugin_id)
+            starting_state = None if record is None else record.state
         correlation_id = self._audit_begin(
             record,
             plugin_id=plugin_id,
@@ -637,6 +638,7 @@ class PluginManager:
                     operation in {"load", "enable"}
                     and result.success
                     and result.error_code is None
+                    and starting_state != "enabled"
                 ):
                     self._set_last_error(record, None)
                 elif result.error_code is not None:

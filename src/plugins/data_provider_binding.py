@@ -40,6 +40,14 @@ DATA_PROVIDER_BIND_ERROR_PRIORITY = "data_provider_bind_priority_conflict"
 DATA_PROVIDER_BIND_ERROR_UNAVAILABLE = "data_provider_bind_unavailable"
 
 
+class DataProviderAutoBindError(RuntimeError):
+    """Fail-closed process-composition error with a stable diagnostic code."""
+
+    def __init__(self, error_code: str) -> None:
+        super().__init__(error_code)
+        self.error_code = error_code
+
+
 def data_provider_auto_bind_enabled(
     config: Any | None = None,
     env: Mapping[str, str] | None = None,
@@ -131,15 +139,17 @@ def try_build_auto_bound_registry(
     config: Any | None = None,
     env: Mapping[str, str] | None = None,
 ) -> tuple[ExtensionRegistry | None, str | None]:
-    """When auto-bind is on and a manager is supplied, return its registry."""
+    """When auto-bind is on, compose and return the manager's exact registry."""
 
-    del additional_contracts
     if not data_provider_auto_bind_enabled(config=config, env=env):
         return None, None
     if data_fetcher_manager is None:
         return None, None
     try:
-        return resolve_data_provider_registry(data_fetcher_manager), None
+        registry = resolve_data_provider_registry(data_fetcher_manager)
+        if additional_contracts:
+            registry.bind_composition_contracts(additional_contracts)
+        return registry, None
     except TypeError as exc:
         log_safe_exception(
             logger,
@@ -156,7 +166,7 @@ def try_build_auto_bound_registry(
             error_code=DATA_PROVIDER_BIND_ERROR_PRIORITY,
         )
         return None, DATA_PROVIDER_BIND_ERROR_PRIORITY
-    except Exception as exc:  # broad-exception: fallback_recorded - bind is best-effort
+    except Exception as exc:  # broad-exception: fallback_recorded - callers receive a stable fail-closed bind code
         log_safe_exception(
             logger,
             "Data provider auto-bind failed",

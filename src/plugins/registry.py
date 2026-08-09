@@ -293,6 +293,43 @@ class ExtensionRegistry:
         self._next_order = 0
         self._lock = threading.RLock()
 
+    def bind_composition_contracts(
+        self,
+        contracts: Mapping[ExtensionPoint, ExtensionContract],
+    ) -> None:
+        """Atomically add process-owned contracts before those points are used.
+
+        A ``DataFetcherManager`` creates the authoritative ``data_provider``
+        registry before the application composition root exists.  The root may
+        therefore bind the remaining process backends into that exact registry,
+        but only while the affected extension points have no registrations.
+        Existing point ownership is never replaced silently.
+        """
+
+        with self._lock:
+            configured = dict(self._contracts)
+            for extension_point, contract in contracts.items():
+                if extension_point not in EXTENSION_POINTS:
+                    raise ValueError("unsupported extension point")
+                if extension_point == "data_provider":
+                    raise ValueError(
+                        "data_provider contract is owned by DataFetcherManager"
+                    )
+                if not isinstance(contract, ExtensionContract):
+                    raise TypeError(
+                        "contracts must contain ExtensionContract values"
+                    )
+                has_registrations = any(
+                    key[0] == extension_point for key in self._entries
+                )
+                current = configured[extension_point]
+                if has_registrations and current is not contract:
+                    raise ValueError(
+                        "cannot replace an active extension contract"
+                    )
+                configured[extension_point] = contract
+            self._contracts = MappingProxyType(configured)
+
     def register(
         self,
         *,

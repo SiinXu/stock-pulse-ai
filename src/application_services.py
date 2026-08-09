@@ -182,16 +182,23 @@ class ApplicationServices:
                     )
                 bound_registry, bind_error = try_build_auto_bound_registry(
                     self._data_fetcher_manager,
+                    additional_contracts=process_contracts,
                     config=config,
                 )
                 if bound_registry is not None:
                     registry = bound_registry
                 elif bind_error is not None:
-                    log_safe_exception(
-                        logger,
-                        "Data provider auto-bind unavailable; using unbound plugin registry",
-                        RuntimeError(bind_error),
-                        error_code=bind_error,
+                    from src.plugins import DataProviderAutoBindError
+
+                    raise DataProviderAutoBindError(bind_error)
+                else:
+                    from src.plugins import (
+                        DATA_PROVIDER_BIND_ERROR_UNAVAILABLE,
+                        DataProviderAutoBindError,
+                    )
+
+                    raise DataProviderAutoBindError(
+                        DATA_PROVIDER_BIND_ERROR_UNAVAILABLE
                     )
             if registry is None:
                 registry = build_application_extension_registry(
