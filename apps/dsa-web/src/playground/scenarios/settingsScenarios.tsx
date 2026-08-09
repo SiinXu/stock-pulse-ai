@@ -2,6 +2,11 @@
 import { useState, type ReactNode } from 'react';
 import { Button } from '../../components/common';
 import { AiOverviewMatrix } from '../../components/settings/AiOverviewMatrix';
+import { AgentBehaviorPanel } from '../../components/settings/AgentBehaviorPanel';
+import {
+  AGENT_PRESET_MANAGED_KEYS,
+  AGENT_SETUP_PRESETS,
+} from '../../components/settings/agentSetupPresets';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
 import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard';
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
@@ -37,6 +42,11 @@ import { SettingsLoading } from '../../components/settings/SettingsLoading';
 import { SettingsSectionNav, SettingsViewTabs } from '../../components/settings/SettingsNavigation';
 import { SettingsPanelErrorBoundary } from '../../components/settings/SettingsPanelErrorBoundary';
 import { SettingsSectionCard } from '../../components/settings/SettingsSectionCard';
+import {
+  getCategoryFieldGroupId,
+  getCategoryFieldGroupOrder,
+  getCategoryFieldOrder,
+} from '../../components/settings/categoryFieldGroups';
 import type { SettingsSectionId } from '../../components/settings/settingsInformationArchitecture';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
@@ -156,6 +166,99 @@ const AiOverviewMatrixStory = () => {
       availableRoutes={new Set([MODEL_REF])}
       onEditRouting={() => undefined}
     />
+  );
+};
+
+const AGENT_STORY_PERSISTED_VALUES: Record<string, string> = {
+  ...AGENT_SETUP_PRESETS.find((preset) => preset.id === 'standard_research')!.values,
+  AGENT_LITELLM_MODEL: MODEL_REF,
+  AGENT_RISK_OVERRIDE: 'true',
+  VALUATION_AGENT_TOOL_ENABLED: 'false',
+};
+
+const makeAgentStoryItem = (key: string, value: string, displayOrder: number): SystemConfigItem => ({
+  key,
+  value,
+  rawValueExists: value.length > 0,
+  isMasked: false,
+  schema: {
+    key,
+    category: 'agent',
+    dataType: key.includes('STEPS') || key.includes('TIMEOUT')
+      ? 'integer'
+      : key.includes('ENABLED') || key === 'AGENT_MODE' || key === 'AGENT_FEATURES_ACKNOWLEDGED_OFF'
+        ? 'boolean'
+        : 'string',
+    uiControl: key.includes('STEPS') || key.includes('TIMEOUT')
+      ? 'number'
+      : key.includes('ENABLED') || key === 'AGENT_MODE' || key === 'AGENT_FEATURES_ACKNOWLEDGED_OFF'
+        ? 'switch'
+        : 'text',
+    isSensitive: false,
+    isRequired: false,
+    isEditable: true,
+    options: [],
+    validation: {},
+    displayOrder,
+  },
+});
+
+const AGENT_STORY_ITEMS = [
+  ...AGENT_PRESET_MANAGED_KEYS,
+  'AGENT_SKILLS',
+  'AGENT_SKILL_DIR',
+  'AGENT_RISK_OVERRIDE',
+  'VALUATION_AGENT_TOOL_ENABLED',
+].map((key, index) => makeAgentStoryItem(
+  key,
+  AGENT_STORY_PERSISTED_VALUES[key] ?? '',
+  index + 1,
+));
+
+const AgentBehaviorPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const [draftValues, setDraftValues] = useState(AGENT_STORY_PERSISTED_VALUES);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'scheduled'>('idle');
+  const items = (scenario === 'empty' ? AGENT_STORY_ITEMS.slice(1) : AGENT_STORY_ITEMS)
+    .map((item) => ({ ...item, value: draftValues[item.key] ?? item.value }));
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <AgentBehaviorPanel
+        items={items}
+        disabled={false}
+        onChange={(key, value) => {
+          setDraftValues((current) => ({ ...current, [key]: value }));
+          setSaveStatus('scheduled');
+        }}
+        onBatchChange={(updates) => {
+          setDraftValues((current) => ({
+            ...current,
+            ...Object.fromEntries(updates.map((item) => [item.key, item.value])),
+          }));
+          setSaveStatus('scheduled');
+        }}
+        onResetKeys={(keys) => {
+          setDraftValues((current) => ({
+            ...current,
+            ...Object.fromEntries(keys.map((key) => [key, AGENT_STORY_PERSISTED_VALUES[key] ?? ''])),
+          }));
+          setSaveStatus('idle');
+        }}
+        issueByKey={{}}
+        draftValuesByKey={draftValues}
+        persistedValuesByKey={AGENT_STORY_PERSISTED_VALUES}
+        saveStatus={saveStatus}
+        modelSummary={{
+          value: 'Fixture Route · Fixture Cloud',
+          source: 'explicit',
+          readiness: scenario === 'error' ? 'unknown' : 'ready',
+        }}
+        fieldGroups={getCategoryFieldGroupOrder('agent') ?? []}
+        fieldGroupIdOf={(key) => getCategoryFieldGroupId('agent', key)}
+        fieldGroupOrderOf={(key) => getCategoryFieldOrder('agent', key)}
+      />
+    </div>
   );
 };
 
@@ -601,6 +704,7 @@ const SettingsOnboardingHostsStory = () => {
 };
 
 export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'agent-behavior-panel': AgentBehaviorPanelStory,
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
   'change-password-card': ChangePasswordCard,
