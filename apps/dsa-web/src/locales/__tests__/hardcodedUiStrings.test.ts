@@ -350,6 +350,17 @@ describe('hardcoded UI string scanner', () => {
     expect(findHardcodedUiStrings('fixture.tsx', 'const View = () => <span>Stream</span>;', [allowance])).toHaveLength(1);
     expect(findHardcodedUiStrings('fixture.tsx', 'const View = () => <span title="JSON" />;', [allowance])).toHaveLength(1);
   });
+
+  it('keeps batch results equivalent to isolated module scans', () => {
+    const sources = [
+      ['first.tsx', "const label = 'First label'; const View = () => <p>{label}</p>;"],
+      ['second.tsx', "const label = 'Second label'; const View = () => <p>{label}</p>;"],
+    ] as const;
+
+    expect(collectHardcodedUiStringsFromSources(sources)).toEqual(
+      sources.flatMap(([filename, source]) => collectHardcodedUiStrings(filename, source)),
+    );
+  });
 });
 
 describe('production hardcoded UI strings', () => {

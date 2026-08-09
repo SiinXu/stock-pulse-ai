@@ -795,8 +795,12 @@ function collectBoundHardcodedUiStrings(
 export function collectHardcodedUiStringsFromSources(
   sources: ReadonlyArray<readonly [filename: string, sourceText: string]>,
 ): HardcodedUiStringCandidate[] {
-  const sourceTexts = new Map(sources);
-  const sourceFiles = new Map(sources.map(([filename, sourceText]) => [
+  const isolatedSources = sources.map(([filename, sourceText]) => [
+    filename,
+    `${sourceText}\nexport {};`,
+  ] as const);
+  const sourceTexts = new Map(isolatedSources);
+  const sourceFiles = new Map(isolatedSources.map(([filename, sourceText]) => [
     filename,
     ts.createSourceFile(
       filename,
