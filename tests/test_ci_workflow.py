@@ -122,12 +122,42 @@ def test_web_gate_runs_full_matrix_for_frontend_changes():
         "🌐 i18n guards": "npm run test:i18n",
         "🧪 Unit tests": "npm run test",
         "🏗️ Build": "npm run build",
+        "📦 Bundle size budget": "node scripts/check-bundle-size.mjs --print",
     }
     frontend_steps = ["📥 Checkout", "🟢 Setup Node", *expected_commands]
     for name in frontend_steps:
         assert steps_by_name[name]["if"] == FRONTEND_EXECUTION_CONDITION
     for name, command in expected_commands.items():
         assert steps_by_name[name]["run"] == command
+
+
+def test_web_gate_enforces_bundle_budget_immediately_after_build():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    web_job = workflow["jobs"]["web-gate"]
+    steps = web_job["steps"]
+
+    build_indexes = [
+        index
+        for index, step in enumerate(steps)
+        if step.get("run") == "npm run build"
+    ]
+    budget_indexes = [
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "📦 Bundle size budget"
+    ]
+
+    assert len(build_indexes) == 1
+    assert len(budget_indexes) == 1
+    assert budget_indexes[0] == build_indexes[0] + 1
+
+    budget_step = steps[budget_indexes[0]]
+    assert budget_step["run"] == "node scripts/check-bundle-size.mjs --print"
+    assert budget_step["if"] == FRONTEND_EXECUTION_CONDITION
+    assert web_job.get("continue-on-error", False) is False
+    assert all(
+        step.get("continue-on-error", False) is False for step in steps
+    )
 
 
 def test_web_gate_concludes_successfully_without_frontend_changes():
