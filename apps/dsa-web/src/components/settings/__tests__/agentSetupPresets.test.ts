@@ -94,5 +94,6 @@ describe('agentSetupPresets', () => {
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_BUDGET');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_TIMEOUT');
     expect(AGENT_PRESET_MANAGED_KEYS).toContain('AGENT_FEATURES_ACKNOWLEDGED_OFF');
+    expect(AGENT_PRESET_MANAGED_KEYS.every((key) => !/(API_KEY|TOKEN|PASSWORD|SECRET)/.test(key))).toBe(true);
   });
 });

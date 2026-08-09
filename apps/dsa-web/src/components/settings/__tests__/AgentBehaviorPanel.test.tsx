@@ -198,4 +198,20 @@ describe('AgentBehaviorPanel', () => {
     expect(field).toHaveTextContent('Step budget is outside the allowed range');
     expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/Status unknown|状态未知/);
   });
+
+  it('never reports a ready Agent while the saved acknowledged-off state is true', () => {
+    const persistedValuesByKey = {
+      ...standardValues(),
+      AGENT_FEATURES_ACKNOWLEDGED_OFF: 'true',
+      AGENT_LITELLM_MODEL: 'primary/gpt',
+    };
+    render(<AgentBehaviorPanel {...propsFor({
+      persistedValuesByKey,
+      modelSummary: { value: 'GPT · primary', source: 'explicit', readiness: 'ready' },
+    })} />);
+
+    const summary = screen.getByTestId('agent-active-summary');
+    expect(summary).toHaveTextContent(/Agent use acknowledged off|已确认暂不使用 Agent/);
+    expect(summary).not.toHaveTextContent(/· Ready|· 可用/);
+  });
 });
