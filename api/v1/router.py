@@ -31,6 +31,7 @@ from api.v1.endpoints import (
     onboarding,
     portfolio,
     portfolio_risk_metrics,
+    report_version_compare,
     scheduled_tasks,
     scorecard,
     security_audit,
@@ -72,6 +73,12 @@ router.include_router(
     history.router,
     prefix="/history",
     tags=["History"]
+)
+
+router.include_router(
+    report_version_compare.router,
+    prefix="/report-version-compare",
+    tags=["ReportVersionCompare"],
 )
 
 router.include_router(
