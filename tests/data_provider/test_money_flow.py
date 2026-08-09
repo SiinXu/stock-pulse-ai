@@ -27,6 +27,7 @@ from data_provider.money_flow_types import (
 )
 from data_provider.plugin_registry import DATA_PROVIDER_CAPABILITY_METHODS
 from src.core.trading_calendar import get_effective_trading_date
+from src.config import Config
 from src.services.smartmoney_flow_service import (
     fetch_money_flow,
     is_smartmoney_enabled,
@@ -213,6 +214,19 @@ def test_service_gate_is_single_authority_and_disabled_is_zero_io(monkeypatch):
         "600519", manager=manager,
         config=SimpleNamespace(smartmoney_enabled=True),
     )
+    assert outcome is not None and outcome.status == MoneyFlowStatus.PARTIAL
+    assert fetcher.calls == 1
+
+
+def test_environment_loaded_config_activates_the_same_manager_operation(monkeypatch):
+    monkeypatch.setenv("SMARTMONEY_ENABLED", "true")
+    config = Config._load_from_env()
+    fetcher = _MoneyFlowFetcher("FlowFetcher", 0, _snapshot())
+    manager = DataFetcherManager(fetchers=[fetcher])
+
+    outcome = fetch_money_flow("600519", manager=manager, config=config)
+
+    assert config.smartmoney_enabled is True
     assert outcome is not None and outcome.status == MoneyFlowStatus.PARTIAL
     assert fetcher.calls == 1
 

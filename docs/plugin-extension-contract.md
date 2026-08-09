@@ -520,7 +520,10 @@ manager returns a typed `not_supported` outcome for an undeclared or
 unimplemented capability rather than raising. Implementations must accept the
 single versioned signature `get_money_flow(stock_code, days=5)` and return a
 validated `MoneyFlowSnapshot`; the manager does not retry a different signature
-after a provider raises `TypeError`.
+after a provider raises `TypeError`. Providers should expose a stable
+`money_flow_calibration_identity` string when their bucket/currency/scale
+contract can vary independently of the provider name; it participates in the
+same-session cache identity.
 
 Existing `prefetch_*` paths remain built-in manager optimizations and are not
 plugin capabilities in contract version 1.
