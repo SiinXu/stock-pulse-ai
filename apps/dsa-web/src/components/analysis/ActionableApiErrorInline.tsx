@@ -2,31 +2,34 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { localizeParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import {
   alignParsedApiErrorWithMapping,
   isUiTextActionableKey,
   mapApiErrorToActionable,
   toUiTextKey,
   type ActionableErrorClass,
-  type ActionableErrorCta,
-  type ActionableErrorMapping,
 } from '../../utils/apiReasonMapper';
 import { Button, InlineAlert, type InlineAlertVariant } from '../common';
 
+export interface ActionableApiErrorAction {
+  label: string;
+  onClick?: () => void;
+  target?: string;
+  reload?: boolean;
+  disabled?: boolean;
+  isLoading?: boolean;
+}
+
 export interface ActionableApiErrorInlineProps {
   error: ParsedApiError;
-  className?: string;
   onDismiss?: () => void;
-  /** Override default CTA handler (after mapping resolves). */
-  onRetry?: () => void;
-  /** Optional extra navigate target for busy/duplicate “view tasks”. */
-  onViewTasks?: () => void;
-  /** Prefer tasks CTA over generic retry when class is busy and handler is set. */
-  preferTasksCta?: boolean;
+  /** Operation-owned actions. The renderer never infers retry safety. */
+  actions?: readonly ActionableApiErrorAction[];
   /** Optional title override (e.g. home.duplicateTask). */
   titleOverride?: string;
   /** Optional message override after localization. */
@@ -51,45 +54,31 @@ const CLASS_VARIANT: Record<ActionableErrorClass, InlineAlertVariant> = {
   generic: 'danger',
 };
 
-function ctaLabel(
-  cta: ActionableErrorCta,
-  mapping: ActionableErrorMapping,
-  t: (key: UiTextKey, params?: UiTextParams) => string,
-  preferTasksCta: boolean,
-): string {
-  if (preferTasksCta && mapping.class === 'busy') {
-    return t('analysisWorkbench.tasks');
-  }
-  if (cta.kind === 'navigate') {
-    if (cta.target?.startsWith('/settings') || mapping.class === 'llm_not_configured') {
-      return t('home.goSettings');
-    }
-    if (cta.target?.startsWith('/login')) {
-      return t('layout.nav.settings');
-    }
-    return t('common.details');
-  }
-  if (cta.kind === 'reload') {
-    return t('routeError.reload');
-  }
-  return t('common.retry');
+const SAFE_DIAGNOSTIC_TOKEN = /^[A-Za-z0-9._:/-]{1,160}$/;
+const SENSITIVE_DIAGNOSTIC_TOKEN = /^(?:sk-|bearer|basic|api[_-]?key|access[_-]?token|secret)/i;
+
+function formatTechnicalPart(label: string, value: unknown): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const token = String(value).trim();
+  if (!token) return null;
+  const safe = SAFE_DIAGNOSTIC_TOKEN.test(token)
+    && !SENSITIVE_DIAGNOSTIC_TOKEN.test(token);
+  return `${label}: ${safe ? token : '[redacted]'}`;
 }
 
 /**
  * Form-primary, toast-free rendering of a mapped API error for analysis launch paths.
  * Technical code/reason stay under a collapsed disclosure (#885 Phase 2).
  */
-export const ActionableApiErrorInline: React.FC<ActionableApiErrorInlineProps> = ({
+const ActionableApiErrorInline: React.FC<ActionableApiErrorInlineProps> = ({
   error,
-  className,
   onDismiss,
-  onRetry,
-  onViewTasks,
-  preferTasksCta = false,
+  actions,
   titleOverride,
   messageOverride,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { language, t } = useUiLanguage();
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -118,51 +107,41 @@ export const ActionableApiErrorInline: React.FC<ActionableApiErrorInlineProps> =
     };
   }, [error, language, mapping, messageOverride, t, titleOverride]);
 
-  const handleCta = () => {
-    const cta = mapping.cta;
-    if (preferTasksCta && mapping.class === 'busy' && onViewTasks) {
-      onViewTasks();
+  const runAction = (action: ActionableApiErrorAction) => {
+    if (action.disabled || action.isLoading) return;
+    if (action.onClick) {
+      action.onClick();
       return;
     }
-    if (!cta) {
-      onRetry?.();
+    if (action.reload) {
+      if (typeof window !== 'undefined') window.location.reload();
       return;
     }
-    if (cta.kind === 'retry') {
-      onRetry?.();
-      return;
-    }
-    if (cta.kind === 'reload') {
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
-      return;
-    }
-    if (cta.kind === 'navigate' && cta.target) {
-      navigate(cta.target);
+    if (action.target) {
+      const target = action.target === APP_ROUTE_PATHS.login
+        ? `${APP_ROUTE_PATHS.login}?${new URLSearchParams({
+            redirect: `${location.pathname}${location.search}${location.hash}`,
+          })}`
+        : action.target;
+      navigate(target);
     }
   };
 
-  const showPrimaryCta = Boolean(
-    mapping.cta || onRetry || (preferTasksCta && mapping.class === 'busy' && onViewTasks),
-  );
-
-  const action = showPrimaryCta || onDismiss ? (
+  const action = actions?.length || onDismiss ? (
     <div className="flex flex-wrap items-center gap-2">
-      {showPrimaryCta ? (
+      {actions?.map((item, index) => (
         <Button
+          key={`${item.label}-${index}`}
           type="button"
           variant="secondary"
           size="compact"
-          onClick={handleCta}
+          onClick={() => runAction(item)}
+          disabled={item.disabled || item.isLoading}
+          isLoading={item.isLoading}
         >
-          {mapping.cta
-            ? ctaLabel(mapping.cta, mapping, t, preferTasksCta && Boolean(onViewTasks))
-            : preferTasksCta && mapping.class === 'busy' && onViewTasks
-              ? t('analysisWorkbench.tasks')
-              : t('common.retry')}
+          {item.label}
         </Button>
-      ) : null}
+      ))}
       {onDismiss ? (
         <Button type="button" variant="ghost" size="compact" onClick={onDismiss}>
           {t('common.close')}
@@ -172,15 +151,14 @@ export const ActionableApiErrorInline: React.FC<ActionableApiErrorInlineProps> =
   ) : undefined;
 
   const technicalParts = [
-    mapping.technicalCode ? `code: ${mapping.technicalCode}` : null,
-    mapping.technicalReason ? `reason: ${mapping.technicalReason}` : null,
-    error.traceId ? `trace: ${error.traceId}` : null,
-    error.status ? `status: ${error.status}` : null,
+    formatTechnicalPart('code', mapping.technicalCode),
+    formatTechnicalPart('reason', mapping.technicalReason),
+    formatTechnicalPart('trace', error.traceId),
+    formatTechnicalPart('status', error.status),
   ].filter((part): part is string => Boolean(part));
 
   return (
     <InlineAlert
-      className={className}
       variant={CLASS_VARIANT[mapping.class]}
       title={title}
       action={action}

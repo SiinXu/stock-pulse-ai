@@ -71,7 +71,7 @@ export interface AnalysisWorkbenchLaunchPanelProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-export const AnalysisWorkbenchLaunchPanel: React.FC<AnalysisWorkbenchLaunchPanelProps> = ({
+const AnalysisWorkbenchLaunchPanel: React.FC<AnalysisWorkbenchLaunchPanelProps> = ({
   activeSegment,
   query,
   setQuery,

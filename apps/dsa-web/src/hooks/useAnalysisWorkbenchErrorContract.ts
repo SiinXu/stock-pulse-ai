@@ -14,7 +14,6 @@ export function useAnalysisWorkbenchErrorContract(options: {
   duplicateError: ParsedApiError | null;
   duplicateTask: { stockCode: string; existingTaskId: string } | null;
   error: ParsedApiError | null;
-  batchError?: ParsedApiError | null;
   analysisTasks: TaskInfo[];
   openTaskRunFlow: (task: TaskInfo) => void;
   selectSegment: (segment: AnalysisWorkbenchSegment) => void;
@@ -23,15 +22,13 @@ export function useAnalysisWorkbenchErrorContract(options: {
     duplicateError,
     duplicateTask,
     error,
-    batchError,
     analysisTasks,
     openTaskRunFlow,
     selectSegment,
   } = options;
 
   const launchBlockedByBusy = Boolean(duplicateError)
-    || isBusyParsedApiError(error)
-    || isBusyParsedApiError(batchError);
+    || isBusyParsedApiError(error);
 
   const openBusyTasks = useCallback(() => {
     const existing = duplicateTask?.existingTaskId

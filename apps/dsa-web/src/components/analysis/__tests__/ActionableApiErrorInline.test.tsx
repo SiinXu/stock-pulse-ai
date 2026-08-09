@@ -2,21 +2,31 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ComponentProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { createParsedApiError } from '../../../api/error';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
-import { ActionableApiErrorInline } from '../ActionableApiErrorInline';
+import ActionableApiErrorInline from '../ActionableApiErrorInline';
 
 function renderInline(
   error: ReturnType<typeof createParsedApiError>,
   props: Partial<ComponentProps<typeof ActionableApiErrorInline>> = {},
+  initialEntry = '/research/analysis?segment=history#report',
 ) {
+  const LocationProbe = () => {
+    const location = useLocation();
+    return <span data-testid="location">{`${location.pathname}${location.search}`}</span>;
+  };
   return render(
-    <MemoryRouter>
-      <UiLanguageProvider initialLanguage="zh">
-        <ActionableApiErrorInline error={error} {...props} />
-      </UiLanguageProvider>
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <Routes>
+        <Route path="*" element={(
+          <UiLanguageProvider initialLanguage="zh">
+            <ActionableApiErrorInline error={error} {...props} />
+            <LocationProbe />
+          </UiLanguageProvider>
+        )} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -30,7 +40,9 @@ describe('ActionableApiErrorInline', () => {
       category: 'llm_not_configured',
       status: 422,
     });
-    renderInline(error);
+    renderInline(error, {
+      actions: [{ label: '去配置', target: '/settings?section=ai-models' }],
+    });
 
     expect(screen.getByTestId('actionable-api-error-inline')).toHaveAttribute(
       'data-error-class',
@@ -52,7 +64,9 @@ describe('ActionableApiErrorInline', () => {
       status: 409,
       params: { stock_code: 'AAPL' },
     });
-    renderInline(error, { preferTasksCta: true, onViewTasks });
+    renderInline(error, {
+      actions: [{ label: '运行中任务', onClick: onViewTasks }],
+    });
 
     expect(screen.getByTestId('actionable-api-error-inline')).toHaveAttribute(
       'data-error-class',
@@ -70,9 +84,69 @@ describe('ActionableApiErrorInline', () => {
       category: 'upstream_network',
       status: 503,
     });
-    renderInline(error, { onRetry });
+    renderInline(error, {
+      actions: [{ label: '重试', onClick: onRetry }],
+    });
 
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { code: 'validation_error', status: 422 },
+    { code: 'not_found', status: 404 },
+    { code: 'unknown_code', status: 500 },
+  ])('does not invent a retry action for $code', ({ code, status }) => {
+    const error = createParsedApiError({
+      title: 'invalid',
+      message: 'invalid',
+      code,
+      status,
+    });
+    renderInline(error);
+
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+  });
+
+  it('uses an admin-login label and preserves a safe return route', () => {
+    const error = createParsedApiError({
+      title: 'auth',
+      message: 'auth',
+      code: 'unauthorized',
+      status: 401,
+    });
+    renderInline(error, {
+      actions: [{ label: '管理员登录', target: '/login' }],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '管理员登录' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/login?redirect=%2Fresearch%2Fanalysis%3Fsegment%3Dhistory%23report',
+    );
+  });
+
+  it('redacts unsafe technical values and never discloses response details', () => {
+    const error = createParsedApiError({
+      title: 'network',
+      message: 'network',
+      code: 'network_error',
+      category: 'upstream_network',
+      status: 503,
+      traceId: 'trace-safe',
+      details: {
+        reason: 'sk-super-secret',
+        authorization: 'Basic hidden',
+        response_body: 'private payload',
+      },
+    });
+    renderInline(error);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    const technical = screen.getByTestId('actionable-error-technical');
+    expect(technical).toHaveTextContent('reason: [redacted]');
+    expect(technical).toHaveTextContent('trace: trace-safe');
+    expect(technical).not.toHaveTextContent('super-secret');
+    expect(technical).not.toHaveTextContent('private payload');
+    expect(technical).not.toHaveTextContent('Basic hidden');
   });
 });
