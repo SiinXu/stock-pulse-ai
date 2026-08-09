@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import sys
+import types
 from io import BytesIO
 from pathlib import Path
 
@@ -86,6 +88,11 @@ def test_capabilities_are_language_aware_and_never_expose_paths(monkeypatch, tmp
     invalid = tmp_path / "operator-secret" / "broken.ttf"
     invalid.parent.mkdir()
     invalid.write_bytes(b"not-a-font")
+    monkeypatch.setattr(
+        export_mod,
+        "inspect_pdf_backend",
+        lambda: PdfBackendStatus(True, "ready", "2.8.3", True),
+    )
     monkeypatch.setattr(export_mod, "_configured_font_path", lambda: str(invalid))
     caps = get_export_capabilities("zh")
     assert caps["formats"]["md"]["available"] is True
@@ -129,14 +136,27 @@ def test_backend_detects_legacy_only_namespace(monkeypatch):
 
 
 def test_backend_rejects_missing_ast_support_dependency(monkeypatch):
-    real_version = export_mod.importlib.metadata.version
+    fake_fpdf = types.ModuleType("fpdf")
+    fake_fpdf.__version__ = "2.8.3"
+    fake_fpdf.FPDF = object
+    monkeypatch.setitem(sys.modules, "fpdf", fake_fpdf)
 
     def _version(distribution):
         if distribution == "markdown-it-py":
             raise export_mod.importlib.metadata.PackageNotFoundError
-        return real_version(distribution)
+        return {"fpdf2": "2.8.3", "fonttools": "4.63.0"}[distribution]
 
     monkeypatch.setattr(export_mod.importlib.metadata, "version", _version)
+    monkeypatch.setattr(
+        export_mod.importlib.metadata,
+        "packages_distributions",
+        lambda: {"fpdf": ["fpdf2"]},
+    )
+    monkeypatch.setattr(
+        export_mod.importlib,
+        "import_module",
+        lambda module_name: types.ModuleType(module_name),
+    )
     backend = export_mod.inspect_pdf_backend()
     assert backend.available is False
     assert backend.status == "dependency_missing"
