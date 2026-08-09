@@ -146,23 +146,25 @@ remain available on the root for diagnostics and deterministic tests.
 X3 exposes its configured unified registry as
 `DataFetcherManager.plugin_registry`. Programmatic composition may pass that
 exact registry to `PluginManager`; the provider manager and plugin manager must
-not be given separate registries. The default process plugin manager does not
-invent a process-wide `DataFetcherManager`, because current provider consumers
-own distinct managers. A composition caller that activates Data Provider
-plugins must inject a `PluginManager` bound to the exact target manager registry.
-X2b does not silently redirect or replace those existing provider-manager
-ownership boundaries.
+not be given separate registries. Manual mode preserves existing independently
+owned provider managers. Auto-bind mode establishes an explicit process owner
+in `ApplicationServices` and routes the stock quote/history service plus the
+primary stock-analysis pipeline through it.
 
-Consequently, setting `PLUGINS_DIR` on the default process root discovers and
-loads plugin lifecycle objects but does not by itself activate a Data Provider
-implementation. A composition caller must construct `PluginManager` with the
-exact target `DataFetcherManager.plugin_registry`; no default process-wide
-provider manager is fabricated for external plugins.
+Consequently, setting only `PLUGINS_DIR` discovers and loads plugin lifecycle
+objects but does not activate a Data Provider implementation in standalone
+managers. Activation through the default process path also requires
+`PLUGIN_DATA_PROVIDER_AUTO_BIND=true`.
 
 ### Opt-in Data Provider auto-bind
 
-`PLUGIN_DATA_PROVIDER_AUTO_BIND` (default off) does not change process startup by
-itself. When a composition root opts in, it may call
+`PLUGIN_DATA_PROVIDER_AUTO_BIND` defaults off. When the default composition root
+opts in, it constructs or accepts one `DataFetcherManager`, shares its exact
+registry with `PluginManager`, and exposes that owner to `StockService` quote
+and history calls plus the primary analysis pipeline. If a manager is injected,
+the root atomically binds the other process extension contracts into that exact
+registry before those points have registrations; an active conflicting contract
+fails closed. Custom composition roots may call
 `try_build_auto_bound_registry(data_fetcher_manager)` (or
 `resolve_data_provider_registry`) to obtain the **exact** manager-owned
 `plugin_registry` instance and pass it into `PluginManager`. Rebuilding a new
@@ -176,13 +178,20 @@ composition root.
 
 ### Lifecycle audit and health
 
-Privileged plugin lifecycle operations (`load` / `enable` / `disable` /
-`reload`) emit best-effort security-audit events with `event_type=plugin.lifecycle`
-through the existing `SecurityAuditService` contract. Audit write failures never
-block plugin load or process startup. `PluginManager.health_check()` returns a
-read-only snapshot of each plugin's state, extension points, and last
-`error_code` for diagnostics consumers (loaded-extensions UI is a separate
-frontend task).
+Plugin lifecycle operations emit security-audit events with
+`event_type=plugin.lifecycle` through the existing `SecurityAuditService`
+contract. Automatic startup loading remains best-effort. Administrator
+enable/disable/reload requests require a persisted attempt before mutation; a
+completion-write failure is returned as `503 security_audit_unavailable` with
+the truthful completed state. One reload emits one correlated reload pair;
+internal disable/load steps are subordinate and are not separate operator
+events. `PluginManager.health_check()` returns a read-only snapshot of each
+plugin's state, extension points, and most recent stable `error_code`. Disable
+preserves that diagnostic; only a successful state-changing load/reload
+establishes recovery and clears it. An already-enabled no-op cannot erase a
+restart-required reload failure. Completion-audit 503 responses preserve the
+underlying error code, message, reload flag, and restart requirement. The
+loaded-extensions UI is a separate frontend task.
 
 ## Startup Composition
 
@@ -1121,4 +1130,3 @@ Lifecycle controls do not weaken the trusted-plugin model:
 2. Persistence records only enable/disable intent for already-registered IDs.
 3. Hot-reload re-imports an already-known package root; new directories are not
    discovered or auto-enabled by the reload path.
-

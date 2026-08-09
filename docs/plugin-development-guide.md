@@ -189,20 +189,30 @@ This section is for deployers and on-call operators, not plugin authors.
 
 ### Lifecycle audit trail
 
-Enable/disable/reload/load transitions record best-effort security-audit events
-(`event_type=plugin.lifecycle`) via the existing security-audit store. Query them
-through the administrator security-audit API. A failed audit write is logged and
-**does not** block plugin startup or other plugins.
+Lifecycle transitions record security-audit events (`event_type=plugin.lifecycle`)
+via the existing security-audit store. Automatic startup loading is best-effort,
+so an unavailable recorder does not block unrelated plugins. Administrator
+enable/disable/reload requests are fail-closed before mutation when the attempt
+event cannot be stored. If the completion write fails after the operation, the
+API returns `503 security_audit_unavailable` and reports the real completed
+state; it does not claim rollback.
 
 ### Data Provider auto-bind (opt-in)
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | off | Composition helpers may return the target `DataFetcherManager.plugin_registry` for `PluginManager` construction so registered providers route without extra glue |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | off | When enabled, the default `ApplicationServices` composition root binds `PluginManager` to a process `DataFetcherManager.plugin_registry` (created or injected) so registered providers route without extra glue |
 
-Leave the flag unset unless a composition root is prepared to supply a concrete
-`DataFetcherManager` instance. The default process root still does not invent a
-process-wide manager.
+Leave the flag unset to keep historical manual mode. When enabled without an
+injected manager, `ApplicationServices` constructs one `DataFetcherManager` and
+exposes it as `services.data_fetcher_manager`. Stock quote/history service calls
+and the primary analysis pipeline resolve this installed owner, so plugin
+providers and built-in fallback use the same registry. For an injected manager,
+the composition root atomically adds the Analysis Strategy, Notification
+Channel, Agent Tool, and Event Hook contracts before those points can register.
+An invalid or already-conflicting registry fails process composition with a
+stable bind code; auto-bind never silently falls back to an orphan registry.
+Custom roots may still call `try_build_auto_bound_registry` directly.
 
 ```python
 from data_provider import DataFetcherManager
@@ -230,8 +240,11 @@ for entry in report.plugins:
     print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
 ```
 
-Use `last_error_code` for failed plugins (for example `plugin_onload_failed`).
-A single failed plugin must not prevent other plugins or core startup.
+Use `last_error_code` for the most recent stable failure (for example
+`plugin_onload_failed`). Disable/intent changes preserve it; a successful
+state-changing load/reload clears it as recovered. An idempotent enable does not
+erase a reload failure that still requires operator action. A single failed
+plugin must not prevent other plugins or core startup.
 
 ## Verification Commands
 

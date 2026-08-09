@@ -25,6 +25,7 @@ from .data_provider_binding import (
     DATA_PROVIDER_BIND_ERROR_PRIORITY,
     DATA_PROVIDER_BIND_ERROR_UNAVAILABLE,
     PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV,
+    DataProviderAutoBindError,
     build_data_provider_bound_contracts,
     build_data_provider_bound_registry,
     data_provider_auto_bind_enabled,
@@ -58,6 +59,7 @@ from .event_hooks import (
 )
 from .loader import ExternalPluginLoader, ExternalPluginResult
 from .manager import (
+    PluginLifecycleAuditCompletionUnavailable,
     PluginManager,
     PluginOperationResult,
     PluginReloadResult,
@@ -114,6 +116,7 @@ __all__ = [
     "DATA_PROVIDER_BIND_ERROR_INTERFACE",
     "DATA_PROVIDER_BIND_ERROR_PRIORITY",
     "DATA_PROVIDER_BIND_ERROR_UNAVAILABLE",
+    "DataProviderAutoBindError",
     "EXTENSION_POINTS",
     "EVENT_HOOK_NAMES",
     "EVENT_HOOK_SCHEMA_VERSION",
@@ -152,6 +155,7 @@ __all__ = [
     "PluginHealthEntry",
     "PluginHealthReport",
     "PluginLifecycleAuditor",
+    "PluginLifecycleAuditCompletionUnavailable",
     "PluginManager",
     "PluginManifest",
     "PluginOperationResult",

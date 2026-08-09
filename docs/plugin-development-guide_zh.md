@@ -178,18 +178,26 @@ class Plugin(BasePlugin):
 
 ### 生命周期审计
 
-enable / disable / reload / load 会通过既有安全审计设施写入 best-effort 事件
-（`event_type=plugin.lifecycle`）。可通过管理员安全审计 API 查询。审计写入失败
-仅记录日志，**不会**阻断插件启动或其它插件。
+生命周期变更会通过既有安全审计设施写入事件（`event_type=plugin.lifecycle`）。
+自动启动加载采用 best-effort，审计存储不可用时不会阻断其它插件。管理员发起
+enable / disable / reload 时，如果 attempt 事件无法持久化，会在状态变更前以
+fail-closed 方式返回错误；如果操作完成后 completion 写入失败，API 会返回
+`503 security_audit_unavailable` 并说明真实完成状态，不会声称已回滚。
 
 ### Data Provider 自动绑定（显式开关）
 
 | 配置项 | 默认 | 效果 |
 | --- | --- | --- |
-| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 组合根可调用 helper 取得目标 `DataFetcherManager.plugin_registry`，使已注册 provider 无需额外手工胶水即可被发现 |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 开启后，默认 `ApplicationServices` 组合根会将 `PluginManager` 绑定到进程级 `DataFetcherManager.plugin_registry`（注入或自动创建），使已注册 provider 无需额外胶水即可路由 |
 
-未准备具体 `DataFetcherManager` 实例时请保持关闭。默认进程根仍不会凭空创建
-进程级 provider 管理器。
+保持关闭即可维持历史手动模式。开启且未注入 manager 时，`ApplicationServices`
+会构造一个 `DataFetcherManager` 并通过 `services.data_fetcher_manager` 暴露。
+股票行情与历史服务及主分析流水线会解析这个已安装 owner，因此插件 provider
+与内置 fallback 共用同一个 registry。注入 manager 时，组合根会在任何相关
+插件注册之前原子补齐 Analysis Strategy、Notification Channel、Agent Tool 与
+Event Hook 合同；无效或已冲突的 registry 会以稳定错误码阻断进程组合，绝不
+静默退化为孤立 registry。自定义组合根仍可直接调用
+`try_build_auto_bound_registry`。
 
 ```python
 from data_provider import DataFetcherManager
@@ -217,8 +225,10 @@ for entry in report.plugins:
     print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
 ```
 
-失败插件查看 `last_error_code`（例如 `plugin_onload_failed`）。单个插件失败不得
-影响其它插件与核心启动。
+`last_error_code` 表示最近一次稳定失败（例如 `plugin_onload_failed`）；禁用或
+修改意图不会清除它，真正改变状态且成功的 load / reload 才表示恢复并清除；
+幂等 enable 不会抹掉仍需运维处理的 reload 失败。单个插件失败不得影响其它
+插件与核心启动。
 
 ## 验证命令
 

@@ -231,8 +231,10 @@ const SettingsPage: React.FC = () => {
     load,
     retry,
     save,
+    serverItems,
     resetDraftKeys,
     setDraftValue,
+    applyPartialUpdate,
     getChangedItems,
     refreshAfterExternalSave,
     configVersion,
@@ -670,6 +672,11 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  const persistedValuesByKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    serverItems.forEach((item) => { map[item.key.toUpperCase()] = String(item.value ?? ''); });
+    return map;
+  }, [serverItems]);
   const rawValueKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const categoryItems of Object.values(itemsByCategory)) {
@@ -1335,6 +1342,21 @@ const SettingsPage: React.FC = () => {
   const activeConfigPanelTitle = sectionScopedCopy?.title
     ?? (hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle);
   const activeConfigPanelDescription = sectionScopedCopy?.description ?? activeCategoryDescription;
+  const persistedAgentModel = (persistedValuesByKey.AGENT_LITELLM_MODEL ?? '').trim();
+  const persistedReportModel = (persistedValuesByKey.LITELLM_MODEL ?? '').trim();
+  const effectivePersistedAgentModel = persistedAgentModel || persistedReportModel;
+  const resolvedPersistedAgentModel = effectivePersistedAgentModel ? resolveConfiguredModelRef(effectivePersistedAgentModel) : '';
+  const agentModelSummary = {
+    value: effectivePersistedAgentModel ? formatConfiguredModel(effectivePersistedAgentModel) : '',
+    source: persistedAgentModel ? 'explicit' as const : 'inherited' as const,
+    readiness: availableModelsLoading
+      ? 'checking' as const
+      : availableModelsError
+        ? 'unknown' as const
+        : !effectivePersistedAgentModel
+          ? 'unconfigured' as const
+          : availableModelRefSet.has(resolvedPersistedAgentModel) ? 'ready' as const : 'unavailable' as const,
+  };
   // For single-tab categories that a section split can narrow (agent →
   // Conversation / Agent Behavior), gate on the section-filtered content so an
   // empty section never renders a bare card.
@@ -1382,8 +1404,13 @@ const SettingsPage: React.FC = () => {
       isSaving={isSaving}
       issueByKey={issueByKey}
       allValuesByKey={allValuesByKey}
+      persistedValuesByKey={persistedValuesByKey}
       alphasiftEnabled={alphasiftEnabled}
       setDraftValue={setDraftValue}
+      applyPartialUpdate={applyPartialUpdate}
+      resetDraftKeys={resetDraftKeys}
+      activeSaveStatus={groupSaveStates[activeCategory]?.status ?? 'idle'}
+      agentModelSummary={agentModelSummary}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
     />

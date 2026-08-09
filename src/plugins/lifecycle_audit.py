@@ -1,12 +1,11 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Best-effort security-audit adapter for plugin lifecycle operations.
+"""Security-audit adapter for plugin lifecycle operations.
 
 Plugin lifecycle is a privileged surface (enable / disable / reload / load).
-This module records durable audit events through the existing
-``SecurityAuditService`` contract without fail-closing the plugin path:
-audit write failures are logged and swallowed so a single storage outage
-cannot block core startup or other plugins.
+Automatic startup loading uses best-effort writes so one unavailable recorder
+does not block unrelated plugins. Administrator-requested mutations opt into
+the existing fail-closed ``SecurityAuditService`` contract.
 """
 
 from __future__ import annotations
@@ -121,20 +120,34 @@ class PluginLifecycleAuditor:
 
         self._recorder = recorder
 
-    def _resolve_recorder(self) -> LifecycleAuditRecorder | None:
+    def _resolve_recorder(
+        self,
+        *,
+        required: bool,
+    ) -> LifecycleAuditRecorder | None:
         if self._recorder is not None:
             return self._recorder
         try:
-            from src.services.security_audit_service import get_security_audit_service
+            from src.services.security_audit_service import (
+                get_security_audit_service,
+                require_security_audit_recorder,
+            )
 
-            return get_security_audit_service()
-        except Exception as exc:  # broad-exception: fallback_recorded - audit is best-effort
+            recorder = get_security_audit_service()
+            resolved = require_security_audit_recorder(recorder)
+            self._recorder = resolved
+            return resolved
+        except Exception as exc:  # broad-exception: fallback_recorded - caller selects fail-open startup or fail-closed operator semantics
             log_safe_exception(
                 logger,
                 "Plugin lifecycle audit service unavailable",
                 exc,
                 error_code="plugin_lifecycle_audit_unavailable",
             )
+            if required:
+                from src.services.security_audit_service import SecurityAuditUnavailable
+
+                raise SecurityAuditUnavailable() from None
             return None
 
     def begin(
@@ -143,13 +156,16 @@ class PluginLifecycleAuditor:
         plugin_id: str,
         operation: str,
         metadata: Mapping[str, Any] | None = None,
+        required: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
     ) -> str | None:
-        """Record an attempt and return a correlation id, or None if skipped."""
+        """Record an attempt, failing closed when ``required`` is true."""
 
         action = _ACTION_BY_OPERATION.get(operation)
         if action is None:
             return None
-        recorder = self._resolve_recorder()
+        recorder = self._resolve_recorder(required=required)
         if recorder is None:
             return None
         try:
@@ -163,8 +179,14 @@ class PluginLifecycleAuditor:
             target_id = _bounded_identity(plugin_id, fallback="unknown-plugin")
             recorder.record_attempt(
                 event_type=PLUGIN_LIFECYCLE_EVENT_TYPE,
-                actor_type=self._actor_type,
-                actor_id=self._actor_id,
+                actor_type=_bounded_stable_name(
+                    actor_type or self._actor_type,
+                    fallback=self._actor_type,
+                ),
+                actor_id=_bounded_identity(
+                    actor_id or self._actor_id,
+                    fallback=self._actor_id,
+                ),
                 execution_id=execution_id,
                 action=action,
                 target_type=PLUGIN_TARGET_TYPE,
@@ -173,7 +195,7 @@ class PluginLifecycleAuditor:
                 metadata=_bounded_metadata(metadata),
             )
             return correlation_id
-        except Exception as exc:  # broad-exception: fallback_recorded - never block lifecycle
+        except Exception as exc:  # broad-exception: fallback_recorded - caller selects fail-open startup or fail-closed operator semantics
             log_safe_exception(
                 logger,
                 "Plugin lifecycle audit attempt failed",
@@ -181,6 +203,10 @@ class PluginLifecycleAuditor:
                 error_code="plugin_lifecycle_audit_attempt_failed",
                 context={"plugin_id": plugin_id, "operation": operation},
             )
+            if required:
+                from src.services.security_audit_service import SecurityAuditUnavailable
+
+                raise SecurityAuditUnavailable() from None
             return None
 
     def complete(
@@ -192,15 +218,18 @@ class PluginLifecycleAuditor:
         correlation_id: str | None,
         error_code: str | None = None,
         metadata: Mapping[str, Any] | None = None,
+        required: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
     ) -> None:
-        """Record a completion event; no-ops when attempt was skipped."""
+        """Record completion, failing closed when ``required`` is true."""
 
         if correlation_id is None:
             return
         action = _ACTION_BY_OPERATION.get(operation)
         if action is None:
             return
-        recorder = self._resolve_recorder()
+        recorder = self._resolve_recorder(required=required)
         if recorder is None:
             return
         try:
@@ -221,8 +250,14 @@ class PluginLifecycleAuditor:
                 payload.setdefault("error_code", error_code)
             recorder.record_completion(
                 event_type=PLUGIN_LIFECYCLE_EVENT_TYPE,
-                actor_type=self._actor_type,
-                actor_id=self._actor_id,
+                actor_type=_bounded_stable_name(
+                    actor_type or self._actor_type,
+                    fallback=self._actor_type,
+                ),
+                actor_id=_bounded_identity(
+                    actor_id or self._actor_id,
+                    fallback=self._actor_id,
+                ),
                 execution_id=execution_id,
                 action=action,
                 target_type=PLUGIN_TARGET_TYPE,
@@ -232,7 +267,7 @@ class PluginLifecycleAuditor:
                 correlation_id=correlation_id,
                 metadata=_bounded_metadata(payload),
             )
-        except Exception as exc:  # broad-exception: fallback_recorded - never block lifecycle
+        except Exception as exc:  # broad-exception: fallback_recorded - completion failure is surfaced for operator mutations
             log_safe_exception(
                 logger,
                 "Plugin lifecycle audit completion failed",
@@ -244,3 +279,7 @@ class PluginLifecycleAuditor:
                     "error_code": error_code,
                 },
             )
+            if required:
+                from src.services.security_audit_service import SecurityAuditUnavailable
+
+                raise SecurityAuditUnavailable() from None

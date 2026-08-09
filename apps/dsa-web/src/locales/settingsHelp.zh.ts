@@ -358,6 +358,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 AlphaSift 适配层来源校验和显式修复安装。'],
     notes: ['请确认来源可信；AlphaSift 是实验性质选股能力，启用前应理解相关风险。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS 或 Atom 订阅地址，作为按需新闻检索的补充来源。',
+    usage: '填写逗号分隔的 http(s) 订阅地址；留空则保持该能力不生效。拉取过程遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '这是对 SearXNG 或付费搜索的补充，不能完全替代它们。',
+      '私有或回环主机需要在 OUTBOUND_HTTP_ALLOWLIST 中写精确条目。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制单源超时（1–30 秒，默认 8）。',
+    ],
+    impact: ['配置后会影响按需新闻检索的覆盖范围。'],
+    notes: ['单个订阅源失败不应阻断其余新闻链路。'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: '实时行情源优先级',
     summary: '配置多个实时行情源的尝试顺序。',
@@ -1070,6 +1082,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略合议',
+    summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持 Phase-1 合成路径不变。',
+    valueNotes: [
+      '关闭时按字节级兼容保留既有合成行为。',
+      '开启后启用多策略合议与最终分歧说明。',
+    ],
+    impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
+    notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
+  },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
     summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
@@ -1230,6 +1253,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
+  },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: '启用离线 OCR Agent 工具',
+    summary: '默认关闭的有界 Tesseract 文字提取。图片字节留在本机，但脱敏后的不可信文字会进入 Agent 上下文并可能发给远端模型；零远端出站需启用 LOCAL_ONLY_MODE。',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR 文件根目录',
+    summary: '单次打开普通图片的文件系统沙箱；拒绝越界路径、特殊文件、超限字节、解码像素与额外帧。',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR 语言',
+    summary: '用 + 连接的 Tesseract 语言码；默认 chi_sim+eng，需安装匹配的系统语言包。',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR 超时秒数',
+    summary: '1–120 秒的硬 wall-clock 上限；超时后终止并回收 OCR worker 及其子进程。',
   },
   // ------------------------------------------------------------------
   // Backtest configuration

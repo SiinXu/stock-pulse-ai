@@ -48,3 +48,10 @@ diff for shape changes (column renames, missing fields) before committing.
 Fixtures must never contain API tokens, cookies, or private endpoints. The
 refresh script strips `token` fields from Tushare request metadata and only
 persists response bodies / OHLCV tables.
+
+## Failure-mode fixtures
+
+See `failures/` for offline empty / rate-limit / missing-field / format-error payloads used by
+`tests/data_provider/test_provider_fallback_contract.py`. These are shape-faithful samples derived
+from the happy-path files above (recorded notes dated 2026-08-08), not live network captures.
+
