@@ -82,7 +82,8 @@ class _SystemConfigCoreMethods:
 
     def get_config(self, include_schema: bool = True, mask_token: str = "******") -> Dict[str, Any]:
         """Return display config values with mask metadata for server-masked fields."""
-        saved_config_map = self._build_display_config_map(self._manager.read_config_map())
+        saved_values, config_version, updated_at = self._manager.read_config_snapshot()
+        saved_config_map = self._build_display_config_map(saved_values)
         runtime_config_map = self._build_runtime_display_config_map(saved_config_map)
         config_map = {
             **runtime_config_map,
@@ -135,11 +136,11 @@ class _SystemConfigCoreMethods:
         )
 
         return {
-            "config_version": self._manager.get_config_version(),
+            "config_version": config_version,
             "mask_token": mask_token,
             "items": items,
             "configured_notification_channels": configured_notification_channels,
-            "updated_at": self._manager.get_updated_at(),
+            "updated_at": updated_at,
         }
 
     def _detect_configured_notification_channels(self) -> List[str]:

@@ -2950,6 +2950,189 @@
         "title": "AnalysisContextPackOverviewSubject",
         "type": "object"
       },
+      "AnalysisDeltaPayload": {
+        "description": "Typed presentation projection of the merged T17 AnalysisDelta contract.",
+        "properties": {
+          "base_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Query Id"
+          },
+          "base_record_id": {
+            "minimum": 1.0,
+            "title": "Base Record Id",
+            "type": "integer"
+          },
+          "baseline_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Reason"
+          },
+          "baseline_status": {
+            "enum": [
+              "ok",
+              "missing_history",
+              "missing_base",
+              "missing_target",
+              "incomparable_structure"
+            ],
+            "title": "Baseline Status",
+            "type": "string"
+          },
+          "conclusion_changes": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisValueChangePayload"
+            },
+            "title": "Conclusion Changes",
+            "type": "array"
+          },
+          "evidence_changes": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisListChangePayload"
+            },
+            "title": "Evidence Changes",
+            "type": "array"
+          },
+          "has_baseline": {
+            "default": false,
+            "title": "Has Baseline",
+            "type": "boolean"
+          },
+          "has_material_changes": {
+            "default": false,
+            "title": "Has Material Changes",
+            "type": "boolean"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Type"
+          },
+          "risk_changes": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisListChangePayload"
+            },
+            "title": "Risk Changes",
+            "type": "array"
+          },
+          "score_changes": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisValueChangePayload"
+            },
+            "title": "Score Changes",
+            "type": "array"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "target_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Query Id"
+          },
+          "target_record_id": {
+            "minimum": 1.0,
+            "title": "Target Record Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "baseline_status",
+          "base_record_id",
+          "target_record_id"
+        ],
+        "title": "AnalysisDeltaPayload",
+        "type": "object"
+      },
+      "AnalysisListChangePayload": {
+        "properties": {
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "added_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Added Total",
+            "type": "integer"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "output_truncated": {
+            "default": false,
+            "title": "Output Truncated",
+            "type": "boolean"
+          },
+          "removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Removed",
+            "type": "array"
+          },
+          "removed_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Removed Total",
+            "type": "integer"
+          },
+          "unchanged": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unchanged",
+            "type": "array"
+          },
+          "unchanged_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unchanged Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AnalysisListChangePayload",
+        "type": "object"
+      },
       "AnalysisReport": {
         "description": "完整分析报告",
         "example": {
@@ -3095,6 +3278,105 @@
           "created_at"
         ],
         "title": "AnalysisResultResponse",
+        "type": "object"
+      },
+      "AnalysisValueChangePayload": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "comparable": {
+            "default": true,
+            "title": "Comparable",
+            "type": "boolean"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "direction": {
+            "enum": [
+              "up",
+              "down",
+              "changed",
+              "unavailable"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "unavailability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueUnavailabilityPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "direction"
+        ],
+        "title": "AnalysisValueChangePayload",
         "type": "object"
       },
       "AnalyzeRequest": {
@@ -4683,6 +4965,125 @@
           "session_id"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "ConfigComponentDiff": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "changed": {
+            "default": false,
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "ConfigComponentDiff",
+        "type": "object"
+      },
+      "ConfigFingerprintDiff": {
+        "properties": {
+          "base_complete": {
+            "default": false,
+            "title": "Base Complete",
+            "type": "boolean"
+          },
+          "base_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Fingerprint"
+          },
+          "base_missing_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Base Missing Keys",
+            "type": "array"
+          },
+          "comparison_status": {
+            "default": "unknown",
+            "enum": [
+              "identical",
+              "different",
+              "unknown"
+            ],
+            "title": "Comparison Status",
+            "type": "string"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigComponentDiff"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "has_differences": {
+            "default": false,
+            "title": "Has Differences",
+            "type": "boolean"
+          },
+          "identical": {
+            "default": false,
+            "title": "Identical",
+            "type": "boolean"
+          },
+          "target_complete": {
+            "default": false,
+            "title": "Target Complete",
+            "type": "boolean"
+          },
+          "target_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Fingerprint"
+          },
+          "target_missing_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Target Missing Keys",
+            "type": "array"
+          }
+        },
+        "title": "ConfigFingerprintDiff",
         "type": "object"
       },
       "ConfigPresetApplyRequest": {
@@ -15239,6 +15640,58 @@
         "title": "ReportDetails",
         "type": "object"
       },
+      "ReportFieldDiff": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "changed": {
+            "default": false,
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "severity": {
+            "default": "none",
+            "enum": [
+              "major",
+              "moderate",
+              "minor",
+              "none",
+              "unknown"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ReportFieldDiff",
+        "type": "object"
+      },
       "ReportMeta": {
         "description": "报告元信息",
         "properties": {
@@ -15928,6 +16381,302 @@
           }
         },
         "title": "ReportSummary",
+        "type": "object"
+      },
+      "ReportVersionCompareResponse": {
+        "description": "Compare two selected analysis runs for one symbol.",
+        "properties": {
+          "base_run": {
+            "$ref": "#/components/schemas/ReportVersionRunItem"
+          },
+          "config_diff": {
+            "$ref": "#/components/schemas/ConfigFingerprintDiff"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisDeltaPayload"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "T17 AnalysisDelta projection when the comparison engine is available"
+          },
+          "engine_status": {
+            "description": "Whether T17 compare_analyses was invoked successfully",
+            "enum": [
+              "ok",
+              "engine_pending"
+            ],
+            "title": "Engine Status",
+            "type": "string"
+          },
+          "field_diffs": {
+            "items": {
+              "$ref": "#/components/schemas/ReportFieldDiff"
+            },
+            "title": "Field Diffs",
+            "type": "array"
+          },
+          "status": {
+            "description": "ok: T17 delta available with baseline; engine_pending: T17 compare_analyses not wired yet; no_baseline: T17 returned has_baseline=false (distinct from no changes); incomparable: runs cannot be compared",
+            "enum": [
+              "ok",
+              "engine_pending",
+              "no_baseline",
+              "incomparable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "target_run": {
+            "$ref": "#/components/schemas/ReportVersionRunItem"
+          }
+        },
+        "required": [
+          "status",
+          "stock_code",
+          "base_run",
+          "target_run",
+          "config_diff",
+          "engine_status"
+        ],
+        "title": "ReportVersionCompareResponse",
+        "type": "object"
+      },
+      "ReportVersionRunItem": {
+        "description": "One selectable analysis run for a symbol.",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured decision action taxonomy",
+            "title": "Action"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Localized action label snapshot",
+            "title": "Action Label"
+          },
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Short analysis summary",
+            "title": "Analysis Summary"
+          },
+          "config_complete": {
+            "default": false,
+            "description": "Whether the persisted run contains the minimum reproducibility provenance",
+            "title": "Config Complete",
+            "type": "boolean"
+          },
+          "config_components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Human-readable configuration components that form the fingerprint",
+            "title": "Config Components",
+            "type": "object"
+          },
+          "config_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Short hash of configuration components used for this run",
+            "title": "Config Fingerprint"
+          },
+          "config_missing_keys": {
+            "description": "Required provenance keys absent from the persisted run",
+            "items": {
+              "type": "string"
+            },
+            "title": "Config Missing Keys",
+            "type": "array"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO created_at timestamp",
+            "title": "Created At"
+          },
+          "model_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Model snapshot for display only; not used for runtime routing",
+            "title": "Model Used"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Legacy operation advice text",
+            "title": "Operation Advice"
+          },
+          "query_id": {
+            "description": "Analysis query_id (may repeat in batch runs)",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "report_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Report language snapshot",
+            "title": "Report Language"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Report type snapshot",
+            "title": "Report Type"
+          },
+          "run_id": {
+            "description": "Stable analysis history primary key as string",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sentiment_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Finite sentiment / confidence score in the supported 0-100 range",
+            "title": "Sentiment Score"
+          },
+          "stock_code": {
+            "description": "Display stock code",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stock name when available",
+            "title": "Stock Name"
+          },
+          "trend_prediction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Trend prediction text",
+            "title": "Trend Prediction"
+          }
+        },
+        "required": [
+          "run_id",
+          "query_id",
+          "stock_code"
+        ],
+        "title": "ReportVersionRunItem",
+        "type": "object"
+      },
+      "ReportVersionRunListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReportVersionRunItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stock_code",
+          "total",
+          "page",
+          "limit"
+        ],
+        "title": "ReportVersionRunListResponse",
         "type": "object"
       },
       "ResearchRequest": {
@@ -21136,6 +21885,362 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValueUnavailabilityPayload": {
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "title": "ValueUnavailabilityPayload",
+        "type": "object"
+      },
+      "WatchlistComputedAttrsSchema": {
+        "additionalProperties": false,
+        "description": "Read-only computed projection owned by T25/T26 services.",
+        "properties": {
+          "ai_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Score"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "title": "WatchlistComputedAttrsSchema",
+        "type": "object"
+      },
+      "WatchlistGroupCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "name"
+        ],
+        "title": "WatchlistGroupCreateRequest",
+        "type": "object"
+      },
+      "WatchlistGroupMemberAddRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "stock_code"
+        ],
+        "title": "WatchlistGroupMemberAddRequest",
+        "type": "object"
+      },
+      "WatchlistGroupMemberMoveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "copy_membership": {
+            "default": false,
+            "title": "Copy Membership",
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "source_group_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Source Group Id",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "target_group_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Target Group Id",
+            "type": "string"
+          },
+          "target_index": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 500.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Index"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "stock_code",
+          "source_group_id",
+          "target_group_id"
+        ],
+        "title": "WatchlistGroupMemberMoveRequest",
+        "type": "object"
+      },
+      "WatchlistGroupMemberReorderRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "ordered_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Ordered Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "ordered_codes"
+        ],
+        "title": "WatchlistGroupMemberReorderRequest",
+        "type": "object"
+      },
+      "WatchlistGroupMemberSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "attrs": {
+            "$ref": "#/components/schemas/WatchlistComputedAttrsSchema"
+          },
+          "sort_order": {
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "sort_order"
+        ],
+        "title": "WatchlistGroupMemberSchema",
+        "type": "object"
+      },
+      "WatchlistGroupRenameRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "name"
+        ],
+        "title": "WatchlistGroupRenameRequest",
+        "type": "object"
+      },
+      "WatchlistGroupReorderRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "ordered_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Ordered Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "ordered_ids"
+        ],
+        "title": "WatchlistGroupReorderRequest",
+        "type": "object"
+      },
+      "WatchlistGroupSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistGroupMemberSchema"
+            },
+            "maxItems": 500,
+            "title": "Members",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "name_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Key"
+          },
+          "sort_order": {
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sort_order",
+          "is_default",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WatchlistGroupSchema",
+        "type": "object"
+      },
+      "WatchlistGroupsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistGroupSchema"
+            },
+            "maxItems": 50,
+            "title": "Groups",
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 160,
+            "title": "Message",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "message"
+        ],
+        "title": "WatchlistGroupsResponse",
+        "type": "object"
+      },
       "WatchlistRequest": {
         "description": "自选队列操作请求",
         "properties": {
@@ -21173,6 +22278,425 @@
           "message"
         ],
         "title": "WatchlistResponse",
+        "type": "object"
+      },
+      "WatchlistScoreFactor": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "analysis_sentiment",
+              "decision_signal"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 8,
+            "title": "Params",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "invalid_sentiment",
+                  "inactive_signal",
+                  "expired_signal",
+                  "incoherent_signal_source",
+                  "unknown_signal_action",
+                  "invalid_signal_confidence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source": {
+            "$ref": "#/components/schemas/WatchlistScoreFactorSource"
+          },
+          "status": {
+            "enum": [
+              "applied",
+              "ignored"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "source"
+        ],
+        "title": "WatchlistScoreFactor",
+        "type": "object"
+      },
+      "WatchlistScoreFactorSource": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "formula_version": {
+            "const": "watchlist_score_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "maxLength": 24,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "source_report_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Report Id"
+          }
+        },
+        "required": [
+          "formula_version"
+        ],
+        "title": "WatchlistScoreFactorSource",
+        "type": "object"
+      },
+      "WatchlistScoreItem": {
+        "additionalProperties": false,
+        "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "maximum": 365000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days"
+          },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "degraded_reasons": {
+            "items": {
+              "enum": [
+                "invalid_sentiment",
+                "inactive_signal",
+                "expired_signal",
+                "incoherent_signal_source",
+                "unknown_signal_action",
+                "invalid_signal_confidence"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Degraded Reasons",
+            "type": "array"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreFactor"
+            },
+            "maxItems": 2,
+            "title": "Factors",
+            "type": "array"
+          },
+          "freshness": {
+            "default": "none",
+            "enum": [
+              "none",
+              "unknown",
+              "today",
+              "recent",
+              "stale_week",
+              "stale"
+            ],
+            "title": "Freshness",
+            "type": "string"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "enum": [
+              "scored",
+              "unanalyzed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "status"
+        ],
+        "title": "WatchlistScoreItem",
+        "type": "object"
+      },
+      "WatchlistScoreQueryCount": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreQueryCount",
+        "type": "object"
+      },
+      "WatchlistScoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "sort": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "score_desc",
+              "score_asc"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "stock_codes": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Stock Codes",
+            "type": "array"
+          }
+        },
+        "title": "WatchlistScoreRequest",
+        "type": "object"
+      },
+      "WatchlistScoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "disclaimer_key": {
+            "const": "watchlist_score.disclaimer",
+            "title": "Disclaimer Key",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "watchlist_score_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreItem"
+            },
+            "maxItems": 200,
+            "title": "Items",
+            "type": "array"
+          },
+          "query_count": {
+            "$ref": "#/components/schemas/WatchlistScoreQueryCount"
+          },
+          "scoring_mode": {
+            "const": "aggregate_existing",
+            "title": "Scoring Mode",
+            "type": "string"
+          },
+          "sort": {
+            "enum": [
+              "manual",
+              "score_desc",
+              "score_asc"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "source_rows": {
+            "$ref": "#/components/schemas/WatchlistScoreSourceRows"
+          }
+        },
+        "required": [
+          "formula_version",
+          "scoring_mode",
+          "sort",
+          "items",
+          "query_count",
+          "source_rows",
+          "disclaimer_key"
+        ],
+        "title": "WatchlistScoreResponse",
+        "type": "object"
+      },
+      "WatchlistScoreSourceRows": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreSourceRows",
         "type": "object"
       }
     },
@@ -31373,6 +32897,257 @@
         ]
       }
     },
+    "/api/v1/report-version-compare/compare": {
+      "get": {
+        "description": "Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.",
+        "operationId": "compareReportVersions",
+        "parameters": [
+          {
+            "description": "Stock code for the selected runs",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code for the selected runs",
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Baseline analysis history id",
+            "in": "query",
+            "name": "base_run_id",
+            "required": true,
+            "schema": {
+              "description": "Baseline analysis history id",
+              "minLength": 1,
+              "title": "Base Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Target analysis history id",
+            "in": "query",
+            "name": "target_run_id",
+            "required": true,
+            "schema": {
+              "description": "Target analysis history id",
+              "minLength": 1,
+              "title": "Target Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionCompareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Run not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Runs are incomparable"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Compare two analysis report versions",
+        "tags": [
+          "ReportVersionCompare"
+        ]
+      }
+    },
+    "/api/v1/report-version-compare/runs": {
+      "get": {
+        "description": "List historical analysis runs for a symbol with run id, time, model, and configuration fingerprint for the report version picker.",
+        "operationId": "listReportVersionRuns",
+        "parameters": [
+          {
+            "description": "Stock code filter",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code filter",
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number (1-based)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number (1-based)",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "description": "Page size",
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional report type filter; market_review rows are skipped when omitted",
+            "in": "query",
+            "name": "report_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report type filter; market_review rows are skipped when omitted",
+              "title": "Report Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionRunListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not authenticated when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List analysis runs for version comparison",
+        "tags": [
+          "ReportVersionCompare"
+        ]
+      }
+    },
     "/api/v1/scheduled-tasks": {
       "get": {
         "description": "List understood definitions and opaque future-version projections.",
@@ -32961,6 +34736,756 @@
         ]
       }
     },
+    "/api/v1/stocks/watchlist/groups": {
+      "get": {
+        "description": "Reconcile groups from authoritative STOCK_LIST before returning revisioned state.",
+        "operationId": "list_watchlist_groups_api_v1_stocks_watchlist_groups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List watchlist groups",
+        "tags": [
+          "Stocks"
+        ]
+      },
+      "post": {
+        "operationId": "create_watchlist_group_api_v1_stocks_watchlist_groups_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Create a watchlist group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/move-member": {
+      "post": {
+        "operationId": "move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupMemberMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Move or copy a symbol between groups",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/reorder": {
+      "put": {
+        "operationId": "reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Atomically reorder every watchlist group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/{group_id}": {
+      "delete": {
+        "operationId": "delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Expected Revision",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Delete a watchlist group",
+        "tags": [
+          "Stocks"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupRenameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Rename a watchlist group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/{group_id}/members": {
+      "post": {
+        "operationId": "add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupMemberAddRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Add an authoritative symbol to a group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/reorder": {
+      "put": {
+        "operationId": "reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupMemberReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Atomically reorder every member in one group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/{stock_code}": {
+      "delete": {
+        "operationId": "remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Expected Revision",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Remove a symbol from one group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
     "/api/v1/stocks/watchlist/remove": {
       "post": {
         "description": "从 STOCK_LIST 中移除指定股票代码。",
@@ -34396,6 +36921,68 @@
         "summary": "LLM token usage summary",
         "tags": [
           "Usage"
+        ]
+      }
+    },
+    "/api/v1/watchlist/scores": {
+      "post": {
+        "description": "Batch-aggregate AI-oriented watchlist scores from the latest analysis history and same-report, unexpired decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Requests are limited to 200 unique market identities. Default sort=manual preserves the caller's order. No new LLM calls.",
+        "operationId": "scoreWatchlistSymbols",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Score aggregation failed"
+          }
+        },
+        "summary": "Score watchlist symbols from existing analysis",
+        "tags": [
+          "Watchlist"
         ]
       }
     },

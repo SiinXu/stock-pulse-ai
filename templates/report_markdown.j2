@@ -1,4 +1,4 @@
-{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line with context %}
+{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line, decision_card with context %}
 # 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ labels.analyzed_prefix }} **{{ results|length }}** {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -24,6 +24,7 @@
 
 ## {{ e.signal_emoji }} {{ e.stock_name }} ({{ result.code }})
 
+{{ decision_card(e, compact=false) }}
 {% if intel %}
 ### 📰 {{ labels.info_heading }}
 
