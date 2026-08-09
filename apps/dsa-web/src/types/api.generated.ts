@@ -3323,6 +3323,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/watchlist/scores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score watchlist symbols from existing analysis
+         * @description Batch-aggregate AI-oriented watchlist scores from the latest analysis history and same-report, unexpired decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Requests are limited to 200 unique market identities. Default sort=manual preserves the caller's order. No new LLM calls.
+         */
+        post: operations["scoreWatchlistSymbols"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -10484,6 +10504,70 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * SchedulerRunNowResponse
+         * @description Acceptance and correlation data for one immediate scheduler run.
+         */
+        SchedulerRunNowResponse: {
+            /** Accepted */
+            accepted: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at?: string | null;
+        };
+        /**
+         * SchedulerStatusResponse
+         * @description Authoritative status for this process's legacy day-batch scheduler.
+         */
+        SchedulerStatusResponse: {
+            /** Active Run Id */
+            active_run_id?: string | null;
+            /** Attached */
+            attached: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /** Last Run Id */
+            last_run_id?: string | null;
+            /** Last Run Outcome */
+            last_run_outcome?: ("succeeded" | "failed") | null;
+            /** Last Skip Reason */
+            last_skip_reason?: string | null;
+            /** Last Skipped At */
+            last_skipped_at?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /**
+             * Process Mode
+             * @enum {string}
+             */
+            process_mode: "serve" | "desktop" | "not_attached";
+            /** Run Now Available */
+            run_now_available: boolean;
+            /** Run Now Block Reason */
+            run_now_block_reason?: string | null;
+            /** Running */
+            running: boolean;
+            /** Schedule Times */
+            schedule_times?: string[];
+            /** Schedule Timezone */
+            schedule_timezone: string;
+            /**
+             * Track
+             * @constant
+             */
+            track: "legacy_day_batch";
+        };
         /** ScorecardBucket */
         ScorecardBucket: {
             /** Avg Return Pct */
@@ -12334,6 +12418,128 @@ export interface components {
              * @description 当前自选队列股票代码列表
              */
             stock_codes?: string[];
+        };
+        /** WatchlistScoreFactor */
+        WatchlistScoreFactor: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "analysis_sentiment" | "decision_signal";
+            /** Params */
+            params?: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Reason */
+            reason?: ("invalid_sentiment" | "inactive_signal" | "expired_signal" | "incoherent_signal_source" | "unknown_signal_action" | "invalid_signal_confidence") | null;
+            source: components["schemas"]["WatchlistScoreFactorSource"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "ignored";
+            /** Value */
+            value?: string | number | null;
+        };
+        /** WatchlistScoreFactorSource */
+        WatchlistScoreFactorSource: {
+            /** As Of */
+            as_of?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "watchlist_score_v1";
+            /** Id */
+            id?: number | null;
+            /** Profile */
+            profile?: string | null;
+            /** Source Report Id */
+            source_report_id?: number | null;
+        };
+        /** WatchlistScoreItem */
+        WatchlistScoreItem: {
+            /** Age Days */
+            age_days?: number | null;
+            /** Analysis Id */
+            analysis_id?: number | null;
+            /** As Of */
+            as_of?: string | null;
+            /** Degraded Reasons */
+            degraded_reasons?: ("invalid_sentiment" | "inactive_signal" | "expired_signal" | "incoherent_signal_source" | "unknown_signal_action" | "invalid_signal_confidence")[];
+            /** Factors */
+            factors?: components["schemas"]["WatchlistScoreFactor"][];
+            /**
+             * Freshness
+             * @default none
+             * @enum {string}
+             */
+            freshness: "none" | "unknown" | "today" | "recent" | "stale_week" | "stale";
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scored" | "unanalyzed";
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistScoreQueryCount */
+        WatchlistScoreQueryCount: {
+            /** Analysis */
+            analysis: number;
+            /** Signals */
+            signals: number;
+        };
+        /** WatchlistScoreRequest */
+        WatchlistScoreRequest: {
+            /**
+             * Sort
+             * @default manual
+             * @enum {string}
+             */
+            sort: "manual" | "score_desc" | "score_asc";
+            /** Stock Codes */
+            stock_codes?: string[];
+        };
+        /** WatchlistScoreResponse */
+        WatchlistScoreResponse: {
+            /**
+             * Disclaimer Key
+             * @constant
+             */
+            disclaimer_key: "watchlist_score.disclaimer";
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "watchlist_score_v1";
+            /** Items */
+            items: components["schemas"]["WatchlistScoreItem"][];
+            query_count: components["schemas"]["WatchlistScoreQueryCount"];
+            /**
+             * Scoring Mode
+             * @constant
+             */
+            scoring_mode: "aggregate_existing";
+            /**
+             * Sort
+             * @enum {string}
+             */
+            sort: "manual" | "score_desc" | "score_asc";
+            source_rows: components["schemas"]["WatchlistScoreSourceRows"];
+        };
+        /** WatchlistScoreSourceRows */
+        WatchlistScoreSourceRows: {
+            /** Analysis */
+            analysis: number;
+            /** Signals */
+            signals: number;
         };
     };
     responses: never;
@@ -21808,9 +22014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerRunNowResponse"];
                 };
             };
         };
@@ -21830,9 +22034,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerStatusResponse"];
                 };
             };
         };
@@ -21899,6 +22101,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scoreWatchlistSymbols: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistScoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistScoreResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Score aggregation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
