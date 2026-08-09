@@ -15404,6 +15404,11 @@
             "title": "Max Input Bytes",
             "type": "integer"
           },
+          "max_output_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Output Bytes",
+            "type": "integer"
+          },
           "max_pages": {
             "exclusiveMinimum": 0.0,
             "title": "Max Pages",
@@ -15430,6 +15435,7 @@
           "max_pages",
           "max_table_rows",
           "max_table_columns",
+          "max_output_bytes",
           "max_render_seconds",
           "max_concurrency"
         ],
@@ -27238,7 +27244,7 @@
                 }
               }
             },
-            "description": "Optional export dependency or font missing"
+            "description": "PDF dependency, font, deadline, or render worker unavailable"
           }
         },
         "summary": "Export a history report",

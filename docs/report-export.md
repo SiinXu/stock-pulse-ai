@@ -91,8 +91,10 @@ query-string fragment can remain in the PDF.
 
 ## Bounded execution
 
-PDF conversion is synchronous but has an explicit owner and degradation
-contract:
+The request waits synchronously, but fpdf2 rendering runs in an isolated spawn
+worker. The parent terminates that worker when the single monotonic deadline
+expires, so a stuck renderer cannot continue occupying the API process. The
+degradation contract is explicit:
 
 | Bound | Default | Failure |
 | --- | ---: | --- |
@@ -101,6 +103,7 @@ contract:
 | Rows per table | 500 | 413 `export_table_rows_exceeded` |
 | Columns per table | 12 | 413 `export_table_columns_exceeded` |
 | Total table cells | 3,000 | 413 `export_table_cells_exceeded` |
+| PDF output | 24 MiB | 413 `export_output_too_large` |
 | Monotonic render deadline | 20 seconds | 503 `export_deadline_exceeded` |
 | Concurrent renders per process | 2 | 429 `export_busy` |
 
@@ -142,7 +145,8 @@ Unicode history identities do not fail Starlette header encoding.
 | 500 | `generation_failed` | History Markdown generation failed |
 | 503 | `export_dependency_missing` | fpdf2 missing, incompatible, or legacy namespace conflict |
 | 503 | `export_font_*` | Font invalid, unavailable, or missing exact report glyphs |
-| 503 | `export_deadline_exceeded` | Monotonic render deadline exceeded |
+| 503 | `export_deadline_exceeded` | Isolated render worker was terminated at the monotonic deadline |
+| 503 | `export_worker_unavailable` | The isolated render worker could not start or return safely |
 
 ## Remaining Issue #163 scope
 

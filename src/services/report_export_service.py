@@ -15,6 +15,7 @@ import html
 import importlib
 import importlib.metadata
 import logging
+import multiprocessing
 import re
 import threading
 import time
@@ -53,6 +54,8 @@ PDF_RENDER_DEADLINE_SECONDS = 20.0
 PDF_MAX_CONCURRENCY = 2
 PDF_CACHE_ENTRIES = 12
 PDF_CACHE_MAX_BYTES = 24 * 1024 * 1024
+PDF_MAX_OUTPUT_BYTES = PDF_CACHE_MAX_BYTES
+PDF_WORKER_SHUTDOWN_SECONDS = 1.0
 
 _IMAGE_OMISSION_NOTE_ZH = "（图表/图片已在 PDF 导出中省略，请参阅原报告 Markdown 附件）"
 _IMAGE_OMISSION_NOTE_EN = (
@@ -142,6 +145,17 @@ class ReportExportBusyError(ReportExportError):
             error_code="export_busy",
         )
         self.status_code = 429
+
+
+class ReportExportWorkerError(ReportExportError):
+    """Raised when the isolated PDF renderer cannot start or return safely."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The isolated PDF render worker is unavailable.",
+            error_code="export_worker_unavailable",
+        )
+        self.status_code = 503
 
 
 @dataclass(frozen=True)
@@ -476,6 +490,7 @@ def get_export_capabilities(language: str = "zh") -> Dict[str, Any]:
             "max_pages": MAX_PDF_PAGES,
             "max_table_rows": MAX_TABLE_ROWS,
             "max_table_columns": MAX_TABLE_COLUMNS,
+            "max_output_bytes": PDF_MAX_OUTPUT_BYTES,
             "max_render_seconds": PDF_RENDER_DEADLINE_SECONDS,
             "max_concurrency": PDF_MAX_CONCURRENCY,
         },
@@ -898,6 +913,136 @@ def _render_pdf_bytes(
     return bytes(raw) if isinstance(raw, (bytes, bytearray)) else str(raw).encode("latin-1")
 
 
+def _render_pdf_worker(
+    send_connection: Any,
+    blocks: Sequence[Tuple[str, Any]],
+    font_path: str,
+    title: Optional[str],
+    deadline: float,
+) -> None:
+    """Render in an isolated process so the parent can enforce a hard deadline."""
+    try:
+        payload: Tuple[Any, ...] = (
+            "ok",
+            _render_pdf_bytes(
+                blocks,
+                font_path=font_path,
+                title=title,
+                deadline=deadline,
+            ),
+        )
+    except ReportExportError as exc:
+        payload = (
+            "export_error",
+            type(exc).__name__,
+            exc.error_code,
+            exc.message,
+            getattr(exc, "status_code", None),
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - child details stay private
+        log_safe_exception(
+            logger,
+            "Isolated PDF render worker failed",
+            exc,
+            error_code="export_worker_failed",
+            level=logging.WARNING,
+        )
+        payload = ("worker_error",)
+    try:
+        send_connection.send(payload)
+    except (BrokenPipeError, EOFError, OSError):
+        pass
+    finally:
+        send_connection.close()
+
+
+def _stop_render_worker(process: Any) -> None:
+    """Bound shutdown of a timed-out or malformed render worker."""
+    if not process.is_alive():
+        process.join(timeout=0)
+        return
+    process.terminate()
+    process.join(timeout=PDF_WORKER_SHUTDOWN_SECONDS)
+    if process.is_alive() and hasattr(process, "kill"):
+        process.kill()
+        process.join(timeout=PDF_WORKER_SHUTDOWN_SECONDS)
+
+
+def _raise_worker_export_error(payload: Tuple[Any, ...]) -> None:
+    _tag, class_name, error_code, message, status_code = payload
+    if class_name == "ReportExportFontError":
+        raise ReportExportFontError(message, error_code=error_code)
+    if class_name == "ReportExportDependencyError":
+        raise ReportExportDependencyError(message)
+    if class_name == "ReportExportLimitError":
+        raise ReportExportLimitError(
+            message,
+            error_code=error_code,
+            status_code=int(status_code or 413),
+        )
+    raise ReportExportError(message, error_code=error_code)
+
+
+def _render_pdf_bytes_isolated(
+    blocks: Sequence[Tuple[str, Any]],
+    *,
+    font_path: str,
+    title: Optional[str],
+    deadline: float,
+) -> bytes:
+    """Run fpdf2 in a spawn worker and terminate it when the deadline expires."""
+    context = multiprocessing.get_context("spawn")
+    receive_connection, send_connection = context.Pipe(duplex=False)
+    process = context.Process(
+        target=_render_pdf_worker,
+        args=(send_connection, blocks, font_path, title, deadline),
+        name="stockpulse-report-export",
+        daemon=True,
+    )
+    try:
+        process.start()
+    except Exception as exc:  # broad-exception: fallback_recorded - platform start failure
+        receive_connection.close()
+        send_connection.close()
+        log_safe_exception(
+            logger,
+            "PDF render worker could not start",
+            exc,
+            error_code="export_worker_unavailable",
+            level=logging.WARNING,
+        )
+        raise ReportExportWorkerError() from exc
+    send_connection.close()
+
+    try:
+        remaining = max(deadline - time.monotonic(), 0.0)
+        if remaining <= 0 or not receive_connection.poll(remaining):
+            _stop_render_worker(process)
+            raise ReportExportLimitError(
+                "PDF export exceeded the render deadline.",
+                error_code="export_deadline_exceeded",
+                status_code=503,
+            )
+        try:
+            payload = receive_connection.recv()
+        except (EOFError, OSError) as exc:
+            _stop_render_worker(process)
+            raise ReportExportWorkerError() from exc
+    finally:
+        receive_connection.close()
+
+    process.join(timeout=PDF_WORKER_SHUTDOWN_SECONDS)
+    if process.is_alive():
+        _stop_render_worker(process)
+    if not isinstance(payload, tuple) or not payload:
+        raise ReportExportWorkerError()
+    if payload[0] == "export_error":
+        _raise_worker_export_error(payload)
+    if payload[0] != "ok" or len(payload) != 2 or not isinstance(payload[1], bytes):
+        raise ReportExportWorkerError()
+    return payload[1]
+
+
 def _safe_filename_stem(stem: str) -> str:
     cleaned = re.sub(r"[^\w.\-]+", "_", str(stem).strip(), flags=re.UNICODE)
     cleaned = cleaned.strip("._") or "report"
@@ -1019,7 +1164,7 @@ def export_pdf_bytes(
     if not _PDF_SEMAPHORE.acquire(blocking=False):
         raise ReportExportBusyError()
     try:
-        pdf_bytes = _render_pdf_bytes(
+        pdf_bytes = _render_pdf_bytes_isolated(
             blocks,
             font_path=resolved_font,
             title=title or stem,
@@ -1033,6 +1178,11 @@ def export_pdf_bytes(
         raise ReportExportError(
             "PDF backend returned invalid output.",
             error_code="export_pdf_invalid",
+        )
+    if len(pdf_bytes) > PDF_MAX_OUTPUT_BYTES:
+        raise ReportExportLimitError(
+            "PDF output exceeds the in-memory artifact limit.",
+            error_code="export_output_too_large",
         )
     artifact = ExportArtifact(pdf_bytes, "application/pdf", f"{stem}.pdf", "pdf")
     _cache_put(key, artifact)

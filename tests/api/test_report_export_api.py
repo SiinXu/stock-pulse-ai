@@ -15,6 +15,7 @@ from src.services.report_export_service import (
     ReportExportDependencyError,
     ReportExportFontError,
     ReportExportLimitError,
+    ReportExportWorkerError,
 )
 
 
@@ -72,6 +73,7 @@ def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
                 "max_pages": 100,
                 "max_table_rows": 500,
                 "max_table_columns": 12,
+                "max_output_bytes": 25_165_824,
                 "max_render_seconds": 20.0,
                 "max_concurrency": 2,
             },
@@ -122,6 +124,16 @@ def test_export_invalid_format_direct_call_still_returns_stable_400(monkeypatch)
     assert exc.value.detail["error"] == "export_format_invalid"
 
 
+def test_export_invalid_format_http_contract_is_400():
+    from api.app import create_app
+    from fastapi.testclient import TestClient
+
+    app = create_app()
+    response = TestClient(app).get("/api/v1/history/1/export?format=xlsx")
+    assert response.status_code == 400
+    assert response.json()["error"] == "export_format_invalid"
+
+
 @pytest.mark.parametrize(
     ("raised", "status", "code"),
     [
@@ -129,6 +141,7 @@ def test_export_invalid_format_direct_call_still_returns_stable_400(monkeypatch)
         (ReportExportFontError("/secret/font.ttf parser detail"), 503, "export_font_missing"),
         (ReportExportLimitError("input too large"), 413, "export_limit_exceeded"),
         (ReportExportBusyError(), 429, "export_busy"),
+        (ReportExportWorkerError(), 503, "export_worker_unavailable"),
     ],
 )
 def test_export_error_mapping_is_bounded_and_sanitized(monkeypatch, raised, status, code):

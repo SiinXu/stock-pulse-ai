@@ -43,6 +43,7 @@ class ReportExportPdfLimits(BaseModel):
     max_pages: int = Field(gt=0)
     max_table_rows: int = Field(gt=0)
     max_table_columns: int = Field(gt=0)
+    max_output_bytes: int = Field(gt=0)
     max_render_seconds: float = Field(gt=0)
     max_concurrency: int = Field(gt=0)
 

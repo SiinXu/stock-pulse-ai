@@ -9199,6 +9199,8 @@ export interface components {
             max_concurrency: number;
             /** Max Input Bytes */
             max_input_bytes: number;
+            /** Max Output Bytes */
+            max_output_bytes: number;
             /** Max Pages */
             max_pages: number;
             /** Max Render Seconds */
@@ -15616,7 +15618,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Optional export dependency or font missing */
+            /** @description PDF dependency, font, deadline, or render worker unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

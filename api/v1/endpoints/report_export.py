@@ -22,7 +22,6 @@ from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.report_export import (
     ReportExportCapabilitiesResponse,
     ReportExportCapabilityLanguage,
-    ReportExportFormat,
 )
 from src.services.history_service import (
     HistoryService,
@@ -35,6 +34,7 @@ from src.services.report_export_service import (
     ReportExportFontError,
     ReportExportFormatError,
     ReportExportLimitError,
+    ReportExportWorkerError,
     capabilities_public_view,
     export_report,
     get_export_capabilities,
@@ -122,7 +122,7 @@ def get_report_export_capabilities(
         404: {"description": "Report not found", "model": ErrorResponse},
         500: {"description": "Export or report generation failed", "model": ErrorResponse},
         503: {
-            "description": "Optional export dependency or font missing",
+            "description": "PDF dependency, font, deadline, or render worker unavailable",
             "model": ErrorResponse,
         },
     },
@@ -140,11 +140,21 @@ def get_report_export_capabilities(
 def export_history_report(
     record_id: str,
     format: Annotated[
-        ReportExportFormat,
-        Query(alias="format", description="Export format: md (default) or pdf"),
+        str,
+        Query(
+            alias="format",
+            description="Export format: md (default) or pdf",
+            json_schema_extra={"enum": ["md", "pdf"]},
+        ),
     ] = "md",
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> Response:
+    if format not in ("md", "pdf"):
+        raise api_error(
+            400,
+            "export_format_invalid",
+            "Unsupported export format. Supported formats: md, pdf.",
+        )
     service = HistoryService(db_manager)
     detail = service.resolve_and_get_detail(record_id)
 
@@ -214,6 +224,8 @@ def export_history_report(
     except ReportExportLimitError as exc:
         raise api_error(exc.status_code, exc.error_code, exc.message) from exc
     except ReportExportBusyError as exc:
+        raise api_error(exc.status_code, exc.error_code, exc.message) from exc
+    except ReportExportWorkerError as exc:
         raise api_error(exc.status_code, exc.error_code, exc.message) from exc
     except ReportExportError as exc:
         log_safe_exception(

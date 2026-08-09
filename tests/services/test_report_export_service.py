@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -260,6 +261,85 @@ def test_pdf_deadline_starts_before_ast_and_font_work(monkeypatch):
     assert exc.value.status_code == 503
 
 
+def test_isolated_worker_is_terminated_at_hard_deadline(monkeypatch):
+    state = {"started": False, "terminated": False, "closed": 0}
+
+    class _ReceiveConnection:
+        def poll(self, _timeout):
+            return False
+
+        def close(self):
+            state["closed"] += 1
+
+    class _SendConnection:
+        def close(self):
+            state["closed"] += 1
+
+    class _Process:
+        def __init__(self):
+            self.alive = False
+
+        def start(self):
+            state["started"] = True
+            self.alive = True
+
+        def is_alive(self):
+            return self.alive
+
+        def terminate(self):
+            state["terminated"] = True
+            self.alive = False
+
+        def join(self, *, timeout):
+            assert timeout in (0, export_mod.PDF_WORKER_SHUTDOWN_SECONDS)
+
+    class _Context:
+        def Pipe(self, *, duplex):
+            assert duplex is False
+            return _ReceiveConnection(), _SendConnection()
+
+        def Process(self, **kwargs):
+            assert kwargs["target"] is export_mod._render_pdf_worker
+            assert kwargs["daemon"] is True
+            return _Process()
+
+    monkeypatch.setattr(export_mod.multiprocessing, "get_context", lambda mode: _Context())
+    with pytest.raises(ReportExportLimitError) as exc:
+        export_mod._render_pdf_bytes_isolated(
+            [],
+            font_path="unused.ttf",
+            title="Report",
+            deadline=export_mod.time.monotonic() + 0.01,
+        )
+    assert exc.value.error_code == "export_deadline_exceeded"
+    assert exc.value.status_code == 503
+    assert state == {"started": True, "terminated": True, "closed": 2}
+
+
+def test_pdf_output_memory_bound_is_explicit(monkeypatch):
+    monkeypatch.setattr(
+        export_mod,
+        "inspect_pdf_backend",
+        lambda: PdfBackendStatus(True, "ready", "2.8.3"),
+    )
+    monkeypatch.setattr(
+        export_mod,
+        "_resolve_font_for_text",
+        lambda *_args, **_kwargs: ("font.ttf", "font_parsed", 0),
+    )
+    monkeypatch.setattr(export_mod, "_cache_key", lambda *_args, **_kwargs: "oversize")
+    monkeypatch.setattr(export_mod, "PDF_MAX_OUTPUT_BYTES", 16)
+    monkeypatch.setattr(
+        export_mod,
+        "_render_pdf_bytes_isolated",
+        lambda *_args, **_kwargs: b"%PDF" + b"x" * export_mod.PDF_MAX_OUTPUT_BYTES,
+    )
+    _clear_pdf_cache()
+    with pytest.raises(ReportExportLimitError) as exc:
+        export_pdf_bytes("# Report")
+    assert exc.value.error_code == "export_output_too_large"
+
+
 @pytest.mark.skipif(
     not export_mod.is_pdf_dependency_available(),
     reason="optional fpdf2 not installed",
@@ -278,7 +358,7 @@ def test_pdf_rejects_report_glyphs_missing_from_otherwise_valid_font():
     not export_mod.is_pdf_dependency_available(),
     reason="optional fpdf2 not installed",
 )
-def test_pdf_long_table_wraps_across_pages_without_text_deletion(tmp_path):
+def test_pdf_long_table_wraps_across_pages_without_text_deletion():
     pypdf = pytest.importorskip("pypdf")
     long_evidence = "Complete evidence sentence " * 18
     rows = "\n".join(
@@ -294,9 +374,7 @@ def test_pdf_long_table_wraps_across_pages_without_text_deletion(tmp_path):
     font = _font_covering(export_mod._rendered_text(export_mod._parse_markdown_blocks(markdown)))
     _clear_pdf_cache()
     artifact = export_pdf_bytes(markdown, font_path=font, filename_stem="long-table")
-    output = tmp_path / "long-table.pdf"
-    output.write_bytes(artifact.content)
-    reader = pypdf.PdfReader(str(output))
+    reader = pypdf.PdfReader(BytesIO(artifact.content))
     extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
     assert len(reader.pages) > 1
     assert extracted.count("Record") >= 2  # repeated table header

@@ -62,10 +62,11 @@ PDF 套件时，默认应用仍可启动并使用无损 Markdown 导出。如果
 | 单表行数 | 500 | 413 `export_table_rows_exceeded` |
 | 单表列数 | 12 | 413 `export_table_columns_exceeded` |
 | 表格总单元格 | 3,000 | 413 `export_table_cells_exceeded` |
+| PDF 输出 | 24 MiB | 413 `export_output_too_large` |
 | 单调时钟渲染期限 | 20 秒 | 503 `export_deadline_exceeded` |
 | 单进程并发渲染 | 2 | 429 `export_busy` |
 
-成功 PDF 使用有界进程内 LRU 缓存（12 项、24 MiB）；键包含 Markdown、标题和字体文件签名，导出器不会持久化 PDF。
+请求会同步等待，但 fpdf2 渲染在隔离的 spawn worker 中执行。到达统一单调时钟期限时，父进程会终止 worker，避免卡死的渲染器继续占用 API 进程；worker 无法启动或安全返回时会得到 503 `export_worker_unavailable`。成功 PDF 使用有界进程内 LRU 缓存（12 项、24 MiB）；键包含 Markdown、标题和字体文件签名，导出器不会持久化 PDF。
 
 ## API
 
