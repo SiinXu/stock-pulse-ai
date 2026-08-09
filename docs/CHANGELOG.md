@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
 - [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).
+- [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
+- [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
 - [Changed] Desktop startup records a bounded asynchronous path-safe CLI visibility summary and documents Desktop/Web capability boundaries for #884 without exposing raw paths to the renderer.
 - [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
 - [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
