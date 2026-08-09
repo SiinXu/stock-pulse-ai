@@ -593,6 +593,7 @@ const baseCategories = [
 type ConfigState = {
   categories: Array<{ category: string; title: string; description: string; displayOrder: number; fields: [] }>;
   itemsByCategory: Record<string, Array<Record<string, unknown>>>;
+  serverItems: Array<Record<string, unknown>>;
   issueByKey: Record<string, unknown[]>;
   activeCategory: string;
   activeSubCategory: string | null;
@@ -626,6 +627,7 @@ type ConfigState = {
   retry: ReturnType<typeof vi.fn>;
   save: typeof save;
   resetDraft: typeof resetDraft;
+  resetDraftKeys: typeof resetDraftKeys;
   setDraftValue: typeof setDraftValue;
   applyPartialUpdate: typeof applyPartialUpdate;
   getChangedItems: () => Array<{ key: string; value: string }>;
@@ -754,6 +756,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
   return {
     categories: baseCategories,
     itemsByCategory,
+    serverItems: Object.values(itemsByCategory).flat(),
     issueByKey: {},
     activeCategory,
     activeSubCategory,
@@ -1008,6 +1011,7 @@ const SettingsPageTestHarness = {
   resetDraft,
   resetDraftKeys,
   setDraftValue,
+  applyPartialUpdate,
   getChangedItems,
   refreshAfterExternalSave,
   refreshStatus,

@@ -39,6 +39,7 @@ describe('agentSetupPresets', () => {
 
     const partial = { ...standard.values, AGENT_MAX_STEPS: '99' };
     expect(matchesAgentPreset('standard_research', partial)).toBe(false);
+    expect(matchesAgentPreset('standard_research', standard.values, new Set(['AGENT_MODE']))).toBe(false);
   });
 
   it('diffs only keys that are available to the panel', () => {
@@ -90,5 +91,8 @@ describe('agentSetupPresets', () => {
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_SKILLS');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_SKILL_DIR');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_EVENT_ALERT_RULES_JSON');
+    expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_BUDGET');
+    expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_TIMEOUT');
+    expect(AGENT_PRESET_MANAGED_KEYS).toContain('AGENT_FEATURES_ACKNOWLEDGED_OFF');
   });
 });

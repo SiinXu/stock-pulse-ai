@@ -19,6 +19,8 @@ import {
   isNotificationChannelKey,
 } from './index';
 import { AgentBehaviorPanel } from './AgentBehaviorPanel';
+import type { AgentModelSummary } from './AgentBehaviorPanel';
+import type { SettingsSaveStatus } from './autosaveMachine';
 
 export type FieldGroupDescriptor = {
   id: string;
@@ -49,8 +51,13 @@ export type SettingsActiveConfigPanelProps = {
   isSaving: boolean;
   issueByKey: Record<string, ConfigValidationIssue[]>;
   allValuesByKey: Record<string, string>;
+  persistedValuesByKey: Record<string, string>;
   alphasiftEnabled: boolean;
   setDraftValue: (key: string, value: string) => void;
+  applyPartialUpdate: (items: Array<{ key: string; value: string }>) => void;
+  resetDraftKeys: (keys: string[]) => void;
+  activeSaveStatus: SettingsSaveStatus;
+  agentModelSummary: AgentModelSummary;
   readOnlyDiagnosticForItem: (item: SystemConfigItem, categoryHint?: string) => string | undefined;
   activeCategory: string;
 };
@@ -83,8 +90,13 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   isSaving,
   issueByKey,
   allValuesByKey,
+  persistedValuesByKey,
   alphasiftEnabled,
   setDraftValue,
+  applyPartialUpdate,
+  resetDraftKeys,
+  activeSaveStatus,
+  agentModelSummary,
   readOnlyDiagnosticForItem,
   activeCategory,
 }) => {
@@ -134,8 +146,16 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           items={subFilteredItems}
           disabled={isSaving}
           onChange={setDraftValue}
+          onBatchChange={applyPartialUpdate}
+          onResetKeys={resetDraftKeys}
           issueByKey={issueByKey}
-          allValuesByKey={allValuesByKey}
+          draftValuesByKey={allValuesByKey}
+          persistedValuesByKey={persistedValuesByKey}
+          saveStatus={activeSaveStatus}
+          modelSummary={agentModelSummary}
+          fieldGroups={activeFieldGroupOrder ?? []}
+          fieldGroupIdOf={fieldGroupIdOf}
+          fieldGroupOrderOf={fieldGroupOrderOf}
           readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
         />
       ) : activeFieldGroupOrder ? (

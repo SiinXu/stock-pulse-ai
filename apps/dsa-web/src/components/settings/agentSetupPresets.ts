@@ -16,15 +16,13 @@ export type AgentSetupPresetId = 'simple_qa' | 'standard_research' | 'deep_gover
 /** Keys a preset is allowed to write. Unrelated keys are left alone. */
 export const AGENT_PRESET_MANAGED_KEYS = [
   'AGENT_MODE',
+  'AGENT_FEATURES_ACKNOWLEDGED_OFF',
   'AGENT_GENERATION_BACKEND',
   'AGENT_MAX_STEPS',
   'AGENT_ARCH',
   'AGENT_ORCHESTRATOR_MODE',
   'AGENT_ORCHESTRATOR_TIMEOUT_S',
   'AGENT_CRITIC_ENABLED',
-  'AGENT_RISK_OVERRIDE',
-  'AGENT_DEEP_RESEARCH_BUDGET',
-  'AGENT_DEEP_RESEARCH_TIMEOUT',
   'AGENT_MEMORY_ENABLED',
   'AGENT_SKILL_ROUTING',
   'AGENT_SKILL_AUTOWEIGHT',
@@ -61,23 +59,21 @@ export type AgentSetupPreset = {
 /**
  * Three semantic profiles over real agent knobs:
  * - simple_qa: single-agent, low step/timeout budgets, no deep research expansion
- * - standard_research: multi/standard pipeline, registry defaults for budgets
- * - deep_governed: higher steps/budgets, critic + multi-strategy deliberation on
+ * - standard_research: multi/standard pipeline with bounded Agent time limits
+ * - deep_governed: higher Agent step/timeout ceilings, critic + deliberation on
  */
 export const AGENT_SETUP_PRESETS: readonly AgentSetupPreset[] = [
   {
     id: 'simple_qa',
     values: {
       AGENT_MODE: 'true',
+      AGENT_FEATURES_ACKNOWLEDGED_OFF: 'false',
       AGENT_GENERATION_BACKEND: 'auto',
       AGENT_MAX_STEPS: '5',
       AGENT_ARCH: 'single',
       AGENT_ORCHESTRATOR_MODE: 'quick',
       AGENT_ORCHESTRATOR_TIMEOUT_S: '300',
       AGENT_CRITIC_ENABLED: 'false',
-      AGENT_RISK_OVERRIDE: 'true',
-      AGENT_DEEP_RESEARCH_BUDGET: '15000',
-      AGENT_DEEP_RESEARCH_TIMEOUT: '60',
       AGENT_MEMORY_ENABLED: 'false',
       AGENT_SKILL_ROUTING: 'auto',
       AGENT_SKILL_AUTOWEIGHT: 'true',
@@ -91,15 +87,13 @@ export const AGENT_SETUP_PRESETS: readonly AgentSetupPreset[] = [
     recommended: true,
     values: {
       AGENT_MODE: 'true',
+      AGENT_FEATURES_ACKNOWLEDGED_OFF: 'false',
       AGENT_GENERATION_BACKEND: 'auto',
       AGENT_MAX_STEPS: '10',
       AGENT_ARCH: 'multi',
       AGENT_ORCHESTRATOR_MODE: 'standard',
       AGENT_ORCHESTRATOR_TIMEOUT_S: '600',
       AGENT_CRITIC_ENABLED: 'false',
-      AGENT_RISK_OVERRIDE: 'true',
-      AGENT_DEEP_RESEARCH_BUDGET: '30000',
-      AGENT_DEEP_RESEARCH_TIMEOUT: '180',
       AGENT_MEMORY_ENABLED: 'false',
       AGENT_SKILL_ROUTING: 'auto',
       AGENT_SKILL_AUTOWEIGHT: 'true',
@@ -112,15 +106,13 @@ export const AGENT_SETUP_PRESETS: readonly AgentSetupPreset[] = [
     id: 'deep_governed',
     values: {
       AGENT_MODE: 'true',
+      AGENT_FEATURES_ACKNOWLEDGED_OFF: 'false',
       AGENT_GENERATION_BACKEND: 'auto',
       AGENT_MAX_STEPS: '25',
       AGENT_ARCH: 'multi',
       AGENT_ORCHESTRATOR_MODE: 'full',
       AGENT_ORCHESTRATOR_TIMEOUT_S: '1200',
       AGENT_CRITIC_ENABLED: 'true',
-      AGENT_RISK_OVERRIDE: 'true',
-      AGENT_DEEP_RESEARCH_BUDGET: '50000',
-      AGENT_DEEP_RESEARCH_TIMEOUT: '300',
       AGENT_MEMORY_ENABLED: 'true',
       AGENT_SKILL_ROUTING: 'auto',
       AGENT_SKILL_AUTOWEIGHT: 'true',
@@ -144,11 +136,37 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       customBasedOn: '自定义（基于 {name}）',
       unmatched: '未匹配任何预设',
       changesTitle: '将写入的字段',
+      confirmTitle: '确认应用 {name}？',
+      confirmDescription: '确认后会将 {count} 项变更作为一个设置草稿批次提交，并由现有自动保存事务持久化。',
+      confirmWarnings: '请核对下方步数与超时变更：更高上限会增加模型调用、耗时和费用；内存会持久化上下文；Critic 与多策略审议会增加推理工作量。应用预设会取消“暂不使用 Agent”的确认，但不会修改 Risk Agent 否决、HITL 审批、全局深度研究预算、技能列表或凭据。',
+      confirm: '确认应用',
+      cancel: '取消',
+      pending: '正在等待保存',
+      saved: '已保存',
+      failed: '自动保存失败',
+      conflicted: '保存冲突',
+      reset: '放弃此预设的草稿更改',
+      unsupported: '后端缺少部分预设字段；无法判定完整匹配',
+      summaryTitle: '已保存的 Agent 状态',
+      model: 'Agent 模型',
+      explicitModel: '专用模型',
+      inheritedModel: '继承报告模型',
+      modelReady: '可用',
+      modelChecking: '正在检查',
+      modelUnavailable: '不可用',
+      modelUnknown: '状态未知',
+      modelNotConfigured: '未配置',
+      agentAcknowledgedOff: '已确认暂不使用 Agent',
+      hitl: '风险与 HITL',
+      hitlEnabled: 'Risk Agent 否决已开启；HITL 绕过仍由 /approvals 单独控制',
+      hitlDisabled: 'Risk Agent 否决已关闭；HITL 绕过仍由 /approvals 单独控制',
+      deepTools: '深度工具',
+      deepToolsEnabled: '估值 Agent 工具已开启',
+      deepToolsDisabled: '估值 Agent 工具已关闭',
       noChanges: '当前值已与该预设一致',
       essentialsTitle: '基础配置',
       advancedTitle: '高级字段',
       advancedDescription: '策略目录、研究预算、治理与诊断类开关。默认折叠，展开后可完整编辑。',
-      fieldChange: '{key}: {from} → {to}',
       emptyValue: '（空）',
       simple_qa: {
         name: '简单问答',
@@ -156,11 +174,11 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       },
       standard_research: {
         name: '标准研究',
-        description: '多 Agent 标准管线，沿用注册表默认预算与安全风险否决。',
+        description: '多 Agent 标准管线，采用适中的 Agent 步数与超时，不开启持久化内存。',
       },
       deep_governed: {
         name: '深度研究',
-        description: '更高步数与研究预算，开启 Critic 与多策略审议。',
+        description: '提高 Agent 步数与超时上限，开启持久化内存、Critic 与多策略审议。',
       },
     },
     en: {
@@ -173,11 +191,37 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       customBasedOn: 'Custom (based on {name})',
       unmatched: 'No matching preset',
       changesTitle: 'Fields that will be written',
+      confirmTitle: 'Apply {name}?',
+      confirmDescription: 'Confirming submits {count} changes as one Settings draft batch, which the existing autosave transaction then persists.',
+      confirmWarnings: 'Review the step and timeout changes below: higher limits increase model calls, latency, and cost; memory persists context; Critic and multi-strategy deliberation add reasoning work. Applying a preset clears “Agent acknowledged off” but does not change Risk Agent veto, HITL approvals, global Deep Research budgets, skill lists, or credentials.',
+      confirm: 'Apply preset',
+      cancel: 'Cancel',
+      pending: 'Waiting to save',
+      saved: 'Saved',
+      failed: 'Autosave failed',
+      conflicted: 'Save conflict',
+      reset: 'Discard this preset draft',
+      unsupported: 'The backend is missing preset fields; a complete match cannot be determined',
+      summaryTitle: 'Saved Agent status',
+      model: 'Agent model',
+      explicitModel: 'Dedicated model',
+      inheritedModel: 'Inherits report model',
+      modelReady: 'Ready',
+      modelChecking: 'Checking',
+      modelUnavailable: 'Unavailable',
+      modelUnknown: 'Status unknown',
+      modelNotConfigured: 'Not configured',
+      agentAcknowledgedOff: 'Agent use acknowledged off',
+      hitl: 'Risk and HITL',
+      hitlEnabled: 'Risk Agent veto is enabled; HITL bypass remains controlled separately in /approvals',
+      hitlDisabled: 'Risk Agent veto is disabled; HITL bypass remains controlled separately in /approvals',
+      deepTools: 'Deep tools',
+      deepToolsEnabled: 'Valuation Agent tool enabled',
+      deepToolsDisabled: 'Valuation Agent tool disabled',
       noChanges: 'Values already match this preset',
       essentialsTitle: 'Essentials',
       advancedTitle: 'Advanced fields',
       advancedDescription: 'Strategy paths, research budgets, governance, and diagnostic toggles. Collapsed by default; expand to edit the full set.',
-      fieldChange: '{key}: {from} → {to}',
       emptyValue: '(empty)',
       simple_qa: {
         name: 'Simple Q&A',
@@ -185,11 +229,11 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       },
       standard_research: {
         name: 'Standard research',
-        description: 'Multi-agent standard pipeline with registry-default budgets and risk veto on.',
+        description: 'Multi-agent standard pipeline with moderate Agent step/time limits and persisted memory off.',
       },
       deep_governed: {
         name: 'Deep + governed',
-        description: 'Higher steps and research budgets with Critic and multi-strategy deliberation.',
+        description: 'Higher Agent step/time limits with persisted memory, Critic, and multi-strategy deliberation.',
       },
     },
   },
@@ -269,6 +313,10 @@ export function matchesAgentPreset(
   currentValues: Readonly<Record<string, string>>,
   availableKeys?: ReadonlySet<string> | readonly string[],
 ): boolean {
+  const allowed = asKeySet(availableKeys);
+  if (allowed && AGENT_PRESET_MANAGED_KEYS.some((key) => !allowed.has(key))) {
+    return false;
+  }
   return diffAgentPreset(presetId, currentValues, availableKeys).length === 0;
 }
 

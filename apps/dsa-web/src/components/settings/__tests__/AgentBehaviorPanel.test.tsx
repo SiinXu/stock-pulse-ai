@@ -1,22 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { SystemConfigItem } from '../../../types/systemConfig';
-import { AgentBehaviorPanel } from '../AgentBehaviorPanel';
+import { AgentBehaviorPanel, type AgentBehaviorPanelProps } from '../AgentBehaviorPanel';
 import {
   AGENT_ESSENTIAL_KEYS,
   AGENT_PRESET_MANAGED_KEYS,
   AGENT_SETUP_PRESETS,
 } from '../agentSetupPresets';
-
-// Mock SettingsField so this suite does not depend on pre-existing settingsHelp
-// inventory drift on main (unrelated RSS_NEWS_FEED_URLS source/en inventory gap).
-vi.mock('../SettingsField', () => ({
-  SettingsField: ({ item }: { item: { key: string } }) => (
-    <div data-testid={`settings-field-${item.key}`}>{item.key}</div>
-  ),
-}));
 
 function buildItem(key: string, value: string, displayOrder = 1): SystemConfigItem {
   return {
@@ -27,23 +19,15 @@ function buildItem(key: string, value: string, displayOrder = 1): SystemConfigIt
     schema: {
       key,
       category: 'agent',
-      dataType: key.includes('STEPS') || key.includes('TIMEOUT') || key.includes('BUDGET')
-        ? 'integer'
-        : key.includes('ENABLED') || key === 'AGENT_MODE' || key.endsWith('_OVERRIDE')
-          ? 'boolean'
-          : 'string',
-      uiControl: key.includes('STEPS') || key.includes('TIMEOUT') || key.includes('BUDGET')
-        ? 'number'
-        : key.includes('ENABLED') || key === 'AGENT_MODE' || key.endsWith('_OVERRIDE')
-          ? 'switch'
-          : 'text',
+      dataType: key.includes('STEPS') || key.includes('TIMEOUT') ? 'integer' : key.includes('ENABLED') || key === 'AGENT_MODE' || key === 'AGENT_FEATURES_ACKNOWLEDGED_OFF' ? 'boolean' : 'string',
+      uiControl: key.includes('STEPS') || key.includes('TIMEOUT') ? 'number' : key.includes('ENABLED') || key === 'AGENT_MODE' || key === 'AGENT_FEATURES_ACKNOWLEDGED_OFF' ? 'switch' : 'text',
       isSensitive: false,
       isRequired: false,
       isEditable: true,
       options: [],
       validation: {},
       displayOrder,
-      title: key,
+      title: key.replaceAll('_', ' '),
     },
   };
 }
@@ -52,107 +36,166 @@ function standardValues(): Record<string, string> {
   return { ...AGENT_SETUP_PRESETS.find((preset) => preset.id === 'standard_research')!.values };
 }
 
-function buildItems(values: Record<string, string>): SystemConfigItem[] {
-  // Essentials + a few advanced keys so progressive disclosure is observable.
-  const keys = [
-    ...AGENT_ESSENTIAL_KEYS,
-    'AGENT_ORCHESTRATOR_TIMEOUT_S',
-    'AGENT_CRITIC_ENABLED',
-    'AGENT_RISK_OVERRIDE',
-    'AGENT_DEEP_RESEARCH_BUDGET',
-    'AGENT_MEMORY_ENABLED',
-    'AGENT_SKILLS',
-    'AGENT_SKILL_DIR',
-  ];
-  return keys.map((key, index) => buildItem(key, values[key] ?? '', index + 1));
+function buildItems(values: Record<string, string>, keys: readonly string[] = AGENT_PRESET_MANAGED_KEYS): SystemConfigItem[] {
+  return [...keys, 'AGENT_SKILLS', 'AGENT_SKILL_DIR', 'AGENT_RISK_OVERRIDE', 'VALUATION_AGENT_TOOL_ENABLED']
+    .filter((key, index, all) => all.indexOf(key) === index)
+    .map((key, index) => buildItem(key, values[key] ?? '', index + 1));
 }
 
-function renderPanel(
-  values: Record<string, string> = standardValues(),
-  onChange = vi.fn(),
-) {
-  const items = buildItems(values);
-  render(
-    <AgentBehaviorPanel
-      items={items}
-      disabled={false}
-      onChange={onChange}
-      issueByKey={{}}
-      allValuesByKey={values}
-    />,
-  );
-  return { onChange, items };
+function propsFor(overrides: Partial<AgentBehaviorPanelProps> = {}): AgentBehaviorPanelProps {
+  const values = standardValues();
+  return {
+    items: buildItems(values),
+    disabled: false,
+    onChange: vi.fn(),
+    onBatchChange: vi.fn(),
+    onResetKeys: vi.fn(),
+    issueByKey: {},
+    draftValuesByKey: values,
+    persistedValuesByKey: { ...values, AGENT_LITELLM_MODEL: 'primary/gpt', AGENT_RISK_OVERRIDE: 'true', VALUATION_AGENT_TOOL_ENABLED: 'false' },
+    saveStatus: 'idle',
+    modelSummary: { value: 'GPT · primary', source: 'explicit', readiness: 'ready' },
+    fieldGroups: [
+      { id: 'mode', titleKey: 'settings.agentGroupMode' },
+      { id: 'skills', titleKey: 'settings.agentGroupSkills' },
+      { id: 'context', titleKey: 'settings.agentGroupContext' },
+      { id: 'other', titleKey: 'settings.categoryGroupOther' },
+    ],
+    fieldGroupIdOf: (key) => key.includes('SKILL') ? 'skills' : key.includes('MEMORY') ? 'context' : key === 'VALUATION_AGENT_TOOL_ENABLED' ? 'other' : 'mode',
+    fieldGroupOrderOf: (key) => buildItems(values).findIndex((item) => item.key === key),
+    ...overrides,
+  };
 }
 
 describe('AgentBehaviorPanel', () => {
-  it('shows presets and only essentials in the default (collapsed) view', () => {
-    renderPanel();
+  it('shows a persisted summary and keeps advanced fields collapsed under semantic groups', () => {
+    render(<AgentBehaviorPanel {...propsFor()} />);
 
-    expect(screen.getByTestId('agent-setup-presets')).toBeInTheDocument();
-    expect(screen.getByTestId('agent-preset-card-simple_qa')).toBeInTheDocument();
-    expect(screen.getByTestId('agent-preset-card-standard_research')).toBeInTheDocument();
-    expect(screen.getByTestId('agent-preset-card-deep_governed')).toBeInTheDocument();
-
+    expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/Standard research|标准研究/);
+    expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/GPT · primary/);
     const essentials = screen.getByTestId('agent-essentials-fields');
     for (const key of AGENT_ESSENTIAL_KEYS) {
       expect(within(essentials).getByTestId(`settings-field-${key}`)).toBeInTheDocument();
     }
-
-    // Advanced block exists but is a collapsed <details> — fields stay in DOM
-    // for a11y but the default open state must be false.
     const advanced = screen.getByTestId('agent-advanced-fields');
-    expect(advanced).toBeInTheDocument();
     expect(advanced).not.toHaveAttribute('open');
-    expect(within(advanced).getByTestId('settings-field-AGENT_SKILLS')).toBeInTheDocument();
-    expect(within(advanced).getByTestId('settings-field-AGENT_CRITIC_ENABLED')).toBeInTheDocument();
-
-    // Default visible field count = essentials only (acceptance: far fewer than flat 20+).
-    expect(AGENT_ESSENTIAL_KEYS.length).toBeLessThanOrEqual(5);
-    expect(AGENT_ESSENTIAL_KEYS.length).toBeLessThan(AGENT_PRESET_MANAGED_KEYS.length);
+    expect(within(advanced).getByText(/Runtime & mode|运行模式/)).toBeInTheDocument();
+    expect(within(advanced).getByText(/Skills|技能/)).toBeInTheDocument();
   });
 
-  it('marks an exact preset match and applies another preset through onChange', () => {
-    const values = standardValues();
+  it('previews without mutation, then confirms exactly one atomic batch', () => {
     const onChange = vi.fn();
-    renderPanel(values, onChange);
+    const onBatchChange = vi.fn();
+    render(<AgentBehaviorPanel {...propsFor({ onChange, onBatchChange })} />);
 
-    expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(/Standard research|标准研究/);
+    const apply = screen.getByTestId('agent-preset-apply-simple_qa');
+    fireEvent.mouseEnter(apply);
+    expect(screen.getByTestId('agent-preset-preview-simple_qa')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onBatchChange).not.toHaveBeenCalled();
 
+    fireEvent.click(apply);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onBatchChange).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
+
+    expect(onBatchChange).toHaveBeenCalledTimes(1);
+    const updates = Object.fromEntries(onBatchChange.mock.calls[0][0].map((item: { key: string; value: string }) => [item.key, item.value]));
+    expect(updates.AGENT_ARCH).toBe('single');
+    expect(updates.AGENT_MAX_STEPS).toBe('5');
+    expect(updates.AGENT_SKILLS).toBeUndefined();
+    expect(updates.AGENT_DEEP_RESEARCH_BUDGET).toBeUndefined();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('cancels confirmation without changing the draft', () => {
+    const onBatchChange = vi.fn();
+    render(<AgentBehaviorPanel {...propsFor({ onBatchChange })} />);
+    fireEvent.click(screen.getByTestId('agent-preset-apply-deep_governed'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Cancel|取消/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onBatchChange).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a failed autosave and offers immediate draft recovery', () => {
+    const onResetKeys = vi.fn();
+    render(<AgentBehaviorPanel {...propsFor({ saveStatus: 'failed', onResetKeys })} />);
     fireEvent.click(screen.getByTestId('agent-preset-apply-simple_qa'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
 
-    // Managed keys that differ from standard → simple_qa must be written.
-    const written = Object.fromEntries(
-      onChange.mock.calls.map((call) => {
-        const [key, value] = call as [string, string];
-        return [key, value];
-      }),
-    );
-    expect(written.AGENT_ARCH).toBe('single');
-    expect(written.AGENT_MAX_STEPS).toBe('5');
-    expect(written.AGENT_ORCHESTRATOR_MODE).toBe('quick');
-    // Skill list is not managed by presets.
-    expect(written.AGENT_SKILLS).toBeUndefined();
-    expect(screen.getByTestId('agent-preset-last-applied')).toBeInTheDocument();
+    expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(/Autosave failed|自动保存失败/);
+    fireEvent.click(screen.getByRole('button', { name: /Discard this preset draft|放弃此预设/ }));
+    expect(onResetKeys).toHaveBeenCalledTimes(1);
+    expect(onResetKeys.mock.calls[0][0]).toContain('AGENT_MAX_STEPS');
   });
 
-  it('shows custom status after a field diverges from the last applied preset base', () => {
-    const values = { ...standardValues(), AGENT_MAX_STEPS: '12' };
-    renderPanel(values);
-
-    // Without last-applied state, still custom (not an exact match).
-    const status = screen.getByTestId('agent-preset-status');
-    expect(status).toHaveTextContent(/Custom|自定义/);
+  it('uses persisted values for the active badge instead of an unsaved draft', () => {
+    const persisted = standardValues();
+    const draft = { ...persisted, AGENT_MAX_STEPS: '12' };
+    render(<AgentBehaviorPanel {...propsFor({ draftValuesByKey: draft, persistedValuesByKey: persisted })} />);
+    expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(/Standard research|标准研究/);
   });
 
-  it('previews the field list for a hovered/focused preset before apply', () => {
+  it('fails closed when the backend omits any managed preset key', () => {
     const values = standardValues();
-    renderPanel(values);
+    render(<AgentBehaviorPanel {...propsFor({ items: buildItems(values, AGENT_ESSENTIAL_KEYS) })} />);
+    expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(/missing preset fields|缺少部分预设字段/);
+    expect(screen.getByTestId('agent-preset-apply-simple_qa')).toBeDisabled();
+  });
 
-    const applyDeep = screen.getByTestId('agent-preset-apply-deep_governed');
-    fireEvent.mouseEnter(applyDeep);
+  it('restores focus to the preset trigger after keyboard cancellation', async () => {
+    render(<AgentBehaviorPanel {...propsFor()} />);
+    const trigger = screen.getByTestId('agent-preset-apply-simple_qa');
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    const preview = screen.getByTestId('agent-preset-preview-deep_governed');
-    expect(preview).toBeInTheDocument();
-    expect(within(preview).getByText(/AGENT_MAX_STEPS/)).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it.each(['failed', 'conflicted'] as const)(
+    'surfaces a %s preset save and restores only the preset draft keys',
+    (saveStatus) => {
+      const onResetKeys = vi.fn();
+      const initialProps = propsFor({ onResetKeys });
+      const { rerender } = render(<AgentBehaviorPanel {...initialProps} />);
+      fireEvent.click(screen.getByTestId('agent-preset-apply-simple_qa'));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
+
+      rerender(<AgentBehaviorPanel {...initialProps} saveStatus={saveStatus} />);
+      expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(
+        saveStatus === 'failed' ? /Autosave failed|自动保存失败/ : /Save conflict|保存冲突/,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Discard this preset draft|放弃此预设/ }));
+      expect(onResetKeys).toHaveBeenCalledTimes(1);
+      expect(onResetKeys.mock.calls[0][0]).toEqual(expect.arrayContaining([
+        'AGENT_ARCH',
+        'AGENT_MAX_STEPS',
+        'AGENT_ORCHESTRATOR_MODE',
+      ]));
+      expect(onResetKeys.mock.calls[0][0]).not.toContain('AGENT_SKILLS');
+    },
+  );
+
+  it('uses the real SettingsField validation and keeps catalog failures unknown', () => {
+    const props = propsFor({
+      issueByKey: {
+        AGENT_MAX_STEPS: [{
+          key: 'AGENT_MAX_STEPS',
+          code: 'out_of_range',
+          message: 'Step budget is outside the allowed range',
+          severity: 'error',
+        }],
+      },
+      modelSummary: { value: 'GPT · primary', source: 'explicit', readiness: 'unknown' },
+    });
+    render(<AgentBehaviorPanel {...props} />);
+
+    const field = screen.getByTestId('settings-field-AGENT_MAX_STEPS');
+    expect(field.querySelector('[aria-invalid="true"]')).not.toBeNull();
+    expect(field).toHaveTextContent('Step budget is outside the allowed range');
+    expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/Status unknown|状态未知/);
   });
 });
