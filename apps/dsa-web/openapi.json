@@ -21136,69 +21136,115 @@
         "title": "ValidationError",
         "type": "object"
       },
-      "WatchlistGroupCreateRequest": {
+      "WatchlistComputedAttrsSchema": {
+        "additionalProperties": false,
+        "description": "Read-only computed projection owned by T25/T26 services.",
         "properties": {
+          "ai_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Score"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "title": "WatchlistComputedAttrsSchema",
+        "type": "object"
+      },
+      "WatchlistGroupCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
           "name": {
-            "description": "New group name",
-            "maxLength": 128,
+            "maxLength": 80,
             "minLength": 1,
             "title": "Name",
             "type": "string"
           }
         },
         "required": [
+          "expected_revision",
           "name"
         ],
         "title": "WatchlistGroupCreateRequest",
         "type": "object"
       },
       "WatchlistGroupMemberAddRequest": {
+        "additionalProperties": false,
         "properties": {
-          "attrs": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Optional attrs payload (T25/T26 mount). Defaults to empty object.",
-            "title": "Attrs"
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
           },
           "stock_code": {
-            "description": "Stock code to add to the group",
+            "maxLength": 32,
             "minLength": 1,
             "title": "Stock Code",
             "type": "string"
           }
         },
         "required": [
+          "expected_revision",
           "stock_code"
         ],
         "title": "WatchlistGroupMemberAddRequest",
         "type": "object"
       },
       "WatchlistGroupMemberMoveRequest": {
+        "additionalProperties": false,
         "properties": {
           "copy_membership": {
             "default": false,
-            "description": "When true, keep the source membership (multi-group). Default moves.",
             "title": "Copy Membership",
             "type": "boolean"
           },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
           "source_group_id": {
+            "maxLength": 64,
             "minLength": 1,
             "title": "Source Group Id",
             "type": "string"
           },
           "stock_code": {
+            "maxLength": 32,
             "minLength": 1,
             "title": "Stock Code",
             "type": "string"
           },
           "target_group_id": {
+            "maxLength": 64,
             "minLength": 1,
             "title": "Target Group Id",
             "type": "string"
@@ -21206,6 +21252,7 @@
           "target_index": {
             "anyOf": [
               {
+                "exclusiveMaximum": 500.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -21213,11 +21260,11 @@
                 "type": "null"
               }
             ],
-            "description": "Optional insert index inside the target group",
             "title": "Target Index"
           }
         },
         "required": [
+          "expected_revision",
           "stock_code",
           "source_group_id",
           "target_group_id"
@@ -21226,39 +21273,44 @@
         "type": "object"
       },
       "WatchlistGroupMemberReorderRequest": {
+        "additionalProperties": false,
         "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
           "ordered_codes": {
-            "description": "Stock codes in desired order within the group",
             "items": {
               "type": "string"
             },
+            "maxItems": 500,
             "minItems": 1,
             "title": "Ordered Codes",
             "type": "array"
           }
         },
         "required": [
+          "expected_revision",
           "ordered_codes"
         ],
         "title": "WatchlistGroupMemberReorderRequest",
         "type": "object"
       },
       "WatchlistGroupMemberSchema": {
-        "description": "One symbol membership inside a group.",
+        "additionalProperties": false,
         "properties": {
           "attrs": {
-            "additionalProperties": true,
-            "description": "Extensible computed-attribute mount point for future watchlist features (e.g. AI score, focus flag). Empty object by default.",
-            "title": "Attrs",
-            "type": "object"
+            "$ref": "#/components/schemas/WatchlistComputedAttrsSchema"
           },
           "sort_order": {
-            "description": "Order inside the group (ascending)",
+            "minimum": 0.0,
             "title": "Sort Order",
             "type": "integer"
           },
           "stock_code": {
-            "description": "Stock code as stored in the watchlist",
+            "maxLength": 32,
+            "minLength": 1,
             "title": "Stock Code",
             "type": "string"
           }
@@ -21271,54 +21323,67 @@
         "type": "object"
       },
       "WatchlistGroupRenameRequest": {
+        "additionalProperties": false,
         "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
           "name": {
-            "description": "Updated group name",
-            "maxLength": 128,
+            "maxLength": 80,
             "minLength": 1,
             "title": "Name",
             "type": "string"
           }
         },
         "required": [
+          "expected_revision",
           "name"
         ],
         "title": "WatchlistGroupRenameRequest",
         "type": "object"
       },
       "WatchlistGroupReorderRequest": {
+        "additionalProperties": false,
         "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
           "ordered_ids": {
-            "description": "Group ids in desired order",
             "items": {
               "type": "string"
             },
+            "maxItems": 50,
             "minItems": 1,
             "title": "Ordered Ids",
             "type": "array"
           }
         },
         "required": [
+          "expected_revision",
           "ordered_ids"
         ],
         "title": "WatchlistGroupReorderRequest",
         "type": "object"
       },
       "WatchlistGroupSchema": {
-        "description": "Watchlist group with ordered members.",
+        "additionalProperties": false,
         "properties": {
           "created_at": {
-            "description": "ISO created timestamp",
+            "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
           "id": {
-            "description": "Stable group key",
+            "maxLength": 64,
+            "minLength": 1,
             "title": "Id",
             "type": "string"
           },
           "is_default": {
-            "description": "Whether this is the auto-seeded default group",
             "title": "Is Default",
             "type": "boolean"
           },
@@ -21326,21 +21391,35 @@
             "items": {
               "$ref": "#/components/schemas/WatchlistGroupMemberSchema"
             },
+            "maxItems": 500,
             "title": "Members",
             "type": "array"
           },
           "name": {
-            "description": "Display name",
+            "maxLength": 80,
+            "minLength": 1,
             "title": "Name",
             "type": "string"
           },
+          "name_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Key"
+          },
           "sort_order": {
-            "description": "Group order (ascending)",
+            "minimum": 0.0,
             "title": "Sort Order",
             "type": "integer"
           },
           "updated_at": {
-            "description": "ISO updated timestamp",
+            "format": "date-time",
             "title": "Updated At",
             "type": "string"
           }
@@ -21357,42 +21436,29 @@
         "type": "object"
       },
       "WatchlistGroupsResponse": {
-        "description": "List of watchlist groups.",
-        "example": {
-          "groups": [
-            {
-              "created_at": "2026-08-09T00:00:00",
-              "id": "default",
-              "is_default": true,
-              "members": [
-                {
-                  "attrs": {},
-                  "sort_order": 0,
-                  "stock_code": "600519"
-                }
-              ],
-              "name": "Default",
-              "sort_order": 0,
-              "updated_at": "2026-08-09T00:00:00"
-            }
-          ],
-          "message": "2 groups"
-        },
+        "additionalProperties": false,
         "properties": {
           "groups": {
             "items": {
               "$ref": "#/components/schemas/WatchlistGroupSchema"
             },
+            "maxItems": 50,
             "title": "Groups",
             "type": "array"
           },
           "message": {
-            "description": "Operation result description",
+            "maxLength": 160,
             "title": "Message",
             "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
           }
         },
         "required": [
+          "revision",
           "message"
         ],
         "title": "WatchlistGroupsResponse",
@@ -33225,7 +33291,7 @@
     },
     "/api/v1/stocks/watchlist/groups": {
       "get": {
-        "description": "Return organized watchlist groups. On first access, existing STOCK_LIST symbols are seeded into the default group without loss.",
+        "description": "Reconcile groups from authoritative STOCK_LIST before returning revisioned state.",
         "operationId": "list_watchlist_groups_api_v1_stocks_watchlist_groups_get",
         "responses": {
           "200": {
@@ -33236,7 +33302,7 @@
                 }
               }
             },
-            "description": "Watchlist groups"
+            "description": "Successful Response"
           },
           "500": {
             "content": {
@@ -33246,7 +33312,7 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
         "summary": "List watchlist groups",
@@ -33275,7 +33341,7 @@
                 }
               }
             },
-            "description": "Group created"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -33285,7 +33351,27 @@
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33305,7 +33391,7 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
         "summary": "Create a watchlist group",
@@ -33316,7 +33402,6 @@
     },
     "/api/v1/stocks/watchlist/groups/move-member": {
       "post": {
-        "description": "Desktop drag-and-drop and mobile Move-to actions share this endpoint.",
         "operationId": "move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post",
         "requestBody": {
           "content": {
@@ -33337,7 +33422,7 @@
                 }
               }
             },
-            "description": "Member moved or copied"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -33347,7 +33432,7 @@
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -33357,7 +33442,17 @@
                 }
               }
             },
-            "description": "Not found"
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33377,7 +33472,7 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
         "summary": "Move or copy a symbol between groups",
@@ -33408,7 +33503,7 @@
                 }
               }
             },
-            "description": "Groups reordered"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -33418,7 +33513,27 @@
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33438,10 +33553,10 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
-        "summary": "Reorder watchlist groups",
+        "summary": "Atomically reorder every watchlist group",
         "tags": [
           "Stocks"
         ]
@@ -33449,7 +33564,6 @@
     },
     "/api/v1/stocks/watchlist/groups/{group_id}": {
       "delete": {
-        "description": "Default group cannot be deleted. Exclusive members are moved to Default.",
         "operationId": "delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete",
         "parameters": [
           {
@@ -33459,6 +33573,16 @@
             "schema": {
               "title": "Group Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Expected Revision",
+              "type": "integer"
             }
           }
         ],
@@ -33471,7 +33595,7 @@
                 }
               }
             },
-            "description": "Group deleted"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -33481,7 +33605,7 @@
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -33491,7 +33615,17 @@
                 }
               }
             },
-            "description": "Not found"
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33511,7 +33645,7 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
         "summary": "Delete a watchlist group",
@@ -33551,7 +33685,7 @@
                 }
               }
             },
-            "description": "Group renamed"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -33561,7 +33695,7 @@
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -33571,7 +33705,17 @@
                 }
               }
             },
-            "description": "Not found"
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33591,7 +33735,7 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
         "summary": "Rename a watchlist group",
@@ -33602,7 +33746,6 @@
     },
     "/api/v1/stocks/watchlist/groups/{group_id}/members": {
       "post": {
-        "description": "Supports multi-group membership. Does not remove the symbol from other groups.",
         "operationId": "add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post",
         "parameters": [
           {
@@ -33634,7 +33777,7 @@
                 }
               }
             },
-            "description": "Member added"
+            "description": "Successful Response"
           },
           "400": {
             "content": {
@@ -33644,7 +33787,7 @@
                 }
               }
             },
-            "description": "Validation error"
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -33654,7 +33797,17 @@
                 }
               }
             },
-            "description": "Not found"
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33674,10 +33827,10 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
-        "summary": "Add a symbol to a group",
+        "summary": "Add an authoritative symbol to a group",
         "tags": [
           "Stocks"
         ]
@@ -33716,7 +33869,17 @@
                 }
               }
             },
-            "description": "Members reordered"
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -33726,7 +33889,17 @@
                 }
               }
             },
-            "description": "Not found"
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33746,10 +33919,10 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
-        "summary": "Reorder symbols inside a group",
+        "summary": "Atomically reorder every member in one group",
         "tags": [
           "Stocks"
         ]
@@ -33757,7 +33930,6 @@
     },
     "/api/v1/stocks/watchlist/groups/{group_id}/members/{stock_code}": {
       "delete": {
-        "description": "Removes membership from one group only. If the symbol would become ungrouped, it is re-homed into the default group. Use the global watchlist remove endpoint to drop a symbol from STOCK_LIST entirely.",
         "operationId": "remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete",
         "parameters": [
           {
@@ -33777,6 +33949,16 @@
               "title": "Stock Code",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Expected Revision",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -33788,7 +33970,17 @@
                 }
               }
             },
-            "description": "Member removed from group"
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "404": {
             "content": {
@@ -33798,7 +33990,17 @@
                 }
               }
             },
-            "description": "Not found"
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
@@ -33818,10 +34020,10 @@
                 }
               }
             },
-            "description": "Server error"
+            "description": "Internal Server Error"
           }
         },
-        "summary": "Remove a symbol from a group",
+        "summary": "Remove a symbol from one group",
         "tags": [
           "Stocks"
         ]

@@ -1,110 +1,91 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Schemas for watchlist group organization APIs."""
+"""Bounded schemas for the revisioned watchlist-group aggregate."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
+
+from src.repositories.watchlist_group_repo import (
+    MAX_GROUPS,
+    MAX_MEMBERS_PER_GROUP,
+    MAX_TOTAL_MEMBERSHIPS,
+)
 
 
-class WatchlistGroupMemberSchema(BaseModel):
-    """One symbol membership inside a group."""
+class _StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    stock_code: str = Field(..., description="Stock code as stored in the watchlist")
-    sort_order: int = Field(..., description="Order inside the group (ascending)")
-    attrs: Dict[str, Any] = Field(
-        default_factory=dict,
-        description=(
-            "Extensible computed-attribute mount point for future watchlist "
-            "features (e.g. AI score, focus flag). Empty object by default."
-        ),
+
+class WatchlistComputedAttrsSchema(_StrictModel):
+    """Read-only computed projection owned by T25/T26 services."""
+
+    schema_version: Literal[1] = 1
+    ai_score: Optional[FiniteFloat] = Field(default=None, ge=0, le=100)
+    focus: Optional[bool] = None
+
+
+class WatchlistGroupMemberSchema(_StrictModel):
+    stock_code: str = Field(..., min_length=1, max_length=32)
+    sort_order: int = Field(..., ge=0)
+    attrs: WatchlistComputedAttrsSchema = Field(default_factory=WatchlistComputedAttrsSchema)
+
+
+class WatchlistGroupSchema(_StrictModel):
+    id: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=80)
+    name_key: Optional[str] = Field(default=None, max_length=128)
+    sort_order: int = Field(..., ge=0)
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+    members: List[WatchlistGroupMemberSchema] = Field(
+        default_factory=list, max_length=MAX_MEMBERS_PER_GROUP
     )
 
 
-class WatchlistGroupSchema(BaseModel):
-    """Watchlist group with ordered members."""
+class WatchlistGroupsResponse(_StrictModel):
+    revision: int = Field(..., ge=1)
+    groups: List[WatchlistGroupSchema] = Field(default_factory=list, max_length=MAX_GROUPS)
+    message: str = Field(..., max_length=160)
 
-    id: str = Field(..., description="Stable group key")
-    name: str = Field(..., description="Display name")
-    sort_order: int = Field(..., description="Group order (ascending)")
-    is_default: bool = Field(..., description="Whether this is the auto-seeded default group")
-    created_at: str = Field(..., description="ISO created timestamp")
-    updated_at: str = Field(..., description="ISO updated timestamp")
-    members: List[WatchlistGroupMemberSchema] = Field(default_factory=list)
-
-
-class WatchlistGroupsResponse(BaseModel):
-    """List of watchlist groups."""
-
-    groups: List[WatchlistGroupSchema] = Field(default_factory=list)
-    message: str = Field(..., description="Operation result description")
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "groups": [
-                    {
-                        "id": "default",
-                        "name": "Default",
-                        "sort_order": 0,
-                        "is_default": True,
-                        "created_at": "2026-08-09T00:00:00",
-                        "updated_at": "2026-08-09T00:00:00",
-                        "members": [
-                            {"stock_code": "600519", "sort_order": 0, "attrs": {}},
-                        ],
-                    }
-                ],
-                "message": "2 groups",
-            }
-        }
-    )
+    @model_validator(mode="after")
+    def validate_total_memberships(self) -> "WatchlistGroupsResponse":
+        if sum(len(group.members) for group in self.groups) > MAX_TOTAL_MEMBERSHIPS:
+            raise ValueError("watchlist group response exceeds membership limit")
+        return self
 
 
-class WatchlistGroupCreateRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=128, description="New group name")
+class _RevisionedRequest(_StrictModel):
+    expected_revision: int = Field(..., ge=1)
 
 
-class WatchlistGroupRenameRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=128, description="Updated group name")
+class WatchlistGroupCreateRequest(_RevisionedRequest):
+    name: str = Field(..., min_length=1, max_length=80)
 
 
-class WatchlistGroupReorderRequest(BaseModel):
-    ordered_ids: List[str] = Field(
-        ...,
-        min_length=1,
-        description="Group ids in desired order",
-    )
+class WatchlistGroupRenameRequest(_RevisionedRequest):
+    name: str = Field(..., min_length=1, max_length=80)
 
 
-class WatchlistGroupMemberAddRequest(BaseModel):
-    stock_code: str = Field(..., min_length=1, description="Stock code to add to the group")
-    attrs: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Optional attrs payload (T25/T26 mount). Defaults to empty object.",
-    )
+class WatchlistGroupReorderRequest(_RevisionedRequest):
+    ordered_ids: List[str] = Field(..., min_length=1, max_length=MAX_GROUPS)
 
 
-class WatchlistGroupMemberReorderRequest(BaseModel):
-    ordered_codes: List[str] = Field(
-        ...,
-        min_length=1,
-        description="Stock codes in desired order within the group",
-    )
+class WatchlistGroupMemberAddRequest(_RevisionedRequest):
+    stock_code: str = Field(..., min_length=1, max_length=32)
 
 
-class WatchlistGroupMemberMoveRequest(BaseModel):
-    stock_code: str = Field(..., min_length=1)
-    source_group_id: str = Field(..., min_length=1)
-    target_group_id: str = Field(..., min_length=1)
-    target_index: Optional[int] = Field(
-        default=None,
-        ge=0,
-        description="Optional insert index inside the target group",
-    )
-    copy_membership: bool = Field(
-        default=False,
-        description="When true, keep the source membership (multi-group). Default moves.",
-    )
+class WatchlistGroupMemberReorderRequest(_RevisionedRequest):
+    ordered_codes: List[str] = Field(..., min_length=1, max_length=MAX_MEMBERS_PER_GROUP)
+
+
+class WatchlistGroupMemberMoveRequest(_RevisionedRequest):
+    stock_code: str = Field(..., min_length=1, max_length=32)
+    source_group_id: str = Field(..., min_length=1, max_length=64)
+    target_group_id: str = Field(..., min_length=1, max_length=64)
+    target_index: Optional[int] = Field(default=None, ge=0, lt=MAX_MEMBERS_PER_GROUP)
+    copy_membership: bool = False

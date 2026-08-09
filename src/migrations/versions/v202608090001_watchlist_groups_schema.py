@@ -18,7 +18,8 @@ _TABLE_STATEMENTS = (
         is_default BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
-        CONSTRAINT uix_watchlist_groups_group_key UNIQUE (group_key)
+        CONSTRAINT uix_watchlist_groups_group_key UNIQUE (group_key),
+        CONSTRAINT uix_watchlist_groups_sort_order UNIQUE (sort_order)
     )
     """,
     """
@@ -31,7 +32,15 @@ _TABLE_STATEMENTS = (
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         CONSTRAINT uix_watchlist_group_member UNIQUE (group_id, stock_code),
+        CONSTRAINT uix_watchlist_group_member_sort UNIQUE (group_id, sort_order),
         FOREIGN KEY(group_id) REFERENCES watchlist_groups (id) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS watchlist_group_state (
+        id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+        revision INTEGER NOT NULL CHECK (revision >= 1),
+        updated_at DATETIME NOT NULL
     )
     """,
 )
@@ -49,7 +58,19 @@ _INDEX_STATEMENTS = (
     "ON watchlist_group_members (group_id, sort_order)",
 )
 
+_TRIGGER_STATEMENTS = (
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_watchlist_groups_delete_members
+    AFTER DELETE ON watchlist_groups
+    FOR EACH ROW
+    BEGIN
+        DELETE FROM watchlist_group_members WHERE group_id = OLD.id;
+    END
+    """,
+)
+
 _DROP_STATEMENTS = (
+    "DROP TABLE IF EXISTS watchlist_group_state",
     "DROP TABLE IF EXISTS watchlist_group_members",
     "DROP TABLE IF EXISTS watchlist_groups",
 )
@@ -61,6 +82,12 @@ def upgrade(execution: MigrationExecution) -> None:
         execution.exec_driver_sql(statement)
     for statement in _INDEX_STATEMENTS:
         execution.exec_driver_sql(statement)
+    for statement in _TRIGGER_STATEMENTS:
+        execution.exec_driver_sql(statement)
+    execution.exec_driver_sql(
+        "INSERT OR IGNORE INTO watchlist_group_state (id, revision, updated_at) "
+        "VALUES (1, 1, CURRENT_TIMESTAMP)"
+    )
 
 
 def downgrade(execution: MigrationExecution) -> None:

@@ -1,32 +1,31 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Watchlist group application service.
-
-Groups organize STOCK_LIST symbols for the Web workspace. STOCK_LIST remains
-the authoritative membership set for analysis/alerts. Per-member ``attrs`` is
-the mount point for T25 scores and T26 focus flags.
-"""
+"""Application contract for revisioned watchlist-group organization."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from datetime import timezone
+import json
+from typing import Any, Dict, List, Optional, Sequence
 from uuid import uuid4
 
 from src.repositories.base import RepositoryError
 from src.repositories.watchlist_group_repo import (
     DEFAULT_GROUP_KEY,
-    DEFAULT_GROUP_NAME,
+    DEFAULT_GROUP_NAME_KEY,
     StoredWatchlistGroup,
     StoredWatchlistGroupMember,
+    StoredWatchlistState,
     WatchlistGroupRepository,
 )
+from src.services.watchlist_identity import watchlist_match_key
 from src.storage import DatabaseManager
+
+MAX_GROUP_NAME_LENGTH = 80
 
 
 class WatchlistGroupServiceError(ValueError):
-    """Domain error for watchlist group operations."""
-
     error_code = "watchlist_group_error"
 
     def __init__(self, message: str, *, error_code: Optional[str] = None) -> None:
@@ -40,7 +39,11 @@ class WatchlistGroupNotFoundError(WatchlistGroupServiceError):
 
 
 class WatchlistGroupConflictError(WatchlistGroupServiceError):
-    error_code = "watchlist_group_conflict"
+    error_code = "watchlist_group_revision_conflict"
+
+    def __init__(self, message: str, *, current_revision: int) -> None:
+        super().__init__(message, error_code=self.error_code)
+        self.current_revision = current_revision
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,7 @@ class WatchlistMemberView:
 class WatchlistGroupView:
     id: str
     name: str
+    name_key: Optional[str]
     sort_order: int
     is_default: bool
     created_at: str
@@ -61,19 +65,25 @@ class WatchlistGroupView:
     members: List[WatchlistMemberView]
 
 
+@dataclass(frozen=True)
+class WatchlistGroupStateView:
+    revision: int
+    groups: List[WatchlistGroupView]
+
+
 def _iso(value: Any) -> str:
-    if value is None:
+    if value is None or not hasattr(value, "isoformat"):
         return ""
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return str(value)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
 
 
 def _member_view(member: StoredWatchlistGroupMember) -> WatchlistMemberView:
     return WatchlistMemberView(
         stock_code=member.stock_code,
         sort_order=member.sort_order,
-        attrs=dict(member.attrs or {}),
+        attrs=dict(member.attrs),
     )
 
 
@@ -81,6 +91,7 @@ def _group_view(group: StoredWatchlistGroup) -> WatchlistGroupView:
     return WatchlistGroupView(
         id=group.group_key,
         name=group.name,
+        name_key=DEFAULT_GROUP_NAME_KEY if group.is_default else None,
         sort_order=group.sort_order,
         is_default=bool(group.is_default),
         created_at=_iso(group.created_at),
@@ -89,12 +100,47 @@ def _group_view(group: StoredWatchlistGroup) -> WatchlistGroupView:
     )
 
 
+def _state_view(state: StoredWatchlistState) -> WatchlistGroupStateView:
+    return WatchlistGroupStateView(
+        revision=state.revision,
+        groups=[_group_view(group) for group in state.groups],
+    )
+
+
+def group_state_to_payload(state: WatchlistGroupStateView) -> Dict[str, Any]:
+    payload = asdict(state)
+    json.dumps(payload, ensure_ascii=False, allow_nan=False)
+    return payload
+
+
 def group_views_to_payload(groups: Sequence[WatchlistGroupView]) -> List[Dict[str, Any]]:
-    return [asdict(group) for group in groups]
+    payload = [asdict(group) for group in groups]
+    json.dumps(payload, ensure_ascii=False, allow_nan=False)
+    return payload
+
+
+def _translate_repo_error(exc: RepositoryError) -> WatchlistGroupServiceError:
+    code = exc.error_code
+    if code == "watchlist_group_revision_conflict":
+        return WatchlistGroupConflictError(
+            "Watchlist groups changed; refresh and retry",
+            current_revision=int(exc.context.get("current_revision", 1)),
+        )
+    if code in {"watchlist_group_not_found", "watchlist_group_member_not_found"}:
+        return WatchlistGroupNotFoundError("Watchlist group or member was not found", error_code=code)
+    if code in {
+        "watchlist_group_reorder_invalid",
+        "watchlist_group_member_reorder_invalid",
+        "watchlist_group_default_delete_forbidden",
+        "watchlist_group_limit_reached",
+        "watchlist_group_member_limit_reached",
+    }:
+        return WatchlistGroupServiceError(str(exc), error_code=code)
+    return WatchlistGroupServiceError("Watchlist group operation failed", error_code=code)
 
 
 class WatchlistGroupService:
-    """Coordinates group CRUD, reorder, and STOCK_LIST compatibility seeding."""
+    """Coordinates the authoritative STOCK_LIST projection and group aggregate."""
 
     def __init__(
         self,
@@ -103,176 +149,135 @@ class WatchlistGroupService:
     ) -> None:
         self.repo = repo or WatchlistGroupRepository(db_manager)
 
-    def list_groups(
-        self,
-        *,
-        stock_list_codes: Sequence[str],
-        default_group_name: str = DEFAULT_GROUP_NAME,
-    ) -> List[WatchlistGroupView]:
-        """Return groups after ensuring default group and STOCK_LIST seed."""
-        self.ensure_compatible_with_stock_list(
-            stock_list_codes=stock_list_codes,
-            default_group_name=default_group_name,
-        )
-        return [_group_view(group) for group in self.repo.list_groups_with_members()]
+    def list_state(self, *, stock_list_codes: Sequence[str]) -> WatchlistGroupStateView:
+        try:
+            return _state_view(self.repo.reconcile(stock_list_codes=stock_list_codes))
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
 
-    def ensure_compatible_with_stock_list(
-        self,
-        *,
-        stock_list_codes: Sequence[str],
-        default_group_name: str = DEFAULT_GROUP_NAME,
-    ) -> None:
-        """Idempotently place every STOCK_LIST code into the default group when missing."""
-        default_group = self.repo.ensure_default_group(name=default_group_name)
-        codes = [str(code).strip() for code in stock_list_codes if str(code).strip()]
-        if not codes:
-            return
-        grouped = set(self.repo.list_membership_codes())
-        for code in codes:
-            if code not in grouped:
-                self.repo.add_member(group_id=default_group.group_id, stock_code=code)
+    def list_groups(self, *, stock_list_codes: Sequence[str]) -> List[WatchlistGroupView]:
+        return self.list_state(stock_list_codes=stock_list_codes).groups
 
-    def create_group(self, *, name: str) -> WatchlistGroupView:
+    @staticmethod
+    def _name(name: str) -> str:
         cleaned = str(name or "").strip()
         if not cleaned:
             raise WatchlistGroupServiceError(
-                "Group name is required",
-                error_code="watchlist_group_name_required",
+                "Group name is required", error_code="watchlist_group_name_required"
             )
-        if len(cleaned) > 128:
+        if len(cleaned) > MAX_GROUP_NAME_LENGTH:
             raise WatchlistGroupServiceError(
-                "Group name is too long",
-                error_code="watchlist_group_name_too_long",
+                "Group name is too long", error_code="watchlist_group_name_too_long"
             )
-        existing = self.repo.list_groups_with_members()
-        sort_order = max((group.sort_order for group in existing), default=-1) + 1
-        group_key = f"g_{uuid4().hex[:12]}"
+        return cleaned
+
+    @staticmethod
+    def _revision(expected_revision: int) -> int:
+        if type(expected_revision) is not int or expected_revision < 1:
+            raise WatchlistGroupServiceError(
+                "expected_revision must be a positive integer",
+                error_code="watchlist_group_revision_invalid",
+            )
+        return expected_revision
+
+    def create_group(self, *, name: str, expected_revision: int) -> WatchlistGroupStateView:
         try:
-            group = self.repo.create_group(
-                group_key=group_key,
-                name=cleaned,
-                sort_order=sort_order,
+            return _state_view(
+                self.repo.create_group(
+                    group_key=f"g_{uuid4().hex[:12]}",
+                    name=self._name(name),
+                    expected_revision=self._revision(expected_revision),
+                )
             )
         except RepositoryError as exc:
-            if exc.error_code == "watchlist_group_key_conflict":
-                raise WatchlistGroupConflictError(str(exc)) from exc
-            raise
-        return _group_view(group)
+            raise _translate_repo_error(exc) from exc
 
-    def rename_group(self, *, group_id: str, name: str) -> WatchlistGroupView:
-        cleaned = str(name or "").strip()
-        if not cleaned:
-            raise WatchlistGroupServiceError(
-                "Group name is required",
-                error_code="watchlist_group_name_required",
-            )
-        group = self.repo.rename_group(group_key=group_id, name=cleaned)
-        if group is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {group_id}")
-        return _group_view(group)
-
-    def delete_group(self, *, group_id: str) -> None:
-        if group_id == DEFAULT_GROUP_KEY:
-            raise WatchlistGroupServiceError(
-                "Default group cannot be deleted",
-                error_code="watchlist_group_default_delete_forbidden",
-            )
-        group = self.repo.get_group_by_key(group_id)
-        if group is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {group_id}")
-        # Re-home exclusive members into the default group so codes are not lost.
-        default_group = self.repo.ensure_default_group()
-        membership_counts: Dict[str, int] = {}
-        for item in self.repo.list_groups_with_members():
-            for member in item.members:
-                membership_counts[member.stock_code] = membership_counts.get(member.stock_code, 0) + 1
-        for member in group.members:
-            if membership_counts.get(member.stock_code, 0) <= 1:
-                self.repo.add_member(
-                    group_id=default_group.group_id,
-                    stock_code=member.stock_code,
-                    attrs=member.attrs,
+    def rename_group(self, *, group_id: str, name: str, expected_revision: int) -> WatchlistGroupStateView:
+        try:
+            return _state_view(
+                self.repo.rename_group(
+                    group_key=group_id,
+                    name=self._name(name),
+                    expected_revision=self._revision(expected_revision),
                 )
-        deleted = self.repo.delete_group(group_key=group_id)
-        if not deleted:
-            raise WatchlistGroupNotFoundError(f"Group not found: {group_id}")
+            )
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
 
-    def reorder_groups(self, *, ordered_ids: Sequence[str]) -> List[WatchlistGroupView]:
-        existing = {group.group_key: group for group in self.repo.list_groups_with_members()}
-        if not existing:
-            return []
-        ordered = [key for key in ordered_ids if key in existing]
-        missing = [key for key in existing if key not in ordered]
-        # Preserve unspecified groups at the end in previous relative order.
-        final_order = ordered + sorted(missing, key=lambda key: existing[key].sort_order)
-        self.repo.set_group_sort_orders(final_order)
-        return [_group_view(group) for group in self.repo.list_groups_with_members()]
+    def delete_group(self, *, group_id: str, expected_revision: int) -> WatchlistGroupStateView:
+        try:
+            return _state_view(
+                self.repo.delete_group(
+                    group_key=group_id,
+                    expected_revision=self._revision(expected_revision),
+                )
+            )
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
+
+    def reorder_groups(
+        self, *, ordered_ids: Sequence[str], expected_revision: int
+    ) -> WatchlistGroupStateView:
+        try:
+            return _state_view(
+                self.repo.reorder_groups(
+                    ordered_keys=ordered_ids,
+                    expected_revision=self._revision(expected_revision),
+                )
+            )
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
 
     def add_member(
-        self,
-        *,
-        group_id: str,
-        stock_code: str,
-        attrs: Optional[Mapping[str, Any]] = None,
-    ) -> WatchlistGroupView:
-        code = str(stock_code or "").strip()
-        if not code:
+        self, *, group_id: str, stock_code: str, expected_revision: int
+    ) -> WatchlistGroupStateView:
+        identity = watchlist_match_key(stock_code)
+        if not identity:
             raise WatchlistGroupServiceError(
-                "Stock code is required",
-                error_code="watchlist_group_member_code_required",
+                "Stock code is required", error_code="watchlist_group_member_code_required"
             )
-        group = self.repo.get_group_by_key(group_id)
-        if group is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {group_id}")
-        self.repo.add_member(group_id=group.group_id, stock_code=code, attrs=attrs)
-        refreshed = self.repo.get_group_by_key(group_id)
-        assert refreshed is not None
-        return _group_view(refreshed)
+        try:
+            return _state_view(
+                self.repo.add_member(
+                    group_key=group_id,
+                    stock_code=identity,
+                    expected_revision=self._revision(expected_revision),
+                )
+            )
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
 
-    def remove_member(self, *, group_id: str, stock_code: str) -> WatchlistGroupView:
-        group = self.repo.get_group_by_key(group_id)
-        if group is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {group_id}")
-        code = str(stock_code or "").strip()
-        removed = self.repo.remove_member(group_id=group.group_id, stock_code=code)
-        if not removed:
-            raise WatchlistGroupNotFoundError(
-                f"Member {code} not found in group {group_id}"
+    def remove_member(
+        self, *, group_id: str, stock_code: str, expected_revision: int
+    ) -> WatchlistGroupStateView:
+        try:
+            return _state_view(
+                self.repo.remove_member(
+                    group_key=group_id,
+                    stock_code=watchlist_match_key(stock_code),
+                    expected_revision=self._revision(expected_revision),
+                )
             )
-        # If the code is no longer in any group, put it back into default so
-        # upgrade compatibility keeps every watchlist symbol grouped.
-        still_grouped = code in set(self.repo.list_membership_codes())
-        if not still_grouped:
-            default_group = self.repo.ensure_default_group()
-            if default_group.group_key != group_id:
-                self.repo.add_member(group_id=default_group.group_id, stock_code=code)
-        refreshed = self.repo.get_group_by_key(group_id)
-        assert refreshed is not None
-        return _group_view(refreshed)
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
 
     def reorder_members(
         self,
         *,
         group_id: str,
         ordered_codes: Sequence[str],
-    ) -> WatchlistGroupView:
-        group = self.repo.get_group_by_key(group_id)
-        if group is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {group_id}")
-        existing_codes = {member.stock_code for member in group.members}
-        ordered = [code for code in ordered_codes if code in existing_codes]
-        missing = [
-            member.stock_code
-            for member in sorted(group.members, key=lambda item: item.sort_order)
-            if member.stock_code not in ordered
-        ]
-        self.repo.set_member_sort_orders(
-            group_id=group.group_id,
-            ordered_codes=ordered + missing,
-        )
-        refreshed = self.repo.get_group_by_key(group_id)
-        assert refreshed is not None
-        return _group_view(refreshed)
+        expected_revision: int,
+    ) -> WatchlistGroupStateView:
+        try:
+            return _state_view(
+                self.repo.reorder_members(
+                    group_key=group_id,
+                    ordered_codes=ordered_codes,
+                    expected_revision=self._revision(expected_revision),
+                )
+            )
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
 
     def move_member(
         self,
@@ -280,42 +285,31 @@ class WatchlistGroupService:
         stock_code: str,
         source_group_id: str,
         target_group_id: str,
+        expected_revision: int,
         target_index: Optional[int] = None,
         copy: bool = False,
-    ) -> List[WatchlistGroupView]:
-        code = str(stock_code or "").strip()
-        source = self.repo.get_group_by_key(source_group_id)
-        target = self.repo.get_group_by_key(target_group_id)
-        if source is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {source_group_id}")
-        if target is None:
-            raise WatchlistGroupNotFoundError(f"Group not found: {target_group_id}")
+    ) -> WatchlistGroupStateView:
         try:
-            self.repo.move_member(
-                stock_code=code,
-                source_group_id=source.group_id,
-                target_group_id=target.group_id,
-                target_index=target_index,
-                copy=copy,
+            return _state_view(
+                self.repo.move_member(
+                    stock_code=watchlist_match_key(stock_code),
+                    source_group_key=source_group_id,
+                    target_group_key=target_group_id,
+                    target_index=target_index,
+                    copy=copy,
+                    expected_revision=self._revision(expected_revision),
+                )
             )
         except RepositoryError as exc:
-            if exc.error_code == "watchlist_group_member_not_found":
-                raise WatchlistGroupNotFoundError(str(exc)) from exc
-            raise
-        return [_group_view(group) for group in self.repo.list_groups_with_members()]
+            raise _translate_repo_error(exc) from exc
 
-    def on_watchlist_code_added(self, stock_code: str) -> None:
-        """Hook for STOCK_LIST add: place code in default group if not grouped."""
-        code = str(stock_code or "").strip()
-        if not code:
-            return
-        default_group = self.repo.ensure_default_group()
-        if code not in set(self.repo.list_membership_codes()):
-            self.repo.add_member(group_id=default_group.group_id, stock_code=code)
 
-    def on_watchlist_code_removed(self, stock_code: str) -> None:
-        """Hook for STOCK_LIST remove: drop memberships everywhere."""
-        code = str(stock_code or "").strip()
-        if not code:
-            return
-        self.repo.remove_member_from_all_groups(stock_code=code)
+__all__ = [
+    "WatchlistGroupConflictError",
+    "WatchlistGroupNotFoundError",
+    "WatchlistGroupService",
+    "WatchlistGroupServiceError",
+    "WatchlistGroupStateView",
+    "group_state_to_payload",
+    "group_views_to_payload",
+]

@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { watchlistGroupsApi } from '../api/watchlistGroups';
 import { getParsedApiError } from '../api/error';
-import type { WatchlistGroup } from '../types/watchlist';
+import type { WatchlistGroup, WatchlistGroupState } from '../types/watchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 
 export interface UseWatchlistGroupsReturn {
   groups: WatchlistGroup[];
+  revision: number | null;
   isLoading: boolean;
   isActioning: boolean;
   errorMessage: string | null;
@@ -27,83 +28,106 @@ export interface UseWatchlistGroupsReturn {
 export function useWatchlistGroups({ enabled = true }: { enabled?: boolean } = {}): UseWatchlistGroupsReturn {
   const { t } = useUiLanguage();
   const [groups, setGroups] = useState<WatchlistGroup[]>([]);
+  const [revision, setRevision] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
   const [isActioning, setIsActioning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const mountedRef = useRef(true);
-  const requestIdRef = useRef(0);
+  const revisionRef = useRef<number | null>(null);
+  const generationRef = useRef(0);
+  const actionLeaseRef = useRef(false);
+
+  const applyState = useCallback((next: WatchlistGroupState, generation: number) => {
+    if (!mountedRef.current || generationRef.current !== generation) return false;
+    revisionRef.current = next.revision;
+    setRevision(next.revision);
+    setGroups(next.groups);
+    return true;
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      requestIdRef.current += 1;
+      generationRef.current += 1;
+      actionLeaseRef.current = false;
     };
   }, []);
 
   const refresh = useCallback(async () => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     if (mountedRef.current) setIsLoading(true);
     try {
       const next = await watchlistGroupsApi.list();
-      if (mountedRef.current && requestIdRef.current === requestId) {
-        setGroups(next);
-        setErrorMessage(null);
-      }
+      if (applyState(next, generation)) setErrorMessage(null);
       return true;
     } catch (error) {
-      if (mountedRef.current && requestIdRef.current === requestId) {
+      if (mountedRef.current && generationRef.current === generation) {
         setErrorMessage(getParsedApiError(error).message || t('watchlist.groupsLoadFailed'));
       }
       return false;
     } finally {
-      if (mountedRef.current && requestIdRef.current === requestId) {
-        setIsLoading(false);
-      }
+      if (mountedRef.current && generationRef.current === generation) setIsLoading(false);
     }
-  }, [t]);
+  }, [applyState, t]);
 
   useEffect(() => {
     if (!enabled) {
-      requestIdRef.current += 1;
+      generationRef.current += 1;
       setIsLoading(false);
       return;
     }
     void refresh();
   }, [enabled, refresh]);
 
-  const runAction = useCallback(async (action: () => Promise<WatchlistGroup[]>) => {
-    if (isActioning) return false;
+  const runAction = useCallback(async (
+    action: (expectedRevision: number) => Promise<WatchlistGroupState>,
+  ) => {
+    const currentRevision = revisionRef.current;
+    if (actionLeaseRef.current || currentRevision === null) return false;
+    actionLeaseRef.current = true;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     setIsActioning(true);
     try {
-      const next = await action();
-      if (mountedRef.current) {
-        setGroups(next);
-        setErrorMessage(null);
-      }
+      const next = await action(currentRevision);
+      if (applyState(next, generation)) setErrorMessage(null);
       return true;
     } catch (error) {
-      if (mountedRef.current) {
+      if (mountedRef.current && generationRef.current === generation) {
         setErrorMessage(getParsedApiError(error).message || t('watchlist.groupsActionFailed'));
+        try {
+          const recovered = await watchlistGroupsApi.list();
+          applyState(recovered, generation);
+        } catch {
+          // Preserve the mutation error; the explicit refresh path remains available.
+        }
       }
       return false;
     } finally {
+      actionLeaseRef.current = false;
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, t]);
+  }, [applyState, t]);
 
   return {
     groups,
+    revision,
     isLoading,
     isActioning,
     errorMessage,
     refresh,
-    createGroup: (name) => runAction(() => watchlistGroupsApi.create(name)),
-    deleteGroup: (groupId) => runAction(() => watchlistGroupsApi.remove(groupId)),
-    reorderGroups: (orderedIds) => runAction(() => watchlistGroupsApi.reorderGroups(orderedIds)),
-    reorderMembers: (groupId, orderedCodes) => runAction(() => watchlistGroupsApi.reorderMembers(groupId, orderedCodes)),
-    moveMember: (params) => runAction(() => watchlistGroupsApi.moveMember(params)),
+    createGroup: (name) => runAction((current) => watchlistGroupsApi.create(name, current)),
+    deleteGroup: (groupId) => runAction((current) => watchlistGroupsApi.remove(groupId, current)),
+    reorderGroups: (orderedIds) => runAction((current) => watchlistGroupsApi.reorderGroups(orderedIds, current)),
+    reorderMembers: (groupId, orderedCodes) => runAction(
+      (current) => watchlistGroupsApi.reorderMembers(groupId, orderedCodes, current),
+    ),
+    moveMember: (params) => runAction((current) => watchlistGroupsApi.moveMember({
+      ...params,
+      expectedRevision: current,
+    })),
   };
 }
 

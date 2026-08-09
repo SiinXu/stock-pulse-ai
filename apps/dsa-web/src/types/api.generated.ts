@@ -2624,7 +2624,7 @@ export interface paths {
         };
         /**
          * List watchlist groups
-         * @description Return organized watchlist groups. On first access, existing STOCK_LIST symbols are seeded into the default group without loss.
+         * @description Reconcile groups from authoritative STOCK_LIST before returning revisioned state.
          */
         get: operations["list_watchlist_groups_api_v1_stocks_watchlist_groups_get"];
         put?: never;
@@ -2645,10 +2645,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Move or copy a symbol between groups
-         * @description Desktop drag-and-drop and mobile Move-to actions share this endpoint.
-         */
+        /** Move or copy a symbol between groups */
         post: operations["move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post"];
         delete?: never;
         options?: never;
@@ -2664,7 +2661,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Reorder watchlist groups */
+        /** Atomically reorder every watchlist group */
         put: operations["reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put"];
         post?: never;
         delete?: never;
@@ -2683,10 +2680,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * Delete a watchlist group
-         * @description Default group cannot be deleted. Exclusive members are moved to Default.
-         */
+        /** Delete a watchlist group */
         delete: operations["delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete"];
         options?: never;
         head?: never;
@@ -2703,10 +2697,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Add a symbol to a group
-         * @description Supports multi-group membership. Does not remove the symbol from other groups.
-         */
+        /** Add an authoritative symbol to a group */
         post: operations["add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post"];
         delete?: never;
         options?: never;
@@ -2722,7 +2713,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Reorder symbols inside a group */
+        /** Atomically reorder every member in one group */
         put: operations["reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put"];
         post?: never;
         delete?: never;
@@ -2741,10 +2732,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * Remove a symbol from a group
-         * @description Removes membership from one group only. If the symbol would become ungrouped, it is re-homed into the default group. Use the global watchlist remove endpoint to drop a symbol from STOCK_LIST entirely.
-         */
+        /** Remove a symbol from one group */
         delete: operations["remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete"];
         options?: never;
         head?: never;
@@ -11854,166 +11842,116 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * WatchlistComputedAttrsSchema
+         * @description Read-only computed projection owned by T25/T26 services.
+         */
+        WatchlistComputedAttrsSchema: {
+            /** Ai Score */
+            ai_score?: number | null;
+            /** Focus */
+            focus?: boolean | null;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+        };
         /** WatchlistGroupCreateRequest */
         WatchlistGroupCreateRequest: {
-            /**
-             * Name
-             * @description New group name
-             */
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
             name: string;
         };
         /** WatchlistGroupMemberAddRequest */
         WatchlistGroupMemberAddRequest: {
-            /**
-             * Attrs
-             * @description Optional attrs payload (T25/T26 mount). Defaults to empty object.
-             */
-            attrs?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Stock Code
-             * @description Stock code to add to the group
-             */
+            /** Expected Revision */
+            expected_revision: number;
+            /** Stock Code */
             stock_code: string;
         };
         /** WatchlistGroupMemberMoveRequest */
         WatchlistGroupMemberMoveRequest: {
             /**
              * Copy Membership
-             * @description When true, keep the source membership (multi-group). Default moves.
              * @default false
              */
             copy_membership: boolean;
+            /** Expected Revision */
+            expected_revision: number;
             /** Source Group Id */
             source_group_id: string;
             /** Stock Code */
             stock_code: string;
             /** Target Group Id */
             target_group_id: string;
-            /**
-             * Target Index
-             * @description Optional insert index inside the target group
-             */
+            /** Target Index */
             target_index?: number | null;
         };
         /** WatchlistGroupMemberReorderRequest */
         WatchlistGroupMemberReorderRequest: {
-            /**
-             * Ordered Codes
-             * @description Stock codes in desired order within the group
-             */
+            /** Expected Revision */
+            expected_revision: number;
+            /** Ordered Codes */
             ordered_codes: string[];
         };
-        /**
-         * WatchlistGroupMemberSchema
-         * @description One symbol membership inside a group.
-         */
+        /** WatchlistGroupMemberSchema */
         WatchlistGroupMemberSchema: {
-            /**
-             * Attrs
-             * @description Extensible computed-attribute mount point for future watchlist features (e.g. AI score, focus flag). Empty object by default.
-             */
-            attrs?: {
-                [key: string]: unknown;
-            };
-            /**
-             * Sort Order
-             * @description Order inside the group (ascending)
-             */
+            attrs?: components["schemas"]["WatchlistComputedAttrsSchema"];
+            /** Sort Order */
             sort_order: number;
-            /**
-             * Stock Code
-             * @description Stock code as stored in the watchlist
-             */
+            /** Stock Code */
             stock_code: string;
         };
         /** WatchlistGroupRenameRequest */
         WatchlistGroupRenameRequest: {
-            /**
-             * Name
-             * @description Updated group name
-             */
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
             name: string;
         };
         /** WatchlistGroupReorderRequest */
         WatchlistGroupReorderRequest: {
-            /**
-             * Ordered Ids
-             * @description Group ids in desired order
-             */
+            /** Expected Revision */
+            expected_revision: number;
+            /** Ordered Ids */
             ordered_ids: string[];
         };
-        /**
-         * WatchlistGroupSchema
-         * @description Watchlist group with ordered members.
-         */
+        /** WatchlistGroupSchema */
         WatchlistGroupSchema: {
             /**
              * Created At
-             * @description ISO created timestamp
+             * Format: date-time
              */
             created_at: string;
-            /**
-             * Id
-             * @description Stable group key
-             */
+            /** Id */
             id: string;
-            /**
-             * Is Default
-             * @description Whether this is the auto-seeded default group
-             */
+            /** Is Default */
             is_default: boolean;
             /** Members */
             members?: components["schemas"]["WatchlistGroupMemberSchema"][];
-            /**
-             * Name
-             * @description Display name
-             */
+            /** Name */
             name: string;
-            /**
-             * Sort Order
-             * @description Group order (ascending)
-             */
+            /** Name Key */
+            name_key?: string | null;
+            /** Sort Order */
             sort_order: number;
             /**
              * Updated At
-             * @description ISO updated timestamp
+             * Format: date-time
              */
             updated_at: string;
         };
-        /**
-         * WatchlistGroupsResponse
-         * @description List of watchlist groups.
-         * @example {
-         *       "groups": [
-         *         {
-         *           "created_at": "2026-08-09T00:00:00",
-         *           "id": "default",
-         *           "is_default": true,
-         *           "members": [
-         *             {
-         *               "attrs": {},
-         *               "sort_order": 0,
-         *               "stock_code": "600519"
-         *             }
-         *           ],
-         *           "name": "Default",
-         *           "sort_order": 0,
-         *           "updated_at": "2026-08-09T00:00:00"
-         *         }
-         *       ],
-         *       "message": "2 groups"
-         *     }
-         */
+        /** WatchlistGroupsResponse */
         WatchlistGroupsResponse: {
             /** Groups */
             groups?: components["schemas"]["WatchlistGroupSchema"][];
-            /**
-             * Message
-             * @description Operation result description
-             */
+            /** Message */
             message: string;
+            /** Revision */
+            revision: number;
         };
         /**
          * WatchlistRequest
@@ -19709,7 +19647,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Watchlist groups */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19718,7 +19656,7 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -19742,7 +19680,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Group created */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19751,8 +19689,26 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19769,7 +19725,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -19793,7 +19749,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Member moved or copied */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19802,7 +19758,7 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19811,8 +19767,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not found */
+            /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19829,7 +19794,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -19853,7 +19818,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Groups reordered */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19862,8 +19827,26 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19880,7 +19863,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -19893,7 +19876,9 @@ export interface operations {
     };
     delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete: {
         parameters: {
-            query?: never;
+            query: {
+                expected_revision: number;
+            };
             header?: never;
             path: {
                 group_id: string;
@@ -19902,7 +19887,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Group deleted */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19911,7 +19896,7 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19920,8 +19905,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not found */
+            /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19938,7 +19932,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -19964,7 +19958,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Group renamed */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -19973,7 +19967,7 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19982,8 +19976,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not found */
+            /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20000,7 +20003,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -20026,7 +20029,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Member added */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -20035,7 +20038,7 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -20044,8 +20047,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not found */
+            /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20062,7 +20074,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -20088,7 +20100,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Members reordered */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -20097,8 +20109,26 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Not found */
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20115,7 +20145,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -20128,7 +20158,9 @@ export interface operations {
     };
     remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete: {
         parameters: {
-            query?: never;
+            query: {
+                expected_revision: number;
+            };
             header?: never;
             path: {
                 group_id: string;
@@ -20138,7 +20170,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Member removed from group */
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -20147,8 +20179,26 @@ export interface operations {
                     "application/json": components["schemas"]["WatchlistGroupsResponse"];
                 };
             };
-            /** @description Not found */
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20165,7 +20215,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Server error */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;

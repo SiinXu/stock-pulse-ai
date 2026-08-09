@@ -1,30 +1,68 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Persistence boundary for watchlist groups and memberships."""
+"""Transactional persistence boundary for watchlist groups."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import json
-import logging
+import math
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from sqlalchemy import delete, select, update
-from sqlalchemy.exc import IntegrityError
-
+from sqlalchemy import delete, func, select, update
 from src.repositories.base import BaseRepository, RepositoryError
 from src.repositories.watchlist_group_tables import (
     watchlist_group_members_table,
+    watchlist_group_state_table,
     watchlist_groups_table,
 )
-from src.storage import DatabaseManager, utc_naive_now
-from src.utils.sanitize import log_safe_exception
-
-logger = logging.getLogger(__name__)
+from src.services.watchlist_identity import canonicalize_watchlist_codes, watchlist_match_key
+from src.storage import DatabaseManager
 
 DEFAULT_GROUP_KEY = "default"
-DEFAULT_GROUP_NAME = "Default"
+DEFAULT_GROUP_NAME = "__default__"
+DEFAULT_GROUP_NAME_KEY = "watchlist.defaultGroupName"
+MAX_GROUPS = 50
+MAX_MEMBERS_PER_GROUP = 500
+MAX_TOTAL_MEMBERSHIPS = 2_000
+COMPUTED_ATTRS_SCHEMA_VERSION = 1
+
+
+def _now() -> datetime:
+    """Return UTC for storage; SQLite may deserialize it without tzinfo."""
+    return datetime.now(timezone.utc)
+
+
+def _typed_attrs(raw: Any) -> Dict[str, Any]:
+    """Project legacy JSON into the bounded, versioned computed schema."""
+    if raw in (None, ""):
+        parsed: Mapping[str, Any] = {}
+    elif isinstance(raw, Mapping):
+        parsed = raw
+    else:
+        try:
+            value = json.loads(str(raw))
+        except (TypeError, ValueError):
+            value = {}
+        parsed = value if isinstance(value, Mapping) else {}
+    result: Dict[str, Any] = {"schema_version": COMPUTED_ATTRS_SCHEMA_VERSION}
+    score = parsed.get("ai_score", parsed.get("score"))
+    if (
+        isinstance(score, (int, float))
+        and not isinstance(score, bool)
+        and math.isfinite(float(score))
+        and 0 <= float(score) <= 100
+    ):
+        result["ai_score"] = float(score)
+    focus = parsed.get("focus")
+    if isinstance(focus, bool):
+        result["focus"] = focus
+    return result
+
+
+def _attrs_json(raw: Any) -> str:
+    return json.dumps(_typed_attrs(raw), ensure_ascii=False, sort_keys=True, allow_nan=False)
 
 
 @dataclass(frozen=True)
@@ -50,601 +88,625 @@ class StoredWatchlistGroup:
     members: tuple[StoredWatchlistGroupMember, ...] = field(default_factory=tuple)
 
 
+@dataclass(frozen=True)
+class StoredWatchlistState:
+    revision: int
+    groups: tuple[StoredWatchlistGroup, ...]
+
+
 class WatchlistGroupRepository(BaseRepository):
-    """SQLite-backed watchlist group storage."""
+    """SQLite-backed aggregate with revision-checked atomic mutations."""
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
         super().__init__(db_manager)
 
     @staticmethod
-    def _parse_attrs(raw: Any) -> Dict[str, Any]:
-        if raw is None or raw == "":
-            return {}
-        if isinstance(raw, dict):
-            return dict(raw)
-        try:
-            parsed = json.loads(raw)
-        except (TypeError, ValueError):
-            return {}
-        return dict(parsed) if isinstance(parsed, dict) else {}
-
-    @classmethod
-    def _row_to_member(cls, row: Mapping[str, Any]) -> StoredWatchlistGroupMember:
+    def _row_to_member(row: Mapping[str, Any]) -> StoredWatchlistGroupMember:
         return StoredWatchlistGroupMember(
             member_id=int(row["id"]),
             group_id=int(row["group_id"]),
             stock_code=str(row["stock_code"]),
             sort_order=int(row["sort_order"]),
-            attrs=cls._parse_attrs(row.get("attrs_json")),
+            attrs=_typed_attrs(row.get("attrs_json")),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
 
     @classmethod
-    def _row_to_group(
-        cls,
-        row: Mapping[str, Any],
-        members: Sequence[StoredWatchlistGroupMember] = (),
-    ) -> StoredWatchlistGroup:
-        return StoredWatchlistGroup(
-            group_id=int(row["id"]),
-            group_key=str(row["group_key"]),
-            name=str(row["name"]),
-            sort_order=int(row["sort_order"]),
-            is_default=bool(row["is_default"]),
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            members=tuple(members),
+    def _groups(cls, session) -> tuple[StoredWatchlistGroup, ...]:
+        group_rows = session.execute(
+            select(watchlist_groups_table).order_by(
+                watchlist_groups_table.c.sort_order, watchlist_groups_table.c.id
+            )
+        ).mappings().all()
+        if not group_rows:
+            return ()
+        group_ids = [int(row["id"]) for row in group_rows]
+        member_rows = session.execute(
+            select(watchlist_group_members_table)
+            .where(watchlist_group_members_table.c.group_id.in_(group_ids))
+            .order_by(
+                watchlist_group_members_table.c.group_id,
+                watchlist_group_members_table.c.sort_order,
+                watchlist_group_members_table.c.id,
+            )
+        ).mappings().all()
+        members: dict[int, list[StoredWatchlistGroupMember]] = {group_id: [] for group_id in group_ids}
+        for row in member_rows:
+            member = cls._row_to_member(row)
+            members.setdefault(member.group_id, []).append(member)
+        return tuple(
+            StoredWatchlistGroup(
+                group_id=int(row["id"]),
+                group_key=str(row["group_key"]),
+                name=str(row["name"]),
+                sort_order=int(row["sort_order"]),
+                is_default=bool(row["is_default"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                members=tuple(members.get(int(row["id"]), [])),
+            )
+            for row in group_rows
         )
 
-    def list_groups_with_members(self) -> List[StoredWatchlistGroup]:
-        try:
-            with self.db.get_session() as session:
-                group_rows = session.execute(
-                    select(watchlist_groups_table).order_by(
-                        watchlist_groups_table.c.sort_order,
-                        watchlist_groups_table.c.id,
-                    )
-                ).mappings().all()
-                if not group_rows:
-                    return []
-                group_ids = [int(row["id"]) for row in group_rows]
-                member_rows = session.execute(
-                    select(watchlist_group_members_table)
-                    .where(watchlist_group_members_table.c.group_id.in_(group_ids))
-                    .order_by(
-                        watchlist_group_members_table.c.group_id,
-                        watchlist_group_members_table.c.sort_order,
-                        watchlist_group_members_table.c.id,
-                    )
-                ).mappings().all()
-                members_by_group: Dict[int, List[StoredWatchlistGroupMember]] = {
-                    group_id: [] for group_id in group_ids
-                }
-                for row in member_rows:
-                    member = self._row_to_member(row)
-                    members_by_group.setdefault(member.group_id, []).append(member)
-                return [
-                    self._row_to_group(row, members_by_group.get(int(row["id"]), []))
-                    for row in group_rows
-                ]
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {}
-            log_safe_exception(
-                logger,
-                "Watchlist group list failed",
-                exc,
-                error_code="watchlist_group_list_failed",
-                context=context,
+    @staticmethod
+    def _revision(session) -> int:
+        revision = session.execute(
+            select(watchlist_group_state_table.c.revision).where(watchlist_group_state_table.c.id == 1)
+        ).scalar_one_or_none()
+        if revision is None:
+            session.execute(
+                watchlist_group_state_table.insert().values(id=1, revision=1, updated_at=_now())
             )
+            return 1
+        return int(revision)
+
+    @classmethod
+    def _assert_revision(cls, session, expected_revision: int) -> int:
+        current = cls._revision(session)
+        if current != expected_revision:
             raise RepositoryError(
-                "Watchlist group list failed",
-                error_code="watchlist_group_list_failed",
-                context=context,
-            ) from exc
+                "Watchlist group revision is stale",
+                error_code="watchlist_group_revision_conflict",
+                context={"current_revision": current},
+            )
+        return current
+
+    @staticmethod
+    def _bump_revision(session, current: int) -> int:
+        next_revision = current + 1
+        result = session.execute(
+            update(watchlist_group_state_table)
+            .where(
+                watchlist_group_state_table.c.id == 1,
+                watchlist_group_state_table.c.revision == current,
+            )
+            .values(revision=next_revision, updated_at=_now())
+        )
+        if int(result.rowcount or 0) != 1:
+            latest = WatchlistGroupRepository._revision(session)
+            raise RepositoryError(
+                "Watchlist group revision changed concurrently",
+                error_code="watchlist_group_revision_conflict",
+                context={"current_revision": latest},
+            )
+        return next_revision
+
+    @staticmethod
+    def _rewrite_orders(session, table, rows: Sequence[tuple[int, int]], *, group_id: int | None = None) -> bool:
+        """Rewrite one exact contiguous sequence without transient unique collisions."""
+        changed = any(old_order != index for index, (_, old_order) in enumerate(rows))
+        if not changed:
+            return False
+        now = _now()
+        offset = max((old for _, old in rows), default=0) + len(rows) + 1_000
+        for index, (row_id, _) in enumerate(rows):
+            where = table.c.id == row_id
+            if group_id is not None:
+                where = where & (table.c.group_id == group_id)
+            session.execute(update(table).where(where).values(sort_order=offset + index, updated_at=now))
+        session.flush()
+        for index, (row_id, _) in enumerate(rows):
+            where = table.c.id == row_id
+            if group_id is not None:
+                where = where & (table.c.group_id == group_id)
+            session.execute(update(table).where(where).values(sort_order=index, updated_at=now))
+        return True
+
+    @classmethod
+    def _normalize_all_orders(cls, session) -> bool:
+        changed = False
+        group_rows = session.execute(
+            select(watchlist_groups_table.c.id, watchlist_groups_table.c.sort_order).order_by(
+                watchlist_groups_table.c.sort_order, watchlist_groups_table.c.id
+            )
+        ).all()
+        changed |= cls._rewrite_orders(session, watchlist_groups_table, group_rows)
+        for group_id, _ in group_rows:
+            member_rows = session.execute(
+                select(watchlist_group_members_table.c.id, watchlist_group_members_table.c.sort_order)
+                .where(watchlist_group_members_table.c.group_id == int(group_id))
+                .order_by(watchlist_group_members_table.c.sort_order, watchlist_group_members_table.c.id)
+            ).all()
+            changed |= cls._rewrite_orders(
+                session, watchlist_group_members_table, member_rows, group_id=int(group_id)
+            )
+        return changed
+
+    @staticmethod
+    def _default_group_id(session) -> int:
+        row = session.execute(
+            select(watchlist_groups_table.c.id).where(
+                watchlist_groups_table.c.group_key == DEFAULT_GROUP_KEY
+            )
+        ).scalar_one_or_none()
+        if row is not None:
+            return int(row)
+        max_order = session.execute(select(func.max(watchlist_groups_table.c.sort_order))).scalar()
+        session.execute(
+            watchlist_groups_table.insert().values(
+                group_key=DEFAULT_GROUP_KEY,
+                name=DEFAULT_GROUP_NAME,
+                sort_order=int(max_order) + 1 if max_order is not None else 0,
+                is_default=True,
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        )
+        return int(
+            session.execute(
+                select(watchlist_groups_table.c.id).where(
+                    watchlist_groups_table.c.group_key == DEFAULT_GROUP_KEY
+                )
+            ).scalar_one()
+        )
+
+    def get_state(self) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            return StoredWatchlistState(self._revision(session), self._groups(session))
+
+    def list_groups_with_members(self) -> List[StoredWatchlistGroup]:
+        return list(self.get_state().groups)
 
     def get_group_by_key(self, group_key: str) -> Optional[StoredWatchlistGroup]:
-        key = str(group_key or "").strip()
-        if not key:
-            return None
-        try:
-            with self.db.get_session() as session:
-                row = session.execute(
-                    select(watchlist_groups_table).where(
-                        watchlist_groups_table.c.group_key == key
-                    )
-                ).mappings().one_or_none()
-                if row is None:
-                    return None
-                member_rows = session.execute(
-                    select(watchlist_group_members_table)
-                    .where(watchlist_group_members_table.c.group_id == int(row["id"]))
-                    .order_by(
-                        watchlist_group_members_table.c.sort_order,
-                        watchlist_group_members_table.c.id,
-                    )
-                ).mappings().all()
-                members = [self._row_to_member(item) for item in member_rows]
-                return self._row_to_group(row, members)
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_key": key}
-            log_safe_exception(
-                logger,
-                "Watchlist group lookup failed",
-                exc,
-                error_code="watchlist_group_get_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group lookup failed",
-                error_code="watchlist_group_get_failed",
-                context=context,
-            ) from exc
+        return next((group for group in self.get_state().groups if group.group_key == group_key), None)
 
-    def ensure_default_group(self, *, name: str = DEFAULT_GROUP_NAME) -> StoredWatchlistGroup:
-        existing = self.get_group_by_key(DEFAULT_GROUP_KEY)
-        if existing is not None:
-            return existing
-        now = utc_naive_now()
-        try:
-            with self.db.get_session() as session:
+    def reconcile(self, *, stock_list_codes: Sequence[str]) -> StoredWatchlistState:
+        """Atomically project authoritative STOCK_LIST membership into group rows."""
+        authoritative = canonicalize_watchlist_codes([str(code) for code in stock_list_codes])
+        authoritative_set = set(authoritative)
+        with self.db.get_session() as session:
+            current = self._revision(session)
+            default_id = self._default_group_id(session)
+            changed = False
+            rows = session.execute(
+                select(watchlist_group_members_table).order_by(
+                    watchlist_group_members_table.c.group_id,
+                    watchlist_group_members_table.c.sort_order,
+                    watchlist_group_members_table.c.id,
+                )
+            ).mappings().all()
+            survivors: dict[tuple[int, str], Mapping[str, Any]] = {}
+            delete_ids: list[int] = []
+            for row in rows:
+                identity = watchlist_match_key(str(row["stock_code"]))
+                key = (int(row["group_id"]), identity)
+                if identity not in authoritative_set or key in survivors:
+                    delete_ids.append(int(row["id"]))
+                    continue
+                survivors[key] = row
+            globally_grouped = {identity for _, identity in survivors}
+            missing = [identity for identity in authoritative if identity not in globally_grouped]
+            projected_default_count = sum(
+                1 for group_id, _identity in survivors if group_id == default_id
+            ) + len(missing)
+            if projected_default_count > MAX_MEMBERS_PER_GROUP:
+                raise RepositoryError(
+                    "Authoritative watchlist exceeds the default group limit",
+                    error_code="watchlist_group_member_limit_reached",
+                )
+            if len(survivors) + len(missing) > MAX_TOTAL_MEMBERSHIPS:
+                raise RepositoryError(
+                    "Membership limit reached",
+                    error_code="watchlist_group_member_limit_reached",
+                )
+            if delete_ids:
                 session.execute(
-                    watchlist_groups_table.insert().values(
-                        group_key=DEFAULT_GROUP_KEY,
-                        name=name,
-                        sort_order=0,
-                        is_default=True,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-                session.commit()
-        except IntegrityError:
-            pass
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {}
-            log_safe_exception(
-                logger,
-                "Watchlist default group create failed",
-                exc,
-                error_code="watchlist_group_default_create_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist default group create failed",
-                error_code="watchlist_group_default_create_failed",
-                context=context,
-            ) from exc
-        group = self.get_group_by_key(DEFAULT_GROUP_KEY)
-        if group is None:
-            raise RepositoryError(
-                "Default watchlist group missing after create",
-                error_code="watchlist_group_default_missing",
-            )
-        return group
-
-    def create_group(self, *, group_key: str, name: str, sort_order: int) -> StoredWatchlistGroup:
-        now = utc_naive_now()
-        try:
-            with self.db.get_session() as session:
-                session.execute(
-                    watchlist_groups_table.insert().values(
-                        group_key=group_key,
-                        name=name,
-                        sort_order=int(sort_order),
-                        is_default=False,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-                session.commit()
-        except IntegrityError as exc:
-            raise RepositoryError(
-                "Watchlist group key already exists",
-                error_code="watchlist_group_key_conflict",
-                context={"group_key": group_key},
-            ) from exc
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_key": group_key}
-            log_safe_exception(
-                logger,
-                "Watchlist group create failed",
-                exc,
-                error_code="watchlist_group_create_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group create failed",
-                error_code="watchlist_group_create_failed",
-                context=context,
-            ) from exc
-        group = self.get_group_by_key(group_key)
-        if group is None:
-            raise RepositoryError(
-                "Watchlist group missing after create",
-                error_code="watchlist_group_missing_after_create",
-                context={"group_key": group_key},
-            )
-        return group
-
-    def rename_group(self, *, group_key: str, name: str) -> Optional[StoredWatchlistGroup]:
-        now = utc_naive_now()
-        try:
-            with self.db.get_session() as session:
-                result = session.execute(
-                    update(watchlist_groups_table)
-                    .where(watchlist_groups_table.c.group_key == group_key)
-                    .values(name=name, updated_at=now)
-                )
-                session.commit()
-                if int(result.rowcount or 0) == 0:
-                    return None
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_key": group_key}
-            log_safe_exception(
-                logger,
-                "Watchlist group rename failed",
-                exc,
-                error_code="watchlist_group_rename_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group rename failed",
-                error_code="watchlist_group_rename_failed",
-                context=context,
-            ) from exc
-        return self.get_group_by_key(group_key)
-
-    def delete_group(self, *, group_key: str) -> bool:
-        if group_key == DEFAULT_GROUP_KEY:
-            raise RepositoryError(
-                "Default watchlist group cannot be deleted",
-                error_code="watchlist_group_default_delete_forbidden",
-            )
-        try:
-            with self.db.get_session() as session:
-                result = session.execute(
-                    delete(watchlist_groups_table).where(
-                        watchlist_groups_table.c.group_key == group_key
-                    )
-                )
-                session.commit()
-                return int(result.rowcount or 0) > 0
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_key": group_key}
-            log_safe_exception(
-                logger,
-                "Watchlist group delete failed",
-                exc,
-                error_code="watchlist_group_delete_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group delete failed",
-                error_code="watchlist_group_delete_failed",
-                context=context,
-            ) from exc
-
-    def set_group_sort_orders(self, ordered_keys: Sequence[str]) -> None:
-        now = utc_naive_now()
-        try:
-            with self.db.get_session() as session:
-                for index, group_key in enumerate(ordered_keys):
-                    session.execute(
-                        update(watchlist_groups_table)
-                        .where(watchlist_groups_table.c.group_key == group_key)
-                        .values(sort_order=index, updated_at=now)
-                    )
-                session.commit()
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {}
-            log_safe_exception(
-                logger,
-                "Watchlist group reorder failed",
-                exc,
-                error_code="watchlist_group_reorder_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group reorder failed",
-                error_code="watchlist_group_reorder_failed",
-                context=context,
-            ) from exc
-
-    def list_membership_codes(self) -> List[str]:
-        try:
-            with self.db.get_session() as session:
-                rows = session.execute(
-                    select(watchlist_group_members_table.c.stock_code).distinct()
-                ).all()
-                return [str(row[0]) for row in rows if row and row[0]]
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {}
-            log_safe_exception(
-                logger,
-                "Watchlist membership codes list failed",
-                exc,
-                error_code="watchlist_group_membership_list_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist membership codes list failed",
-                error_code="watchlist_group_membership_list_failed",
-                context=context,
-            ) from exc
-
-    def add_member(
-        self,
-        *,
-        group_id: int,
-        stock_code: str,
-        sort_order: Optional[int] = None,
-        attrs: Optional[Mapping[str, Any]] = None,
-    ) -> StoredWatchlistGroupMember:
-        now = utc_naive_now()
-        attrs_json = json.dumps(dict(attrs or {}), ensure_ascii=False, sort_keys=True)
-        try:
-            with self.db.get_session() as session:
-                existing = session.execute(
-                    select(watchlist_group_members_table).where(
-                        watchlist_group_members_table.c.group_id == group_id,
-                        watchlist_group_members_table.c.stock_code == stock_code,
-                    )
-                ).mappings().one_or_none()
-                if existing is not None:
-                    return self._row_to_member(existing)
-
-                if sort_order is None:
-                    max_order = session.execute(
-                        select(watchlist_group_members_table.c.sort_order)
-                        .where(watchlist_group_members_table.c.group_id == group_id)
-                        .order_by(watchlist_group_members_table.c.sort_order.desc())
-                        .limit(1)
-                    ).scalar()
-                    sort_order = int(max_order) + 1 if max_order is not None else 0
-
-                session.execute(
-                    watchlist_group_members_table.insert().values(
-                        group_id=group_id,
-                        stock_code=stock_code,
-                        sort_order=int(sort_order),
-                        attrs_json=attrs_json,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-                session.commit()
-                row = session.execute(
-                    select(watchlist_group_members_table).where(
-                        watchlist_group_members_table.c.group_id == group_id,
-                        watchlist_group_members_table.c.stock_code == stock_code,
-                    )
-                ).mappings().one()
-                return self._row_to_member(row)
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_id": group_id, "stock_code": stock_code}
-            log_safe_exception(
-                logger,
-                "Watchlist group member add failed",
-                exc,
-                error_code="watchlist_group_member_add_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group member add failed",
-                error_code="watchlist_group_member_add_failed",
-                context=context,
-            ) from exc
-
-    def remove_member(self, *, group_id: int, stock_code: str) -> bool:
-        try:
-            with self.db.get_session() as session:
-                result = session.execute(
                     delete(watchlist_group_members_table).where(
-                        watchlist_group_members_table.c.group_id == group_id,
-                        watchlist_group_members_table.c.stock_code == stock_code,
+                        watchlist_group_members_table.c.id.in_(delete_ids)
                     )
                 )
-                session.commit()
-                return int(result.rowcount or 0) > 0
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_id": group_id, "stock_code": stock_code}
-            log_safe_exception(
-                logger,
-                "Watchlist group member remove failed",
-                exc,
-                error_code="watchlist_group_member_remove_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group member remove failed",
-                error_code="watchlist_group_member_remove_failed",
-                context=context,
-            ) from exc
-
-    def remove_member_from_all_groups(self, *, stock_code: str) -> int:
-        try:
-            with self.db.get_session() as session:
-                result = session.execute(
-                    delete(watchlist_group_members_table).where(
-                        watchlist_group_members_table.c.stock_code == stock_code
-                    )
-                )
-                session.commit()
-                return int(result.rowcount or 0)
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"stock_code": stock_code}
-            log_safe_exception(
-                logger,
-                "Watchlist group member global remove failed",
-                exc,
-                error_code="watchlist_group_member_global_remove_failed",
-                context=context,
-            )
-            raise RepositoryError(
-                "Watchlist group member global remove failed",
-                error_code="watchlist_group_member_global_remove_failed",
-                context=context,
-            ) from exc
-
-    def set_member_sort_orders(
-        self,
-        *,
-        group_id: int,
-        ordered_codes: Sequence[str],
-    ) -> None:
-        now = utc_naive_now()
-        try:
-            with self.db.get_session() as session:
-                for index, stock_code in enumerate(ordered_codes):
+                session.flush()
+                changed = True
+            for (_, identity), row in survivors.items():
+                typed_json = _attrs_json(row.get("attrs_json"))
+                if str(row["stock_code"]) != identity or str(row.get("attrs_json") or "") != typed_json:
                     session.execute(
                         update(watchlist_group_members_table)
-                        .where(
-                            watchlist_group_members_table.c.group_id == group_id,
-                            watchlist_group_members_table.c.stock_code == stock_code,
-                        )
-                        .values(sort_order=index, updated_at=now)
+                        .where(watchlist_group_members_table.c.id == int(row["id"]))
+                        .values(stock_code=identity, attrs_json=typed_json, updated_at=_now())
                     )
-                session.commit()
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {"group_id": group_id}
-            log_safe_exception(
-                logger,
-                "Watchlist group member reorder failed",
-                exc,
-                error_code="watchlist_group_member_reorder_failed",
-                context=context,
+                    changed = True
+            next_order = session.execute(
+                select(func.max(watchlist_group_members_table.c.sort_order)).where(
+                    watchlist_group_members_table.c.group_id == default_id
+                )
+            ).scalar()
+            insert_order = int(next_order) + 1 if next_order is not None else 0
+            for identity in missing:
+                session.execute(
+                    watchlist_group_members_table.insert().values(
+                        group_id=default_id,
+                        stock_code=identity,
+                        sort_order=insert_order,
+                        attrs_json=_attrs_json({}),
+                        created_at=_now(),
+                        updated_at=_now(),
+                    )
+                )
+                insert_order += 1
+                changed = True
+            changed |= self._normalize_all_orders(session)
+            if changed:
+                current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def create_group(self, *, group_key: str, name: str, expected_revision: int) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            count = int(session.execute(select(func.count()).select_from(watchlist_groups_table)).scalar_one())
+            if count >= MAX_GROUPS:
+                raise RepositoryError("Group limit reached", error_code="watchlist_group_limit_reached")
+            session.execute(
+                watchlist_groups_table.insert().values(
+                    group_key=group_key,
+                    name=name,
+                    sort_order=count,
+                    is_default=False,
+                    created_at=_now(),
+                    updated_at=_now(),
+                )
             )
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def rename_group(self, *, group_key: str, name: str, expected_revision: int) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            result = session.execute(
+                update(watchlist_groups_table)
+                .where(watchlist_groups_table.c.group_key == group_key)
+                .values(name=name, updated_at=_now())
+            )
+            if int(result.rowcount or 0) != 1:
+                raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def delete_group(self, *, group_key: str, expected_revision: int) -> StoredWatchlistState:
+        if group_key == DEFAULT_GROUP_KEY:
             raise RepositoryError(
-                "Watchlist group member reorder failed",
-                error_code="watchlist_group_member_reorder_failed",
-                context=context,
-            ) from exc
+                "Default group cannot be deleted",
+                error_code="watchlist_group_default_delete_forbidden",
+            )
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            group_id = session.execute(
+                select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
+            ).scalar_one_or_none()
+            if group_id is None:
+                raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
+            default_id = self._default_group_id(session)
+            members = session.execute(
+                select(watchlist_group_members_table).where(
+                    watchlist_group_members_table.c.group_id == int(group_id)
+                )
+            ).mappings().all()
+            default_count = int(
+                session.execute(
+                    select(func.count()).select_from(watchlist_group_members_table).where(
+                        watchlist_group_members_table.c.group_id == default_id
+                    )
+                ).scalar_one()
+            )
+            for member in members:
+                other = int(
+                    session.execute(
+                        select(func.count()).select_from(watchlist_group_members_table).where(
+                            watchlist_group_members_table.c.stock_code == member["stock_code"],
+                            watchlist_group_members_table.c.group_id != int(group_id),
+                        )
+                    ).scalar_one()
+                )
+                if other == 0:
+                    if default_count >= MAX_MEMBERS_PER_GROUP:
+                        raise RepositoryError(
+                            "Membership limit reached",
+                            error_code="watchlist_group_member_limit_reached",
+                        )
+                    session.execute(
+                        watchlist_group_members_table.insert().values(
+                            group_id=default_id,
+                            stock_code=member["stock_code"],
+                            sort_order=default_count,
+                            attrs_json=_attrs_json(member.get("attrs_json")),
+                            created_at=_now(),
+                            updated_at=_now(),
+                        )
+                    )
+                    default_count += 1
+            session.execute(delete(watchlist_groups_table).where(watchlist_groups_table.c.id == int(group_id)))
+            self._normalize_all_orders(session)
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def reorder_groups(self, *, ordered_keys: Sequence[str], expected_revision: int) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            rows = session.execute(
+                select(
+                    watchlist_groups_table.c.id,
+                    watchlist_groups_table.c.group_key,
+                    watchlist_groups_table.c.sort_order,
+                )
+                .order_by(watchlist_groups_table.c.sort_order)
+            ).all()
+            current_keys = [str(row[1]) for row in rows]
+            requested = [str(key) for key in ordered_keys]
+            if len(requested) != len(set(requested)) or set(requested) != set(current_keys):
+                raise RepositoryError(
+                    "Reorder must contain every current group exactly once",
+                    error_code="watchlist_group_reorder_invalid",
+                )
+            by_key = {str(row[1]): (int(row[0]), int(row[2])) for row in rows}
+            self._rewrite_orders(session, watchlist_groups_table, [by_key[key] for key in requested])
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def add_member(self, *, group_key: str, stock_code: str, expected_revision: int) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            group_id = session.execute(
+                select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
+            ).scalar_one_or_none()
+            if group_id is None:
+                raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
+            identity = watchlist_match_key(stock_code)
+            exists = session.execute(
+                select(watchlist_group_members_table.c.id).where(
+                    watchlist_group_members_table.c.group_id == int(group_id),
+                    watchlist_group_members_table.c.stock_code == identity,
+                )
+            ).scalar_one_or_none()
+            if exists is not None:
+                return StoredWatchlistState(current, self._groups(session))
+            group_count = int(
+                session.execute(
+                    select(func.count()).select_from(watchlist_group_members_table).where(
+                        watchlist_group_members_table.c.group_id == int(group_id)
+                    )
+                ).scalar_one()
+            )
+            total_count = int(
+                session.execute(
+                    select(func.count()).select_from(watchlist_group_members_table)
+                ).scalar_one()
+            )
+            if group_count >= MAX_MEMBERS_PER_GROUP or total_count >= MAX_TOTAL_MEMBERSHIPS:
+                raise RepositoryError("Membership limit reached", error_code="watchlist_group_member_limit_reached")
+            session.execute(
+                watchlist_group_members_table.insert().values(
+                    group_id=int(group_id),
+                    stock_code=identity,
+                    sort_order=group_count,
+                    attrs_json=_attrs_json({}),
+                    created_at=_now(),
+                    updated_at=_now(),
+                )
+            )
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def remove_member(self, *, group_key: str, stock_code: str, expected_revision: int) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            group_id = session.execute(
+                select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
+            ).scalar_one_or_none()
+            if group_id is None:
+                raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
+            identity = watchlist_match_key(stock_code)
+            result = session.execute(
+                delete(watchlist_group_members_table).where(
+                    watchlist_group_members_table.c.group_id == int(group_id),
+                    watchlist_group_members_table.c.stock_code == identity,
+                )
+            )
+            if int(result.rowcount or 0) != 1:
+                raise RepositoryError("Member not found", error_code="watchlist_group_member_not_found")
+            remaining = int(
+                session.execute(
+                    select(func.count()).select_from(watchlist_group_members_table).where(
+                        watchlist_group_members_table.c.stock_code == identity
+                    )
+                ).scalar_one()
+            )
+            if remaining == 0:
+                default_id = self._default_group_id(session)
+                default_count = int(
+                    session.execute(
+                        select(func.count()).select_from(watchlist_group_members_table).where(
+                            watchlist_group_members_table.c.group_id == default_id
+                        )
+                    ).scalar_one()
+                )
+                session.execute(
+                    watchlist_group_members_table.insert().values(
+                        group_id=default_id,
+                        stock_code=identity,
+                        sort_order=default_count,
+                        attrs_json=_attrs_json({}),
+                        created_at=_now(),
+                        updated_at=_now(),
+                    )
+                )
+            self._normalize_all_orders(session)
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def reorder_members(
+        self, *, group_key: str, ordered_codes: Sequence[str], expected_revision: int
+    ) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            group_id = session.execute(
+                select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
+            ).scalar_one_or_none()
+            if group_id is None:
+                raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
+            rows = session.execute(
+                select(
+                    watchlist_group_members_table.c.id,
+                    watchlist_group_members_table.c.stock_code,
+                    watchlist_group_members_table.c.sort_order,
+                )
+                .where(watchlist_group_members_table.c.group_id == int(group_id))
+                .order_by(watchlist_group_members_table.c.sort_order)
+            ).all()
+            requested = [watchlist_match_key(code) for code in ordered_codes]
+            current_codes = [str(row[1]) for row in rows]
+            if len(requested) != len(set(requested)) or set(requested) != set(current_codes):
+                raise RepositoryError(
+                    "Reorder must contain every current member exactly once",
+                    error_code="watchlist_group_member_reorder_invalid",
+                )
+            by_code = {str(row[1]): (int(row[0]), int(row[2])) for row in rows}
+            self._rewrite_orders(
+                session,
+                watchlist_group_members_table,
+                [by_code[code] for code in requested],
+                group_id=int(group_id),
+            )
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
 
     def move_member(
         self,
         *,
         stock_code: str,
-        source_group_id: int,
-        target_group_id: int,
-        target_index: Optional[int] = None,
-        copy: bool = False,
-    ) -> None:
-        """Move or copy a member between groups, preserving attrs on move."""
-        try:
-            with self.db.get_session() as session:
-                source = session.execute(
-                    select(watchlist_group_members_table).where(
-                        watchlist_group_members_table.c.group_id == source_group_id,
-                        watchlist_group_members_table.c.stock_code == stock_code,
-                    )
-                ).mappings().one_or_none()
-                if source is None:
-                    raise RepositoryError(
-                        "Source membership not found",
-                        error_code="watchlist_group_member_not_found",
-                        context={
-                            "stock_code": stock_code,
-                            "source_group_id": source_group_id,
-                        },
-                    )
-
-                now = utc_naive_now()
-                target = session.execute(
-                    select(watchlist_group_members_table).where(
-                        watchlist_group_members_table.c.group_id == target_group_id,
-                        watchlist_group_members_table.c.stock_code == stock_code,
-                    )
-                ).mappings().one_or_none()
-
-                if target is None:
-                    max_order = session.execute(
-                        select(watchlist_group_members_table.c.sort_order)
-                        .where(watchlist_group_members_table.c.group_id == target_group_id)
-                        .order_by(watchlist_group_members_table.c.sort_order.desc())
-                        .limit(1)
-                    ).scalar()
-                    next_order = int(max_order) + 1 if max_order is not None else 0
-                    insert_order = (
-                        max(0, min(int(target_index), next_order))
-                        if target_index is not None
-                        else next_order
-                    )
-                    existing_codes = session.execute(
-                        select(
-                            watchlist_group_members_table.c.id,
-                            watchlist_group_members_table.c.sort_order,
-                        )
-                        .where(watchlist_group_members_table.c.group_id == target_group_id)
-                        .order_by(watchlist_group_members_table.c.sort_order)
-                    ).all()
-                    for row_id, sort_order in existing_codes:
-                        if int(sort_order) >= insert_order:
-                            session.execute(
-                                update(watchlist_group_members_table)
-                                .where(watchlist_group_members_table.c.id == int(row_id))
-                                .values(sort_order=int(sort_order) + 1, updated_at=now)
-                            )
-                    session.execute(
-                        watchlist_group_members_table.insert().values(
-                            group_id=target_group_id,
-                            stock_code=stock_code,
-                            sort_order=insert_order,
-                            attrs_json=source["attrs_json"] or "{}",
-                            created_at=now,
-                            updated_at=now,
-                        )
-                    )
-                elif target_index is not None:
-                    codes = [
-                        str(row[0])
-                        for row in session.execute(
-                            select(watchlist_group_members_table.c.stock_code)
-                            .where(
-                                watchlist_group_members_table.c.group_id == target_group_id
-                            )
-                            .order_by(watchlist_group_members_table.c.sort_order)
-                        ).all()
-                    ]
-                    if stock_code in codes:
-                        codes.remove(stock_code)
-                    insert_at = max(0, min(int(target_index), len(codes)))
-                    codes.insert(insert_at, stock_code)
-                    for index, code in enumerate(codes):
-                        session.execute(
-                            update(watchlist_group_members_table)
-                            .where(
-                                watchlist_group_members_table.c.group_id == target_group_id,
-                                watchlist_group_members_table.c.stock_code == code,
-                            )
-                            .values(sort_order=index, updated_at=now)
-                        )
-
-                if not copy and source_group_id != target_group_id:
-                    session.execute(
-                        delete(watchlist_group_members_table).where(
-                            watchlist_group_members_table.c.group_id == source_group_id,
-                            watchlist_group_members_table.c.stock_code == stock_code,
-                        )
-                    )
-                session.commit()
-        except RepositoryError:
-            raise
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            context = {
-                    "stock_code": stock_code,
-                    "source_group_id": source_group_id,
-                    "target_group_id": target_group_id,
-                }
-            log_safe_exception(
-                logger,
-                "Watchlist group member move failed",
-                exc,
-                error_code="watchlist_group_member_move_failed",
-                context=context,
+        source_group_key: str,
+        target_group_key: str,
+        target_index: Optional[int],
+        copy: bool,
+        expected_revision: int,
+    ) -> StoredWatchlistState:
+        with self.db.get_session() as session:
+            current = self._assert_revision(session, expected_revision)
+            groups = dict(
+                session.execute(select(watchlist_groups_table.c.group_key, watchlist_groups_table.c.id)).all()
             )
-            raise RepositoryError(
-                "Watchlist group member move failed",
-                error_code="watchlist_group_member_move_failed",
-                context=context,
-            ) from exc
+            if source_group_key not in groups or target_group_key not in groups:
+                raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
+            source_id = int(groups[source_group_key])
+            target_id = int(groups[target_group_key])
+            identity = watchlist_match_key(stock_code)
+            source = session.execute(
+                select(watchlist_group_members_table).where(
+                    watchlist_group_members_table.c.group_id == source_id,
+                    watchlist_group_members_table.c.stock_code == identity,
+                )
+            ).mappings().one_or_none()
+            if source is None:
+                raise RepositoryError("Member not found", error_code="watchlist_group_member_not_found")
+            target = session.execute(
+                select(watchlist_group_members_table).where(
+                    watchlist_group_members_table.c.group_id == target_id,
+                    watchlist_group_members_table.c.stock_code == identity,
+                )
+            ).mappings().one_or_none()
+            if target is None:
+                target_count = int(
+                    session.execute(
+                        select(func.count()).select_from(watchlist_group_members_table).where(
+                            watchlist_group_members_table.c.group_id == target_id
+                        )
+                    ).scalar_one()
+                )
+                if target_count >= MAX_MEMBERS_PER_GROUP:
+                    raise RepositoryError("Membership limit reached", error_code="watchlist_group_member_limit_reached")
+                if copy:
+                    total_count = int(
+                        session.execute(
+                            select(func.count()).select_from(watchlist_group_members_table)
+                        ).scalar_one()
+                    )
+                    if total_count >= MAX_TOTAL_MEMBERSHIPS:
+                        raise RepositoryError(
+                            "Membership limit reached",
+                            error_code="watchlist_group_member_limit_reached",
+                        )
+                session.execute(
+                    watchlist_group_members_table.insert().values(
+                        group_id=target_id,
+                        stock_code=identity,
+                        sort_order=target_count,
+                        attrs_json=_attrs_json(source.get("attrs_json")),
+                        created_at=_now(),
+                        updated_at=_now(),
+                    )
+                )
+            if not copy and source_id != target_id:
+                session.execute(
+                    delete(watchlist_group_members_table).where(
+                        watchlist_group_members_table.c.id == int(source["id"])
+                    )
+                )
+            session.flush()
+            for affected_id in {source_id, target_id}:
+                ordered_rows = session.execute(
+                    select(
+                        watchlist_group_members_table.c.id,
+                        watchlist_group_members_table.c.stock_code,
+                        watchlist_group_members_table.c.sort_order,
+                    )
+                    .where(watchlist_group_members_table.c.group_id == affected_id)
+                    .order_by(watchlist_group_members_table.c.sort_order, watchlist_group_members_table.c.id)
+                ).all()
+                if affected_id == target_id and target_index is not None:
+                    ordered_rows = list(ordered_rows)
+                    moving = next((row for row in ordered_rows if row[1] == identity), None)
+                    if moving is not None:
+                        ordered_rows.remove(moving)
+                        ordered_rows.insert(min(int(target_index), len(ordered_rows)), moving)
+                self._rewrite_orders(
+                    session,
+                    watchlist_group_members_table,
+                    [(int(row[0]), int(row[2])) for row in ordered_rows],
+                    group_id=affected_id,
+                )
+            current = self._bump_revision(session, current)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+
+__all__ = [
+    "COMPUTED_ATTRS_SCHEMA_VERSION",
+    "DEFAULT_GROUP_KEY",
+    "DEFAULT_GROUP_NAME",
+    "DEFAULT_GROUP_NAME_KEY",
+    "MAX_GROUPS",
+    "MAX_MEMBERS_PER_GROUP",
+    "MAX_TOTAL_MEMBERSHIPS",
+    "StoredWatchlistGroup",
+    "StoredWatchlistGroupMember",
+    "StoredWatchlistState",
+    "WatchlistGroupRepository",
+]

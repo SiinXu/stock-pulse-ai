@@ -11,11 +11,12 @@ export interface HomeWatchlistRow {
   activeTask?: TaskInfo;
 }
 
-/**
- * Per-member computed-attribute mount for T25 (scores) / T26 (focus).
- * Empty by default; consumers may attach arbitrary JSON fields.
- */
-export type WatchlistMemberAttrs = Record<string, unknown>;
+/** Read-only, versioned projection owned by T25/T26 services. */
+export interface WatchlistMemberAttrs {
+  schemaVersion: 1;
+  aiScore?: number | null;
+  focus?: boolean | null;
+}
 
 export interface WatchlistGroupMember {
   stockCode: string;
@@ -26,9 +27,15 @@ export interface WatchlistGroupMember {
 export interface WatchlistGroup {
   id: string;
   name: string;
+  nameKey?: string | null;
   sortOrder: number;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
   members: WatchlistGroupMember[];
+}
+
+export interface WatchlistGroupState {
+  revision: number;
+  groups: WatchlistGroup[];
 }

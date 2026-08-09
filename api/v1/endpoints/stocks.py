@@ -42,6 +42,7 @@ from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
 from data_provider.base import normalize_stock_code
+from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -113,10 +114,7 @@ def _validate_and_normalize_stock_code(code: str) -> str:
 
 def _watchlist_match_key(code: str) -> str:
     """Return the equivalence key used for watchlist add/remove matching."""
-    normalized = normalize_stock_code(code.strip())
-    if re.fullmatch(r"\d{5}", normalized):
-        return f"HK{normalized}"
-    return normalized.upper()
+    return watchlist_match_key(code)
 
 
 @router.post(
@@ -391,18 +389,6 @@ def add_to_watchlist(
         if _watchlist_match_key(validated) not in existing_keys:
             codes.append(display_code)
             _write_watchlist_codes(service, codes)
-        try:
-            from src.services.watchlist_group_service import WatchlistGroupService
-
-            WatchlistGroupService().on_watchlist_code_added(display_code)
-        except Exception as group_exc:  # broad-exception: fallback_recorded - group sync must not block add
-            log_safe_exception(
-                logger,
-                "Watchlist group sync after add failed",
-                group_exc,
-                error_code="watchlist_group_sync_add_failed",
-                context={"stock_code": display_code},
-            )
         return WatchlistResponse(stock_codes=codes, message=f"已加入 {display_code}")
     except HTTPException:
         raise
@@ -440,25 +426,10 @@ def remove_from_watchlist(
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
         requested_key = _watchlist_match_key(validated)
-        removed_code = request.stock_code.strip()
         if requested_key in existing_keys:
             idx = existing_keys.index(requested_key)
-            removed_code = codes.pop(idx)
+            codes.pop(idx)
             _write_watchlist_codes(service, codes)
-        try:
-            from src.services.watchlist_group_service import WatchlistGroupService
-
-            WatchlistGroupService().on_watchlist_code_removed(removed_code)
-            if removed_code != request.stock_code.strip():
-                WatchlistGroupService().on_watchlist_code_removed(request.stock_code.strip())
-        except Exception as group_exc:  # broad-exception: fallback_recorded - group sync must not block remove
-            log_safe_exception(
-                logger,
-                "Watchlist group sync after remove failed",
-                group_exc,
-                error_code="watchlist_group_sync_remove_failed",
-                context={"stock_code": removed_code},
-            )
         return WatchlistResponse(stock_codes=codes, message=f"已移除 {request.stock_code.strip()}")
     except HTTPException:
         raise
