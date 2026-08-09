@@ -4,21 +4,17 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { SystemConfigItem } from '../../../types/systemConfig';
 import { DataProvidersPanel } from '../DataProvidersPanel';
+import { isDataProviderKey } from '../dataProviders';
 
-// SettingsField pulls settingsHelp, whose en inventory is currently stale on main
-// for newly added data_source keys (RSS_NEWS_*). Mock the field shell so this
-// hub suite stays focused on card/filter/dialog contracts without that debt.
-vi.mock('../SettingsField', () => ({
-  SettingsField: ({ item }: { item: { key: string } }) => (
-    <div id={`setting-${item.key}`} data-testid={`setting-${item.key}`} />
-  ),
-}));
-
-function buildItem(key: string, value: string): SystemConfigItem {
+function buildItem(
+  key: string,
+  value: string,
+  rawValueExists = value !== '',
+): SystemConfigItem {
   return {
     key,
     value,
-    rawValueExists: value !== '',
+    rawValueExists,
     isMasked: false,
     schema: {
       key,
@@ -50,50 +46,38 @@ function renderPanel(items: SystemConfigItem[], configuredOverrides?: Record<str
 }
 
 describe('DataProvidersPanel', () => {
-  it('groups provider cards by hub role with capability and status chips', () => {
+  it('shows only market-provider configuration owners with truthful scope copy', () => {
     renderPanel(
       [
         buildItem('TUSHARE_TOKEN', ''),
         buildItem('TICKFLOW_API_KEY', 'tf-key'),
-        buildItem('TICKFLOW_PRIORITY', 'high'),
-        buildItem('TAVILY_API_KEYS', ''),
+        buildItem('TAVILY_API_KEYS', 'search-key'),
+        buildItem('FUTU_OPEND_HOST', '127.0.0.1', false),
       ],
     );
 
-    expect(screen.getByRole('heading', { name: '默认路径' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '增强器' })).toBeInTheDocument();
-
-    // Keyless baselines always appear with honest unknown as-of.
-    expect(screen.getByText('AkShare')).toBeInTheDocument();
-    expect(screen.getByText('yfinance')).toBeInTheDocument();
-    expect(document.getElementById('data-provider-akshare')).toHaveAttribute(
-      'data-provider-role',
-      'baseline',
-    );
+    expect(screen.getByText(/只显示已保存的行情提供方设置/)).toBeInTheDocument();
 
     const tushareCard = screen.getByRole('button', { name: /Tushare/ });
     expect(within(tushareCard).getByText('未配置')).toBeInTheDocument();
-    expect(within(tushareCard).getByText('基本面')).toBeInTheDocument();
-    expect(within(tushareCard).getByText('增强器')).toBeInTheDocument();
-    expect(tushareCard).toHaveAttribute('id', 'data-provider-tushare');
 
     const tickflowCard = screen.getByRole('button', { name: /TickFlow/ });
     expect(within(tickflowCard).getByText('已配置')).toBeInTheDocument();
 
-    // Providers without any matching items are not rendered.
-    expect(screen.queryByRole('button', { name: /Pytdx/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Brave/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tavily/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Futu/ })).not.toBeInTheDocument();
+    expect(isDataProviderKey('TAVILY_API_KEYS')).toBe(false);
+    expect(isDataProviderKey('FUTU_OPEND_HOST')).toBe(false);
   });
 
-  it('does not mark a provider configured from non-credential defaults', () => {
+  it('does not treat inherited endpoint defaults as explicit configuration', () => {
     renderPanel([
-      buildItem('TICKFLOW_API_KEY', ''),
-      buildItem('TICKFLOW_PRIORITY', 'high'),
-      buildItem('TICKFLOW_KLINE_ADJUST', 'qfq'),
+      buildItem('PYTDX_HOST', '127.0.0.1', false),
+      buildItem('PYTDX_PORT', '7709', false),
     ]);
 
-    const tickflowCard = screen.getByRole('button', { name: /TickFlow/ });
-    expect(within(tickflowCard).getByText('未配置')).toBeInTheDocument();
+    const pytdxCard = screen.getByRole('button', { name: /Pytdx/ });
+    expect(within(pytdxCard).getByText('未配置')).toBeInTheDocument();
   });
 
   it('honors configured overrides for externally managed providers', () => {
@@ -101,40 +85,34 @@ describe('DataProvidersPanel', () => {
 
     const alphasiftCard = screen.getByRole('button', { name: /AlphaSift/ });
     expect(within(alphasiftCard).getByText('已配置')).toBeInTheDocument();
-    expect(within(alphasiftCard).getByText('高级')).toBeInTheDocument();
   });
 
-  it('filters cards by search query and role chips', () => {
-    renderPanel([
-      buildItem('TUSHARE_TOKEN', 'tok'),
-      buildItem('TAVILY_API_KEYS', 'key-1'),
-      buildItem('PYTDX_HOST', '127.0.0.1'),
-    ]);
-
-    const filters = screen.getByRole('group', { name: '数据源筛选' });
-    fireEvent.click(within(filters).getByRole('button', { name: '增强器' }));
-    expect(screen.getByRole('button', { name: /Tushare/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Tavily/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Pytdx/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('AkShare')).not.toBeInTheDocument();
-
-    fireEvent.click(within(filters).getByRole('button', { name: '全部角色' }));
-    const search = screen.getByRole('searchbox', { name: '按名称、类型或状态筛选数据源' });
-    fireEvent.change(search, { target: { value: 'tushare' } });
-    expect(screen.getByRole('button', { name: /Tushare/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Tavily/ })).not.toBeInTheDocument();
-  });
-
-  it('keeps the provider directory inline and mounts fields only in the shared dialog', () => {
+  it('filters by provider name and explicit configuration state', () => {
     renderPanel([
       buildItem('TUSHARE_TOKEN', ''),
-      buildItem('TAVILY_API_KEYS', 'key-1'),
+      buildItem('TICKFLOW_API_KEY', 'tf-key'),
+      buildItem('PYTDX_HOST', '127.0.0.1', false),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: '已配置' }));
+    expect(screen.getByRole('button', { name: /TickFlow/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tushare/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '全部配置' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: '按名称或配置状态筛选' }), {
+      target: { value: 'pytdx' },
+    });
+    expect(screen.getByRole('button', { name: /Pytdx/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /TickFlow/ })).not.toBeInTheDocument();
+  });
+
+  it('mounts the real shared SettingsField only inside the modal and returns focus', () => {
+    renderPanel([
+      buildItem('TUSHARE_TOKEN', ''),
     ]);
 
     const trigger = screen.getByRole('button', { name: /Tushare/ });
-    expect(screen.getByRole('heading', { name: '增强器' })).toBeInTheDocument();
     expect(within(trigger).getByText('未配置')).toBeInTheDocument();
-    expect(within(screen.getByRole('button', { name: /Tavily/ })).getByText('已配置')).toBeInTheDocument();
     expect(document.querySelector('#setting-TUSHARE_TOKEN')).toBeNull();
 
     trigger.focus();
@@ -146,7 +124,6 @@ describe('DataProvidersPanel', () => {
     const providerField = dialog.querySelector('#setting-TUSHARE_TOKEN');
     expect(providerField).not.toBeNull();
     expect(providerField?.closest('[role="dialog"]')).toBe(dialog);
-    expect(dialog.querySelector('#setting-TAVILY_API_KEYS')).toBeNull();
 
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
@@ -154,12 +131,5 @@ describe('DataProvidersPanel', () => {
     expect(document.querySelector('#setting-TUSHARE_TOKEN')).toBeNull();
     expect(trigger).toHaveFocus();
     expect(within(trigger).getByText('未配置')).toBeInTheDocument();
-  });
-
-  it('exposes stable hub anchors for deep links', () => {
-    renderPanel([buildItem('TUSHARE_TOKEN', '')]);
-    expect(document.getElementById('data-sources-providers')).toBeInTheDocument();
-    expect(document.getElementById('data-provider-tushare')).toBeInTheDocument();
-    expect(document.getElementById('data-sources-role-baseline')).toBeInTheDocument();
   });
 });

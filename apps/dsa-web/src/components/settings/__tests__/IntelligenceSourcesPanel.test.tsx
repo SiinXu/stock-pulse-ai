@@ -58,19 +58,9 @@ describe('IntelligenceSourcesPanel', () => {
     await waitFor(() => expect(api.createDefaultSources).toHaveBeenCalledWith(true));
   });
 
-  it('lists connected sources with health chips, anchors, and fetches one', async () => {
+  it('lists connected sources and fetches one', async () => {
     api.listSources.mockResolvedValue({
-      items: [{
-        id: 3,
-        name: '财经RSS',
-        sourceType: 'rss',
-        url: 'https://feed',
-        enabled: true,
-        scopeType: 'market',
-        market: 'cn',
-        lastStatus: 'ok',
-        lastFetchedAt: '2026-08-01T00:00:00Z',
-      }],
+      items: [{ id: 3, name: '财经RSS', sourceType: 'rss', url: 'https://feed', enabled: true, scopeType: 'market', market: 'cn' }],
       total: 1,
       page: 1,
       pageSize: 50,
@@ -79,55 +69,8 @@ describe('IntelligenceSourcesPanel', () => {
     render(<IntelligenceSourcesPanel />);
 
     await screen.findByText('财经RSS');
-    expect(screen.getAllByText('健康').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('增强器').length).toBeGreaterThan(0);
-    expect(document.getElementById('intelligence-source-3')).toHaveAttribute(
-      'data-intelligence-health',
-      'healthy',
-    );
-    expect(document.getElementById('data-sources-intelligence')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '抓取' }));
     await waitFor(() => expect(api.fetchSource).toHaveBeenCalledWith(3, false));
-  });
-
-  it('filters listed sources by search query', async () => {
-    api.listSources.mockResolvedValue({
-      items: [
-        {
-          id: 1,
-          name: '财经RSS',
-          sourceType: 'rss',
-          url: 'https://a',
-          enabled: true,
-          scopeType: 'market',
-          market: 'cn',
-          lastStatus: 'ok',
-        },
-        {
-          id: 2,
-          name: '宏观Atom',
-          sourceType: 'atom',
-          url: 'https://b',
-          enabled: true,
-          scopeType: 'market',
-          market: 'us',
-          lastError: 'timeout',
-        },
-      ],
-      total: 2,
-      page: 1,
-      pageSize: 50,
-    });
-    render(<IntelligenceSourcesPanel />);
-    await screen.findByText('财经RSS');
-    expect(screen.getByText('宏观Atom')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByRole('searchbox', { name: '按名称、类型或状态筛选情报源' }), {
-      target: { value: 'atom' },
-    });
-    expect(screen.queryByText('财经RSS')).not.toBeInTheDocument();
-    expect(screen.getByText('宏观Atom')).toBeInTheDocument();
-    expect(screen.getAllByText('异常').length).toBeGreaterThan(0);
   });
 
   it('mounts the manual source form only after opening the shared dialog', async () => {

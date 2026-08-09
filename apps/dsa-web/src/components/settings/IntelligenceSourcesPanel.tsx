@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { SETTINGS_INTELLIGENCE_TEXT } from '../../locales/settingsIntelligence';
@@ -11,20 +11,15 @@ import {
   type IntelligenceSource,
   type IntelligenceSourceTemplate,
 } from '../../api/intelligence';
-import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { Textarea } from '../common/Textarea';
 import { StatePanel } from '../common/StatePanel';
 import { InlineAlert } from '../common/InlineAlert';
 import { Modal } from '../common/Modal';
-import { SearchInput } from '../common/SearchInput';
 import { Select } from '../common/Select';
-import { SelectionChip } from '../common/SelectionChip';
-import { StatusDot } from '../common/StatusDot';
 
 type LoadPhase = 'loading' | 'error' | 'ready';
-type SourceStatusFilter = 'all' | 'healthy' | 'error' | 'unknown' | 'disabled';
 
 const SOURCE_TYPE_OPTIONS = ['rss', 'atom', 'json'];
 const SCOPE_TYPE_OPTIONS = ['market', 'stock'];
@@ -33,34 +28,6 @@ const toSelectOptions = (options: string[]) => options.map((value) => ({ value, 
 
 function format(template: string, params: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ''));
-}
-
-/** Stable DOM id for deep links into an intelligence source row. */
-function intelligenceSourceAnchorId(sourceId: number): string {
-  return `intelligence-source-${sourceId}`;
-}
-
-type IntelligenceSourceHealth = 'healthy' | 'error' | 'unknown' | 'disabled';
-
-/**
- * Derive health from fields the intelligence list API already returns.
- * Never invents success when lastStatus/lastError are absent.
- */
-function resolveIntelligenceSourceHealth(source: IntelligenceSource): IntelligenceSourceHealth {
-  if (!source.enabled) {
-    return 'disabled';
-  }
-  if (source.lastError) {
-    return 'error';
-  }
-  const status = String(source.lastStatus ?? '').trim().toLowerCase();
-  if (status === 'ok' || status === 'success' || status === 'healthy') {
-    return 'healthy';
-  }
-  if (status === 'error' || status === 'failed' || status === 'fail') {
-    return 'error';
-  }
-  return 'unknown';
 }
 
 interface DraftState {
@@ -96,8 +63,6 @@ export function IntelligenceSourcesPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<SourceStatusFilter>('all');
 
   const load = useCallback(async () => {
     setPhase('loading');
@@ -235,45 +200,6 @@ export function IntelligenceSourcesPanel() {
     }
   }, [language]);
 
-  const healthLabel = useCallback((health: IntelligenceSourceHealth): string => {
-    switch (health) {
-      case 'healthy':
-        return text.healthHealthy;
-      case 'error':
-        return text.healthError;
-      case 'disabled':
-        return text.healthDisabled;
-      default:
-        return text.healthUnknown;
-    }
-  }, [text]);
-
-  const filteredSources = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return sources.filter((source) => {
-      const health = resolveIntelligenceSourceHealth(source);
-      if (statusFilter !== 'all' && health !== statusFilter) {
-        return false;
-      }
-      if (!q) {
-        return true;
-      }
-      const haystack = [
-        source.name,
-        source.url,
-        source.sourceType,
-        source.market,
-        source.scopeType,
-        health,
-        healthLabel(health),
-        source.lastStatus ?? '',
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [healthLabel, query, sources, statusFilter]);
-
   if (phase === 'loading') {
     return <StatePanel state="loading" title={text.loading} />;
   }
@@ -319,38 +245,12 @@ export function IntelligenceSourcesPanel() {
     setIsCreateOpen(false);
   };
 
-  const statusFilterOptions: Array<{ id: SourceStatusFilter; label: string }> = [
-    { id: 'all', label: text.filterAllStatus },
-    { id: 'healthy', label: text.healthHealthy },
-    { id: 'error', label: text.healthError },
-    { id: 'unknown', label: text.healthUnknown },
-    { id: 'disabled', label: text.healthDisabled },
-  ];
-
-  const healthDotTone = (health: IntelligenceSourceHealth): 'success' | 'danger' | 'warning' | 'neutral' => {
-    switch (health) {
-      case 'healthy':
-        return 'success';
-      case 'error':
-        return 'danger';
-      case 'disabled':
-        return 'neutral';
-      default:
-        return 'warning';
-    }
-  };
-
   return (
-    <div
-      id="data-sources-intelligence"
-      className="space-y-6"
-      data-settings-hub="data-sources-intelligence"
-    >
+    <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <h2 className="text-base font-semibold text-foreground">{text.title}</h2>
           <p className="max-w-2xl text-xs leading-6 text-secondary-text sm:text-sm">{text.description}</p>
-          <p className="text-xs text-muted-text">{text.enhancerNote}</p>
         </div>
         <Button type="button" variant="primary" size="default" className="shrink-0" onClick={openCreateDialog}>
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -373,94 +273,44 @@ export function IntelligenceSourcesPanel() {
         />
       ) : (
         <section aria-label={text.sourcesTitle} className="space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">{text.sourcesTitle}</h3>
             <Button variant="secondary" size="compact" onClick={handleFetchAll} isLoading={busy === 'fetch-all'} loadingText={text.fetchingAll}>
               {text.fetchAll}
             </Button>
           </div>
-
-          <SearchInput
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={text.searchPlaceholder}
-            aria-label={text.searchPlaceholder}
-            wrapperClassName="w-full sm:max-w-sm"
-          />
-          <div className="flex flex-wrap gap-2" role="group" aria-label={text.filtersLabel}>
-            {statusFilterOptions.map((option) => (
-              <SelectionChip
-                key={option.id}
-                label={option.label}
-                selected={statusFilter === option.id}
-                onClick={() => setStatusFilter(option.id)}
-              />
-            ))}
-          </div>
-
-          {filteredSources.length === 0 ? (
-            <p className="text-sm text-secondary-text" role="status">{text.noMatches}</p>
-          ) : (
-            <ul className="space-y-2">
-              {filteredSources.map((source) => {
-                const health = resolveIntelligenceSourceHealth(source);
-                return (
-                  <li
-                    key={source.id}
-                    id={intelligenceSourceAnchorId(source.id)}
-                    data-intelligence-source-id={source.id}
-                    data-intelligence-health={health}
-                    className="rounded-md border border-[var(--settings-border)] p-3"
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusDot
-                            tone={healthDotTone(health)}
-                            aria-label={healthLabel(health)}
-                          />
-                          <span className="truncate font-medium text-foreground">{source.name}</span>
-                          <Badge
-                            variant={health === 'healthy' ? 'success' : health === 'error' ? 'danger' : 'default'}
-                            size="sm"
-                          >
-                            {healthLabel(health)}
-                          </Badge>
-                          <Badge variant="info" size="sm">{text.roleEnhancer}</Badge>
-                          <span className={`rounded px-1.5 text-xs ${source.enabled ? 'bg-success/10 text-success' : 'bg-subtle text-secondary-text'}`}>
-                            {source.enabled ? text.enabledBadge : text.disabledBadge}
-                          </span>
-                          <span className="text-xs text-secondary-text">{source.sourceType} · {source.market}</span>
-                        </div>
-                        <p className="mt-1 truncate text-xs text-secondary-text">{source.url}</p>
-                        <p className="mt-1 text-xs text-secondary-text">
-                          {source.lastFetchedAt
-                            ? format(text.lastFetched, { time: source.lastFetchedAt })
-                            : text.neverFetched}
-                        </p>
-                        {source.lastStatus ? (
-                          <p className="mt-1 text-xs text-secondary-text">
-                            {format(text.lastStatusLabel, { status: source.lastStatus })}
-                          </p>
-                        ) : null}
-                        {source.lastError ? (
-                          <p className="mt-1 text-xs text-danger">{format(text.lastErrorLabel, { error: source.lastError })}</p>
-                        ) : null}
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        <Button variant="outline" size="compact" onClick={() => handleFetch(source.id, true)} isLoading={busy === `fetch:${source.id}:dry`}>
-                          {text.dryRun}
-                        </Button>
-                        <Button variant="secondary" size="compact" onClick={() => handleFetch(source.id, false)} isLoading={busy === `fetch:${source.id}:live`} loadingText={text.fetching}>
-                          {text.fetch}
-                        </Button>
-                      </div>
+          <ul className="space-y-2">
+            {sources.map((source) => (
+              <li key={source.id} className="rounded-md border border-[var(--settings-border)] p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-medium text-foreground">{source.name}</span>
+                      <span className={`rounded px-1.5 text-xs ${source.enabled ? 'bg-success/10 text-success' : 'bg-subtle text-secondary-text'}`}>
+                        {source.enabled ? text.enabledBadge : text.disabledBadge}
+                      </span>
+                      <span className="text-xs text-secondary-text">{source.sourceType} · {source.market}</span>
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    <p className="mt-1 truncate text-xs text-secondary-text">{source.url}</p>
+                    <p className="mt-1 text-xs text-secondary-text">
+                      {source.lastFetchedAt ? format(text.lastFetched, { time: source.lastFetchedAt }) : text.neverFetched}
+                    </p>
+                    {source.lastError ? (
+                      <p className="mt-1 text-xs text-danger">{format(text.lastErrorLabel, { error: source.lastError })}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="outline" size="compact" onClick={() => handleFetch(source.id, true)} isLoading={busy === `fetch:${source.id}:dry`}>
+                      {text.dryRun}
+                    </Button>
+                    <Button variant="secondary" size="compact" onClick={() => handleFetch(source.id, false)} isLoading={busy === `fetch:${source.id}:live`} loadingText={text.fetching}>
+                      {text.fetch}
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
