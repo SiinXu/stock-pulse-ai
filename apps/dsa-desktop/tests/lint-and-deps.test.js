@@ -12,6 +12,10 @@ test('desktop package pins the upgraded electron stack from issue #615', () => {
   assert.equal(packageJson.devDependencies.electron, '43.3.0');
   assert.equal(packageJson.devDependencies['electron-builder'], '26.15.7');
   assert.equal(packageJson.overrides['app-builder-lib'].tar, '7.5.22');
+  // electron-updater (production) and the builder chain both depend on js-yaml;
+  // pin the 4.x graph past GHSA-5p4m-2wfm-xmqj, which has no assigned CVE ID.
+  // CVE-2026-59870 belongs to the separate GHSA-724g-mxrg-4qvm record for 5.x.
+  assert.equal(packageJson.overrides['js-yaml'], '4.3.1');
   assert.ok(packageJson.devDependencies.eslint, 'eslint is a desktop devDependency');
   assert.equal(packageJson.scripts.lint, 'eslint .');
   assert.equal(packageJson.scripts.typecheck, 'tsc -p jsconfig.json --noEmit');
