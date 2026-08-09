@@ -214,7 +214,11 @@ class ReportVersionCompareService:
         persisted_report_language = (
             raw_result.get("report_language") or getattr(record, "report_language", None)
         )
-        report_language = normalize_report_language(persisted_report_language)
+        report_language = normalize_report_language(
+            persisted_report_language
+            if isinstance(persisted_report_language, str)
+            else None
+        )
         config_report_language = (
             report_language
             if is_supported_report_language_value(persisted_report_language)

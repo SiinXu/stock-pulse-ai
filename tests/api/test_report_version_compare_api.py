@@ -47,7 +47,7 @@ def _insert_history(
     action: str = "buy",
     sentiment_score: Any = 70,
     model_used: str = "model-a",
-    report_language: Optional[str] = "zh",
+    report_language: Any = "zh",
     created_at: Optional[datetime] = None,
 ) -> int:
     raw = {
@@ -261,7 +261,7 @@ class ReportVersionCompareApiTests(unittest.TestCase):
         }
         self.assertTrue(all(score is None for score in scores.values()))
 
-    def test_list_runs_does_not_fingerprint_defaulted_or_invalid_language(self) -> None:
+    def test_list_runs_does_not_fingerprint_unusable_persisted_language(self) -> None:
         run_ids = {
             _insert_history(
                 self.db,
@@ -272,6 +272,16 @@ class ReportVersionCompareApiTests(unittest.TestCase):
                 self.db,
                 query_id="invalid-language",
                 report_language="not-a-language",
+            ),
+            _insert_history(
+                self.db,
+                query_id="numeric-language",
+                report_language=1,
+            ),
+            _insert_history(
+                self.db,
+                query_id="mapping-language",
+                report_language={"unexpected": "language"},
             ),
         }
 
@@ -285,7 +295,7 @@ class ReportVersionCompareApiTests(unittest.TestCase):
             item for item in resp.json()["items"]
             if item["run_id"] in {str(run_id) for run_id in run_ids}
         ]
-        self.assertEqual(len(items), 2)
+        self.assertEqual(len(items), 4)
         for item in items:
             self.assertEqual(item["report_language"], "zh")
             self.assertFalse(item["config_complete"])

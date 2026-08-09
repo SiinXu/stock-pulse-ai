@@ -39,7 +39,7 @@ def _insert_history(
     action: str = "buy",
     sentiment_score: Any = 75,
     model_used: str = "gpt-test",
-    report_language: Optional[str] = "zh",
+    report_language: Any = "zh",
     operation_advice: str = "买入",
     trend_prediction: str = "上行",
     analysis_summary: str = "summary-a",
@@ -320,10 +320,16 @@ class ReportVersionCompareServiceTests(unittest.TestCase):
         self.assertEqual(result["config_diff"]["comparison_status"], "unknown")
         self.assertFalse(result["config_diff"]["identical"])
 
-    def test_missing_or_invalid_persisted_language_keeps_config_unknown(self) -> None:
+    def test_missing_invalid_or_non_string_language_keeps_config_unknown(self) -> None:
         service = ReportVersionCompareService(self.db)
 
-        for index, persisted_language in enumerate((None, "not-a-language"), start=1):
+        persisted_languages = (
+            None,
+            "not-a-language",
+            1,
+            {"unexpected": "language"},
+        )
+        for index, persisted_language in enumerate(persisted_languages, start=1):
             with self.subTest(persisted_language=persisted_language):
                 run_id = _insert_history(
                     self.db,
