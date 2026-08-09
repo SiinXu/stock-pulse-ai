@@ -260,7 +260,7 @@ export function formatSignedChangeAmount(
 /**
  * Format an equity price with market currency code, fixed precision, and locale grouping.
  *
- * @param value - Numeric price; null/undefined/NaN → `—`
+ * @param value - Numeric price; null/undefined/NaN/±Infinity → `—`
  * @param market - cn | hk | us
  * @param language - UI language for digit grouping only (currency code stays ISO)
  */
@@ -272,7 +272,7 @@ export function formatPrice(
   if (!isMarketId(market)) {
     throw new Error(`Unsupported market for formatPrice: ${String(market)}`);
   }
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
     return EMPTY_PRICE;
   }
   const digits = MARKET_PRICE_FRACTION_DIGITS[market];
@@ -288,6 +288,7 @@ export function formatPrice(
  *
  * Preference order: explicit `userPref` → market convention default.
  * Direction is always derived from the numeric sign (not from color).
+ * Non-finite inputs (NaN, ±Infinity) are treated as flat + neutral.
  */
 export function changeSemantics(
   value: number | null | undefined,
@@ -300,7 +301,7 @@ export function changeSemantics(
   const colorPreference = resolveChangeColorPreference(market, userPref);
 
   let direction: ChangeDirection = 'flat';
-  if (value !== null && value !== undefined && !Number.isNaN(Number(value))) {
+  if (value !== null && value !== undefined && Number.isFinite(Number(value))) {
     const numeric = Number(value);
     if (numeric > 0) direction = 'up';
     else if (numeric < 0) direction = 'down';
@@ -318,6 +319,7 @@ export function changeSemantics(
 
 function parseTimestamp(ts: string | number | Date): Date | null {
   const date = ts instanceof Date ? ts : new Date(ts);
+  // Invalid Date.getTime() is always NaN (never ±Infinity); isNaN is the correct predicate here.
   if (Number.isNaN(date.getTime())) return null;
   return date;
 }

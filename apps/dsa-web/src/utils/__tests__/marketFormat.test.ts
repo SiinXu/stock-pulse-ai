@@ -50,10 +50,14 @@ describe('marketFormat contract', () => {
       expect(formatPrice(1_234_567.8, 'us', 'en')).toBe('USD 1,234,567.80');
     });
 
-    it('returns an em dash for missing or non-numeric prices', () => {
+    it('returns an em dash for missing, non-numeric, or non-finite prices', () => {
       expect(formatPrice(null, 'cn')).toBe('—');
       expect(formatPrice(undefined, 'hk')).toBe('—');
       expect(formatPrice(Number.NaN, 'us')).toBe('—');
+      for (const market of MARKETS) {
+        expect(formatPrice(Number.POSITIVE_INFINITY, market, 'en')).toBe('—');
+        expect(formatPrice(Number.NEGATIVE_INFINITY, market, 'en')).toBe('—');
+      }
     });
   });
 
@@ -111,10 +115,16 @@ describe('marketFormat contract', () => {
       },
     );
 
-    it('treats null/undefined/NaN as flat + neutral', () => {
+    it('treats null/undefined/NaN/±Infinity as flat + neutral', () => {
       for (const market of MARKETS) {
         for (const pref of PREFS) {
-          for (const value of [null, undefined, Number.NaN] as const) {
+          for (const value of [
+            null,
+            undefined,
+            Number.NaN,
+            Number.POSITIVE_INFINITY,
+            Number.NEGATIVE_INFINITY,
+          ] as const) {
             expect(changeSemantics(value, market, pref)).toEqual({
               direction: 'flat',
               colorPreference: pref,
@@ -158,6 +168,8 @@ describe('marketFormat contract', () => {
       expect(formatMarketTime(undefined, 'us')).toBeNull();
       expect(formatMarketTime('not-a-date', 'hk')).toBeNull();
       expect(formatMarketTime('', 'cn')).toBeNull();
+      // Invalid Date.getTime() is always NaN (never ±Infinity); pin parseTimestamp isNaN.
+      expect(formatMarketTime(Number.POSITIVE_INFINITY, 'us')).toBeNull();
     });
   });
 

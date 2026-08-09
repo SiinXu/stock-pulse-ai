@@ -13,11 +13,16 @@ import {
   type HomeWatchlistRow,
   type HomeWorkspaceTab,
 } from '../../components/watchlist/HomeStockWorkspace';
+import { WatchlistScoreColumn } from '../../components/watchlist/WatchlistScoreColumn';
+import type { WatchlistScoreItem } from '../../types/watchlistScore';
+import { HomeWatchlistGroupsSection } from '../../components/watchlist/HomeWatchlistGroupsSection';
+import { WatchlistGroupsPanel } from '../../components/watchlist/WatchlistGroupsPanel';
 import { createParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
+import type { WatchlistGroup } from '../../types/watchlist';
 import { DEFAULT_ONBOARDING_PROFILE, type OnboardingPlan } from '../../types/onboarding';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
@@ -128,6 +133,72 @@ const HomeStockWorkspaceStory = () => {
     />
   );
 };
+
+const WATCHLIST_GROUP_FIXTURES: WatchlistGroup[] = [
+  {
+    id: 'default',
+    name: '__default__',
+    nameKey: 'watchlist.defaultGroupName',
+    sortOrder: 0,
+    isDefault: true,
+    createdAt: '2026-08-09T00:00:00+00:00',
+    updatedAt: '2026-08-09T00:00:00+00:00',
+    members: [
+      { stockCode: '600519', sortOrder: 0, attrs: { schemaVersion: 1, aiScore: 91, focus: true } },
+      { stockCode: 'AAPL', sortOrder: 1, attrs: { schemaVersion: 1 } },
+    ],
+  },
+  {
+    id: 'growth',
+    name: 'Growth',
+    nameKey: null,
+    sortOrder: 1,
+    isDefault: false,
+    createdAt: '2026-08-09T00:00:00+00:00',
+    updatedAt: '2026-08-09T00:00:00+00:00',
+    members: [],
+  },
+];
+
+const WatchlistGroupsPanelStory = () => {
+  const [groups, setGroups] = useState(WATCHLIST_GROUP_FIXTURES);
+  return (
+    <div className="max-w-3xl rounded-xl border border-border bg-card p-4">
+      <WatchlistGroupsPanel
+        groups={groups}
+        watchlistRows={[
+          { code: '600519', analyzedToday: true, latestItem: fixtureStockBarItems[0] },
+          { code: 'AAPL', analyzedToday: false, latestItem: fixtureStockBarItems[1] },
+        ]}
+        onCreateGroup={async (name) => {
+          setGroups((current) => [...current, {
+            id: `group-${current.length}`,
+            name,
+            sortOrder: current.length,
+            isDefault: false,
+            createdAt: '2026-08-09T00:00:00+00:00',
+            updatedAt: '2026-08-09T00:00:00+00:00',
+            members: [],
+          }]);
+          return true;
+        }}
+        onDeleteGroup={async (groupId) => {
+          setGroups((current) => current.filter((group) => group.id !== groupId));
+          return true;
+        }}
+        onReorderGroups={async (orderedIds) => {
+          setGroups((current) => orderedIds.map((id) => current.find((group) => group.id === id)!).filter(Boolean));
+          return true;
+        }}
+        onReorderMembers={async () => true}
+        onMoveMember={async () => true}
+        onRemoveFromWatchlist={async () => true}
+      />
+    </div>
+  );
+};
+
+const HomeWatchlistGroupsSectionStory = () => <HomeWatchlistGroupsSection />;
 
 const FIXTURE_SETUP_STATUS: SetupStatusResponse = {
   isComplete: false,
@@ -254,10 +325,11 @@ const OnboardingTodayPlanCardStory = () => {
 
 const AgentOnboardingWizardStory = () => {
   const { t } = useUiLanguage();
+  const text = useSamples();
   const [open, setOpen] = useState(true);
   return (
     <div className="space-y-3">
-      <Button variant="primary" onClick={() => setOpen(true)}>Open agent onboarding wizard</Button>
+      <Button variant="primary" onClick={() => setOpen(true)}>{text.openAgentOnboardingWizard}</Button>
       <AgentOnboardingWizard
         open={open}
         onClose={() => setOpen(false)}
@@ -270,13 +342,98 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
+
+const scoredFixture: WatchlistScoreItem = {
+  stockCode: '600519',
+  status: 'scored',
+  score: 72,
+  asOf: '2026-08-08T09:00:00+00:00',
+  ageDays: 1,
+  analysisId: 5,
+  operationAdvice: 'Buy',
+  freshness: 'recent',
+  degradedReasons: [],
+  factors: [
+    {
+      key: 'analysis_sentiment',
+      status: 'applied',
+      value: 72,
+      params: { operationAdvice: 'Buy', reportType: 'detailed' },
+      reason: null,
+      source: {
+        id: 5,
+        sourceReportId: 5,
+        profile: null,
+        asOf: '2026-08-08T09:00:00+00:00',
+        expiresAt: null,
+        formulaVersion: 'watchlist_score_v1',
+      },
+    },
+    {
+      key: 'decision_signal',
+      status: 'applied',
+      value: 'buy',
+      params: { confidence: 0.8, profile: 'balanced' },
+      reason: null,
+      source: {
+        id: 8,
+        sourceReportId: 5,
+        profile: 'balanced',
+        asOf: '2026-08-08T10:00:00+00:00',
+        expiresAt: '2026-08-10T10:00:00+00:00',
+        formulaVersion: 'watchlist_score_v1',
+      },
+    },
+  ],
+};
+
+const unanalyzedFixture: WatchlistScoreItem = {
+  stockCode: 'AAPL',
+  status: 'unanalyzed',
+  score: null,
+  asOf: null,
+  ageDays: null,
+  analysisId: null,
+  operationAdvice: null,
+  factors: [],
+  freshness: 'none',
+  degradedReasons: [],
+};
+
+const WatchlistScoreColumnStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return (
+      <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreColumn item={unanalyzedFixture} />
+      </div>
+    );
+  }
+  if (scenario === 'interactive') {
+    return (
+      <div className="max-w-sm space-y-3 rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreColumn item={scoredFixture} expanded />
+        <WatchlistScoreColumn item={unanalyzedFixture} />
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+      <WatchlistScoreColumn item={scoredFixture} />
+    </div>
+  );
+};
+
 export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'stock-autocomplete': StockAutocompleteStory,
   'suggestions-list': SuggestionsListStory,
   'task-panel': TaskPanelStory,
   'home-stock-workspace': HomeStockWorkspaceStory,
+  'home-watchlist-groups-section': HomeWatchlistGroupsSectionStory,
+  'watchlist-groups-panel': WatchlistGroupsPanelStory,
   'home-readiness-card': HomeReadinessCardStory,
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
+  'watchlist-score-column': WatchlistScoreColumnStory,
 };

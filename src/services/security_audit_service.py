@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
+from threading import Lock
 from typing import Any, Optional, Protocol, cast
 import uuid
+from weakref import WeakKeyDictionary
 
 from src.repositories.security_audit_repo import SecurityAuditRepository
 from src.schemas.security_audit import (
@@ -56,6 +58,11 @@ def require_security_audit_recorder(value: object) -> SecurityAuditRecorder:
 class SecurityAuditService:
     """Sanitize, validate, retain, append, and query security audit events."""
 
+    _shared_retention_lock = Lock()
+    _retention_by_database: WeakKeyDictionary[object, dict[int, date]] = (
+        WeakKeyDictionary()
+    )
+
     def __init__(
         self,
         repository: Optional[SecurityAuditRepository] = None,
@@ -66,6 +73,8 @@ class SecurityAuditService:
             raise ValueError("security audit retention must be at least one day")
         self._repository = repository
         self._retention_days = int(retention_days)
+        self._retention_applied_on: date | None = None
+        self._retention_lock = Lock()
 
     @staticmethod
     def new_correlation_id() -> str:
@@ -142,7 +151,7 @@ class SecurityAuditService:
     ) -> SecurityAuditEventPage:
         try:
             repository = self._get_repository()
-            repository.apply_retention(cutoff=self._retention_cutoff())
+            self._apply_retention_if_due(repository)
             items, total = repository.list_events(
                 page=page,
                 page_size=page_size,
@@ -200,7 +209,7 @@ class SecurityAuditService:
             )
             event = SecurityAuditEventCreate.model_validate(sanitized)
             repository = self._get_repository()
-            repository.apply_retention(cutoff=self._retention_cutoff())
+            self._apply_retention_if_due(repository)
             return repository.append(event)
         except Exception as exc:  # broad-exception: fallback_recorded - Normalize validation/redaction/storage failures before a privileged action proceeds.
             log_safe_exception(
@@ -216,8 +225,36 @@ class SecurityAuditService:
             self._repository = SecurityAuditRepository()
         return self._repository
 
-    def _retention_cutoff(self) -> datetime:
-        return datetime.now(timezone.utc) - timedelta(days=self._retention_days)
+    def _apply_retention_if_due(self, repository: SecurityAuditRepository) -> None:
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        if self._retention_applied_on == today:
+            return
+        with self._retention_lock:
+            if self._retention_applied_on == today:
+                return
+            if type(repository) is SecurityAuditRepository:
+                with self._shared_retention_lock:
+                    retained = self._retention_by_database.get(repository.db)
+                    if (
+                        retained is not None
+                        and retained.get(self._retention_days) == today
+                    ):
+                        self._retention_applied_on = today
+                        return
+                    repository.apply_retention(
+                        cutoff=now - timedelta(days=self._retention_days)
+                    )
+                    if retained is None:
+                        retained = {}
+                        self._retention_by_database[repository.db] = retained
+                    retained[self._retention_days] = today
+                    self._retention_applied_on = today
+                    return
+            repository.apply_retention(
+                cutoff=now - timedelta(days=self._retention_days)
+            )
+            self._retention_applied_on = today
 
 
 def get_security_audit_service() -> SecurityAuditService:
