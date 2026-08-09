@@ -4980,4 +4980,9 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "설정 지문 구성 비교",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "설정 구성 없음",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "없음",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryDescription": "이 디렉터리는 저장된 시장 데이터 제공자 설정만 표시합니다. 현재 라우팅, 가용성, 상태, 폴백 결과 또는 캐시 최신성을 나타내지 않습니다. 검색 자격 증명과 Futu 포트폴리오 가져오기는 여기에서 관리하지 않습니다.",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryFilterAll": "모든 구성",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryNoMatches": "일치하는 제공자 설정이 없습니다",
+  "i18n.uiText.UI_TEXT.settings.dataDirectorySearchPlaceholder": "이름 또는 구성 상태로 필터링",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryTitle": "제공자 구성",
 } as const;
