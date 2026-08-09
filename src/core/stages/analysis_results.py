@@ -106,22 +106,40 @@ class _AnalysisResultStageMixin:
             runtime_facts = getattr(agent_result, "runtime_facts", None)
             if (
                 isinstance(dash, dict)
-                and getattr(runtime_facts, "risk_override_application", None) is None
+                and getattr(runtime_facts, "risk_gate_result", None) is None
             ):
-                from src.agent.protocols import AgentContext
                 from src.agent.risk_override import (
                     EXIT_SINGLE_AGENT,
                     apply_risk_manager_gate_from_config,
+                    build_risk_context_for_exit,
+                )
+                from src.agent.runtime_facts import (
+                    attach_risk_gate_result,
+                    build_agent_runtime_facts,
                 )
 
-                gate_ctx = AgentContext(query="", stock_code=code)
-                apply_risk_manager_gate_from_config(
+                gate_ctx = build_risk_context_for_exit(
+                    stock_code=code,
+                    current_signal=dash.get("decision_type", "hold"),
+                    dashboard=dash,
+                    runtime_facts=runtime_facts,
+                )
+                gate_result = apply_risk_manager_gate_from_config(
                     gate_ctx,
                     current_signal=dash.get("decision_type", "hold"),
                     exit_id=EXIT_SINGLE_AGENT,
                     config=getattr(self, "config", None),
                     dashboard=dash,
                 )
+                agent_result.runtime_facts = attach_risk_gate_result(
+                    runtime_facts,
+                    gate_result,
+                    evidence=build_agent_runtime_facts(gate_ctx).risk_evidence,
+                )
+                runtime_facts = agent_result.runtime_facts
+            existing_gate_result = getattr(runtime_facts, "risk_gate_result", None)
+            if existing_gate_result is not None:
+                result.risk_gate_result = existing_gate_result.to_trace_dict()
             ai_stock_name = str(dash.get("stock_name", "")).strip()
             if ai_stock_name and self._is_placeholder_stock_name(stock_name, code):
                 result.name = ai_stock_name

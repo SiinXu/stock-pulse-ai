@@ -244,8 +244,7 @@ class Config:
     agent_portfolio_agent_timeout_s: float = 0
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
-    risk_gate_enabled: bool = True  # Mandatory Risk Manager gate (default on, warn-first)
-    risk_gate_strict: bool = False  # When true, gate force-downgrades on risk evidence
+    risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout

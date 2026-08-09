@@ -19,10 +19,14 @@ from src.agent.risk_override import (
     EXIT_SINGLE_AGENT,
     META_RISK_GATE_RESULT,
     RiskGateOutcome,
+    RiskGateProfile,
+    RiskGateResult,
     apply_risk_manager_gate,
     apply_risk_manager_gate_from_config,
+    build_risk_context_for_exit,
     evaluate_risk_manager_gate,
     get_risk_gate_result,
+    render_risk_gate_notice,
 )
 
 
@@ -82,20 +86,18 @@ def test_gate_pass_when_no_risk_evidence():
     assert result.warnings == ()
 
 
-def test_gate_attach_warning_when_override_disabled_but_veto_present():
+def test_balanced_gate_downgrades_even_when_legacy_override_disabled():
     ctx = _ctx_with_risk(veto=True, high_flag=True, risk_signal="strong_sell")
     result = evaluate_risk_manager_gate(
         ctx,
         current_signal="buy",
         exit_id=EXIT_ORCHESTRATOR_MULTI_AGENT,
         override_enabled=False,
-        gate_enabled=True,
-        gate_strict=False,
+        profile="balanced",
     )
-    assert result.outcome is RiskGateOutcome.ATTACH_WARNING
-    assert result.final_signal == "buy"
+    assert result.outcome is RiskGateOutcome.DOWNGRADE
+    assert result.final_signal == "hold"
     assert result.original_signal == "buy"
-    assert result.warnings
     assert "risk_veto" in result.evidence_codes
     assert all(result.final_signal for _ in [1])  # never empty
 
@@ -114,17 +116,89 @@ def test_gate_downgrade_when_override_enabled_and_veto():
     assert result.original_signal == "buy"
 
 
-def test_gate_strict_force_downgrade_when_override_disabled():
+def test_conservative_profile_rejects_explicit_veto():
     ctx = _ctx_with_risk(veto=True, high_flag=True, risk_signal="strong_sell")
     result = evaluate_risk_manager_gate(
         ctx,
         current_signal="buy",
         exit_id=EXIT_ORCHESTRATOR_MULTI_AGENT,
         override_enabled=False,
-        gate_strict=True,
+        profile="conservative",
     )
-    assert result.outcome is RiskGateOutcome.DOWNGRADE
+    assert result.outcome is RiskGateOutcome.REJECT
     assert result.final_signal == "hold"
+
+
+@pytest.mark.parametrize(
+    ("profile", "verdict"),
+    [
+        ("conservative", RiskGateOutcome.REJECT),
+        ("balanced", RiskGateOutcome.DOWNGRADE),
+        ("aggressive", RiskGateOutcome.DOWNGRADE),
+    ],
+)
+def test_every_profile_handles_explicit_veto(profile, verdict):
+    ctx = _ctx_with_risk(veto=True, high_flag=True, risk_signal="strong_sell")
+
+    result = evaluate_risk_manager_gate(
+        ctx,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        override_enabled=False,
+        profile=profile,
+    )
+
+    assert result.verdict is verdict
+    assert result.final_action == "hold"
+
+
+def test_invalid_dashboard_risk_evidence_fails_closed_without_truthy_coercion():
+    gate_ctx = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        dashboard={
+            "decision_type": "buy",
+            "risk_assessment": {"veto_buy": "false"},
+        },
+    )
+
+    result = evaluate_risk_manager_gate(
+        gate_ctx,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="balanced",
+    )
+
+    assert result.final_action == "hold"
+    assert "invalid_risk_evidence" in result.evidence_codes
+
+
+def test_stale_runtime_evidence_is_preserved_and_blocks_bullish_publication():
+    from src.agent.runtime_facts import AgentRuntimeFacts, RiskEvidenceFact
+
+    runtime_facts = AgentRuntimeFacts(
+        risk_evidence=RiskEvidenceFact(
+            signal="hold",
+            risk_level="low",
+            as_of="2020-01-01T00:00:00+00:00",
+        )
+    )
+    gate_ctx = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        runtime_facts=runtime_facts,
+    )
+
+    result = evaluate_risk_manager_gate(
+        gate_ctx,
+        current_signal="buy",
+        exit_id=EXIT_DELIBERATION_PROJECTION,
+        profile="balanced",
+    )
+
+    assert result.final_action == "hold"
+    assert "stale_risk_evidence" in result.evidence_codes
+    assert "risk_evidence_as_of" in result.evidence_provenance
 
 
 def test_gate_fail_safe_on_internal_error():
@@ -140,15 +214,62 @@ def test_gate_fail_safe_on_internal_error():
             exit_id=EXIT_SINGLE_AGENT,
         )
 
-    assert result.fail_safe is True
-    assert result.outcome is RiskGateOutcome.PASS
-    assert result.final_signal == "buy"
+    assert result.fail_closed is True
+    assert result.outcome is RiskGateOutcome.REJECT
+    assert result.final_signal == "hold"
     assert "gate_internal_failure" in result.evidence_codes
     assert get_risk_gate_result(ctx) is result
     assert isinstance(ctx.get_data(DATA_RISK_GATE_APPLIED), dict)
 
 
-def test_apply_gate_annotates_warning_without_clearing_signal():
+def test_invalid_direct_profile_fails_closed_instead_of_escaping_fallback():
+    result = apply_risk_manager_gate(
+        AgentContext(),
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="invalid-profile",
+    )
+
+    assert result.verdict is RiskGateOutcome.REJECT
+    assert result.final_action == "hold"
+    assert result.profile is RiskGateProfile.BALANCED
+    assert result.fail_closed is True
+    assert dict(result.reason_params)["requested_profile"] == "invalid-profile"
+
+
+def test_gate_result_rejects_unbounded_or_human_reason_codes():
+    common = {
+        "outcome": RiskGateOutcome.PASS,
+        "original_signal": "hold",
+        "final_signal": "hold",
+        "warnings": (),
+        "evidence_codes": (),
+        "enabled": True,
+        "strict": False,
+        "override_enabled": True,
+        "override_would_apply": False,
+        "exit_id": EXIT_SINGLE_AGENT,
+    }
+
+    with pytest.raises(ValueError, match="stable bounded keys"):
+        RiskGateResult(reasons=("human readable sentence",), **common)
+    with pytest.raises(ValueError, match="exceeds 20 items"):
+        RiskGateResult(reasons=tuple(f"reason_{index}" for index in range(21)), **common)
+
+
+def test_gate_notice_localizes_korean_and_keeps_structured_reason_codes():
+    result = evaluate_risk_manager_gate(
+        _ctx_with_risk(veto=True),
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+    )
+
+    assert "리스크 매니저 하향 조정" in render_risk_gate_notice(result, "ko")
+    assert result.reasons == result.evidence_codes
+    assert all(" " not in code for code in result.to_trace_dict()["reason_codes"])
+
+
+def test_apply_gate_annotates_and_mutates_the_authoritative_signal():
     ctx = _ctx_with_risk(veto=True, high_flag=True)
     dashboard = {
         "decision_type": "buy",
@@ -160,13 +281,14 @@ def test_apply_gate_annotates_warning_without_clearing_signal():
         current_signal="buy",
         exit_id=EXIT_ORCHESTRATOR_MULTI_AGENT,
         override_enabled=False,
-        gate_strict=False,
+        profile="balanced",
         dashboard=dashboard,
     )
-    assert result.outcome is RiskGateOutcome.ATTACH_WARNING
-    assert dashboard["decision_type"] == "buy"
+    assert result.outcome is RiskGateOutcome.DOWNGRADE
+    assert dashboard["decision_type"] == "hold"
     assert dashboard["operation_advice"] == "买入"
-    assert "[Risk Manager]" in dashboard["risk_warning"]
+    assert "风控经理已下调" in dashboard["risk_warning"]
+    assert dashboard["risk_manager"]["final_action"] == "hold"
     assert "原提示" in dashboard["risk_warning"]
 
 
@@ -192,8 +314,7 @@ def test_each_decision_exit_records_gate_trace(exit_id):
         current_signal="buy",
         exit_id=exit_id,
         config=SimpleNamespace(
-            risk_gate_enabled=True,
-            risk_gate_strict=False,
+            risk_gate_profile="balanced",
             agent_risk_override=False,
         ),
     )
@@ -212,8 +333,7 @@ def test_orchestrator_multi_agent_exit_runs_gate():
         llm_adapter=MagicMock(),
         config=SimpleNamespace(
             agent_risk_override=True,
-            risk_gate_enabled=True,
-            risk_gate_strict=False,
+            risk_gate_profile="balanced",
         ),
     )
     ctx = _ctx_with_risk(veto=True, high_flag=True, risk_signal="strong_sell")
@@ -253,8 +373,7 @@ def test_committee_mode_exit_uses_committee_exit_id():
         llm_adapter=MagicMock(),
         config=SimpleNamespace(
             agent_risk_override=False,
-            risk_gate_enabled=True,
-            risk_gate_strict=False,
+            risk_gate_profile="balanced",
         ),
     )
     ctx = _ctx_with_risk(veto=True, high_flag=True, risk_signal="strong_sell")
@@ -271,13 +390,12 @@ def test_committee_mode_exit_uses_committee_exit_id():
     resolved = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
     assert resolved is not None
-    # Override off + non-strict → warn only, signal stays buy
-    assert resolved["decision_type"] == "buy"
+    assert resolved["decision_type"] == "hold"
     gate = get_risk_gate_result(ctx)
     assert gate is not None
     assert gate.exit_id == EXIT_COMMITTEE_MODE
-    assert gate.outcome is RiskGateOutcome.ATTACH_WARNING
-    assert "[Risk Manager]" in resolved["risk_warning"]
+    assert gate.outcome is RiskGateOutcome.DOWNGRADE
+    assert "风控经理已下调" in resolved["risk_warning"]
 
 
 def test_single_agent_exit_gates_dashboard_without_prior_override():
@@ -302,16 +420,68 @@ def test_single_agent_exit_gates_dashboard_without_prior_override():
         current_signal="buy",
         exit_id=EXIT_SINGLE_AGENT,
         config=SimpleNamespace(
-            risk_gate_enabled=True,
-            risk_gate_strict=False,
+            risk_gate_profile="balanced",
             agent_risk_override=False,
         ),
         dashboard=dash,
     )
     assert result.exit_id == EXIT_SINGLE_AGENT
-    assert result.outcome is RiskGateOutcome.ATTACH_WARNING
-    assert dash["decision_type"] == "buy"
-    assert "[Risk Manager]" in dash["risk_warning"]
+    assert result.outcome is RiskGateOutcome.DOWNGRADE
+    assert dash["decision_type"] == "hold"
+    assert "风控经理已下调" in dash["risk_warning"]
+
+
+def test_real_single_agent_conversion_uses_dashboard_risk_evidence():
+    from src.core.stages.analysis_results import _AnalysisResultStageMixin
+    from src.enums import ReportType
+
+    class Stage(_AnalysisResultStageMixin):
+        config = SimpleNamespace(
+            report_language="en",
+            risk_gate_profile="balanced",
+            agent_risk_override=False,
+        )
+
+    agent_result = SimpleNamespace(
+        success=True,
+        error=None,
+        provider="test",
+        model="test/model",
+        runtime_facts=None,
+        dashboard={
+            "stock_name": "Apple",
+            "decision_type": "buy",
+            "operation_advice": "Buy",
+            "analysis_summary": "Buy now",
+            "risk_warning": "",
+            "risk_assessment": {
+                "veto_buy": True,
+                "risk_level": "high",
+                "risk_flags": [
+                    {
+                        "category": "exposure",
+                        "description": "Exposure limit breached",
+                        "severity": "high",
+                    }
+                ],
+            },
+        },
+    )
+
+    result = Stage()._agent_result_to_analysis_result(
+        agent_result,
+        "AAPL",
+        "Apple",
+        ReportType.FULL,
+        "query-risk",
+    )
+
+    assert result.decision_type == "hold"
+    assert agent_result.dashboard["decision_type"] == "hold"
+    assert result.risk_gate_result["final_action"] == "hold"
+    assert agent_result.runtime_facts.risk_gate_result.final_action == "hold"
+    assert agent_result.runtime_facts.risk_evidence.risk_level == "high"
+    assert agent_result.runtime_facts.risk_evidence.flags[0][0] == "exposure"
 
 
 def test_deliberation_projection_exit_records_gate():
@@ -338,7 +508,7 @@ def test_agent_chat_exit_unstructured_still_evaluates():
     assert result.final_signal == "hold"
 
 
-def test_gate_disabled_is_explicit_pass():
+def test_gate_disable_attempt_fails_closed():
     ctx = _ctx_with_risk(veto=True)
     result = evaluate_risk_manager_gate(
         ctx,
@@ -346,9 +516,10 @@ def test_gate_disabled_is_explicit_pass():
         exit_id=EXIT_ORCHESTRATOR_MULTI_AGENT,
         gate_enabled=False,
     )
-    assert result.outcome is RiskGateOutcome.PASS
-    assert result.enabled is False
-    assert result.final_signal == "buy"
+    assert result.outcome is RiskGateOutcome.REJECT
+    assert result.enabled is True
+    assert result.final_signal == "hold"
+    assert result.fail_closed is True
 
 
 def test_override_disabled_still_gets_mandatory_warning_on_multi_agent():
@@ -360,8 +531,7 @@ def test_override_disabled_still_gets_mandatory_warning_on_multi_agent():
         llm_adapter=MagicMock(),
         config=SimpleNamespace(
             agent_risk_override=False,
-            risk_gate_enabled=True,
-            risk_gate_strict=False,
+            risk_gate_profile="balanced",
         ),
     )
     ctx = _ctx_with_risk(veto=True, high_flag=True, risk_signal="strong_sell")
@@ -376,9 +546,9 @@ def test_override_disabled_still_gets_mandatory_warning_on_multi_agent():
     ctx.set_data("final_dashboard", dashboard)
     resolved = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
-    assert resolved["decision_type"] == "buy"
-    assert ctx.get_data("risk_override_applied") is None
+    assert resolved["decision_type"] == "hold"
+    assert ctx.get_data("risk_override_applied")["to"] == "hold"
     gate = ctx.meta.get(META_RISK_GATE_RESULT)
     assert gate is not None
-    assert gate.outcome is RiskGateOutcome.ATTACH_WARNING
-    assert "[Risk Manager]" in resolved["risk_warning"]
+    assert gate.outcome is RiskGateOutcome.DOWNGRADE
+    assert "风控经理已下调" in resolved["risk_warning"]

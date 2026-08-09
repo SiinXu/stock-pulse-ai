@@ -97,7 +97,15 @@ class _ChatMethods:
         resolution_context.update(context or {})
         scope_resolution = resolve_stock_scope(message, resolution_context)
 
-        config = self.config or getattr(self.llm_adapter, "_config", None) or get_config()
+        config = self.config
+        if config is None:
+            adapter_config = getattr(self.llm_adapter, "_config", None)
+            adapter_profile = getattr(adapter_config, "risk_gate_profile", None)
+            config = (
+                adapter_config
+                if isinstance(adapter_profile, str)
+                else get_config()
+            )
         history = build_visible_chat_history(session_id, self.llm_adapter, config)
         report_language = normalize_report_language(
             scope_resolution.effective_context.get("report_language", "zh")
@@ -175,6 +183,53 @@ class _ChatMethods:
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
 
+        # Final-action authority runs before response/history publication.
+        from src.agent.risk_override import (
+            EXIT_AGENT_CHAT,
+            RiskGateOutcome,
+            apply_risk_manager_gate_from_config,
+            build_risk_context_for_exit,
+            render_risk_gate_notice,
+        )
+        from src.agent.runtime_facts import (
+            attach_risk_gate_result,
+            build_agent_runtime_facts,
+        )
+
+        chat_dashboard = (
+            orch_result.dashboard if isinstance(orch_result.dashboard, dict) else None
+        )
+        signal = (
+            chat_dashboard.get("decision_type", "hold")
+            if chat_dashboard is not None
+            else "hold"
+        )
+        gate_ctx = build_risk_context_for_exit(
+            stock_code=str(
+                (scope_resolution.effective_context or {}).get("stock_code") or ""
+            ),
+            current_signal=signal,
+            dashboard=chat_dashboard,
+            runtime_facts=orch_result.runtime_facts,
+        )
+        gate_result = apply_risk_manager_gate_from_config(
+            gate_ctx,
+            current_signal=signal,
+            exit_id=EXIT_AGENT_CHAT,
+            config=config,
+            dashboard=chat_dashboard,
+        )
+        orch_result.runtime_facts = attach_risk_gate_result(
+            orch_result.runtime_facts,
+            gate_result,
+            evidence=build_agent_runtime_facts(gate_ctx).risk_evidence,
+        )
+        if chat_dashboard is not None:
+            orch_result.dashboard = chat_dashboard
+        if gate_result.verdict is not RiskGateOutcome.PASS:
+            notice = render_risk_gate_notice(gate_result, report_language)
+            orch_result.content = f"{notice}\n\n{orch_result.content}".strip()
+
         terminal_state = classify_result_terminal_state(orch_result)
         if terminal_state is ExecutionState.SUCCEEDED:
             conversation_manager.add_message(session_id, "assistant", orch_result.content)
@@ -192,48 +247,6 @@ class _ChatMethods:
                 session_id,
                 "assistant",
                 AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
-            )
-
-        # Agent Chat decision exit: mandatory Risk Manager gate when a structured
-        # dashboard decision is present; unstructured replies still leave a gate
-        # trace so the exit is never skipped.
-        try:
-            from src.agent.protocols import AgentContext
-            from src.agent.risk_override import (
-                EXIT_AGENT_CHAT,
-                apply_risk_manager_gate_from_config,
-            )
-
-            chat_dashboard = (
-                orch_result.dashboard
-                if isinstance(orch_result.dashboard, dict)
-                else None
-            )
-            signal = "hold"
-            if chat_dashboard is not None:
-                signal = chat_dashboard.get("decision_type", "hold")
-            gate_ctx = AgentContext(
-                query=message,
-                stock_code=str(
-                    (scope_resolution.effective_context or {}).get("stock_code") or ""
-                ),
-            )
-            apply_risk_manager_gate_from_config(
-                gate_ctx,
-                current_signal=signal,
-                exit_id=EXIT_AGENT_CHAT,
-                config=config,
-                dashboard=chat_dashboard,
-            )
-            if chat_dashboard is not None:
-                orch_result.dashboard = chat_dashboard
-        except Exception as gate_exc:  # broad-exception: fallback_recorded - chat must not fail closed on gate errors
-            log_safe_exception(
-                logger,
-                "Agent chat risk gate failed safe",
-                gate_exc,
-                error_code="agent_chat_risk_gate_failed_safe",
-                context={"session_id": session_id},
             )
 
         return AgentResult(

@@ -1,70 +1,65 @@
-# Risk Manager Gate
+# Risk Manager final-action authority
 
-Mandatory decision-exit risk evaluation for Issue #120. This upgrades the existing
-`src/agent/risk_override.py` module — it does **not** introduce a parallel risk
-engine or change the final report JSON schema.
+The Risk Manager is the mandatory, deterministic authority immediately before a
+buy, hold, or sell recommendation is published. It extends
+`src/agent/risk_override.py`; it does not add a second risk engine and never
+calls an LLM.
 
-## Call-path map (current)
+## Covered exits
 
-```
-Single Agent (AgentExecutor dashboard)
-  → analysis_results._agent_result_to_analysis_result
-  → apply_risk_manager_gate(exit=single_agent)
+- Multi-Agent and Investment Committee dashboard finalization
+- Single-Agent dashboard conversion
+- Multi-strategy deliberation projection, after later guardrails
+- Agent Chat, before response and conversation-history publication
 
-Multi-Agent / Investment Committee
-  → orchestrator dashboard finalization
-  → _apply_risk_override
-  → apply_risk_manager_gate(exit=orchestrator_multi_agent|committee_mode)
-  → existing AGENT_RISK_OVERRIDE plan + optional HITL bypass
+Each exit projects real dashboard and bounded runtime risk evidence into the
+same evaluator. The final action returned by that evaluator is then reused by
+the dashboard, `AnalysisResult`, report, notification, API payload, persisted
+raw report, DecisionSignal metadata, and chat history.
 
-Deliberation projection
-  → analysis_agent (when multi-strategy deliberation is on)
-  → apply_risk_manager_gate(exit=deliberation_projection)
-  → build_pipeline_final_explanation (explanation only)
+## Verdicts and profiles
 
-Agent Chat
-  → orchestrator_parts.chat.chat
-  → apply_risk_manager_gate(exit=agent_chat)
-```
+The canonical verdict set is `pass`, `downgrade`, and `reject`. Every result uses
+the bounded `risk-manager-result/v1` shape and includes the original action,
+final action, reason/evidence codes, profile, exit ID, evaluation ID, timestamp,
+and optional authorized-bypass ID. Raw prompts and model reasoning are never
+stored in this shape.
 
-Every exit **must** call the gate. Skipping an exit is considered incomplete.
+Set `RISK_GATE_PROFILE` to one of:
 
-## Outcomes
+| Profile | Policy |
+| --- | --- |
+| `conservative` | Intervenes on any supported elevated-risk evidence and rejects explicit vetoes. |
+| `balanced` | Default. Downgrades directional conflicts, vetoes, high-severity flags, and explicit downgrade adjustments. |
+| `aggressive` | Intervenes only on explicit blocking evidence or an enabled legacy override transition. |
 
-| Outcome | Signal | User-visible effect |
-| --- | --- | --- |
-| `pass` | unchanged | no mandatory note |
-| `attach_warning` | unchanged | appends `[Risk Manager] ...` to `risk_warning` |
-| `downgrade` | more conservative | signal change + mandatory note |
+Invalid values stop configuration loading. The gate cannot be disabled. The
+legacy `AGENT_RISK_OVERRIDE` flag still controls legacy override planning, but
+turning it off cannot bypass the mandatory final-action authority.
 
-Rules are **deterministic** (risk flags, veto, signal_adjustment, evidence/conclusion
-conflict, confidence mismatch). The gate never calls an LLM.
+Missing evidence by itself produces `pass`; it is not fabricated. Evidence with
+an invalid bounded field or malformed timestamp is marked invalid and blocks a
+new bullish publication. Timestamped evidence older than 24 hours is retained
+with its provenance, marked stale, and also blocks a new bullish publication.
 
-## Configuration
+## Failure and approval semantics
 
-| Env | Default | Meaning |
-| --- | --- | --- |
-| `RISK_GATE_ENABLED` | `true` | Run the gate at every exit |
-| `RISK_GATE_STRICT` | `false` | Force-downgrade on risk evidence even when `AGENT_RISK_OVERRIDE=false` |
-| `AGENT_RISK_OVERRIDE` | `true` | Existing force-downgrade authority when its plan `will_apply` |
+An internal evaluation failure is fail-closed. A buy becomes hold and the
+structured result records `reject`, `gate_internal_failure`, and
+`fail_closed=true`; the original buy is never published accidentally.
 
-**Default mode choice:** warn-first. Changing every existing buy to a forced
-downgrade would be a breaking user-visible change. Strict mode is opt-in.
+For operational recovery, inspect the stable `exception_type`, `exit_id`, and
+`evaluation_id` diagnostics in the structured result, correct the invalid
+configuration/evidence or runtime fault, and rerun the analysis. Recovery must
+not disable or bypass the gate; a one-shot approval is the only authorized way
+to retain an action that the working gate recommends changing.
 
-## Trace / fail-safe
-
-- Each evaluation stores `ctx.meta["risk_gate_result"]` and
-  `ctx.data["risk_gate_applied"]` (low-sensitivity dict for T03-style traces).
-- If the gate itself throws, analysis continues with the original signal and a
-  `fail_safe=true` pass result (`gate_internal_failure`).
-
-## Compatibility
-
-- Does not remove or replace `AGENT_RISK_OVERRIDE` / HITL approval bypass.
-- Does not alter `runner.py` log format or report schema fields.
-- Optional Web Settings registry entries are intentionally deferred (config
-  registry ownership is outside this change); env defaults work without Web UI.
+`/approvals` remains an optional, one-shot bypass. A consumed approval preserves
+the original action, stores the approval ID in the structured result, and uses
+wording that says the original action was authorized. It must not claim that a
+downgrade was applied.
 
 ## Rollback
 
-Set `RISK_GATE_ENABLED=false`, or revert the PR. No data migration.
+Revert the change. There is no schema migration: new persisted fields are
+additive JSON metadata. Do not add a disable switch as a rollback mechanism.

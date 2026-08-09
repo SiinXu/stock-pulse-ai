@@ -67,12 +67,12 @@ The Web page is `/approvals`, reached from the Home To-dos card without adding a
 The page states default preconditions honestly instead of looking “broken”:
 
 - Disabled authentication (`403` / `approval_auth_required`) or a missing session (`401`) shows a warning banner, disables rule edits and decision actions, and deep-links to Auth & Security settings or the sign-in page.
-- When the rule is off by default, the page explains that no pending approvals are created and the existing `AGENT_RISK_OVERRIDE` conservative override still applies automatically.
-- When the rule can load, the page explains the relationship to `AGENT_RISK_OVERRIDE`: with override on and `will_apply`, the conservative path still runs first; only a matched rule plus successful approval and consumption preserves the original recommendation.
+- When the rule is off by default, the page explains that no pending approvals are created and the mandatory Risk Manager final action still applies automatically.
+- When the rule can load, the page explains that every conservative `downgrade` or `reject` runs first; only a matched rule plus successful one-shot approval and consumption preserves the original recommendation with an audited approval ID.
 
 ## Execution semantics
 
-The multi-agent decision exit still runs through `AgentOrchestrator._apply_risk_override`, which now always evaluates the mandatory Risk Manager gate first (see `docs/risk-manager-gate_EN.md`) and then applies the existing `AGENT_RISK_OVERRIDE` plan. The HITL approval rule is consulted only when the existing risk plan actually `will_apply`. An off rule or unselected risk category preserves historical behavior. When matched, the worker creates or reuses a proposal and polls while Web/API decisions complete asynchronously:
+The multi-agent decision exit still runs through `AgentOrchestrator._apply_risk_override`, which evaluates the mandatory Risk Manager final-action authority (see `docs/risk-manager-gate_EN.md`). The HITL approval rule is consulted for a conservative `downgrade` or `reject`, including profile-driven decisions that do not depend on a legacy `AGENT_RISK_OVERRIDE` plan. An off rule or unselected risk category keeps the conservative final action. When matched, the worker creates or reuses a proposal and polls while Web/API decisions complete asynchronously:
 
 1. `approved` plus successful CAS consumption preserves the original, more aggressive recommendation and records the consumed proposal id in internal runtime facts.
 2. `rejected`, `cancelled`, `expired`, missing, stale, foreign-owner, replayed consumption, audit failure, or concurrency failure applies the existing conservative recommendation.

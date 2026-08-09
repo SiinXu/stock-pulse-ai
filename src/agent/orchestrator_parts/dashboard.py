@@ -18,10 +18,14 @@ from src.agent.risk_override import (
     RiskGateResult as _RiskGateResult,
     RiskOverrideApplication,
     apply_risk_manager_gate as _apply_risk_manager_gate,
+    authorize_risk_gate_bypass as _authorize_risk_gate_bypass,
+    build_approved_risk_application_from_gate as _build_approved_risk_application_from_gate,
     build_approved_risk_bypass_application as _build_approved_risk_bypass_application,
     build_risk_override_application,
+    build_risk_application_from_gate as _build_risk_application_from_gate,
     build_risk_override_plan,
     get_risk_gate_result as _get_risk_gate_result,
+    render_risk_gate_notice as _render_risk_gate_notice,
     resolve_risk_gate_flags as _resolve_risk_gate_flags,
 )
 from src.schemas.approvals import (
@@ -777,17 +781,17 @@ class _DashboardMethods:
     def _apply_risk_override(self, ctx: AgentContext) -> Optional[RiskOverrideApplication]:
         """Apply risk rules and retain their validated actual outcome.
 
-        Always runs the mandatory Risk Manager gate (warn / downgrade / pass)
-        so this multi-agent decision exit cannot skip risk evaluation. Existing
-        ``AGENT_RISK_OVERRIDE`` force-downgrade and HITL bypass remain the
-        signal-mutation authority when the override plan ``will_apply``.
+        Always runs the mandatory Risk Manager final-action authority so this
+        decision exit cannot skip risk evaluation. Existing
+        ``AGENT_RISK_OVERRIDE`` planning and HITL approval remain compatible,
+        but cannot silently bypass a profile-driven verdict.
         """
         dashboard = ctx.get_data("final_dashboard")
         if not isinstance(dashboard, dict):
             return None
 
         current_signal = normalize_decision_signal(dashboard.get("decision_type", "hold"))
-        gate_enabled, gate_strict, _ = _resolve_risk_gate_flags(self.config)
+        gate_enabled, gate_profile, _ = _resolve_risk_gate_flags(self.config)
         override_enabled = getattr(self.config, "agent_risk_override", True)
         exit_id = (
             _EXIT_COMMITTEE_MODE
@@ -809,7 +813,7 @@ class _DashboardMethods:
                     exit_id=exit_id,
                     override_enabled=bool(override_enabled),
                     gate_enabled=gate_enabled,
-                    gate_strict=gate_strict,
+                    profile=gate_profile,
                     dashboard=None,
                 )
             return existing
@@ -823,7 +827,7 @@ class _DashboardMethods:
             exit_id=exit_id,
             override_enabled=bool(override_enabled),
             gate_enabled=gate_enabled,
-            gate_strict=gate_strict,
+            profile=gate_profile,
             dashboard=None,
         )
         ctx.meta[_META_RISK_GATE_RESULT] = gate_result
@@ -833,7 +837,10 @@ class _DashboardMethods:
             current_signal=current_signal,
             override_enabled=bool(override_enabled),
         )
-        if plan.will_apply:
+        if gate_result.verdict in {
+            _RiskGateOutcome.DOWNGRADE,
+            _RiskGateOutcome.REJECT,
+        }:
             import uuid
 
             execution_id = str(
@@ -842,7 +849,12 @@ class _DashboardMethods:
                 or uuid.uuid4().hex
             )[:128]
             ctx.meta["approval_execution_id"] = execution_id
-            trigger = _ApprovalRiskSource(plan.trigger.value)
+            trigger_value = (
+                plan.trigger.value
+                if plan.trigger.value != "none"
+                else "risk_downgrade"
+            )
+            trigger = _ApprovalRiskSource(trigger_value)
             risk_summary = (
                 "A risk veto would replace the original buy signal."
                 if trigger is _ApprovalRiskSource.RISK_VETO
@@ -868,7 +880,7 @@ class _DashboardMethods:
                     context=_ApprovalContext(
                         stock_code=str(ctx.stock_code or "")[:32],
                         original_signal=plan.current_signal,
-                        conservative_signal=plan.target_signal,
+                        conservative_signal=gate_result.final_action,
                         risk_source=trigger,
                         risk_summary=risk_summary,
                     ),
@@ -885,20 +897,44 @@ class _DashboardMethods:
                 approved = None
             if approved is not None:
                 ctx.meta["_risk_control_bypass_fallback_application"] = (
-                    build_risk_override_application(plan)
+                    _build_risk_application_from_gate(
+                        gate_result,
+                        veto_buy=plan.veto_buy,
+                    )
                 )
-                application = _build_approved_risk_bypass_application(
-                    plan,
+                application = _build_approved_risk_application_from_gate(
+                    gate_result,
                     approval_id=approved.id,
+                    veto_buy=plan.veto_buy,
                 )
                 ctx.meta["risk_override_application"] = application
+                gate_result = _authorize_risk_gate_bypass(
+                    gate_result,
+                    approval_id=approved.id,
+                    approval_owner=approved.owner,
+                    approved_at=(
+                        approved.consumed_at.isoformat()
+                        if approved.consumed_at is not None
+                        else None
+                    ),
+                )
+                ctx.meta[_META_RISK_GATE_RESULT] = gate_result
+                ctx.set_data("risk_gate_applied", gate_result.to_trace_dict())
                 ctx.set_data(
                     "risk_control_bypass_applied",
                     {
                         "approval_id": approved.id,
+                        "approval_owner": approved.owner,
+                        "approved_at": (
+                            approved.consumed_at.isoformat()
+                            if approved.consumed_at is not None
+                            else None
+                        ),
                         "risk_source": trigger.value,
                         "signal": plan.current_signal,
-                        "conservative_signal": plan.target_signal,
+                        "conservative_signal": ctx.meta[
+                            "_risk_control_bypass_fallback_application"
+                        ].post_risk_signal.value,
                     },
                 )
                 logger.info(
@@ -909,59 +945,22 @@ class _DashboardMethods:
                 self._annotate_dashboard_with_risk_gate(dashboard, gate_result)
                 ctx.set_data("final_dashboard", dashboard)
                 return application
-        application = build_risk_override_application(plan)
+        application = _build_risk_application_from_gate(
+            gate_result,
+            veto_buy=plan.veto_buy,
+        )
         ctx.meta["risk_override_application"] = application
-        if not application.applied:
-            # Override did not change the signal — apply gate warn/strict downgrade.
-            if (
-                gate_result.outcome is _RiskGateOutcome.DOWNGRADE
-                and gate_result.final_signal != gate_result.original_signal
-            ):
-                dashboard["decision_type"] = gate_result.final_signal
-                # Record a synthetic applied application so downstream consumers
-                # see the post-gate signal consistently.
-                strict_plan = build_risk_override_plan(
-                    ctx,
-                    current_signal=gate_result.original_signal,
-                    override_enabled=True,
-                )
-                if strict_plan.will_apply:
-                    application = build_risk_override_application(strict_plan)
-                    ctx.meta["risk_override_application"] = application
-                    ctx.set_data(
-                        "risk_override_applied",
-                        {
-                            "from": gate_result.original_signal,
-                            "to": gate_result.final_signal,
-                            "adjustment": strict_plan.adjustment
-                            or ("veto" if strict_plan.veto_buy else "gate_strict"),
-                            "reason": "risk_gate_strict",
-                        },
-                    )
-            self._annotate_dashboard_with_risk_gate(dashboard, gate_result)
-            ctx.set_data("final_dashboard", dashboard)
-            return application
-
-        current_signal = application.from_signal.value
-        new_signal = application.to_signal.value
-        dashboard["decision_type"] = new_signal
+        dashboard["decision_type"] = gate_result.final_action
         self._annotate_dashboard_with_risk_gate(dashboard, gate_result)
 
         ctx.set_data("final_dashboard", dashboard)
-        ctx.set_data("risk_override_applied", {
-            "from": current_signal,
-            "to": new_signal,
-            "adjustment": plan.adjustment or ("veto" if plan.veto_buy else "none"),
-            "reason": plan.reason,
-        })
-
-        logger.info(
-            "[Orchestrator] risk override applied: %s -> %s (adjustment=%s, high_flag=%s)",
-            current_signal,
-            new_signal,
-            plan.adjustment or ("veto" if plan.veto_buy else "none"),
-            plan.has_high_flag,
-        )
+        if gate_result.final_action != gate_result.original_action:
+            ctx.set_data("risk_override_applied", {
+                "from": gate_result.original_action,
+                "to": gate_result.final_action,
+                "adjustment": gate_result.adjustment,
+                "reason": gate_result.verdict.value,
+            })
         return application
 
     @staticmethod
@@ -969,18 +968,21 @@ class _DashboardMethods:
         dashboard: Dict[str, Any],
         gate_result: _RiskGateResult,
     ) -> None:
-        """Attach mandatory gate warnings onto existing risk_warning text only.
-
-        Gate machine facts stay in ctx.meta / runtime data — they must not alter
-        the final report JSON schema.
-        """
-        if not gate_result.warnings:
+        """Attach the structured verdict and localized user-facing notice."""
+        dashboard["risk_manager"] = gate_result.to_trace_dict()
+        if (
+            gate_result.verdict is _RiskGateOutcome.PASS
+            and not gate_result.authorized_bypass_id
+        ):
             return
+        note = _render_risk_gate_notice(
+            gate_result,
+            str(dashboard.get("report_language") or "zh"),
+        )
         existing = str(dashboard.get("risk_warning") or "").strip()
-        for note in gate_result.warnings:
-            text = str(note or "").strip()
-            if text and text not in existing:
-                existing = f"{existing} {text}".strip() if existing else text
+        text = str(note or "").strip()
+        if text and text not in existing:
+            existing = f"{existing} {text}".strip() if existing else text
         dashboard["risk_warning"] = existing
 
     @staticmethod

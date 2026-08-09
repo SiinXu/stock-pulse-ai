@@ -67,12 +67,12 @@ Web 页面位于 `/approvals`，从 Home 的“待办”卡片进入，不新增
 页面会诚实展示默认前置条件，而不是伪装成“功能损坏”：
 
 - 认证关闭（`403` / `approval_auth_required`）或会话无效（`401`）时显示警告横幅，禁用规则编辑与决策操作，并深链到设置中的认证与安全页或登录页。
-- 规则默认关闭时显示说明：不会创建待审批，既有 `AGENT_RISK_OVERRIDE` 保守覆写仍自动生效。
-- 规则可加载时说明与 `AGENT_RISK_OVERRIDE` 的关系：覆写开启且 `will_apply` 时仍先走保守路径；只有本页规则命中并成功批准与消费后，才保留原始建议。
+- 规则默认关闭时显示说明：不会创建待审批，强制 Risk Manager 最终动作仍自动生效。
+- 规则可加载时说明：每个保守 `downgrade` 或 `reject` 均先执行；只有本页规则命中并成功完成一次性批准与消费后，才会在记录审批 ID 的前提下保留原始建议。
 
 ## 执行语义
 
-多 Agent 决策出口仍经过 `AgentOrchestrator._apply_risk_override`：该路径会先执行强制 Risk Manager 决策门（见 `docs/risk-manager-gate.md`），再应用既有 `AGENT_RISK_OVERRIDE` 计划。HITL 审批规则仅在既有风险计划确实 `will_apply` 时查询。规则关闭或风险来源未选中时，行为与历史版本相同。规则命中时 worker 创建或复用提案并轮询；Web/API 可以异步决策：
+多 Agent 决策出口仍经过 `AgentOrchestrator._apply_risk_override`，并执行强制 Risk Manager 最终动作裁决（见 `docs/risk-manager-gate.md`）。HITL 审批规则会处理保守的 `downgrade` 或 `reject`，包括不依赖 legacy `AGENT_RISK_OVERRIDE` 计划的档位裁决。规则关闭或风险来源未选中时保留保守最终动作。规则命中时 worker 创建或复用提案并轮询；Web/API 可以异步决策：
 
 1. `approved` 且 CAS 消费成功：保留原始、更激进的建议，并在内部 runtime facts 中记录已消费的 proposal id。
 2. `rejected`、`cancelled`、`expired`、缺失、失效、跨 owner、重复消费、审计失败或并发失败：应用原有保守建议。

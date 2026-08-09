@@ -1,68 +1,54 @@
-# Risk Manager 决策门
+# Risk Manager 最终动作裁决
 
-Issue #120 的强制决策出口风控评估。本能力**升级**既有
-`src/agent/risk_override.py`，不新建平行风控引擎，也不改最终报告 JSON schema。
+Risk Manager 是每个 buy、hold、sell 建议发布前的强制、确定性最终裁决者。
+它扩展 `src/agent/risk_override.py`，不会新增平行风控引擎，也不会调用 LLM。
 
-## 调用路径图（当前）
+## 覆盖出口
 
-```
-单 Agent（AgentExecutor dashboard）
-  → analysis_results._agent_result_to_analysis_result
-  → apply_risk_manager_gate(exit=single_agent)
+- 多 Agent 与投资委员会的 dashboard 定稿
+- 单 Agent dashboard 转换
+- 多策略合议在后续护栏完成后的最终投影
+- Agent Chat 在返回响应和写入会话历史之前
 
-多 Agent / 投资委员会
-  → orchestrator dashboard 定稿
-  → _apply_risk_override
-  → apply_risk_manager_gate(exit=orchestrator_multi_agent|committee_mode)
-  → 既有 AGENT_RISK_OVERRIDE 计划 + 可选 HITL 旁路
+每个出口都把真实 dashboard 与有界 runtime 风险证据投影到同一个评估器。
+评估器返回的最终动作继续用于 dashboard、`AnalysisResult`、报告、通知、API
+payload、持久化 raw report、DecisionSignal metadata 和聊天历史。
 
-Deliberation 修订投影
-  → analysis_agent（开启 multi-strategy deliberation 时）
-  → apply_risk_manager_gate(exit=deliberation_projection)
-  → build_pipeline_final_explanation（仅解释）
+## 裁决与档位
 
-Agent Chat 问股
-  → orchestrator_parts.chat.chat
-  → apply_risk_manager_gate(exit=agent_chat)
-```
+标准裁决只有 `pass`、`downgrade`、`reject`。每次结果使用有界的
+`risk-manager-result/v1` 结构，包含原始动作、最终动作、原因/证据 code、档位、
+出口 ID、评估 ID、时间戳及可选的一次性授权 ID；不会持久化原始 Prompt 或
+模型推理。
 
-每一条决策出口**必须**过门；缺一条视为未完成。
+`RISK_GATE_PROFILE` 支持：
 
-## 三种结果
+| 档位 | 策略 |
+| --- | --- |
+| `conservative` | 任一受支持的高风险证据均会介入，明确 veto 会被 reject。 |
+| `balanced` | 默认；方向冲突、veto、高危旗标和明确降级指令会触发下调。 |
+| `aggressive` | 仅在明确阻断证据或已启用的 legacy override 转换时介入。 |
 
-| 结果 | 信号 | 用户可见 |
-| --- | --- | --- |
-| `pass` | 不变 | 无强制提示 |
-| `attach_warning` | 不变 | 在 `risk_warning` 追加 `[Risk Manager] ...` |
-| `downgrade` | 更保守 | 改信号 + 强制提示 |
+非法值会阻止配置加载。闸门不可关闭。既有 `AGENT_RISK_OVERRIDE` 仍控制 legacy
+override 计划，但关闭它不能绕过最终动作裁决。
 
-判定规则为**确定性**条件（风险旗标、veto、signal_adjustment、证据与结论矛盾、
-置信度与证据不匹配），**不再调用 LLM**。
+单纯缺少证据时返回 `pass`，不会伪造风险。包含非法有界字段或畸形时间戳的证据
+会标记为 invalid 并阻止新的 bullish 发布；带时间戳且早于 24 小时的证据会保留
+来源、标记 stale，并同样阻止新的 bullish 发布。
 
-## 配置
+## 失败与授权语义
 
-| 环境变量 | 默认 | 含义 |
-| --- | --- | --- |
-| `RISK_GATE_ENABLED` | `true` | 每个出口都执行门评估 |
-| `RISK_GATE_STRICT` | `false` | 有风险证据时强制降级（即使 `AGENT_RISK_OVERRIDE=false`） |
-| `AGENT_RISK_OVERRIDE` | `true` | 既有强制降级权威（计划 `will_apply` 时） |
+内部评估异常采用 fail-closed：buy 变为 hold，并记录 `reject`、
+`gate_internal_failure`、`fail_closed=true`，不会意外发布原始 buy。
 
-**默认模式取舍**：默认只附加风险提示。把所有既有 buy 强制降级属于破坏性变更；
-严格模式需显式开启。
+运行恢复时，应检查结构化结果中的稳定诊断字段 `exception_type`、`exit_id` 和
+`evaluation_id`，修复非法配置/证据或运行时故障后重新执行分析。恢复过程不得
+关闭或绕过闸门；若工作正常的闸门建议改变动作，只有一次性审批可授权保留原动作。
 
-## 留痕与 fail-safe
-
-- 每次评估写入 `ctx.meta["risk_gate_result"]` 与
-  `ctx.data["risk_gate_applied"]`（低敏 dict，可供 T03 类 trace 消费）。
-- 门自身异常时分析继续，保留原信号，并记录 `fail_safe=true` /
-  `gate_internal_failure`。
-
-## 兼容性
-
-- 不替换 `AGENT_RISK_OVERRIDE` / HITL 审批旁路。
-- 不改 `runner.py` 日志格式与报告 schema 字段。
-- Web Settings 注册表项刻意延后（配置注册表归属其他任务）；环境变量默认即可运行。
+`/approvals` 仍提供可选的一次性旁路。授权被消费后保留原始动作，在结构化结果
+中记录审批 ID，并明确显示“经授权保留原始动作”，不能误称“已下调”。
 
 ## 回滚
 
-设置 `RISK_GATE_ENABLED=false`，或 revert 对应 PR。无数据迁移。
+回退对应变更即可。新增持久化内容均为附加 JSON metadata，无数据库迁移。
+不要以新增关闭开关作为回滚方式。

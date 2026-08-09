@@ -480,46 +480,80 @@ class _AgentAnalysisStageMixin:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                runtime_facts = getattr(agent_result, "runtime_facts", None)
+                from src.schemas.decision_action import normalize_decision_action
+                from src.agent.risk_override import (
+                    EXIT_DELIBERATION_PROJECTION,
+                    EXIT_SINGLE_AGENT,
+                    apply_risk_manager_gate_from_config,
+                    build_risk_context_for_exit,
+                )
+                from src.agent.runtime_facts import (
+                    attach_risk_gate_result,
+                    build_agent_runtime_facts,
+                )
+
+                if not isinstance(result.dashboard, dict):
+                    result.dashboard = {}
+                pipeline_start_signal = getattr(result, "decision_type", "hold")
+                start_action = normalize_decision_action(getattr(result, "action", None))
+                final_gate_ctx = build_risk_context_for_exit(
+                    stock_code=code,
+                    current_signal=pipeline_start_signal,
+                    dashboard=result.dashboard,
+                    runtime_facts=runtime_facts,
+                )
+                final_gate = apply_risk_manager_gate_from_config(
+                    final_gate_ctx,
+                    current_signal=pipeline_start_signal,
+                    exit_id=(
+                        EXIT_DELIBERATION_PROJECTION
+                        if getattr(
+                            self.config,
+                            "agent_multi_strategy_deliberation",
+                            False,
+                        )
+                        else EXIT_SINGLE_AGENT
+                    ),
+                    config=self.config,
+                    dashboard=result.dashboard,
+                )
+                runtime_facts = attach_risk_gate_result(
+                    runtime_facts,
+                    final_gate,
+                    evidence=build_agent_runtime_facts(
+                        final_gate_ctx
+                    ).risk_evidence,
+                )
+                agent_result.runtime_facts = runtime_facts
+                result.decision_type = final_gate.final_action
+                result.risk_gate_result = final_gate.to_trace_dict()
+                if final_gate.final_action != final_gate.original_action:
+                    result.operation_advice = localize_operation_advice(
+                        final_gate.final_action,
+                        getattr(result, "report_language", "zh"),
+                    )
+                populate_decision_action_fields(
+                    result,
+                    report_type=report_type.value,
+                    explicit_action=final_gate.final_action,
+                    use_existing_action=False,
+                    align_with_score=False,
+                )
+
                 if getattr(self.config, "agent_multi_strategy_deliberation", False):
-                    runtime_facts = getattr(agent_result, "runtime_facts", None)
-                    from src.schemas.decision_action import normalize_decision_action
                     from src.agent.deliberation_final_explanation import (
                         build_pipeline_final_explanation,
                     )
-                    final_action = normalize_decision_action(getattr(result, "action", None))
-                    start_action = final_action
-                    if runtime_facts is not None and final_action is not None and start_action is not None:
-                        try:
-                            if not isinstance(result.dashboard, dict):
-                                result.dashboard = {}
-                            result.dashboard.pop("agent_disagreement_explanation", None)
-                            pipeline_start_signal = getattr(result, "decision_type", "hold")
-                            risk_application = getattr(runtime_facts, "risk_override_application", None)
-                            if risk_application is not None:
-                                pipeline_start_signal = risk_application.post_risk_signal.value
-                            # Deliberation projection exit: re-run mandatory Risk Manager gate
-                            # on the published final signal using projected base opinions.
-                            from src.agent.protocols import AgentContext, AgentOpinion
-                            from src.agent.risk_override import (
-                                EXIT_DELIBERATION_PROJECTION,
-                                apply_risk_manager_gate_from_config,
-                            )
 
-                            deliberation_ctx = AgentContext(query="", stock_code=code)
-                            for fact in getattr(runtime_facts, "base_agent_opinions", ()) or ():
-                                deliberation_ctx.add_opinion(
-                                    AgentOpinion(
-                                        agent_name=str(getattr(fact, "agent", "") or "unknown"),
-                                        signal=str(getattr(fact, "signal", "") or "hold"),
-                                        confidence=float(getattr(fact, "confidence", 0.0) or 0.0),
-                                    )
-                                )
-                            apply_risk_manager_gate_from_config(
-                                deliberation_ctx,
-                                current_signal=pipeline_start_signal,
-                                exit_id=EXIT_DELIBERATION_PROJECTION,
-                                config=self.config,
-                                dashboard=None,
+                    final_action = normalize_decision_action(
+                        getattr(result, "action", None)
+                    )
+                    if final_action is not None and start_action is not None:
+                        try:
+                            result.dashboard.pop(
+                                "agent_disagreement_explanation",
+                                None,
                             )
                             result.dashboard["agent_disagreement_explanation"] = (
                                 build_pipeline_final_explanation(
@@ -530,12 +564,15 @@ class _AgentAnalysisStageMixin:
                                     pipeline_adjustments=(),
                                     data_quality=(
                                         analysis_context_pack_overview.get("data_quality")
-                                        if isinstance(analysis_context_pack_overview, dict)
+                                        if isinstance(
+                                            analysis_context_pack_overview,
+                                            dict,
+                                        )
                                         else None
                                     ),
                                 )
                             )
-                        except Exception as exc:  # broad-exception: fallback_recorded - Final explanation is optional and fail-closed.
+                        except Exception as exc:  # broad-exception: fallback_recorded - Final explanation is optional.
                             log_safe_exception(
                                 logger,
                                 "Agent deliberation final explanation skipped",
