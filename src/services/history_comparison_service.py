@@ -7,7 +7,7 @@ Report Engine - History Comparison Service
 Fetches recent analysis signal changes per stock for report rendering.
 Excludes current record via exclude_query_id.
 
-Also provides deterministic multi-dimension deltas between two analysis runs
+Also provides deterministic multi-dimension deltas between two history records
 (``compare_analyses`` / ``get_latest_delta``) for Issue #148 / T17.
 """
 
@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
+from hashlib import sha256
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.report_language import normalize_report_language
@@ -33,6 +34,7 @@ def _database_manager():
 
     return DatabaseManager
 
+
 # Baseline status values for AnalysisDelta.
 BASELINE_OK = "ok"
 BASELINE_MISSING_HISTORY = "missing_history"
@@ -47,6 +49,39 @@ DIRECTION_UNCHANGED = "unchanged"
 DIRECTION_CHANGED = "changed"
 DIRECTION_UNAVAILABLE = "unavailable"
 
+# Stable public reasons for numeric values that cannot participate in a delta.
+UNAVAILABLE_MISSING_VALUE = "missing_value"
+UNAVAILABLE_NON_FINITE_NUMBER = "non_finite_number"
+UNAVAILABLE_INVALID_NUMBER = "invalid_number"
+
+# Bound public evidence/risk payloads while reporting when details were omitted.
+MAX_LIST_CHANGE_ITEMS = 100
+MAX_LIST_ITEM_LENGTH = 512
+
+
+def _json_safe_value(value: Any) -> Any:
+    """Return a recursively strict-JSON-safe representation."""
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_json_safe_value(item) for item in value]
+    return str(value)
+
+
+@dataclass(frozen=True)
+class ValueUnavailability:
+    """Structured reasons for unavailable numeric comparison sides."""
+
+    base: Optional[str] = None
+    target: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Optional[str]]:
+        return _json_safe_value({"base": self.base, "target": self.target})
+
 
 @dataclass(frozen=True)
 class ValueChange:
@@ -58,9 +93,24 @@ class ValueChange:
     delta: Optional[float] = None
     direction: str = DIRECTION_UNCHANGED
     comparable: bool = True
+    unavailability: Optional[ValueUnavailability] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        return _json_safe_value(
+            {
+                "field": self.field,
+                "base_value": _json_safe_value(self.base_value),
+                "target_value": _json_safe_value(self.target_value),
+                "delta": _json_safe_value(self.delta),
+                "direction": self.direction,
+                "comparable": self.comparable,
+                "unavailability": (
+                    self.unavailability.to_dict()
+                    if self.unavailability is not None
+                    else None
+                ),
+            }
+        )
 
 
 @dataclass(frozen=True)
@@ -71,29 +121,39 @@ class ListChange:
     added: Tuple[str, ...] = ()
     removed: Tuple[str, ...] = ()
     unchanged: Tuple[str, ...] = ()
+    added_total: int = 0
+    removed_total: int = 0
+    unchanged_total: int = 0
+    output_truncated: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "field": self.field,
-            "added": list(self.added),
-            "removed": list(self.removed),
-            "unchanged": list(self.unchanged),
-        }
+        return _json_safe_value(
+            {
+                "field": self.field,
+                "added": list(self.added),
+                "removed": list(self.removed),
+                "unchanged": list(self.unchanged),
+                "added_total": self.added_total or len(self.added),
+                "removed_total": self.removed_total or len(self.removed),
+                "unchanged_total": self.unchanged_total or len(self.unchanged),
+                "output_truncated": self.output_truncated,
+            }
+        )
 
     @property
     def has_changes(self) -> bool:
-        return bool(self.added or self.removed)
+        return bool(self.added_total or self.removed_total or self.added or self.removed)
 
 
 @dataclass
 class AnalysisDelta:
     """
-    Deterministic delta between two analysis history runs.
+    Deterministic delta between two analysis history records.
 
-    ``has_baseline`` is False when comparison is impossible (first run, missing
-    history, missing run ids, or incomparable structure). That state must never
+    ``has_baseline`` is False when comparison is impossible (first record, missing
+    history, missing record ids, or incomparable structure). That state must never
     be confused with ``has_baseline=True`` and empty change buckets (no material
-    change between two valid runs).
+    change between two valid records).
     """
 
     has_baseline: bool
@@ -101,34 +161,43 @@ class AnalysisDelta:
     score_changes: List[ValueChange] = field(default_factory=list)
     evidence_changes: List[ListChange] = field(default_factory=list)
     risk_changes: List[ListChange] = field(default_factory=list)
-    base_run_id: Optional[str] = None
-    target_run_id: Optional[str] = None
+    base_record_id: Optional[int] = None
+    target_record_id: Optional[int] = None
+    base_query_id: Optional[str] = None
+    target_query_id: Optional[str] = None
     stock_code: Optional[str] = None
+    report_type: Optional[str] = None
     baseline_status: str = BASELINE_OK
     baseline_reason: Optional[str] = None
     has_material_changes: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        return _json_safe_value({
             "has_baseline": self.has_baseline,
             "baseline_status": self.baseline_status,
             "baseline_reason": self.baseline_reason,
             "stock_code": self.stock_code,
-            "base_run_id": self.base_run_id,
-            "target_run_id": self.target_run_id,
+            "base_record_id": self.base_record_id,
+            "target_record_id": self.target_record_id,
+            "base_query_id": self.base_query_id,
+            "target_query_id": self.target_query_id,
+            "report_type": self.report_type,
             "has_material_changes": self.has_material_changes,
             "conclusion_changes": [c.to_dict() for c in self.conclusion_changes],
             "score_changes": [c.to_dict() for c in self.score_changes],
             "evidence_changes": [c.to_dict() for c in self.evidence_changes],
             "risk_changes": [c.to_dict() for c in self.risk_changes],
-        }
+        })
 
 
 def _empty_delta(
     *,
     stock_code: Optional[str],
-    base_run_id: Optional[str],
-    target_run_id: Optional[str],
+    base_record_id: Optional[int],
+    target_record_id: Optional[int],
+    base_query_id: Optional[str] = None,
+    target_query_id: Optional[str] = None,
+    report_type: Optional[str] = None,
     baseline_status: str,
     baseline_reason: str,
 ) -> AnalysisDelta:
@@ -139,9 +208,12 @@ def _empty_delta(
         score_changes=[],
         evidence_changes=[],
         risk_changes=[],
-        base_run_id=base_run_id,
-        target_run_id=target_run_id,
+        base_record_id=base_record_id,
+        target_record_id=target_record_id,
+        base_query_id=base_query_id,
+        target_query_id=target_query_id,
         stock_code=stock_code,
+        report_type=report_type,
         baseline_status=baseline_status,
         baseline_reason=baseline_reason,
         has_material_changes=False,
@@ -306,6 +378,27 @@ def _normalize_text(value: Any) -> Optional[str]:
     return text if text else None
 
 
+def _normalize_record_id(value: Any) -> Optional[int]:
+    """Normalize a positive AnalysisHistory primary key without accepting booleans."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        record_id = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return record_id if record_id > 0 else None
+
+
+def _bounded_list_text(value: Any) -> Optional[str]:
+    """Normalize one evidence/risk item to a deterministic bounded string."""
+    text = _normalize_text(value)
+    if text is None or len(text) <= MAX_LIST_ITEM_LENGTH:
+        return text
+    digest = sha256(text.encode("utf-8")).hexdigest()[:16]
+    suffix = f"… [sha256:{digest}]"
+    return f"{text[: MAX_LIST_ITEM_LENGTH - len(suffix)]}{suffix}"
+
+
 def _split_text_items(value: Any) -> List[str]:
     """Split key_points / data_sources style free text into stable tokens."""
     if value is None:
@@ -313,7 +406,7 @@ def _split_text_items(value: Any) -> List[str]:
     if isinstance(value, (list, tuple, set)):
         items: List[str] = []
         for item in value:
-            text = _normalize_text(item)
+            text = _bounded_list_text(item)
             if text:
                 items.append(text)
         return items
@@ -323,16 +416,17 @@ def _split_text_items(value: Any) -> List[str]:
     # Prefer common list separators used in persisted analysis text.
     for separator in ("\n", "；", ";", "，", ","):
         if separator in text:
-            parts = [p.strip() for p in text.split(separator)]
+            parts = [_bounded_list_text(p) for p in text.split(separator)]
             return [p for p in parts if p]
-    return [text]
+    bounded = _bounded_list_text(text)
+    return [bounded] if bounded else []
 
 
 def _string_list(value: Any) -> List[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        cleaned = value.strip()
+        cleaned = _bounded_list_text(value)
         return [cleaned] if cleaned else []
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         out: List[str] = []
@@ -347,13 +441,13 @@ def _string_list(value: Any) -> List[str]:
                     or item.get("fact")
                     or item.get("summary")
                 )
-                text = _normalize_text(statement)
+                text = _bounded_list_text(statement)
             else:
-                text = _normalize_text(item)
+                text = _bounded_list_text(item)
             if text:
                 out.append(text)
         return out
-    text = _normalize_text(value)
+    text = _bounded_list_text(value)
     return [text] if text else []
 
 
@@ -392,9 +486,11 @@ def _extract_comparable_snapshot(record: Any) -> Optional[Dict[str, Any]]:
     if record is None:
         return None
 
+    record_id = _normalize_record_id(getattr(record, "id", None))
     code = _normalize_text(getattr(record, "code", None))
     query_id = _normalize_text(getattr(record, "query_id", None))
-    if not code or not query_id:
+    report_type = _normalize_text(getattr(record, "report_type", None))
+    if record_id is None or not code:
         return None
 
     raw = parse_json_field(getattr(record, "raw_result", None))
@@ -467,13 +563,17 @@ def _extract_comparable_snapshot(record: Any) -> Optional[Dict[str, Any]]:
         candidate = data_perspective.get(dim_key)
         if candidate is None:
             nested = _as_mapping(data_perspective.get(dim_key.replace("_score", "_status")))
-            candidate = nested.get("score") or nested.get(dim_key)
+            candidate = nested.get("score")
+            if candidate is None:
+                candidate = nested.get(dim_key)
         if candidate is not None:
             dimension_scores[dim_key] = candidate
 
     return {
+        "record_id": record_id,
         "code": code,
         "query_id": query_id,
+        "report_type": report_type,
         "operation_advice": _normalize_text(operation_advice),
         "action": _normalize_text(action_fields.get("action")),
         "action_label": _normalize_text(action_fields.get("action_label")),
@@ -493,6 +593,34 @@ def _extract_comparable_snapshot(record: Any) -> Optional[Dict[str, Any]]:
     }
 
 
+def _numeric_unavailability_reason(value: Any) -> str:
+    """Classify why a raw numeric value could not be projected."""
+    if value is None:
+        return UNAVAILABLE_MISSING_VALUE
+    if isinstance(value, bool):
+        return UNAVAILABLE_INVALID_NUMBER
+    if isinstance(value, (int, float)):
+        return (
+            UNAVAILABLE_NON_FINITE_NUMBER
+            if not math.isfinite(float(value))
+            else UNAVAILABLE_INVALID_NUMBER
+        )
+    if isinstance(value, str):
+        text = value.strip().replace(",", "")
+        if not text:
+            return UNAVAILABLE_MISSING_VALUE
+        try:
+            number = float(text)
+        except ValueError:
+            return UNAVAILABLE_INVALID_NUMBER
+        return (
+            UNAVAILABLE_NON_FINITE_NUMBER
+            if not math.isfinite(number)
+            else UNAVAILABLE_INVALID_NUMBER
+        )
+    return UNAVAILABLE_INVALID_NUMBER
+
+
 def _value_change(
     field_name: str,
     base_value: Any,
@@ -503,33 +631,30 @@ def _value_change(
     if numeric:
         base_num = _finite_number(base_value)
         target_num = _finite_number(target_value)
-        # Both missing after finite coercion: treat as no material change and skip.
-        if base_num is None and target_num is None:
-            # If either side had a non-empty raw value that failed finite checks,
-            # surface an unavailable comparison rather than silent equality.
-            base_present = base_value is not None and _normalize_text(base_value) is not None
-            target_present = target_value is not None and _normalize_text(target_value) is not None
-            if base_present or target_present:
-                return ValueChange(
-                    field=field_name,
-                    base_value=base_value,
-                    target_value=target_value,
-                    delta=None,
-                    direction=DIRECTION_UNAVAILABLE,
-                    comparable=False,
-                )
+        base_reason = None if base_num is not None else _numeric_unavailability_reason(base_value)
+        target_reason = None if target_num is not None else _numeric_unavailability_reason(target_value)
+
+        # Two genuinely absent values carry no comparison information.
+        if (
+            base_num is None
+            and target_num is None
+            and base_reason == UNAVAILABLE_MISSING_VALUE
+            and target_reason == UNAVAILABLE_MISSING_VALUE
+        ):
             return None
+
         if base_num is None or target_num is None:
-            # One side missing/non-finite: change is reported but not numeric-delta capable.
-            if base_num == target_num:
-                return None
             return ValueChange(
                 field=field_name,
-                base_value=base_num if base_num is not None else base_value,
-                target_value=target_num if target_num is not None else target_value,
+                base_value=base_num,
+                target_value=target_num,
                 delta=None,
                 direction=DIRECTION_UNAVAILABLE,
                 comparable=False,
+                unavailability=ValueUnavailability(
+                    base=base_reason,
+                    target=target_reason,
+                ),
             )
         delta = target_num - base_num
         if delta > 0:
@@ -567,16 +692,27 @@ def _value_change(
 def _list_change(field_name: str, base_items: Sequence[str], target_items: Sequence[str]) -> Optional[ListChange]:
     base_set = {item for item in base_items if item}
     target_set = {item for item in target_items if item}
-    added = tuple(sorted(target_set - base_set))
-    removed = tuple(sorted(base_set - target_set))
-    unchanged = tuple(sorted(base_set & target_set))
-    if not added and not removed:
+    added_all = sorted(target_set - base_set)
+    removed_all = sorted(base_set - target_set)
+    unchanged_all = sorted(base_set & target_set)
+    if not added_all and not removed_all:
         return None
+    added = tuple(added_all[:MAX_LIST_CHANGE_ITEMS])
+    removed = tuple(removed_all[:MAX_LIST_CHANGE_ITEMS])
+    unchanged = tuple(unchanged_all[:MAX_LIST_CHANGE_ITEMS])
     return ListChange(
         field=field_name,
         added=added,
         removed=removed,
         unchanged=unchanged,
+        added_total=len(added_all),
+        removed_total=len(removed_all),
+        unchanged_total=len(unchanged_all),
+        output_truncated=(
+            len(added) < len(added_all)
+            or len(removed) < len(removed_all)
+            or len(unchanged) < len(unchanged_all)
+        ),
     )
 
 
@@ -638,144 +774,227 @@ def _diff_snapshots(base: Mapping[str, Any], target: Mapping[str, Any]) -> Analy
         score_changes=score_changes,
         evidence_changes=evidence_changes,
         risk_changes=risk_changes,
-        base_run_id=str(base.get("query_id") or "") or None,
-        target_run_id=str(target.get("query_id") or "") or None,
+        base_record_id=_normalize_record_id(base.get("record_id")),
+        target_record_id=_normalize_record_id(target.get("record_id")),
+        base_query_id=_normalize_text(base.get("query_id")),
+        target_query_id=_normalize_text(target.get("query_id")),
         stock_code=str(base.get("code") or target.get("code") or "") or None,
+        report_type=_normalize_text(base.get("report_type") or target.get("report_type")),
         baseline_status=BASELINE_OK,
         baseline_reason=None,
         has_material_changes=has_material,
     )
 
 
-def _lookup_history_record(stock_code: str, run_id: str) -> Optional[Any]:
-    """Load one AnalysisHistory row by stock code + query_id (run id)."""
-    code = _normalize_text(stock_code)
-    query_id = _normalize_text(run_id)
-    if not code or not query_id:
-        return None
+def _lookup_history_record(record_id: int) -> Optional[Any]:
+    """Load exactly one AnalysisHistory row by its unique primary key."""
     db = _database_manager().get_instance()
-    records = db.get_analysis_history(code=code, query_id=query_id, limit=1)
-    if not records:
-        return None
-    return records[0]
+    return db.get_analysis_history_by_id(record_id)
 
 
-def compare_analyses(stock_code: str, base_run_id: str, target_run_id: str) -> AnalysisDelta:
-    """
-    Compare two analysis history runs for the same stock.
-
-    Run ids are ``AnalysisHistory.query_id`` values. Comparison is deterministic
-    (field-level diff only; no LLM summary). When either run is missing or a
-    usable snapshot cannot be built, returns ``has_baseline=False`` with an
-    explicit ``baseline_status`` — never a silent empty "no change" delta.
-    """
+def _compare_records(
+    stock_code: str,
+    base_record: Any,
+    target_record: Any,
+    *,
+    base_record_id: int,
+    target_record_id: int,
+) -> AnalysisDelta:
+    """Compare two already-selected rows without a lossy identity re-lookup."""
     code = _normalize_text(stock_code)
-    base_id = _normalize_text(base_run_id)
-    target_id = _normalize_text(target_run_id)
-
-    if not code:
-        return _empty_delta(
-            stock_code=stock_code,
-            base_run_id=base_run_id,
-            target_run_id=target_run_id,
-            baseline_status=BASELINE_INCOMPARABLE,
-            baseline_reason="stock_code is required",
-        )
-    if not base_id or not target_id:
-        return _empty_delta(
-            stock_code=code,
-            base_run_id=base_id,
-            target_run_id=target_id,
-            baseline_status=BASELINE_INCOMPARABLE,
-            baseline_reason="base_run_id and target_run_id are required",
-        )
-
-    base_record = _lookup_history_record(code, base_id)
-    if base_record is None:
-        return _empty_delta(
-            stock_code=code,
-            base_run_id=base_id,
-            target_run_id=target_id,
-            baseline_status=BASELINE_MISSING_BASE,
-            baseline_reason=f"base run not found for stock_code={code!r} run_id={base_id!r}",
-        )
-
-    target_record = _lookup_history_record(code, target_id)
-    if target_record is None:
-        return _empty_delta(
-            stock_code=code,
-            base_run_id=base_id,
-            target_run_id=target_id,
-            baseline_status=BASELINE_MISSING_TARGET,
-            baseline_reason=f"target run not found for stock_code={code!r} run_id={target_id!r}",
-        )
+    base_query_id = _normalize_text(getattr(base_record, "query_id", None))
+    target_query_id = _normalize_text(getattr(target_record, "query_id", None))
+    base_report_type = _normalize_text(getattr(base_record, "report_type", None))
+    target_report_type = _normalize_text(getattr(target_record, "report_type", None))
 
     base_snap = _extract_comparable_snapshot(base_record)
     target_snap = _extract_comparable_snapshot(target_record)
     if base_snap is None or target_snap is None:
         return _empty_delta(
             stock_code=code,
-            base_run_id=base_id,
-            target_run_id=target_id,
+            base_record_id=base_record_id,
+            target_record_id=target_record_id,
+            base_query_id=base_query_id,
+            target_query_id=target_query_id,
+            report_type=base_report_type or target_report_type,
             baseline_status=BASELINE_INCOMPARABLE,
-            baseline_reason="one or both runs lack a comparable analysis snapshot",
+            baseline_reason="one or both records lack a comparable analysis snapshot",
+        )
+
+    if base_snap["code"] != code or target_snap["code"] != code:
+        return _empty_delta(
+            stock_code=code,
+            base_record_id=base_record_id,
+            target_record_id=target_record_id,
+            base_query_id=base_query_id,
+            target_query_id=target_query_id,
+            report_type=base_report_type or target_report_type,
+            baseline_status=BASELINE_INCOMPARABLE,
+            baseline_reason="both records must belong to the requested stock_code",
+        )
+
+    if not base_report_type or not target_report_type or base_report_type != target_report_type:
+        return _empty_delta(
+            stock_code=code,
+            base_record_id=base_record_id,
+            target_record_id=target_record_id,
+            base_query_id=base_query_id,
+            target_query_id=target_query_id,
+            report_type=(
+                base_report_type if base_report_type == target_report_type else None
+            ),
+            baseline_status=BASELINE_INCOMPARABLE,
+            baseline_reason="both records must have the same explicit report_type",
         )
 
     return _diff_snapshots(base_snap, target_snap)
 
 
-def get_latest_delta(stock_code: str) -> AnalysisDelta:
+def compare_analyses(
+    stock_code: str,
+    base_record_id: int,
+    target_record_id: int,
+) -> AnalysisDelta:
     """
-    Compare the two most recent analysis runs for a stock.
+    Compare two analysis history records for the same stock.
 
-    Convenience wrapper around ``compare_analyses``. When fewer than two history
-    rows exist, returns an explicit no-baseline result (first analysis / missing
-    history) rather than an empty no-change delta.
+    Record ids are unique ``AnalysisHistory.id`` primary keys. ``query_id`` is
+    retained only as correlation metadata. Comparison is deterministic
+    (field-level diff only; no LLM summary). When either record is missing or a
+    usable snapshot cannot be built, returns ``has_baseline=False`` with an
+    explicit ``baseline_status`` -- never a silent empty "no change" delta.
     """
     code = _normalize_text(stock_code)
+    base_id = _normalize_record_id(base_record_id)
+    target_id = _normalize_record_id(target_record_id)
+
     if not code:
         return _empty_delta(
             stock_code=stock_code,
-            base_run_id=None,
-            target_run_id=None,
+            base_record_id=base_id,
+            target_record_id=target_id,
             baseline_status=BASELINE_INCOMPARABLE,
             baseline_reason="stock_code is required",
         )
+    if base_id is None or target_id is None:
+        return _empty_delta(
+            stock_code=code,
+            base_record_id=base_id,
+            target_record_id=target_id,
+            baseline_status=BASELINE_INCOMPARABLE,
+            baseline_reason="base_record_id and target_record_id must be positive integers",
+        )
+
+    base_record = _lookup_history_record(base_id)
+    if base_record is None:
+        return _empty_delta(
+            stock_code=code,
+            base_record_id=base_id,
+            target_record_id=target_id,
+            baseline_status=BASELINE_MISSING_BASE,
+            baseline_reason=f"base record not found for record_id={base_id}",
+        )
+
+    target_record = base_record if target_id == base_id else _lookup_history_record(target_id)
+    if target_record is None:
+        return _empty_delta(
+            stock_code=code,
+            base_record_id=base_id,
+            target_record_id=target_id,
+            base_query_id=_normalize_text(getattr(base_record, "query_id", None)),
+            report_type=_normalize_text(getattr(base_record, "report_type", None)),
+            baseline_status=BASELINE_MISSING_TARGET,
+            baseline_reason=f"target record not found for record_id={target_id}",
+        )
+
+    return _compare_records(
+        code,
+        base_record,
+        target_record,
+        base_record_id=base_id,
+        target_record_id=target_id,
+    )
+
+
+def get_latest_delta(stock_code: str, report_type: str) -> AnalysisDelta:
+    """
+    Compare the two most recent rows for one stock and one report type.
+
+    Rows are selected once with ``created_at DESC, id DESC`` and ``LIMIT 2``.
+    There is no age cutoff. The selected immutable row values are compared
+    directly, so concurrent inserts or deletes cannot redirect the comparison.
+    """
+    code = _normalize_text(stock_code)
+    normalized_report_type = _normalize_text(report_type)
+    if not code:
+        return _empty_delta(
+            stock_code=stock_code,
+            base_record_id=None,
+            target_record_id=None,
+            baseline_status=BASELINE_INCOMPARABLE,
+            baseline_reason="stock_code is required",
+        )
+    if not normalized_report_type:
+        return _empty_delta(
+            stock_code=code,
+            base_record_id=None,
+            target_record_id=None,
+            report_type=normalized_report_type,
+            baseline_status=BASELINE_INCOMPARABLE,
+            baseline_reason="report_type is required",
+        )
 
     db = _database_manager().get_instance()
-    # days window wide enough for typical re-analysis cadence; still only needs 2 rows.
-    records = db.get_analysis_history(code=code, days=365, limit=2)
+    records = db.get_analysis_history(
+        code=code,
+        report_type=normalized_report_type,
+        days=None,
+        limit=2,
+    )
     if not records:
         return _empty_delta(
             stock_code=code,
-            base_run_id=None,
-            target_run_id=None,
+            base_record_id=None,
+            target_record_id=None,
+            report_type=normalized_report_type,
             baseline_status=BASELINE_MISSING_HISTORY,
-            baseline_reason="no analysis history for stock",
+            baseline_reason="no analysis history for stock and report_type",
         )
     if len(records) < 2:
-        only_id = _normalize_text(getattr(records[0], "query_id", None))
+        only_record_id = _normalize_record_id(getattr(records[0], "id", None))
+        only_query_id = _normalize_text(getattr(records[0], "query_id", None))
         return _empty_delta(
             stock_code=code,
-            base_run_id=None,
-            target_run_id=only_id,
+            base_record_id=None,
+            target_record_id=only_record_id,
+            target_query_id=only_query_id,
+            report_type=normalized_report_type,
             baseline_status=BASELINE_MISSING_HISTORY,
             baseline_reason="only one analysis history row; no prior baseline",
         )
 
-    # get_analysis_history orders by created_at desc → [latest, previous, ...]
+    # Stable storage ordering returns [latest, previous]. Compare these rows directly.
     target_record, base_record = records[0], records[1]
-    target_id = _normalize_text(getattr(target_record, "query_id", None))
-    base_id = _normalize_text(getattr(base_record, "query_id", None))
-    if not target_id or not base_id:
+    target_id = _normalize_record_id(getattr(target_record, "id", None))
+    base_id = _normalize_record_id(getattr(base_record, "id", None))
+    if target_id is None or base_id is None:
         return _empty_delta(
             stock_code=code,
-            base_run_id=base_id,
-            target_run_id=target_id,
+            base_record_id=base_id,
+            target_record_id=target_id,
+            base_query_id=_normalize_text(getattr(base_record, "query_id", None)),
+            target_query_id=_normalize_text(getattr(target_record, "query_id", None)),
+            report_type=normalized_report_type,
             baseline_status=BASELINE_INCOMPARABLE,
-            baseline_reason="latest history rows missing query_id",
+            baseline_reason="latest history rows missing primary-key identity",
         )
-    return compare_analyses(code, base_id, target_id)
+    return _compare_records(
+        code,
+        base_record,
+        target_record,
+        base_record_id=base_id,
+        target_record_id=target_id,
+    )
 
 
 # Public surface for T17 / T18 consumers.
@@ -787,7 +1006,13 @@ __all__ = [
     "BASELINE_MISSING_TARGET",
     "BASELINE_OK",
     "ListChange",
+    "MAX_LIST_CHANGE_ITEMS",
+    "MAX_LIST_ITEM_LENGTH",
+    "UNAVAILABLE_INVALID_NUMBER",
+    "UNAVAILABLE_MISSING_VALUE",
+    "UNAVAILABLE_NON_FINITE_NUMBER",
     "ValueChange",
+    "ValueUnavailability",
     "compare_analyses",
     "get_latest_delta",
     "get_signal_changes",

@@ -4,7 +4,7 @@ import json
 import math
 from datetime import datetime
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, patch
 
 from src.services.history_comparison_service import (
@@ -13,8 +13,11 @@ from src.services.history_comparison_service import (
     BASELINE_MISSING_TARGET,
     BASELINE_OK,
     DIRECTION_CHANGED,
+    DIRECTION_DOWN,
     DIRECTION_UNAVAILABLE,
     DIRECTION_UP,
+    MAX_LIST_CHANGE_ITEMS,
+    MAX_LIST_ITEM_LENGTH,
     _diff_snapshots,
     _extract_comparable_snapshot,
     _finite_number,
@@ -26,6 +29,7 @@ from src.services.history_comparison_service import (
 
 def _record(**overrides: Any) -> SimpleNamespace:
     values = {
+        "id": 1,
         "created_at": datetime(2026, 7, 11, 9, 0),
         "query_id": "q1",
         "code": "600519",
@@ -124,7 +128,7 @@ def test_no_baseline_distinct_from_no_change() -> None:
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        no_baseline = get_latest_delta("600519")
+        no_baseline = get_latest_delta("600519", "stock")
 
     assert no_baseline.has_baseline is False
     assert no_baseline.baseline_status == BASELINE_MISSING_HISTORY
@@ -159,37 +163,38 @@ def test_no_baseline_distinct_from_no_change() -> None:
 def test_get_latest_delta_single_history_is_no_baseline() -> None:
     db = MagicMock()
     db.get_analysis_history.return_value = [
-        _record(query_id="only", raw_result=_raw_payload()),
+        _record(id=11, query_id="only", raw_result=_raw_payload()),
     ]
 
     with patch(
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        delta = get_latest_delta("600519")
+        delta = get_latest_delta("600519", "stock")
 
     assert delta.has_baseline is False
     assert delta.baseline_status == BASELINE_MISSING_HISTORY
-    assert delta.target_run_id == "only"
-    assert delta.base_run_id is None
+    assert delta.target_record_id == 11
+    assert delta.target_query_id == "only"
+    assert delta.base_record_id is None
 
 
 def test_compare_analyses_missing_base_or_target() -> None:
     db = MagicMock()
 
-    def _lookup(*, code: str, query_id: Optional[str] = None, **_kwargs: Any) -> List[Any]:
-        if query_id == "base":
-            return [_record(query_id="base", code=code, raw_result=_raw_payload())]
-        return []
+    def _lookup(record_id: int) -> Optional[Any]:
+        if record_id == 10:
+            return _record(id=10, query_id="base", raw_result=_raw_payload())
+        return None
 
-    db.get_analysis_history.side_effect = _lookup
+    db.get_analysis_history_by_id.side_effect = _lookup
 
     with patch(
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        missing_target = compare_analyses("600519", "base", "missing")
-        missing_base = compare_analyses("600519", "missing", "base")
+        missing_target = compare_analyses("600519", 10, 20)
+        missing_base = compare_analyses("600519", 20, 10)
 
     assert missing_target.has_baseline is False
     assert missing_target.baseline_status == BASELINE_MISSING_TARGET
@@ -199,6 +204,7 @@ def test_compare_analyses_missing_base_or_target() -> None:
 
 def test_compare_analyses_detects_dimension_changes() -> None:
     base = _record(
+        id=101,
         query_id="run-base",
         sentiment_score=50,
         operation_advice="Hold",
@@ -234,6 +240,7 @@ def test_compare_analyses_detects_dimension_changes() -> None:
         ),
     )
     target = _record(
+        id=102,
         query_id="run-target",
         sentiment_score=70,
         operation_advice="Buy",
@@ -278,26 +285,28 @@ def test_compare_analyses_detects_dimension_changes() -> None:
 
     db = MagicMock()
 
-    def _lookup(*, code: str, query_id: Optional[str] = None, **_kwargs: Any) -> List[Any]:
-        if query_id == "run-base":
-            return [base]
-        if query_id == "run-target":
-            return [target]
-        return []
+    def _lookup(record_id: int) -> Optional[Any]:
+        if record_id == 101:
+            return base
+        if record_id == 102:
+            return target
+        return None
 
-    db.get_analysis_history.side_effect = _lookup
+    db.get_analysis_history_by_id.side_effect = _lookup
 
     with patch(
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        delta = compare_analyses("600519", "run-base", "run-target")
+        delta = compare_analyses("600519", 101, 102)
 
     assert delta.has_baseline is True
     assert delta.baseline_status == BASELINE_OK
     assert delta.has_material_changes is True
-    assert delta.base_run_id == "run-base"
-    assert delta.target_run_id == "run-target"
+    assert delta.base_record_id == 101
+    assert delta.target_record_id == 102
+    assert delta.base_query_id == "run-base"
+    assert delta.target_query_id == "run-target"
 
     conclusion_by_field = {c.field: c for c in delta.conclusion_changes}
     assert conclusion_by_field["operation_advice"].direction == DIRECTION_CHANGED
@@ -329,6 +338,7 @@ def test_compare_analyses_detects_dimension_changes() -> None:
 
 def test_non_finite_numeric_is_not_forged_into_delta() -> None:
     base = _record(
+        id=201,
         query_id="b",
         stop_loss=100.0,
         sentiment_score=50,
@@ -343,6 +353,7 @@ def test_non_finite_numeric_is_not_forged_into_delta() -> None:
         ),
     )
     target = _record(
+        id=202,
         query_id="t",
         stop_loss=float("nan"),
         sentiment_score=float("inf"),
@@ -361,26 +372,29 @@ def test_non_finite_numeric_is_not_forged_into_delta() -> None:
 
     db = MagicMock()
 
-    def _lookup(*, code: str, query_id: Optional[str] = None, **_kwargs: Any) -> List[Any]:
-        if query_id == "b":
-            return [base]
-        if query_id == "t":
-            return [target]
-        return []
+    def _lookup(record_id: int) -> Optional[Any]:
+        if record_id == 201:
+            return base
+        if record_id == 202:
+            return target
+        return None
 
-    db.get_analysis_history.side_effect = _lookup
+    db.get_analysis_history_by_id.side_effect = _lookup
 
     with patch(
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        delta = compare_analyses("600519", "b", "t")
+        delta = compare_analyses("600519", 201, 202)
 
     assert delta.has_baseline is True
     by_field = {c.field: c for c in delta.conclusion_changes + delta.score_changes}
     assert by_field["stop_loss"].comparable is False
     assert by_field["stop_loss"].delta is None
     assert by_field["stop_loss"].direction == DIRECTION_UNAVAILABLE
+    assert by_field["stop_loss"].target_value is None
+    assert by_field["stop_loss"].unavailability is not None
+    assert by_field["stop_loss"].unavailability.target == "non_finite_number"
     assert by_field["sentiment_score"].comparable is False
     assert by_field["sentiment_score"].delta is None
     # Non-finite target trend_score must not produce a numeric delta.
@@ -388,16 +402,19 @@ def test_non_finite_numeric_is_not_forged_into_delta() -> None:
     assert by_field["dimension.trend_score"].delta is None
     assert by_field["dimension.trend_score"].direction == DIRECTION_UNAVAILABLE
     assert math.isfinite(by_field["stop_loss"].base_value)
+    json.dumps(delta.to_dict(), allow_nan=False)
 
 
 def test_get_latest_delta_uses_two_most_recent_runs() -> None:
     older = _record(
+        id=301,
         query_id="older",
         created_at=datetime(2026, 7, 10, 9, 0),
         sentiment_score=40,
         raw_result=_raw_payload(sentiment_score=40, operation_advice="Hold", action="hold"),
     )
     newer = _record(
+        id=302,
         query_id="newer",
         created_at=datetime(2026, 7, 11, 9, 0),
         sentiment_score=65,
@@ -409,44 +426,44 @@ def test_get_latest_delta_uses_two_most_recent_runs() -> None:
         ),
     )
     db = MagicMock()
-    # Storage returns newest first.
-    db.get_analysis_history.side_effect = [
-        [newer, older],  # get_latest_delta list
-        [older],  # compare base lookup
-        [newer],  # compare target lookup
-    ]
+    # Storage returns newest first; the service compares this exact pair directly.
+    db.get_analysis_history.return_value = [newer, older]
 
     with patch(
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        delta = get_latest_delta("600519")
+        delta = get_latest_delta("600519", "stock")
 
     assert delta.has_baseline is True
-    assert delta.base_run_id == "older"
-    assert delta.target_run_id == "newer"
+    assert delta.base_record_id == 301
+    assert delta.target_record_id == 302
+    assert delta.base_query_id == "older"
+    assert delta.target_query_id == "newer"
+    db.get_analysis_history_by_id.assert_not_called()
     score = next(c for c in delta.score_changes if c.field == "sentiment_score")
     assert score.delta == 25.0
     assert score.direction == DIRECTION_UP
 
 
 def test_analysis_delta_to_dict_shape() -> None:
-    base = _record(query_id="a", raw_result=_raw_payload(sentiment_score=10))
+    base = _record(id=401, query_id="a", raw_result=_raw_payload(sentiment_score=10))
     target = _record(
+        id=402,
         query_id="b",
         sentiment_score=20,
         raw_result=_raw_payload(sentiment_score=20),
     )
     db = MagicMock()
-    db.get_analysis_history.side_effect = lambda **kwargs: (
-        [base] if kwargs.get("query_id") == "a" else [target]
+    db.get_analysis_history_by_id.side_effect = lambda record_id: (
+        base if record_id == 401 else target if record_id == 402 else None
     )
 
     with patch(
         "src.services.history_comparison_service._database_manager",
         return_value=MagicMock(get_instance=MagicMock(return_value=db)),
     ):
-        payload = compare_analyses("600519", "a", "b").to_dict()
+        payload = compare_analyses("600519", 401, 402).to_dict()
 
     assert set(payload.keys()) >= {
         "has_baseline",
@@ -454,9 +471,165 @@ def test_analysis_delta_to_dict_shape() -> None:
         "score_changes",
         "evidence_changes",
         "risk_changes",
-        "base_run_id",
-        "target_run_id",
+        "base_record_id",
+        "target_record_id",
+        "base_query_id",
+        "target_query_id",
     }
     assert payload["has_baseline"] is True
-    assert payload["base_run_id"] == "a"
-    assert payload["target_run_id"] == "b"
+    assert payload["base_record_id"] == 401
+    assert payload["target_record_id"] == 402
+    assert payload["base_query_id"] == "a"
+    assert payload["target_query_id"] == "b"
+    assert json.loads(json.dumps(payload, allow_nan=False)) == payload
+
+
+def test_nested_dimension_score_preserves_zero_and_negative_values() -> None:
+    for value in (0, 0.0, "0", -3):
+        snapshot = _extract_comparable_snapshot(
+            _record(
+                id=501,
+                raw_result=_raw_payload(
+                    dashboard={
+                        "data_perspective": {"volume_status": {"score": value}},
+                    }
+                ),
+            )
+        )
+        assert snapshot is not None
+        assert snapshot["dimension_scores"]["volume_score"] == value
+
+    missing = _extract_comparable_snapshot(
+        _record(
+            id=502,
+            raw_result=_raw_payload(dashboard={"data_perspective": {"volume_status": {}}}),
+        )
+    )
+    assert missing is not None
+    assert "volume_score" not in missing["dimension_scores"]
+
+
+def test_real_five_to_zero_dimension_score_is_a_decrease() -> None:
+    base = _extract_comparable_snapshot(
+        _record(
+            id=511,
+            query_id="base",
+            raw_result=_raw_payload(
+                dashboard={
+                    "data_perspective": {"volume_status": {"score": 5}},
+                }
+            ),
+        )
+    )
+    target = _extract_comparable_snapshot(
+        _record(
+            id=512,
+            query_id="target",
+            raw_result=_raw_payload(
+                dashboard={
+                    "data_perspective": {"volume_status": {"score": 0}},
+                }
+            ),
+        )
+    )
+    assert base is not None and target is not None
+
+    change = next(
+        item
+        for item in _diff_snapshots(base, target).score_changes
+        if item.field == "dimension.volume_score"
+    )
+    assert change.base_value == 5.0
+    assert change.target_value == 0.0
+    assert change.delta == -5.0
+    assert change.direction == DIRECTION_DOWN
+
+
+def test_non_finite_dimension_zero_and_missing_reasons_are_strict_json_safe() -> None:
+    base = _extract_comparable_snapshot(
+        _record(
+            id=521,
+            query_id="base",
+            stop_loss=100.0,
+            sentiment_score=10,
+            raw_result=_raw_payload(
+                key_points=["base evidence"],
+                risk_warning=["base risk"],
+                dashboard={
+                    "data_perspective": {
+                        "volume_status": {"score": 0},
+                        "momentum_status": {"score": float("nan")},
+                    }
+                },
+            ),
+        )
+    )
+    target = _extract_comparable_snapshot(
+        _record(
+            id=522,
+            query_id="target",
+            stop_loss=float("inf"),
+            sentiment_score=20,
+            raw_result=_raw_payload(
+                key_points=["target evidence"],
+                risk_warning=["target risk"],
+                dashboard={
+                    "data_perspective": {
+                        "volume_status": {"score": -1},
+                        "momentum_status": {"score": float("-inf")},
+                    }
+                },
+            ),
+        )
+    )
+    assert base is not None and target is not None
+
+    payload = _diff_snapshots(base, target).to_dict()
+    assert payload["conclusion_changes"]
+    assert payload["score_changes"]
+    assert payload["evidence_changes"]
+    assert payload["risk_changes"]
+    stop_loss = next(
+        item for item in payload["conclusion_changes"] if item["field"] == "stop_loss"
+    )
+    assert stop_loss["target_value"] is None
+    assert stop_loss["unavailability"]["target"] == "non_finite_number"
+    momentum = next(
+        item
+        for item in payload["score_changes"]
+        if item["field"] == "dimension.momentum_score"
+    )
+    assert momentum["base_value"] is None
+    assert momentum["target_value"] is None
+    assert momentum["unavailability"] == {
+        "base": "non_finite_number",
+        "target": "non_finite_number",
+    }
+    assert json.loads(json.dumps(payload, allow_nan=False)) == payload
+
+
+def test_list_change_output_is_bounded_and_reports_omitted_details() -> None:
+    long_suffix = "x" * (MAX_LIST_ITEM_LENGTH + 50)
+    base = _extract_comparable_snapshot(
+        _record(id=531, query_id="base", raw_result=_raw_payload(key_points=[]))
+    )
+    target = _extract_comparable_snapshot(
+        _record(
+            id=532,
+            query_id="target",
+            raw_result=_raw_payload(
+                key_points=[f"item-{index:03d}-{long_suffix}" for index in range(105)]
+            ),
+        )
+    )
+    assert base is not None and target is not None
+
+    change = next(
+        item
+        for item in _diff_snapshots(base, target).evidence_changes
+        if item.field == "key_points"
+    )
+    assert len(change.added) == MAX_LIST_CHANGE_ITEMS
+    assert change.added_total == 105
+    assert change.output_truncated is True
+    assert all(len(item) <= MAX_LIST_ITEM_LENGTH for item in change.added)

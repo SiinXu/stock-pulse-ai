@@ -20,8 +20,8 @@ flowchart TD
   H --> I[9 Optional strategy synthesis]
 ```
 
-> **Service note (delta vs prior run)**  
-> Backend history comparison can compute a deterministic field-level delta between two stored runs (`compare_analyses` / `get_latest_delta`). See [Analysis Delta Comparison](../analysis-delta-comparison.md). Web “since last analysis” presentation is a separate UI task; when only one history row exists the service returns **no baseline**, not “no change.”
+> **Service note (delta vs prior history version)**
+> Backend history comparison can compute a deterministic field-level delta between two stored versions (`compare_analyses` / `get_latest_delta`). Versions use unique history-record ids; the non-unique query id remains correlation metadata. Latest comparison stays within an explicit report type and has no hidden age cutoff. See [Analysis Delta Comparison](../analysis-delta-comparison.md). Web “since last analysis” presentation is a separate UI task; when only one matching history row exists the service returns **no baseline**, not “no change.”
 
 | Step | What | Concepts | Plain meaning |
 | --- | --- | --- | --- |

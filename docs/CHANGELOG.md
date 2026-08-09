@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Analysis history comparison service exposes deterministic `compare_analyses` / `get_latest_delta` deltas (conclusion, scores, evidence, risks) with explicit no-baseline status distinct from no-change (#148).
+- [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
 - [Fixed] Ensure the `web-gate` check always concludes on pull requests, reports successful no-frontend runs, and fails closed when change detection is unavailable.
 - [Fixed] Shared ScrollArea no longer applies touch-pan-y, restoring pinch-to-zoom inside chat and history rails while keeping the min-h-0 height chain.
 - [Fixed] Treat non-finite numbers (±Infinity) as missing values in marketFormat price and change-color guards so sentinel/overflow inputs never render as prices or paint as up/down moves.
