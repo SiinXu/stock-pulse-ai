@@ -16,6 +16,7 @@ _SUPPORTED_MARKET_NAMES = {
     "cn": "A 股 (CN) / A-share",
     "hk": "港股 (HK) / Hong Kong",
     "us": "美股 (US) / US stock",
+    "crypto": "加密资产 (Crypto) / crypto asset",
 }
 
 _OTHER_MARKET_NAMES = {
@@ -28,7 +29,8 @@ _SUPPORTED_FORMATS_MESSAGE = (
     "支持格式 / Supported formats: "
     "A 股/A-share `600519`; "
     "港股/Hong Kong `HK00700` or `00700.HK`; "
-    "美股/US `AAPL`."
+    "美股/US `AAPL`; "
+    "加密资产/Crypto `crypto:BTC`."
 )
 
 
@@ -62,7 +64,7 @@ def is_recognized_stock_symbol(value: str) -> bool:
 
 
 def parse_bot_stock_symbol(value: str) -> BotStockSymbol:
-    """Validate and canonicalize an A-share, Hong Kong, or US symbol.
+    """Validate and canonicalize an A-share, Hong Kong, US, or crypto symbol.
 
     Formatting and market detection stay authoritative in the shared helpers.
     This module only applies the Bot capability boundary and public guidance.

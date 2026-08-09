@@ -1,42 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Crypto market data via CoinGecko public API (Issue #236 / T13).
-
-Design choices
---------------
-* Market modeling: **Plan A** — ``crypto`` is a first-class value in
-  ``DATA_PROVIDER_MARKETS`` so the existing ``DataProvider`` contract is reused.
-  Equity providers do not declare the crypto market and are filtered out.
-* Symbol namespace: only ``crypto:TICKER`` is accepted. Bare ``BTC`` / ``ETH``
-  remain equity candidates so they never auto-resolve to crypto.
-* Free default stack: CoinGecko public REST endpoints need no API key for the
-  basic OHLC / simple-price paths used here (rate-limited; optional demo key
-  via ``COINGECKO_API_KEY`` when the operator upgrades).
-* 24×7 bar definition: daily OHLC bars are **UTC calendar days**. ``pre_close``
-  is the previous UTC daily close; ``open`` is the current UTC day's open from
-  the latest completed/in-progress daily candle returned by CoinGecko OHLC.
-* Equity-only capabilities (limit-up pool, A-share chip distribution, PE/PB
-  fundamentals) are intentionally unsupported and return empty/None rather
-  than stock-shaped placeholders.
-
-Manager wiring
---------------
-``DataFetcherManager`` initialization lives in ``data_provider/base.py``
-(owned by a parallel task). This module is self-contained: call
-:func:`attach_crypto_provider` or register
-:func:`build_crypto_provider_registration` after the manager exists. See the
-PR Integration Point.
-"""
+"""CoinGecko market data for explicit, allowlisted ``crypto:`` identities."""
 
 from __future__ import annotations
 
-import logging
-import os
-from datetime import datetime, timezone
-from typing import Any, Dict, Mapping, Optional
+import math
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, Mapping, Optional
+from urllib.parse import urlsplit
 
 import pandas as pd
 import requests
 
+from src.security.outbound_policy import OutboundPolicyError, safe_get
 from src.utils.sanitize import log_safe_exception
 
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS
@@ -49,165 +25,278 @@ from .symbol_normalization import (
     parse_crypto_symbol,
 )
 
+import logging
+
 logger = logging.getLogger(__name__)
 
-_COINGECKO_API_BASE = "https://api.coingecko.com/api/v3"
+_DEMO_API_BASE = "https://api.coingecko.com/api/v3"
+_PRO_API_BASE = "https://pro-api.coingecko.com/api/v3"
+_OFFICIAL_AUTH_ORIGINS = {
+    "demo": "api.coingecko.com",
+    "pro": "pro-api.coingecko.com",
+}
+_MAX_ATTEMPTS = 3
+_MAX_RETRY_DELAY_SECONDS = 2.0
 
-# Common tickers → CoinGecko coin ids. Unknown tickers fall back to lower-case
-# id form (e.g. crypto:solana → "solana") so operators can pass CoinGecko ids
-# directly after the namespace prefix.
+# Versioned MVP identity catalog. Unknown ticker text is rejected because ticker
+# symbols are not globally unique or durable provider identifiers.
+SUPPORTED_CRYPTO_ASSETS_VERSION = "2026-08-09"
 _TICKER_TO_COINGECKO_ID: Dict[str, str] = {
-    "BTC": "bitcoin",
-    "ETH": "ethereum",
-    "SOL": "solana",
-    "BNB": "binancecoin",
-    "XRP": "ripple",
-    "ADA": "cardano",
-    "DOGE": "dogecoin",
-    "DOT": "polkadot",
-    "AVAX": "avalanche-2",
-    "LINK": "chainlink",
-    "MATIC": "matic-network",
-    "POL": "polygon-ecosystem-token",
-    "LTC": "litecoin",
-    "BCH": "bitcoin-cash",
-    "ATOM": "cosmos",
-    "UNI": "uniswap",
-    "NEAR": "near",
-    "APT": "aptos",
-    "ARB": "arbitrum",
-    "OP": "optimism",
-    "SUI": "sui",
-    "TRX": "tron",
-    "TON": "the-open-network",
-    "SHIB": "shiba-inu",
-    "PEPE": "pepe",
-    "WIF": "dogwifcoin",
+    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+    "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
+    "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
+    "LINK": "chainlink", "POL": "polygon-ecosystem-token", "LTC": "litecoin",
+    "BCH": "bitcoin-cash", "ATOM": "cosmos", "UNI": "uniswap",
+    "NEAR": "near", "APT": "aptos", "ARB": "arbitrum", "OP": "optimism",
+    "SUI": "sui", "TRX": "tron", "TON": "the-open-network",
+    "SHIB": "shiba-inu", "PEPE": "pepe", "WIF": "dogwifcoin",
 }
 
 
 def ticker_to_coingecko_id(ticker: str) -> str:
-    """Map a crypto ticker or CoinGecko id fragment to a CoinGecko coin id."""
+    """Resolve one supported ticker to its immutable CoinGecko ID."""
     key = (ticker or "").strip().upper()
     if not key:
         raise ValueError("crypto ticker is empty")
-    mapped = _TICKER_TO_COINGECKO_ID.get(key)
-    if mapped:
-        return mapped
-    # Allow explicit CoinGecko ids: crypto:bitcoin, crypto:avalanche-2
-    return (ticker or "").strip().lower()
-
-
-def _clamp_ohlc_days(start_date: str, end_date: str) -> int:
-    """CoinGecko OHLC accepts discrete day windows; pick the smallest covering window."""
     try:
-        start = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end = datetime.strptime(end_date, "%Y-%m-%d").date()
-        span = max((end - start).days + 1, 1)
-    except ValueError:
-        span = 30
-    for candidate in (1, 7, 14, 30, 90, 180, 365):
-        if span <= candidate:
-            return candidate
-    return 365
+        return _TICKER_TO_COINGECKO_ID[key]
+    except KeyError:
+        raise ValueError(
+            f"unsupported crypto asset {key!r}; catalog={SUPPORTED_CRYPTO_ASSETS_VERSION}"
+        ) from None
+
+
+def _finite_float(value: Any, *, positive: bool = False, nonnegative: bool = False) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("numeric value is invalid") from None
+    if not math.isfinite(parsed):
+        raise ValueError("numeric value must be finite")
+    if positive and parsed <= 0:
+        raise ValueError("numeric value must be positive")
+    if nonnegative and parsed < 0:
+        raise ValueError("numeric value must be nonnegative")
+    return parsed
+
+
+def _parse_requested_dates(start_date: str, end_date: str) -> tuple[datetime, datetime]:
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        end = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        raise DataFetchError("crypto date range must use YYYY-MM-DD") from None
+    if end < start:
+        raise DataFetchError("crypto end_date must not precede start_date")
+    return start, end
 
 
 class CryptoCoingeckoFetcher(BaseFetcher):
-    """CoinGecko-backed crypto daily/realtime provider (crypto market only)."""
+    """CoinGecko provider restricted to the explicit crypto market."""
 
     name = "CryptoCoingeckoFetcher"
-    priority = int(os.getenv("CRYPTO_COINGECKO_PRIORITY", "10"))
+    priority = 10
 
     def __init__(
         self,
         *,
+        config: Any = None,
         api_base: str | None = None,
         session: requests.Session | None = None,
         api_key: str | None = None,
+        api_plan: str | None = None,
+        sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
-        self._api_base = (api_base or os.getenv("COINGECKO_API_BASE") or _COINGECKO_API_BASE).rstrip(
-            "/"
-        )
-        self._session = session or requests.Session()
-        self._api_key = (
-            api_key
-            if api_key is not None
-            else (os.getenv("COINGECKO_API_KEY") or "").strip() or None
-        )
+        if config is None:
+            from src.config import get_config
+            config = get_config()
+        self.priority = int(getattr(config, "crypto_coingecko_priority", 10))
+        if self.priority < 0 or self.priority > 99:
+            raise ValueError("crypto CoinGecko priority must be between 0 and 99")
 
-    # ------------------------------------------------------------------
-    # Symbol gates
-    # ------------------------------------------------------------------
+        plan = (api_plan or getattr(config, "coingecko_api_plan", "keyless") or "keyless").strip().lower()
+        if plan not in {"keyless", "demo", "pro"}:
+            raise ValueError("CoinGecko API plan must be keyless, demo, or pro")
+        key = api_key if api_key is not None else getattr(config, "coingecko_api_key", None)
+        key = str(key or "").strip() or None
+        configured_base = api_base or getattr(config, "coingecko_api_base", None)
+        default_base = _PRO_API_BASE if plan == "pro" else _DEMO_API_BASE
+        base = str(configured_base or default_base).rstrip("/")
+        parsed_base = urlsplit(base)
+        if parsed_base.scheme != "https" or not parsed_base.hostname:
+            raise ValueError("CoinGecko API base must be an absolute HTTPS URL")
+        if (parsed_base.query or parsed_base.fragment or parsed_base.username or parsed_base.password):
+            raise ValueError("CoinGecko API base must not contain credentials, query, or fragment")
+        if plan in {"demo", "pro"}:
+            if not key:
+                raise ValueError(f"CoinGecko {plan} plan requires an API key")
+            if parsed_base.hostname.lower() != _OFFICIAL_AUTH_ORIGINS[plan]:
+                raise ValueError("CoinGecko credentials may only be sent to the matching official origin")
+        elif key:
+            raise ValueError("CoinGecko keyless plan must not configure an API key")
+
+        self._api_base = base
+        self._api_plan = plan
+        self._api_key = key
+        self._session = session
+        self._sleeper = sleeper
+        self._cooldown_until = 0.0
+
     def _require_crypto_code(self, stock_code: str) -> str:
         normalized = normalize_crypto_symbol(stock_code)
         if normalized is None:
             raise DataFetchError(
-                f"[{self.name}] {stock_code!r} is not a crypto-namespaced symbol; "
-                f"use {CRYPTO_NAMESPACE_PREFIX}TICKER (e.g. crypto:BTC)"
+                f"[{self.name}] use {CRYPTO_NAMESPACE_PREFIX}TICKER (for example crypto:BTC)"
             )
+        ticker = parse_crypto_symbol(normalized)
+        assert ticker is not None
+        try:
+            ticker_to_coingecko_id(ticker)
+        except ValueError as exc:
+            raise DataFetchError(f"[{self.name}] {exc}") from exc
         return normalized
 
     def _coin_id_for_code(self, stock_code: str) -> str:
         normalized = self._require_crypto_code(stock_code)
         ticker = parse_crypto_symbol(normalized)
-        assert ticker is not None  # guarded by _require_crypto_code
+        assert ticker is not None
         return ticker_to_coingecko_id(ticker)
 
-    # ------------------------------------------------------------------
-    # HTTP
-    # ------------------------------------------------------------------
-    def _request_json(self, path: str, params: Optional[Mapping[str, Any]] = None) -> Any:
-        url = f"{self._api_base}{path}"
-        query: Dict[str, Any] = dict(params or {})
-        headers: Dict[str, str] = {"Accept": "application/json"}
-        if self._api_key:
-            # CoinGecko demo/pro keys use x-cg-demo-api-key / x-cg-pro-api-key.
-            # Demo header is the low-friction paid tier; free public works without.
+    def _headers(self) -> Dict[str, str]:
+        headers = {"Accept": "application/json"}
+        if self._api_plan == "demo" and self._api_key:
             headers["x-cg-demo-api-key"] = self._api_key
-        try:
-            self.random_sleep(0.2, 0.5)
-            response = self._session.get(url, params=query, headers=headers, timeout=20)
-            response.raise_for_status()
-            return response.json()
-        except (requests.RequestException, ValueError, TypeError) as exc:
-            raise DataFetchError(f"[{self.name}] HTTP request failed for {path}: {exc}") from exc
+        elif self._api_plan == "pro" and self._api_key:
+            headers["x-cg-pro-api-key"] = self._api_key
+        return headers
 
-    # ------------------------------------------------------------------
-    # Daily data
-    # ------------------------------------------------------------------
+    def _request_json(self, path: str, params: Optional[Mapping[str, Any]] = None) -> Any:
+        if not path.startswith("/"):
+            raise DataFetchError(f"[{self.name}] request path is invalid")
+        last_error = "request failed"
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                response = safe_get(
+                    f"{self._api_base}{path}",
+                    params=dict(params or {}),
+                    headers=self._headers(),
+                    timeout=20,
+                    max_response_bytes=4 * 1024 * 1024,
+                    allow_redirects=False,
+                    transport=self._session,
+                )
+                if 300 <= int(response.status_code) < 400:
+                    raise DataFetchError("CoinGecko redirects are not accepted")
+                if response.status_code == 429:
+                    retry_after_raw = response.headers.get("Retry-After")
+                    try:
+                        retry_after = float(retry_after_raw) if retry_after_raw else 2 ** attempt
+                    except (TypeError, ValueError):
+                        retry_after = 2 ** attempt
+                    delay = max(0.0, min(retry_after, _MAX_RETRY_DELAY_SECONDS))
+                    self._cooldown_until = time.monotonic() + delay
+                    last_error = "rate_limited"
+                    if attempt + 1 < _MAX_ATTEMPTS:
+                        self._sleeper(delay)
+                        continue
+                    break
+                response.raise_for_status()
+                payload = response.json()
+                self._cooldown_until = 0.0
+                return payload
+            except OutboundPolicyError as exc:
+                raise DataFetchError(f"[{self.name}] {exc}") from exc
+            except (requests.RequestException, ValueError, TypeError) as exc:
+                last_error = str(exc)
+                if attempt + 1 < _MAX_ATTEMPTS:
+                    delay = min(2 ** attempt, _MAX_RETRY_DELAY_SECONDS)
+                    self._cooldown_until = time.monotonic() + delay
+                    self._sleeper(delay)
+                    continue
+        raise DataFetchError(f"[{self.name}] HTTP request failed for {path}: {last_error}")
+
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         coin_id = self._coin_id_for_code(stock_code)
-        days = _clamp_ohlc_days(start_date, end_date)
+        start, end = _parse_requested_dates(start_date, end_date)
+        end_exclusive = end + timedelta(days=1)
         payload = self._request_json(
-            f"/coins/{coin_id}/ohlc",
-            params={"vs_currency": "usd", "days": days},
+            f"/coins/{coin_id}/market_chart/range",
+            params={
+                "vs_currency": "usd",
+                "from": int(start.timestamp()),
+                "to": int(end_exclusive.timestamp()) - 1,
+            },
         )
-        if not isinstance(payload, list) or not payload:
-            raise DataFetchError(f"[{self.name}] No OHLC data for {stock_code} ({coin_id})")
-        return pd.DataFrame(payload, columns=["ts", "open", "high", "low", "close"])
+        if not isinstance(payload, dict) or not isinstance(payload.get("prices"), list):
+            raise DataFetchError(f"[{self.name}] malformed range response for {stock_code}")
+        volume_by_ts: Dict[int, float] = {}
+        for item in payload.get("total_volumes") or []:
+            if isinstance(item, list) and len(item) >= 2:
+                try:
+                    volume_by_ts[int(item[0])] = _finite_float(item[1], nonnegative=True)
+                except (TypeError, ValueError):
+                    continue
+        rows = []
+        for item in payload["prices"]:
+            if not isinstance(item, list) or len(item) < 2:
+                continue
+            try:
+                ts = int(item[0])
+                price = _finite_float(item[1], positive=True)
+                observed = datetime.fromtimestamp(ts / 1000.0, tz=timezone.utc)
+            except (OSError, OverflowError, TypeError, ValueError):
+                continue
+            if start <= observed < end_exclusive:
+                rows.append({"ts": ts, "price": price, "usd_value_24h": volume_by_ts.get(ts)})
+        if not rows:
+            raise DataFetchError(f"[{self.name}] no observations in requested UTC range")
+        return pd.DataFrame(rows)
 
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         if df is None or df.empty:
             return pd.DataFrame(columns=STANDARD_COLUMNS)
-
-        out = df.copy()
-        # CoinGecko OHLC timestamps are milliseconds since epoch (UTC).
-        out["date"] = pd.to_datetime(out["ts"], unit="ms", utc=True).dt.tz_convert(None).dt.date
+        out = df.copy().sort_values("ts").drop_duplicates("ts", keep="last")
+        out["observed_at"] = pd.to_datetime(out["ts"], unit="ms", utc=True)
+        out["date"] = out["observed_at"].dt.date
+        daily = out.groupby("date", sort=True).agg(
+            open=("price", "first"), high=("price", "max"), low=("price", "min"),
+            close=("price", "last"), amount=("usd_value_24h", "last"),
+            close_timestamp=("observed_at", "last"), observation_count=("price", "size"),
+        ).reset_index()
         for column in ("open", "high", "low", "close"):
-            out[column] = pd.to_numeric(out[column], errors="coerce")
-        out = out.dropna(subset=["open", "high", "low", "close"])
-        out["volume"] = 0.0  # OHLC endpoint has no volume; do not invent values
-        out["amount"] = out["volume"] * out["close"]
-        out["pct_chg"] = out["close"].pct_change() * 100.0
-        out["pct_chg"] = out["pct_chg"].fillna(0.0).round(2)
-        out["code"] = normalize_crypto_symbol(stock_code) or stock_code
+            daily[column] = daily[column].map(lambda value: _finite_float(value, positive=True))
+        invalid = (
+            (daily["high"] < daily[["open", "close"]].max(axis=1))
+            | (daily["low"] > daily[["open", "close"]].min(axis=1))
+            | (daily["high"] < daily["low"])
+        )
+        if bool(invalid.any()) or daily["date"].duplicated().any():
+            raise DataFetchError(f"[{self.name}] invalid UTC daily OHLC invariants")
+        daily["volume"] = 0.0
+        daily["amount"] = (
+            pd.to_numeric(daily["amount"], errors="coerce")
+            .replace([float("inf"), float("-inf")], pd.NA)
+            .fillna(0.0)
+        )
+        daily["pct_chg"] = daily["close"].pct_change().mul(100).fillna(0.0).round(2)
+        daily["code"] = self._require_crypto_code(stock_code)
+        daily["market"] = "crypto"
+        daily["currency"] = "USD"
+        daily["source"] = "coingecko"
+        daily["granularity"] = "utc_calendar_day"
+        current_utc_date = datetime.now(timezone.utc).date()
+        daily["completeness"] = daily["date"].map(
+            lambda value: "in_progress" if value == current_utc_date else "complete_utc_day"
+        )
+        daily["amount_period"] = "provider_total_volume_sample"
+        daily["volume_unit"] = "unavailable"
+        daily["close_timestamp"] = daily["close_timestamp"].map(lambda value: value.isoformat())
+        keep = ["code"] + STANDARD_COLUMNS + [
+            "market", "currency", "source", "granularity", "completeness",
+            "close_timestamp", "observation_count", "amount_period", "volume_unit",
+        ]
+        return daily[[column for column in keep if column in daily.columns]]
 
-        keep = ["code"] + STANDARD_COLUMNS
-        return out[[col for col in keep if col in out.columns]]
-
-    # ------------------------------------------------------------------
-    # Realtime + name
-    # ------------------------------------------------------------------
     def get_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         if not is_crypto_symbol(stock_code):
             return None
@@ -216,142 +305,61 @@ class CryptoCoingeckoFetcher(BaseFetcher):
             coin_id = self._coin_id_for_code(normalized)
             payload = self._request_json(
                 "/simple/price",
-                params={
-                    "ids": coin_id,
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true",
-                    "include_24hr_vol": "true",
-                    "include_last_updated_at": "true",
-                },
+                params={"ids": coin_id, "vs_currencies": "usd", "include_24hr_change": "true",
+                        "include_24hr_vol": "true", "include_last_updated_at": "true"},
             )
-        except DataFetchError as exc:
-            log_safe_exception(
-                logger,
-                "CoinGecko realtime quote failed",
-                exc,
-                error_code="crypto_coingecko_realtime_failed",
-                level=logging.WARNING,
-                context={"symbol": stock_code},
-            )
+            row = payload.get(coin_id) if isinstance(payload, dict) else None
+            if not isinstance(row, dict):
+                return None
+            price = _finite_float(row.get("usd"), positive=True)
+            change = None if row.get("usd_24h_change") is None else _finite_float(row["usd_24h_change"])
+            amount = None if row.get("usd_24h_vol") is None else _finite_float(row["usd_24h_vol"], nonnegative=True)
+            updated = int(_finite_float(row.get("last_updated_at"), positive=True))
+            provider_timestamp = datetime.fromtimestamp(updated, tz=timezone.utc).isoformat()
+        except (DataFetchError, OSError, OverflowError, TypeError, ValueError) as exc:
+            log_safe_exception(logger, "CoinGecko realtime quote failed", exc,
+                               error_code="crypto_coingecko_realtime_failed", level=logging.WARNING,
+                               context={"symbol": stock_code})
             return None
-
-        if not isinstance(payload, dict):
-            return None
-        row = payload.get(coin_id)
-        if not isinstance(row, dict):
-            return None
-        price = row.get("usd")
-        if price is None:
-            return None
-        try:
-            price_f = float(price)
-        except (TypeError, ValueError):
-            return None
-        if price_f <= 0:
-            return None
-
-        change_pct = row.get("usd_24h_change")
-        volume = row.get("usd_24h_vol")
-        try:
-            change_pct_f = float(change_pct) if change_pct is not None else None
-        except (TypeError, ValueError):
-            change_pct_f = None
-        try:
-            volume_f = float(volume) if volume is not None else None
-        except (TypeError, ValueError):
-            volume_f = None
-
-        # 24×7 definition: pre_close is implied by 24h change against current price.
-        pre_close = None
-        if change_pct_f is not None and change_pct_f != -100.0:
-            pre_close = price_f / (1.0 + change_pct_f / 100.0)
-
+        missing = [field for field, value in {"asset_volume": None, "previous_utc_close": None}.items() if value is None]
         return UnifiedRealtimeQuote(
-            code=normalized,
-            source=RealtimeSource.FALLBACK,
-            price=price_f,
-            change_pct=round(change_pct_f, 2) if change_pct_f is not None else None,
-            change_amount=(
-                round(price_f - pre_close, 6) if pre_close is not None else None
-            ),
-            volume=volume_f,
-            amount=None,
-            volume_ratio=None,
-            turnover_rate=None,
-            amplitude=None,
-            open_price=None,  # CoinGecko simple price has no session open
-            high=None,
-            low=None,
-            pre_close=round(pre_close, 6) if pre_close is not None else None,
+            code=normalized, source=RealtimeSource.COINGECKO, price=price,
+            change_pct=round(change, 2) if change is not None else None,
+            change_amount=None, volume=None, amount=amount, pre_close=None,
+            provider_timestamp=provider_timestamp, market="crypto", currency="USD",
+            data_quality="partial", missing_fields=missing,
+            granularity="realtime", amount_period="rolling_24h",
         )
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         if not is_crypto_symbol(stock_code):
             return None
-        try:
-            coin_id = self._coin_id_for_code(stock_code)
-            payload = self._request_json(
-                f"/coins/{coin_id}",
-                params={
-                    "localization": "false",
-                    "tickers": "false",
-                    "market_data": "false",
-                    "community_data": "false",
-                    "developer_data": "false",
-                    "sparkline": "false",
-                },
-            )
-        except DataFetchError as exc:
-            log_safe_exception(
-                logger,
-                "CoinGecko coin name lookup failed",
-                exc,
-                error_code="crypto_coingecko_name_failed",
-                level=logging.DEBUG,
-                context={"symbol": stock_code},
-            )
-            return None
-        if not isinstance(payload, dict):
-            return None
-        name = payload.get("name")
-        if isinstance(name, str) and name.strip():
-            return name.strip()
-        return None
+        normalized = self._require_crypto_code(stock_code)
+        ticker = parse_crypto_symbol(normalized)
+        assert ticker is not None
+        return ticker
 
-    def get_limit_up_pool(
-        self,
-        date: Optional[str] = None,
-        n: int = 20,
-    ) -> Optional[list]:
-        """Crypto has no limit-up regime; always empty rather than stock-shaped data."""
+    def get_limit_up_pool(self, date: Optional[str] = None, n: int = 20) -> Optional[list]:
         del date, n
         return []
 
     def is_available_for_request(self, capability: str = "") -> bool:
         del capability
-        return True
+        return time.monotonic() >= self._cooldown_until
 
 
-def build_crypto_provider_registration() -> DataProviderRegistration:
-    """Build a plugin registration for the crypto CoinGecko provider."""
+def build_crypto_provider_registration(*, config: Any = None) -> DataProviderRegistration:
     return DataProviderRegistration(
         provider_id="crypto_coingecko",
-        factory=CryptoCoingeckoFetcher,
+        factory=lambda: CryptoCoingeckoFetcher(config=config),
         markets=frozenset({"crypto"}),
         capabilities=frozenset({"daily_data", "realtime_quote", "stock_name"}),
     )
 
 
-def attach_crypto_provider(manager: Any) -> CryptoCoingeckoFetcher:
-    """Attach the crypto provider to an existing ``DataFetcherManager``.
-
-    Integration Point (after parallel-batch ownership of ``base.py`` clears)::
-
-        from data_provider.crypto_coingecko_fetcher import attach_crypto_provider
-        if os.getenv("CRYPTO_PROVIDER_ENABLED", "").strip().lower() in {"1", "true", "yes"}:
-            attach_crypto_provider(self)
-    """
-    fetcher = CryptoCoingeckoFetcher()
+def attach_crypto_provider(manager: Any, *, config: Any = None) -> CryptoCoingeckoFetcher:
+    """Compatibility helper; production registration uses the declared plugin contract."""
+    fetcher = CryptoCoingeckoFetcher(config=config)
     add = getattr(manager, "add_fetcher", None)
     if not callable(add):
         raise TypeError("manager must provide add_fetcher(fetcher)")
@@ -360,14 +368,11 @@ def attach_crypto_provider(manager: Any) -> CryptoCoingeckoFetcher:
 
 
 def utc_now_iso() -> str:
-    """Helper for diagnostics (UTC clock; crypto has no exchange session close)."""
     return datetime.now(timezone.utc).isoformat()
 
 
 __all__ = [
-    "CryptoCoingeckoFetcher",
-    "attach_crypto_provider",
-    "build_crypto_provider_registration",
-    "ticker_to_coingecko_id",
-    "utc_now_iso",
+    "CryptoCoingeckoFetcher", "SUPPORTED_CRYPTO_ASSETS_VERSION",
+    "attach_crypto_provider", "build_crypto_provider_registration",
+    "ticker_to_coingecko_id", "utc_now_iso",
 ]

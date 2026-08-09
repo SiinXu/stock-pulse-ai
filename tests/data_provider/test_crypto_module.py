@@ -137,10 +137,28 @@ def _ohlc_fixture() -> list[list[float]]:
     ]
 
 
+def _market_chart_fixture() -> dict[str, list[list[float]]]:
+    return {
+        "prices": [
+            [1_704_067_200_000, 42000.0],
+            [1_704_110_400_000, 43000.0],
+            [1_704_153_600_000, 42500.0],
+            [1_704_196_800_000, 43200.0],
+        ],
+        "total_volumes": [
+            [1_704_067_200_000, 1.0e9],
+            [1_704_110_400_000, 1.1e9],
+            [1_704_153_600_000, 1.2e9],
+            [1_704_196_800_000, 1.3e9],
+        ],
+    }
+
+
 def test_ticker_to_coingecko_id_mapping() -> None:
     assert ticker_to_coingecko_id("BTC") == "bitcoin"
     assert ticker_to_coingecko_id("ETH") == "ethereum"
-    assert ticker_to_coingecko_id("bitcoin") == "bitcoin"
+    with pytest.raises(ValueError, match="unsupported crypto asset"):
+        ticker_to_coingecko_id("bitcoin")
 
 
 def test_fetcher_rejects_non_crypto_symbols() -> None:
@@ -154,7 +172,9 @@ def test_fetcher_normalizes_ohlc_fixture_offline() -> None:
     session = MagicMock()
     response = MagicMock()
     response.raise_for_status = MagicMock()
-    response.json.return_value = _ohlc_fixture()
+    response.status_code = 200
+    response.headers = {}
+    response.json.return_value = _market_chart_fixture()
     session.get.return_value = response
 
     fetcher = CryptoCoingeckoFetcher(session=session)
@@ -169,24 +189,30 @@ def test_fetcher_normalizes_ohlc_fixture_offline() -> None:
     assert not df.empty
     for column in ("date", "open", "high", "low", "close", "volume", "amount", "pct_chg"):
         assert column in df.columns
-    assert len(df) >= 2
+    assert len(df) == 2
     assert float(df.iloc[-1]["close"]) == pytest.approx(43200.0)
-    # Volume is explicitly zero when CoinGecko OHLC has none (no fabrication).
-    assert (pd.to_numeric(df["volume"], errors="coerce") >= 0).all()
+    assert (pd.to_numeric(df["volume"], errors="coerce") == 0).all()
+    assert set(df["granularity"]) == {"utc_calendar_day"}
+    assert set(df["currency"]) == {"USD"}
     called_url = session.get.call_args.args[0]
     assert "bitcoin" in called_url
-    assert "ohlc" in called_url
+    assert "market_chart/range" in called_url
+    assert session.get.call_args.kwargs["params"]["from"] == 1_704_067_200
+    assert session.get.call_args.kwargs["params"]["to"] == 1_704_931_199
 
 
 def test_fetcher_realtime_quote_offline() -> None:
     session = MagicMock()
     response = MagicMock()
     response.raise_for_status = MagicMock()
+    response.status_code = 200
+    response.headers = {}
     response.json.return_value = {
         "bitcoin": {
             "usd": 50000.0,
             "usd_24h_change": 2.5,
             "usd_24h_vol": 1.2e9,
+            "last_updated_at": 1_704_067_200,
         }
     }
     session.get.return_value = response
@@ -198,8 +224,13 @@ def test_fetcher_realtime_quote_offline() -> None:
     assert quote.code == "crypto:BTC"
     assert quote.price == pytest.approx(50000.0)
     assert quote.change_pct == pytest.approx(2.5)
-    assert quote.pre_close is not None
-    assert quote.pre_close == pytest.approx(50000.0 / 1.025, rel=1e-4)
+    assert quote.pre_close is None
+    assert quote.volume is None
+    assert quote.amount == pytest.approx(1.2e9)
+    assert quote.amount_period == "rolling_24h"
+    assert quote.market == "crypto"
+    assert quote.currency == "USD"
+    assert quote.provider_timestamp == "2024-01-01T00:00:00+00:00"
 
     # Bare equity-shaped ticker must not be served as crypto.
     assert fetcher.get_realtime_quote("BTC") is None

@@ -5,6 +5,45 @@ from typing import Any, Dict
 from src.config import DEFAULT_ALPHASIFT_INSTALL_SPEC
 
 DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+    "CRYPTO_PROVIDER_ENABLED": {
+        "title": "CoinGecko Crypto Provider",
+        "description": "Enable the explicit crypto: symbol market-data provider. Requires restart.",
+        "category": "data_source", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "false", "options": [], "validation": {}, "display_order": 20,
+    },
+    "COINGECKO_API_KEY": {
+        "title": "CoinGecko API Key",
+        "description": "Optional Demo or Pro key. The plan selects its official origin and header.",
+        "category": "data_source", "data_type": "string", "ui_control": "password",
+        "is_sensitive": True, "is_required": False, "is_editable": True,
+        "default_value": None, "options": [], "validation": {}, "display_order": 21,
+        "warning_codes": ["secret_value"],
+    },
+    "COINGECKO_API_PLAN": {
+        "title": "CoinGecko API Plan",
+        "description": "Authentication mode: keyless, demo, or pro. Requires restart.",
+        "category": "data_source", "data_type": "string", "ui_control": "select",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "keyless", "options": ["keyless", "demo", "pro"],
+        "validation": {}, "display_order": 22,
+    },
+    "COINGECKO_API_BASE": {
+        "title": "CoinGecko API Base",
+        "description": "Optional custom base for keyless requests only. Credentials are never sent to custom origins.",
+        "category": "data_source", "data_type": "string", "ui_control": "text",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": None, "options": [],
+        "validation": {"item_type": "url", "allowed_schemes": ["https"]}, "display_order": 23,
+    },
+    "CRYPTO_COINGECKO_PRIORITY": {
+        "title": "CoinGecko Provider Priority",
+        "description": "Crypto provider priority; lower values run first. Requires restart.",
+        "category": "data_source", "data_type": "integer", "ui_control": "number",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "10", "options": [], "validation": {"min": 0, "max": 99},
+        "display_order": 24,
+    },
     "TUSHARE_TOKEN": {
         "title": "Tushare Token",
         "description": "Token for Tushare Pro API.",

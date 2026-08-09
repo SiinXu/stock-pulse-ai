@@ -294,6 +294,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 A 股日线回退链、实时行情、股票名称/列表与大盘复盘数据覆盖度。'],
     notes: ['不要在 issue、日志或截图中暴露真实 Key。'],
   },
+  'settings.data_source.coingecko': {
+    title: 'CoinGecko 加密资产数据源',
+    summary: '为显式、白名单内的 crypto: 身份提供默认关闭的行情数据。',
+    usage: '启用数据源后选择 keyless、Demo 或 Pro 鉴权模式；修改后重启生效。',
+    valueNotes: ['Demo 与 Pro 使用不同的官方域名和凭据请求头。', '自定义 HTTPS 地址仅允许用于 keyless 模式。'],
+    impact: ['仅影响 crypto 市场路由；裸代码与股票数据源保持不变。'],
+    notes: ['不要在日志或截图中暴露 API Key；仅本地模式会阻断出站请求。'],
+  },
   'settings.data_source.TICKFLOW_PRIORITY': {
     title: 'TickFlow 日 K 优先级',
     summary: '控制 TickFlow 在 A 股日 K 数据源回退链中的位置。',

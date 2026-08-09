@@ -209,7 +209,10 @@ class _CapabilityCatalogMethods:
     ) -> bool:
         registration = self._provider_plugin_registration(fetcher)
         if registration is None:
-            return True
+            if market is None:
+                return True
+            supported = self._DAILY_MARKET_FETCHER_SUPPORT.get(fetcher.name)
+            return supported is None or market in supported
         return (
             capability in registration.capabilities
             and (market is None or market in registration.markets)

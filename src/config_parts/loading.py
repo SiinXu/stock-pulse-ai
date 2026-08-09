@@ -604,6 +604,14 @@ class _ConfigLoadingMethods:
         if report_show_llm_model_raw is not None and not report_show_llm_model_raw.strip():
             report_show_llm_model = False
 
+        coingecko_api_plan = (os.getenv('COINGECKO_API_PLAN') or 'keyless').strip().lower()
+        if coingecko_api_plan not in {'keyless', 'demo', 'pro'}:
+            logger.warning(
+                "COINGECKO_API_PLAN=%r is invalid; falling back to keyless",
+                coingecko_api_plan,
+            )
+            coingecko_api_plan = 'keyless'
+
         return cls(
             stock_list=stock_list,
             feishu_app_id=os.getenv('FEISHU_APP_ID'),
@@ -618,6 +626,19 @@ class _ConfigLoadingMethods:
             tencent_priority=parse_env_int(os.getenv('TENCENT_PRIORITY'), 5, field_name='TENCENT_PRIORITY', minimum=0),
             finnhub_api_key=os.getenv('FINNHUB_API_KEY') or None,
             alphavantage_api_key=os.getenv('ALPHAVANTAGE_API_KEY') or None,
+            crypto_provider_enabled=parse_env_bool(
+                os.getenv('CRYPTO_PROVIDER_ENABLED'), default=False
+            ),
+            coingecko_api_key=os.getenv('COINGECKO_API_KEY') or None,
+            coingecko_api_plan=coingecko_api_plan,
+            coingecko_api_base=(os.getenv('COINGECKO_API_BASE') or '').strip() or None,
+            crypto_coingecko_priority=parse_env_int(
+                os.getenv('CRYPTO_COINGECKO_PRIORITY'),
+                10,
+                field_name='CRYPTO_COINGECKO_PRIORITY',
+                minimum=0,
+                maximum=99,
+            ),
             longbridge_app_key=os.getenv('LONGBRIDGE_APP_KEY') or None,
             longbridge_app_secret=os.getenv('LONGBRIDGE_APP_SECRET') or None,
             longbridge_access_token=os.getenv('LONGBRIDGE_ACCESS_TOKEN') or None,

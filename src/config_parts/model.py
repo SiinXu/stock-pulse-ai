@@ -71,6 +71,11 @@ class Config:
     tencent_priority: int = 5
     finnhub_api_key: Optional[str] = None
     alphavantage_api_key: Optional[str] = None
+    crypto_provider_enabled: bool = False
+    coingecko_api_key: Optional[str] = None
+    coingecko_api_plan: str = "keyless"
+    coingecko_api_base: Optional[str] = None
+    crypto_coingecko_priority: int = 10
     longbridge_app_key: Optional[str] = None
     longbridge_app_secret: Optional[str] = None
     longbridge_access_token: Optional[str] = None

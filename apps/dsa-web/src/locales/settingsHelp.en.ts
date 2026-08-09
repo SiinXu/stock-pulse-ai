@@ -270,6 +270,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects A-share daily-data fallback, realtime quotes, stock list/name lookup, and market-review coverage.'],
     notes: ['Do not expose real keys in issues, logs, or screenshots.'],
   },
+  'settings.data_source.coingecko': {
+    title: 'CoinGecko crypto provider',
+    summary: 'Provides default-off market data for explicit, allowlisted crypto: identities.',
+    usage: 'Enable the provider, then select keyless, Demo, or Pro authentication. Restart after changes.',
+    valueNotes: ['Demo and Pro use different official origins and credential headers.', 'Custom HTTPS bases are allowed only in keyless mode.'],
+    impact: ['Affects only the crypto market route; bare tickers and equity providers are unchanged.'],
+    notes: ['Never expose an API key in logs or screenshots. Local Only mode blocks outbound calls.'],
+  },
   'settings.data_source.TICKFLOW_PRIORITY': {
     title: 'TickFlow Daily K-line Priority',
     summary: 'Controls where TickFlow sits in the A-share daily K-line provider fallback chain.',

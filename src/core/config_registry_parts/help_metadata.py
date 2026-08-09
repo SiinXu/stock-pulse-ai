@@ -49,6 +49,32 @@ _DOC_CUSTOM_WEBHOOK = [
 ]
 
 _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
+    "CRYPTO_PROVIDER_ENABLED": {
+        "help_key": "settings.data_source.coingecko",
+        "examples": ["CRYPTO_PROVIDER_ENABLED=false"],
+        "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
+    },
+    "COINGECKO_API_KEY": {
+        "help_key": "settings.data_source.coingecko",
+        "examples": ["COINGECKO_API_KEY=your_key"],
+        "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
+        "warning_codes": ["secret_value"],
+    },
+    "COINGECKO_API_PLAN": {
+        "help_key": "settings.data_source.coingecko",
+        "examples": ["COINGECKO_API_PLAN=keyless", "COINGECKO_API_PLAN=pro"],
+        "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
+    },
+    "COINGECKO_API_BASE": {
+        "help_key": "settings.data_source.coingecko",
+        "examples": ["COINGECKO_API_BASE=https://example.com/api/v3"],
+        "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
+    },
+    "CRYPTO_COINGECKO_PRIORITY": {
+        "help_key": "settings.data_source.coingecko",
+        "examples": ["CRYPTO_COINGECKO_PRIORITY=10"],
+        "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
+    },
     "ANSPIRE_LLM_ENABLED": {
         "help_key": "settings.ai_model.anspire_llm",
         "examples": [
