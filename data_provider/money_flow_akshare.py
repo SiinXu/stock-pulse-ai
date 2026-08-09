@@ -12,16 +12,18 @@ unit-tested offline with fixture DataFrames.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
+import requests
 
 from data_provider.money_flow_types import (
     EASTMONEY_EM_ORDER_BUCKET_DEFINITION,
     MoneyFlowSnapshot,
+    validate_history_days,
 )
-from data_provider.realtime_types import safe_float
 from data_provider.symbol_normalization import (
     _is_hk_market,
     _is_jp_market,
@@ -31,7 +33,6 @@ from data_provider.symbol_normalization import (
     is_bse_code,
     normalize_stock_code,
 )
-from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ def normalize_eastmoney_fund_flow_df(
     *,
     stock_code: str,
     history_days: int = 5,
+    amount_unit: str = "unknown",
+    amount_scale: str = "unknown",
 ) -> Optional[MoneyFlowSnapshot]:
     """Normalize an Eastmoney individual fund-flow DataFrame into a snapshot.
 
@@ -93,57 +96,64 @@ def normalize_eastmoney_fund_flow_df(
     if df is None or getattr(df, "empty", True):
         return None
 
+    requested_days = validate_history_days(history_days)
     work = df.copy()
     date_col = _EM_FIELD_MAP["date"]
-    if date_col in work.columns:
-        work = work.sort_values(by=date_col)
+    if date_col not in work.columns:
+        raise ValueError("money-flow provider response has no date column")
+    parsed_dates = pd.to_datetime(work[date_col], errors="coerce")
+    if parsed_dates.isna().any():
+        raise ValueError("money-flow provider response contains an invalid date")
+    work = work.assign(_provider_date=parsed_dates.dt.date)
+    work = work.sort_values(by="_provider_date").drop_duplicates("_provider_date", keep="last")
+    work = work.iloc[-requested_days:]
     latest = work.iloc[-1]
 
     code = normalize_stock_code(stock_code)
-    main = safe_float(latest.get(_EM_FIELD_MAP["main_net_inflow"]))
+    calibrated_amounts = amount_unit != "unknown" and amount_scale != "unknown"
+
+    def numeric(field: str) -> Optional[float]:
+        value = latest.get(_EM_FIELD_MAP[field])
+        if value is None or pd.isna(value):
+            return None
+        if isinstance(value, bool):
+            raise TypeError(f"{field} must not be boolean")
+        return float(value)
+
     snapshot = MoneyFlowSnapshot(
         code=code,
-        date=_stringify_date(latest.get(date_col)),
+        date=latest["_provider_date"].isoformat(),
         source=SOURCE_ID,
         market="cn",
-        main_net_inflow=main,
-        super_large_net_inflow=safe_float(
-            latest.get(_EM_FIELD_MAP["super_large_net_inflow"])
-        ),
-        large_net_inflow=safe_float(latest.get(_EM_FIELD_MAP["large_net_inflow"])),
-        medium_net_inflow=safe_float(latest.get(_EM_FIELD_MAP["medium_net_inflow"])),
-        small_net_inflow=safe_float(latest.get(_EM_FIELD_MAP["small_net_inflow"])),
-        main_net_inflow_ratio=safe_float(
-            latest.get(_EM_FIELD_MAP["main_net_inflow_ratio"])
-        ),
-        super_large_net_inflow_ratio=safe_float(
-            latest.get(_EM_FIELD_MAP["super_large_net_inflow_ratio"])
-        ),
-        large_net_inflow_ratio=safe_float(
-            latest.get(_EM_FIELD_MAP["large_net_inflow_ratio"])
-        ),
-        medium_net_inflow_ratio=safe_float(
-            latest.get(_EM_FIELD_MAP["medium_net_inflow_ratio"])
-        ),
-        small_net_inflow_ratio=safe_float(
-            latest.get(_EM_FIELD_MAP["small_net_inflow_ratio"])
-        ),
-        close=safe_float(latest.get(_EM_FIELD_MAP["close"])),
-        change_pct=safe_float(latest.get(_EM_FIELD_MAP["change_pct"])),
-        unit="CNY",
+        main_net_inflow=numeric("main_net_inflow") if calibrated_amounts else None,
+        super_large_net_inflow=numeric("super_large_net_inflow") if calibrated_amounts else None,
+        large_net_inflow=numeric("large_net_inflow") if calibrated_amounts else None,
+        medium_net_inflow=numeric("medium_net_inflow") if calibrated_amounts else None,
+        small_net_inflow=numeric("small_net_inflow") if calibrated_amounts else None,
+        main_net_inflow_ratio=numeric("main_net_inflow_ratio"),
+        super_large_net_inflow_ratio=numeric("super_large_net_inflow_ratio"),
+        large_net_inflow_ratio=numeric("large_net_inflow_ratio"),
+        medium_net_inflow_ratio=numeric("medium_net_inflow_ratio"),
+        small_net_inflow_ratio=numeric("small_net_inflow_ratio"),
+        close=numeric("close"),
+        change_pct=numeric("change_pct"),
+        unit=amount_unit,
+        amount_scale=amount_scale,
         bucket_definition=EASTMONEY_EM_ORDER_BUCKET_DEFINITION,
         raw_field_map=dict(_EM_FIELD_MAP),
         as_of=datetime.now(timezone.utc).isoformat(),
-        history_days=int(history_days) if history_days else 0,
+        requested_days=requested_days,
+        observed_days=len(work),
+        completeness="complete" if len(work) == requested_days else "partial",
     )
 
     main_col = _EM_FIELD_MAP["main_net_inflow"]
-    if main_col in work.columns:
+    if calibrated_amounts and main_col in work.columns:
         series = pd.to_numeric(work[main_col], errors="coerce").dropna()
         if not series.empty:
-            if len(series) >= 5:
+            if requested_days >= 5 and len(series) >= 5:
                 snapshot.main_net_inflow_5d = float(series.iloc[-5:].sum())
-            if len(series) >= 10:
+            if requested_days >= 10 and len(series) >= 10:
                 snapshot.main_net_inflow_10d = float(series.iloc[-10:].sum())
 
     return snapshot
@@ -155,11 +165,15 @@ def fetch_akshare_individual_money_flow(
     history_days: int = 5,
     ak_module: Any = None,
     rate_limit: Optional[Callable[[], None]] = None,
+    timeout_runner: Optional[Callable[..., Any]] = None,
+    timeout_seconds: float = 12.0,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> Optional[MoneyFlowSnapshot]:
     """Fetch and normalize A-share individual money flow via AkShare.
 
     Non-CN symbols return None without network I/O.
     """
+    requested_days = validate_history_days(history_days)
     code = normalize_stock_code(stock_code or "")
     market = resolve_cn_exchange_market(code)
     if market is None:
@@ -172,26 +186,39 @@ def fetch_akshare_individual_money_flow(
     if ak_module is None:
         import akshare as ak_module  # type: ignore
 
-    if rate_limit is not None:
-        rate_limit()
+    if timeout_runner is None:
+        from data_provider.retry_policy import call_with_timeout
 
-    try:
+        timeout_runner = call_with_timeout
+
+    retryable = (TimeoutError, ConnectionError, requests.RequestException)
+    last_error: Optional[BaseException] = None
+    for attempt in range(2):
+        if rate_limit is not None:
+            rate_limit()
         logger.info(
             "[API调用] ak.stock_individual_fund_flow(stock=%s, market=%s)",
             code,
             market,
         )
-        df = ak_module.stock_individual_fund_flow(stock=code, market=market)
-    except Exception as exc:  # broad-exception: fallback_recorded - provider failure logged
-        log_safe_exception(
-            logger,
-            "Akshare individual money flow fetch failed",
-            exc,
-            error_code="akshare_money_flow_failed",
-            level=logging.WARNING,
-            context={"symbol": code, "market": market},
-        )
-        return None
+        try:
+            df = timeout_runner(
+                ak_module.stock_individual_fund_flow,
+                stock=code,
+                market=market,
+                timeout=timeout_seconds,
+                call_name="akshare_money_flow",
+            )
+            break
+        except retryable as exc:
+            last_error = exc
+            if attempt == 0:
+                sleeper(0.25)
+                continue
+            raise
+    else:
+        assert last_error is not None
+        raise last_error
 
     if df is None or getattr(df, "empty", True):
         logger.warning(
@@ -204,17 +231,5 @@ def fetch_akshare_individual_money_flow(
     return normalize_eastmoney_fund_flow_df(
         df,
         stock_code=code,
-        history_days=history_days,
+        history_days=requested_days,
     )
-
-
-def _stringify_date(value: Any) -> str:
-    if value is None:
-        return ""
-    if hasattr(value, "isoformat"):
-        try:
-            return value.isoformat()
-        except (TypeError, ValueError, AttributeError):
-            return str(value).strip()
-    text = str(value).strip()
-    return text

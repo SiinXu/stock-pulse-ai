@@ -378,6 +378,10 @@ class AkshareFetcher(BaseFetcher):
     - 随机 User-Agent 轮换
     - 失败后指数退避重试（最多3次）
     """
+
+    money_flow_calibration_identity = (
+        "eastmoney_em_order_size_buckets_v1;amount_unit=unknown;ratio_unit=percent"
+    )
     
     name = "AkshareFetcher"
     priority = int(os.getenv("AKSHARE_PRIORITY", "1"))
@@ -1742,10 +1746,21 @@ class AkshareFetcher(BaseFetcher):
         """
         from .money_flow_akshare import fetch_akshare_individual_money_flow
 
+        def _run_with_process_timeout(func, **kwargs):
+            timeout = kwargs.pop("timeout", 12.0)
+            call_name = kwargs.pop("call_name", "akshare_money_flow")
+            return _akshare_call_with_timeout(
+                func,
+                timeout=timeout,
+                call_name=call_name,
+                **kwargs,
+            )
+
         return fetch_akshare_individual_money_flow(
             stock_code,
             history_days=days,
             rate_limit=self._enforce_rate_limit,
+            timeout_runner=_run_with_process_timeout,
         )
 
     def get_chip_distribution(self, stock_code: str) -> Optional[ChipDistribution]:

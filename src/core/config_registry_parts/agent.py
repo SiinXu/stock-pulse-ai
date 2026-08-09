@@ -993,6 +993,147 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["restart_required"],
     },
+    "OCR_AGENT_TOOL_ENABLED": {
+        "title": "Enable Offline OCR Agent Tool",
+        "description": (
+            "Opt-in bounded Tesseract OCR Agent Tool (issue #196). Default is off. "
+            "When enabled with OCR_FILE_ROOT or MULTIMODAL_FILE_ROOT and optional "
+            "requirements-ocr.txt + system Tesseract, Agents may call "
+            "extract_image_text after a process restart. Image bytes stay local; "
+            "redacted, untrusted OCR text enters Agent context and may reach a remote "
+            "model unless LOCAL_ONLY_MODE=true. This phase is bounded raw-text "
+            "extraction, not verified table parsing. See docs/agent-ocr-tool_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 79,
+        "help_key": "settings.agent.OCR_AGENT_TOOL_ENABLED",
+        "examples": [
+            "OCR_AGENT_TOOL_ENABLED=false",
+            "OCR_AGENT_TOOL_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+            {
+                "label": "离线 OCR 说明（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_FILE_ROOT": {
+        "title": "OCR File Root",
+        "description": (
+            "Local directory for user-provided images for offline OCR. Paths are "
+            "sandboxed to this root. Falls back to MULTIMODAL_FILE_ROOT when empty. "
+            "Required (directly or via multimodal root) when OCR_AGENT_TOOL_ENABLED=true."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 80,
+        "help_key": "settings.agent.OCR_FILE_ROOT",
+        "examples": [
+            "OCR_FILE_ROOT=",
+            "OCR_FILE_ROOT=/var/stockpulse/ocr-uploads",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_LANGS": {
+        "title": "OCR Languages",
+        "description": (
+            "Tesseract language codes joined by '+'. Default chi_sim+eng for mixed "
+            "Chinese/English statements. Requires matching traineddata packages."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "chi_sim+eng",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 81,
+        "help_key": "settings.agent.OCR_LANGS",
+        "examples": [
+            "OCR_LANGS=chi_sim+eng",
+            "OCR_LANGS=eng",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_TIMEOUT_SECONDS": {
+        "title": "OCR Timeout Seconds",
+        "description": (
+            "Per-call OCR timeout in seconds (clamped 1-120). Default 30."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 120},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 82,
+        "help_key": "settings.agent.OCR_TIMEOUT_SECONDS",
+        "examples": [
+            "OCR_TIMEOUT_SECONDS=30",
+            "OCR_TIMEOUT_SECONDS=60",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
     "VALUATION_AGENT_TOOL_ENABLED": {
         "title": "Enable Valuation Agent Tool",
         "description": (

@@ -228,12 +228,14 @@ class _StockAnalysisStageMixin:
                 if getattr(self.config, "smartmoney_enabled", False):
                     money_flow_data = self.fetcher_manager.get_money_flow(code)
                     if money_flow_data is not None:
+                        snapshot = getattr(money_flow_data, "snapshot", None)
                         logger.info(
-                            "%s(%s) money flow: main_net_inflow=%s source=%s",
+                            "%s(%s) money flow: status=%s main_net_inflow=%s source=%s",
                             stock_name,
                             code,
-                            getattr(money_flow_data, "main_net_inflow", None),
-                            getattr(money_flow_data, "source", None),
+                            getattr(getattr(money_flow_data, "status", None), "value", None),
+                            getattr(snapshot, "main_net_inflow", None),
+                            getattr(snapshot, "source", None),
                         )
             except Exception as e:  # broad-exception: fallback_recorded - money-flow is optional
                 log_safe_exception(
@@ -431,7 +433,6 @@ class _StockAnalysisStageMixin:
                     daily_market_context=daily_market_context,
                     portfolio_context=portfolio_context,
                     market_structure_context=market_structure_context,
-                    money_flow_data=money_flow_data,
                 )
 
             # Step 4: Multi-Dimensional Intelligence Search (Latest News + Risk Assessment + Earnings Expectations)

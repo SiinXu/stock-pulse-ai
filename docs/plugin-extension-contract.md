@@ -516,8 +516,11 @@ on the factory result:
 `money_flow` is an additive contract v1 capability (Issue #862 / #619). Existing
 providers that do not declare or implement it remain valid: registration still
 requires only the capabilities listed on the registration object, and the
-manager treats undeclared/unimplemented money-flow as a capability miss (returns
-`None`) rather than a hard failure.
+manager returns a typed `not_supported` outcome for an undeclared or
+unimplemented capability rather than raising. Implementations must accept the
+single versioned signature `get_money_flow(stock_code, days=5)` and return a
+validated `MoneyFlowSnapshot`; the manager does not retry a different signature
+after a provider raises `TypeError`.
 
 Existing `prefetch_*` paths remain built-in manager optimizations and are not
 plugin capabilities in contract version 1.
@@ -1080,4 +1083,3 @@ Lifecycle controls do not weaken the trusted-plugin model:
 2. Persistence records only enable/disable intent for already-registered IDs.
 3. Hot-reload re-imports an already-known package root; new directories are not
    discovered or auto-enabled by the reload path.
-
