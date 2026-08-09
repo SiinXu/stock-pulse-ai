@@ -4,22 +4,6 @@ import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../..
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { LLMChannelEditor } from '../LLMChannelEditor';
 
-vi.mock('../../../api/localModels', () => ({
-  localModelsApi: {
-    getRuntime: vi.fn(async () => ({
-      status: 'running',
-      configuration: {
-        configVersion: '1',
-        registeredModels: ['qwen2.5'],
-        primaryModel: 'qwen2.5',
-        agentModel: '',
-        importedModels: [],
-      },
-      installedModels: ['qwen2.5'],
-    })),
-  },
-}));
-
 function provider(
   overrides: Partial<LlmProviderCatalogEntry> & Pick<LlmProviderCatalogEntry, 'id' | 'label' | 'protocol'>,
 ): LlmProviderCatalogEntry {
@@ -185,32 +169,15 @@ function officialItemsWithoutBaseUrl(providerId: 'gemini' | 'anthropic') {
   ];
 }
 
-const { testLLMChannel, discoverLLMChannelModels, getGenerationBackendStatus } = vi.hoisted(() => ({
+const { testLLMChannel, discoverLLMChannelModels } = vi.hoisted(() => ({
   testLLMChannel: vi.fn(),
   discoverLLMChannelModels: vi.fn(),
-  getGenerationBackendStatus: vi.fn(async () => ({
-    primaryBackendId: 'litellm',
-    fallbackBackendId: null,
-    primary: {
-      backendId: 'litellm',
-      backendType: 'litellm',
-      available: true,
-      healthStatus: 'passed',
-      supportsJson: true,
-      supportsStream: true,
-      supportsTools: true,
-      maxConcurrency: 1,
-    },
-    fallback: null,
-    backends: [],
-  })),
 }));
 
 vi.mock('../../../api/systemConfig', () => ({
   systemConfigApi: {
     testLLMChannel: (...args: unknown[]) => testLLMChannel(...args),
     discoverLLMChannelModels: (...args: unknown[]) => discoverLLMChannelModels(...args),
-    getGenerationBackendStatus: (...args: unknown[]) => getGenerationBackendStatus(...args),
   },
 }));
 
@@ -347,6 +314,37 @@ describe('LLMChannelEditor', () => {
     expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('服务地址')).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/生成后端状态|主后端|备用后端|运行时能力检测/);
+  });
+
+  it('filters cloud connections by provider and model without changing ownership', () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          ...OPENAI_ITEMS.map((item) => (
+            item.key === 'LLM_CHANNELS' ? { ...item, value: 'openai,deepseek' } : item
+          )),
+          { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
+          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
+          { key: 'LLM_DEEPSEEK_API_KEY', value: 'secret-key' },
+          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat' },
+        ]}
+        providers={PROVIDERS}
+        maskToken="******"
+      />,
+    );
+
+    const filter = screen.getByRole('searchbox', { name: '筛选云端模型连接' });
+    expect(connectionCard('openai')).toBeInTheDocument();
+    expect(connectionCard('deepseek')).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: 'deepseek-chat' } });
+    expect(screen.queryByTestId('connection-card-openai')).not.toBeInTheDocument();
+    expect(connectionCard('deepseek')).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: 'missing-provider' } });
+    expect(screen.getByRole('status')).toHaveTextContent('没有匹配的云端模型连接');
   });
 
   it.each([
@@ -1563,7 +1561,7 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
     expect(onReplaceModelReferences).toHaveBeenCalledTimes(1);
     expect(onReplaceModelReferences.mock.calls[0]?.[0]).toHaveLength(2);
-  }, 15000);
+  });
 
   it('opens and focuses the requested dynamic connection field through the editor signal', async () => {
     render(
@@ -1726,7 +1724,7 @@ describe('LLMChannelEditor', () => {
     replaceModels(['gpt-4o-mini']);
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
     await waitFor(() => expect(lastDraft(onDraftItemsChange)).toEqual([]));
-  }, 15000);
+  });
 
   it('does not emit invalid env keys while the connection name is empty', () => {
     const onDraftItemsChange = vi.fn();
@@ -2288,35 +2286,7 @@ describe('LLMChannelEditor', () => {
       <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
     const dialog = editConnection();
-    // Model Sources hub may mention primary/fallback backends for Local CLI status;
-    // still forbid legacy channel/env jargon and internal config keys.
-    expect(container.textContent).not.toMatch(/渠道|LLM_|LITELLM_|GENERATION_BACKEND/);
+    expect(container.textContent).not.toMatch(/渠道|LLM_|LITELLM_|GENERATION_BACKEND|主后端|备用后端/);
     expect(dialog.textContent).not.toMatch(/JSON|Tools|Stream|运行时能力/);
   });
-  it('renders Model Sources hub groups and searchable filter', async () => {
-    render(
-      <LLMChannelEditor
-        items={OPENAI_ITEMS}
-        providers={PROVIDERS}
-        maskToken="******"
-      />,
-    );
-
-    expect(await screen.findByTestId('model-sources-hub')).toBeInTheDocument();
-    expect(screen.getByTestId('model-sources-cloud-group')).toBeInTheDocument();
-    expect(screen.getByTestId('model-sources-local-group')).toBeInTheDocument();
-    expect(screen.getByTestId('model-sources-cli-group')).toBeInTheDocument();
-    expect(screen.getByTestId('model-sources-fallback-group')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByTestId('model-sources-filter'), { target: { value: 'zzz-no-match' } });
-    expect(await screen.findByTestId('model-sources-no-matches')).toBeInTheDocument();
-  });
-
-  it('opens the in-page connection wizard instead of a modal overlay', async () => {
-    const dialog = openAddAfterRender();
-    expect(dialog).toHaveAttribute('data-testid', 'connection-wizard');
-    expect(screen.getByTestId('model-sources-hub-wizard')).toBeInTheDocument();
-    expect(screen.queryByTestId('model-sources-hub')).not.toBeInTheDocument();
-  });
-
 });

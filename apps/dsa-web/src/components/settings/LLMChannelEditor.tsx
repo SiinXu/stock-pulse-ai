@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import { ConfirmDialog, InlineAlert, SearchInput, StatusDot } from '../common';
+import { ConfirmDialog, InlineAlert, SearchInput } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import {
@@ -8,11 +8,10 @@ import {
   MODEL_ACCESS_TEXT,
   localizeModelAccessIssue,
 } from '../../locales/settingsModelAccess';
-import { localModelsApi } from '../../api/localModels';
-import { systemConfigApi } from '../../api/systemConfig';
-import type { GenerationBackendStatusResponse } from '../../types/systemConfig';
-import type { LocalModelRuntimeState } from '../../types/localModels';
-import { inspectConnectionSchemaDefinition, getProviderDisplayLabel } from './llmConnectionContract';
+import {
+  getProviderDisplayLabel,
+  inspectConnectionSchemaDefinition,
+} from './llmConnectionContract';
 import {
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
@@ -31,7 +30,6 @@ import {
   channelSchemaAllowsKnownOperations,
   channelsAreEqual,
   collectChannelRouteSet,
-  findCatalogProvider,
   getChannelCompletenessIssues,
   getChannelDisplayNameIssues,
   getChannelNameIssues,
@@ -122,11 +120,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const testRequestIdRef = useRef(0);
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onValidityChangeRef = useRef(onValidityChange);
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [localRuntime, setLocalRuntime] = useState<LocalModelRuntimeState | null>(null);
-  const [localRuntimeStatus, setLocalRuntimeStatus] = useState<'idle' | 'loading' | 'error'>('loading');
-  const [cliStatus, setCliStatus] = useState<GenerationBackendStatusResponse | null>(null);
-  const [cliStatusState, setCliStatusState] = useState<'idle' | 'loading' | 'error'>('loading');
+  const [connectionFilter, setConnectionFilter] = useState('');
 
   const connectionSchemaDefinition = useMemo(
     () => inspectConnectionSchemaDefinition(connectionFields),
@@ -200,35 +194,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       setModal({ mode: 'edit', index, focusField: parsed.suffix });
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    void localModelsApi.getRuntime()
-      .then((runtime) => {
-        if (cancelled) return;
-        setLocalRuntime(runtime);
-        setLocalRuntimeStatus('idle');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLocalRuntime(null);
-        setLocalRuntimeStatus('error');
-      });
-    void systemConfigApi.getGenerationBackendStatus()
-      .then((status) => {
-        if (cancelled) return;
-        setCliStatus(status);
-        setCliStatusState('idle');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCliStatus(null);
-        setCliStatusState('error');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const hasChanges = useMemo(() => {
     if (channels.length !== initialChannels.length) {
@@ -541,98 +506,31 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     setModal(null);
   };
 
-  const normalizedFilter = sourceFilter.trim().toLowerCase();
-  const channelMatchesFilter = (channel: ChannelConfig) => {
-    if (!normalizedFilter) {
-      return true;
-    }
-    const provider = findCatalogProvider(providers, channel.providerId);
-    const providerLabel = provider
-      ? getProviderDisplayLabel(provider, language)
-      : channel.providerId;
-    const haystack = [
-      channel.name,
-      channel.displayName,
-      channel.providerId,
-      providerLabel,
-      channel.models,
-      channel.baseUrl,
-      ...(channel.enabled ? resolvedTaskModelRefs
-        .filter((ref) => {
-          const routes = resolveChannelRouteModels(channel);
-          return routes.includes(ref.route);
-        })
-        .map((ref) => ref.label) : []),
-    ].join(' ').toLowerCase();
-    return haystack.includes(normalizedFilter);
-  };
-  const filteredChannels = channels.filter(channelMatchesFilter);
-  const primaryModel = initialRuntimeConfig.primaryModel.trim();
-  const fallbackModels = initialRuntimeConfig.fallbackModels;
-  const fallbackMatches = !normalizedFilter
-    || primaryModel.toLowerCase().includes(normalizedFilter)
-    || fallbackModels.some((model) => model.toLowerCase().includes(normalizedFilter))
-    || editorText.hubFallbackGroup.toLowerCase().includes(normalizedFilter)
-    || resolvedTaskModelRefs.some((ref) => (
-      ref.route
-      && (
-        ref.route === primaryModel
-        || fallbackModels.includes(ref.route)
-        || ref.label.toLowerCase().includes(normalizedFilter)
-      )
-    ));
-  const localMatches = !normalizedFilter
-    || editorText.hubLocalGroup.toLowerCase().includes(normalizedFilter)
-    || 'ollama'.includes(normalizedFilter)
-    || (localRuntime?.configuration.primaryModel || '').toLowerCase().includes(normalizedFilter)
-    || (localRuntime?.configuration.agentModel || '').toLowerCase().includes(normalizedFilter)
-    || (localRuntime?.status || '').toLowerCase().includes(normalizedFilter);
-  const cliMatches = !normalizedFilter
-    || editorText.hubCliGroup.toLowerCase().includes(normalizedFilter)
-    || 'cli'.includes(normalizedFilter)
-    || (cliStatus?.primary?.backendId || '').toLowerCase().includes(normalizedFilter)
-    || (cliStatus?.fallback?.backendId || '').toLowerCase().includes(normalizedFilter)
-    || (cliStatus?.primary?.backendType || '').toLowerCase().includes(normalizedFilter);
-  const hasAnyMatch = filteredChannels.length > 0 || localMatches || cliMatches || fallbackMatches;
-  const localConfig = localRuntime?.configuration;
-  const registeredCount = localConfig?.registeredModels?.length ?? 0;
-  const localPrimary = (localConfig?.primaryModel || '').trim();
-  const localAgent = (localConfig?.agentModel || '').trim();
-  const localRuntimeLabel = localRuntime?.status || 'unknown';
-  const cliPrimary = cliStatus?.primary;
-  const cliIsLocal = cliPrimary?.backendType === 'local_cli';
+  const visibleChannels = useMemo(() => {
+    const query = connectionFilter.trim().toLowerCase();
+    return channels
+      .map((channel, index) => ({ channel, index }))
+      .filter(({ channel }) => {
+        if (!query) {
+          return true;
+        }
+        const provider = providers.find((entry) => entry.id === channel.providerId);
+        const providerLabel = provider
+          ? getProviderDisplayLabel(provider, language)
+          : channel.providerId;
+        return [
+          channel.name,
+          channel.displayName,
+          channel.providerId,
+          providerLabel,
+          channel.models,
+          channel.baseUrl,
+        ].join(' ').toLowerCase().includes(query);
+      });
+  }, [channels, connectionFilter, language, providers]);
 
   return (
-    <div className="space-y-4" data-testid={modal ? 'model-sources-hub-wizard' : 'model-sources-hub'}>
-      {modal ? (
-        <ConnectionModal
-          mode={modal.mode}
-          initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
-          focusModels={modal.mode === 'edit' ? modal.focusModels : false}
-          focusField={modal.mode === 'edit' ? modal.focusField : undefined}
-          channels={channels}
-          availableModelRoutes={availableModelRoutes}
-          availableModels={availableModels}
-          providers={providers}
-          connectionFields={connectionFields}
-          emptyApiKeyHosts={emptyApiKeyHosts}
-          maskToken={maskToken}
-          hermesSecretPersisted={hermesSecretPersisted}
-          catalogUnavailable={catalogUnavailable}
-          disabled={busy}
-          taskModelRefs={resolvedTaskModelRefs}
-          onReloadCatalog={onReloadCatalog}
-          onManageModels={onManageModels}
-          canReplaceModelReferences={Boolean(onReplaceModelReferences)}
-          onSubmit={handleModalSubmit}
-          onClose={() => setModal(null)}
-        />
-      ) : null}
-      <div
-        className={modal ? 'hidden' : 'space-y-4'}
-        aria-hidden={modal ? true : undefined}
-        data-testid="model-sources-hub-body"
-      >
+    <div className="space-y-4">
       {overriddenByMode ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-2.5 text-xs text-secondary-text">
           <span>{editorText.readonly}</span>
@@ -668,228 +566,96 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         />
       ) : null}
 
-      <div className="space-y-2">
-        <label htmlFor="model-sources-filter" className="sr-only">
-          {editorText.hubSearchLabel}
-        </label>
-        <SearchInput
-          id="model-sources-filter"
-          value={sourceFilter}
-          onChange={(event) => setSourceFilter(event.target.value)}
-          placeholder={editorText.hubSearchPlaceholder}
-          aria-label={editorText.hubSearchLabel}
-          data-testid="model-sources-filter"
-        />
-      </div>
-
-      {!hasAnyMatch ? (
-        <p className="px-1 text-sm text-muted-text" data-testid="model-sources-no-matches">
-          {editorText.hubNoSearchMatches}
-        </p>
-      ) : null}
-
-      {fallbackMatches ? (
-        <section
-          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
-          data-testid="model-sources-fallback-group"
-          aria-labelledby="model-sources-fallback-heading"
-        >
-          <h3 id="model-sources-fallback-heading" className="text-sm font-semibold text-foreground">
-            {editorText.hubFallbackGroup}
-          </h3>
-          <p className="text-xs text-secondary-text">
-            {primaryModel
-              ? formatUiText(editorText.hubPrimaryModel, { model: primaryModel })
-              : formatUiText(editorText.hubPrimaryModel, { model: MODEL_ACCESS_TEXT[language].disabled })}
-          </p>
-          <p className="text-xs text-secondary-text">
-            {fallbackModels.length > 0
-              ? formatUiText(editorText.hubFallbackOrder, {
-                models: fallbackModels.join(getUiListSeparator(language)),
-              })
-              : editorText.hubFallbackNone}
-          </p>
-          <p className="text-xs text-muted-text">{editorText.hubFallbackEditHint}</p>
-        </section>
-      ) : null}
-
-      <section
-        className="space-y-2"
-        data-testid="model-sources-cloud-group"
-        aria-labelledby="model-sources-cloud-heading"
-      >
-        <h3 id="model-sources-cloud-heading" className="text-sm font-semibold text-foreground">
+      <section className="space-y-2" aria-labelledby="cloud-connections-heading">
+        <h3 id="cloud-connections-heading" className="text-sm font-semibold text-foreground">
           {editorText.hubCloudGroup}
         </h3>
-        {channels.length === 0 ? (
-          <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
-            <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
-            <p className="mt-1 text-xs text-muted-text">{editorText.emptyDescription}</p>
-          </div>
-        ) : filteredChannels.length === 0 ? (
-          normalizedFilter ? null : (
-            <p className="text-xs text-muted-text">{editorText.hubCloudEmpty}</p>
-          )
-        ) : (
-          <div className="space-y-2">
-            {filteredChannels.map((channel) => {
-              const index = channels.findIndex((entry) => entry.id === channel.id);
-              if (index < 0) {
-                return null;
-              }
-              return (
-                <ConnectionCard
-                  key={channel.id}
-                  channel={channel}
-                  providers={providers}
-                  availableModels={availableModels}
-                  taskModelRefs={resolvedTaskModelRefs}
-                  unsaved={isChannelUnsaved(channel)}
-                  busy={busy || (
-                    !schemaAllowsInspection
-                    && !channelSchemaAllowsKnownOperations(
-                      channel,
-                      providers,
-                      emptyApiKeyHosts,
-                      connectionFields,
-                    )
-                  )}
-                  testState={testStates[channel.id]}
-                  issues={catalogLoading ? [] : [
-                    ...getChannelNameIssues(channel),
-                    ...getChannelDisplayNameIssues(channel, connectionFields),
-                    ...getChannelCompletenessIssues(
-                      channel,
-                      providers,
-                      emptyApiKeyHosts,
-                      connectionFields,
-                      catalogUnavailable,
-                    ),
-                  ]}
-                  onTest={() => void handleTest(channel)}
-                  canTest={
-                    !mutationBusy
-                    && channelSchemaAllowsKnownOperations(
-                      channel,
-                      providers,
-                      emptyApiKeyHosts,
-                      connectionFields,
-                    )
-                  }
-                  onEdit={() => openChannelEditor(index)}
-                  onManageModels={() => openChannelEditor(index, { focusModels: true })}
-                  onToggleEnabled={() => toggleEnabled(index)}
-                  canToggleEnabled={
-                    !mutationBusy
-                    && channelFieldCanWrite(
-                      channel,
-                      'enabled',
-                      providers,
-                      emptyApiKeyHosts,
-                      connectionFields,
-                    )
-                  }
-                  onRemove={() => requestRemoveChannel(index)}
-                  canRemove={
-                    !mutationBusy
-                    && channelConnectionNameCanWrite(
-                      channel,
-                      providers,
-                      emptyApiKeyHosts,
-                      connectionFields,
-                    )
-                  }
-                />
-              );
-            })}
-          </div>
-        )}
+        <SearchInput
+          value={connectionFilter}
+          onChange={(event) => setConnectionFilter(event.target.value)}
+          placeholder={editorText.hubSearchPlaceholder}
+          aria-label={editorText.hubSearchLabel}
+          wrapperClassName="w-full sm:max-w-sm"
+        />
       </section>
 
-      {localMatches ? (
-        <section
-          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
-          data-testid="model-sources-local-group"
-          aria-labelledby="model-sources-local-heading"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusDot
-              tone={
-                localRuntimeStatus === 'error'
-                  ? 'danger'
-                  : localRuntime?.status === 'running'
-                    ? 'success'
-                    : localRuntime?.status === 'starting'
-                      ? 'warning'
-                      : 'neutral'
-              }
-              pulse={localRuntime?.status === 'starting'}
-            />
-            <h3 id="model-sources-local-heading" className="text-sm font-semibold text-foreground">
-              {editorText.hubLocalGroup}
-            </h3>
-          </div>
-          {localRuntimeStatus === 'loading' && !localRuntime ? (
-            <p className="text-xs text-muted-text">{editorText.hubLocalLoading}</p>
-          ) : localRuntimeStatus === 'error' ? (
-            <p className="text-xs text-danger">{editorText.hubLocalFailed}</p>
-          ) : (
-            <div className="space-y-1 text-xs text-secondary-text">
-              <p>{formatUiText(editorText.hubLocalRuntime, { status: localRuntimeLabel })}</p>
-              {registeredCount > 0 ? (
-                <p>{editorText.hubLocalConfigured} · {registeredCount}</p>
-              ) : (
-                <p>{editorText.hubLocalNone}</p>
+      {channels.length === 0 ? (
+        <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
+          <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
+          <p className="mt-1 text-xs text-muted-text">{editorText.emptyDescription}</p>
+        </div>
+      ) : visibleChannels.length === 0 ? (
+        <p className="px-1 text-sm text-muted-text" role="status">
+          {editorText.hubNoSearchMatches}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {visibleChannels.map(({ channel, index }) => (
+            <ConnectionCard
+              key={channel.id}
+              channel={channel}
+              providers={providers}
+              availableModels={availableModels}
+              taskModelRefs={resolvedTaskModelRefs}
+              unsaved={isChannelUnsaved(channel)}
+              busy={busy || (
+                !schemaAllowsInspection
+                && !channelSchemaAllowsKnownOperations(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
               )}
-              {localPrimary ? (
-                <p>{formatUiText(editorText.hubLocalPrimary, { model: localPrimary })}</p>
-              ) : null}
-              {localAgent ? (
-                <p>{formatUiText(editorText.hubLocalAgent, { model: localAgent })}</p>
-              ) : null}
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      {cliMatches ? (
-        <section
-          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
-          data-testid="model-sources-cli-group"
-          aria-labelledby="model-sources-cli-heading"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusDot
-              tone={
-                cliStatusState === 'error'
-                  ? 'danger'
-                  : cliPrimary?.healthStatus === 'passed' || cliPrimary?.available
-                    ? 'success'
-                    : cliPrimary?.healthStatus === 'failed'
-                      ? 'warning'
-                      : 'neutral'
+              testState={testStates[channel.id]}
+              issues={catalogLoading ? [] : [
+                ...getChannelNameIssues(channel),
+                ...getChannelDisplayNameIssues(channel, connectionFields),
+                ...getChannelCompletenessIssues(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                  catalogUnavailable,
+                ),
+              ]}
+              onTest={() => void handleTest(channel)}
+              canTest={
+                !mutationBusy
+                && channelSchemaAllowsKnownOperations(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              }
+              onEdit={() => openChannelEditor(index)}
+              onManageModels={() => openChannelEditor(index, { focusModels: true })}
+              onToggleEnabled={() => toggleEnabled(index)}
+              canToggleEnabled={
+                !mutationBusy
+                && channelFieldCanWrite(
+                  channel,
+                  'enabled',
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              }
+              onRemove={() => requestRemoveChannel(index)}
+              canRemove={
+                !mutationBusy
+                && channelConnectionNameCanWrite(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
               }
             />
-            <h3 id="model-sources-cli-heading" className="text-sm font-semibold text-foreground">
-              {editorText.hubCliGroup}
-            </h3>
-          </div>
-          {cliStatusState === 'loading' && !cliStatus ? (
-            <p className="text-xs text-muted-text">{editorText.hubCliLoading}</p>
-          ) : cliStatusState === 'error' ? (
-            <p className="text-xs text-danger">{editorText.hubCliFailed}</p>
-          ) : cliIsLocal && cliPrimary ? (
-            <div className="space-y-1 text-xs text-secondary-text">
-              <p>{formatUiText(editorText.hubCliPrimary, { backend: cliPrimary.backendId })}</p>
-              {cliStatus?.fallback?.backendId ? (
-                <p>{formatUiText(editorText.hubCliFallback, { backend: cliStatus.fallback.backendId })}</p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-xs text-secondary-text">{editorText.hubCliNone}</p>
-          )}
-        </section>
-      ) : null}
+          ))}
+        </div>
+      )}
 
       {!draftValid ? (
         <InlineAlert
@@ -948,8 +714,31 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         }}
         onCancel={() => setPendingRemove(null)}
       />
-      </div>
+
+      {modal ? (
+        <ConnectionModal
+          mode={modal.mode}
+          initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
+          focusModels={modal.mode === 'edit' ? modal.focusModels : false}
+          focusField={modal.mode === 'edit' ? modal.focusField : undefined}
+          channels={channels}
+          availableModelRoutes={availableModelRoutes}
+          availableModels={availableModels}
+          providers={providers}
+          connectionFields={connectionFields}
+          emptyApiKeyHosts={emptyApiKeyHosts}
+          maskToken={maskToken}
+          hermesSecretPersisted={hermesSecretPersisted}
+          catalogUnavailable={catalogUnavailable}
+          disabled={busy}
+          taskModelRefs={resolvedTaskModelRefs}
+          onReloadCatalog={onReloadCatalog}
+          onManageModels={onManageModels}
+          canReplaceModelReferences={Boolean(onReplaceModelReferences)}
+          onSubmit={handleModalSubmit}
+          onClose={() => setModal(null)}
+        />
+      ) : null}
     </div>
   );
 };
-

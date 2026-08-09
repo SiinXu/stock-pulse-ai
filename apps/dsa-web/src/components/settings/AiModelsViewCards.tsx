@@ -393,10 +393,10 @@ const AiModelAccessSection: React.FC<AiModelAccessSectionProps> = ({
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
 
   return (
-    <section className="space-y-4" aria-labelledby="model-sources-heading" data-testid="model-sources-section">
+    <section className="space-y-4" aria-labelledby="model-access-heading" data-testid="model-access-section">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <h2 id="model-sources-heading" className="text-base font-semibold text-foreground">
+          <h2 id="model-access-heading" className="text-base font-semibold text-foreground">
             {settingsText.modelAccess}
           </h2>
           <p className="text-sm leading-6 text-muted-text">
