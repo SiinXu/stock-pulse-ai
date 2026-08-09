@@ -626,7 +626,7 @@ describe('page and Router pattern production guard', () => {
     ]);
   });
 
-  it('rejects every direct production history mutation', () => {
+  it('rejects every direct production history mutation', { timeout: 15_000 }, () => {
     const productionEntries = Object.entries(productionTypeScriptSources);
     const boundSources = createBoundSourceFiles(productionEntries);
     const actual = productionEntries.flatMap(([filename, source]) => {

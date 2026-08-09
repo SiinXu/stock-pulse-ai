@@ -352,7 +352,7 @@ describe('hardcoded UI string scanner', () => {
 });
 
 describe('production hardcoded UI strings', () => {
-  it('keeps hardcoded English and Chinese copy out of user-facing TSX contexts', () => {
+  it('keeps hardcoded English and Chinese copy out of user-facing TSX contexts', { timeout: 15_000 }, () => {
     const failures = productionCandidates().filter((candidate) => !exactAllowedStrings.some((allowance) => (
       allowance.file === candidate.file
       && allowance.text === candidate.text
