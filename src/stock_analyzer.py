@@ -34,8 +34,6 @@ from src.utils.indicator_periods import (
     IndicatorPeriodConfig,
     format_ma_label,
     insufficient_data_note,
-    iter_named_ma_slots,
-    periods_from_config,
 )
 from src.schemas.decision_scale import signal_key_for_score
 
@@ -92,6 +90,69 @@ class RSIStatus(Enum):
     OVERSOLD = "超卖"         # RSI < 30
 
 
+@dataclass(frozen=True)
+class IndicatorReading:
+    """Typed dynamic indicator value with explicit availability metadata."""
+
+    kind: str
+    period: int
+    label: str
+    value: Optional[float]
+    available: bool
+    reason: Optional[str]
+    bar_count: int
+    as_of: Optional[str]
+    source: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "period": self.period,
+            "label": self.label,
+            "value": self.value,
+            "available": self.available,
+            "reason": self.reason,
+            "bar_count": self.bar_count,
+            "as_of": self.as_of,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True)
+class MACDReading:
+    """Typed MACD triplet with its configured periods and provenance."""
+
+    fast_period: int
+    slow_period: int
+    signal_period: int
+    label: str
+    dif: Optional[float]
+    dea: Optional[float]
+    bar: Optional[float]
+    available: bool
+    reason: Optional[str]
+    bar_count: int
+    as_of: Optional[str]
+    source: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": "macd",
+            "fast_period": self.fast_period,
+            "slow_period": self.slow_period,
+            "signal_period": self.signal_period,
+            "label": self.label,
+            "dif": self.dif,
+            "dea": self.dea,
+            "bar": self.bar,
+            "available": self.available,
+            "reason": self.reason,
+            "bar_count": self.bar_count,
+            "as_of": self.as_of,
+            "source": self.source,
+        }
+
+
 @dataclass
 class TrendAnalysisResult:
     """趋势分析结果"""
@@ -103,16 +164,16 @@ class TrendAnalysisResult:
     trend_strength: float = 0.0      # Trend strength 0-100
     
     # Moving average data
-    ma5: float = 0.0
-    ma10: float = 0.0
-    ma20: float = 0.0
-    ma60: float = 0.0
+    ma5: Optional[float] = None
+    ma10: Optional[float] = None
+    ma20: Optional[float] = None
+    ma60: Optional[float] = None
     current_price: float = 0.0
     
     # bias ratio (deviation from MA5)
-    bias_ma5: float = 0.0            # (Close - MA5) / MA5 * 100
-    bias_ma10: float = 0.0
-    bias_ma20: float = 0.0
+    bias_ma5: Optional[float] = None  # Always (Close - MA5) / MA5 * 100
+    bias_ma10: Optional[float] = None
+    bias_ma20: Optional[float] = None
     
     # Volume analysis
     volume_status: VolumeStatus = VolumeStatus.NORMAL
@@ -131,11 +192,12 @@ class TrendAnalysisResult:
     macd_bar: float = 0.0           # MACD histogram
     macd_status: MACDStatus = MACDStatus.BULLISH
     macd_signal: str = ""            # MACD signal description
+    macd_reading: Optional[MACDReading] = None
 
     # RSI indicator
-    rsi_6: float = 0.0              # RSI short-term slot (default period 6)
-    rsi_12: float = 0.0             # RSI medium-term slot (default period 12)
-    rsi_24: float = 0.0             # RSI long-term slot (default period 24)
+    rsi_6: Optional[float] = None
+    rsi_12: Optional[float] = None
+    rsi_24: Optional[float] = None
     rsi_status: RSIStatus = RSIStatus.NEUTRAL
     rsi_signal: str = ""              # RSI Signal Description
 
@@ -144,6 +206,15 @@ class TrendAnalysisResult:
     ma_periods_used: List[int] = field(default_factory=list)
     rsi_by_period: Dict[int, Any] = field(default_factory=dict)
     rsi_periods_used: List[int] = field(default_factory=list)
+    ma_readings: Dict[int, IndicatorReading] = field(default_factory=dict)
+    rsi_readings: Dict[int, IndicatorReading] = field(default_factory=dict)
+    bias_by_period: Dict[int, Optional[float]] = field(default_factory=dict)
+    support_by_period: Dict[int, bool] = field(default_factory=dict)
+    primary_ma_periods: List[int] = field(default_factory=list)
+    primary_bias_period: Optional[int] = None
+    indicator_period_source: str = "defaults"
+    indicator_bar_count: int = 0
+    indicator_as_of: Optional[str] = None
 
     # Buy Signal
     buy_signal: BuySignal = BuySignal.WAIT
@@ -163,10 +234,15 @@ class TrendAnalysisResult:
             'ma60': self.ma60,
             'ma_by_period': self.ma_by_period,
             'ma_periods_used': self.ma_periods_used,
+            'ma_readings': {str(k): v.to_dict() for k, v in self.ma_readings.items()},
             'current_price': self.current_price,
             'bias_ma5': self.bias_ma5,
             'bias_ma10': self.bias_ma10,
             'bias_ma20': self.bias_ma20,
+            'bias_by_period': self.bias_by_period,
+            'support_by_period': self.support_by_period,
+            'primary_ma_periods': self.primary_ma_periods,
+            'primary_bias_period': self.primary_bias_period,
             'volume_status': self.volume_status.value,
             'volume_ratio_5d': self.volume_ratio_5d,
             'volume_trend': self.volume_trend,
@@ -181,11 +257,18 @@ class TrendAnalysisResult:
             'macd_bar': self.macd_bar,
             'macd_status': self.macd_status.value,
             'macd_signal': self.macd_signal,
+            'macd_reading': (
+                self.macd_reading.to_dict() if self.macd_reading is not None else None
+            ),
             'rsi_6': self.rsi_6,
             'rsi_12': self.rsi_12,
             'rsi_24': self.rsi_24,
             'rsi_by_period': self.rsi_by_period,
             'rsi_periods_used': self.rsi_periods_used,
+            'rsi_readings': {str(k): v.to_dict() for k, v in self.rsi_readings.items()},
+            'indicator_period_source': self.indicator_period_source,
+            'indicator_bar_count': self.indicator_bar_count,
+            'indicator_as_of': self.indicator_as_of,
             'rsi_status': self.rsi_status.value,
             'rsi_signal': self.rsi_signal,
         }
@@ -245,17 +328,26 @@ class StockTrendAnalyzer:
         periods = self._resolve_periods()
         result.ma_periods_used = list(periods.ma_periods)
         result.rsi_periods_used = list(periods.rsi_periods)
+        result.primary_ma_periods = list(periods.ma_periods[:3])
+        result.primary_bias_period = periods.ma_short
+        result.indicator_period_source = periods.source
 
-        # Need enough bars for the three alignment MAs (defaults: 5/10/20 → 20).
-        min_bars = max(periods.ma_long, 20) if periods.ma_periods else 20
-        if df is None or df.empty or len(df) < min_bars:
+        if df is None or df.empty:
+            self._initialize_indicator_evidence(periods, result)
             logger.warning(f"{code} 数据不足，无法进行趋势分析")
             result.risk_factors.append("数据不足，无法完成分析")
             return result
-        
+
         # Ensure data is sorted by date
         df = df.sort_values('date').reset_index(drop=True)
-        
+        result.indicator_bar_count = len(df)
+        result.indicator_as_of = str(df.iloc[-1].get("date"))[:10]
+        self._initialize_indicator_evidence(periods, result)
+        if len(df) < 20:
+            logger.warning(f"{code} 数据不足，无法进行趋势分析")
+            result.risk_factors.append("数据不足，无法完成分析")
+            return result
+
         # Calculate moving average
         df = self._calculate_mas(df, periods, result)
 
@@ -272,13 +364,13 @@ class StockTrendAnalyzer:
         self._analyze_trend(df, result, periods)
 
         # 2. Bias ratio calculation
-        self._calculate_bias(result)
+        self._calculate_bias(result, periods)
 
         # 3. Volume analysis
         self._analyze_volume(df, result)
 
         # 4. Support and resistance analysis
-        self._analyze_support_resistance(df, result)
+        self._analyze_support_resistance(df, result, periods)
 
         # 5. MACD analysis
         self._analyze_macd(df, result, periods)
@@ -291,15 +383,74 @@ class StockTrendAnalyzer:
 
         return result
 
+    def _initialize_indicator_evidence(
+        self,
+        periods: IndicatorPeriodConfig,
+        result: TrendAnalysisResult,
+    ) -> None:
+        """Create explicit unavailable evidence before any calculation succeeds."""
+        result.ma_by_period = {period: None for period in periods.ma_periods}
+        result.rsi_by_period = {period: None for period in periods.rsi_periods}
+        result.ma_readings = {
+            period: IndicatorReading(
+                kind="ma",
+                period=period,
+                label=format_ma_label(period),
+                value=None,
+                available=False,
+                reason=(
+                    f"insufficient_history:need={period},got={result.indicator_bar_count}"
+                ),
+                bar_count=result.indicator_bar_count,
+                as_of=result.indicator_as_of,
+                source=result.indicator_period_source,
+            )
+            for period in periods.ma_periods
+        }
+        result.rsi_readings = {
+            period: IndicatorReading(
+                kind="rsi",
+                period=period,
+                label=f"RSI({period})",
+                value=None,
+                available=False,
+                reason=(
+                    f"insufficient_history:need={period},got={result.indicator_bar_count}"
+                ),
+                bar_count=result.indicator_bar_count,
+                as_of=result.indicator_as_of,
+                source=result.indicator_period_source,
+            )
+            for period in periods.rsi_periods
+        }
+        result.macd_reading = MACDReading(
+            fast_period=periods.macd_fast,
+            slow_period=periods.macd_slow,
+            signal_period=periods.macd_signal,
+            label=f"MACD({periods.macd_fast},{periods.macd_slow},{periods.macd_signal})",
+            dif=None,
+            dea=None,
+            bar=None,
+            available=False,
+            reason=(
+                f"insufficient_history:need={periods.macd_slow},"
+                f"got={result.indicator_bar_count}"
+            ),
+            bar_count=result.indicator_bar_count,
+            as_of=result.indicator_as_of,
+            source=result.indicator_period_source,
+        )
+
     def _assign_ma_slots(
         self,
         latest: pd.Series,
         periods: IndicatorPeriodConfig,
         result: TrendAnalysisResult,
     ) -> None:
-        """Fill legacy ma5/ma10/ma20/ma60 slots and ma_by_period map."""
+        """Populate exact-period dynamic values and period-stable legacy fields."""
         ma_by_period: Dict[int, Any] = {}
-        for period in periods.ma_periods:
+        all_periods = tuple(dict.fromkeys((*periods.ma_periods, *DEFAULT_MA_PERIODS)))
+        for period in all_periods:
             col = format_ma_label(period)
             raw = latest.get(col)
             if raw is None or (isinstance(raw, float) and np.isnan(raw)):
@@ -307,15 +458,29 @@ class StockTrendAnalyzer:
             else:
                 ma_by_period[period] = float(raw)
         result.ma_by_period = ma_by_period
+        result.ma_readings = {
+            period: IndicatorReading(
+                kind="ma",
+                period=period,
+                label=format_ma_label(period),
+                value=ma_by_period[period],
+                available=ma_by_period[period] is not None,
+                reason=(
+                    None
+                    if ma_by_period[period] is not None
+                    else f"insufficient_history:need={period},got={result.indicator_bar_count}"
+                ),
+                bar_count=result.indicator_bar_count,
+                as_of=result.indicator_as_of,
+                source=result.indicator_period_source,
+            )
+            for period in periods.ma_periods
+        }
 
-        slot_defaults = {"ma5": 0.0, "ma10": 0.0, "ma20": 0.0, "ma60": 0.0}
-        for slot_name, period in iter_named_ma_slots(periods.ma_periods):
-            value = ma_by_period.get(period)
-            slot_defaults[slot_name] = float(value) if value is not None else 0.0
-        result.ma5 = slot_defaults["ma5"]
-        result.ma10 = slot_defaults["ma10"]
-        result.ma20 = slot_defaults["ma20"]
-        result.ma60 = slot_defaults["ma60"]
+        result.ma5 = ma_by_period.get(5)
+        result.ma10 = ma_by_period.get(10)
+        result.ma20 = ma_by_period.get(20)
+        result.ma60 = ma_by_period.get(60)
     
     def _calculate_mas(
         self,
@@ -326,7 +491,8 @@ class StockTrendAnalyzer:
         """Calculate configured moving averages without shorter-period substitution."""
         df = df.copy()
         bar_count = len(df)
-        for period in periods.ma_periods:
+        all_periods = tuple(dict.fromkeys((*periods.ma_periods, *DEFAULT_MA_PERIODS)))
+        for period in all_periods:
             col = format_ma_label(period)
             if bar_count >= period:
                 df[col] = df['close'].rolling(window=period).mean()
@@ -387,7 +553,12 @@ class StockTrendAnalyzer:
         resolved = periods or self._resolve_periods()
         df = df.copy()
 
-        for period in resolved.rsi_periods:
+        all_periods = tuple(dict.fromkeys((*resolved.rsi_periods, *DEFAULT_RSI_PERIODS)))
+        for period in all_periods:
+            col_name = f'RSI_{period}'
+            if len(df) < period:
+                df[col_name] = np.nan
+                continue
             # Calculate price change
             delta = df['close'].diff()
 
@@ -406,8 +577,6 @@ class StockTrendAnalyzer:
             # Fill NaN values
             rsi = rsi.fillna(50)  # Default is neutral value
 
-            # Add to DataFrame
-            col_name = f'RSI_{period}'
             df[col_name] = rsi
 
         return df
@@ -424,18 +593,31 @@ class StockTrendAnalyzer:
         核心逻辑：判断均线排列和趋势强度
         """
         resolved = periods or self._resolve_periods()
-        ma5, ma10, ma20 = result.ma5, result.ma10, result.ma20
+        ma_short = result.ma_by_period.get(resolved.ma_short)
+        ma_mid = result.ma_by_period.get(resolved.ma_mid)
+        ma_long = result.ma_by_period.get(resolved.ma_long)
         short_col = format_ma_label(resolved.ma_short)
         long_col = format_ma_label(resolved.ma_long)
+
+        if ma_short is None or ma_mid is None or ma_long is None:
+            result.trend_status = TrendStatus.CONSOLIDATION
+            result.ma_alignment = (
+                "insufficient data for "
+                f"{format_ma_label(resolved.ma_short)}/"
+                f"{format_ma_label(resolved.ma_mid)}/"
+                f"{format_ma_label(resolved.ma_long)}"
+            )
+            result.trend_strength = 0
+            return
         
         # Determine moving average arrangement.
-        if ma5 > ma10 > ma20 > 0:
+        if ma_short > ma_mid > ma_long > 0:
             # Check if the spacing is expanding (strong)
             prev = df.iloc[-5] if len(df) >= 5 else df.iloc[-1]
             prev_long = float(prev.get(long_col) or 0)
             prev_short = float(prev.get(short_col) or 0)
             prev_spread = (prev_short - prev_long) / prev_long * 100 if prev_long > 0 else 0
-            curr_spread = (ma5 - ma20) / ma20 * 100 if ma20 > 0 else 0
+            curr_spread = (ma_short - ma_long) / ma_long * 100 if ma_long > 0 else 0
             
             if curr_spread > prev_spread and curr_spread > 5:
                 result.trend_status = TrendStatus.STRONG_BULL
@@ -450,7 +632,7 @@ class StockTrendAnalyzer:
                 )
                 result.trend_strength = 75
                 
-        elif ma5 > ma10 and ma10 <= ma20 and ma5 > 0 and ma10 > 0:
+        elif ma_short > ma_mid and ma_mid <= ma_long and ma_short > 0 and ma_mid > 0:
             result.trend_status = TrendStatus.WEAK_BULL
             result.ma_alignment = (
                 f"弱势多头，{format_ma_label(resolved.ma_short)}>"
@@ -459,12 +641,12 @@ class StockTrendAnalyzer:
             )
             result.trend_strength = 55
             
-        elif 0 < ma5 < ma10 < ma20:
+        elif 0 < ma_short < ma_mid < ma_long:
             prev = df.iloc[-5] if len(df) >= 5 else df.iloc[-1]
             prev_long = float(prev.get(long_col) or 0)
             prev_short = float(prev.get(short_col) or 0)
             prev_spread = (prev_long - prev_short) / prev_short * 100 if prev_short > 0 else 0
-            curr_spread = (ma20 - ma5) / ma5 * 100 if ma5 > 0 else 0
+            curr_spread = (ma_long - ma_short) / ma_short * 100 if ma_short > 0 else 0
             
             if curr_spread > prev_spread and curr_spread > 5:
                 result.trend_status = TrendStatus.STRONG_BEAR
@@ -479,7 +661,7 @@ class StockTrendAnalyzer:
                 )
                 result.trend_strength = 25
                 
-        elif ma5 < ma10 and ma10 >= ma20 and ma5 > 0 and ma10 > 0:
+        elif ma_short < ma_mid and ma_mid >= ma_long and ma_short > 0 and ma_mid > 0:
             result.trend_status = TrendStatus.WEAK_BEAR
             result.ma_alignment = (
                 f"弱势空头，{format_ma_label(resolved.ma_short)}<"
@@ -493,7 +675,11 @@ class StockTrendAnalyzer:
             result.ma_alignment = "均线缠绕，趋势不明"
             result.trend_strength = 50
     
-    def _calculate_bias(self, result: TrendAnalysisResult) -> None:
+    def _calculate_bias(
+        self,
+        result: TrendAnalysisResult,
+        periods: IndicatorPeriodConfig,
+    ) -> None:
         """
         计算乖离率
         
@@ -503,12 +689,21 @@ class StockTrendAnalyzer:
         """
         price = result.current_price
         
-        if result.ma5 > 0:
+        if result.ma5 is not None and result.ma5 > 0:
             result.bias_ma5 = (price - result.ma5) / result.ma5 * 100
-        if result.ma10 > 0:
+        if result.ma10 is not None and result.ma10 > 0:
             result.bias_ma10 = (price - result.ma10) / result.ma10 * 100
-        if result.ma20 > 0:
+        if result.ma20 is not None and result.ma20 > 0:
             result.bias_ma20 = (price - result.ma20) / result.ma20 * 100
+        result.bias_by_period = {
+            period: (
+                (price - value) / value * 100
+                if value is not None and value > 0
+                else None
+            )
+            for period, value in result.ma_by_period.items()
+            if period in periods.ma_periods
+        }
     
     def _analyze_volume(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
         """
@@ -548,7 +743,12 @@ class StockTrendAnalyzer:
             result.volume_status = VolumeStatus.NORMAL
             result.volume_trend = "量能正常"
     
-    def _analyze_support_resistance(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+    def _analyze_support_resistance(
+        self,
+        df: pd.DataFrame,
+        result: TrendAnalysisResult,
+        periods: IndicatorPeriodConfig,
+    ) -> None:
         """
         分析支撑压力位
         
@@ -557,14 +757,14 @@ class StockTrendAnalyzer:
         price = result.current_price
         
         # Check if support is found near MA5
-        if result.ma5 > 0:
+        if result.ma5 is not None and result.ma5 > 0:
             ma5_distance = abs(price - result.ma5) / result.ma5
             if ma5_distance <= self.MA_SUPPORT_TOLERANCE and price >= result.ma5:
                 result.support_ma5 = True
                 result.support_levels.append(result.ma5)
         
         # Check if support is found near MA10
-        if result.ma10 > 0:
+        if result.ma10 is not None and result.ma10 > 0:
             ma10_distance = abs(price - result.ma10) / result.ma10
             if ma10_distance <= self.MA_SUPPORT_TOLERANCE and price >= result.ma10:
                 result.support_ma10 = True
@@ -572,8 +772,18 @@ class StockTrendAnalyzer:
                     result.support_levels.append(result.ma10)
         
         # MA20 as an important support.
-        if result.ma20 > 0 and price >= result.ma20:
+        if result.ma20 is not None and result.ma20 > 0 and price >= result.ma20:
             result.support_levels.append(result.ma20)
+
+        for period in periods.ma_periods[:2]:
+            value = result.ma_by_period.get(period)
+            supported = False
+            if value is not None and value > 0:
+                distance = abs(price - value) / value
+                supported = distance <= self.MA_SUPPORT_TOLERANCE and price >= value
+                if supported and value not in result.support_levels:
+                    result.support_levels.append(value)
+            result.support_by_period[period] = supported
         
         # Recent high as resistance
         if len(df) >= 20:
@@ -607,6 +817,23 @@ class StockTrendAnalyzer:
         result.macd_dif = float(latest['MACD_DIF'])
         result.macd_dea = float(latest['MACD_DEA'])
         result.macd_bar = float(latest['MACD_BAR'])
+        result.macd_reading = MACDReading(
+            fast_period=resolved.macd_fast,
+            slow_period=resolved.macd_slow,
+            signal_period=resolved.macd_signal,
+            label=(
+                f"MACD({resolved.macd_fast},{resolved.macd_slow},"
+                f"{resolved.macd_signal})"
+            ),
+            dif=result.macd_dif,
+            dea=result.macd_dea,
+            bar=result.macd_bar,
+            available=True,
+            reason=None,
+            bar_count=result.indicator_bar_count,
+            as_of=result.indicator_as_of,
+            source=result.indicator_period_source,
+        )
 
         # Identify golden crosses and death crosses.
         prev_dif_dea = prev['MACD_DIF'] - prev['MACD_DEA']
@@ -665,49 +892,67 @@ class StockTrendAnalyzer:
         - 40-60：中性区域
         """
         resolved = periods or self._resolve_periods()
-        rsi_long = max(resolved.rsi_periods)
-        if len(df) < rsi_long:
-            result.rsi_signal = "数据不足"
-            return
-
         latest = df.iloc[-1]
 
         rsi_by_period: Dict[int, Any] = {}
-        for period in resolved.rsi_periods:
+        all_periods = tuple(dict.fromkeys((*resolved.rsi_periods, *DEFAULT_RSI_PERIODS)))
+        for period in all_periods:
             col = f"RSI_{period}"
             if col in latest.index and latest[col] == latest[col]:
                 rsi_by_period[period] = float(latest[col])
             else:
                 rsi_by_period[period] = None
         result.rsi_by_period = rsi_by_period
+        result.rsi_readings = {
+            period: IndicatorReading(
+                kind="rsi",
+                period=period,
+                label=f"RSI({period})",
+                value=rsi_by_period[period],
+                available=rsi_by_period[period] is not None,
+                reason=(
+                    None
+                    if rsi_by_period[period] is not None
+                    else f"insufficient_history:need={period},got={result.indicator_bar_count}"
+                ),
+                bar_count=result.indicator_bar_count,
+                as_of=result.indicator_as_of,
+                source=result.indicator_period_source,
+            )
+            for period in resolved.rsi_periods
+        }
 
-        # Legacy slots: first three configured RSI periods → rsi_6/rsi_12/rsi_24
-        slot_values = list(resolved.rsi_periods[:3])
-        while len(slot_values) < 3:
-            slot_values.append(slot_values[-1] if slot_values else DEFAULT_RSI_PERIODS[0])
-        result.rsi_6 = float(rsi_by_period.get(slot_values[0]) or 0.0)
-        result.rsi_12 = float(rsi_by_period.get(slot_values[1]) or 0.0)
-        result.rsi_24 = float(rsi_by_period.get(slot_values[2]) or 0.0)
+        # Legacy fields always retain their exact periods.
+        result.rsi_6 = rsi_by_period.get(6)
+        result.rsi_12 = rsi_by_period.get(12)
+        result.rsi_24 = rsi_by_period.get(24)
 
-        # Use medium-term RSI (second configured period, default 12) as primary
-        rsi_mid = result.rsi_12
+        primary_period = (
+            resolved.rsi_periods[1]
+            if len(resolved.rsi_periods) > 1
+            else resolved.rsi_periods[0]
+        )
+        rsi_mid = rsi_by_period.get(primary_period)
+        if rsi_mid is None:
+            result.rsi_signal = f"RSI({primary_period}) 数据不足"
+            return
 
         # Check RSI status
         if rsi_mid > self.RSI_OVERBOUGHT:
             result.rsi_status = RSIStatus.OVERBOUGHT
-            result.rsi_signal = f"⚠️ RSI超买({rsi_mid:.1f}>70)，短期回调风险高"
+            result.rsi_signal = f"⚠️ RSI({primary_period})超买({rsi_mid:.1f}>70)，短期回调风险高"
         elif rsi_mid > 60:
             result.rsi_status = RSIStatus.STRONG_BUY
-            result.rsi_signal = f"✅ RSI强势({rsi_mid:.1f})，多头力量充足"
+            result.rsi_signal = f"✅ RSI({primary_period})强势({rsi_mid:.1f})，多头力量充足"
         elif rsi_mid >= 40:
             result.rsi_status = RSIStatus.NEUTRAL
-            result.rsi_signal = f" RSI中性({rsi_mid:.1f})，震荡整理中"
+            result.rsi_signal = f" RSI({primary_period})中性({rsi_mid:.1f})，震荡整理中"
         elif rsi_mid >= self.RSI_OVERSOLD:
             result.rsi_status = RSIStatus.WEAK
-            result.rsi_signal = f"⚡ RSI弱势({rsi_mid:.1f})，关注反弹"
+            result.rsi_signal = f"⚡ RSI({primary_period})弱势({rsi_mid:.1f})，关注反弹"
         else:
             result.rsi_status = RSIStatus.OVERSOLD
-            result.rsi_signal = f"⭐ RSI超卖({rsi_mid:.1f}<30)，反弹机会大"
+            result.rsi_signal = f"⭐ RSI({primary_period})超卖({rsi_mid:.1f}<30)，反弹机会大"
 
     def _generate_signal(self, result: TrendAnalysisResult) -> None:
         """
@@ -743,10 +988,18 @@ class StockTrendAnalyzer:
         elif result.trend_status in [TrendStatus.BEAR, TrendStatus.STRONG_BEAR]:
             risks.append(f"⚠️ {result.trend_status.value}，不宜做多")
 
-        # === bias ratio Score (20 points, strong trend compensation) ===
-        bias = result.bias_ma5
-        if bias != bias or bias is None:  # NaN or None defense
-            bias = 0.0
+        # === configured short-MA bias score (20 points) ===
+        bias_period = result.primary_bias_period or 5
+        if bias_period in result.bias_by_period:
+            bias = result.bias_by_period[bias_period]
+        else:
+            # Compatibility for callers constructing the historical result shape
+            # directly. Analyzer-produced snapshots always populate bias_by_period.
+            bias = {
+                5: result.bias_ma5,
+                10: result.bias_ma10,
+                20: result.bias_ma20,
+            }.get(bias_period)
         base_threshold = get_config().bias_threshold
 
         # Strong trend compensation: relax threshold for STRONG_BULL with high strength
@@ -758,23 +1011,25 @@ class StockTrendAnalyzer:
             effective_threshold = base_threshold
             is_strong_trend = False
 
-        if bias < 0:
-            # Price below MA5 (pullback)
+        ma_label = format_ma_label(bias_period)
+        if bias is None or bias != bias:
+            risks.append(f"⚠️ {ma_label} 乖离率不可用，未计入位置评分")
+        elif bias < 0:
             if bias > -3:
                 score += 20
-                reasons.append(f"✅ 价格略低于MA5({bias:.1f}%)，回踩买点")
+                reasons.append(f"✅ 价格略低于{ma_label}({bias:.1f}%)，回踩买点")
             elif bias > -5:
                 score += 16
-                reasons.append(f"✅ 价格回踩MA5({bias:.1f}%)，观察支撑")
+                reasons.append(f"✅ 价格回踩{ma_label}({bias:.1f}%)，观察支撑")
             else:
                 score += 8
                 risks.append(f"⚠️ 乖离率过大({bias:.1f}%)，可能破位")
         elif bias < 2:
             score += 18
-            reasons.append(f"✅ 价格贴近MA5({bias:.1f}%)，介入好时机")
+            reasons.append(f"✅ 价格贴近{ma_label}({bias:.1f}%)，介入好时机")
         elif bias < base_threshold:
             score += 14
-            reasons.append(f"⚡ 价格略高于MA5({bias:.1f}%)，可小仓介入")
+            reasons.append(f"⚡ 价格略高于{ma_label}({bias:.1f}%)，可小仓介入")
         elif bias > effective_threshold:
             score += 4
             risks.append(
@@ -808,12 +1063,19 @@ class StockTrendAnalyzer:
             risks.append("⚠️ 放量下跌，注意风险")
 
         # === Support Score (10 points) ===
-        if result.support_ma5:
+        support_periods = result.primary_ma_periods[:2] or [5, 10]
+
+        def has_support(period: int) -> bool:
+            if period in result.support_by_period:
+                return result.support_by_period[period]
+            return {5: result.support_ma5, 10: result.support_ma10}.get(period, False)
+
+        if support_periods and has_support(support_periods[0]):
             score += 5
-            reasons.append("✅ MA5支撑有效")
-        if result.support_ma10:
+            reasons.append(f"✅ {format_ma_label(support_periods[0])}支撑有效")
+        if len(support_periods) > 1 and has_support(support_periods[1]):
             score += 5
-            reasons.append("✅ MA10支撑有效")
+            reasons.append(f"✅ {format_ma_label(support_periods[1])}支撑有效")
 
         # === MACD score (15 points) ===
         macd_scores = {
@@ -897,6 +1159,23 @@ class StockTrendAnalyzer:
         Returns:
             格式化的分析文本
         """
+        def _fmt(value: Optional[float], digits: int = 2) -> str:
+            return "N/A" if value is None else f"{value:.{digits}f}"
+
+        primary_bias = result.bias_by_period.get(result.primary_bias_period or 5)
+        dynamic_ma_lines = [
+            f"   {reading.label}: {_fmt(reading.value)}"
+            for reading in result.ma_readings.values()
+        ]
+        dynamic_rsi_lines = [
+            f"   {reading.label}: {_fmt(reading.value, 1)}"
+            for reading in result.rsi_readings.values()
+        ]
+        macd_reading = result.macd_reading
+        macd_label = macd_reading.label if macd_reading is not None else "MACD"
+        macd_dif = macd_reading.dif if macd_reading is not None else result.macd_dif
+        macd_dea = macd_reading.dea if macd_reading is not None else result.macd_dea
+        macd_bar = macd_reading.bar if macd_reading is not None else result.macd_bar
         lines = [
             f"=== {result.code} 趋势分析 ===",
             f"",
@@ -906,24 +1185,22 @@ class StockTrendAnalyzer:
             f"",
             f"📈 均线数据:",
             f"   现价: {result.current_price:.2f}",
-            f"   MA5:  {result.ma5:.2f} (乖离 {result.bias_ma5:+.2f}%)",
-            f"   MA10: {result.ma10:.2f} (乖离 {result.bias_ma10:+.2f}%)",
-            f"   MA20: {result.ma20:.2f} (乖离 {result.bias_ma20:+.2f}%)",
+            *dynamic_ma_lines,
+            f"   {format_ma_label(result.primary_bias_period or 5)}乖离: "
+            f"{'N/A' if primary_bias is None else f'{primary_bias:+.2f}%'}",
             f"",
             f"📊 量能分析: {result.volume_status.value}",
             f"   量比(vs5日): {result.volume_ratio_5d:.2f}",
             f"   量能趋势: {result.volume_trend}",
             f"",
-            f"📈 MACD指标: {result.macd_status.value}",
-            f"   DIF: {result.macd_dif:.4f}",
-            f"   DEA: {result.macd_dea:.4f}",
-            f"   MACD: {result.macd_bar:.4f}",
+            f"📈 {macd_label}指标: {result.macd_status.value}",
+            f"   DIF: {_fmt(macd_dif, 4)}",
+            f"   DEA: {_fmt(macd_dea, 4)}",
+            f"   MACD: {_fmt(macd_bar, 4)}",
             f"   信号: {result.macd_signal}",
             f"",
             f"📊 RSI指标: {result.rsi_status.value}",
-            f"   RSI(6): {result.rsi_6:.1f}",
-            f"   RSI(12): {result.rsi_12:.1f}",
-            f"   RSI(24): {result.rsi_24:.1f}",
+            *dynamic_rsi_lines,
             f"   信号: {result.rsi_signal}",
             f"",
             f"🎯 操作建议: {result.buy_signal.value}",

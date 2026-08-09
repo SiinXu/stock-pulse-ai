@@ -232,6 +232,7 @@ class Config:
     indicator_macd_slow: int = 26
     indicator_macd_signal: int = 9
     indicator_rsi_periods: List[int] = field(default_factory=lambda: [6, 12, 24])
+    indicator_period_source: str = "defaults"
 
     # == Agent Mode Configuration ===
     agent_generation_backend: str = AUTO_AGENT_BACKEND_ID

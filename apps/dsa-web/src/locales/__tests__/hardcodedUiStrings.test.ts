@@ -391,8 +391,6 @@ describe('hardcoded UI string scanner', () => {
 });
 
 describe('production hardcoded UI strings', () => {
-  // CI runners can exceed the default 5s vitest timeout when the production
-  // TSX scan grows with the settings-help / i18n inventory surface.
   it('keeps hardcoded English and Chinese copy out of user-facing TSX contexts', () => {
     const failures = productionCandidates().filter((candidate) => !exactAllowedStrings.some((allowance) => (
       allowance.file === candidate.file
@@ -403,7 +401,7 @@ describe('production hardcoded UI strings', () => {
     expect(failures.map(({ file, line, context, text }) => (
       `${file}:${line} [${context}] ${JSON.stringify(text)}`
     ))).toEqual([]);
-  }, 20_000);
+  });
 
   it('keeps every allowance documented, exact, and in use', () => {
     expect(exactAllowedStrings.every((allowance) => allowance.purpose.trim().length > 0)).toBe(true);

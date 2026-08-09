@@ -1283,7 +1283,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Leave empty for historical defaults. Add longer horizons such as 120 or 250 for long-term trend context. The analysis history window expands automatically to cover the longest configured period.',
     valueNotes: [
       'Each value must be a positive integer up to 500.',
-      'The first four periods map to legacy ma5/ma10/ma20/ma60 result slots; extras appear in ma_by_period.',
+      'Configured periods appear under their exact MA labels in ma_by_period and the typed indicator snapshot.',
       'When bars are fewer than a period, that MA is omitted and annotated as insufficient data (no silent shorter-period substitute).',
     ],
     impact: ['Affects trend classification, bias ratios, support checks, and report MA values.'],
@@ -1295,7 +1295,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'INDICATOR_MACD_FAST must be less than INDICATOR_MACD_SLOW. Signal is the DEA smoothing period.',
     valueNotes: [
       'Standard settings are 12/26/9; shorter pairs react faster but are noisier.',
-      'Invalid combinations fall back to defaults at process start; Settings validation rejects them on save.',
+      'Explicit invalid values are rejected consistently at process start and by Settings validation.',
     ],
     impact: ['Affects MACD DIF/DEA/histogram and derived buy/sell scoring.'],
     notes: ['Keep defaults unless you intentionally change the MACD convention.'],
@@ -1303,13 +1303,13 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.indicators.INDICATOR_RSI_PERIODS': {
     title: 'RSI Periods',
     summary: 'Comma-separated RSI periods (default 6,12,24).',
-    usage: 'The first three values fill the legacy rsi_6/rsi_12/rsi_24 slots. Medium (second) period drives RSI status thresholds.',
+    usage: 'Configured values are exposed under their exact RSI labels. The second value (or first when only one is configured) drives RSI status thresholds.',
     valueNotes: [
       'Periods must be positive integers up to 250.',
       'RSI uses Wilder/SMMA smoothing, consistent with alert-path RSI.',
     ],
     impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
-    notes: ['Defaults match the historical report RSI periods.'],
+    notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
   },
   // ------------------------------------------------------------------
   // Report configuration

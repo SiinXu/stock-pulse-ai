@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Configurable technical indicator periods (MA/MACD/RSI) via INDICATOR_* settings with defaults matching historical 5/10/20/60, 12/26/9, 6/12/24; long MAs expand analysis lookback and insufficient data is annotated without shorter-period substitution (#172).
+- [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
 - [Changed] Desktop startup records a bounded asynchronous path-safe CLI visibility summary and documents Desktop/Web capability boundaries for #884 without exposing raw paths to the renderer.
 - [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
 - [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).

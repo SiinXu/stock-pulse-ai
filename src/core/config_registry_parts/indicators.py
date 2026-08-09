@@ -34,8 +34,8 @@ INDICATOR_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Comma-separated moving-average periods in trading days "
             f"(default {_DEFAULT_MA}). Supports longer horizons such as 120/250. "
-            "The first four values map to the legacy ma5/ma10/ma20/ma60 slots; "
-            "additional periods appear in ma_by_period. When a period exceeds "
+            "Configured values appear under their exact MA labels; legacy "
+            "ma5/ma10/ma20/ma60 fields always retain those exact periods. When a period exceeds "
             "available bars the value is omitted and annotated as insufficient data "
             "(no silent shorter-period substitution)."
         ),
@@ -47,7 +47,7 @@ INDICATOR_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": _DEFAULT_MA,
         "options": [],
-        "validation": {},
+        "validation": {"min_items": 3, "max_items": 16, "unique": True},
         "display_order": 10,
         "help_key": "settings.indicators.INDICATOR_MA_PERIODS",
         "examples": [
@@ -131,8 +131,8 @@ INDICATOR_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "RSI Periods",
         "description": (
             "Comma-separated RSI periods (default "
-            f"{_DEFAULT_RSI}). The first three values map to rsi_6/rsi_12/rsi_24 "
-            "legacy slots for report compatibility."
+            f"{_DEFAULT_RSI}). Configured values keep their exact RSI labels; "
+            "legacy rsi_6/rsi_12/rsi_24 fields retain those exact periods."
         ),
         "category": "indicators",
         "data_type": "string",
@@ -142,7 +142,7 @@ INDICATOR_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": _DEFAULT_RSI,
         "options": [],
-        "validation": {},
+        "validation": {"min_items": 1, "max_items": 8, "unique": True},
         "display_order": 50,
         "help_key": "settings.indicators.INDICATOR_RSI_PERIODS",
         "examples": [

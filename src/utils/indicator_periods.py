@@ -4,17 +4,16 @@
 Defaults match the historical hard-coded periods used by StockTrendAnalyzer:
 MA 5/10/20/60, MACD 12/26/9, RSI 6/12/24.
 
-Invalid env values fall back to defaults with a warning so the process always
-starts; Settings/registry validation rejects invalid values on write.
+Explicit invalid values are rejected consistently by environment loading,
+Settings validation, imports, and runtime construction. Only absent values use
+the historical defaults.
 """
 
 from __future__ import annotations
 
-import logging
+import inspect
 from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence, Tuple
-
-logger = logging.getLogger(__name__)
+from typing import Mapping, Optional, Sequence, Tuple
 
 DEFAULT_MA_PERIODS: Tuple[int, ...] = (5, 10, 20, 60)
 DEFAULT_MACD_FAST = 12
@@ -35,6 +34,15 @@ _CALENDAR_DAY_FACTOR = 1.8
 _CALENDAR_DAY_MARGIN = 10
 
 
+class IndicatorPeriodValidationError(ValueError):
+    """Actionable validation error for one indicator-period field."""
+
+    def __init__(self, field_name: str, message: str) -> None:
+        self.field_name = field_name
+        self.detail = message
+        super().__init__(f"{field_name}: {message}")
+
+
 @dataclass(frozen=True)
 class IndicatorPeriodConfig:
     """Resolved, validated indicator periods used by the trend analyzer."""
@@ -44,6 +52,51 @@ class IndicatorPeriodConfig:
     macd_slow: int = DEFAULT_MACD_SLOW
     macd_signal: int = DEFAULT_MACD_SIGNAL
     rsi_periods: Tuple[int, ...] = DEFAULT_RSI_PERIODS
+    source: str = "defaults"
+
+    def __post_init__(self) -> None:
+        ma_periods = _validate_period_tuple(
+            self.ma_periods,
+            field_name="INDICATOR_MA_PERIODS",
+            min_items=3,
+            max_items=16,
+            maximum=MAX_MA_PERIOD,
+        )
+        rsi_periods = _validate_period_tuple(
+            self.rsi_periods,
+            field_name="INDICATOR_RSI_PERIODS",
+            min_items=1,
+            max_items=8,
+            maximum=MAX_RSI_PERIOD,
+        )
+        macd_values = {}
+        for field_name, value in (
+            ("INDICATOR_MACD_FAST", self.macd_fast),
+            ("INDICATOR_MACD_SLOW", self.macd_slow),
+            ("INDICATOR_MACD_SIGNAL", self.macd_signal),
+        ):
+            macd_values[field_name] = _validate_bounded_int(
+                value,
+                field_name=field_name,
+                minimum=MIN_PERIOD,
+                maximum=MAX_MACD_PERIOD,
+            )
+        if macd_values["INDICATOR_MACD_FAST"] >= macd_values["INDICATOR_MACD_SLOW"]:
+            raise IndicatorPeriodValidationError(
+                "INDICATOR_MACD_FAST",
+                "must be less than INDICATOR_MACD_SLOW",
+            )
+        if not isinstance(self.source, str) or not self.source.strip() or len(self.source) > 80:
+            raise IndicatorPeriodValidationError(
+                "indicator_period_source",
+                "must be a non-empty string no longer than 80 characters",
+            )
+        object.__setattr__(self, "ma_periods", ma_periods)
+        object.__setattr__(self, "rsi_periods", rsi_periods)
+        object.__setattr__(self, "macd_fast", macd_values["INDICATOR_MACD_FAST"])
+        object.__setattr__(self, "macd_slow", macd_values["INDICATOR_MACD_SLOW"])
+        object.__setattr__(self, "macd_signal", macd_values["INDICATOR_MACD_SIGNAL"])
+        object.__setattr__(self, "source", self.source.strip())
 
     @property
     def ma_short(self) -> int:
@@ -87,6 +140,56 @@ def trading_days_to_calendar_days(trading_days: int) -> int:
     return int(days * _CALENDAR_DAY_FACTOR) + _CALENDAR_DAY_MARGIN
 
 
+def _validate_bounded_int(
+    value: object,
+    *,
+    field_name: str,
+    minimum: int,
+    maximum: int,
+) -> int:
+    if isinstance(value, bool):
+        raise IndicatorPeriodValidationError(field_name, "must be an integer")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise IndicatorPeriodValidationError(field_name, "must be an integer") from exc
+    if str(value).strip() != str(parsed):
+        raise IndicatorPeriodValidationError(field_name, "must be an integer")
+    if parsed < minimum or parsed > maximum:
+        raise IndicatorPeriodValidationError(
+            field_name,
+            f"must be between {minimum} and {maximum}",
+        )
+    return parsed
+
+
+def _validate_period_tuple(
+    values: Sequence[int],
+    *,
+    field_name: str,
+    min_items: int,
+    max_items: int,
+    maximum: int,
+) -> Tuple[int, ...]:
+    parsed = tuple(
+        _validate_bounded_int(
+            value,
+            field_name=field_name,
+            minimum=MIN_PERIOD,
+            maximum=maximum,
+        )
+        for value in values
+    )
+    if len(parsed) < min_items or len(parsed) > max_items:
+        raise IndicatorPeriodValidationError(
+            field_name,
+            f"must contain between {min_items} and {max_items} periods",
+        )
+    if len(set(parsed)) != len(parsed):
+        raise IndicatorPeriodValidationError(field_name, "must not contain duplicate periods")
+    return parsed
+
+
 def parse_positive_int_list(
     raw: Optional[str],
     *,
@@ -96,57 +199,21 @@ def parse_positive_int_list(
     max_items: int = 16,
     maximum: int = MAX_MA_PERIOD,
 ) -> Tuple[int, ...]:
-    """Parse a comma-separated positive-int list; fall back to *default* on error."""
+    """Parse a comma-separated list; absent values alone use *default*."""
     default_tuple = tuple(int(x) for x in default)
     if raw is None or not str(raw).strip():
         return default_tuple
 
-    parts = [part.strip() for part in str(raw).split(",") if part.strip()]
-    if not parts:
-        logger.warning("%s is empty; falling back to %s", field_name, default_tuple)
-        return default_tuple
-
-    parsed: list[int] = []
-    seen = set()
-    for part in parts:
-        try:
-            value = int(part)
-        except (TypeError, ValueError):
-            logger.warning(
-                "%s=%r contains non-integer %r; falling back to %s",
-                field_name,
-                raw,
-                part,
-                default_tuple,
-            )
-            return default_tuple
-        if value < MIN_PERIOD or value > maximum:
-            logger.warning(
-                "%s=%r has out-of-range period %s (allowed %s..%s); falling back to %s",
-                field_name,
-                raw,
-                value,
-                MIN_PERIOD,
-                maximum,
-                default_tuple,
-            )
-            return default_tuple
-        if value not in seen:
-            seen.add(value)
-            parsed.append(value)
-
-    if len(parsed) < min_items or len(parsed) > max_items:
-        logger.warning(
-            "%s=%r must have between %s and %s unique periods; falling back to %s",
-            field_name,
-            raw,
-            min_items,
-            max_items,
-            default_tuple,
-        )
-        return default_tuple
-
-    return tuple(parsed)
+    parts = [part.strip() for part in str(raw).split(",")]
+    if any(not part for part in parts):
+        raise IndicatorPeriodValidationError(field_name, "must not contain empty entries")
+    return _validate_period_tuple(
+        parts,
+        field_name=field_name,
+        min_items=min_items,
+        max_items=max_items,
+        maximum=maximum,
+    )
 
 
 def _parse_bounded_int(
@@ -157,38 +224,15 @@ def _parse_bounded_int(
     minimum: int,
     maximum: int,
 ) -> int:
-    """Parse a single bounded integer with warning + fallback (leaf helper)."""
+    """Parse a single bounded integer; absent values alone use the default."""
     if raw is None or not str(raw).strip():
         return int(default)
-    try:
-        parsed = int(str(raw).strip())
-    except (TypeError, ValueError):
-        logger.warning(
-            "%s=%r is not a valid integer; falling back to %s",
-            field_name,
-            raw,
-            default,
-        )
-        return int(default)
-    if parsed < minimum:
-        logger.warning(
-            "%s=%r is below minimum %s; clamping to %s",
-            field_name,
-            parsed,
-            minimum,
-            minimum,
-        )
-        return minimum
-    if parsed > maximum:
-        logger.warning(
-            "%s=%r is above maximum %s; clamping to %s",
-            field_name,
-            parsed,
-            maximum,
-            maximum,
-        )
-        return maximum
-    return parsed
+    return _validate_bounded_int(
+        str(raw).strip(),
+        field_name=field_name,
+        minimum=minimum,
+        maximum=maximum,
+    )
 
 
 def parse_macd_periods(
@@ -220,16 +264,10 @@ def parse_macd_periods(
         maximum=MAX_MACD_PERIOD,
     )
     if fast >= slow:
-        logger.warning(
-            "INDICATOR_MACD_FAST=%s must be < INDICATOR_MACD_SLOW=%s; "
-            "falling back to %s/%s/%s",
-            fast,
-            slow,
-            DEFAULT_MACD_FAST,
-            DEFAULT_MACD_SLOW,
-            DEFAULT_MACD_SIGNAL,
+        raise IndicatorPeriodValidationError(
+            "INDICATOR_MACD_FAST",
+            "must be less than INDICATOR_MACD_SLOW",
         )
-        return DEFAULT_MACD_FAST, DEFAULT_MACD_SLOW, DEFAULT_MACD_SIGNAL
     return fast, slow, signal
 
 
@@ -240,27 +278,54 @@ def resolve_indicator_periods(
     macd_slow: Optional[int] = None,
     macd_signal: Optional[int] = None,
     rsi_periods: Optional[Sequence[int]] = None,
+    source: str = "runtime",
 ) -> IndicatorPeriodConfig:
     """Build a period config from already-parsed integers (or defaults)."""
-    ma = tuple(ma_periods) if ma_periods else DEFAULT_MA_PERIODS
-    rsi = tuple(rsi_periods) if rsi_periods else DEFAULT_RSI_PERIODS
+    ma = tuple(ma_periods) if ma_periods is not None else DEFAULT_MA_PERIODS
+    rsi = tuple(rsi_periods) if rsi_periods is not None else DEFAULT_RSI_PERIODS
     return IndicatorPeriodConfig(
-        ma_periods=ma if ma else DEFAULT_MA_PERIODS,
-        macd_fast=int(macd_fast) if macd_fast is not None else DEFAULT_MACD_FAST,
-        macd_slow=int(macd_slow) if macd_slow is not None else DEFAULT_MACD_SLOW,
-        macd_signal=int(macd_signal) if macd_signal is not None else DEFAULT_MACD_SIGNAL,
-        rsi_periods=rsi if rsi else DEFAULT_RSI_PERIODS,
+        ma_periods=ma,
+        macd_fast=macd_fast if macd_fast is not None else DEFAULT_MACD_FAST,
+        macd_slow=macd_slow if macd_slow is not None else DEFAULT_MACD_SLOW,
+        macd_signal=macd_signal if macd_signal is not None else DEFAULT_MACD_SIGNAL,
+        rsi_periods=rsi,
+        source=source,
     )
 
 
 def periods_from_config(config: object) -> IndicatorPeriodConfig:
     """Read indicator periods from a Config-like object."""
+    def explicit_value(name: str) -> object:
+        """Read a genuinely declared attribute without dynamic-proxy fabrication."""
+        try:
+            attributes = vars(config)
+        except TypeError:
+            attributes = {}
+        if name in attributes:
+            return attributes[name]
+        sentinel = object()
+        static_value = inspect.getattr_static(config, name, sentinel)
+        if static_value is sentinel:
+            return None
+        return getattr(config, name)
+
+    ma_periods = explicit_value("indicator_ma_periods")
+    macd_fast = explicit_value("indicator_macd_fast")
+    macd_slow = explicit_value("indicator_macd_slow")
+    macd_signal = explicit_value("indicator_macd_signal")
+    rsi_periods = explicit_value("indicator_rsi_periods")
+    source = explicit_value("indicator_period_source")
+    has_explicit_periods = any(
+        value is not None
+        for value in (ma_periods, macd_fast, macd_slow, macd_signal, rsi_periods)
+    )
     return resolve_indicator_periods(
-        ma_periods=getattr(config, "indicator_ma_periods", None),
-        macd_fast=getattr(config, "indicator_macd_fast", None),
-        macd_slow=getattr(config, "indicator_macd_slow", None),
-        macd_signal=getattr(config, "indicator_macd_signal", None),
-        rsi_periods=getattr(config, "indicator_rsi_periods", None),
+        ma_periods=ma_periods,
+        macd_fast=macd_fast,
+        macd_slow=macd_slow,
+        macd_signal=macd_signal,
+        rsi_periods=rsi_periods,
+        source=source or ("global_settings" if has_explicit_periods else "defaults"),
     )
 
 
@@ -287,29 +352,49 @@ def validate_period_list_string(
     """Strict validation for Settings writes (no silent fallback)."""
     if raw is None or not str(raw).strip():
         return False, "period list must not be empty"
-    parts = [part.strip() for part in str(raw).split(",") if part.strip()]
-    if len(parts) < min_items or len(parts) > max_items:
-        return False, f"period list must have between {min_items} and {max_items} values"
-    seen = set()
-    for part in parts:
-        try:
-            value = int(part)
-        except (TypeError, ValueError):
-            return False, f"period values must be integers, got {part!r}"
-        if value < MIN_PERIOD or value > maximum:
-            return False, f"period {value} out of range {MIN_PERIOD}..{maximum}"
-        if value in seen:
-            return False, f"duplicate period {value}"
-        seen.add(value)
+    try:
+        parse_positive_int_list(
+            raw,
+            default=(),
+            field_name="period list",
+            min_items=min_items,
+            max_items=max_items,
+            maximum=maximum,
+        )
+    except IndicatorPeriodValidationError as exc:
+        return False, exc.detail
     return True, ""
 
 
-def iter_named_ma_slots(periods: Sequence[int]) -> Iterable[Tuple[str, int]]:
-    """Map ordered periods onto legacy result field names ma5/ma10/ma20/ma60.
-
-    Slot names are historical compatibility labels; the period integers come
-    from configuration. Only the first four periods are mapped to named slots.
-    """
-    slot_names = ("ma5", "ma10", "ma20", "ma60")
-    for name, period in zip(slot_names, periods):
-        yield name, int(period)
+def validate_indicator_env_map(values: Mapping[str, object]) -> IndicatorPeriodConfig:
+    """Validate raw env/Settings values through the authoritative contract."""
+    ma = parse_positive_int_list(
+        values.get("INDICATOR_MA_PERIODS"),
+        default=DEFAULT_MA_PERIODS,
+        field_name="INDICATOR_MA_PERIODS",
+        min_items=3,
+        max_items=16,
+        maximum=MAX_MA_PERIOD,
+    )
+    rsi = parse_positive_int_list(
+        values.get("INDICATOR_RSI_PERIODS"),
+        default=DEFAULT_RSI_PERIODS,
+        field_name="INDICATOR_RSI_PERIODS",
+        min_items=1,
+        max_items=8,
+        maximum=MAX_RSI_PERIOD,
+    )
+    fast, slow, signal = parse_macd_periods(
+        fast_raw=values.get("INDICATOR_MACD_FAST"),
+        slow_raw=values.get("INDICATOR_MACD_SLOW"),
+        signal_raw=values.get("INDICATOR_MACD_SIGNAL"),
+    )
+    explicit = any(value is not None and str(value).strip() for value in values.values())
+    return IndicatorPeriodConfig(
+        ma_periods=ma,
+        macd_fast=fast,
+        macd_slow=slow,
+        macd_signal=signal,
+        rsi_periods=rsi,
+        source="global_settings" if explicit else "defaults",
+    )

@@ -102,43 +102,25 @@ def emit_legacy_schedule_deprecation_if_needed(
 
 
 def _load_indicator_period_fields() -> Dict[str, Any]:
-    """Parse technical-indicator period env vars with defaults matching history."""
-    from src.utils.indicator_periods import (
-        DEFAULT_MA_PERIODS,
-        DEFAULT_RSI_PERIODS,
-        MAX_MA_PERIOD,
-        MAX_RSI_PERIOD,
-        parse_macd_periods,
-        parse_positive_int_list,
-    )
+    """Load the same strict contract used by Settings and runtime reload."""
+    from src.utils.indicator_periods import validate_indicator_env_map
 
-    ma_periods = parse_positive_int_list(
-        os.getenv("INDICATOR_MA_PERIODS"),
-        default=DEFAULT_MA_PERIODS,
-        field_name="INDICATOR_MA_PERIODS",
-        min_items=3,
-        max_items=16,
-        maximum=MAX_MA_PERIOD,
-    )
-    rsi_periods = parse_positive_int_list(
-        os.getenv("INDICATOR_RSI_PERIODS"),
-        default=DEFAULT_RSI_PERIODS,
-        field_name="INDICATOR_RSI_PERIODS",
-        min_items=1,
-        max_items=8,
-        maximum=MAX_RSI_PERIOD,
-    )
-    macd_fast, macd_slow, macd_signal = parse_macd_periods(
-        fast_raw=os.getenv("INDICATOR_MACD_FAST"),
-        slow_raw=os.getenv("INDICATOR_MACD_SLOW"),
-        signal_raw=os.getenv("INDICATOR_MACD_SIGNAL"),
+    resolved = validate_indicator_env_map(
+        {
+            "INDICATOR_MA_PERIODS": os.getenv("INDICATOR_MA_PERIODS"),
+            "INDICATOR_MACD_FAST": os.getenv("INDICATOR_MACD_FAST"),
+            "INDICATOR_MACD_SLOW": os.getenv("INDICATOR_MACD_SLOW"),
+            "INDICATOR_MACD_SIGNAL": os.getenv("INDICATOR_MACD_SIGNAL"),
+            "INDICATOR_RSI_PERIODS": os.getenv("INDICATOR_RSI_PERIODS"),
+        }
     )
     return {
-        "indicator_ma_periods": list(ma_periods),
-        "indicator_macd_fast": macd_fast,
-        "indicator_macd_slow": macd_slow,
-        "indicator_macd_signal": macd_signal,
-        "indicator_rsi_periods": list(rsi_periods),
+        "indicator_ma_periods": list(resolved.ma_periods),
+        "indicator_macd_fast": resolved.macd_fast,
+        "indicator_macd_slow": resolved.macd_slow,
+        "indicator_macd_signal": resolved.macd_signal,
+        "indicator_rsi_periods": list(resolved.rsi_periods),
+        "indicator_period_source": resolved.source,
     }
 
 
