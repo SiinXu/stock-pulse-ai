@@ -1,394 +1,515 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Read-only Agent trajectory evaluation over runner ``tool_calls_log`` (Issue #269).
+"""Deterministic trajectory evaluation for the owned offline benchmark.
 
-Consumes fields already written by the agent runner:
-
-- ``step`` (int, loop step index; may repeat for parallel tools)
-- ``tool`` (str)
-- ``arguments`` (dict, already redacted by the runner)
-- ``success`` (bool)
-- ``duration`` (float seconds; converted to ms here)
-- ``cached`` (bool)
-- optional ``timeout`` (bool)
-- optional ``guarded`` (bool)
-
-Does **not** modify runner / executor / orchestrator. Default-off gate:
-``AGENT_TRAJECTORY_EVAL_ENABLED`` (env) or ``config.agent_trajectory_eval_enabled``.
+The benchmark invocation is the opt-in consumer. This service has no runtime
+environment gate and never mutates the agent runner. It consumes the runner's
+already-redacted tool-call log plus benchmark-owned expected-tool annotations.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
-import logging
-import os
+import math
+from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
+from pydantic import ValidationError
 
 from src.schemas.agent_trajectory import (
     FAILURE_CLASS_ERROR,
     FAILURE_CLASS_GUARDED,
     FAILURE_CLASS_NONE,
     FAILURE_CLASS_TIMEOUT,
-    PATH_LABELS,
+    INPUT_SCHEMA_VERSION,
     PATH_ORCHESTRATOR,
     PATH_SINGLE,
+    RUBRIC_VERSION,
     TRAJECTORY_EVAL_ENGINE_VERSION,
     TrajectoryEvalResult,
+    TrajectoryEvaluationProvenance,
     TrajectoryMetrics,
+    TrajectoryRubric,
+    TrajectoryRunInput,
+    TrajectoryRunProvenance,
     TrajectoryStep,
+    TrajectoryToolCallInput,
 )
 
 
-logger = logging.getLogger(__name__)
-
-ToolCallsLog = Sequence[Mapping[str, Any]]
-PathLabel = str
-
-
-def is_agent_trajectory_eval_enabled(config: Any = None) -> bool:
-    """Return whether trajectory evaluation is enabled (default off).
-
-    Resolution order:
-
-    1. Explicit ``config.agent_trajectory_eval_enabled`` when the attribute exists
-    2. Environment variable ``AGENT_TRAJECTORY_EVAL_ENABLED``
-    3. Default ``False``
-
-    Config model registration is intentionally not required for this offline
-    consumer so the gate works without touching shared config ownership files.
-    """
-    if config is not None and hasattr(config, "agent_trajectory_eval_enabled"):
-        return bool(getattr(config, "agent_trajectory_eval_enabled"))
-    return _parse_env_bool(os.getenv("AGENT_TRAJECTORY_EVAL_ENABLED"), False)
+MAX_RUNS = 64
+MAX_SOURCE_CALLS_PER_RUN = 2_000
+MAX_EVALUATED_CALLS = 2_000
+MAX_OUTPUT_STEPS = 1_000
+MAX_RESULT_CHARS = 500_000
+MAX_ARGUMENT_DEPTH = 4
+MAX_ARGUMENT_KEYS = 32
+MAX_ARGUMENT_ITEMS = 64
+MAX_ARGUMENT_STRING_CHARS = 512
+MAX_ARGUMENT_JSON_CHARS = 4_096
 
 
 def evaluate_agent_trajectory(
-    tool_calls_log: Optional[ToolCallsLog] = None,
+    runs: Sequence[TrajectoryRunInput | Mapping[str, Any] | Any],
     *,
-    runs: Optional[Sequence[ToolCallsLog]] = None,
-    path_label: PathLabel = PATH_SINGLE,
-    config: Any = None,
-    force: bool = False,
+    rubric: TrajectoryRubric | Mapping[str, Any],
+    path_label: str = PATH_SINGLE,
+    as_of: Optional[str] = None,
 ) -> TrajectoryEvalResult:
-    """Evaluate one or more ``tool_calls_log`` sequences under the default-off gate.
+    """Evaluate bounded run inputs and return a joinable strict result.
 
-    Parameters
-    ----------
-    tool_calls_log:
-        Single-run log. Ignored when ``runs`` is provided.
-    runs:
-        Multiple runs (single-agent or orchestrator-aggregated logs). All runs
-        share the same metric functions for comparable baselines.
-    path_label:
-        ``single`` or ``orchestrator`` — labeling only; does not change formulas.
-    config:
-        Optional config object exposing ``agent_trajectory_eval_enabled``.
-    force:
-        When True, compute metrics even if the gate is off (used by pure tests
-        and offline tooling). Runtime product callers should leave this False.
+    Invalid runs/calls are counted rather than coerced. Valid calls within a
+    partially malformed run remain evaluable. Raw argument bodies are used only
+    to compute a bounded SHA-256 fingerprint and are not returned.
     """
-    label = _normalize_path_label(path_label)
-    if not force and not is_agent_trajectory_eval_enabled(config):
-        return _neutral_result(path_label=label, enabled=False)
+    label = _validate_path_label(path_label)
+    rubric_model = (
+        rubric if isinstance(rubric, TrajectoryRubric) else TrajectoryRubric.model_validate(rubric)
+    )
+    normalized_as_of = _validate_optional_timestamp(as_of)
 
-    run_logs = _collect_runs(tool_calls_log=tool_calls_log, runs=runs)
-    return compute_trajectory_metrics(run_logs, path_label=label)
+    accepted_runs: List[TrajectoryRunInput] = []
+    run_provenance: List[TrajectoryRunProvenance] = []
+    rejected_run_count = 0
+    rejected_call_count = 0
+    source_truncated = len(runs) > MAX_RUNS
+    remaining_capacity = MAX_EVALUATED_CALLS
+
+    for raw_run in list(runs)[:MAX_RUNS]:
+        parsed = _parse_run(raw_run, remaining_capacity=remaining_capacity)
+        if parsed is None:
+            rejected_run_count += 1
+            continue
+        run_model, rejected, clipped = parsed
+        rejected_call_count += rejected
+        source_truncated = source_truncated or clipped or run_model.source_truncated
+        accepted_runs.append(run_model)
+        remaining_capacity -= len(run_model.tool_calls)
+        run_provenance.append(
+            TrajectoryRunProvenance(
+                run_id=run_model.run_id,
+                execution_id=run_model.execution_id,
+                task_id=run_model.task_id,
+                agent_id=run_model.agent_id,
+                stock_code=run_model.stock_code,
+                market=run_model.market,
+                started_at=run_model.started_at,
+                completed=run_model.completed,
+                source_truncated=run_model.source_truncated or clipped,
+                accepted_call_count=len(run_model.tool_calls),
+                rejected_call_count=rejected,
+            )
+        )
+        if remaining_capacity <= 0:
+            source_truncated = True
+            break
+
+    result = _compute_result(
+        accepted_runs,
+        rubric=rubric_model,
+        path_label=label,
+        as_of=normalized_as_of,
+        run_provenance=run_provenance,
+        rejected_run_count=rejected_run_count,
+        rejected_call_count=rejected_call_count,
+        source_truncated=source_truncated,
+    )
+    return _enforce_result_budget(result)
 
 
 def compute_trajectory_metrics(
-    runs: Sequence[ToolCallsLog],
+    runs: Sequence[TrajectoryRunInput | Mapping[str, Any] | Any],
     *,
-    path_label: PathLabel = PATH_SINGLE,
+    rubric: TrajectoryRubric | Mapping[str, Any],
+    path_label: str = PATH_SINGLE,
+    as_of: Optional[str] = None,
 ) -> TrajectoryEvalResult:
-    """Pure metric computation shared by single-agent and orchestrator paths.
-
-    Empty input returns a neutral result with ``sample_size=0`` and nullable
-    rate metrics set to ``None`` (never fabricated).
-    """
-    label = _normalize_path_label(path_label)
-    if not runs:
-        return TrajectoryEvalResult(
-            metrics=_empty_metrics(path_label=label, enabled=True, neutral=True),
-            steps=[],
-            run_count=0,
-        )
-
-    all_steps: List[TrajectoryStep] = []
-    total_success = 0
-    total_redundant = 0
-    total_retry = 0
-    total_duration_ms = 0
-    global_index = 0
-
-    for run_log in runs:
-        run_steps, success_n, redundant_n, retry_n, duration_ms = _evaluate_single_run(
-            run_log,
-            start_index=global_index,
-        )
-        all_steps.extend(run_steps)
-        total_success += success_n
-        total_redundant += redundant_n
-        total_retry += retry_n
-        total_duration_ms += duration_ms
-        global_index += len(run_steps)
-
-    sample_size = len(all_steps)
-    run_count = len(runs)
-    if sample_size == 0:
-        return TrajectoryEvalResult(
-            metrics=_empty_metrics(path_label=label, enabled=True, neutral=True),
-            steps=[],
-            run_count=run_count,
-        )
-
-    accuracy = total_success / float(sample_size)
-    efficiency = (sample_size - total_redundant) / float(sample_size)
-
-    metrics = TrajectoryMetrics(
-        tool_selection_accuracy=accuracy,
-        redundant_call_count=total_redundant,
-        retry_count=total_retry,
-        step_efficiency=efficiency,
-        total_duration_ms=total_duration_ms,
-        sample_size=sample_size,
-        path_label=label,
-        engine_version=TRAJECTORY_EVAL_ENGINE_VERSION,
-        enabled=True,
-        neutral=False,
+    """Compatibility name for the pure benchmark calculation."""
+    return evaluate_agent_trajectory(
+        runs,
+        rubric=rubric,
+        path_label=path_label,
+        as_of=as_of,
     )
-    return TrajectoryEvalResult(
-        metrics=metrics,
-        steps=all_steps,
-        run_count=run_count,
+
+
+def strict_json_dumps(result: TrajectoryEvalResult) -> str:
+    """Serialize without JavaScript-only NaN/Infinity extensions."""
+    return json.dumps(
+        result.to_dict(),
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
     )
+
+
+def duration_to_ms(duration_seconds: Any) -> Optional[int]:
+    """Convert a finite 0..3600-second duration to milliseconds."""
+    if duration_seconds is None or isinstance(duration_seconds, bool):
+        return None
+    try:
+        value = float(duration_seconds)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(value) or value < 0.0 or value > 3_600.0:
+        return None
+    return int(value * 1_000.0)
 
 
 def normalize_tool_arguments(arguments: Any) -> str:
-    """Return a stable fingerprint for argument equality (redundancy / retry).
-
-    Deterministic rules:
-
-    - Non-mapping arguments become a JSON scalar / list via ``default=str``
-    - Mapping keys are sorted recursively
-    - Output is compact JSON (no whitespace)
-    """
-    return json.dumps(
-        _canonicalize(arguments if arguments is not None else {}),
+    """Return a bounded canonical JSON representation or raise ``ValueError``."""
+    normalized = _canonicalize(arguments, depth=0)
+    serialized = json.dumps(
+        normalized,
+        allow_nan=False,
         ensure_ascii=False,
-        sort_keys=True,
         separators=(",", ":"),
-        default=str,
+        sort_keys=True,
     )
+    if len(serialized) > MAX_ARGUMENT_JSON_CHARS:
+        raise ValueError("tool arguments exceed canonical size limit")
+    return serialized
 
 
-def classify_failure(entry: Mapping[str, Any]) -> str:
-    """Classify failure using only runner log fields."""
-    if bool(entry.get("success")):
+def classify_failure(entry: TrajectoryToolCallInput | Mapping[str, Any]) -> str:
+    """Classify a strictly Boolean tool outcome."""
+    success = entry.success if isinstance(entry, TrajectoryToolCallInput) else entry.get("success")
+    if success is True:
         return FAILURE_CLASS_NONE
-    if entry.get("timeout") is True:
+    timeout = entry.timeout if isinstance(entry, TrajectoryToolCallInput) else entry.get("timeout")
+    guarded = entry.guarded if isinstance(entry, TrajectoryToolCallInput) else entry.get("guarded")
+    if timeout is True:
         return FAILURE_CLASS_TIMEOUT
-    if entry.get("guarded") is True:
+    if guarded is True:
         return FAILURE_CLASS_GUARDED
     return FAILURE_CLASS_ERROR
 
 
-def duration_to_ms(duration_seconds: Any) -> Optional[int]:
-    """Convert runner ``duration`` (seconds) to non-negative milliseconds."""
-    if duration_seconds is None:
-        return None
-    try:
-        return max(0, int(float(duration_seconds) * 1000.0))
-    except (TypeError, ValueError):
-        return None
-
-
-# ---------------------------------------------------------------------------
-# Internals
-# ---------------------------------------------------------------------------
-
-
-def _evaluate_single_run(
-    tool_calls_log: Optional[ToolCallsLog],
+def _parse_run(
+    raw_run: TrajectoryRunInput | Mapping[str, Any] | Any,
     *,
-    start_index: int = 0,
-) -> Tuple[List[TrajectoryStep], int, int, int, int]:
-    """Evaluate one run. Returns steps, success_n, redundant_n, retry_n, duration_ms."""
-    steps: List[TrajectoryStep] = []
-    if not tool_calls_log:
-        return steps, 0, 0, 0, 0
+    remaining_capacity: int,
+) -> Optional[Tuple[TrajectoryRunInput, int, bool]]:
+    if isinstance(raw_run, TrajectoryRunInput):
+        calls_raw: Sequence[Any] = raw_run.tool_calls
+        metadata = raw_run.model_dump(exclude={"tool_calls"})
+    elif isinstance(raw_run, Mapping):
+        calls_value = raw_run.get("tool_calls")
+        if not isinstance(calls_value, list):
+            return None
+        calls_raw = calls_value
+        allowed = set(TrajectoryRunInput.model_fields) - {"tool_calls"}
+        if any(key not in allowed and key != "tool_calls" for key in raw_run):
+            return None
+        metadata = {key: raw_run[key] for key in allowed if key in raw_run}
+    else:
+        return None
 
-    # fingerprint -> last outcome was success (True) or failure (False)
-    prior_outcome: Dict[str, bool] = {}
-    success_n = 0
-    redundant_n = 0
-    retry_n = 0
-    duration_sum = 0
-    emitted = 0
-
-    for raw in tool_calls_log:
-        if not isinstance(raw, Mapping):
-            continue
-        tool = _tool_name(raw.get("tool"))
-        args_key = normalize_tool_arguments(raw.get("arguments"))
-        fingerprint = f"{tool}\0{args_key}"
-        success = bool(raw.get("success"))
-        cached = bool(raw.get("cached"))
-        duration_ms = duration_to_ms(raw.get("duration"))
-        failure_class = classify_failure(raw)
-
-        is_redundant = False
-        is_retry = False
-        if fingerprint in prior_outcome:
-            if prior_outcome[fingerprint] is True:
-                # Same tool + same normalized args after a prior success → redundant
-                # (includes cache hits re-issued with identical args).
-                is_redundant = True
-                redundant_n += 1
-            else:
-                # Same tool + same normalized args after a prior failure → retry
-                is_retry = True
-                retry_n += 1
-
-        # Update last outcome for this fingerprint (latest attempt wins for chain).
-        prior_outcome[fingerprint] = success
-
-        if success:
-            success_n += 1
-        if duration_ms is not None:
-            duration_sum += duration_ms
-
-        step_value = raw.get("step")
-        step_int: Optional[int]
+    valid_calls: List[TrajectoryToolCallInput] = []
+    rejected = 0
+    source_limit = min(MAX_SOURCE_CALLS_PER_RUN, max(0, remaining_capacity))
+    clipped = len(calls_raw) > source_limit
+    for raw_call in list(calls_raw)[:source_limit]:
         try:
-            step_int = int(step_value) if step_value is not None else None
-        except (TypeError, ValueError):
-            step_int = None
-
-        arguments = raw.get("arguments")
-        args_dict: Optional[Dict[str, Any]]
-        if isinstance(arguments, dict):
-            args_dict = dict(arguments)
-        else:
-            args_dict = None
-
-        steps.append(
-            TrajectoryStep(
-                index=start_index + emitted,
-                step=step_int,
-                tool=tool,
-                success=success,
-                duration_ms=duration_ms,
-                cached=cached,
-                failure_class=failure_class,
-                is_redundant=is_redundant,
-                is_retry=is_retry,
-                arguments=args_dict,
+            call = (
+                raw_call
+                if isinstance(raw_call, TrajectoryToolCallInput)
+                else TrajectoryToolCallInput.model_validate(raw_call)
             )
-        )
-        emitted += 1
+            normalize_tool_arguments(call.arguments)
+        except (ValidationError, TypeError, ValueError, OverflowError):
+            rejected += 1
+            continue
+        valid_calls.append(call)
+    rejected += max(0, len(calls_raw) - source_limit)
 
-    return steps, success_n, redundant_n, retry_n, duration_sum
+    try:
+        run = TrajectoryRunInput.model_validate({**metadata, "tool_calls": valid_calls})
+    except ValidationError:
+        return None
+    return run, rejected, clipped
 
 
-def _collect_runs(
+def _compute_result(
+    runs: Sequence[TrajectoryRunInput],
     *,
-    tool_calls_log: Optional[ToolCallsLog],
-    runs: Optional[Sequence[ToolCallsLog]],
-) -> List[ToolCallsLog]:
-    if runs is not None:
-        return [run if run is not None else [] for run in runs]
-    if tool_calls_log is not None:
-        return [tool_calls_log]
-    return []
+    rubric: TrajectoryRubric,
+    path_label: str,
+    as_of: Optional[str],
+    run_provenance: List[TrajectoryRunProvenance],
+    rejected_run_count: int,
+    rejected_call_count: int,
+    source_truncated: bool,
+) -> TrajectoryEvalResult:
+    steps: List[TrajectoryStep] = []
+    success_count = 0
+    redundant_count = 0
+    retry_count = 0
+    productive_count = 0
+    cache_count = 0
+    total_duration_ms = 0
+    missing_duration_count = 0
+    selected_tools: List[str] = []
 
+    for run in runs:
+        # Fingerprints never cross run or agent ownership boundaries.
+        prior: Dict[Tuple[str, str], Tuple[Optional[int], bool]] = {}
+        for local_index, call in enumerate(run.tool_calls):
+            agent_id = call.agent_id or run.agent_id
+            argument_json = normalize_tool_arguments(call.arguments)
+            argument_fingerprint = hashlib.sha256(argument_json.encode("utf-8")).hexdigest()
+            scope_key = (agent_id, f"{call.tool}\0{argument_fingerprint}")
+            position = call.dispatch_index if call.dispatch_index is not None else call.step
+            is_redundant = False
+            is_retry = False
+            previous = prior.get(scope_key)
+            if previous is not None:
+                previous_position, previous_success = previous
+                causally_after = (
+                    position is not None
+                    and previous_position is not None
+                    and position > previous_position
+                )
+                if causally_after and previous_success:
+                    is_redundant = True
+                    redundant_count += 1
+                elif causally_after and not previous_success:
+                    is_retry = True
+                    retry_count += 1
+            if previous is None or (
+                position is not None
+                and (previous[0] is None or position >= previous[0])
+            ):
+                prior[scope_key] = (position, call.success)
 
-def _neutral_result(*, path_label: str, enabled: bool) -> TrajectoryEvalResult:
-    logger.debug(
-        "agent_trajectory_eval neutral result path_label=%s enabled=%s",
-        path_label,
-        enabled,
+            duration_ms = duration_to_ms(call.duration)
+            if duration_ms is None:
+                missing_duration_count += 1
+            else:
+                total_duration_ms += duration_ms
+            if call.success:
+                success_count += 1
+            if call.cached:
+                cache_count += 1
+            if call.success and not is_redundant:
+                productive_count += 1
+            selected_tools.append(call.tool)
+
+            steps.append(
+                TrajectoryStep(
+                    index=len(steps),
+                    run_id=run.run_id,
+                    execution_id=run.execution_id,
+                    task_id=run.task_id,
+                    agent_id=agent_id,
+                    call_id=call.call_id or f"{run.run_id}:{agent_id}:{local_index}",
+                    step=call.step,
+                    dispatch_index=call.dispatch_index,
+                    tool=call.tool,
+                    argument_fingerprint=argument_fingerprint,
+                    success=call.success,
+                    duration_ms=duration_ms,
+                    cached=call.cached,
+                    failure_class=classify_failure(call),
+                    is_redundant=is_redundant,
+                    is_retry=is_retry,
+                    dispatched_at=call.dispatched_at,
+                    started_at=call.started_at,
+                    ended_at=call.ended_at,
+                )
+            )
+
+    sample_size = len(steps)
+    precision, recall, f1 = _selection_metrics(selected_tools, rubric)
+    completed = [run.completed for run in runs if run.completed is not None]
+    completion_rate = (
+        sum(1 for value in completed if value) / float(len(completed))
+        if completed
+        else None
+    )
+    metrics = TrajectoryMetrics(
+        tool_selection_precision=precision,
+        tool_selection_recall=recall,
+        tool_selection_f1=f1,
+        tool_call_success_rate=_rate(success_count, sample_size),
+        productive_step_rate=_rate(productive_count, sample_size),
+        redundancy_rate=_rate(redundant_count, sample_size),
+        retry_rate=_rate(retry_count, sample_size),
+        cache_hit_rate=_rate(cache_count, sample_size),
+        task_completion_rate=completion_rate,
+        redundant_call_count=redundant_count,
+        retry_count=retry_count,
+        successful_call_count=success_count,
+        productive_step_count=productive_count,
+        total_duration_ms=total_duration_ms,
+        missing_duration_count=missing_duration_count,
+        sample_size=sample_size,
+    )
+
+    rubric_json = json.dumps(
+        rubric.model_dump(mode="json"),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    rubric_fingerprint = hashlib.sha256(rubric_json.encode("utf-8")).hexdigest()
+    identity_payload = {
+        "as_of": as_of,
+        "engine": TRAJECTORY_EVAL_ENGINE_VERSION,
+        "path": path_label,
+        "rubric": rubric_fingerprint,
+        "runs": [item.model_dump(mode="json") for item in run_provenance],
+        "steps": [
+            {
+                "run_id": step.run_id,
+                "agent_id": step.agent_id,
+                "call_id": step.call_id,
+                "tool": step.tool,
+                "argument_fingerprint": step.argument_fingerprint,
+                "success": step.success,
+            }
+            for step in steps
+        ],
+    }
+    evaluation_id = hashlib.sha256(
+        json.dumps(
+            identity_payload,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    provenance = TrajectoryEvaluationProvenance(
+        evaluation_id=evaluation_id,
+        input_schema_version=INPUT_SCHEMA_VERSION,
+        engine_version=TRAJECTORY_EVAL_ENGINE_VERSION,
+        rubric_version=RUBRIC_VERSION,
+        rubric_fingerprint=rubric_fingerprint,
+        path_label=path_label,
+        as_of=as_of,
+        run_count=len(runs),
+        rejected_run_count=rejected_run_count,
+        rejected_call_count=rejected_call_count,
+        source_truncated=source_truncated,
+        output_truncated=False,
+        output_dropped_step_count=0,
     )
     return TrajectoryEvalResult(
-        metrics=_empty_metrics(path_label=path_label, enabled=enabled, neutral=True),
-        steps=[],
-        run_count=0,
+        provenance=provenance,
+        metrics=metrics,
+        runs=run_provenance,
+        steps=steps[:MAX_OUTPUT_STEPS],
     )
 
 
-def _empty_metrics(
-    *,
-    path_label: str,
-    enabled: bool,
-    neutral: bool,
-) -> TrajectoryMetrics:
-    return TrajectoryMetrics(
-        tool_selection_accuracy=None,
-        redundant_call_count=0,
-        retry_count=0,
-        step_efficiency=None,
-        total_duration_ms=0,
-        sample_size=0,
-        path_label=path_label,
-        engine_version=TRAJECTORY_EVAL_ENGINE_VERSION,
-        enabled=enabled,
-        neutral=neutral,
-    )
+def _enforce_result_budget(result: TrajectoryEvalResult) -> TrajectoryEvalResult:
+    steps = list(result.steps)
+    initial_dropped = max(0, result.metrics.sample_size - len(steps))
+    while steps:
+        candidate = _with_output_truncation(result, steps, initial_dropped + len(result.steps) - len(steps))
+        if len(strict_json_dumps(candidate)) <= MAX_RESULT_CHARS:
+            return candidate
+        steps = steps[: max(0, len(steps) // 2)]
+    candidate = _with_output_truncation(result, [], result.metrics.sample_size)
+    if len(strict_json_dumps(candidate)) > MAX_RESULT_CHARS:
+        raise ValueError("trajectory evaluation metadata exceeds result size limit")
+    return candidate
 
 
-def _normalize_path_label(path_label: Optional[str]) -> str:
-    if path_label in PATH_LABELS:
-        return str(path_label)
-    if path_label in (None, ""):
-        return PATH_SINGLE
-    lowered = str(path_label).strip().lower()
-    if lowered in PATH_LABELS:
-        return lowered
-    if lowered in {"multi", "multi_agent", "multi-agent", "orch"}:
-        return PATH_ORCHESTRATOR
-    return PATH_SINGLE
-
-
-def _tool_name(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _canonicalize(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {
-            str(k): _canonicalize(v)
-            for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))
+def _with_output_truncation(
+    result: TrajectoryEvalResult,
+    steps: List[TrajectoryStep],
+    dropped: int,
+) -> TrajectoryEvalResult:
+    provenance = result.provenance.model_copy(
+        update={
+            "output_truncated": dropped > 0,
+            "output_dropped_step_count": dropped,
         }
-    if isinstance(value, (list, tuple)):
-        return [_canonicalize(item) for item in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return str(value)
+    )
+    return result.model_copy(update={"provenance": provenance, "steps": steps})
 
 
-def _parse_env_bool(value: Optional[str], default: bool = False) -> bool:
-    """Local bool parse to avoid hard dependency on config loading in unit tests."""
+def _selection_metrics(
+    selected_tools: Sequence[str],
+    rubric: TrajectoryRubric,
+) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    required = set(rubric.required_tools)
+    if not required:
+        return None, None, None
+    correct_call_count = sum(1 for tool in selected_tools if tool in required)
+    precision = _rate(correct_call_count, len(selected_tools))
+    recall = len(required & set(selected_tools)) / float(len(required))
+    if precision is None or precision + recall == 0.0:
+        f1 = 0.0
+    else:
+        f1 = 2.0 * precision * recall / (precision + recall)
+    return precision, recall, f1
+
+
+def _rate(numerator: int, denominator: int) -> Optional[float]:
+    return numerator / float(denominator) if denominator else None
+
+
+def _validate_path_label(value: str) -> str:
+    if value not in {PATH_SINGLE, PATH_ORCHESTRATOR}:
+        raise ValueError("path_label must be 'single' or 'orchestrator'")
+    return value
+
+
+def _validate_optional_timestamp(value: Optional[str]) -> Optional[str]:
     if value is None:
-        return default
-    normalized = str(value).strip().lower()
-    if not normalized:
-        return default
-    if normalized in {"0", "false", "no", "off", "n"}:
-        return False
-    if normalized in {"1", "true", "yes", "on", "y"}:
-        return True
-    return default
+        return None
+    if not isinstance(value, str) or not value.strip() or len(value) > 64:
+        raise ValueError("as_of must be a bounded ISO-8601 string")
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("as_of must be an ISO-8601 timestamp") from exc
+    return value
+
+
+def _canonicalize(value: Any, *, depth: int) -> Any:
+    if depth > MAX_ARGUMENT_DEPTH:
+        raise ValueError("tool arguments exceed depth limit")
+    if value is None or isinstance(value, bool) or isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("tool arguments contain a non-finite number")
+        return value
+    if isinstance(value, str):
+        if len(value) > MAX_ARGUMENT_STRING_CHARS:
+            raise ValueError("tool argument string exceeds length limit")
+        return value
+    if isinstance(value, Mapping):
+        if len(value) > MAX_ARGUMENT_KEYS:
+            raise ValueError("tool arguments exceed mapping key limit")
+        normalized: Dict[str, Any] = {}
+        for key, item in sorted(value.items(), key=lambda pair: str(pair[0])):
+            if not isinstance(key, str) or not key or len(key) > 120:
+                raise ValueError("tool argument keys must be bounded strings")
+            normalized[key] = _canonicalize(item, depth=depth + 1)
+        return normalized
+    if isinstance(value, list):
+        if len(value) > MAX_ARGUMENT_ITEMS:
+            raise ValueError("tool arguments exceed list item limit")
+        return [_canonicalize(item, depth=depth + 1) for item in value]
+    raise ValueError("tool arguments must contain JSON values only")
 
 
 __all__ = [
+    "MAX_EVALUATED_CALLS",
+    "MAX_RESULT_CHARS",
     "PATH_ORCHESTRATOR",
     "PATH_SINGLE",
-    "TRAJECTORY_EVAL_ENGINE_VERSION",
     "classify_failure",
     "compute_trajectory_metrics",
     "duration_to_ms",
     "evaluate_agent_trajectory",
-    "is_agent_trajectory_eval_enabled",
     "normalize_tool_arguments",
+    "strict_json_dumps",
 ]

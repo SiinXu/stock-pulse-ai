@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Default-off agent trajectory evaluation service over runner tool_calls_log (tool success rate, redundant/retry counts, step efficiency; Issue #269).
+- [Added] Offline benchmark trajectory evaluation with expected-tool precision/recall/F1, separate success/productivity/retry/redundancy metrics, causal run/agent scoping, strict bounded inputs, and joinable provenance (Refs #269).
 
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).

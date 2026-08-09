@@ -89,9 +89,29 @@ def test_end_to_end_benchmark_passes_and_matches_baseline() -> None:
 
 
 def test_benchmark_is_deterministic() -> None:
-    first = score_only_view(run_benchmark())
-    second = score_only_view(run_benchmark())
+    first = run_benchmark()
+    second = run_benchmark()
     assert canonical_json(first) == canonical_json(second)
+
+
+def test_benchmark_emits_joinable_strict_trajectory_evaluations() -> None:
+    report = run_benchmark()
+    details = report["scenario_details"]
+    assert details
+    evaluation_ids = set()
+    for detail in details:
+        trajectory = detail["trajectory_evaluation"]
+        provenance = trajectory["provenance"]
+        assert provenance["input_schema_version"] == "agent-trajectory-input-v1"
+        assert provenance["engine_version"] == "agent-trajectory-eval-v2"
+        assert provenance["run_count"] == 1
+        assert trajectory["runs"][0]["task_id"] == detail["scenario_id"]
+        assert trajectory["metrics"]["tool_selection_precision"] is not None
+        assert "tool_selection_accuracy" not in trajectory["metrics"]
+        assert "step_efficiency" not in trajectory["metrics"]
+        evaluation_ids.add(provenance["evaluation_id"])
+    assert len(evaluation_ids) == len(details)
+    json.dumps(report, allow_nan=False, sort_keys=True)
 
 
 def test_score_observation_detects_overconfident_partial_path() -> None:
