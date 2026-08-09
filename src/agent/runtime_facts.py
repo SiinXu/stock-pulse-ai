@@ -57,6 +57,7 @@ class RiskEvidenceFact:
     volatility: Optional[float] = None
     historical_outcomes: Optional[str] = None
     current_holdings: Optional[str] = None
+    invalid_fields: Tuple[str, ...] = ()
     as_of: Optional[str] = None
 
 
@@ -288,7 +289,33 @@ def _risk_evidence(ctx: AgentContext) -> Optional[RiskEvidenceFact]:
         for flag in ctx.risk_flags[:20]
         if isinstance(flag, dict)
     )
-    if risk_opinion is None and not raw and not flags:
+    portfolio_exposure = _bounded_number(ctx.get_data("portfolio_exposure"))
+    volatility = _bounded_number(ctx.get_data("volatility"))
+    historical_outcomes = _bounded_json(ctx.get_data("historical_outcomes"), 500)
+    current_holdings = _bounded_json(
+        ctx.get_data("current_holdings"),
+        500,
+        truncate=True,
+    )
+    invalid_fields = tuple(
+        key
+        for key, bounded in (
+            ("portfolio_exposure", portfolio_exposure),
+            ("volatility", volatility),
+            ("historical_outcomes", historical_outcomes),
+        )
+        if _has_value(ctx.get_data(key)) and bounded is None
+    )
+    has_portfolio_facts = any(
+        _has_value(ctx.get_data(key))
+        for key in (
+            "portfolio_exposure",
+            "volatility",
+            "historical_outcomes",
+            "current_holdings",
+        )
+    )
+    if risk_opinion is None and not raw and not flags and not has_portfolio_facts:
         return None
     return RiskEvidenceFact(
         signal=_effective_signal("risk", getattr(risk_opinion, "signal", "hold")),
@@ -297,12 +324,18 @@ def _risk_evidence(ctx: AgentContext) -> Optional[RiskEvidenceFact]:
         veto_buy=raw.get("veto_buy") is True,
         signal_adjustment=_bounded_text(raw.get("signal_adjustment"), 32),
         flags=flags,
-        portfolio_exposure=_bounded_number(ctx.get_data("portfolio_exposure")),
-        volatility=_bounded_number(ctx.get_data("volatility")),
-        historical_outcomes=_bounded_json(ctx.get_data("historical_outcomes"), 500),
-        current_holdings=_bounded_json(ctx.get_data("current_holdings"), 500),
+        portfolio_exposure=portfolio_exposure,
+        volatility=volatility,
+        historical_outcomes=historical_outcomes,
+        current_holdings=current_holdings,
+        invalid_fields=invalid_fields,
         as_of=_bounded_text(ctx.get_data("risk_evidence_as_of"), 64),
     )
+
+
+def _has_value(value: Any) -> bool:
+    """Return whether a caller supplied a non-empty risk fact."""
+    return value not in (None, "", (), [], {})
 
 
 def _bounded_text(value: Any, maximum: int) -> Optional[str]:
@@ -310,14 +343,23 @@ def _bounded_text(value: Any, maximum: int) -> Optional[str]:
     return text[:maximum] or None
 
 
-def _bounded_json(value: Any, maximum: int) -> Optional[str]:
+def _bounded_json(
+    value: Any,
+    maximum: int,
+    *,
+    truncate: bool = False,
+) -> Optional[str]:
     if value in (None, "", (), [], {}):
         return None
     try:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     except (TypeError, ValueError):
         text = str(value)
-    return text[:maximum] or None
+    if not text:
+        return None
+    if truncate:
+        return text[:maximum]
+    return text if len(text) <= maximum else None
 
 
 def _bounded_number(value: Any) -> Optional[float]:
@@ -329,7 +371,7 @@ def _bounded_number(value: Any) -> Optional[float]:
         return None
     if not isfinite(parsed):
         return None
-    return parsed if -1_000_000_000 <= parsed <= 1_000_000_000 else None
+    return parsed if 0.0 <= parsed <= 1.0 else None
 
 
 def _normalize_opinion_signal(signal: Any) -> str:

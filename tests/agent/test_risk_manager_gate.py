@@ -152,6 +152,151 @@ def test_every_profile_handles_explicit_veto(profile, verdict):
     assert result.final_action == "hold"
 
 
+@pytest.mark.parametrize(
+    ("profile", "verdict", "final_action"),
+    [
+        ("conservative", RiskGateOutcome.REJECT, "hold"),
+        ("balanced", RiskGateOutcome.PASS, "buy"),
+        ("aggressive", RiskGateOutcome.PASS, "buy"),
+    ],
+)
+def test_profiles_apply_distinct_portfolio_exposure_thresholds(
+    profile,
+    verdict,
+    final_action,
+):
+    ctx = AgentContext()
+    ctx.set_data("portfolio_exposure", 0.75)
+
+    result = evaluate_risk_manager_gate(
+        ctx,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile=profile,
+    )
+
+    assert result.verdict is verdict
+    assert result.final_action == final_action
+    assert ("portfolio_exposure_limit" in result.evidence_codes) is (
+        profile == "conservative"
+    )
+
+
+@pytest.mark.parametrize(
+    ("profile", "verdict"),
+    [
+        ("conservative", RiskGateOutcome.REJECT),
+        ("balanced", RiskGateOutcome.DOWNGRADE),
+        ("aggressive", RiskGateOutcome.DOWNGRADE),
+    ],
+)
+def test_extreme_portfolio_facts_block_buy_without_risk_agent(profile, verdict):
+    ctx = AgentContext()
+    ctx.set_data("portfolio_exposure", 0.99)
+    ctx.set_data("volatility", 0.80)
+    ctx.set_data("historical_outcomes", {"loss_rate": 0.95})
+    ctx.set_data("current_holdings", {"AAPL": 120})
+
+    result = evaluate_risk_manager_gate(
+        ctx,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile=profile,
+    )
+
+    assert result.verdict is verdict
+    assert result.final_action == "hold"
+    assert set(result.evidence_codes) >= {
+        "portfolio_exposure_limit",
+        "volatility_limit",
+        "historical_loss_rate_limit",
+    }
+    assert set(result.evidence_provenance) >= {
+        "portfolio_exposure",
+        "volatility",
+        "historical_outcomes",
+        "current_holdings",
+    }
+
+
+def test_real_orchestrator_entry_carries_portfolio_facts_to_final_gate():
+    from src.agent.orchestrator import AgentOrchestrator
+    from src.agent.runtime_facts import build_agent_runtime_facts
+
+    orchestrator = AgentOrchestrator(
+        tool_registry=MagicMock(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(investment_committee_enabled=False),
+    )
+    context = orchestrator._build_context(
+        "Analyze AAPL",
+        {
+            "stock_code": "AAPL",
+            "portfolio_context": {
+                "portfolio_exposure": 0.99,
+                "volatility": 0.80,
+                "historical_outcomes": {"loss_rate": 0.95},
+                "symbol": "AAPL",
+                "quantity": 120,
+            },
+        },
+    )
+    runtime_facts = build_agent_runtime_facts(context)
+    gate_ctx = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        runtime_facts=runtime_facts,
+    )
+
+    result = evaluate_risk_manager_gate(
+        gate_ctx,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="conservative",
+    )
+
+    assert runtime_facts.risk_evidence is not None
+    assert runtime_facts.risk_evidence.portfolio_exposure == 0.99
+    assert '"quantity": 120' in runtime_facts.risk_evidence.current_holdings
+    assert result.verdict is RiskGateOutcome.REJECT
+    assert result.final_action == "hold"
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -0.1, 1.1])
+def test_invalid_portfolio_ratios_fail_closed(value):
+    from src.agent.orchestrator import AgentOrchestrator
+    from src.agent.runtime_facts import build_agent_runtime_facts
+
+    orchestrator = AgentOrchestrator(
+        tool_registry=MagicMock(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(investment_committee_enabled=False),
+    )
+    context = orchestrator._build_context(
+        "Analyze AAPL",
+        {"stock_code": "AAPL", "portfolio_exposure": value},
+    )
+    runtime_facts = build_agent_runtime_facts(context)
+    gate_ctx = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        runtime_facts=runtime_facts,
+    )
+
+    result = evaluate_risk_manager_gate(
+        gate_ctx,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="balanced",
+    )
+
+    assert result.verdict is RiskGateOutcome.DOWNGRADE
+    assert result.final_action == "hold"
+    assert "invalid_risk_evidence" in result.evidence_codes
+    assert runtime_facts.risk_evidence is not None
+    assert runtime_facts.risk_evidence.invalid_fields == ("portfolio_exposure",)
+
+
 def test_invalid_dashboard_risk_evidence_fails_closed_without_truthy_coercion():
     gate_ctx = build_risk_context_for_exit(
         stock_code="AAPL",

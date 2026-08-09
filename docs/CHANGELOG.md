@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
+- [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, deterministic portfolio exposure/volatility/historical-loss thresholds, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).

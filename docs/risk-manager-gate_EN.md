@@ -33,11 +33,29 @@ Set `RISK_GATE_PROFILE` to one of:
 | `balanced` | Default. Downgrades directional conflicts, vetoes, high-severity flags, and explicit downgrade adjustments. |
 | `aggressive` | Intervenes only on explicit blocking evidence or an enabled legacy override transition. |
 
+Portfolio ratios use a closed `[0, 1]` range. The gate compares each supplied
+value with the selected profile's inclusive threshold:
+
+| Profile | Portfolio exposure | Volatility | Historical `loss_rate` |
+| --- | ---: | ---: | ---: |
+| `conservative` | 0.70 | 0.40 | 0.50 |
+| `balanced` | 0.80 | 0.60 | 0.65 |
+| `aggressive` | 0.90 | 0.75 | 0.80 |
+
+The production orchestration context accepts these facts directly and through
+`portfolio_context`; a supplied portfolio context is also retained as bounded
+`current_holdings` evidence. Portfolio evidence remains available even when no
+Risk Agent opinion or risk flag was produced. Reaching any threshold blocks a
+new bullish publication: conservative rejects it, while balanced/aggressive
+downgrade it. Values outside `[0, 1]`, non-finite values, and malformed or
+oversized historical outcomes are invalid and fail closed.
+
 Invalid values stop configuration loading. The gate cannot be disabled. The
 legacy `AGENT_RISK_OVERRIDE` flag still controls legacy override planning, but
 turning it off cannot bypass the mandatory final-action authority.
 
-Missing evidence by itself produces `pass`; it is not fabricated. Evidence with
+Missing evidence by itself produces `pass`; it is not fabricated. A supplied
+portfolio fact below every selected-profile threshold also passes. Evidence with
 an invalid bounded field or malformed timestamp is marked invalid and blocks a
 new bullish publication. Timestamped evidence older than 24 hours is retained
 with its provenance, marked stale, and also blocks a new bullish publication.

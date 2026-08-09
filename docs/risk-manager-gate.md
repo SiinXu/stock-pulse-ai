@@ -29,10 +29,25 @@ payload、持久化 raw report、DecisionSignal metadata 和聊天历史。
 | `balanced` | 默认；方向冲突、veto、高危旗标和明确降级指令会触发下调。 |
 | `aggressive` | 仅在明确阻断证据或已启用的 legacy override 转换时介入。 |
 
+组合风险比例采用闭区间 `[0, 1]`，闸门按所选档位使用包含边界值的阈值：
+
+| 档位 | 组合暴露 | 波动率 | 历史 `loss_rate` |
+| --- | ---: | ---: | ---: |
+| `conservative` | 0.70 | 0.40 | 0.50 |
+| `balanced` | 0.80 | 0.60 | 0.65 |
+| `aggressive` | 0.90 | 0.75 | 0.80 |
+
+生产编排上下文既可直接传入这些事实，也可通过 `portfolio_context` 传入；已提供的
+组合上下文还会作为有界的 `current_holdings` 证据保留。即使没有 Risk Agent 意见或
+风险旗标，组合证据也不会丢失。任一指标达到阈值都会阻止新的 bullish 发布：
+`conservative` 执行 reject，`balanced`/`aggressive` 执行 downgrade。超出 `[0, 1]`
+的值、非有限数，以及畸形或超出有界长度的历史结果均视为非法并 fail closed。
+
 非法值会阻止配置加载。闸门不可关闭。既有 `AGENT_RISK_OVERRIDE` 仍控制 legacy
 override 计划，但关闭它不能绕过最终动作裁决。
 
-单纯缺少证据时返回 `pass`，不会伪造风险。包含非法有界字段或畸形时间戳的证据
+单纯缺少证据时返回 `pass`，不会伪造风险；已提供但低于所选档位全部阈值的组合
+事实也会通过。包含非法有界字段或畸形时间戳的证据
 会标记为 invalid 并阻止新的 bullish 发布；带时间戳且早于 24 小时的证据会保留
 来源、标记 stale，并同样阻止新的 bullish 发布。
 

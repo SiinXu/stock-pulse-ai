@@ -14,6 +14,7 @@ and never publish an unevaluated bullish action.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import uuid
@@ -534,6 +535,8 @@ def build_risk_context_for_exit(
         for flag in getattr(evidence, "flags", ()) or ():
             if isinstance(flag, tuple) and len(flag) == 3:
                 ctx.add_risk_flag(flag[0], flag[1], severity=flag[2])
+        if getattr(evidence, "invalid_fields", ()):
+            invalid_evidence = True
         for key in (
             "portfolio_exposure",
             "volatility",
@@ -546,6 +549,14 @@ def build_risk_context_for_exit(
 
     for source in _dashboard_risk_sources(dashboard):
         absorb_raw(source)
+        for key in (
+            "portfolio_exposure",
+            "volatility",
+            "historical_outcomes",
+            "current_holdings",
+        ):
+            if key in source and key not in ctx.data:
+                ctx.set_data(key, source[key])
         risk_signal = str(source.get("risk_signal") or source.get("signal") or risk_signal)
         risk_confidence = _bounded_confidence(
             source.get("risk_confidence", source.get("confidence", risk_confidence))
@@ -680,6 +691,25 @@ class RiskGateProfile(str, Enum):
     CONSERVATIVE = "conservative"
     BALANCED = "balanced"
     AGGRESSIVE = "aggressive"
+
+
+_PORTFOLIO_RISK_THRESHOLDS: Dict[RiskGateProfile, Dict[str, float]] = {
+    RiskGateProfile.CONSERVATIVE: {
+        "portfolio_exposure": 0.70,
+        "volatility": 0.40,
+        "historical_loss_rate": 0.50,
+    },
+    RiskGateProfile.BALANCED: {
+        "portfolio_exposure": 0.80,
+        "volatility": 0.60,
+        "historical_loss_rate": 0.65,
+    },
+    RiskGateProfile.AGGRESSIVE: {
+        "portfolio_exposure": 0.90,
+        "volatility": 0.75,
+        "historical_loss_rate": 0.80,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -836,6 +866,7 @@ def _collect_gate_evidence(
     *,
     current_signal: str,
     plan: RiskOverridePlan,
+    profile: RiskGateProfile,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
     """Return stable ``(evidence_codes, reason_codes)`` from deterministic facts."""
     codes: List[str] = []
@@ -860,6 +891,22 @@ def _collect_gate_evidence(
     if plan.risk_level_high:
         codes.append("high_risk_evidence")
         reasons.append("high_risk_evidence")
+
+    thresholds = _PORTFOLIO_RISK_THRESHOLDS[profile]
+    exposure, exposure_invalid = _unit_interval_fact(ctx, "portfolio_exposure")
+    volatility, volatility_invalid = _unit_interval_fact(ctx, "volatility")
+    loss_rate, history_invalid = _historical_loss_rate(ctx)
+    if exposure_invalid or volatility_invalid or history_invalid:
+        codes.append("invalid_risk_evidence")
+        reasons.append("invalid_risk_evidence")
+    for value, threshold_key, code in (
+        (exposure, "portfolio_exposure", "portfolio_exposure_limit"),
+        (volatility, "volatility", "volatility_limit"),
+        (loss_rate, "historical_loss_rate", "historical_loss_rate_limit"),
+    ):
+        if value is not None and value >= thresholds[threshold_key]:
+            codes.append(code)
+            reasons.append(code)
 
     risk_opinion = next(
         (op for op in reversed(ctx.opinions) if op.agent_name == "risk"),
@@ -920,6 +967,7 @@ def _gate_reason_params(
     ctx: AgentContext,
     *,
     plan: RiskOverridePlan,
+    profile: RiskGateProfile,
 ) -> Tuple[Tuple[str, str], ...]:
     """Return bounded diagnostic values separately from stable reason keys."""
     params: Dict[str, str] = {}
@@ -934,7 +982,80 @@ def _gate_reason_params(
     evidence_as_of = ctx.get_data("risk_evidence_as_of")
     if evidence_as_of not in (None, ""):
         params["risk_evidence_as_of"] = str(evidence_as_of)[:_MAX_GATE_TEXT]
+    thresholds = _PORTFOLIO_RISK_THRESHOLDS[profile]
+    exposure, exposure_invalid = _unit_interval_fact(ctx, "portfolio_exposure")
+    volatility, volatility_invalid = _unit_interval_fact(ctx, "volatility")
+    loss_rate, history_invalid = _historical_loss_rate(ctx)
+    for key, value in (
+        ("portfolio_exposure", exposure),
+        ("volatility", volatility),
+        ("historical_loss_rate", loss_rate),
+    ):
+        if value is not None:
+            params[key] = _format_risk_ratio(value)
+            params[f"{key}_threshold"] = _format_risk_ratio(thresholds[key])
+    invalid_fields = []
+    if exposure_invalid:
+        invalid_fields.append("portfolio_exposure")
+    if volatility_invalid:
+        invalid_fields.append("volatility")
+    if history_invalid:
+        invalid_fields.append("historical_outcomes")
+    if invalid_fields:
+        params["invalid_fields"] = ",".join(invalid_fields)
     return tuple(params.items())
+
+
+def _unit_interval_fact(
+    ctx: AgentContext,
+    key: str,
+) -> Tuple[Optional[float], bool]:
+    """Return one optional [0, 1] ratio and whether it was invalid."""
+    value = ctx.get_data(key)
+    if value in (None, ""):
+        return None, False
+    if isinstance(value, bool):
+        return None, True
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None, True
+    if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        return None, True
+    return parsed, False
+
+
+def _historical_loss_rate(ctx: AgentContext) -> Tuple[Optional[float], bool]:
+    """Extract the optional bounded loss-rate ratio from historical outcomes."""
+    source = ctx.get_data("historical_outcomes")
+    if source in (None, "", (), [], {}):
+        return None, False
+    if isinstance(source, str):
+        try:
+            source = json.loads(source)
+            if isinstance(source, str):
+                source = json.loads(source)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None, True
+    if not isinstance(source, Mapping):
+        return None, True
+    if "loss_rate" not in source or source.get("loss_rate") in (None, ""):
+        return None, False
+    value = source.get("loss_rate")
+    if isinstance(value, bool):
+        return None, True
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None, True
+    if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        return None, True
+    return parsed, False
+
+
+def _format_risk_ratio(value: float) -> str:
+    """Render a deterministic bounded ratio for diagnostic parameters."""
+    return f"{value:.4f}".rstrip("0").rstrip(".")
 
 
 def evaluate_risk_manager_gate(
@@ -997,16 +1118,28 @@ def evaluate_risk_manager_gate(
         ctx,
         current_signal=normalized,
         plan=force_plan,
+        profile=selected_profile,
     )
-    reason_params = _gate_reason_params(ctx, plan=force_plan)
+    reason_params = _gate_reason_params(
+        ctx,
+        plan=force_plan,
+        profile=selected_profile,
+    )
     override_would_apply = bool(force_plan.will_apply)
 
     if not evidence_codes:
+        provenance = _gate_evidence_provenance(ctx)
         return RiskGateResult(
             outcome=RiskGateOutcome.PASS,
             original_signal=normalized,
             final_signal=normalized,
-            reasons=("no_risk_evidence",),
+            reasons=(
+                (
+                    "risk_evidence_within_profile_limits"
+                    if provenance
+                    else "no_risk_evidence"
+                ),
+            ),
             warnings=(),
             evidence_codes=(),
             enabled=True,
@@ -1015,7 +1148,7 @@ def evaluate_risk_manager_gate(
             override_would_apply=False,
             exit_id=exit_key,
             profile=selected_profile,
-            evidence_provenance=_gate_evidence_provenance(ctx),
+            evidence_provenance=provenance,
             reason_params=reason_params,
         )
 
@@ -1026,6 +1159,9 @@ def evaluate_risk_manager_gate(
             "risk_veto",
             "invalid_risk_evidence",
             "stale_risk_evidence",
+            "portfolio_exposure_limit",
+            "volatility_limit",
+            "historical_loss_rate_limit",
         )
     )
     directional_conflict = any(

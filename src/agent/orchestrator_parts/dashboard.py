@@ -100,6 +100,29 @@ class _DashboardMethods:
                 if context.get(data_key):
                     ctx.set_data(data_key, context[data_key])
 
+            # Portfolio-risk facts are final-action inputs, not prompt-only
+            # metadata. Preserve explicit top-level values and the equivalent
+            # fields carried by the production portfolio request context.
+            portfolio_context = context.get("portfolio_context")
+            portfolio_mapping = (
+                portfolio_context if isinstance(portfolio_context, dict) else {}
+            )
+            for data_key in (
+                "portfolio_exposure",
+                "volatility",
+                "historical_outcomes",
+                "current_holdings",
+            ):
+                if data_key in context:
+                    ctx.set_data(data_key, context[data_key])
+                elif data_key in portfolio_mapping:
+                    ctx.set_data(data_key, portfolio_mapping[data_key])
+            if (
+                "current_holdings" not in ctx.data
+                and portfolio_mapping
+            ):
+                ctx.set_data("current_holdings", dict(portfolio_mapping))
+
         # Try to extract stock code from the query text
         if not ctx.stock_code:
             ctx.stock_code = _extract_stock_code(task)

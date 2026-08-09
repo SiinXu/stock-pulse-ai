@@ -198,6 +198,23 @@ def test_runtime_facts_preserve_bounded_risk_evidence_for_later_exits():
     assert evidence.as_of == "2026-08-09T00:00:00+00:00"
 
 
+def test_runtime_facts_keep_portfolio_evidence_without_risk_agent_or_flags():
+    ctx = AgentContext(stock_code="AAPL")
+    ctx.set_data("portfolio_exposure", 0.99)
+    ctx.set_data("volatility", 0.80)
+    ctx.set_data("historical_outcomes", {"loss_rate": 0.95})
+    ctx.set_data("current_holdings", {"AAPL": 120})
+
+    evidence = build_agent_runtime_facts(ctx).risk_evidence
+
+    assert evidence is not None
+    assert evidence.portfolio_exposure == 0.99
+    assert evidence.volatility == 0.80
+    assert evidence.historical_outcomes == '{"loss_rate": 0.95}'
+    assert evidence.current_holdings == '{"AAPL": 120}'
+    assert evidence.invalid_fields == ()
+
+
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
 def test_runtime_risk_numeric_boundaries_reject_non_finite_values(value):
     ctx = AgentContext()
@@ -211,6 +228,7 @@ def test_runtime_risk_numeric_boundaries_reject_non_finite_values(value):
     assert evidence.confidence == 0.5
     assert evidence.portfolio_exposure is None
     assert evidence.volatility is None
+    assert evidence.invalid_fields == ("portfolio_exposure", "volatility")
 
     with pytest.raises(ValueError, match="finite"):
         AgentOpinion(agent_name="risk", signal="hold", confidence=value)
