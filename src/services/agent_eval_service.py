@@ -32,13 +32,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import math
-import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from pydantic import ValidationError
 
@@ -57,8 +55,6 @@ from src.schemas.agent_output_eval import (
     ToolCallOutcome,
     ToolUsageRubric,
 )
-
-logger = logging.getLogger(__name__)
 
 EVAL_SCHEMA_VERSION = "agent-output-eval-v1"
 EVALUATOR_VERSION = "agent-output-evaluator-v2"
@@ -97,13 +93,6 @@ JUDGE_LLM = "llm"
 
 DEFAULT_FIXTURE_ROOT = (
     Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "agent_eval"
-)
-
-# Numbers that look like financial figures (prices, %, large integers).
-_NUMBER_RE = re.compile(
-    r"(?<![A-Za-z0-9_/])"  # avoid matching inside tickers/ids
-    r"([+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?)"
-    r"(?![A-Za-z0-9_])"
 )
 
 _BEARISH_TOKENS = frozenset(
@@ -437,37 +426,6 @@ def _collect_text(payload: Any) -> str:
 
     _walk(payload)
     return "\n".join(chunks)
-
-
-def _normalize_number_token(token: str) -> str:
-    text = token.strip().replace(",", "")
-    if text.endswith("%"):
-        text = text[:-1]
-    try:
-        value = float(text)
-    except ValueError:
-        return token.strip()
-    # Canonical form so 1800.0 matches 1800
-    if value.is_integer():
-        return str(int(value))
-    return f"{value:.6f}".rstrip("0").rstrip(".")
-
-
-def _extract_numbers(text: str) -> List[str]:
-    found: List[str] = []
-    for match in _NUMBER_RE.finditer(text or ""):
-        raw = match.group(1)
-        # Skip year-like and pure tiny ints that are often list indexes / counts
-        # when the case does not care — still keep % and decimals.
-        norm = _normalize_number_token(raw)
-        if not norm:
-            continue
-        found.append(norm)
-    return found
-
-
-def _context_number_set(context: Mapping[str, Any]) -> set:
-    return set(_extract_numbers(_collect_text(context)))
 
 
 def _normalize_signal(value: Any) -> str:
