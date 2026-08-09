@@ -1,33 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Manager-layer wiring for the financial data validation layer (T11 / #185).
+"""Idempotent final-exit validation wrappers for ``DataFetcherManager``.
 
-Wraps unified exit methods on ``DataFetcherManager``:
-
-- ``get_daily_data``
-- ``get_realtime_quote``
-- ``get_fundamental_context``
-
-Default mode is warn-only (annotate + log). Strict mode
-(``DATA_VALIDATION_STRICT=true``) raises ``DataValidationRejected`` on REJECT
-findings so upper layers can degrade.
-
-This module is owned by T11 (``manager_parts/``). It must not modify
-``data_provider/base.py`` (T10), fetchers, ``symbol_normalization``, or
-``decision_signal_data_quality``.
+Daily and realtime provider candidates are validated inside the manager's
+bounded provider loop. These wrappers cover cache/facade exits and never
+mislabel outer-layer quote degradation as provider failover. Fundamental
+upper-layer rejection is a separate, explicit configuration mode.
 """
 
 from __future__ import annotations
 
 import logging
 from functools import wraps
+from threading import RLock
 from typing import Any, Callable, Dict, Optional, Type
 
 from src.utils.sanitize import log_safe_exception
 
+
 logger = logging.getLogger(__name__)
 
-_WRAPPED_FLAG = "_stockpulse_data_validation_wrapped"
-_INSTALLED_ON: Dict[int, bool] = {}
+_WRAPPED_TOKEN_ATTR = "_stockpulse_data_validation_wrapper_token"
+_WRAPPED_ORIGINAL_ATTR = "_stockpulse_data_validation_original"
+_INSTALL_TOKEN = object()
+_INSTALL_LOCK = RLock()
 
 _EXIT_METHODS = (
     "get_daily_data",
@@ -36,62 +31,53 @@ _EXIT_METHODS = (
 )
 
 
-def _infer_market_from_code(stock_code: Optional[str]) -> Optional[str]:
-    if not stock_code:
-        return None
+def _infer_market_from_code(stock_code: Optional[str]) -> str:
     try:
-        from data_provider.base import _market_tag  # local import; avoid cycles
+        from data_provider.symbol_normalization import _market_tag, normalize_stock_code
 
-        return _market_tag(stock_code)
-    except Exception:  # broad-exception: optional_metadata - market tag is best-effort context only
-        text = str(stock_code).strip().lower()
-        if text.startswith(("hk", "0")) and len(text) <= 7:
-            return "hk"
-        if text.isalpha():
-            return "us"
-        return "cn"
+        return _market_tag(normalize_stock_code(str(stock_code or "")))
+    except (ImportError, TypeError, ValueError):
+        return "unknown"
 
 
 def _wrap_get_daily_data(original: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(original)
     def wrapped(self: Any, stock_code: str, *args: Any, **kwargs: Any) -> Any:
-        from data_provider.data_validation import (
-            DataValidationRejected,
-            is_validation_enabled,
-            validate_and_annotate,
-        )
-
         result = original(self, stock_code, *args, **kwargs)
-        if not is_validation_enabled():
-            return result
-        market = _infer_market_from_code(stock_code)
         try:
-            outcome = validate_and_annotate(
+            from data_provider.data_validation import (
+                ATTR_KEY,
+                is_validation_enabled,
+                validate_and_annotate,
+            )
+
+            if not is_validation_enabled():
+                return result
+            frame = result[0] if isinstance(result, tuple) and result else result
+            attrs = getattr(frame, "attrs", None)
+            if isinstance(attrs, dict) and isinstance(attrs.get(ATTR_KEY), dict):
+                return result
+            provider = (
+                str(result[1])
+                if isinstance(result, tuple) and len(result) > 1 and result[1]
+                else "cache_or_final_exit"
+            )
+            validate_and_annotate(
                 result,
                 data_type="daily_data",
-                market=market,
+                market=_infer_market_from_code(stock_code),
                 stock_code=stock_code,
+                provider=provider,
+                strict=False,
             )
-            # Structured detail lives on frame.attrs["data_validation"]; keep the
-            # runtime log free of exception-tainted dynamic fields.
-            if not outcome.ok:
-                logger.info("[data_validation] daily_data findings annotated on frame")
-        except DataValidationRejected as rejected:
+        except Exception as exc:  # broad-exception: fallback_recorded - final-exit evidence is fail-open
             log_safe_exception(
                 logger,
-                "data_validation daily_data rejected",
-                rejected,
-                error_code="data_validation_reject",
-                level=logging.WARNING,
-            )
-            raise
-        except Exception as exc:  # broad-exception: fallback_recorded - never break fetch path on validator bugs
-            log_safe_exception(
-                logger,
-                "data_validation daily_data failed open",
+                "Data validation daily final-exit observation failed",
                 exc,
-                error_code="data_validation_open",
+                error_code="data_validation_final_exit_failed",
                 level=logging.WARNING,
+                context={"data_type": "daily_data"},
             )
         return result
 
@@ -101,42 +87,38 @@ def _wrap_get_daily_data(original: Callable[..., Any]) -> Callable[..., Any]:
 def _wrap_get_realtime_quote(original: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(original)
     def wrapped(self: Any, stock_code: str, *args: Any, **kwargs: Any) -> Any:
-        from data_provider.data_validation import (
-            DataValidationRejected,
-            is_validation_enabled,
-            validate_and_annotate,
-        )
-
         result = original(self, stock_code, *args, **kwargs)
-        if result is None or not is_validation_enabled():
-            return result
-        market = _infer_market_from_code(stock_code)
+        if result is None:
+            return None
         try:
-            outcome = validate_and_annotate(
+            from data_provider.data_validation import (
+                is_validation_enabled,
+                validate_and_annotate,
+            )
+
+            if not is_validation_enabled() or isinstance(
+                getattr(result, "data_quality_evidence", None),
+                dict,
+            ):
+                return result
+            source = getattr(result, "source", None)
+            provider = getattr(source, "value", source)
+            validate_and_annotate(
                 result,
                 data_type="realtime_quote",
-                market=market,
+                market=_infer_market_from_code(stock_code),
                 stock_code=stock_code,
+                provider=str(provider or "final_exit"),
+                strict=False,
             )
-            if not outcome.ok:
-                logger.info("[data_validation] realtime_quote findings annotated")
-        except DataValidationRejected as rejected:
-            # Strict mode: treat as unavailable so existing failover/None paths apply.
+        except Exception as exc:  # broad-exception: fallback_recorded - final-exit evidence is fail-open
             log_safe_exception(
                 logger,
-                "data_validation realtime_quote rejected",
-                rejected,
-                error_code="data_validation_reject",
-                level=logging.WARNING,
-            )
-            return None
-        except Exception as exc:  # broad-exception: fallback_recorded - never break fetch path on validator bugs
-            log_safe_exception(
-                logger,
-                "data_validation realtime_quote failed open",
+                "Data validation realtime final-exit observation failed",
                 exc,
-                error_code="data_validation_open",
+                error_code="data_validation_final_exit_failed",
                 level=logging.WARNING,
+                context={"data_type": "realtime_quote"},
             )
         return result
 
@@ -146,48 +128,36 @@ def _wrap_get_realtime_quote(original: Callable[..., Any]) -> Callable[..., Any]
 def _wrap_get_fundamental_context(original: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(original)
     def wrapped(self: Any, stock_code: str, *args: Any, **kwargs: Any) -> Any:
-        from data_provider.data_validation import (
-            DataValidationRejected,
-            is_validation_enabled,
-            validate_and_annotate,
-        )
-
         result = original(self, stock_code, *args, **kwargs)
-        if not is_validation_enabled():
-            return result
-        market = None
-        if isinstance(result, dict):
-            market = result.get("market")
-        market = market or _infer_market_from_code(stock_code)
         try:
-            outcome = validate_and_annotate(
+            from data_provider.data_validation import (
+                DataValidationRejected,
+                is_validation_enabled,
+                upper_layer_rejection_enabled,
+                validate_and_annotate,
+            )
+
+            if not is_validation_enabled():
+                return result
+            market = result.get("market") if isinstance(result, dict) else None
+            validate_and_annotate(
                 result,
                 data_type="fundamental_context",
-                market=market,
+                market=market or _infer_market_from_code(stock_code),
                 stock_code=stock_code,
+                provider="fundamental_pipeline",
+                strict=upper_layer_rejection_enabled(),
             )
-            if not outcome.ok:
-                logger.info("[data_validation] fundamental_context findings annotated")
-        except DataValidationRejected as rejected:
-            # Strict mode: annotate reject and re-raise so callers see the failure
-            # without silent data drop.
-            if isinstance(result, dict):
-                result["data_validation"] = dict(rejected.validation_payload)
-            log_safe_exception(
-                logger,
-                "data_validation fundamental_context rejected",
-                rejected,
-                error_code="data_validation_reject",
-                level=logging.WARNING,
-            )
+        except DataValidationRejected:
             raise
-        except Exception as exc:  # broad-exception: fallback_recorded - never break fetch path on validator bugs
+        except Exception as exc:  # broad-exception: fallback_recorded - optional upper evidence is fail-open
             log_safe_exception(
                 logger,
-                "data_validation fundamental_context failed open",
+                "Data validation fundamental final-exit observation failed",
                 exc,
-                error_code="data_validation_open",
+                error_code="data_validation_final_exit_failed",
                 level=logging.WARNING,
+                context={"data_type": "fundamental_context"},
             )
         return result
 
@@ -202,49 +172,26 @@ _WRAPPERS: Dict[str, Callable[[Callable[..., Any]], Callable[..., Any]]] = {
 
 
 def ensure_validation_wrappers(target_class: Type[Any]) -> bool:
-    """Idempotently wrap manager unified-exit methods.
+    """Install each wrapper on the target class itself, once per module load.
 
-    Returns True when wrappers were installed on this call (or already present).
+    Per-method ownership avoids inherited class flags, covers subclass
+    overrides and partial installs, and replaces wrappers after a module/facade
+    reload without stacking old wrappers.
     """
-    class_id = id(target_class)
-    if _INSTALLED_ON.get(class_id):
-        return True
-    if getattr(target_class, _WRAPPED_FLAG, False):
-        _INSTALLED_ON[class_id] = True
-        return True
-
-    for method_name in _EXIT_METHODS:
-        original = getattr(target_class, method_name, None)
-        if original is None or not callable(original):
-            logger.debug(
-                "[data_validation] skip wrap; missing method %s on %s",
-                method_name,
-                target_class.__name__,
-            )
-            continue
-        # Avoid double-wrap if another path already installed.
-        if getattr(original, _WRAPPED_FLAG, False):
-            continue
-        wrapper_factory = _WRAPPERS[method_name]
-        wrapped = wrapper_factory(original)
-        setattr(wrapped, _WRAPPED_FLAG, True)
-        setattr(target_class, method_name, wrapped)
-
-    setattr(target_class, _WRAPPED_FLAG, True)
-    _INSTALLED_ON[class_id] = True
-    logger.debug(
-        "[data_validation] installed validation wrappers on %s",
-        target_class.__name__,
-    )
-    return True
-
-
-def reset_validation_wrappers_state_for_tests() -> None:
-    """Test helper: clear install bookkeeping (does not unwrap methods)."""
-    _INSTALLED_ON.clear()
-
-
-__all__ = [
-    "ensure_validation_wrappers",
-    "reset_validation_wrappers_state_for_tests",
-]
+    installed_or_present = False
+    with _INSTALL_LOCK:
+        for method_name in _EXIT_METHODS:
+            local_method = target_class.__dict__.get(method_name)
+            candidate = local_method or getattr(target_class, method_name, None)
+            if candidate is None or not callable(candidate):
+                continue
+            if getattr(candidate, _WRAPPED_TOKEN_ATTR, None) is _INSTALL_TOKEN:
+                installed_or_present = True
+                continue
+            original = getattr(candidate, _WRAPPED_ORIGINAL_ATTR, candidate)
+            wrapped = _WRAPPERS[method_name](original)
+            setattr(wrapped, _WRAPPED_TOKEN_ATTR, _INSTALL_TOKEN)
+            setattr(wrapped, _WRAPPED_ORIGINAL_ATTR, original)
+            setattr(target_class, method_name, wrapped)
+            installed_or_present = True
+    return installed_or_present

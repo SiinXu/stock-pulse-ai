@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Unified financial data validation layer at DataFetcherManager exits (OHLCV / realtime quote / fundamentals) with structured reason codes, warn-only default, and opt-in DATA_VALIDATION_STRICT (#185).
+- [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).
 - [Fixed] Ensure the `web-gate` check always concludes on pull requests, reports successful no-frontend runs, and fails closed when change detection is unavailable.

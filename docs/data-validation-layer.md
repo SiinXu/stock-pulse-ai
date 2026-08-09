@@ -1,104 +1,62 @@
 # Financial Data Validation Layer
 
-Issue: #185 · Module: `data_provider/data_validation.py` · Manager wiring: `data_provider/manager_parts/data_validation_wiring.py`
+Issue reference: #185. The implementation lives in `data_provider/data_validation.py`; provider-candidate wiring lives in `data_provider/manager_parts/daily_source_health.py`, and final-exit/reload wiring lives in `data_provider/manager_parts/data_validation_wiring.py`.
 
-## Purpose
+## Boundary and modes
 
-Validate OHLCV bars, realtime quotes, and key fundamental metrics **before** they flow into analysis, LLM prompts, and reports. Validation runs at the `DataFetcherManager` unified exit (manager layer), not inside individual fetchers.
+Every non-empty daily or realtime provider candidate is validated before the manager accepts or caches it. In strict mode, a rejected candidate raises `DataValidationRejected` inside the existing bounded provider loop, is recorded in provider health/run diagnostics, and allows that loop to continue to the next eligible provider. Returning `None` from an outer manager wrapper is not provider failover and is not used by this implementation.
 
-## Policy
-
-| Mode | Env | Behavior |
+| Configuration | Default | Contract |
 | --- | --- | --- |
-| Enabled (default) | `DATA_VALIDATION_ENABLED=true` (default) | Run validators; **warn-only** |
-| Disabled | `DATA_VALIDATION_ENABLED=false` | No validation; behavior identical to pre-layer |
-| Strict (opt-in) | `DATA_VALIDATION_STRICT=true` | `REJECT` findings raise `DataValidationRejected` (daily/fundamental) or force quote `None` so existing failover applies |
+| `DATA_VALIDATION_ENABLED` | `true` | Run validation and emit typed evidence. |
+| `DATA_VALIDATION_STRICT` | `false` | Reject provider candidates with reject-severity findings before acceptance/cache. |
+| `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | Comma-separated `market/instrument` selectors, for example `cn/equity,hk/etf,us/index`. `*` is a wildcard. |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | Aggregated fundamental results remain warn/evidence-only by default. `reject` explicitly raises at that separate upper boundary; it is not described as provider failover. |
 
-**Never silent drop.** Issues are structured reason codes attached to diagnostics (`DataFrame.attrs["data_validation"]` for daily frames; `data_validation` key on fundamental dicts) and logged.
+All four fields are loaded by the typed `Config` owner and remain environment-managed; this change does not add a parallel Web-settings surface. Disabling validation is the immediate rollback switch.
+Malformed strict selectors do not silently disable rejection: when no selector is valid, strict mode falls back to `*/*`.
 
-## Reason codes
+## Numeric contract
 
-| Code | Typical severity | Meaning |
+All covered numeric fields use the same classification:
+
+| Input form | Classification | Result |
 | --- | --- | --- |
-| `dv_price_missing` | reject | Close/price missing |
-| `dv_price_non_finite` | reject | NaN / ±Infinity in a price field |
-| `dv_price_non_positive` | reject | Zero or negative price |
-| `dv_high_below_low` | reject | high &lt; low |
-| `dv_close_out_of_range` | reject | close outside [low, high] |
-| `dv_open_out_of_range` | warn | open outside [low, high] |
-| `dv_pct_chg_inconsistent` | warn | pct_chg vs (close − pre_close) / pre_close |
-| `dv_volume_negative` | reject | Negative volume |
-| `dv_volume_non_finite` | reject | Non-finite volume |
-| `dv_volume_unit_suspect` | warn | amount/volume ≈ 100 × close (likely 手 vs 股) |
-| `dv_amount_negative` | reject | Negative amount |
-| `dv_date_out_of_order` | warn | Dates / report periods reverse |
-| `dv_date_duplicate` | warn | Duplicate date / period |
-| `dv_fund_pe_non_finite` | reject | PE is NaN / ±Infinity |
-| `dv_fund_pe_extreme` | reject | \|PE\| ≥ 50 000 |
-| `dv_fund_pe_negative` | warn | Negative PE (often legitimate) |
-| `dv_fund_pb_non_finite` | reject | PB is NaN / ±Infinity |
-| `dv_fund_pb_extreme` | reject | \|PB\| ≥ 10 000 |
-| `dv_empty_payload` | reject/warn | Empty or unsupported payload |
+| `None`, empty string, `-`, `--`, `N/A` | missing | Required price/close rejects; optional/offshore/ETF valuation fields remain absent without a finding. |
+| `bool` or a nonnumeric value such as `"not-a-number"` | invalid type | Reject with a field-specific `*_invalid_type` code. |
+| `NaN`, `+Infinity`, `-Infinity` | non-finite | Reject with a field-specific `*_non_finite` code. |
+| Finite numeric value outside the field range | out of range | Reject with a field-specific `*_out_of_range` code. |
+| Finite numeric value inside the field range | finite | Continue to relational checks such as high/low and percentage-change consistency. |
 
-## Dirty-data inventory and handling
+Field-specific code families are version-stable:
 
-This inventory is a first-class deliverable of #185. Each row is covered by an offline unit test.
+- Daily OHLCV: `dv_ohlcv_<field>_<reason>`
+- Realtime quote: `dv_quote_<field>_<reason>`
+- Fundamentals: `dv_fund_pe_<reason>` and `dv_fund_pb_<reason>`
+- Selected technical indicators: `dv_technical_<field>_<reason>` for `ma5`, `ma10`, `ma20`, `bias_ma5`, `bias_ma10`, `trend_strength`, and `signal_score`
 
-| # | Dirty form | Where it appears | Severity | Handling |
-| --- | --- | --- | --- | --- |
-| 1 | Price `None` / missing close | Daily bar, quote | reject | Strict: raise / quote→None; default: log + annotate |
-| 2 | Price `0` or negative | Daily bar, quote | reject | Same |
-| 3 | Price `NaN` / `±Infinity` | Daily bar, quote, PE/PB | reject | Same |
-| 4 | `pct_chg` inconsistent with price vs pre_close / prior close | Daily bar, quote | warn | Always pass-through; log + annotate |
-| 5 | `high < low` | Daily bar, quote | reject | Strict blocks; default annotate |
-| 6 | `close` outside `[low, high]` | Daily bar, quote | reject | Strict blocks; default annotate |
-| 7 | Negative volume / amount | Daily bar, quote | reject | Strict blocks; default annotate |
-| 8 | Volume unit mismatch (手 vs 股) — amount/volume ~100× close | Daily bar, quote (historical TickFlow-class bug) | warn | Pass-through; log + annotate (no auto-rescale) |
-| 9 | Duplicate bar dates / earnings periods | Daily frame, fundamentals | warn | Pass-through; log + annotate |
-| 10 | Date / period reverse order | Daily frame, fundamentals | warn | Pass-through; log + annotate |
-| 11 | Extreme PE/PB magnitudes | Quote valuation, fundamental valuation block | reject | Strict blocks; default annotate |
-| 12 | Negative PE | Quote / fundamentals | warn | Pass-through (loss-making issuers are valid) |
+Cross-field codes cover high below low, close/price outside the high-low range, percentage-change inconsistency, volume-unit suspicion, duplicate dates, and out-of-order dates. Negative PE is warn-only because it is valid for loss-making issuers. Zero volume and amount are valid for suspended instruments. Missing PE/PB is valid for ETFs and partial/offshore providers. Provider rounding within ±0.51 percentage points is accepted.
 
-### Explicit non-goals (false-positive protection)
+## Evidence and diagnostics
 
-- Missing PE/PB on ETFs or partial offshore coverage → **no issue**
-- Mild pct_chg rounding within ±0.51 percentage points → **no issue**
-- Negative PE alone → **warn only**, never reject
-- Empty realtime quote (`None`) from upstream failover → validation is skipped at the wiring layer when the result is already `None`
+Findings are projected as `data_quality_evidence.v1`. Each record contains bounded issue lists plus sanitized severity, symbol, canonical market, canonical instrument type, and provider. Non-finite values are converted to strict-JSON-safe values before evidence persistence.
 
-## Integration point
+The existing run-diagnostics owner logs the structured fields and stores evidence in `diagnostics.data_quality_evidence`. This evidence:
 
-Wiring is installed when the manager daily-source-health facade binds (owned by T11 under `manager_parts/`). No change to `data_provider/base.py` (owned by T10 in the parallel batch).
+- survives DataFrame-to-row/database conversion because it does not rely on `DataFrame.attrs`;
+- appears in the user-facing run-diagnostics data-quality component;
+- is projected into `AnalysisContextPack.data_quality.metadata.validation_evidence` and its prompt warnings;
+- is included in the persisted low-sensitivity AnalysisContextPack overview;
+- is available to realtime callers through the additive typed `UnifiedRealtimeQuote.data_quality_evidence` field.
 
-Methods wrapped:
+Daily `DataFrame.attrs["data_validation"]` remains a local convenience annotation. Public fundamental dictionaries are not mutated with ad-hoc keys.
 
-1. `DataFetcherManager.get_daily_data`
-2. `DataFetcherManager.get_realtime_quote`
-3. `DataFetcherManager.get_fundamental_context`
+## Wrapper lifecycle
 
-Public pure API for tests and diagnostics:
+Final-exit wrappers are installed per method on each target class. Installation uses a lock and a reload token, unwraps an older wrapper before replacement, and does not rely on inherited class flags. Therefore subclass overrides, partial installation, concurrent installation, and module/facade reloads cannot silently bypass validation.
 
-```python
-from data_provider.data_validation import (
-    validate_daily_frame,
-    validate_realtime_quote,
-    validate_fundamental_context,
-    validate_and_annotate,
-    ValidationResult,
-    REASON_CODES,
-)
-```
+## Compatibility and rollback
 
-## Related modules (do not conflate)
+Warn mode preserves daily tuple, realtime quote, and fundamental dictionary return shapes. The realtime evidence field is optional and additive; API/Web/Desktop mappings that enumerate quote fields continue to work unchanged. Strict candidate rejection uses the existing provider loop and does not add an unbounded retry path.
 
-| Module | Role |
-| --- | --- |
-| `data_provider/symbol_normalization.py` | Code normalization only |
-| `data_provider/retry_policy.py` | Retry / timeout policy |
-| `src/services/decision_signal_data_quality.py` | Decision-signal quality labels (signal layer) |
-| Web `marketFormat` finite guards (PR #939) | UI formatting of non-finite numbers |
-
-## Rollback
-
-1. Set `DATA_VALIDATION_ENABLED=false`, or
-2. Revert the PR that introduced this layer.
+Rollback by setting `DATA_VALIDATION_ENABLED=false`, or revert the introducing change.

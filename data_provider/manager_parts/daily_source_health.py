@@ -164,6 +164,20 @@ class _DailySourceHealthMethods:
         """Serialize shared fetcher state access through manager-owned per-instance locks."""
         method = getattr(fetcher, method_name)
         with self._get_fetcher_call_lock(fetcher):
+            if method_name == "get_realtime_quote":
+                result = method(*args, **kwargs)
+                if result is not None:
+                    from data_provider.data_validation import validate_and_annotate
+
+                    stock_code = kwargs.get("stock_code") or (args[0] if args else "")
+                    validate_and_annotate(
+                        result,
+                        data_type="realtime_quote",
+                        market=_market_tag(normalize_stock_code(str(stock_code))),
+                        stock_code=str(stock_code),
+                        provider=fetcher.name,
+                    )
+                return result
             if method_name != "get_daily_data":
                 return method(*args, **kwargs)
 
@@ -183,13 +197,29 @@ class _DailySourceHealthMethods:
             started_at = time.monotonic()
             try:
                 result = method(*args, **kwargs)
-            except Exception:
+                if isinstance(result, pd.DataFrame) and not result.empty:
+                    from data_provider.data_validation import validate_and_annotate
+
+                    validate_and_annotate(
+                        result,
+                        data_type="daily_data",
+                        market=market,
+                        stock_code=str(stock_code),
+                        provider=fetcher.name,
+                    )
+            except Exception as exc:
                 latency_ms = (time.monotonic() - started_at) * 1000.0
-                self._daily_source_health.record_failure(
-                    health_key,
-                    error="data_provider_daily_data_attempt_failed",
-                    latency_ms=latency_ms,
-                )
+                if type(exc).__name__ == "DataValidationRejected":
+                    self._daily_source_health.record_quality_failure(
+                        health_key,
+                        latency_ms=latency_ms,
+                    )
+                else:
+                    self._daily_source_health.record_failure(
+                        health_key,
+                        error="data_provider_daily_data_attempt_failed",
+                        latency_ms=latency_ms,
+                    )
                 self._mark_daily_health_recorded(health_key)
                 raise
 
@@ -723,8 +753,7 @@ def bind_daily_source_health_facade(
             ),
         )
         bound_names.append(name)
-    # T11 / #185: install financial data validation at manager unified exits.
-    # Kept inside manager_parts so T10-owned data_provider/base.py stays untouched.
+    # Reinstall final-exit validation after each facade bind/reload.
     try:
         from .data_validation_wiring import ensure_validation_wrappers
 

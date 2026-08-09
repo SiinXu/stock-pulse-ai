@@ -9,6 +9,7 @@ diagnostic store is introduced.
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 import uuid
@@ -233,6 +234,40 @@ class ProviderRun:
             "created_at": self.created_at,
         }
         return {key: value for key, value in payload.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class DataQualityEvidenceRecord:
+    """Finite, bounded validation evidence owned by run diagnostics."""
+
+    schema_version: str
+    data_type: str
+    severity: str
+    symbol: Optional[str]
+    provider: Optional[str]
+    market: str
+    instrument_type: str
+    rejected: bool
+    issues: List[Dict[str, Any]]
+    issue_count: int
+    truncated: bool
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "data_type": self.data_type,
+            "severity": self.severity,
+            "symbol": self.symbol,
+            "provider": self.provider,
+            "market": self.market,
+            "instrument_type": self.instrument_type,
+            "rejected": self.rejected,
+            "issues": list(self.issues),
+            "issue_count": self.issue_count,
+            "truncated": self.truncated,
+            "created_at": self.created_at,
+        }
 
 
 @dataclass
@@ -505,6 +540,7 @@ class RunDiagnosticContext:
     trigger_source: Optional[str] = None
     scope: Optional[str] = None
     provider_runs: List[ProviderRun] = field(default_factory=list)
+    data_quality_evidence: List[DataQualityEvidenceRecord] = field(default_factory=list)
     llm_runs: List[LLMRun] = field(default_factory=list)
     notification_runs: List[NotificationRun] = field(default_factory=list)
     history_runs: List[HistoryRun] = field(default_factory=list)
@@ -539,6 +575,26 @@ class RunDiagnosticContext:
             attempt_index = self.provider_attempt_index_by_type.get(data_type_key, 0) + 1
             self.provider_attempt_index_by_type[data_type_key] = attempt_index
         self._emit_flow_event(_provider_flow_event(self, provider_run, attempt_index))
+
+    def record_data_quality_evidence(
+        self,
+        evidence: DataQualityEvidenceRecord,
+    ) -> None:
+        """Append one bounded finding set and suppress immediate duplicates."""
+        if self.data_quality_evidence:
+            previous = self.data_quality_evidence[-1]
+            if (
+                previous.data_type == evidence.data_type
+                and previous.symbol == evidence.symbol
+                and previous.provider == evidence.provider
+                and previous.severity == evidence.severity
+                and previous.rejected == evidence.rejected
+                and previous.issues == evidence.issues
+            ):
+                return
+        self.data_quality_evidence.append(evidence)
+        if len(self.data_quality_evidence) > 100:
+            del self.data_quality_evidence[: len(self.data_quality_evidence) - 100]
 
     def record_provider_run_started(
         self,
@@ -692,6 +748,9 @@ class RunDiagnosticContext:
             "trigger_source": self.trigger_source,
             "scope": self.scope,
             "provider_runs": [run.to_dict() for run in self.provider_runs],
+            "data_quality_evidence": [
+                evidence.to_dict() for evidence in self.data_quality_evidence
+            ],
             "llm_runs": [run.to_dict() for run in self.llm_runs],
             "notification_runs": [run.to_dict() for run in self.notification_runs],
             "history_runs": [run.to_dict() for run in self.history_runs],
@@ -1411,6 +1470,129 @@ def record_provider_run(
         )
 
 
+def _finite_diagnostic_value(value: Any, *, depth: int = 0) -> Any:
+    """Constrain validation evidence before storage and strict JSON encoding."""
+    if depth > 4:
+        return "<truncated>"
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, str):
+        return sanitize_diagnostic_text(value, max_length=160)
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Mapping):
+        result: Dict[str, Any] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= 20:
+                result["truncated"] = True
+                break
+            safe_key = safe_diagnostic_key(key)
+            if safe_key:
+                result[safe_key] = _finite_diagnostic_value(
+                    item,
+                    depth=depth + 1,
+                )
+        return result
+    if isinstance(value, (list, tuple)):
+        return [
+            _finite_diagnostic_value(item, depth=depth + 1)
+            for item in list(value)[:24]
+        ]
+    return sanitize_diagnostic_text(value, max_length=160)
+
+
+def record_data_quality_evidence(
+    *,
+    data_type: str,
+    severity: str,
+    symbol: Optional[str],
+    provider: Optional[str],
+    market: Optional[str],
+    instrument_type: Optional[str],
+    rejected: bool,
+    issues: Iterable[Mapping[str, Any]],
+    issue_count: Optional[int] = None,
+    truncated: bool = False,
+    schema_version: str = "data_quality_evidence.v1",
+) -> None:
+    """Log and persist one sanitized validation finding set."""
+    normalized_severity = str(severity or "warn").strip().lower()
+    if normalized_severity not in {"warn", "reject"}:
+        normalized_severity = "warn"
+    safe_issues: List[Dict[str, Any]] = []
+    for index, issue in enumerate(issues):
+        if index >= 24:
+            truncated = True
+            break
+        if not isinstance(issue, Mapping):
+            continue
+        safe_issue = _finite_diagnostic_value(issue)
+        if isinstance(safe_issue, dict):
+            safe_issues.append(safe_issue)
+    safe_symbol = sanitize_diagnostic_text(symbol, max_length=80)
+    safe_provider = sanitize_diagnostic_text(provider, max_length=120)
+    safe_market = sanitize_diagnostic_text(market, max_length=16) or "unknown"
+    safe_instrument = (
+        sanitize_diagnostic_text(instrument_type, max_length=24) or "equity"
+    )
+    codes = sorted(
+        {
+            str(issue.get("code"))
+            for issue in safe_issues
+            if issue.get("code")
+        }
+    )
+    log_method = logger.warning if normalized_severity == "reject" else logger.info
+    log_method(
+        "data_quality event=validation severity=%s symbol=%s provider=%s "
+        "market=%s instrument_type=%s rejected=%s codes=%s",
+        normalized_severity,
+        safe_symbol or "unknown",
+        safe_provider or "unknown",
+        safe_market,
+        safe_instrument,
+        bool(rejected),
+        ",".join(codes) or "unknown",
+    )
+
+    context = get_current_diagnostic_context()
+    if context is None:
+        return
+    try:
+        context.record_data_quality_evidence(
+            DataQualityEvidenceRecord(
+                schema_version=sanitize_diagnostic_text(
+                    schema_version,
+                    max_length=48,
+                )
+                or "data_quality_evidence.v1",
+                data_type=sanitize_diagnostic_text(data_type, max_length=64)
+                or "unknown",
+                severity=normalized_severity,
+                symbol=safe_symbol,
+                provider=safe_provider,
+                market=safe_market,
+                instrument_type=safe_instrument,
+                rejected=bool(rejected),
+                issues=safe_issues,
+                issue_count=min(
+                    1_000_000,
+                    max(len(safe_issues), int(issue_count or 0)),
+                ),
+                truncated=bool(truncated),
+            )
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - Data-quality diagnostic failures are safely logged and cannot affect analysis.
+        log_safe_exception(
+            logger,
+            "Data-quality diagnostic record failed",
+            exc,
+            error_code="data_quality_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
+
+
 def record_provider_run_started(
     *,
     data_type: str,
@@ -1948,6 +2130,65 @@ def _history_component(
     return _component("history", label, "unknown", "历史保存未记录诊断信息")
 
 
+def _data_quality_component(diagnostics: Dict[str, Any]) -> RunDiagnosticComponent:
+    """Project typed validation evidence into the user-facing run summary."""
+    evidence = [
+        item
+        for item in _as_list(diagnostics.get("data_quality_evidence"))
+        if isinstance(item, dict)
+    ]
+    if not evidence:
+        return _component(
+            "data_quality",
+            "数据质量",
+            "unknown",
+            "未记录数据质量校验证据",
+        )
+    rejected = [item for item in evidence if item.get("rejected") is True]
+    findings = [
+        item
+        for item in evidence
+        if item.get("severity") in {"warn", "reject"}
+    ]
+    codes = sorted(
+        {
+            str(issue.get("code"))
+            for item in findings
+            for issue in _as_list(item.get("issues"))
+            if isinstance(issue, dict) and issue.get("code")
+        }
+    )[:12]
+    details = {
+        "schema_version": evidence[-1].get("schema_version"),
+        "evidence_count": len(evidence),
+        "rejected_count": len(rejected),
+        "reason_codes": codes,
+    }
+    if rejected:
+        return _component(
+            "data_quality",
+            "数据质量",
+            "degraded",
+            "数据质量校验拒绝了一个或多个候选数据源，并继续执行既有降级链",
+            details,
+        )
+    if findings:
+        return _component(
+            "data_quality",
+            "数据质量",
+            "degraded",
+            "数据质量校验发现警告，证据已传递到分析上下文",
+            details,
+        )
+    return _component(
+        "data_quality",
+        "数据质量",
+        "ok",
+        "数据质量校验未发现问题",
+        details,
+    )
+
+
 def build_run_diagnostic_summary(
     *,
     context_snapshot: Optional[Any] = None,
@@ -1987,6 +2228,7 @@ def build_run_diagnostic_summary(
             snapshot,
         ),
         "news": _news_component(snapshot, raw),
+        "data_quality": _data_quality_component(diagnostics),
         "llm": _llm_component(diagnostics, raw),
         "notification": _notification_component(diagnostics),
         "history": _history_component(diagnostics, report_saved),
@@ -2067,6 +2309,7 @@ def format_copyable_diagnostics(summary: Dict[str, Any]) -> str:
         _component_line("realtime_quote"),
         _component_line("daily_data"),
         _component_line("news"),
+        _component_line("data_quality"),
         _component_line("llm"),
         _component_line("notification"),
         _component_line("history"),

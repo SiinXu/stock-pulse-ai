@@ -363,6 +363,10 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `ENABLE_CHIP_DISTRIBUTION` | Enable chip distribution analysis (this API is unstable, recommended to disable for cloud deployment). GitHub Actions users must set `ENABLE_CHIP_DISTRIBUTION=true` in Repository Variables to enable; disabled by default in workflows. | `true` | Optional |
 | `ENABLE_EASTMONEY_PATCH` | Eastmoney API patch: Recommended to set to `true` when Eastmoney APIs fail frequently (e.g., RemoteDisconnected, connection closed). Injects NID tokens and random User-Agents to reduce rate limiting probability. | `false` | Optional |
 | `REALTIME_SOURCE_PRIORITY` | Real-time quote source priority (comma-separated), e.g., `tencent,akshare_sina,efinance,akshare_em`; add `tickflow` explicitly to use TickFlow realtime quotes | See .env.example | Optional |
+| `DATA_VALIDATION_ENABLED` | Enable the unified numeric contract for daily, realtime, fundamental, and selected technical fields, with versioned diagnostic evidence. | `true` | Optional |
+| `DATA_VALIDATION_STRICT` | Reject invalid provider candidates before acceptance/cache so the existing bounded fallback loop can try the next source. | `false` | Optional |
+| `DATA_VALIDATION_STRICT_SCOPES` | Comma-separated `market/instrument` strict-mode selectors such as `cn/equity,hk/etf,us/index`; `*` is a wildcard. | `*/*` | Optional |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | Final aggregated-fundamental policy: `warn` preserves data with evidence; `reject` raises explicitly and is not provider failover. | `warn` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |

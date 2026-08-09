@@ -1,84 +1,72 @@
 # -*- coding: utf-8 -*-
-"""Unified financial data validation layer (Issue #185 / T11).
+"""Validated, observable financial-data boundary contracts.
 
-Pure-function validators for OHLCV bars, realtime quotes, and fundamental
-blocks. Intended to run at the data-provider unified exit (manager layer),
-not inside individual fetchers.
-
-Default policy is **warn-only**: issues are recorded and logged; data is
-passed through. Set ``DATA_VALIDATION_STRICT=true`` to reject definite errors
-and let upper layers degrade.
-
-This module never silently drops rows or fields.
+The validators in this module are pure except for the explicit
+``validate_and_annotate`` orchestration entry point. Provider candidates use
+that entry point before acceptance and caching; callers in warn-only mode keep
+their established return values while receiving versioned evidence.
 """
 
 from __future__ import annotations
 
 import math
-import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-# ---------------------------------------------------------------------------
-# Reason codes (structured; safe for diagnostics / reports)
-# ---------------------------------------------------------------------------
 
-CODE_PRICE_MISSING = "dv_price_missing"
-CODE_PRICE_NON_FINITE = "dv_price_non_finite"
-CODE_PRICE_NON_POSITIVE = "dv_price_non_positive"
-CODE_HIGH_BELOW_LOW = "dv_high_below_low"
-CODE_CLOSE_OUT_OF_RANGE = "dv_close_out_of_range"
-CODE_OPEN_OUT_OF_RANGE = "dv_open_out_of_range"
-CODE_PCT_CHG_INCONSISTENT = "dv_pct_chg_inconsistent"
-CODE_VOLUME_NEGATIVE = "dv_volume_negative"
-CODE_VOLUME_NON_FINITE = "dv_volume_non_finite"
-CODE_VOLUME_UNIT_SUSPECT = "dv_volume_unit_suspect"
-CODE_AMOUNT_NEGATIVE = "dv_amount_negative"
-CODE_DATE_OUT_OF_ORDER = "dv_date_out_of_order"
-CODE_DATE_DUPLICATE = "dv_date_duplicate"
-CODE_FUND_PE_NON_FINITE = "dv_fund_pe_non_finite"
-CODE_FUND_PE_EXTREME = "dv_fund_pe_extreme"
-CODE_FUND_PB_NON_FINITE = "dv_fund_pb_non_finite"
-CODE_FUND_PB_EXTREME = "dv_fund_pb_extreme"
-CODE_FUND_PE_NEGATIVE = "dv_fund_pe_negative"
-CODE_EMPTY_PAYLOAD = "dv_empty_payload"
+EVIDENCE_SCHEMA_VERSION = "data_quality_evidence.v1"
+ATTR_KEY = "data_validation"
 
-# Severity ranking for aggregation
-_SEVERITY_RANK = {
-    "pass": 0,
-    "warn": 1,
-    "reject": 2,
-}
+MAX_EVIDENCE_ISSUES = 24
+MAX_EVIDENCE_TEXT = 160
 
-# Tolerances chosen to avoid false positives on normal provider rounding.
-# pct_chg is typically percent points (e.g. 1.23 means +1.23%).
-PCT_CHG_ABS_TOLERANCE = 0.51  # allow ~0.5pp rounding / limit-board quirks
-# Volume unit heuristic: amount/volume vs close near 100x => volume likely in lots (手).
+PCT_CHG_ABS_TOLERANCE = 0.51
 VOLUME_UNIT_RATIO_MIN = 80.0
 VOLUME_UNIT_RATIO_MAX = 120.0
-# Fundamental extremes that almost always indicate bad feed data.
 PE_ABS_EXTREME = 50_000.0
 PB_ABS_EXTREME = 10_000.0
 
-ENV_STRICT = "DATA_VALIDATION_STRICT"
-ENV_ENABLED = "DATA_VALIDATION_ENABLED"
+CODE_DATE_OUT_OF_ORDER = "dv_daily_date_out_of_order"
+CODE_DATE_DUPLICATE = "dv_daily_date_duplicate"
+CODE_FUND_PE_INVALID_TYPE = "dv_fund_pe_invalid_type"
+CODE_FUND_PE_NON_FINITE = "dv_fund_pe_non_finite"
+CODE_FUND_PE_EXTREME = "dv_fund_pe_out_of_range"
+CODE_FUND_PB_INVALID_TYPE = "dv_fund_pb_invalid_type"
+CODE_FUND_PB_NON_FINITE = "dv_fund_pb_non_finite"
+CODE_FUND_PB_EXTREME = "dv_fund_pb_out_of_range"
+CODE_FUND_PE_NEGATIVE = "dv_fund_pe_negative"
+CODE_EMPTY_PAYLOAD = "dv_payload_empty"
 
-ATTR_KEY = "data_validation"
+_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
+_INSTRUMENT_TYPES = frozenset({"equity", "etf", "index"})
+_TECHNICAL_CONTRACTS: Mapping[str, Tuple[Optional[float], Optional[float]]] = {
+    "ma5": (0.0, None),
+    "ma10": (0.0, None),
+    "ma20": (0.0, None),
+    "bias_ma5": (-100.0, None),
+    "bias_ma10": (-100.0, None),
+    "trend_strength": (0.0, 100.0),
+    "signal_score": (0.0, 100.0),
+}
+_SEVERITY_RANK = {"pass": 0, "warn": 1, "reject": 2}
 
 
 class ValidationSeverity(str, Enum):
-    """Outcome grade for a single issue or an aggregated result."""
-
     PASS = "pass"
     WARN = "warn"
     REJECT = "reject"
 
 
+class NumericKind(str, Enum):
+    MISSING = "missing"
+    INVALID_TYPE = "invalid_type"
+    NON_FINITE = "non_finite"
+    FINITE = "finite"
+
+
 @dataclass(frozen=True)
 class ValidationIssue:
-    """One structured validation finding."""
-
     code: str
     severity: ValidationSeverity
     message: str
@@ -88,25 +76,21 @@ class ValidationIssue:
 
     def to_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
-            "code": self.code,
-            "severity": self.severity.value
-            if isinstance(self.severity, ValidationSeverity)
-            else str(self.severity),
-            "message": self.message,
+            "code": _bounded_text(self.code, 96),
+            "severity": self.severity.value,
+            "message": _bounded_text(self.message, MAX_EVIDENCE_TEXT),
         }
         if self.field is not None:
-            payload["field"] = self.field
+            payload["field"] = _bounded_text(self.field, 96)
         if self.row_index is not None:
-            payload["row_index"] = self.row_index
+            payload["row_index"] = max(0, int(self.row_index))
         if self.detail:
-            payload["detail"] = dict(self.detail)
+            payload["detail"] = _json_safe(self.detail)
         return payload
 
 
 @dataclass
 class ValidationResult:
-    """Aggregated validation outcome. Never implies silent data mutation."""
-
     status: ValidationSeverity = ValidationSeverity.PASS
     issues: List[ValidationIssue] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
@@ -121,22 +105,12 @@ class ValidationResult:
 
     @property
     def has_warn(self) -> bool:
-        return any(i.severity == ValidationSeverity.WARN for i in self.issues)
+        return any(issue.severity == ValidationSeverity.WARN for issue in self.issues)
 
     def add(self, issue: ValidationIssue) -> None:
         self.issues.append(issue)
-        rank = _SEVERITY_RANK.get(
-            issue.severity.value
-            if isinstance(issue.severity, ValidationSeverity)
-            else str(issue.severity),
-            0,
-        )
-        if rank > _SEVERITY_RANK.get(self.status.value, 0):
-            self.status = (
-                issue.severity
-                if isinstance(issue.severity, ValidationSeverity)
-                else ValidationSeverity(str(issue.severity))
-            )
+        if _SEVERITY_RANK[issue.severity.value] > _SEVERITY_RANK[self.status.value]:
+            self.status = issue.severity
 
     def extend(self, issues: Iterable[ValidationIssue]) -> None:
         for issue in issues:
@@ -148,114 +122,223 @@ class ValidationResult:
             self.context.setdefault(key, value)
         return self
 
-    def should_reject(self, *, strict: Optional[bool] = None) -> bool:
-        """True only when status is REJECT and strict mode is active."""
+    def should_reject(
+        self,
+        *,
+        strict: Optional[bool] = None,
+        market: Optional[str] = None,
+        instrument_type: Optional[str] = None,
+    ) -> bool:
         if strict is None:
-            strict = is_strict_mode()
+            strict = is_strict_mode(
+                market=market or self.context.get("market"),
+                instrument_type=(
+                    instrument_type
+                    or self.context.get("instrument_type")
+                    or self.context.get("asset_type")
+                ),
+            )
         return bool(strict) and self.has_reject
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "status": self.status.value,
-            "issues": [issue.to_dict() for issue in self.issues],
-            "context": dict(self.context),
+            "issues": [issue.to_dict() for issue in self.issues[:MAX_EVIDENCE_ISSUES]],
+            "issue_count": len(self.issues),
+            "truncated": len(self.issues) > MAX_EVIDENCE_ISSUES,
+            "context": _json_safe(self.context),
+        }
+
+    def to_evidence(
+        self,
+        *,
+        data_type: str,
+        stock_code: Optional[str] = None,
+        provider: Optional[str] = None,
+        market: Optional[str] = None,
+        instrument_type: Optional[str] = None,
+        rejected: bool = False,
+    ) -> Dict[str, Any]:
+        return {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "data_type": _bounded_text(data_type, 64),
+            "severity": self.status.value,
+            "symbol": _bounded_optional_text(stock_code, 80),
+            "provider": _bounded_optional_text(provider, 120),
+            "market": canonical_market(market),
+            "instrument_type": canonical_instrument_type(instrument_type),
+            "rejected": bool(rejected),
+            "issue_count": len(self.issues),
+            "issues": [issue.to_dict() for issue in self.issues[:MAX_EVIDENCE_ISSUES]],
+            "truncated": len(self.issues) > MAX_EVIDENCE_ISSUES,
         }
 
 
 class DataValidationRejected(Exception):
-    """Raised in strict mode when validation status is REJECT.
-
-    Upper layers (manager failover / analysis pipeline) decide degradation.
-
-    Stores only a plain dict payload (not a live ValidationResult) so production
-    exception-log taint analysis does not treat ValidationResult locals as
-    exception objects when they are logged after sanitization.
-    """
+    """Provider candidate rejection with bounded, serializable reason evidence."""
 
     def __init__(self, validation: ValidationResult, *, data_type: str = "unknown"):
-        payload = validation.to_dict()
-        self.validation_payload: Dict[str, Any] = payload
+        self.validation_payload = validation.to_dict()
         self.data_type = data_type
-        codes = ",".join(
+        self.reason_codes = tuple(
             sorted(
                 {
-                    str(item.get("code") or "")
-                    for item in payload.get("issues", [])
-                    if isinstance(item, dict)
-                    and item.get("severity") == ValidationSeverity.REJECT.value
+                    issue.code
+                    for issue in validation.issues
+                    if issue.severity == ValidationSeverity.REJECT
                 }
             )
         )
         super().__init__(
-            f"data validation rejected data_type={data_type} codes={codes or 'unknown'}"
+            "data validation rejected "
+            f"data_type={_bounded_text(data_type, 64)} "
+            f"codes={','.join(self.reason_codes) or 'unknown'}"
         )
 
 
-# ---------------------------------------------------------------------------
-# Config helpers (no config-registry coupling; opt-in / default-safe)
-# ---------------------------------------------------------------------------
+def _bounded_text(value: Any, limit: int) -> str:
+    return " ".join(str(value or "").split())[:limit]
 
 
-def _read_bool_env(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    text = str(raw).strip().lower()
-    if text in {"1", "true", "yes", "on"}:
-        return True
-    if text in {"0", "false", "no", "off"}:
-        return False
-    return default
+def _bounded_optional_text(value: Any, limit: int) -> Optional[str]:
+    text = _bounded_text(value, limit)
+    return text or None
+
+
+def _json_safe(value: Any, *, depth: int = 0) -> Any:
+    """Return a finite, bounded value accepted by strict JSON encoders."""
+    if depth > 4:
+        return "<truncated>"
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, str):
+        return _bounded_text(value, MAX_EVIDENCE_TEXT)
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Enum):
+        return _json_safe(value.value, depth=depth + 1)
+    if isinstance(value, Mapping):
+        payload: Dict[str, Any] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= 24:
+                payload["truncated"] = True
+                break
+            payload[_bounded_text(key, 80)] = _json_safe(item, depth=depth + 1)
+        return payload
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [_json_safe(item, depth=depth + 1) for item in list(value)[:24]]
+    return _bounded_text(value, MAX_EVIDENCE_TEXT)
+
+
+def _validation_config() -> Any:
+    """Resolve validation policy through the repository configuration owner."""
+    from src.application_services import get_application_services
+
+    return get_application_services().config
 
 
 def is_validation_enabled() -> bool:
-    """Master switch. Default True so the layer runs warn-only without config."""
-    return _read_bool_env(ENV_ENABLED, True)
+    return bool(getattr(_validation_config(), "data_validation_enabled", True))
 
 
-def is_strict_mode() -> bool:
-    """When True, REJECT findings raise / block. Default False (warn-only)."""
-    return _read_bool_env(ENV_STRICT, False)
+def canonical_market(value: Optional[str]) -> str:
+    normalized = str(value or "unknown").strip().lower()
+    aliases = {"a": "cn", "a_share": "cn", "china": "cn", "usa": "us"}
+    normalized = aliases.get(normalized, normalized)
+    return normalized if normalized in _MARKETS else "unknown"
 
 
-# ---------------------------------------------------------------------------
-# Numeric helpers
-# ---------------------------------------------------------------------------
+def canonical_instrument_type(value: Optional[str]) -> str:
+    normalized = str(value or "equity").strip().lower()
+    aliases = {
+        "stock": "equity",
+        "share": "equity",
+        "fund": "etf",
+        "indices": "index",
+    }
+    normalized = aliases.get(normalized, normalized)
+    return normalized if normalized in _INSTRUMENT_TYPES else "equity"
 
 
-def is_non_finite_number(value: Any) -> bool:
-    """Return True when value is a numeric NaN or ±Infinity."""
-    if value is None:
-        return False
+def infer_instrument_type(
+    stock_code: Optional[str],
+    *,
+    explicit: Optional[str] = None,
+) -> str:
+    if explicit:
+        return canonical_instrument_type(explicit)
+    code = str(stock_code or "").strip()
     try:
-        # bool is int subclass; treat as finite number.
-        if isinstance(value, bool):
-            return False
-        number = float(value)
-    except (TypeError, ValueError):
-        return False
-    return not math.isfinite(number)
+        from data_provider.symbol_normalization import _is_etf_code
+        from data_provider.us_index_mapping import is_us_index_code
 
-
-def to_finite_float(value: Any) -> Optional[float]:
-    """Convert to float when finite; None for missing / non-numeric / non-finite."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return float(value)
-    try:
-        # pandas / numpy NA
-        if value != value:  # NaN
-            return None
-    except Exception:  # broad-exception: optional_metadata - equality can fail for exotic types
+        if is_us_index_code(code):
+            return "index"
+        if _is_etf_code(code):
+            return "etf"
+    except (ImportError, TypeError, ValueError):
         pass
+    return "equity"
+
+
+def _strict_scope_matches(
+    market: str,
+    instrument_type: str,
+    raw: str,
+) -> bool:
+    valid_scopes = []
+    for scope in (item.strip().lower() for item in raw.split(",")):
+        if "/" not in scope:
+            continue
+        scope_market, scope_instrument = (part.strip() for part in scope.split("/", 1))
+        if scope_market not in _MARKETS | {"*"}:
+            continue
+        if scope_instrument not in _INSTRUMENT_TYPES | {"*"}:
+            continue
+        valid_scopes.append((scope_market, scope_instrument))
+    for scope_market, scope_instrument in valid_scopes or [("*", "*")]:
+        if scope_market in {"*", market} and scope_instrument in {"*", instrument_type}:
+            return True
+    return False
+
+
+def is_strict_mode(
+    *,
+    market: Optional[str] = None,
+    instrument_type: Optional[str] = None,
+) -> bool:
+    config = _validation_config()
+    if not bool(getattr(config, "data_validation_strict", False)):
+        return False
+    return _strict_scope_matches(
+        canonical_market(market),
+        canonical_instrument_type(instrument_type),
+        str(getattr(config, "data_validation_strict_scopes", "*/*") or "*/*"),
+    )
+
+
+def upper_layer_rejection_enabled() -> bool:
+    return (
+        getattr(_validation_config(), "data_validation_upper_layer_mode", "warn")
+        == "reject"
+    )
+
+
+def classify_numeric(value: Any) -> Tuple[NumericKind, Optional[float]]:
+    """Classify every numeric input using one repository-wide contract."""
+    if value is None:
+        return NumericKind.MISSING, None
+    if isinstance(value, str) and value.strip() in {"", "-", "--", "N/A", "n/a"}:
+        return NumericKind.MISSING, None
+    if isinstance(value, bool):
+        return NumericKind.INVALID_TYPE, None
     try:
         number = float(value)
-    except (TypeError, ValueError):
-        return None
+    except (TypeError, ValueError, OverflowError):
+        return NumericKind.INVALID_TYPE, None
     if not math.isfinite(number):
-        return None
-    return number
+        return NumericKind.NON_FINITE, None
+    return NumericKind.FINITE, number
 
 
 def _issue(
@@ -267,19 +350,78 @@ def _issue(
     row_index: Optional[int] = None,
     detail: Optional[Dict[str, Any]] = None,
 ) -> ValidationIssue:
-    return ValidationIssue(
-        code=code,
-        severity=severity,
-        message=message,
-        field=field,
-        row_index=row_index,
-        detail=detail,
+    return ValidationIssue(code, severity, message, field, row_index, detail)
+
+
+def _numeric_code(namespace: str, field_name: str, kind: str) -> str:
+    normalized = field_name.replace(".", "_")
+    return f"dv_{namespace}_{normalized}_{kind}"
+
+
+def _validate_numeric_field(
+    result: ValidationResult,
+    *,
+    namespace: str,
+    field_name: str,
+    raw_value: Any,
+    required: bool = False,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+    minimum_exclusive: bool = False,
+    row_index: Optional[int] = None,
+) -> Optional[float]:
+    kind, number = classify_numeric(raw_value)
+    if kind == NumericKind.MISSING:
+        if required:
+            result.add(
+                _issue(
+                    _numeric_code(namespace, field_name, "missing"),
+                    ValidationSeverity.REJECT,
+                    f"{field_name} is missing",
+                    field=field_name,
+                    row_index=row_index,
+                )
+            )
+        return None
+    if kind == NumericKind.INVALID_TYPE:
+        result.add(
+            _issue(
+                _numeric_code(namespace, field_name, "invalid_type"),
+                ValidationSeverity.REJECT,
+                f"{field_name} is not numeric",
+                field=field_name,
+                row_index=row_index,
+            )
+        )
+        return None
+    if kind == NumericKind.NON_FINITE:
+        result.add(
+            _issue(
+                _numeric_code(namespace, field_name, "non_finite"),
+                ValidationSeverity.REJECT,
+                f"{field_name} is not finite",
+                field=field_name,
+                row_index=row_index,
+            )
+        )
+        return None
+    assert number is not None
+    below_minimum = minimum is not None and (
+        number <= minimum if minimum_exclusive else number < minimum
     )
-
-
-# ---------------------------------------------------------------------------
-# OHLCV / daily bar validation
-# ---------------------------------------------------------------------------
+    above_maximum = maximum is not None and number > maximum
+    if below_minimum or above_maximum:
+        result.add(
+            _issue(
+                _numeric_code(namespace, field_name, "out_of_range"),
+                ValidationSeverity.REJECT,
+                f"{field_name} is outside its accepted range",
+                field=field_name,
+                row_index=row_index,
+                detail={"value": number, "minimum": minimum, "maximum": maximum},
+            )
+        )
+    return number
 
 
 def validate_ohlcv_bar(
@@ -289,166 +431,144 @@ def validate_ohlcv_bar(
     prev_close: Optional[float] = None,
     market: Optional[str] = None,
     asset_type: Optional[str] = None,
+    namespace: str = "ohlcv",
 ) -> ValidationResult:
-    """Validate a single OHLCV-like mapping (daily bar or quote-like dict)."""
+    instrument_type = canonical_instrument_type(asset_type)
     result = ValidationResult(
         context={
-            "market": market,
-            "asset_type": asset_type,
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
             "row_index": row_index,
         }
     )
-
-    open_px = to_finite_float(bar.get("open", bar.get("open_price")))
-    high = to_finite_float(bar.get("high"))
-    low = to_finite_float(bar.get("low"))
-    close = to_finite_float(bar.get("close", bar.get("price")))
-    volume = to_finite_float(bar.get("volume"))
-    amount = to_finite_float(bar.get("amount"))
-    pct_chg = to_finite_float(bar.get("pct_chg", bar.get("change_pct")))
-    pre_close = to_finite_float(bar.get("pre_close"))
+    price_field = "price" if namespace == "quote" else "close"
+    raw_values = {
+        "open": bar.get("open", bar.get("open_price")),
+        "high": bar.get("high"),
+        "low": bar.get("low"),
+        price_field: bar.get("price", bar.get("close")) if namespace == "quote" else bar.get("close", bar.get("price")),
+        "volume": bar.get("volume"),
+        "amount": bar.get("amount"),
+        "pct_chg": bar.get("pct_chg", bar.get("change_pct")),
+        "pre_close": bar.get("pre_close"),
+    }
+    values: Dict[str, Optional[float]] = {}
+    for field_name in ("open", "high", "low"):
+        values[field_name] = _validate_numeric_field(
+            result,
+            namespace=namespace,
+            field_name=field_name,
+            raw_value=raw_values[field_name],
+            minimum=0.0,
+            minimum_exclusive=True,
+            row_index=row_index,
+        )
+    values[price_field] = _validate_numeric_field(
+        result,
+        namespace=namespace,
+        field_name=price_field,
+        raw_value=raw_values[price_field],
+        required=True,
+        minimum=0.0,
+        minimum_exclusive=True,
+        row_index=row_index,
+    )
+    values["volume"] = _validate_numeric_field(
+        result,
+        namespace=namespace,
+        field_name="volume",
+        raw_value=raw_values["volume"],
+        minimum=0.0,
+        row_index=row_index,
+    )
+    values["amount"] = _validate_numeric_field(
+        result,
+        namespace=namespace,
+        field_name="amount",
+        raw_value=raw_values["amount"],
+        minimum=0.0,
+        row_index=row_index,
+    )
+    values["pct_chg"] = _validate_numeric_field(
+        result,
+        namespace=namespace,
+        field_name="pct_chg",
+        raw_value=raw_values["pct_chg"],
+        row_index=row_index,
+    )
+    pre_close = _validate_numeric_field(
+        result,
+        namespace=namespace,
+        field_name="pre_close",
+        raw_value=raw_values["pre_close"],
+        minimum=0.0,
+        minimum_exclusive=True,
+        row_index=row_index,
+    )
     if pre_close is None:
         pre_close = prev_close
 
-    # Non-finite raw values that failed conversion
-    for field_name in ("open", "high", "low", "close", "price", "volume", "amount", "pct_chg", "change_pct"):
-        if field_name in bar and is_non_finite_number(bar.get(field_name)):
-            result.add(
-                _issue(
-                    CODE_PRICE_NON_FINITE if field_name != "volume" else CODE_VOLUME_NON_FINITE,
-                    ValidationSeverity.REJECT,
-                    f"Non-finite value in field {field_name}",
-                    field=field_name,
-                    row_index=row_index,
-                )
-            )
-
-    if close is None and bar.get("close", bar.get("price")) is None:
-        result.add(
-            _issue(
-                CODE_PRICE_MISSING,
-                ValidationSeverity.REJECT,
-                "Close/price is missing",
-                field="close",
-                row_index=row_index,
-            )
-        )
-    elif close is not None and close <= 0:
-        result.add(
-            _issue(
-                CODE_PRICE_NON_POSITIVE,
-                ValidationSeverity.REJECT,
-                f"Close/price must be positive, got {close}",
-                field="close",
-                row_index=row_index,
-                detail={"value": close},
-            )
-        )
-
-    for field_name, value in (("open", open_px), ("high", high), ("low", low)):
-        if value is not None and value <= 0:
-            result.add(
-                _issue(
-                    CODE_PRICE_NON_POSITIVE,
-                    ValidationSeverity.REJECT,
-                    f"{field_name} must be positive, got {value}",
-                    field=field_name,
-                    row_index=row_index,
-                    detail={"value": value},
-                )
-            )
+    close = values[price_field]
+    high = values["high"]
+    low = values["low"]
+    open_px = values["open"]
+    volume = values["volume"]
+    amount = values["amount"]
+    pct_chg = values["pct_chg"]
 
     if high is not None and low is not None and high < low:
         result.add(
             _issue(
-                CODE_HIGH_BELOW_LOW,
+                _numeric_code(namespace, "high", "below_low"),
                 ValidationSeverity.REJECT,
-                f"high ({high}) < low ({low})",
+                "high is below low",
                 field="high",
                 row_index=row_index,
                 detail={"high": high, "low": low},
             )
         )
-
     if close is not None and high is not None and low is not None and high >= low:
-        # Allow tiny float noise outside [low, high]
         eps = max(abs(close) * 1e-9, 1e-8)
         if close > high + eps or close < low - eps:
             result.add(
                 _issue(
-                    CODE_CLOSE_OUT_OF_RANGE,
+                    _numeric_code(namespace, price_field, "out_of_range"),
                     ValidationSeverity.REJECT,
-                    f"close ({close}) outside [low={low}, high={high}]",
-                    field="close",
+                    f"{price_field} is outside the high/low range",
+                    field=price_field,
                     row_index=row_index,
-                    detail={"close": close, "high": high, "low": low},
+                    detail={price_field: close, "high": high, "low": low},
                 )
             )
-
     if open_px is not None and high is not None and low is not None and high >= low:
         eps = max(abs(open_px) * 1e-9, 1e-8)
         if open_px > high + eps or open_px < low - eps:
             result.add(
                 _issue(
-                    CODE_OPEN_OUT_OF_RANGE,
+                    _numeric_code(namespace, "open", "outside_range"),
                     ValidationSeverity.WARN,
-                    f"open ({open_px}) outside [low={low}, high={high}]",
+                    "open is outside the high/low range",
                     field="open",
                     row_index=row_index,
-                    detail={"open": open_px, "high": high, "low": low},
                 )
             )
-
-    # pct_chg consistency with previous close
-    baseline = pre_close
-    if baseline is not None and baseline > 0 and close is not None and pct_chg is not None:
-        expected = (close - baseline) / baseline * 100.0
+    if pre_close is not None and close is not None and pct_chg is not None:
+        expected = (close - pre_close) / pre_close * 100.0
         if abs(expected - pct_chg) > PCT_CHG_ABS_TOLERANCE:
             result.add(
                 _issue(
-                    CODE_PCT_CHG_INCONSISTENT,
+                    _numeric_code(namespace, "pct_chg", "inconsistent"),
                     ValidationSeverity.WARN,
-                    (
-                        f"pct_chg ({pct_chg}) inconsistent with "
-                        f"(close-pre_close)/pre_close*100 ({expected:.4f})"
-                    ),
+                    "pct_chg is inconsistent with close and pre_close",
                     field="pct_chg",
                     row_index=row_index,
                     detail={
-                        "pct_chg": pct_chg,
-                        "expected_pct_chg": expected,
-                        "close": close,
-                        "pre_close": baseline,
+                        "value": pct_chg,
+                        "expected": expected,
                         "tolerance": PCT_CHG_ABS_TOLERANCE,
                     },
                 )
             )
-
-    if volume is not None and volume < 0:
-        result.add(
-            _issue(
-                CODE_VOLUME_NEGATIVE,
-                ValidationSeverity.REJECT,
-                f"volume is negative: {volume}",
-                field="volume",
-                row_index=row_index,
-                detail={"value": volume},
-            )
-        )
-
-    if amount is not None and amount < 0:
-        result.add(
-            _issue(
-                CODE_AMOUNT_NEGATIVE,
-                ValidationSeverity.REJECT,
-                f"amount is negative: {amount}",
-                field="amount",
-                row_index=row_index,
-                detail={"value": amount},
-            )
-        )
-
-    # Unit inconsistency: volume in 手 (lots) while contract is shares.
     if (
         volume is not None
         and volume > 0
@@ -457,27 +577,18 @@ def validate_ohlcv_bar(
         and close is not None
         and close > 0
     ):
-        avg_price = amount / volume
-        ratio = avg_price / close
+        ratio = (amount / volume) / close
         if VOLUME_UNIT_RATIO_MIN <= ratio <= VOLUME_UNIT_RATIO_MAX:
             result.add(
                 _issue(
-                    CODE_VOLUME_UNIT_SUSPECT,
+                    _numeric_code(namespace, "volume", "unit_suspect"),
                     ValidationSeverity.WARN,
-                    (
-                        "volume unit may be lots (手) instead of shares: "
-                        f"amount/volume≈{avg_price:.4f} vs close={close}"
-                    ),
+                    "volume may be expressed in lots instead of shares",
                     field="volume",
                     row_index=row_index,
-                    detail={
-                        "avg_price_from_amount_volume": avg_price,
-                        "close": close,
-                        "ratio": ratio,
-                    },
+                    detail={"ratio": ratio},
                 )
             )
-
     return result
 
 
@@ -489,158 +600,94 @@ def validate_daily_frame(
     stock_code: Optional[str] = None,
     max_rows_to_scan: Optional[int] = None,
 ) -> ValidationResult:
-    """Validate a standardized daily OHLCV DataFrame (or row sequence).
-
-    Expects columns among: date, open, high, low, close, volume, amount, pct_chg.
-    """
+    instrument_type = infer_instrument_type(stock_code, explicit=asset_type)
     result = ValidationResult(
         context={
-            "market": market,
-            "asset_type": asset_type,
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
             "stock_code": stock_code,
             "data_type": "daily_data",
         }
     )
-
-    if frame is None:
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.REJECT,
-                "daily frame is None",
-            )
-        )
-        return result
-
-    # Duck-type DataFrame
-    if hasattr(frame, "empty") and bool(getattr(frame, "empty")):
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.REJECT,
-                "daily frame is empty",
-            )
-        )
+    if frame is None or (hasattr(frame, "empty") and bool(frame.empty)):
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.REJECT, "daily data is empty"))
         return result
 
     rows: List[Mapping[str, Any]]
-    dates: List[Any] = []
-
+    dates: List[Any]
     if hasattr(frame, "to_dict") and hasattr(frame, "columns"):
-        records = frame.to_dict(orient="records")
-        rows = list(records)
-        if "date" in getattr(frame, "columns", []):
-            dates = list(frame["date"].tolist())
+        rows = list(frame.to_dict(orient="records"))
+        dates = list(frame["date"].tolist()) if "date" in frame.columns else []
     elif isinstance(frame, Sequence) and not isinstance(frame, (str, bytes)):
         rows = [row for row in frame if isinstance(row, Mapping)]
         dates = [row.get("date") for row in rows]
     else:
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.WARN,
-                f"unsupported daily frame type: {type(frame).__name__}",
-            )
-        )
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.REJECT, "daily data type is unsupported"))
         return result
-
     if not rows:
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.REJECT,
-                "daily frame has no rows",
-            )
-        )
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.REJECT, "daily data has no rows"))
         return result
 
     scan_count = len(rows) if max_rows_to_scan is None else min(len(rows), max_rows_to_scan)
     prev_close: Optional[float] = None
-    for idx in range(scan_count):
-        row = rows[idx]
-        bar_result = validate_ohlcv_bar(
-            row,
-            row_index=idx,
-            prev_close=prev_close,
-            market=market,
-            asset_type=asset_type,
+    for index, row in enumerate(rows[:scan_count]):
+        result.merge(
+            validate_ohlcv_bar(
+                row,
+                row_index=index,
+                prev_close=prev_close,
+                market=market,
+                asset_type=instrument_type,
+            )
         )
-        result.merge(bar_result)
-        close = to_finite_float(row.get("close", row.get("price")))
-        if close is not None and close > 0:
+        close_kind, close = classify_numeric(row.get("close", row.get("price")))
+        if close_kind == NumericKind.FINITE and close is not None and close > 0:
             prev_close = close
 
-    # Date order / duplicates (full date list, not only scanned bars)
-    if dates:
-        seen: Dict[str, int] = {}
-        prev_key: Optional[str] = None
-        for idx, raw_date in enumerate(dates):
-            if raw_date is None:
-                continue
-            key = str(raw_date)
-            if key in seen:
-                result.add(
-                    _issue(
-                        CODE_DATE_DUPLICATE,
-                        ValidationSeverity.WARN,
-                        f"duplicate date {key}",
-                        field="date",
-                        row_index=idx,
-                        detail={"first_row_index": seen[key], "date": key},
-                    )
+    seen: Dict[str, int] = {}
+    previous: Optional[str] = None
+    for index, raw_date in enumerate(dates):
+        if raw_date is None:
+            continue
+        key = str(raw_date)
+        if key in seen:
+            result.add(
+                _issue(
+                    CODE_DATE_DUPLICATE,
+                    ValidationSeverity.WARN,
+                    "daily data contains a duplicate date",
+                    field="date",
+                    row_index=index,
+                    detail={"date": key, "first_row_index": seen[key]},
                 )
-            else:
-                seen[key] = idx
-            if prev_key is not None and key < prev_key:
-                result.add(
-                    _issue(
-                        CODE_DATE_OUT_OF_ORDER,
-                        ValidationSeverity.WARN,
-                        f"date out of order: {key} after {prev_key}",
-                        field="date",
-                        row_index=idx,
-                        detail={"date": key, "previous_date": prev_key},
-                    )
+            )
+        else:
+            seen[key] = index
+        if previous is not None and key < previous:
+            result.add(
+                _issue(
+                    CODE_DATE_OUT_OF_ORDER,
+                    ValidationSeverity.WARN,
+                    "daily dates are out of order",
+                    field="date",
+                    row_index=index,
+                    detail={"date": key, "previous_date": previous},
                 )
-            prev_key = key
-
-    result.context["row_count"] = len(rows)
-    result.context["scanned_rows"] = scan_count
+            )
+        previous = key
+    result.context.update({"row_count": len(rows), "scanned_rows": scan_count})
     return result
 
 
-# ---------------------------------------------------------------------------
-# Realtime quote validation
-# ---------------------------------------------------------------------------
-
-
-def validate_realtime_quote(
-    quote: Any,
-    *,
-    market: Optional[str] = None,
-    asset_type: Optional[str] = None,
-) -> ValidationResult:
-    """Validate a UnifiedRealtimeQuote instance or quote-like mapping."""
-    if quote is None:
-        result = ValidationResult(
-            context={"market": market, "asset_type": asset_type, "data_type": "realtime_quote"}
-        )
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.REJECT,
-                "realtime quote is None",
-            )
-        )
-        return result
-
-    if hasattr(quote, "to_dict") and callable(quote.to_dict):
-        payload = quote.to_dict()
-    elif isinstance(quote, Mapping):
-        payload = dict(quote)
-    else:
-        # Fall back to attribute access for dataclass-like objects
-        payload = {}
+def _mapping_from_value(value: Any) -> Dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        payload = to_dict()
+        return dict(payload) if isinstance(payload, Mapping) else {}
+    return {
+        name: getattr(value, name)
         for name in (
             "price",
             "open_price",
@@ -652,46 +699,45 @@ def validate_realtime_quote(
             "change_pct",
             "pe_ratio",
             "pb_ratio",
-        ):
-            if hasattr(quote, name):
-                payload[name] = getattr(quote, name)
-
-    # Map quote fields onto OHLCV bar shape
-    bar = {
-        "open": payload.get("open_price", payload.get("open")),
-        "high": payload.get("high"),
-        "low": payload.get("low"),
-        "close": payload.get("price", payload.get("close")),
-        "volume": payload.get("volume"),
-        "amount": payload.get("amount"),
-        "pct_chg": payload.get("change_pct", payload.get("pct_chg")),
-        "pre_close": payload.get("pre_close"),
-        "price": payload.get("price"),
+        )
+        if hasattr(value, name)
     }
+
+
+def validate_realtime_quote(
+    quote: Any,
+    *,
+    market: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+) -> ValidationResult:
+    instrument_type = infer_instrument_type(stock_code, explicit=asset_type)
+    if quote is None:
+        result = ValidationResult(
+            context={
+                "market": canonical_market(market),
+                "instrument_type": instrument_type,
+                "data_type": "realtime_quote",
+            }
+        )
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.REJECT, "realtime quote is empty"))
+        return result
+    payload = _mapping_from_value(quote)
     result = validate_ohlcv_bar(
-        bar,
+        payload,
         market=market,
-        asset_type=asset_type,
+        asset_type=instrument_type,
+        namespace="quote",
     )
     result.context["data_type"] = "realtime_quote"
-
-    # Valuation metrics on quotes (soft checks; missing is fine for ETFs etc.)
     result.merge(
         validate_fundamental_metrics(
-            {
-                "pe_ratio": payload.get("pe_ratio"),
-                "pb_ratio": payload.get("pb_ratio"),
-            },
+            payload,
             market=market,
-            asset_type=asset_type,
+            asset_type=instrument_type,
         )
     )
     return result
-
-
-# ---------------------------------------------------------------------------
-# Fundamental validation
-# ---------------------------------------------------------------------------
 
 
 def validate_fundamental_metrics(
@@ -700,78 +746,67 @@ def validate_fundamental_metrics(
     market: Optional[str] = None,
     asset_type: Optional[str] = None,
 ) -> ValidationResult:
-    """Validate PE/PB-style fundamental scalars.
-
-    Negative PE is a **warn** (common for loss-making names), not reject.
-    Extreme magnitudes and non-finite values are rejected as feed errors.
-    Missing metrics never produce findings (ETF / partial coverage safe).
-    """
+    instrument_type = canonical_instrument_type(asset_type)
     result = ValidationResult(
         context={
-            "market": market,
-            "asset_type": asset_type,
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
             "data_type": "fundamental_metrics",
         }
     )
-
     pe_raw = metrics.get("pe_ratio", metrics.get("pe"))
     pb_raw = metrics.get("pb_ratio", metrics.get("pb"))
-
-    if is_non_finite_number(pe_raw):
+    pe_kind, pe = classify_numeric(pe_raw)
+    if pe_kind not in {NumericKind.MISSING, NumericKind.FINITE}:
         result.add(
             _issue(
-                CODE_FUND_PE_NON_FINITE,
+                CODE_FUND_PE_INVALID_TYPE if pe_kind == NumericKind.INVALID_TYPE else CODE_FUND_PE_NON_FINITE,
                 ValidationSeverity.REJECT,
-                "pe_ratio is non-finite",
+                "pe_ratio is invalid" if pe_kind == NumericKind.INVALID_TYPE else "pe_ratio is not finite",
                 field="pe_ratio",
             )
         )
-    else:
-        pe = to_finite_float(pe_raw)
-        if pe is not None:
-            if pe < 0:
-                result.add(
-                    _issue(
-                        CODE_FUND_PE_NEGATIVE,
-                        ValidationSeverity.WARN,
-                        f"pe_ratio is negative ({pe}); may be loss-making issuer",
-                        field="pe_ratio",
-                        detail={"value": pe},
-                    )
+    elif pe is not None:
+        if pe < 0:
+            result.add(
+                _issue(
+                    CODE_FUND_PE_NEGATIVE,
+                    ValidationSeverity.WARN,
+                    "negative PE can represent a loss-making issuer",
+                    field="pe_ratio",
+                    detail={"value": pe},
                 )
-            if abs(pe) >= PE_ABS_EXTREME:
-                result.add(
-                    _issue(
-                        CODE_FUND_PE_EXTREME,
-                        ValidationSeverity.REJECT,
-                        f"pe_ratio absolute value extreme ({pe})",
-                        field="pe_ratio",
-                        detail={"value": pe, "threshold": PE_ABS_EXTREME},
-                    )
+            )
+        if abs(pe) >= PE_ABS_EXTREME:
+            result.add(
+                _issue(
+                    CODE_FUND_PE_EXTREME,
+                    ValidationSeverity.REJECT,
+                    "pe_ratio is outside the accepted feed range",
+                    field="pe_ratio",
+                    detail={"value": pe, "absolute_limit": PE_ABS_EXTREME},
                 )
-
-    if is_non_finite_number(pb_raw):
+            )
+    pb_kind, pb = classify_numeric(pb_raw)
+    if pb_kind not in {NumericKind.MISSING, NumericKind.FINITE}:
         result.add(
             _issue(
-                CODE_FUND_PB_NON_FINITE,
+                CODE_FUND_PB_INVALID_TYPE if pb_kind == NumericKind.INVALID_TYPE else CODE_FUND_PB_NON_FINITE,
                 ValidationSeverity.REJECT,
-                "pb_ratio is non-finite",
+                "pb_ratio is invalid" if pb_kind == NumericKind.INVALID_TYPE else "pb_ratio is not finite",
                 field="pb_ratio",
             )
         )
-    else:
-        pb = to_finite_float(pb_raw)
-        if pb is not None and abs(pb) >= PB_ABS_EXTREME:
-            result.add(
-                _issue(
-                    CODE_FUND_PB_EXTREME,
-                    ValidationSeverity.REJECT,
-                    f"pb_ratio absolute value extreme ({pb})",
-                    field="pb_ratio",
-                    detail={"value": pb, "threshold": PB_ABS_EXTREME},
-                )
+    elif pb is not None and abs(pb) >= PB_ABS_EXTREME:
+        result.add(
+            _issue(
+                CODE_FUND_PB_EXTREME,
+                ValidationSeverity.REJECT,
+                "pb_ratio is outside the accepted feed range",
+                field="pb_ratio",
+                detail={"value": pb, "absolute_limit": PB_ABS_EXTREME},
             )
-
+        )
     return result
 
 
@@ -782,110 +817,153 @@ def validate_fundamental_context(
     asset_type: Optional[str] = None,
     stock_code: Optional[str] = None,
 ) -> ValidationResult:
-    """Validate a fundamental context dict from DataFetcherManager."""
+    instrument_type = infer_instrument_type(stock_code, explicit=asset_type)
     result = ValidationResult(
         context={
-            "market": market,
-            "asset_type": asset_type,
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
             "stock_code": stock_code,
             "data_type": "fundamental_context",
         }
     )
     if context is None:
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.WARN,
-                "fundamental context is None",
-            )
-        )
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.WARN, "fundamental context is empty"))
         return result
     if not isinstance(context, Mapping):
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.WARN,
-                f"fundamental context type unsupported: {type(context).__name__}",
-            )
-        )
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.REJECT, "fundamental context type is unsupported"))
         return result
-
-    market = market or context.get("market")
-    result.context["market"] = market
-
+    resolved_market = market or context.get("market")
+    result.context["market"] = canonical_market(resolved_market)
     valuation = context.get("valuation") or {}
     if isinstance(valuation, Mapping):
-        # Block shape: {status, data: {...}} or flat metrics
         data = valuation.get("data") if isinstance(valuation.get("data"), Mapping) else valuation
-        if isinstance(data, Mapping):
-            result.merge(
-                validate_fundamental_metrics(
-                    data,
-                    market=market,
-                    asset_type=asset_type,
-                )
+        result.merge(
+            validate_fundamental_metrics(
+                data,
+                market=resolved_market,
+                asset_type=instrument_type,
             )
-
-    # Earnings period dates if present (duplicate / reverse order)
+        )
     earnings = context.get("earnings") or {}
     if isinstance(earnings, Mapping):
-        data = earnings.get("data") if isinstance(earnings.get("data"), Mapping) else earnings
+        data = (
+            earnings.get("data")
+            if isinstance(earnings.get("data"), Mapping)
+            else earnings
+        )
         periods = None
         if isinstance(data, Mapping):
-            periods = data.get("periods") or data.get("report_dates") or data.get("dates")
+            periods = (
+                data.get("periods")
+                or data.get("report_dates")
+                or data.get("dates")
+            )
         if isinstance(periods, Sequence) and not isinstance(periods, (str, bytes)):
-            keys = [str(p) for p in periods if p is not None]
             seen: Dict[str, int] = {}
-            prev: Optional[str] = None
-            for idx, key in enumerate(keys):
+            previous: Optional[str] = None
+            for index, raw_period in enumerate(periods):
+                if raw_period is None:
+                    continue
+                key = str(raw_period)
                 if key in seen:
                     result.add(
                         _issue(
                             CODE_DATE_DUPLICATE,
                             ValidationSeverity.WARN,
-                            f"duplicate earnings period {key}",
+                            "earnings periods contain a duplicate date",
                             field="earnings.periods",
-                            row_index=idx,
+                            row_index=index,
                         )
                     )
                 else:
-                    seen[key] = idx
-                # Expect chronological ascending; reverse is warn
-                if prev is not None and key < prev:
+                    seen[key] = index
+                if previous is not None and key < previous:
                     result.add(
                         _issue(
                             CODE_DATE_OUT_OF_ORDER,
                             ValidationSeverity.WARN,
-                            f"earnings period out of order: {key} after {prev}",
+                            "earnings periods are out of order",
                             field="earnings.periods",
-                            row_index=idx,
+                            row_index=index,
                         )
                     )
-                prev = key
-
+                previous = key
     return result
 
 
-# ---------------------------------------------------------------------------
-# Attach / log helpers (no silent drop)
-# ---------------------------------------------------------------------------
+def validate_technical_indicators(
+    indicators: Any,
+    *,
+    market: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+) -> ValidationResult:
+    instrument_type = infer_instrument_type(stock_code, explicit=asset_type)
+    result = ValidationResult(
+        context={
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
+            "stock_code": stock_code,
+            "data_type": "technical_indicators",
+        }
+    )
+    payload = _mapping_from_value(indicators)
+    if not payload:
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.WARN, "technical indicators are empty"))
+        return result
+    for field_name, (minimum, maximum) in _TECHNICAL_CONTRACTS.items():
+        if field_name not in payload:
+            continue
+        _validate_numeric_field(
+            result,
+            namespace="technical",
+            field_name=field_name,
+            raw_value=payload.get(field_name),
+            minimum=minimum,
+            maximum=maximum,
+            minimum_exclusive=field_name.startswith("ma"),
+        )
+    return result
+
+
+def project_technical_indicators(
+    indicators: Any,
+    *,
+    market: Optional[str] = None,
+    instrument_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+    provider: str = "StockTrendAnalyzer",
+) -> Dict[str, Any]:
+    """Validate, record, and return the finite synthesis projection."""
+    payload = _mapping_from_value(indicators)
+    result = validate_technical_indicators(
+        payload,
+        market=market,
+        asset_type=instrument_type,
+        stock_code=stock_code,
+    )
+    log_validation_result(
+        result,
+        data_type="technical_indicators",
+        stock_code=stock_code,
+        provider=provider,
+        market=market,
+        instrument_type=instrument_type,
+        rejected=False,
+    )
+    rejected_fields = {
+        issue.field
+        for issue in result.issues
+        if issue.severity == ValidationSeverity.REJECT and issue.field
+    }
+    return {key: value for key, value in payload.items() if key not in rejected_fields}
 
 
 def attach_validation_to_frame(frame: Any, result: ValidationResult) -> Any:
-    """Store validation summary on DataFrame.attrs when available."""
-    if frame is None:
-        return frame
     attrs = getattr(frame, "attrs", None)
     if isinstance(attrs, dict):
         attrs[ATTR_KEY] = result.to_dict()
     return frame
-
-
-def attach_validation_to_mapping(payload: Any, result: ValidationResult) -> Any:
-    """Attach validation summary under ``data_validation`` key when mapping-like."""
-    if isinstance(payload, dict):
-        payload[ATTR_KEY] = result.to_dict()
-    return payload
 
 
 def log_validation_result(
@@ -893,20 +971,37 @@ def log_validation_result(
     *,
     data_type: str,
     stock_code: Optional[str] = None,
-) -> None:
-    """Record warn/reject findings without mutating data.
-
-    Logging is intentionally deferred to the manager-layer wiring helper so
-    this module never mixes Exception subclasses with logger calls (production
-    exception-log callsite guard). Findings remain available via
-    ``ValidationResult.to_dict()`` and frame/mapping annotations.
-    """
-    del data_type, stock_code  # retained for API stability / call-site clarity
+    provider: Optional[str] = None,
+    market: Optional[str] = None,
+    instrument_type: Optional[str] = None,
+    rejected: bool = False,
+) -> Dict[str, Any]:
+    evidence = outcome.to_evidence(
+        data_type=data_type,
+        stock_code=stock_code,
+        provider=provider,
+        market=market or outcome.context.get("market"),
+        instrument_type=(instrument_type or outcome.context.get("instrument_type")),
+        rejected=rejected,
+    )
     if outcome.ok:
-        return
-    # Touch fields so callers keep a stable side-effect-free entry point.
-    _ = outcome.status
-    _ = len(outcome.issues)
+        return evidence
+    from src.services.run_diagnostics import record_data_quality_evidence
+
+    record_data_quality_evidence(
+        data_type=evidence["data_type"],
+        severity=evidence["severity"],
+        symbol=evidence.get("symbol"),
+        provider=evidence.get("provider"),
+        market=evidence.get("market"),
+        instrument_type=evidence.get("instrument_type"),
+        rejected=evidence["rejected"],
+        issues=evidence["issues"],
+        issue_count=evidence["issue_count"],
+        truncated=evidence["truncated"],
+        schema_version=evidence["schema_version"],
+    )
+    return evidence
 
 
 def validate_and_annotate(
@@ -915,25 +1010,25 @@ def validate_and_annotate(
     data_type: str,
     market: Optional[str] = None,
     asset_type: Optional[str] = None,
+    instrument_type: Optional[str] = None,
     stock_code: Optional[str] = None,
+    provider: Optional[str] = None,
     strict: Optional[bool] = None,
 ) -> ValidationResult:
-    """Run the appropriate validator, annotate, log, and optionally raise.
-
-    This is the single orchestration entry for manager-layer wiring.
-    """
     if not is_validation_enabled():
         return ValidationResult(
             context={"data_type": data_type, "enabled": False, "stock_code": stock_code}
         )
-
+    resolved_instrument = infer_instrument_type(
+        stock_code,
+        explicit=instrument_type or asset_type,
+    )
     if data_type == "daily_data":
-        # data may be (frame, source) or frame
-        frame = data[0] if isinstance(data, tuple) and len(data) >= 1 else data
+        frame = data[0] if isinstance(data, tuple) and data else data
         result = validate_daily_frame(
             frame,
             market=market,
-            asset_type=asset_type,
+            asset_type=resolved_instrument,
             stock_code=stock_code,
         )
         attach_validation_to_frame(frame, result)
@@ -941,98 +1036,48 @@ def validate_and_annotate(
         result = validate_realtime_quote(
             data,
             market=market,
-            asset_type=asset_type,
+            asset_type=resolved_instrument,
+            stock_code=stock_code,
         )
     elif data_type == "fundamental_context":
         result = validate_fundamental_context(
             data,
             market=market,
-            asset_type=asset_type,
+            asset_type=resolved_instrument,
             stock_code=stock_code,
         )
-        attach_validation_to_mapping(data, result)
-    else:
-        result = ValidationResult(context={"data_type": data_type, "stock_code": stock_code})
-        result.add(
-            _issue(
-                CODE_EMPTY_PAYLOAD,
-                ValidationSeverity.WARN,
-                f"unknown data_type for validation: {data_type}",
-            )
+    elif data_type == "technical_indicators":
+        result = validate_technical_indicators(
+            data,
+            market=market,
+            asset_type=resolved_instrument,
+            stock_code=stock_code,
         )
+    else:
+        result = ValidationResult(
+            context={"data_type": data_type, "stock_code": stock_code}
+        )
+        result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.WARN, "unknown validation data type"))
 
-    log_validation_result(result, data_type=data_type, stock_code=stock_code)
-
-    if result.should_reject(strict=strict):
+    reject = result.should_reject(
+        strict=strict,
+        market=market,
+        instrument_type=resolved_instrument,
+    )
+    evidence = log_validation_result(
+        result,
+        data_type=data_type,
+        stock_code=stock_code,
+        provider=provider,
+        market=market,
+        instrument_type=resolved_instrument,
+        rejected=reject,
+    )
+    if data_type == "realtime_quote" and data is not None:
+        try:
+            setattr(data, "data_quality_evidence", evidence)
+        except (AttributeError, TypeError):
+            pass
+    if reject:
         raise DataValidationRejected(result, data_type=data_type)
     return result
-
-
-# Public re-export surface for diagnostics consumers
-REASON_CODES: Mapping[str, str] = {
-    CODE_PRICE_MISSING: "Price/close missing",
-    CODE_PRICE_NON_FINITE: "Price field is NaN or ±Infinity",
-    CODE_PRICE_NON_POSITIVE: "Price is zero or negative",
-    CODE_HIGH_BELOW_LOW: "High is below low",
-    CODE_CLOSE_OUT_OF_RANGE: "Close outside high/low range",
-    CODE_OPEN_OUT_OF_RANGE: "Open outside high/low range",
-    CODE_PCT_CHG_INCONSISTENT: "pct_chg inconsistent with price change",
-    CODE_VOLUME_NEGATIVE: "Volume is negative",
-    CODE_VOLUME_NON_FINITE: "Volume is NaN or ±Infinity",
-    CODE_VOLUME_UNIT_SUSPECT: "Volume unit may be lots instead of shares",
-    CODE_AMOUNT_NEGATIVE: "Amount is negative",
-    CODE_DATE_OUT_OF_ORDER: "Dates out of chronological order",
-    CODE_DATE_DUPLICATE: "Duplicate date/period",
-    CODE_FUND_PE_NON_FINITE: "PE is NaN or ±Infinity",
-    CODE_FUND_PE_EXTREME: "PE absolute value is extreme",
-    CODE_FUND_PB_NON_FINITE: "PB is NaN or ±Infinity",
-    CODE_FUND_PB_EXTREME: "PB absolute value is extreme",
-    CODE_FUND_PE_NEGATIVE: "PE is negative (often loss-making issuer)",
-    CODE_EMPTY_PAYLOAD: "Empty or unsupported payload",
-}
-
-__all__ = [
-    "ATTR_KEY",
-    "CODE_AMOUNT_NEGATIVE",
-    "CODE_CLOSE_OUT_OF_RANGE",
-    "CODE_DATE_DUPLICATE",
-    "CODE_DATE_OUT_OF_ORDER",
-    "CODE_EMPTY_PAYLOAD",
-    "CODE_FUND_PB_EXTREME",
-    "CODE_FUND_PB_NON_FINITE",
-    "CODE_FUND_PE_EXTREME",
-    "CODE_FUND_PE_NEGATIVE",
-    "CODE_FUND_PE_NON_FINITE",
-    "CODE_HIGH_BELOW_LOW",
-    "CODE_OPEN_OUT_OF_RANGE",
-    "CODE_PCT_CHG_INCONSISTENT",
-    "CODE_PRICE_MISSING",
-    "CODE_PRICE_NON_FINITE",
-    "CODE_PRICE_NON_POSITIVE",
-    "CODE_VOLUME_NEGATIVE",
-    "CODE_VOLUME_NON_FINITE",
-    "CODE_VOLUME_UNIT_SUSPECT",
-    "DataValidationRejected",
-    "ENV_ENABLED",
-    "ENV_STRICT",
-    "PCT_CHG_ABS_TOLERANCE",
-    "PE_ABS_EXTREME",
-    "PB_ABS_EXTREME",
-    "REASON_CODES",
-    "ValidationIssue",
-    "ValidationResult",
-    "ValidationSeverity",
-    "attach_validation_to_frame",
-    "attach_validation_to_mapping",
-    "is_non_finite_number",
-    "is_strict_mode",
-    "is_validation_enabled",
-    "log_validation_result",
-    "to_finite_float",
-    "validate_and_annotate",
-    "validate_daily_frame",
-    "validate_fundamental_context",
-    "validate_fundamental_metrics",
-    "validate_ohlcv_bar",
-    "validate_realtime_quote",
-]
