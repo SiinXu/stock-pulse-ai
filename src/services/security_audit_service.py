@@ -4,8 +4,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
+from threading import Lock
 from typing import Any, Optional, Protocol, cast
 import uuid
 
@@ -66,6 +67,8 @@ class SecurityAuditService:
             raise ValueError("security audit retention must be at least one day")
         self._repository = repository
         self._retention_days = int(retention_days)
+        self._retention_applied_on: date | None = None
+        self._retention_lock = Lock()
 
     @staticmethod
     def new_correlation_id() -> str:
@@ -142,7 +145,7 @@ class SecurityAuditService:
     ) -> SecurityAuditEventPage:
         try:
             repository = self._get_repository()
-            repository.apply_retention(cutoff=self._retention_cutoff())
+            self._apply_retention_if_due(repository)
             items, total = repository.list_events(
                 page=page,
                 page_size=page_size,
@@ -200,7 +203,7 @@ class SecurityAuditService:
             )
             event = SecurityAuditEventCreate.model_validate(sanitized)
             repository = self._get_repository()
-            repository.apply_retention(cutoff=self._retention_cutoff())
+            self._apply_retention_if_due(repository)
             return repository.append(event)
         except Exception as exc:  # broad-exception: fallback_recorded - Normalize validation/redaction/storage failures before a privileged action proceeds.
             log_safe_exception(
@@ -216,8 +219,18 @@ class SecurityAuditService:
             self._repository = SecurityAuditRepository()
         return self._repository
 
-    def _retention_cutoff(self) -> datetime:
-        return datetime.now(timezone.utc) - timedelta(days=self._retention_days)
+    def _apply_retention_if_due(self, repository: SecurityAuditRepository) -> None:
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        if self._retention_applied_on == today:
+            return
+        with self._retention_lock:
+            if self._retention_applied_on == today:
+                return
+            repository.apply_retention(
+                cutoff=now - timedelta(days=self._retention_days)
+            )
+            self._retention_applied_on = today
 
 
 def get_security_audit_service() -> SecurityAuditService:

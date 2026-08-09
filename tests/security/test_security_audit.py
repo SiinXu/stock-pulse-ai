@@ -42,6 +42,19 @@ class _CapturingSecurityAuditRepository(SecurityAuditRepository):
         return super().append(event)
 
 
+class _CountingRetentionRepository(SecurityAuditRepository):
+    def __init__(self, db_manager: DatabaseManager, *, fail_first: bool = False) -> None:
+        super().__init__(db_manager)
+        self.retention_calls = 0
+        self.fail_first = fail_first
+
+    def apply_retention(self, *, cutoff):
+        self.retention_calls += 1
+        if self.fail_first and self.retention_calls == 1:
+            raise RuntimeError("retention unavailable")
+        return super().apply_retention(cutoff=cutoff)
+
+
 def _record_attempt(service: SecurityAuditService, **overrides):
     fields = {
         "event_type": "auth.login",
@@ -113,6 +126,43 @@ def test_retention_and_query_are_bounded(isolated_database) -> None:
     assert page.total == 1
     assert [event.id for event in page.items] == [current.id]
     assert page.page_size == 100
+
+
+def test_retention_runs_once_per_utc_day_for_reused_service(isolated_database) -> None:
+    repository = _CountingRetentionRepository(isolated_database)
+    service = SecurityAuditService(repository)
+
+    first = _record_attempt(service)
+    second = _record_attempt(
+        service,
+        correlation_id="fedcba9876543210fedcba9876543210",
+    )
+    page = service.list_events(page=1, page_size=100)
+
+    assert repository.retention_calls == 1
+    assert page.total == 2
+    assert {event.id for event in page.items} == {first.id, second.id}
+
+    service._retention_applied_on = datetime.now(timezone.utc).date() - timedelta(days=1)
+    _record_attempt(
+        service,
+        correlation_id="00112233445566778899aabbccddeeff",
+    )
+
+    assert repository.retention_calls == 2
+
+
+def test_retention_failure_is_retried_before_later_append(isolated_database) -> None:
+    repository = _CountingRetentionRepository(isolated_database, fail_first=True)
+    service = SecurityAuditService(repository)
+
+    with pytest.raises(SecurityAuditUnavailable):
+        _record_attempt(service)
+
+    persisted = _record_attempt(service)
+
+    assert repository.retention_calls == 2
+    assert persisted.action == "auth.login"
 
 
 class _FailingRepository:

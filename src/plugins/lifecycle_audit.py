@@ -134,11 +134,9 @@ class PluginLifecycleAuditor:
             )
 
             recorder = get_security_audit_service()
-            return (
-                require_security_audit_recorder(recorder)
-                if required
-                else recorder
-            )
+            resolved = require_security_audit_recorder(recorder)
+            self._recorder = resolved
+            return resolved
         except Exception as exc:  # broad-exception: fallback_recorded - caller selects fail-open startup or fail-closed operator semantics
             log_safe_exception(
                 logger,

@@ -20,6 +20,7 @@ from src.plugins import (
     ExtensionRegistry,
     Plugin,
     PluginContext,
+    PluginLifecycleAuditor,
     PluginManager,
     PluginManifest,
     build_data_provider_bound_registry,
@@ -200,6 +201,42 @@ def test_lifecycle_audit_records_load_enable_disable_and_onload_failed() -> None
     assert last["target_id"] == "stockpulse.failing-plugin"
     assert last["metadata"]["error_code"] == "plugin_onload_failed"
     assert "token=onload-secret" not in repr(audit.attempts + audit.completions)
+
+
+def test_lifecycle_auditor_reuses_lazy_default_recorder(monkeypatch) -> None:
+    audit = SecurityAuditRecorderStub()
+    factory_calls = 0
+
+    def build_recorder():
+        nonlocal factory_calls
+        factory_calls += 1
+        return audit
+
+    monkeypatch.setattr(
+        "src.services.security_audit_service.get_security_audit_service",
+        build_recorder,
+    )
+    auditor = PluginLifecycleAuditor()
+
+    first = auditor.begin(plugin_id="stockpulse.first", operation="load")
+    auditor.complete(
+        plugin_id="stockpulse.first",
+        operation="load",
+        success=True,
+        correlation_id=first,
+    )
+    second = auditor.begin(plugin_id="stockpulse.second", operation="enable")
+    auditor.complete(
+        plugin_id="stockpulse.second",
+        operation="enable",
+        success=True,
+        correlation_id=second,
+    )
+
+    assert factory_calls == 1
+    assert auditor.recorder is audit
+    assert len(audit.attempts) == 2
+    assert len(audit.completions) == 2
 
 
 def test_lifecycle_audit_records_reload_completion(tmp_path: Path) -> None:
