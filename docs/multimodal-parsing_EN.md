@@ -46,7 +46,7 @@ MULTIMODAL_AGENT_TOOLS_ENABLED=false
 | --- | --- |
 | `src/services/pdf_parsing_service.py` | Local PDF parse → `schema_version=pdf-parse-v1` |
 | `src/services/chart_reading_service.py` | Vision chart read → `schema_version=chart-reading-v1` |
-| `src/services/earnings_transcript_service.py` | Transcript parse → `schema_version=earnings-transcript-v1` |
+| `src/services/earnings_transcript_service.py` | Transcript parse → `schema_version=earnings-transcript-v2` |
 | `src/agent/tools/multimodal_tools.py` | Default-off PDF/chart `ToolDefinition` factories |
 | `src/agent/tools/earnings_transcript_tools.py` | Default-off transcript tool (separate from OCR) |
 

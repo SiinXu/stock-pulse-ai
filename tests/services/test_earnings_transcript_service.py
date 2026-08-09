@@ -4,12 +4,19 @@
 
 from __future__ import annotations
 
+import json
+import os
+import stat
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
 from src.services.earnings_transcript_service import (
     MAX_CHUNK_CHARS,
+    MAX_MODEL_RESULT_BYTES,
+    MAX_TRANSCRIPT_BYTES,
     TRANSCRIPT_DISCLAIMER,
     TRANSCRIPT_SCHEMA_VERSION,
     EarningsTranscriptService,
@@ -36,7 +43,7 @@ def test_parse_fixture_segments_and_qa() -> None:
     assert result["status"] in {"available", "degraded"}
     assert result["disclaimer"] == TRANSCRIPT_DISCLAIMER
     assert result["method"] == "local_deterministic"
-    assert result["text_char_count"] == len(text.replace("\r\n", "\n").replace("\r", "\n"))
+    assert result["text_char_count"] == len(text)
 
     segment_types = {seg["type"] for seg in result["segments"]}
     assert "prepared_remarks" in segment_types or "qa" in segment_types
@@ -59,7 +66,7 @@ def test_metrics_are_source_traceable() -> None:
     assert metrics, "expected at least one metric from the fixture"
 
     failures = assert_metrics_source_traceable(
-        text.replace("\r\n", "\n").replace("\r", "\n"),
+        text,
         metrics,
     )
     assert failures == []
@@ -70,11 +77,13 @@ def test_metrics_are_source_traceable() -> None:
     assert any("$1.42" in v or "1.42" in v for v in values)
 
     for metric in metrics:
-        assert metric.get("source_verified") is True
+        assert metric.get("lexically_source_verified") is True
+        assert metric.get("semantic_metric_validated") is True
+        assert metric.get("unit")
+        assert metric.get("relation")
         start = metric["start_char"]
         end = metric["end_char"]
-        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-        assert normalized[start:end] == metric["value_text"]
+        assert text[start:end] == metric["value_text"]
 
 
 def test_does_not_fabricate_absent_numbers() -> None:
@@ -131,6 +140,15 @@ def test_long_transcript_chunking_respects_limit() -> None:
     assert result["chunks"]
     assert all(c["char_count"] <= 2_000 for c in result["chunks"])
     assert all(c["char_count"] <= MAX_CHUNK_CHARS for c in result["chunks"])
+    assert all("text" not in c for c in result["chunks"])
+    assert result["retrieval"]["mode"] == "same_tool_chunk_index"
+
+    selected = parse_transcript_text(text, max_chunk_chars=2_000, chunk_index=1)
+    assert len(selected["chunks"]) == 1
+    assert selected["chunks"][0]["index"] == 1
+    assert selected["chunks"][0]["text"] == text[
+        selected["chunks"][0]["start_char"] : selected["chunks"][0]["end_char"]
+    ]
 
 
 def test_forward_looking_and_optional_tone() -> None:
@@ -192,3 +210,143 @@ def test_chunk_overlap_progresses() -> None:
     assert starts == sorted(starts)
     assert starts[0] == 0
     assert chunks[-1]["end_char"] == len(text)
+
+
+def test_exact_coordinates_preserve_padding_crlf_and_cr() -> None:
+    text = (
+        "  \r\nPrepared Remarks\rCEO: Revenue was $77 million.\r\n"
+        "Question-and-Answer Session\r\nQ - A, B:\r\nWhy?\r\nA - CEO:\r\nBecause.\r\n  "
+    )
+    result = parse_transcript_text(text)
+    metric = result["metrics"][0]
+    assert text[metric["start_char"] : metric["end_char"]] == "$77 million"
+    assert result["source"]["normalization"] == "none"
+    assert result["source"]["original_char_count"] == len(text)
+    assert result["source"]["coordinate_system"] == "exact_submitted_text_characters"
+
+
+def test_metric_parser_rejects_year_phone_and_account_numbers() -> None:
+    text = (
+        "Prepared Remarks\nCEO: Fiscal year 2026 was stable. "
+        "Revenue hotline 5551234. Revenue was 555. Account ID 998877. "
+        "Revenue was $120 million and gross margin reached 42%.\n"
+    )
+    values = {item["value_text"] for item in parse_transcript_text(text)["metrics"]}
+    assert "$120 million" in values
+    assert "42%" in values
+    assert not any("2026" in value or "555" in value or "998877" in value for value in values)
+
+
+def test_tone_is_management_scoped_and_negation_aware() -> None:
+    no_scope = parse_transcript_text(
+        "Question-and-Answer Session\nQ - Analyst, Firm: View?\nA - CEO: We are confident."
+    )
+    assert no_scope["management_tone"] is None
+
+    result = parse_transcript_text(
+        "Prepared Remarks\nCEO: We are not confident and not optimistic. "
+        "Conditions remain challenging."
+    )
+    tone = result["management_tone"]
+    assert tone["confident_signal_count"] == 0
+    assert tone["negated_positive_signal_count"] == 2
+    assert tone["label"] == "cautious"
+
+
+def test_utf8_bom_and_invalid_utf8_have_explicit_provenance(tmp_path: Path) -> None:
+    bom = tmp_path / "bom.txt"
+    bom.write_bytes(b"\xef\xbb\xbfPrepared Remarks\nRevenue was $1 million.")
+    parsed = parse_transcript_path("bom.txt", file_root=str(tmp_path))
+    assert parsed["source"]["encoding"] == "utf-8-sig"
+    assert parsed["metrics"][0]["value_text"] == "$1 million"
+
+    invalid = tmp_path / "invalid.txt"
+    invalid.write_bytes(b"Prepared Remarks\nRevenue was $1 million.\xff")
+    failed = parse_transcript_path("invalid.txt", file_root=str(tmp_path))
+    assert failed["status"] == "unavailable"
+    assert failed["reason_code"] == "unsupported_encoding"
+    assert failed["source"]["encoding"] == "invalid_utf8"
+    assert len(failed["source"]["content_sha256"]) == 64
+
+    oversized = tmp_path / "oversized.txt"
+    oversized.write_bytes(b"x" * (MAX_TRANSCRIPT_BYTES + 1))
+    too_large = parse_transcript_path("oversized.txt", file_root=str(tmp_path))
+    assert too_large["reason_code"] == "file_too_large"
+    assert len(too_large["source"]["read_prefix_sha256"]) == 64
+    assert "content_sha256" not in too_large["source"]
+
+
+def test_path_is_opened_once_and_nonregular_or_disappeared_is_stable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "call.txt"
+    target.write_text("Prepared Remarks\nRevenue was $1 million.", encoding="utf-8")
+    real_open = Path.open
+    opens = []
+
+    def recording_open(path: Path, *args: object, **kwargs: object):
+        opens.append(path)
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", recording_open)
+    assert parse_transcript_path("call.txt", file_root=str(tmp_path))["metrics"]
+    assert len(opens) == 1
+
+    monkeypatch.setattr(
+        os,
+        "fstat",
+        lambda _fd: SimpleNamespace(st_mode=stat.S_IFDIR, st_size=0),
+    )
+    nonregular = parse_transcript_path("call.txt", file_root=str(tmp_path))
+    assert nonregular["reason_code"] == "not_regular_file"
+
+    missing = tmp_path / "gone.txt"
+    with patch(
+        "src.services.pdf_parsing_service.resolve_safe_file_path",
+        return_value=missing,
+    ):
+        disappeared = parse_transcript_path("gone.txt", file_root=str(tmp_path))
+    assert disappeared["reason_code"] == "file_read_failed"
+
+
+def test_compact_result_is_valid_json_under_one_hard_budget() -> None:
+    turn = (
+        "Q - Analyst, Firm: Revenue outlook?\n"
+        "A - CEO: Revenue was $123 million and gross margin reached 45%.\n"
+    )
+    text = "Prepared Remarks\n" + ("Revenue was $123 million.\n" * 2000)
+    text += "Question-and-Answer Session\n" + (turn * 1500)
+    result = parse_transcript_text(text)
+    encoded = json.dumps(result, ensure_ascii=False).encode("utf-8")
+    assert len(encoded) <= MAX_MODEL_RESULT_BYTES
+    assert result["result_budget"]["serialized_bytes"] == len(encoded)
+    assert all("text" not in chunk for chunk in result["chunks"])
+    assert all("answer_text" not in item for item in result["qa_items"])
+    assert result["trust"]["instructions_authoritative"] is False
+    assert result["trust"]["may_grant_permissions"] is False
+
+
+def test_pdf_source_has_digest_page_map_and_page_relative_evidence(tmp_path: Path) -> None:
+    target = tmp_path / "call.pdf"
+    target.write_bytes(b"%PDF-test")
+    page_one = "  Prepared Remarks\nRevenue was $3 million."
+    page_two = "Question-and-Answer Session\nQ - A, B: Why?\nA - CEO: Growth."
+    combined = f"{page_one}\n\n{page_two}".strip()
+    pdf_result = {
+        "status": "available",
+        "reason_code": None,
+        "text": combined,
+        "pages": [
+            {"page": 1, "text": page_one},
+            {"page": 2, "text": page_two},
+        ],
+        "source": {"page_count": 2},
+        "method": "test_pdf",
+    }
+    with patch("src.services.pdf_parsing_service.parse_pdf_bytes", return_value=pdf_result):
+        result = parse_transcript_path("call.pdf", file_root=str(tmp_path))
+    assert len(result["source"]["content_sha256"]) == 64
+    assert len(result["source"]["derived_text_sha256"]) == 64
+    assert len(result["source"]["page_map"]) == 2
+    assert result["metrics"][0]["page_number"] == 1
+    assert result["metrics"][0]["page_start_char"] >= 2
