@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Analysis history comparison service exposes deterministic `compare_analyses` / `get_latest_delta` deltas (conclusion, scores, evidence, risks) with explicit no-baseline status distinct from no-change (#148).
+- [Fixed] Ensure the `web-gate` check always concludes on pull requests, reports successful no-frontend runs, and fails closed when change detection is unavailable.
+- [Fixed] Shared ScrollArea no longer applies touch-pan-y, restoring pinch-to-zoom inside chat and history rails while keeping the min-h-0 height chain.
 - [Fixed] Treat non-finite numbers (±Infinity) as missing values in marketFormat price and change-color guards so sentinel/overflow inputs never render as prices or paint as up/down moves.
 - [Added] Report templates pin a Decision Card (direction/score, conclusion, confidence, key risks, watch/invalidation conditions) at the top of each stock section using existing dashboard fields only; brief uses a 1+1 line push length budget so a typical 10-stock brief stays within Pushover max_length=1024 (#861 Phase 1).
 - [Fixed] Restore Simplified Chinese Settings help source for RSS news feeds and multi-strategy deliberation so UI i18n resource extraction no longer fails at import.
