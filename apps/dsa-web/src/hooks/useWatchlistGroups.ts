@@ -60,8 +60,9 @@ export function useWatchlistGroups({ enabled = true }: { enabled?: boolean } = {
     if (mountedRef.current) setIsLoading(true);
     try {
       const next = await watchlistGroupsApi.list();
-      if (applyState(next, generation)) setErrorMessage(null);
-      return true;
+      const applied = applyState(next, generation);
+      if (applied) setErrorMessage(null);
+      return applied;
     } catch (error) {
       if (mountedRef.current && generationRef.current === generation) {
         setErrorMessage(getParsedApiError(error).message || t('watchlist.groupsLoadFailed'));
@@ -92,8 +93,9 @@ export function useWatchlistGroups({ enabled = true }: { enabled?: boolean } = {
     setIsActioning(true);
     try {
       const next = await action(currentRevision);
-      if (applyState(next, generation)) setErrorMessage(null);
-      return true;
+      const applied = applyState(next, generation);
+      if (applied) setErrorMessage(null);
+      return applied;
     } catch (error) {
       if (mountedRef.current && generationRef.current === generation) {
         setErrorMessage(getParsedApiError(error).message || t('watchlist.groupsActionFailed'));

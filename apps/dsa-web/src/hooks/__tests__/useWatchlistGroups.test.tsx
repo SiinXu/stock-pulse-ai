@@ -62,9 +62,24 @@ describe('useWatchlistGroups', () => {
     await act(async () => pendingRefresh.resolve(state(3)));
     await expect(refresh).resolves.toBe(true);
     await act(async () => pendingAction.resolve(state(2)));
-    await expect(action).resolves.toBe(true);
+    await expect(action).resolves.toBe(false);
 
     expect(result.current.revision).toBe(3);
     expect(result.current.isActioning).toBe(false);
+  });
+
+  it('returns false through the public callback when a mutation fails', async () => {
+    mockCreate.mockRejectedValue(new Error('create failed'));
+    const { result } = renderHook(() => useWatchlistGroups());
+    await waitFor(() => expect(result.current.revision).toBe(1));
+
+    let succeeded!: boolean;
+    await act(async () => {
+      succeeded = await result.current.createGroup('Core');
+    });
+
+    expect(succeeded).toBe(false);
+    expect(result.current.errorMessage).toBeTruthy();
+    expect(mockList).toHaveBeenCalledTimes(2);
   });
 });

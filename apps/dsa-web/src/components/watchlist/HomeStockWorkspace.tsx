@@ -69,16 +69,16 @@ interface HomeStockWorkspaceProps {
   watchlistGroupsLoading?: boolean;
   watchlistGroupsActioning?: boolean;
   watchlistGroupsError?: string | null;
-  onCreateWatchlistGroup?: (name: string) => Promise<void> | void;
-  onDeleteWatchlistGroup?: (groupId: string) => Promise<void> | void;
-  onReorderWatchlistGroups?: (orderedIds: string[]) => Promise<void> | void;
-  onReorderWatchlistGroupMembers?: (groupId: string, orderedCodes: string[]) => Promise<void> | void;
+  onCreateWatchlistGroup?: (name: string) => Promise<boolean> | boolean;
+  onDeleteWatchlistGroup?: (groupId: string) => Promise<boolean> | boolean;
+  onReorderWatchlistGroups?: (orderedIds: string[]) => Promise<boolean> | boolean;
+  onReorderWatchlistGroupMembers?: (groupId: string, orderedCodes: string[]) => Promise<boolean> | boolean;
   onMoveWatchlistGroupMember?: (params: {
     stockCode: string;
     sourceGroupId: string;
     targetGroupId: string;
     targetIndex?: number;
-  }) => Promise<void> | void;
+  }) => Promise<boolean> | boolean;
 }
 
 function getTaskStatusLabel(task: TaskInfo | undefined, t: (key: UiTextKey, params?: UiTextParams) => string) {

@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import timezone
 import json
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 from uuid import uuid4
 
 from src.repositories.base import RepositoryError
@@ -44,6 +44,10 @@ class WatchlistGroupConflictError(WatchlistGroupServiceError):
     def __init__(self, message: str, *, current_revision: int) -> None:
         super().__init__(message, error_code=self.error_code)
         self.current_revision = current_revision
+
+
+class WatchlistGroupAuthorityChangedError(WatchlistGroupServiceError):
+    error_code = "watchlist_group_authority_changed"
 
 
 @dataclass(frozen=True)
@@ -128,6 +132,11 @@ def _translate_repo_error(exc: RepositoryError) -> WatchlistGroupServiceError:
         )
     if code in {"watchlist_group_not_found", "watchlist_group_member_not_found"}:
         return WatchlistGroupNotFoundError("Watchlist group or member was not found", error_code=code)
+    if code == "watchlist_group_authority_changed":
+        return WatchlistGroupAuthorityChangedError(
+            "Authoritative watchlist changed; retry with a fresh snapshot",
+            error_code=code,
+        )
     if code in {
         "watchlist_group_reorder_invalid",
         "watchlist_group_member_reorder_invalid",
@@ -149,9 +158,21 @@ class WatchlistGroupService:
     ) -> None:
         self.repo = repo or WatchlistGroupRepository(db_manager)
 
-    def list_state(self, *, stock_list_codes: Sequence[str]) -> WatchlistGroupStateView:
+    def list_state(
+        self,
+        *,
+        stock_list_codes: Sequence[str],
+        authority_version: Optional[str] = None,
+        authority_version_reader: Optional[Callable[[], str]] = None,
+    ) -> WatchlistGroupStateView:
         try:
-            return _state_view(self.repo.reconcile(stock_list_codes=stock_list_codes))
+            return _state_view(
+                self.repo.reconcile(
+                    stock_list_codes=stock_list_codes,
+                    authority_version=authority_version,
+                    authority_version_reader=authority_version_reader,
+                )
+            )
         except RepositoryError as exc:
             raise _translate_repo_error(exc) from exc
 
@@ -305,6 +326,7 @@ class WatchlistGroupService:
 
 
 __all__ = [
+    "WatchlistGroupAuthorityChangedError",
     "WatchlistGroupConflictError",
     "WatchlistGroupNotFoundError",
     "WatchlistGroupService",

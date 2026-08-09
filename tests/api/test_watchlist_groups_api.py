@@ -4,9 +4,11 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import json
 from pathlib import Path
+from threading import Barrier, Event, Thread, get_ident
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -51,6 +53,7 @@ class FakeSystemConfigService:
             raise RuntimeError("configuration write failed")
         self.stock_list = kwargs["items"][0]["value"]
         self.update_calls.append(self.stock_list)
+        self.config_version = f"cfg-v{len(self.update_calls) + 1}"
 
 
 def _service(tmp_path: Path, name: str) -> WatchlistGroupService:
@@ -90,6 +93,32 @@ def test_real_client_validates_revisioned_response_contract(tmp_path: Path) -> N
     assert stale.status_code == 409
     assert stale.json()["detail"]["error"] == "watchlist_group_revision_conflict"
     assert stale.json()["detail"]["params"]["current_revision"] == created.json()["revision"]
+
+
+def test_two_real_clients_with_one_revision_return_200_and_409_never_500(tmp_path: Path) -> None:
+    config = FakeSystemConfigService("600519,AAPL")
+    service = _service(tmp_path, "api-concurrent-clients.db")
+    client = _client(config, service)
+    revision = client.get("/api/v1/stocks/watchlist/groups").json()["revision"]
+    start = Barrier(2)
+
+    def create(name: str):
+        concurrent_client = _client(config, service)
+        start.wait(timeout=5)
+        return concurrent_client.post(
+            "/api/v1/stocks/watchlist/groups",
+            json={"name": name, "expected_revision": revision},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(create, ["Growth", "Income"]))
+
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    conflict = next(response for response in responses if response.status_code == 409)
+    assert conflict.json()["detail"]["error"] == "watchlist_group_revision_conflict"
+    final = client.get("/api/v1/stocks/watchlist/groups")
+    assert final.status_code == 200
+    assert len([group for group in final.json()["groups"] if not group["is_default"]]) == 1
 
 
 def test_revisioned_api_flow_and_strict_json(tmp_path: Path) -> None:
@@ -210,6 +239,73 @@ def test_group_failure_after_authority_commit_repairs_into_default(
         "AAPL",
         "HK00700",
     ]
+
+
+def test_stale_authority_reader_cannot_delete_a_committed_group_placement(tmp_path: Path) -> None:
+    class BlockingSnapshotConfig(FakeSystemConfigService):
+        def __init__(self) -> None:
+            super().__init__("AAPL")
+            self.stale_thread_id: int | None = None
+            self.snapshot_captured = Event()
+            self.release_snapshot = Event()
+            self._served_stale_snapshot = False
+
+        def get_config(self, include_schema: bool = False) -> dict:
+            snapshot = super().get_config(include_schema=include_schema)
+            if (
+                get_ident() == self.stale_thread_id
+                and not self._served_stale_snapshot
+            ):
+                self._served_stale_snapshot = True
+                self.snapshot_captured.set()
+                assert self.release_snapshot.wait(timeout=5)
+            return snapshot
+
+    config = BlockingSnapshotConfig()
+    service = _service(tmp_path, "api-authority-fence.db")
+    listed = endpoints.list_watchlist_groups(service=config, group_service=service)
+    created = endpoints.create_watchlist_group(
+        WatchlistGroupCreateRequest(name="Growth", expected_revision=listed.revision),
+        group_service=service,
+    )
+    growth_id = next(group.id for group in created.groups if group.name == "Growth")
+    stale_result: dict[str, object] = {}
+
+    def stale_read() -> None:
+        config.stale_thread_id = get_ident()
+        try:
+            stale_result["response"] = endpoints.list_watchlist_groups(
+                service=config,
+                group_service=service,
+            )
+        except Exception as exc:  # assertion captures unexpected thread failures
+            stale_result["error"] = exc
+
+    reader = Thread(target=stale_read)
+    reader.start()
+    assert config.snapshot_captured.wait(timeout=5)
+    added = endpoints.add_watchlist_group_member(
+        growth_id,
+        WatchlistGroupMemberAddRequest(
+            stock_code="TSLA",
+            expected_revision=created.revision,
+        ),
+        service=config,
+        group_service=service,
+    )
+    assert config.config_version == "cfg-v2"
+    assert any(member.stock_code == "TSLA" for group in added.groups for member in group.members)
+    config.release_snapshot.set()
+    reader.join(timeout=5)
+
+    assert not reader.is_alive()
+    assert "error" not in stale_result
+    response = stale_result["response"]
+    assert isinstance(response, type(listed))
+    growth = next(group for group in response.groups if group.id == growth_id)
+    default = next(group for group in response.groups if group.is_default)
+    assert [member.stock_code for member in growth.members] == ["TSLA"]
+    assert "TSLA" not in [member.stock_code for member in default.members]
 
 
 def test_member_add_schema_rejects_arbitrary_non_finite_attrs() -> None:

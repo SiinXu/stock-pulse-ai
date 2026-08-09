@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { WatchlistGroupsPanel } from '../WatchlistGroupsPanel';
@@ -39,11 +39,11 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WatchlistGro
       { code: '600519', analyzedToday: false },
       { code: 'AAPL', analyzedToday: true },
     ],
-    onCreateGroup: vi.fn(),
-    onDeleteGroup: vi.fn(),
-    onReorderGroups: vi.fn(),
-    onReorderMembers: vi.fn(),
-    onMoveMember: vi.fn(),
+    onCreateGroup: vi.fn(async () => true),
+    onDeleteGroup: vi.fn(async () => true),
+    onReorderGroups: vi.fn(async () => true),
+    onReorderMembers: vi.fn(async () => true),
+    onMoveMember: vi.fn(async () => true),
     onRemoveFromWatchlist: vi.fn(async () => true),
     ...overrides,
   };
@@ -53,7 +53,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WatchlistGro
 
 describe('WatchlistGroupsPanel', () => {
   it('uses a non-drag member row and an explicit desktop drag/keyboard handle', () => {
-    const onReorderMembers = vi.fn(async () => undefined);
+    const onReorderMembers = vi.fn(async () => true);
     renderPanel({ onReorderMembers });
 
     expect(screen.getByTestId('watchlist-member-default-600519')).not.toHaveAttribute('draggable');
@@ -63,9 +63,9 @@ describe('WatchlistGroupsPanel', () => {
     expect(onReorderMembers).toHaveBeenCalledWith('default', ['AAPL', '600519']);
   });
 
-  it('supports mobile non-drag ordering and Move-to actions', () => {
-    const onReorderGroups = vi.fn(async () => undefined);
-    const onMoveMember = vi.fn(async () => undefined);
+  it('supports mobile non-drag ordering and Move-to actions', async () => {
+    const onReorderGroups = vi.fn(async () => true);
+    const onMoveMember = vi.fn(async () => true);
     renderPanel({ onReorderGroups, onMoveMember });
 
     fireEvent.click(screen.getByRole('button', { name: '下移分组 默认分组' }));
@@ -77,6 +77,9 @@ describe('WatchlistGroupsPanel', () => {
       sourceGroupId: 'default',
       targetGroupId: 'growth',
     });
+    await waitFor(() => expect(screen.getByTestId('watchlist-groups-announcement')).toHaveTextContent(
+      '已将 600519 移动到 Growth',
+    ));
   });
 
   it('closes the member menu on Escape and restores trigger focus', () => {
@@ -89,13 +92,40 @@ describe('WatchlistGroupsPanel', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('creates a group from the form', () => {
-    const onCreateGroup = vi.fn(async () => undefined);
+  it('creates a group from the form', async () => {
+    const onCreateGroup = vi.fn(async () => true);
     renderPanel({ onCreateGroup });
     fireEvent.change(screen.getByRole('textbox', { name: '新分组名称' }), {
       target: { value: 'Value' },
     });
     fireEvent.click(screen.getByRole('button', { name: '创建分组' }));
     expect(onCreateGroup).toHaveBeenCalledWith('Value');
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '新分组名称' })).toHaveValue(''));
+  });
+
+  it('retains the create draft and suppresses success announcements when mutations fail', async () => {
+    const onCreateGroup = vi.fn(async () => false);
+    const onReorderGroups = vi.fn(async () => false);
+    const onReorderMembers = vi.fn(async () => false);
+    const onMoveMember = vi.fn(async () => false);
+    renderPanel({ onCreateGroup, onReorderGroups, onReorderMembers, onMoveMember });
+
+    const draft = screen.getByRole('textbox', { name: '新分组名称' });
+    fireEvent.change(draft, { target: { value: 'Keep me' } });
+    fireEvent.click(screen.getByRole('button', { name: '创建分组' }));
+    await waitFor(() => expect(onCreateGroup).toHaveBeenCalledWith('Keep me'));
+    expect(draft).toHaveValue('Keep me');
+
+    fireEvent.click(screen.getByRole('button', { name: '下移分组 默认分组' }));
+    await waitFor(() => expect(onReorderGroups).toHaveBeenCalled());
+    fireEvent.keyDown(screen.getByRole('button', { name: '排序 600519；按上下方向键移动' }), {
+      key: 'ArrowDown',
+    });
+    await waitFor(() => expect(onReorderMembers).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: '600519 的分组操作' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Growth' }));
+    await waitFor(() => expect(onMoveMember).toHaveBeenCalled());
+
+    expect(screen.getByTestId('watchlist-groups-announcement')).toBeEmptyDOMElement();
   });
 });

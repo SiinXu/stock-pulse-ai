@@ -168,19 +168,28 @@ const WatchlistGroupsPanelStory = () => {
           { code: '600519', analyzedToday: true, latestItem: fixtureStockBarItems[0] },
           { code: 'AAPL', analyzedToday: false, latestItem: fixtureStockBarItems[1] },
         ]}
-        onCreateGroup={async (name) => setGroups((current) => [...current, {
-          id: `group-${current.length}`,
-          name,
-          sortOrder: current.length,
-          isDefault: false,
-          createdAt: '2026-08-09T00:00:00+00:00',
-          updatedAt: '2026-08-09T00:00:00+00:00',
-          members: [],
-        }])}
-        onDeleteGroup={async (groupId) => setGroups((current) => current.filter((group) => group.id !== groupId))}
-        onReorderGroups={async (orderedIds) => setGroups((current) => orderedIds.map((id) => current.find((group) => group.id === id)!).filter(Boolean))}
-        onReorderMembers={async () => undefined}
-        onMoveMember={async () => undefined}
+        onCreateGroup={async (name) => {
+          setGroups((current) => [...current, {
+            id: `group-${current.length}`,
+            name,
+            sortOrder: current.length,
+            isDefault: false,
+            createdAt: '2026-08-09T00:00:00+00:00',
+            updatedAt: '2026-08-09T00:00:00+00:00',
+            members: [],
+          }]);
+          return true;
+        }}
+        onDeleteGroup={async (groupId) => {
+          setGroups((current) => current.filter((group) => group.id !== groupId));
+          return true;
+        }}
+        onReorderGroups={async (orderedIds) => {
+          setGroups((current) => orderedIds.map((id) => current.find((group) => group.id === id)!).filter(Boolean));
+          return true;
+        }}
+        onReorderMembers={async () => true}
+        onMoveMember={async () => true}
         onRemoveFromWatchlist={async () => true}
       />
     </div>

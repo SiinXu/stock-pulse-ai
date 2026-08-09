@@ -14,16 +14,16 @@ export interface WatchlistGroupsPanelProps {
   loading?: boolean;
   actioning?: boolean;
   errorMessage?: string | null;
-  onCreateGroup: (name: string) => Promise<void> | void;
-  onDeleteGroup: (groupId: string) => Promise<void> | void;
-  onReorderGroups: (orderedIds: string[]) => Promise<void> | void;
-  onReorderMembers: (groupId: string, orderedCodes: string[]) => Promise<void> | void;
+  onCreateGroup: (name: string) => Promise<boolean> | boolean;
+  onDeleteGroup: (groupId: string) => Promise<boolean> | boolean;
+  onReorderGroups: (orderedIds: string[]) => Promise<boolean> | boolean;
+  onReorderMembers: (groupId: string, orderedCodes: string[]) => Promise<boolean> | boolean;
   onMoveMember: (params: {
     stockCode: string;
     sourceGroupId: string;
     targetGroupId: string;
     targetIndex?: number;
-  }) => Promise<void> | void;
+  }) => Promise<boolean> | boolean;
   onRemoveFromWatchlist: (code: string) => Promise<boolean | void>;
 }
 
@@ -115,8 +115,10 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
     const from = ids.indexOf(groupId);
     const to = Math.max(0, Math.min(from + delta, ids.length - 1));
     if (from === to || actioning) return;
-    await onReorderGroups(moved(ids, from, to));
-    setAnnouncement(t('watchlist.reorderAnnouncement', { item: groupName(groups[from]) }));
+    const succeeded = await onReorderGroups(moved(ids, from, to));
+    if (succeeded) {
+      setAnnouncement(t('watchlist.reorderAnnouncement', { item: groupName(groups[from]) }));
+    }
   };
 
   const reorderMemberBy = async (group: WatchlistGroup, stockCode: string, delta: number) => {
@@ -124,16 +126,18 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
     const from = codes.indexOf(stockCode);
     const to = Math.max(0, Math.min(from + delta, codes.length - 1));
     if (from === to || actioning) return;
-    await onReorderMembers(group.id, moved(codes, from, to));
-    setAnnouncement(t('watchlist.reorderAnnouncement', { item: stockCode }));
+    const succeeded = await onReorderMembers(group.id, moved(codes, from, to));
+    if (succeeded) {
+      setAnnouncement(t('watchlist.reorderAnnouncement', { item: stockCode }));
+    }
   };
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
     const name = draftName.trim();
     if (!name || actioning) return;
-    await onCreateGroup(name);
-    setDraftName('');
+    const succeeded = await onCreateGroup(name);
+    if (succeeded) setDraftName('');
   };
 
   const handleGroupDrop = async (targetGroupId: string, event: React.DragEvent) => {
@@ -187,7 +191,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
 
   return (
     <div className="space-y-3" data-testid="watchlist-groups-panel">
-      <p className="sr-only" aria-live="polite">{announcement}</p>
+      <p className="sr-only" aria-live="polite" data-testid="watchlist-groups-announcement">{announcement}</p>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-secondary-text">{t('watchlist.groupsTitle')}</p>
         <span className="text-xs text-muted-text">{t('watchlist.groupsHint')}</span>
@@ -334,8 +338,10 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
                                     className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground hover:bg-subtle-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                     onClick={async () => {
                                       closeMenu(false);
-                                      await onMoveMember({ stockCode: member.stockCode, sourceGroupId: group.id, targetGroupId: candidate.id });
-                                      setAnnouncement(t('watchlist.moveAnnouncement', { code: member.stockCode, group: groupName(candidate) }));
+                                      const succeeded = await onMoveMember({ stockCode: member.stockCode, sourceGroupId: group.id, targetGroupId: candidate.id });
+                                      if (succeeded) {
+                                        setAnnouncement(t('watchlist.moveAnnouncement', { code: member.stockCode, group: groupName(candidate) }));
+                                      }
                                     }}
                                   >
                                     {groupName(candidate)}

@@ -28,13 +28,11 @@ export const HomeWatchlistGroupsSection: React.FC = () => {
         loading={watchlistGroups.isLoading || watchlist.isLoading}
         actioning={watchlistGroups.isActioning || watchlist.isActioning}
         errorMessage={watchlistGroups.errorMessage}
-        onCreateGroup={async (name) => { await watchlistGroups.createGroup(name); }}
-        onDeleteGroup={async (groupId) => { await watchlistGroups.deleteGroup(groupId); }}
-        onReorderGroups={async (orderedIds) => { await watchlistGroups.reorderGroups(orderedIds); }}
-        onReorderMembers={async (groupId, orderedCodes) => {
-          await watchlistGroups.reorderMembers(groupId, orderedCodes);
-        }}
-        onMoveMember={async (params) => { await watchlistGroups.moveMember(params); }}
+        onCreateGroup={watchlistGroups.createGroup}
+        onDeleteGroup={watchlistGroups.deleteGroup}
+        onReorderGroups={watchlistGroups.reorderGroups}
+        onReorderMembers={watchlistGroups.reorderMembers}
+        onMoveMember={watchlistGroups.moveMember}
         onRemoveFromWatchlist={async (code) => {
           const ok = await watchlist.removeFromWatchlist(code);
           if (ok) await watchlistGroups.refresh();

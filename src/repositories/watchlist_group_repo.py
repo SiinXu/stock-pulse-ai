@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import math
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from sqlalchemy import delete, func, select, update
 from src.repositories.base import BaseRepository, RepositoryError
@@ -162,18 +162,62 @@ class WatchlistGroupRepository(BaseRepository):
         return int(revision)
 
     @classmethod
-    def _assert_revision(cls, session, expected_revision: int) -> int:
-        current = cls._revision(session)
-        if current != expected_revision:
-            raise RepositoryError(
-                "Watchlist group revision is stale",
-                error_code="watchlist_group_revision_conflict",
-                context={"current_revision": current},
+    def _acquire_revision_lease(cls, session, expected_revision: int) -> int:
+        """Acquire the aggregate write lease before any business mutation."""
+        next_revision = expected_revision + 1
+        result = session.execute(
+            update(watchlist_group_state_table)
+            .where(
+                watchlist_group_state_table.c.id == 1,
+                watchlist_group_state_table.c.revision == expected_revision,
             )
-        return current
+            .values(revision=next_revision, updated_at=_now())
+        )
+        if int(result.rowcount or 0) != 1:
+            latest = cls._revision(session)
+            if latest == expected_revision:
+                result = session.execute(
+                    update(watchlist_group_state_table)
+                    .where(
+                        watchlist_group_state_table.c.id == 1,
+                        watchlist_group_state_table.c.revision == expected_revision,
+                    )
+                    .values(revision=next_revision, updated_at=_now())
+                )
+                if int(result.rowcount or 0) == 1:
+                    return next_revision
+            raise RepositoryError(
+                "Watchlist group revision changed concurrently",
+                error_code="watchlist_group_revision_conflict",
+                context={"current_revision": latest},
+            )
+        return next_revision
+
+    @classmethod
+    def _acquire_reconcile_lease(cls, session) -> int:
+        """Serialize reconciliation with mutations without changing revision."""
+        result = session.execute(
+            update(watchlist_group_state_table)
+            .where(watchlist_group_state_table.c.id == 1)
+            .values(revision=watchlist_group_state_table.c.revision)
+        )
+        if int(result.rowcount or 0) == 0:
+            cls._revision(session)
+            result = session.execute(
+                update(watchlist_group_state_table)
+                .where(watchlist_group_state_table.c.id == 1)
+                .values(revision=watchlist_group_state_table.c.revision)
+            )
+            if int(result.rowcount or 0) != 1:
+                raise RepositoryError(
+                    "Watchlist group write lease is unavailable",
+                    error_code="watchlist_group_revision_conflict",
+                    context={"current_revision": cls._revision(session)},
+                )
+        return cls._revision(session)
 
     @staticmethod
-    def _bump_revision(session, current: int) -> int:
+    def _commit_reconciled_revision(session, current: int) -> int:
         next_revision = current + 1
         result = session.execute(
             update(watchlist_group_state_table)
@@ -271,12 +315,27 @@ class WatchlistGroupRepository(BaseRepository):
     def get_group_by_key(self, group_key: str) -> Optional[StoredWatchlistGroup]:
         return next((group for group in self.get_state().groups if group.group_key == group_key), None)
 
-    def reconcile(self, *, stock_list_codes: Sequence[str]) -> StoredWatchlistState:
+    def reconcile(
+        self,
+        *,
+        stock_list_codes: Sequence[str],
+        authority_version: Optional[str] = None,
+        authority_version_reader: Optional[Callable[[], str]] = None,
+    ) -> StoredWatchlistState:
         """Atomically project authoritative STOCK_LIST membership into group rows."""
         authoritative = canonicalize_watchlist_codes([str(code) for code in stock_list_codes])
         authoritative_set = set(authoritative)
         with self.db.get_session() as session:
-            current = self._revision(session)
+            current = self._acquire_reconcile_lease(session)
+            if (
+                authority_version is not None
+                and authority_version_reader is not None
+                and authority_version_reader() != authority_version
+            ):
+                raise RepositoryError(
+                    "Authoritative STOCK_LIST changed during reconciliation",
+                    error_code="watchlist_group_authority_changed",
+                )
             default_id = self._default_group_id(session)
             changed = False
             rows = session.execute(
@@ -348,13 +407,13 @@ class WatchlistGroupRepository(BaseRepository):
                 changed = True
             changed |= self._normalize_all_orders(session)
             if changed:
-                current = self._bump_revision(session, current)
+                current = self._commit_reconciled_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
     def create_group(self, *, group_key: str, name: str, expected_revision: int) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             count = int(session.execute(select(func.count()).select_from(watchlist_groups_table)).scalar_one())
             if count >= MAX_GROUPS:
                 raise RepositoryError("Group limit reached", error_code="watchlist_group_limit_reached")
@@ -368,13 +427,12 @@ class WatchlistGroupRepository(BaseRepository):
                     updated_at=_now(),
                 )
             )
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
     def rename_group(self, *, group_key: str, name: str, expected_revision: int) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             result = session.execute(
                 update(watchlist_groups_table)
                 .where(watchlist_groups_table.c.group_key == group_key)
@@ -382,7 +440,6 @@ class WatchlistGroupRepository(BaseRepository):
             )
             if int(result.rowcount or 0) != 1:
                 raise RepositoryError("Group not found", error_code="watchlist_group_not_found")
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
@@ -393,7 +450,7 @@ class WatchlistGroupRepository(BaseRepository):
                 error_code="watchlist_group_default_delete_forbidden",
             )
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             group_id = session.execute(
                 select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
             ).scalar_one_or_none()
@@ -440,13 +497,12 @@ class WatchlistGroupRepository(BaseRepository):
                     default_count += 1
             session.execute(delete(watchlist_groups_table).where(watchlist_groups_table.c.id == int(group_id)))
             self._normalize_all_orders(session)
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
     def reorder_groups(self, *, ordered_keys: Sequence[str], expected_revision: int) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             rows = session.execute(
                 select(
                     watchlist_groups_table.c.id,
@@ -464,13 +520,12 @@ class WatchlistGroupRepository(BaseRepository):
                 )
             by_key = {str(row[1]): (int(row[0]), int(row[2])) for row in rows}
             self._rewrite_orders(session, watchlist_groups_table, [by_key[key] for key in requested])
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
     def add_member(self, *, group_key: str, stock_code: str, expected_revision: int) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             group_id = session.execute(
                 select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
             ).scalar_one_or_none()
@@ -484,7 +539,8 @@ class WatchlistGroupRepository(BaseRepository):
                 )
             ).scalar_one_or_none()
             if exists is not None:
-                return StoredWatchlistState(current, self._groups(session))
+                session.rollback()
+                return self.get_state()
             group_count = int(
                 session.execute(
                     select(func.count()).select_from(watchlist_group_members_table).where(
@@ -509,13 +565,12 @@ class WatchlistGroupRepository(BaseRepository):
                     updated_at=_now(),
                 )
             )
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
     def remove_member(self, *, group_key: str, stock_code: str, expected_revision: int) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             group_id = session.execute(
                 select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
             ).scalar_one_or_none()
@@ -557,7 +612,6 @@ class WatchlistGroupRepository(BaseRepository):
                     )
                 )
             self._normalize_all_orders(session)
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
@@ -565,7 +619,7 @@ class WatchlistGroupRepository(BaseRepository):
         self, *, group_key: str, ordered_codes: Sequence[str], expected_revision: int
     ) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             group_id = session.execute(
                 select(watchlist_groups_table.c.id).where(watchlist_groups_table.c.group_key == group_key)
             ).scalar_one_or_none()
@@ -594,7 +648,6 @@ class WatchlistGroupRepository(BaseRepository):
                 [by_code[code] for code in requested],
                 group_id=int(group_id),
             )
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
@@ -609,7 +662,7 @@ class WatchlistGroupRepository(BaseRepository):
         expected_revision: int,
     ) -> StoredWatchlistState:
         with self.db.get_session() as session:
-            current = self._assert_revision(session, expected_revision)
+            current = self._acquire_revision_lease(session, expected_revision)
             groups = dict(
                 session.execute(select(watchlist_groups_table.c.group_key, watchlist_groups_table.c.id)).all()
             )
@@ -692,7 +745,6 @@ class WatchlistGroupRepository(BaseRepository):
                     [(int(row[0]), int(row[2])) for row in ordered_rows],
                     group_id=affected_id,
                 )
-            current = self._bump_revision(session, current)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 

@@ -53,15 +53,20 @@ router = APIRouter()
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
 
 
-def _read_watchlist_codes(service: SystemConfigService) -> list:
-    """Read STOCK_LIST codes as-is (no normalization)."""
+def _read_watchlist_snapshot(service: SystemConfigService) -> tuple[list, str]:
+    """Read STOCK_LIST and its optimistic config version from one snapshot."""
     config_data = service.get_config(include_schema=False)
     stock_list_str = ""
     for item in config_data.get("items", []):
         if item.get("key") == "STOCK_LIST":
             stock_list_str = str(item.get("value", ""))
             break
-    return split_stock_list(stock_list_str)
+    return split_stock_list(stock_list_str), str(config_data.get("config_version", ""))
+
+
+def _read_watchlist_codes(service: SystemConfigService) -> list:
+    """Read STOCK_LIST codes as-is (no normalization)."""
+    return _read_watchlist_snapshot(service)[0]
 
 
 def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:

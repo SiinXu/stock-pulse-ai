@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.deps import get_system_config_service
 from api.v1.endpoints.stocks import (
     _read_watchlist_codes,
+    _read_watchlist_snapshot,
     _validate_and_normalize_stock_code,
     _watchlist_match_key,
     _write_watchlist_codes,
@@ -29,6 +30,7 @@ from api.v1.schemas.watchlist_groups import (
 )
 from src.services.system_config_service import SystemConfigService
 from src.services.watchlist_group_service import (
+    WatchlistGroupAuthorityChangedError,
     WatchlistGroupConflictError,
     WatchlistGroupNotFoundError,
     WatchlistGroupService,
@@ -48,6 +50,7 @@ _ERROR_RESPONSES = {
     409: {"model": ErrorResponse},
     500: {"model": ErrorResponse},
 }
+_AUTHORITY_RECONCILE_ATTEMPTS = 3
 
 
 def get_watchlist_group_service() -> WatchlistGroupService:
@@ -69,6 +72,8 @@ def _execute(operation: Callable[[], T], *, log_message: str) -> T:
             str(exc),
             params={"current_revision": exc.current_revision},
         ) from exc
+    except WatchlistGroupAuthorityChangedError as exc:
+        raise api_error(409, exc.error_code, str(exc)) from exc
     except WatchlistGroupNotFoundError as exc:
         raise api_error(404, exc.error_code, str(exc)) from exc
     except WatchlistGroupServiceError as exc:
@@ -83,7 +88,7 @@ def _execute(operation: Callable[[], T], *, log_message: str) -> T:
 @router.get(
     "/watchlist/groups",
     response_model=WatchlistGroupsResponse,
-    responses={500: {"model": ErrorResponse}},
+    responses={409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="List watchlist groups",
     description="Reconcile groups from authoritative STOCK_LIST before returning revisioned state.",
 )
@@ -91,11 +96,27 @@ def list_watchlist_groups(
     service: SystemConfigService = Depends(get_system_config_service),
     group_service: WatchlistGroupService = Depends(get_watchlist_group_service),
 ) -> WatchlistGroupsResponse:
+    def operation() -> WatchlistGroupsResponse:
+        last_error: WatchlistGroupAuthorityChangedError | None = None
+        for _attempt in range(_AUTHORITY_RECONCILE_ATTEMPTS):
+            codes, authority_version = _read_watchlist_snapshot(service)
+            try:
+                state = group_service.list_state(
+                    stock_list_codes=codes,
+                    authority_version=authority_version,
+                    authority_version_reader=lambda: _read_watchlist_snapshot(service)[1],
+                )
+                return _response(state, "Watchlist groups loaded")
+            except WatchlistGroupAuthorityChangedError as exc:
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise WatchlistGroupAuthorityChangedError(
+            "Authoritative watchlist changed; retry with a fresh snapshot"
+        )
+
     return _execute(
-        lambda: _response(
-            group_service.list_state(stock_list_codes=_read_watchlist_codes(service)),
-            "Watchlist groups loaded",
-        ),
+        operation,
         log_message="Watchlist groups list failed",
     )
 
