@@ -2280,6 +2280,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/report-version-compare/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare two analysis report versions
+         * @description Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.
+         */
+        get: operations["compareReportVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-version-compare/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List analysis runs for version comparison
+         * @description List historical analysis runs for a symbol with run id, time, model, and configuration fingerprint for the report version picker.
+         */
+        get: operations["listReportVersionRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/scheduled-tasks": {
         parameters: {
             query?: never;
@@ -4175,6 +4215,80 @@ export interface components {
             stock_name?: string | null;
         };
         /**
+         * AnalysisDeltaPayload
+         * @description Typed presentation projection of the merged T17 AnalysisDelta contract.
+         */
+        AnalysisDeltaPayload: {
+            /** Base Query Id */
+            base_query_id?: string | null;
+            /** Base Record Id */
+            base_record_id: number;
+            /** Baseline Reason */
+            baseline_reason?: string | null;
+            /**
+             * Baseline Status
+             * @enum {string}
+             */
+            baseline_status: "ok" | "missing_history" | "missing_base" | "missing_target" | "incomparable_structure";
+            /** Conclusion Changes */
+            conclusion_changes?: components["schemas"]["AnalysisValueChangePayload"][];
+            /** Evidence Changes */
+            evidence_changes?: components["schemas"]["AnalysisListChangePayload"][];
+            /**
+             * Has Baseline
+             * @default false
+             */
+            has_baseline: boolean;
+            /**
+             * Has Material Changes
+             * @default false
+             */
+            has_material_changes: boolean;
+            /** Report Type */
+            report_type?: string | null;
+            /** Risk Changes */
+            risk_changes?: components["schemas"]["AnalysisListChangePayload"][];
+            /** Score Changes */
+            score_changes?: components["schemas"]["AnalysisValueChangePayload"][];
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Target Query Id */
+            target_query_id?: string | null;
+            /** Target Record Id */
+            target_record_id: number;
+        };
+        /** AnalysisListChangePayload */
+        AnalysisListChangePayload: {
+            /** Added */
+            added?: string[];
+            /**
+             * Added Total
+             * @default 0
+             */
+            added_total: number;
+            /** Field */
+            field: string;
+            /**
+             * Output Truncated
+             * @default false
+             */
+            output_truncated: boolean;
+            /** Removed */
+            removed?: string[];
+            /**
+             * Removed Total
+             * @default 0
+             */
+            removed_total: number;
+            /** Unchanged */
+            unchanged?: string[];
+            /**
+             * Unchanged Total
+             * @default 0
+             */
+            unchanged_total: number;
+        };
+        /**
          * AnalysisReport
          * @description 完整分析报告
          * @example {
@@ -4263,6 +4377,28 @@ export interface components {
              * @description 诊断 trace ID
              */
             trace_id?: string | null;
+        };
+        /** AnalysisValueChangePayload */
+        AnalysisValueChangePayload: {
+            /** Base Value */
+            base_value?: string | number | boolean | null;
+            /**
+             * Comparable
+             * @default true
+             */
+            comparable: boolean;
+            /** Delta */
+            delta?: string | number | boolean | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "changed" | "unavailable";
+            /** Field */
+            field: string;
+            /** Target Value */
+            target_value?: string | number | boolean | null;
+            unavailability?: components["schemas"]["ValueUnavailabilityPayload"] | null;
         };
         /**
          * AnalyzeRequest
@@ -4971,6 +5107,59 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+        };
+        /** ConfigComponentDiff */
+        ConfigComponentDiff: {
+            /** Base Value */
+            base_value?: string | null;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /** Key */
+            key: string;
+            /** Target Value */
+            target_value?: string | null;
+        };
+        /** ConfigFingerprintDiff */
+        ConfigFingerprintDiff: {
+            /**
+             * Base Complete
+             * @default false
+             */
+            base_complete: boolean;
+            /** Base Fingerprint */
+            base_fingerprint?: string | null;
+            /** Base Missing Keys */
+            base_missing_keys?: string[];
+            /**
+             * Comparison Status
+             * @default unknown
+             * @enum {string}
+             */
+            comparison_status: "identical" | "different" | "unknown";
+            /** Components */
+            components?: components["schemas"]["ConfigComponentDiff"][];
+            /**
+             * Has Differences
+             * @default false
+             */
+            has_differences: boolean;
+            /**
+             * Identical
+             * @default false
+             */
+            identical: boolean;
+            /**
+             * Target Complete
+             * @default false
+             */
+            target_complete: boolean;
+            /** Target Fingerprint */
+            target_fingerprint?: string | null;
+            /** Target Missing Keys */
+            target_missing_keys?: string[];
         };
         /**
          * ConfigPresetApplyRequest
@@ -9164,6 +9353,26 @@ export interface components {
             /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
         };
+        /** ReportFieldDiff */
+        ReportFieldDiff: {
+            /** Base Value */
+            base_value?: string | null;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /** Field */
+            field: string;
+            /**
+             * Severity
+             * @default none
+             * @enum {string}
+             */
+            severity: "major" | "moderate" | "minor" | "none" | "unknown";
+            /** Target Value */
+            target_value?: string | null;
+        };
         /**
          * ReportMeta
          * @description 报告元信息
@@ -9456,6 +9665,145 @@ export interface components {
              * @description 趋势预测
              */
             trend_prediction?: string | null;
+        };
+        /**
+         * ReportVersionCompareResponse
+         * @description Compare two selected analysis runs for one symbol.
+         */
+        ReportVersionCompareResponse: {
+            base_run: components["schemas"]["ReportVersionRunItem"];
+            config_diff: components["schemas"]["ConfigFingerprintDiff"];
+            /** @description T17 AnalysisDelta projection when the comparison engine is available */
+            delta?: components["schemas"]["AnalysisDeltaPayload"] | null;
+            /**
+             * Engine Status
+             * @description Whether T17 compare_analyses was invoked successfully
+             * @enum {string}
+             */
+            engine_status: "ok" | "engine_pending";
+            /** Field Diffs */
+            field_diffs?: components["schemas"]["ReportFieldDiff"][];
+            /**
+             * Status
+             * @description ok: T17 delta available with baseline; engine_pending: T17 compare_analyses not wired yet; no_baseline: T17 returned has_baseline=false (distinct from no changes); incomparable: runs cannot be compared
+             * @enum {string}
+             */
+            status: "ok" | "engine_pending" | "no_baseline" | "incomparable";
+            /** Stock Code */
+            stock_code: string;
+            target_run: components["schemas"]["ReportVersionRunItem"];
+        };
+        /**
+         * ReportVersionRunItem
+         * @description One selectable analysis run for a symbol.
+         */
+        ReportVersionRunItem: {
+            /**
+             * Action
+             * @description Structured decision action taxonomy
+             */
+            action?: string | null;
+            /**
+             * Action Label
+             * @description Localized action label snapshot
+             */
+            action_label?: string | null;
+            /**
+             * Analysis Summary
+             * @description Short analysis summary
+             */
+            analysis_summary?: string | null;
+            /**
+             * Config Complete
+             * @description Whether the persisted run contains the minimum reproducibility provenance
+             * @default false
+             */
+            config_complete: boolean;
+            /**
+             * Config Components
+             * @description Human-readable configuration components that form the fingerprint
+             */
+            config_components?: {
+                [key: string]: string;
+            };
+            /**
+             * Config Fingerprint
+             * @description Short hash of configuration components used for this run
+             */
+            config_fingerprint?: string | null;
+            /**
+             * Config Missing Keys
+             * @description Required provenance keys absent from the persisted run
+             */
+            config_missing_keys?: string[];
+            /**
+             * Created At
+             * @description ISO created_at timestamp
+             */
+            created_at?: string | null;
+            /**
+             * Model Used
+             * @description Model snapshot for display only; not used for runtime routing
+             */
+            model_used?: string | null;
+            /**
+             * Operation Advice
+             * @description Legacy operation advice text
+             */
+            operation_advice?: string | null;
+            /**
+             * Query Id
+             * @description Analysis query_id (may repeat in batch runs)
+             */
+            query_id: string;
+            /**
+             * Report Language
+             * @description Report language snapshot
+             */
+            report_language?: string | null;
+            /**
+             * Report Type
+             * @description Report type snapshot
+             */
+            report_type?: string | null;
+            /**
+             * Run Id
+             * @description Stable analysis history primary key as string
+             */
+            run_id: string;
+            /**
+             * Sentiment Score
+             * @description Finite sentiment / confidence score in the supported 0-100 range
+             */
+            sentiment_score?: number | null;
+            /**
+             * Stock Code
+             * @description Display stock code
+             */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @description Stock name when available
+             */
+            stock_name?: string | null;
+            /**
+             * Trend Prediction
+             * @description Trend prediction text
+             */
+            trend_prediction?: string | null;
+        };
+        /** ReportVersionRunListResponse */
+        ReportVersionRunListResponse: {
+            /** Items */
+            items?: components["schemas"]["ReportVersionRunItem"][];
+            /** Limit */
+            limit: number;
+            /** Page */
+            page: number;
+            /** Stock Code */
+            stock_code: string;
+            /** Total */
+            total: number;
         };
         /** ResearchRequest */
         ResearchRequest: {
@@ -11792,6 +12140,13 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValueUnavailabilityPayload */
+        ValueUnavailabilityPayload: {
+            /** Base */
+            base?: string | null;
+            /** Target */
+            target?: string | null;
         };
         /**
          * WatchlistRequest
@@ -18548,6 +18903,152 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compareReportVersions: {
+        parameters: {
+            query: {
+                /** @description Stock code for the selected runs */
+                stock_code: string;
+                /** @description Baseline analysis history id */
+                base_run_id: string;
+                /** @description Target analysis history id */
+                target_run_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersionCompareResponse"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not authenticated when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Runs are incomparable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listReportVersionRuns: {
+        parameters: {
+            query: {
+                /** @description Stock code filter */
+                stock_code: string;
+                /** @description Page number (1-based) */
+                page?: number;
+                /** @description Page size */
+                limit?: number;
+                /** @description Optional report type filter; market_review rows are skipped when omitted */
+                report_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersionRunListResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not authenticated when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;
