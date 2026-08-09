@@ -313,6 +313,21 @@ def test_manager_uses_stale_cache_after_provider_failure():
     assert fallback.fallback_from == "provider_failure"
 
 
+def test_stale_cache_never_crosses_provider_calibration_identity():
+    fetcher = _MoneyFlowFetcher("FlowFetcher", 0, _snapshot())
+    fetcher.money_flow_calibration_identity = "fixture-v1"
+    manager = DataFetcherManager(fetchers=[fetcher])
+    assert manager.get_money_flow("600519").snapshot is not None
+    manager._MONEY_FLOW_CACHE_TTL_SECONDS = -1
+    fetcher.money_flow_calibration_identity = "fixture-v2"
+    fetcher._result = RuntimeError("upstream down")
+
+    outcome = manager.get_money_flow("600519")
+
+    assert outcome.status == MoneyFlowStatus.FETCH_FAILED
+    assert outcome.cache_state == "miss"
+
+
 def test_money_flow_to_context_preserves_outcome_and_calibration():
     snapshot = _snapshot(ratio=-2.0)
     outcome = MoneyFlowOutcome(

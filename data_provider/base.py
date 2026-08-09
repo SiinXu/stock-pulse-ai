@@ -2454,11 +2454,16 @@ class DataFetcherManager:
         with self._money_flow_cache_lock:
             entry = self._money_flow_cache.get(key)
             if entry is None and allow_stale:
-                identity = (key[0], key[1], key[3])
+                identity = (key[0], key[1], key[3], key[4])
                 candidates = [
                     value
                     for cache_key, value in self._money_flow_cache.items()
-                    if (cache_key[0], cache_key[1], cache_key[3]) == identity
+                    if (
+                        cache_key[0],
+                        cache_key[1],
+                        cache_key[3],
+                        cache_key[4],
+                    ) == identity
                 ]
                 entry = max(candidates, key=lambda item: item["stored_at"], default=None)
             if entry is None:
