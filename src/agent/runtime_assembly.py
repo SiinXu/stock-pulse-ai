@@ -207,7 +207,7 @@ def get_tool_registry():
     if _TOOL_REGISTRY is not None:
         return _TOOL_REGISTRY
 
-    from src.agent.tools.registry import ToolRegistry
+    from src.agent.tools.registry import ToolInventoryDeclaration, ToolRegistry
     from src.agent.tools.data_tools import ALL_DATA_TOOLS
     from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
     from src.agent.tools.search_tools import ALL_SEARCH_TOOLS
@@ -220,10 +220,30 @@ def get_tool_registry():
 
     # Optional multimodal PDF/chart tools (issue #253): default-off.
     try:
-        from src.agent.tools.multimodal_tools import build_multimodal_tools
+        from src.agent.tools.multimodal_tools import (
+            PARSE_PDF_TOOL_NAME,
+            READ_CHART_TOOL_NAME,
+            build_multimodal_tools,
+        )
         from src.application_services import get_application_services
 
-        multimodal_tools = build_multimodal_tools(get_application_services().config)
+        config = get_application_services().config
+        enabled = getattr(config, "multimodal_agent_tools_enabled", False) is True
+        root = str(getattr(config, "multimodal_file_root", "") or "").strip()
+        configured = enabled and bool(root)
+        reason_code = None if configured else (
+            "missing_config" if enabled else "feature_disabled"
+        )
+        for name in (PARSE_PDF_TOOL_NAME, READ_CHART_TOOL_NAME):
+            registry.declare_inventory_tool(
+                ToolInventoryDeclaration(
+                    name=name,
+                    configured=configured,
+                    scopes=("multimodal:read",),
+                    reason_code=reason_code,
+                )
+            )
+        multimodal_tools = build_multimodal_tools(config)
         if multimodal_tools:
             for tool_def in multimodal_tools:
                 registry.register(tool_def)
@@ -238,10 +258,22 @@ def get_tool_registry():
 
     # Optional valuation tool (issue #238): default-off, registered only when enabled.
     try:
-        from src.agent.tools.valuation_tools import build_valuation_tool
+        from src.agent.tools.valuation_tools import (
+            VALUATION_TOOL_NAME,
+            build_valuation_tool,
+        )
         from src.application_services import get_application_services
 
-        valuation_tool = build_valuation_tool(get_application_services().config)
+        config = get_application_services().config
+        configured = getattr(config, "valuation_agent_tool_enabled", False) is True
+        registry.declare_inventory_tool(
+            ToolInventoryDeclaration(
+                name=VALUATION_TOOL_NAME,
+                configured=configured,
+                reason_code=None if configured else "feature_disabled",
+            )
+        )
+        valuation_tool = build_valuation_tool(config)
         if valuation_tool is not None:
             registry.register(valuation_tool)
     except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.

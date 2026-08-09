@@ -197,6 +197,41 @@ class ToolDefinition:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ToolInventoryDeclaration:
+    """Owner metadata for an expected tool that may not be registered."""
+
+    name: str
+    configured: Optional[bool] = None
+    dependency_ready: Optional[bool] = None
+    scopes: tuple[str, ...] = ()
+    reason_code: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.name, str)
+            or not self.name.strip()
+            or len(self.name) > 128
+        ):
+            raise ValueError("inventory tool name must be bounded and non-empty")
+        if self.configured is not None and type(self.configured) is not bool:
+            raise TypeError("configured must be bool or None")
+        if (
+            self.dependency_ready is not None
+            and type(self.dependency_ready) is not bool
+        ):
+            raise TypeError("dependency_ready must be bool or None")
+        if len(self.scopes) > 64 or any(
+            not isinstance(scope, str) or not scope or len(scope) > 128
+            for scope in self.scopes
+        ):
+            raise ValueError("inventory tool scopes must be bounded strings")
+        if self.reason_code is not None and (
+            not self.reason_code or len(self.reason_code) > 128
+        ):
+            raise ValueError("inventory tool reason code must be bounded")
+
+
 def _strict_contract_value_equal(
     current: Any,
     snapshot: Any,
@@ -378,6 +413,8 @@ class ToolRegistry:
     def __init__(self):
         self._tools: Dict[str, ToolDefinition] = {}
         self._definition_versions: Dict[str, int] = {}
+        self._inventory_declarations: Dict[str, ToolInventoryDeclaration] = {}
+        self._registry_generation = 0
 
     # ----- Registration -----
 
@@ -389,6 +426,7 @@ class ToolRegistry:
             self._definition_versions.get(tool_def.name, 0) + 1
         )
         self._tools[tool_def.name] = tool_def
+        self._registry_generation += 1
         logger.debug(f"Registered tool: {tool_def.name} (category={tool_def.category})")
 
     def unregister(self, name: str) -> None:
@@ -398,6 +436,14 @@ class ToolRegistry:
                 self._definition_versions.get(name, 0) + 1
             )
             self._tools.pop(name, None)
+            self._registry_generation += 1
+
+    def declare_inventory_tool(self, declaration: ToolInventoryDeclaration) -> None:
+        """Publish optional-tool metadata through the ToolRegistry owner."""
+
+        if self._inventory_declarations.get(declaration.name) != declaration:
+            self._inventory_declarations[declaration.name] = declaration
+            self._registry_generation += 1
 
     # ----- Query -----
 
@@ -412,6 +458,39 @@ class ToolRegistry:
     def definition_version(self, name: str) -> int:
         """Return the monotonic registration generation for one exact name."""
         return self._definition_versions.get(name, 0)
+
+    def definition_snapshot(self) -> tuple[int, tuple[ToolDefinition, ...]]:
+        """Return one generation-consistent immutable definition collection."""
+
+        for _ in range(3):
+            generation = self._registry_generation
+            try:
+                definitions = tuple(self._tools.values())
+            except RuntimeError:
+                continue
+            if self._registry_generation == generation:
+                return generation, definitions
+        raise RuntimeError("tool registry generation drift")
+
+    def capability_inventory_snapshot(
+        self,
+    ) -> tuple[
+        int,
+        tuple[ToolDefinition, ...],
+        tuple[ToolInventoryDeclaration, ...],
+    ]:
+        """Return definitions and owner declarations at one generation."""
+
+        for _ in range(3):
+            generation = self._registry_generation
+            try:
+                definitions = tuple(self._tools.values())
+                declarations = tuple(self._inventory_declarations.values())
+            except RuntimeError:
+                continue
+            if self._registry_generation == generation:
+                return generation, definitions, declarations
+        raise RuntimeError("tool registry generation drift")
 
     def bind_definition(self, name: str) -> Optional[ToolDefinitionBinding]:
         """Freeze one exact live definition for a single execution boundary."""

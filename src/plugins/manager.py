@@ -395,6 +395,39 @@ class PluginManager:
             if registration.plugin_id in enabled_plugin_ids
         )
 
+    def capability_inventory_snapshot(
+        self,
+    ) -> tuple[str, tuple[PluginSnapshot, ...], tuple[ExtensionRegistration, ...]]:
+        """Correlate lifecycle and active contributions at stable generations."""
+
+        from .registry import EXTENSION_POINTS
+
+        for _ in range(3):
+            with self._lock:
+                before = {
+                    point: self._registry.registration_snapshot_generation(point)
+                    for point in EXTENSION_POINTS
+                }
+                enabled_plugin_ids = self._stable_enabled_plugin_ids
+                registrations = tuple(
+                    registration
+                    for registration in self._registry.registrations_snapshot()
+                    if registration.plugin_id in enabled_plugin_ids
+                )
+                lifecycle = tuple(
+                    self._build_snapshot(record) for record in self._plugins.values()
+                )
+                after = {
+                    point: self._registry.registration_snapshot_generation(point)
+                    for point in EXTENSION_POINTS
+                }
+            if before == after:
+                generation = ",".join(
+                    f"{point}:{before[point]}" for point in sorted(before)
+                )
+                return generation, lifecycle, registrations
+        raise RuntimeError("extension registry generation drift")
+
     def enabled_native_owner_registrations_snapshot(
         self,
         extension_point: ExtensionPoint | None = None,

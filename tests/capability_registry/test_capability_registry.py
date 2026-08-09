@@ -1,235 +1,282 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Unit tests for the read-only capability registry aggregation view."""
+"""Focused owner-consistency tests for the capability inventory."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any, List, Optional
+from typing import Any
 
 import pytest
 
-from src.capability_registry import (
-    REASON_FEATURE_DISABLED,
-    REASON_MISSING_CONFIG,
-    REASON_MISSING_DEPENDENCY,
-    REASON_PLUGIN_DISABLED,
-    CapabilityRecord,
-    collect_capability_records,
+from src.capability_registry import collect_capability_records
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolInventoryDeclaration,
+    ToolRegistry,
 )
-from src.capability_registry.models import KNOWN_UNAVAILABLE_REASON_CODES
+
+NOW = datetime(2026, 8, 9, tzinfo=timezone.utc)
+
+
+class _DataRuntime:
+    def __init__(self, generation: int = 1, active: tuple[Any, ...] = ()) -> None:
+        self.generation = generation
+        self.active = active
+        self.reads = 0
+
+    def active_provider_snapshot(self) -> tuple[int, tuple[Any, ...]]:
+        self.reads += 1
+        return self.generation, self.active
+
+
+def _active_provider(
+    provider_id: str,
+    *,
+    markets: tuple[str, ...],
+    capabilities: tuple[str, ...],
+) -> Any:
+    registration = SimpleNamespace(
+        provider_id=provider_id,
+        markets=frozenset(markets),
+        capabilities=frozenset(capabilities),
+    )
+    return SimpleNamespace(
+        registration=registration,
+        provider=SimpleNamespace(name=f"{provider_id.title()}Fetcher"),
+    )
 
 
 @dataclass
-class _FakePolicy:
-    permissions: List[str] = field(default_factory=list)
+class _Policy:
+    permissions: list[str] = field(default_factory=list)
 
 
 @dataclass
-class _FakeTool:
+class _Tool:
     name: str
-    category: str = "data"
-    policy: Optional[_FakePolicy] = None
+    policy: _Policy = field(default_factory=_Policy)
 
 
-class _FakeToolRegistry:
-    def __init__(self, tools: List[_FakeTool]) -> None:
-        self._tools = tools
+class _ToolRegistry:
+    def __init__(
+        self,
+        tools: tuple[_Tool, ...] = (),
+        generation: int = 1,
+        declarations: tuple[Any, ...] = (),
+    ) -> None:
+        self.tools = tools
+        self.generation = generation
+        self.declarations = declarations
+        self.reads = 0
 
-    def list_tools(self, category: Optional[str] = None) -> List[_FakeTool]:
-        tools = list(self._tools)
-        if category:
-            tools = [tool for tool in tools if tool.category == category]
-        return tools
+    def capability_inventory_snapshot(self) -> tuple[int, tuple[_Tool, ...], tuple[Any, ...]]:
+        self.reads += 1
+        return self.generation, self.tools, self.declarations
 
-    def list_names(self) -> List[str]:
-        return [tool.name for tool in self._tools]
+
+class _FailingToolRegistry:
+    def definition_snapshot(self) -> Any:
+        raise OSError("registry unavailable")
+
+
+class _DriftingToolRegistry:
+    def capability_inventory_snapshot(self) -> Any:
+        raise RuntimeError("tool registry generation drift")
 
 
 @dataclass
-class _FakeManifest:
+class _Manifest:
     id: str
     name: str
+    version: str = "1.0.0"
 
 
 @dataclass
-class _FakeSnapshot:
-    manifest: _FakeManifest
-    state: str
+class _PluginSnapshot:
+    manifest: _Manifest
+    state: str = "enabled"
     desired_enabled: bool = True
-    source: str = "builtin"
-    extension_points: tuple[str, ...] = ()
 
 
-class _FakePluginManager:
-    def __init__(self, snapshots: List[_FakeSnapshot], registry: Any = None) -> None:
-        self._snapshots = snapshots
-        self.registry = registry
+@dataclass
+class _Registration:
+    plugin_id: str
+    extension_point: str
+    registration_id: str
+    contract_version: str = "1"
 
-    def list_snapshots(self) -> tuple[_FakeSnapshot, ...]:
-        return tuple(self._snapshots)
+
+class _PluginManager:
+    def __init__(
+        self,
+        lifecycle: tuple[_PluginSnapshot, ...] = (),
+        registrations: tuple[_Registration, ...] = (),
+        generation: str = "agent_tool:2",
+    ) -> None:
+        self.lifecycle = lifecycle
+        self.registrations = registrations
+        self.generation = generation
+        self.reads = 0
+
+    def capability_inventory_snapshot(
+        self,
+    ) -> tuple[str, tuple[_PluginSnapshot, ...], tuple[_Registration, ...]]:
+        self.reads += 1
+        return self.generation, self.lifecycle, self.registrations
 
 
-def _base_config(**overrides: Any) -> SimpleNamespace:
-    data = dict(
-        tushare_token=None,
-        tickflow_api_key=None,
-        finnhub_api_key=None,
-        alphavantage_api_key=None,
-        longbridge_app_key=None,
-        longbridge_app_secret=None,
-        longbridge_access_token=None,
-        longbridge_oauth_client_id=None,
-        multimodal_agent_tools_enabled=False,
-        multimodal_file_root=None,
-        valuation_agent_tool_enabled=False,
-        kronos_enabled=False,
+def _collect(**kwargs: Any):
+    return collect_capability_records(clock=lambda: NOW, **kwargs)
+
+
+def _by_id(snapshot: Any) -> dict[str, Any]:
+    return {record.capability_id: record for record in snapshot.items}
+
+
+def test_empty_data_owner_does_not_fabricate_catalog_or_executability() -> None:
+    runtime = _DataRuntime(generation=4)
+    snapshot = _collect(data_provider_runtime=runtime, domains=("data",))
+
+    assert snapshot.items == ()
+    assert snapshot.sources[0].state == "ok"
+    assert snapshot.sources[0].generation == "4"
+    assert runtime.reads == 1
+
+
+def test_live_provider_appears_and_unload_disappears_at_new_generation() -> None:
+    runtime = _DataRuntime(
+        generation=7,
+        active=(_active_provider("demo", markets=("cn",), capabilities=("daily",)),),
     )
-    data.update(overrides)
-    return SimpleNamespace(**data)
+    first = _collect(data_provider_runtime=runtime, domains=("data",))
+    records = _by_id(first)
+
+    assert records["data.provider:demo"].markets == ("cn",)
+    assert records["data.provider:demo"].executable is None
+    assert records["data.method:daily"].provider == "demo"
+
+    runtime.generation = 8
+    runtime.active = ()
+    second = _collect(data_provider_runtime=runtime, domains=("data",))
+    assert second.items == ()
+    assert second.sources[0].generation == "8"
 
 
-def _by_id(records: List[CapabilityRecord]) -> dict[str, CapabilityRecord]:
-    return {record.capability_id: record for record in records}
+def test_source_failure_is_explicit_partial_not_plausible_empty_success() -> None:
+    snapshot = _collect(tool_registry=_FailingToolRegistry(), domains=("tool",))
+
+    assert snapshot.partial is True
+    assert snapshot.items == ()
+    assert snapshot.sources[0].state == "error"
+    assert snapshot.sources[0].error_code == "tool_source_unavailable"
 
 
-def test_feature_disabled_reason_for_multimodal_tools() -> None:
-    records = collect_capability_records(
-        config=_base_config(multimodal_agent_tools_enabled=False),
-        tool_registry=_FakeToolRegistry([]),
-        plugin_manager=_FakePluginManager([]),
-        dependency_probe=lambda _name: True,
-        domains=("tool",),
+def test_generation_drift_is_distinct_from_source_failure() -> None:
+    snapshot = _collect(tool_registry=_DriftingToolRegistry(), domains=("tool",))
+
+    assert snapshot.partial is True
+    assert snapshot.items == ()
+    assert snapshot.sources[0].state == "generation_drift"
+    assert snapshot.sources[0].error_code == "tool_generation_drift"
+
+
+def test_tools_use_one_owner_snapshot_and_keep_execution_unknown() -> None:
+    registry = _ToolRegistry(
+        (_Tool("parse_financial_pdf", _Policy(["multimodal:read"])),),
+        generation=12,
     )
-    multimodal = _by_id(records)["tool.optional:multimodal"]
-    assert multimodal.available is False
-    assert multimodal.reason_code == REASON_FEATURE_DISABLED
-    assert "MULTIMODAL_AGENT_TOOLS_ENABLED" in (multimodal.reason_message or "")
+    snapshot = _collect(tool_registry=registry, domains=("tool",))
+    record = snapshot.items[0]
+
+    assert registry.reads == 1
+    assert record.capability_id == "tool:parse_financial_pdf"
+    assert record.registered is True
+    assert record.grantable is None
+    assert record.executable is None
+    assert record.scopes == ("multimodal:read",)
+    assert record.source_generation == "12"
 
 
-def test_missing_config_reason_for_finnhub_and_multimodal_root() -> None:
-    records = collect_capability_records(
-        config=_base_config(
-            finnhub_api_key=None,
-            multimodal_agent_tools_enabled=True,
-            multimodal_file_root="",
+def test_partial_optional_group_reports_each_missing_member() -> None:
+    declarations = (
+        SimpleNamespace(
+            name="parse_financial_pdf", configured=True, dependency_ready=None,
+            scopes=("multimodal:read",), reason_code=None,
         ),
-        tool_registry=_FakeToolRegistry([]),
-        plugin_manager=_FakePluginManager([]),
-        dependency_probe=lambda _name: True,
-        domains=("data", "tool"),
-    )
-    by_id = _by_id(records)
-    finnhub = by_id["data.provider:finnhub"]
-    assert finnhub.available is False
-    assert finnhub.reason_code == REASON_MISSING_CONFIG
-    assert "FINNHUB_API_KEY" in (finnhub.reason_message or "")
-    multimodal = by_id["tool.optional:multimodal"]
-    assert multimodal.available is False
-    assert multimodal.reason_code == REASON_MISSING_CONFIG
-    assert "MULTIMODAL_FILE_ROOT" in (multimodal.reason_message or "")
-
-
-def test_missing_dependency_reason_for_tickflow() -> None:
-    records = collect_capability_records(
-        config=_base_config(tickflow_api_key="present-key"),
-        tool_registry=_FakeToolRegistry([]),
-        plugin_manager=_FakePluginManager([]),
-        dependency_probe=lambda name: name != "tickflow",
-        domains=("data",),
-    )
-    tickflow = _by_id(records)["data.provider:tickflow"]
-    assert tickflow.available is False
-    assert tickflow.reason_code == REASON_MISSING_DEPENDENCY
-    assert "tickflow" in (tickflow.reason_message or "")
-
-
-def test_available_provider_when_config_and_deps_present() -> None:
-    records = collect_capability_records(
-        config=_base_config(finnhub_api_key="fh-demo", tushare_token="ts-demo"),
-        tool_registry=_FakeToolRegistry([]),
-        plugin_manager=_FakePluginManager([]),
-        dependency_probe=lambda _name: True,
-        domains=("data",),
-    )
-    by_id = _by_id(records)
-    assert by_id["data.provider:finnhub"].available is True
-    assert by_id["data.provider:tushare"].available is True
-    assert by_id["data.provider:efinance"].available is True
-    assert by_id["data.capability:daily_data"].available is True
-
-
-def test_registered_tools_are_available_and_tokens_reflect_providers() -> None:
-    tools = [
-        _FakeTool(
-            name="get_realtime_quote",
-            policy=_FakePolicy(permissions=["market_data:read"]),
+        SimpleNamespace(
+            name="read_price_chart", configured=True, dependency_ready=None,
+            scopes=("multimodal:read",), reason_code=None,
         ),
-        _FakeTool(
-            name="parse_financial_pdf",
-            category="multimodal",
-            policy=_FakePolicy(permissions=["multimodal:read"]),
-        ),
-    ]
-    records = collect_capability_records(
-        config=_base_config(
-            multimodal_agent_tools_enabled=True,
-            multimodal_file_root="/tmp/multimodal",
-        ),
-        tool_registry=_FakeToolRegistry(tools),
-        plugin_manager=_FakePluginManager([]),
-        dependency_probe=lambda _name: True,
-        domains=("tool",),
     )
-    by_id = _by_id(records)
-    assert by_id["tool:get_realtime_quote"].available is True
-    assert by_id["tool:parse_financial_pdf"].available is True
-    assert "tool.optional:multimodal" not in by_id
-    token = by_id["tool.capability:market_data:read"]
-    assert token.available is True
-    assert "get_realtime_quote" in token.provider
-
-
-
-def test_plugin_disabled_reason() -> None:
-    manager = _FakePluginManager([
-        _FakeSnapshot(
-            manifest=_FakeManifest(id="demo.plugin", name="Demo"),
-            state="disabled", desired_enabled=False, extension_points=("agent_tool",),
-        )
-    ])
-    records = collect_capability_records(
-        config=_base_config(),
-        tool_registry=_FakeToolRegistry([]),
-        plugin_manager=manager,
-        dependency_probe=lambda _name: True,
-        domains=("extension",),
+    registry = _ToolRegistry(
+        (_Tool("parse_financial_pdf", _Policy(["multimodal:read"])),),
+        declarations=declarations,
     )
-    plugin = _by_id(records)["extension.plugin:demo.plugin"]
-    assert plugin.available is False
-    assert plugin.reason_code == REASON_PLUGIN_DISABLED
+    records = _by_id(_collect(tool_registry=registry, domains=("tool",)))
+
+    assert records["tool:parse_financial_pdf"].registered is True
+    missing = records["tool:read_price_chart"]
+    assert missing.registered is False
+    assert missing.configured is True
+    assert missing.executable is False
+    assert missing.reason_code == "not_registered"
 
 
-def test_domain_filter_rejects_unknown() -> None:
+def test_live_tool_owner_registration_and_unregistration_advance_generation() -> None:
+    registry = ToolRegistry()
+    registry.declare_inventory_tool(ToolInventoryDeclaration(name="demo_tool"))
+    missing = _collect(tool_registry=registry, domains=("tool",))
+    missing_record = _by_id(missing)["tool:demo_tool"]
+    assert missing_record.registered is False
+
+    registry.register(ToolDefinition("demo_tool", "demo", [], lambda: None))
+    active = _collect(tool_registry=registry, domains=("tool",))
+    active_record = _by_id(active)["tool:demo_tool"]
+    assert active_record.registered is True
+    assert active.sources[0].generation != missing.sources[0].generation
+
+    registry.unregister("demo_tool")
+    unloaded = _collect(tool_registry=registry, domains=("tool",))
+    unloaded_record = _by_id(unloaded)["tool:demo_tool"]
+    assert unloaded_record.registered is False
+    assert unloaded.sources[0].generation != active.sources[0].generation
+
+
+def test_plugin_lifecycle_is_not_a_contributed_capability() -> None:
+    manager = _PluginManager(
+        lifecycle=(_PluginSnapshot(_Manifest("demo.plugin", "Demo")),),
+    )
+    snapshot = _collect(plugin_manager=manager, domains=("extension",))
+    record = snapshot.items[0]
+
+    assert manager.reads == 1
+    assert record.capability_type == "plugin_lifecycle"
+    assert record.executable is False
+    assert record.reason_code == "lifecycle_not_capability"
+
+
+def test_extension_contribution_is_separate_and_execution_unknown() -> None:
+    manager = _PluginManager(
+        lifecycle=(_PluginSnapshot(_Manifest("demo.plugin", "Demo")),),
+        registrations=(
+            _Registration("demo.plugin", "agent_tool", "demo_tool", "2"),
+        ),
+    )
+    snapshot = _collect(plugin_manager=manager, domains=("extension",))
+    records = _by_id(snapshot)
+    contribution = records["extension.registration:agent_tool:demo_tool"]
+
+    assert contribution.capability_type == "extension_registration"
+    assert contribution.dependencies == ("agent_tool",)
+    assert contribution.version == "2"
+    assert contribution.executable is None
+
+
+def test_domain_filter_rejects_unknown_or_empty() -> None:
     with pytest.raises(ValueError, match="unsupported capability domains"):
-        collect_capability_records(
-            config=_base_config(),
-            tool_registry=_FakeToolRegistry([]),
-            plugin_manager=_FakePluginManager([]),
-            domains=("data", "nope"),
-        )
-
-
-def test_reason_codes_are_documented_stable_set() -> None:
-    assert REASON_FEATURE_DISABLED in KNOWN_UNAVAILABLE_REASON_CODES
-    assert REASON_MISSING_CONFIG in KNOWN_UNAVAILABLE_REASON_CODES
-    assert REASON_MISSING_DEPENDENCY in KNOWN_UNAVAILABLE_REASON_CODES
-
-
-def test_available_record_rejects_reason_code() -> None:
-    with pytest.raises(ValueError, match="must not carry"):
-        CapabilityRecord(
-            capability_id="x", domain="data", provider="p", available=True,
-            reason_code=REASON_MISSING_CONFIG,
-        )
+        _collect(domains=("data", "nope"))
+    with pytest.raises(ValueError, match="unsupported capability domains"):
+        _collect(domains=())

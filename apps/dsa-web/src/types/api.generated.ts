@@ -840,8 +840,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List aggregated agent capabilities (read-only)
-         * @description Return a read-only aggregation of capabilities from the existing data-provider catalog, agent tool registry, and plugin extension surface. Does not change registration behavior. available=false includes a stable reason_code such as feature_disabled, missing_config, or missing_dependency.
+         * List the runtime capability inventory (read-only)
+         * @description Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.
          */
         get: operations["listCapabilities"];
         put?: never;
@@ -4927,51 +4927,51 @@ export interface components {
             total_tokens: number;
         };
         /**
-         * CapabilityItem
-         * @description One aggregated capability observation.
-         */
-        CapabilityItem: {
-            /** Available */
-            available: boolean;
-            /** Details */
-            details?: {
-                [key: string]: unknown;
-            };
-            /**
-             * Display Name
-             * @default
-             */
-            display_name: string;
-            /**
-             * Domain
-             * @enum {string}
-             */
-            domain: "data" | "tool" | "extension";
-            /**
-             * Id
-             * @description Stable capability id (domain-prefixed)
-             */
-            id: string;
-            /** Provider */
-            provider: string;
-            /** Reason Code */
-            reason_code?: string | null;
-            /** Reason Message */
-            reason_message?: string | null;
-        };
-        /**
          * CapabilityListResponse
-         * @description GET /api/v1/capabilities response.
+         * @description Versioned GET /api/v1/capabilities inventory snapshot.
          */
         CapabilityListResponse: {
-            /** Available Count */
-            available_count: number;
+            /** Executable Count */
+            executable_count: number;
             /** Items */
-            items?: components["schemas"]["CapabilityItem"][];
+            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"])[];
+            /** Non Executable Count */
+            non_executable_count: number;
+            /** Partial */
+            partial: boolean;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "capability-inventory/v1";
+            /** Sources */
+            sources?: components["schemas"]["CapabilitySourceStatus"][];
             /** Total */
             total: number;
-            /** Unavailable Count */
-            unavailable_count: number;
+            /** Unknown Executable Count */
+            unknown_executable_count: number;
+        };
+        /**
+         * CapabilitySourceStatus
+         * @description Freshness and consistency state for one authoritative owner.
+         */
+        CapabilitySourceStatus: {
+            /** As Of */
+            as_of: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Generation */
+            generation: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "data" | "tool" | "extension";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "error" | "generation_drift";
         };
         /**
          * ChangePasswordRequest
@@ -5338,6 +5338,64 @@ export interface components {
             time: string;
             /** Timezone */
             timezone: string;
+        };
+        /**
+         * DataCapabilityItem
+         * @description Active data-provider or supplied-method observation.
+         */
+        DataCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "data";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "data_provider" | "data_method";
+            /** Version */
+            version: string;
         };
         /** DecisionSignalCreateRequest */
         DecisionSignalCreateRequest: {
@@ -6098,6 +6156,64 @@ export interface components {
             content: string;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /**
+         * ExtensionCapabilityItem
+         * @description Plugin lifecycle or active contribution observation.
+         */
+        ExtensionCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "extension";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "plugin_lifecycle" | "extension_registration";
+            /** Version */
+            version: string;
         };
         /**
          * ExtractFromImageResponse
@@ -11522,6 +11638,64 @@ export interface components {
             stage?: string | null;
             /** Success */
             success: boolean;
+        };
+        /**
+         * ToolCapabilityItem
+         * @description Registered or owner-declared Agent tool observation.
+         */
+        ToolCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "tool";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "agent_tool";
+            /** Version */
+            version: string;
         };
         /**
          * UnsupportedScheduledTaskItem

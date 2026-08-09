@@ -4569,88 +4569,61 @@
         "title": "CallTypeBreakdown",
         "type": "object"
       },
-      "CapabilityItem": {
-        "additionalProperties": false,
-        "description": "One aggregated capability observation.",
-        "properties": {
-          "available": {
-            "title": "Available",
-            "type": "boolean"
-          },
-          "details": {
-            "additionalProperties": true,
-            "title": "Details",
-            "type": "object"
-          },
-          "display_name": {
-            "default": "",
-            "title": "Display Name",
-            "type": "string"
-          },
-          "domain": {
-            "enum": [
-              "data",
-              "tool",
-              "extension"
-            ],
-            "title": "Domain",
-            "type": "string"
-          },
-          "id": {
-            "description": "Stable capability id (domain-prefixed)",
-            "title": "Id",
-            "type": "string"
-          },
-          "provider": {
-            "title": "Provider",
-            "type": "string"
-          },
-          "reason_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason Code"
-          },
-          "reason_message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason Message"
-          }
-        },
-        "required": [
-          "id",
-          "domain",
-          "provider",
-          "available"
-        ],
-        "title": "CapabilityItem",
-        "type": "object"
-      },
       "CapabilityListResponse": {
         "additionalProperties": false,
-        "description": "GET /api/v1/capabilities response.",
+        "description": "Versioned GET /api/v1/capabilities inventory snapshot.",
         "properties": {
-          "available_count": {
+          "executable_count": {
             "minimum": 0.0,
-            "title": "Available Count",
+            "title": "Executable Count",
             "type": "integer"
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/CapabilityItem"
+              "discriminator": {
+                "mapping": {
+                  "data": "#/components/schemas/DataCapabilityItem",
+                  "extension": "#/components/schemas/ExtensionCapabilityItem",
+                  "tool": "#/components/schemas/ToolCapabilityItem"
+                },
+                "propertyName": "domain"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/DataCapabilityItem"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolCapabilityItem"
+                },
+                {
+                  "$ref": "#/components/schemas/ExtensionCapabilityItem"
+                }
+              ]
             },
+            "maxItems": 4096,
             "title": "Items",
+            "type": "array"
+          },
+          "non_executable_count": {
+            "minimum": 0.0,
+            "title": "Non Executable Count",
+            "type": "integer"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "capability-inventory/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilitySourceStatus"
+            },
+            "maxItems": 3,
+            "title": "Sources",
             "type": "array"
           },
           "total": {
@@ -4658,18 +4631,77 @@
             "title": "Total",
             "type": "integer"
           },
-          "unavailable_count": {
+          "unknown_executable_count": {
             "minimum": 0.0,
-            "title": "Unavailable Count",
+            "title": "Unknown Executable Count",
             "type": "integer"
           }
         },
         "required": [
+          "schema_version",
+          "partial",
           "total",
-          "available_count",
-          "unavailable_count"
+          "executable_count",
+          "non_executable_count",
+          "unknown_executable_count"
         ],
         "title": "CapabilityListResponse",
+        "type": "object"
+      },
+      "CapabilitySourceStatus": {
+        "additionalProperties": false,
+        "description": "Freshness and consistency state for one authoritative owner.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Generation",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "data",
+              "tool",
+              "extension"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "error",
+              "generation_drift"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "state",
+          "generation",
+          "as_of"
+        ],
+        "title": "CapabilitySourceStatus",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -5351,6 +5383,193 @@
           "calendar_market"
         ],
         "title": "DailyScheduleRequest",
+        "type": "object"
+      },
+      "DataCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Active data-provider or supplied-method observation.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dependency_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Ready"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "const": "data",
+            "title": "Domain",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "grantable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantable"
+          },
+          "healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthy"
+          },
+          "id": {
+            "description": "Stable domain-prefixed id",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Markets",
+            "type": "array"
+          },
+          "owner": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "source_generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Generation",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "data_provider",
+              "data_method"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "provider",
+          "version",
+          "source_generation",
+          "as_of",
+          "registered",
+          "domain",
+          "type"
+        ],
+        "title": "DataCapabilityItem",
         "type": "object"
       },
       "DecisionSignalCreateRequest": {
@@ -7887,6 +8106,193 @@
           "config_version"
         ],
         "title": "ExportSystemConfigResponse",
+        "type": "object"
+      },
+      "ExtensionCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Plugin lifecycle or active contribution observation.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dependency_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Ready"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "const": "extension",
+            "title": "Domain",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "grantable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantable"
+          },
+          "healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthy"
+          },
+          "id": {
+            "description": "Stable domain-prefixed id",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Markets",
+            "type": "array"
+          },
+          "owner": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "source_generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Generation",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "plugin_lifecycle",
+              "extension_registration"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "provider",
+          "version",
+          "source_generation",
+          "as_of",
+          "registered",
+          "domain",
+          "type"
+        ],
+        "title": "ExtensionCapabilityItem",
         "type": "object"
       },
       "ExtractFromImageResponse": {
@@ -20754,6 +21160,190 @@
         "title": "TestNotificationChannelResponse",
         "type": "object"
       },
+      "ToolCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Registered or owner-declared Agent tool observation.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dependency_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Ready"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "const": "tool",
+            "title": "Domain",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "grantable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantable"
+          },
+          "healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthy"
+          },
+          "id": {
+            "description": "Stable domain-prefixed id",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Markets",
+            "type": "array"
+          },
+          "owner": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "source_generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Generation",
+            "type": "string"
+          },
+          "type": {
+            "const": "agent_tool",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "provider",
+          "version",
+          "source_generation",
+          "as_of",
+          "registered",
+          "domain",
+          "type"
+        ],
+        "title": "ToolCapabilityItem",
+        "type": "object"
+      },
       "UnsupportedScheduledTaskItem": {
         "additionalProperties": false,
         "description": "Opaque projection of a definition written by a newer application.",
@@ -24426,7 +25016,7 @@
     },
     "/api/v1/capabilities": {
       "get": {
-        "description": "Return a read-only aggregation of capabilities from the existing data-provider catalog, agent tool registry, and plugin extension surface. Does not change registration behavior. available=false includes a stable reason_code such as feature_disabled, missing_config, or missing_dependency.",
+        "description": "Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.",
         "operationId": "listCapabilities",
         "parameters": [
           {
@@ -24498,7 +25088,7 @@
             "AdminSessionCookie": []
           }
         ],
-        "summary": "List aggregated agent capabilities (read-only)",
+        "summary": "List the runtime capability inventory (read-only)",
         "tags": [
           "Capabilities"
         ]
