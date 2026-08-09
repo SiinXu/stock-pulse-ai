@@ -510,6 +510,48 @@ def test_adjustment_and_schema_identities_are_isolated_without_clobbering(
     assert len(list(tmp_path.glob("*.json"))) == 2
 
 
+def test_manager_tickflow_adjustment_identity_prevents_cross_run_reuse(
+    tmp_path: Path,
+) -> None:
+    clock = _Clock()
+    forward_provider = _Provider([_bars(close=10.0)], name="TickFlowFetcher")
+    forward_provider.kline_adjust = "forward"
+    forward_manager = _manager(
+        forward_provider,
+        _cache(tmp_path, clock, mode=MarketDataFetchMode.REFRESH),
+    )
+
+    forward, _ = forward_manager.get_daily_data(
+        "600519",
+        start_date="2026-07-01",
+        end_date="2026-07-20",
+        days=30,
+    )
+
+    backward_provider = _Provider([], name="TickFlowFetcher")
+    backward_provider.kline_adjust = "backward"
+    backward_manager = _manager(
+        backward_provider,
+        _cache(tmp_path, clock, mode=MarketDataFetchMode.LOCAL_ONLY),
+    )
+
+    with pytest.raises(LocalDataMissingError):
+        backward_manager.get_daily_data(
+            "600519",
+            start_date="2026-07-01",
+            end_date="2026-07-20",
+            days=30,
+        )
+
+    assert float(forward.iloc[0]["close"]) == pytest.approx(10.0)
+    assert backward_provider.calls == 0
+    identities = {
+        json.loads(path.read_text(encoding="utf-8"))["identity"]["adjustment"]
+        for path in tmp_path.glob("*.json")
+    }
+    assert identities == {"tickflow:forward"}
+
+
 def test_different_provider_sources_are_not_merged_into_false_coverage(
     tmp_path: Path,
 ) -> None:
@@ -627,6 +669,86 @@ def test_schema_v1_entry_is_read_compatible_after_restart(tmp_path: Path) -> Non
     assert source == "LegacySource"
     assert len(frame) == 3
     assert manager.get_daily_cache_stats()["schema_v1_reads"] >= 1
+
+
+def test_schema_v1_overlap_prefers_newest_stored_entry_not_filename_order(
+    tmp_path: Path,
+) -> None:
+    clock = _Clock()
+    key = DailyCacheKey("600519", "2026-07-01", "2026-07-20", 30)
+
+    def _write_legacy(filename: str, *, stored_at: float, close: float) -> None:
+        payload = {
+            "schema_version": 1,
+            "key": key.legacy_dict(),
+            "stored_at": stored_at,
+            "source_name": "LegacySource",
+            "dataframe": _bars(close=close).to_json(
+                orient="table",
+                date_format="iso",
+                date_unit="ms",
+            ),
+        }
+        (tmp_path / filename).write_text(json.dumps(payload), encoding="utf-8")
+
+    # Lexical order places the newer entry first. Filename-driven
+    # concatenation would therefore let the older duplicate win keep-last.
+    _write_legacy(
+        f"{key.symbol_digest()}-a-new.json",
+        stored_at=clock.now,
+        close=20.0,
+    )
+    _write_legacy(
+        f"{key.symbol_digest()}-z-old.json",
+        stored_at=clock.now - 10.0,
+        close=10.0,
+    )
+    manager = _manager(
+        _Provider([]),
+        _cache(tmp_path, clock, mode=MarketDataFetchMode.LOCAL_ONLY),
+    )
+
+    frame, source = manager.get_daily_data(
+        "600519",
+        start_date="2026-07-01",
+        end_date="2026-07-20",
+        days=30,
+    )
+
+    assert source == "LegacySource"
+    assert float(frame.iloc[0]["close"]) == pytest.approx(20.0)
+
+
+def test_unusable_provider_schema_records_one_health_failure_before_fallback(
+    tmp_path: Path,
+) -> None:
+    clock = _Clock()
+    invalid = _Provider(
+        [_bars(include_volume=False)],
+        name="EfinanceFetcher",
+        priority=0,
+    )
+    backup = _Provider([_bars()], name="TencentFetcher", priority=1)
+    manager = DataFetcherManager(fetchers=[invalid, backup])
+    manager._daily_data_cache = _cache(
+        tmp_path,
+        clock,
+        mode=MarketDataFetchMode.REFRESH,
+    )
+
+    _frame, source = manager.get_daily_data(
+        "600519",
+        start_date="2026-07-01",
+        end_date="2026-07-20",
+        days=30,
+    )
+
+    health_key = DataFetcherManager._daily_health_key(invalid, "cn")
+    snapshot = manager.get_daily_source_health_snapshot()[health_key]
+    assert source == "TencentFetcher"
+    assert snapshot["sample_count"] == 1
+    assert snapshot["error_rate"] == pytest.approx(1.0)
+    assert snapshot["consecutive_failures"] == 1
 
 
 def test_invalid_mode_fails_at_manager_cache_configuration(

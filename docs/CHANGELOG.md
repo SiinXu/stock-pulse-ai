@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Wire range-aware local-first daily data into `DataFetcherManager` with fail-closed mode validation, bounded schema-v2 persistence, zero-provider `local_only` misses, `auto` stale-if-error, and `refresh` persistence (refs #178, #218, and #159 data scope).
+- [Fixed] Preserve local-only boundaries across batch prefetch, stock-name lookup, scheduled execution, asynchronous task errors, adjustment-aware persistence, legacy overlap ordering, provider health, and analysis OpenAPI responses.
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).

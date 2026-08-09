@@ -683,12 +683,29 @@ class DataFetcherManager:
                 self._daily_data_cache = DailyDataCache.from_env()
             return self._daily_data_cache
 
+    def is_market_data_local_only(self) -> bool:
+        """Return whether manager-owned market-data helpers must avoid providers."""
+
+        return self._get_daily_data_cache().fetch_mode is MarketDataFetchMode.LOCAL_ONLY
+
+    def _daily_adjustment_identity(self) -> str:
+        """Return the active adjustment policy that partitions persistent bars."""
+
+        for fetcher in self._get_fetchers_snapshot():
+            if fetcher.name != "TickFlowFetcher":
+                continue
+            adjustment = str(getattr(fetcher, "kline_adjust", "none") or "none")
+            return f"tickflow:{adjustment.strip().lower()}"
+        return "provider_default"
+
     @staticmethod
     def _daily_cache_key(
         stock_code: str,
         start_date: Optional[str],
         end_date: Optional[str],
         days: int,
+        *,
+        adjustment: str = "provider_default",
     ) -> DailyCacheKey:
         effective_end = end_date or datetime.now().strftime("%Y-%m-%d")
         effective_start = start_date
@@ -700,6 +717,7 @@ class DataFetcherManager:
             start_date=effective_start,
             end_date=effective_end,
             days=days,
+            adjustment=adjustment,
             allow_end_rollover=end_date is None,
         )
 
@@ -1170,29 +1188,32 @@ class DataFetcherManager:
     ) -> Optional[pd.DataFrame]:
         """Call one provider and reject unusable normalized daily schemas."""
 
-        frame = self._call_fetcher_method(
+        def _validate_result(frame: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+            if frame is None or frame.empty:
+                return frame
+            missing_columns = [
+                column for column in REQUIRED_DAILY_COLUMNS if column not in frame.columns
+            ]
+            if missing_columns:
+                raise DataFetchError(
+                    f"[{fetcher.name}] daily data is missing required columns: "
+                    f"{','.join(missing_columns)}"
+                )
+            if not pd.to_datetime(frame["date"], errors="coerce").notna().any():
+                raise DataFetchError(
+                    f"[{fetcher.name}] daily data has no valid date values"
+                )
+            return frame
+
+        return self._call_fetcher_method(
             fetcher,
             "get_daily_data",
             stock_code=stock_code,
             start_date=start_date,
             end_date=end_date,
             days=days,
+            _manager_result_validator=_validate_result,
         )
-        if frame is None or frame.empty:
-            return frame
-        missing_columns = [
-            column for column in REQUIRED_DAILY_COLUMNS if column not in frame.columns
-        ]
-        if missing_columns:
-            raise DataFetchError(
-                f"[{fetcher.name}] daily data is missing required columns: "
-                f"{','.join(missing_columns)}"
-            )
-        if not pd.to_datetime(frame["date"], errors="coerce").notna().any():
-            raise DataFetchError(
-                f"[{fetcher.name}] daily data has no valid date values"
-            )
-        return frame
 
     def get_daily_data(
         self,
@@ -1217,6 +1238,7 @@ class DataFetcherManager:
             start_date,
             end_date,
             days,
+            adjustment=self._daily_adjustment_identity(),
         )
         daily_cache = self._get_daily_data_cache()
         network_fetch = None
@@ -1626,6 +1648,12 @@ class DataFetcherManager:
         Returns:
             预取的股票数量（0 表示跳过预取）
         """
+        if self.is_market_data_local_only():
+            logger.debug(
+                "[prefetch] component=realtime_prefetch action=skip reason=local_only"
+            )
+            return 0
+
         # Normalize all codes
         stock_codes = [normalize_stock_code(c) for c in stock_codes]
 
@@ -1702,7 +1730,7 @@ class DataFetcherManager:
                     )
                     or 0
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics preserve per-symbol fallback after optional TickFlow prefetch fails.
                 log_safe_exception(
                     logger,
                     "TickFlow realtime quote prefetch failed",
@@ -1734,7 +1762,7 @@ class DataFetcherManager:
                 )
                 return 0
                 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve per-symbol fallback after optional realtime prefetch fails.
             log_safe_exception(
                 logger,
                 "Realtime quote prefetch failed",
@@ -1747,6 +1775,11 @@ class DataFetcherManager:
 
     def prefetch_daily_klines(self, stock_codes: List[str], days: int = 30) -> int:
         """Batch-prefetch TickFlow daily K-lines without changing per-stock callers."""
+        if self.is_market_data_local_only():
+            logger.debug(
+                "[prefetch] component=daily_kline_prefetch action=skip reason=local_only"
+            )
+            return 0
         fetcher = self._get_fetcher_by_name("TickFlowFetcher", capability="daily_data")
         if fetcher is None or not hasattr(fetcher, "prefetch_daily_klines"):
             return 0
@@ -1761,7 +1794,7 @@ class DataFetcherManager:
                 )
                 or 0
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics preserve per-symbol fallback after optional daily prefetch fails.
             log_safe_exception(
                 logger,
                 "TickFlow daily K-line prefetch failed",
@@ -2531,6 +2564,12 @@ class DataFetcherManager:
         if is_meaningful_stock_name(index_name, stock_code):
             return self._cache_stock_name(stock_code, index_name) or index_name
 
+        # Stock-name fallbacks are provider-backed. In market-data local-only
+        # mode, retain local maps/caches above but never enter a provider or
+        # realtime callback merely to decorate an otherwise local analysis.
+        if self.is_market_data_local_only():
+            return ""
+
         # 2. Attempt to fetch from real-time quotes (fastest, can be disabled on demand)
         if allow_realtime:
             quote = self.get_realtime_quote(raw_stock_code or stock_code, log_final_failure=False)
@@ -2664,7 +2703,7 @@ class DataFetcherManager:
             stock_codes: Stock codes to prefetch.
             use_bulk: If True, may use get_stock_list (full fetch). Default False.
         """
-        if not stock_codes:
+        if not stock_codes or self.is_market_data_local_only():
             return
         stock_codes = [normalize_stock_code(c) for c in stock_codes]
         if use_bulk:
@@ -2701,6 +2740,9 @@ class DataFetcherManager:
                     missing_codes.discard(code)
         
         if not missing_codes:
+            return result
+
+        if self.is_market_data_local_only():
             return result
         
         # 2. Attempt to fetch stock lists in capability-filtered priority order.

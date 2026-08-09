@@ -163,8 +163,13 @@ class _DailySourceHealthMethods:
     def _call_fetcher_method(self, fetcher: BaseFetcher, method_name: str, *args, **kwargs):
         """Serialize shared fetcher state access through manager-owned per-instance locks."""
         method = getattr(fetcher, method_name)
+        result_validator = kwargs.pop("_manager_result_validator", None)
         with self._get_fetcher_call_lock(fetcher):
             if method_name != "get_daily_data":
+                if result_validator is not None:
+                    raise ValueError(
+                        "_manager_result_validator is only supported for get_daily_data"
+                    )
                 return method(*args, **kwargs)
 
             stock_code = kwargs.get("stock_code") or (args[0] if args else "")
@@ -183,6 +188,8 @@ class _DailySourceHealthMethods:
             started_at = time.monotonic()
             try:
                 result = method(*args, **kwargs)
+                if result_validator is not None:
+                    result = result_validator(result)
             except Exception:
                 latency_ms = (time.monotonic() - started_at) * 1000.0
                 self._daily_source_health.record_failure(

@@ -10,6 +10,13 @@ This feature is separate from `LOCAL_ONLY_MODE` in
 `LOCAL_ONLY_MODE` is the process-wide non-loopback HTTP policy. Enable both
 when the complete process must be offline.
 
+In `local_only`, the analysis pipeline also skips batch daily/realtime
+prefetch and provider-backed stock-name decoration. Existing in-memory names,
+static index names, and the local daily store remain available. This prevents
+five-or-more-symbol batches from reaching a provider before the per-symbol
+local resolver runs; it does not replace `LOCAL_ONLY_MODE` for unrelated
+outbound features such as news, LLMs, or notifications.
+
 ## Modes
 
 | `PROVIDER_MARKET_DATA_MODE` | Local read | Provider chain | Provider failure |
@@ -25,9 +32,12 @@ actionable `ValueError`; an offline typo can never become network-capable.
 ## Range and field coverage
 
 The persistent identity is normalized symbol + adjustment identity + schema
-identity. The persisted source name is part of the entry contract, and ranges
-from different sources are never merged. The `days` hint is not storage
-identity: exact, overlapping, and subset windows reuse one symbol table.
+identity. When TickFlow is active, its configured K-line adjustment is part of
+that identity, so forward-, backward-, and unadjusted bars cannot reuse one
+another across process restarts. Other providers use `provider_default`. The
+persisted source name is part of the entry contract, and ranges from different
+sources are never merged. The `days` hint is not storage identity: exact,
+overlapping, and subset windows reuse one symbol table.
 
 Successful requests record covered date intervals. Local reads verify that the
 requested interval is covered, verify the requested columns, then sort,
@@ -67,9 +77,12 @@ Possible reasons include `cache_disabled`, `no_local_entry`,
 `no_rows_in_covered_window`, and `local_entry_too_old`.
 
 The typed error reaches the stock-history API as HTTP 409 with
-`error=local_market_data_missing` and the payload in `details`. Synchronous and
-queued analysis expose the same stable code/details. Any missed symbol makes a
-scheduled or CLI batch fail before analysis notifications are assembled.
+`error=local_market_data_missing` and the payload in `details`. The analysis
+endpoint declares this structured variant alongside duplicate-task HTTP 409
+responses in OpenAPI. Synchronous and queued analysis expose the same stable
+code/details, including after asynchronous task terminalization. Any missed
+symbol makes either the embedded or standalone scheduled CLI path fail before
+analysis notifications are assembled.
 
 ## Persistence, privacy, and retention
 
@@ -99,10 +112,13 @@ freshness meanings. The cache directory remains
 
 Existing exact-request schema-v1 JSON tables are read as `provider_default` /
 `normalized_daily_v1` coverage ranges, allowlisted on read, and can satisfy
-matching/subset requests. Other adjustment/schema identities ignore them. The
+matching/subset requests. When multiple compatible legacy files overlap, their
+`stored_at` timestamps control merge order and the newest observation wins;
+filenames only break equal-timestamp ties. Other adjustment/schema identities,
+including active TickFlow adjustment identities, ignore legacy entries. The
 next successful same-source write creates the schema-v2 symbol table.
-Unsupported, corrupt, identity-mismatched, or incomplete entries never count as
-hits.
+Unsupported, corrupt, identity-mismatched, or incomplete entries never count
+as hits.
 
 Rollback is either reverting this change or unsetting/setting
 `PROVIDER_MARKET_DATA_MODE=auto`. Reverting does not delete cache files;
@@ -117,6 +133,8 @@ python -m pytest \
   tests/data_provider/test_daily_provider_cache.py \
   tests/data_provider/test_local_first_store.py \
   tests/services/test_local_first_boundaries.py \
+  tests/app/test_main_schedule_mode.py \
+  tests/test_analysis_api_contract.py \
   -m "not network"
 ```
 

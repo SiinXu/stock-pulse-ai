@@ -11,13 +11,21 @@ from fastapi import HTTPException
 from api.v1.endpoints.analysis import _handle_sync_analysis
 from api.v1.endpoints.stocks import get_stock_history
 from api.v1.schemas.analysis import AnalyzeRequest
-from data_provider.daily_cache import LocalDataMissing, LocalDataMissingError
+from data_provider.base import DataFetcherManager
+from data_provider.daily_cache import (
+    DailyCacheConfig,
+    DailyDataCache,
+    LocalDataMissing,
+    LocalDataMissingError,
+    MarketDataFetchMode,
+)
 from src.app import runtime
 from src.app.analysis import run_full_analysis
 from src.core.stages.orchestration import _OrchestrationStageMixin
 from src.services.analysis_service import AnalysisService
 from src.services.stock_service import StockService
 from src.services.task_queue import AnalysisTaskQueue, KnownTaskFailure
+from src.task_execution import TaskCommand, TaskStatusEnum
 
 
 def _missing_error() -> LocalDataMissingError:
@@ -84,6 +92,66 @@ def test_mixed_batch_propagates_local_missing_before_notifications() -> None:
     stage._activate_delivery_diagnostic_context.assert_not_called()
 
 
+def test_five_symbol_local_only_pipeline_never_enters_provider_or_socket_path(
+    tmp_path,
+) -> None:
+    socket_probe = MagicMock()
+
+    class _OutboundProvider:
+        name = "TickFlowFetcher"
+        priority = 0
+        kline_adjust = "none"
+
+        def _outbound(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            socket_probe()
+            raise AssertionError("local_only must not enter provider callbacks")
+
+        get_daily_data = _outbound
+        get_stock_name = _outbound
+        prefetch_daily_klines = _outbound
+        prefetch_realtime_quotes = _outbound
+
+    manager = DataFetcherManager(fetchers=[_OutboundProvider()])
+    manager._daily_data_cache = DailyDataCache(
+        DailyCacheConfig(
+            enabled=True,
+            directory=tmp_path,
+            fetch_mode=MarketDataFetchMode.LOCAL_ONLY,
+            local_only_max_age_seconds=300.0,
+        )
+    )
+    stage = object.__new__(_OrchestrationStageMixin)
+    stage.max_workers = 2
+    stage.fetcher_manager = manager
+    stage.config = SimpleNamespace(
+        single_stock_notify=False,
+        report_type="simple",
+        analysis_delay=0,
+    )
+    stage._activate_delivery_diagnostic_context = MagicMock()
+
+    def _process(code, **_kwargs):  # type: ignore[no-untyped-def]
+        assert manager.get_stock_name(code, allow_realtime=False) == ""
+        manager.get_daily_data(
+            code,
+            start_date="2026-07-01",
+            end_date="2026-07-20",
+            days=30,
+        )
+
+    stage._process_single_stock_for_batch = _process
+
+    with pytest.raises(LocalDataMissingError):
+        stage.run(
+            stock_codes=["600991", "600992", "600993", "600994", "600995"],
+            dry_run=False,
+            send_notification=True,
+        )
+
+    socket_probe.assert_not_called()
+    stage._activate_delivery_diagnostic_context.assert_not_called()
+
+
 def test_analysis_service_preserves_structured_local_missing_details() -> None:
     service = object.__new__(AnalysisService)
     service.repo = MagicMock()
@@ -130,6 +198,49 @@ def test_async_analysis_command_preserves_local_missing_details() -> None:
 
     assert exc_info.value.error_code == "local_market_data_missing"
     assert exc_info.value.message_params["fields"] == ["volume"]
+
+
+def test_async_task_terminal_state_preserves_local_missing_code_and_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(AnalysisTaskQueue, "_instance", None)
+    queue = AnalysisTaskQueue(max_workers=1, inflight_store=MagicMock())
+    details = _missing_error().to_dict()
+
+    def _run(_context):  # type: ignore[no-untyped-def]
+        raise KnownTaskFailure(
+            "local_market_data_missing",
+            str(_missing_error()),
+            message_params=details,
+        )
+
+    try:
+        task_id = queue.submit(
+            TaskCommand(
+                kind="stock_analysis",
+                run=_run,
+                metadata={
+                    "stock_code": "600519",
+                    "message": "任务已加入队列",
+                    "message_code": "task.queued",
+                },
+                failure_error_code="analysis_failed",
+                none_is_success=False,
+            )
+        )
+        queue._futures[task_id].result(timeout=2)
+        task = queue.get_task(task_id)
+    finally:
+        queue.shutdown()
+
+    assert task is not None
+    assert task.status is TaskStatusEnum.FAILED
+    assert task.error == "local_market_data_missing"
+    assert task.message_code == "local_market_data_missing"
+    assert task.message_params["missing_ranges"] == details["missing_ranges"]
+    assert task.to_dict()["message"] == (
+        "Local market data does not cover the requested analysis window"
+    )
 
 
 def test_sync_analysis_api_returns_structured_409() -> None:
@@ -180,6 +291,42 @@ def test_scheduled_analysis_boundary_propagates_local_missing(
 
     with pytest.raises(LocalDataMissingError):
         runtime.run_scheduled_analysis(SimpleNamespace(), SimpleNamespace())
+
+
+def test_standalone_cli_scheduler_uses_raising_analysis_entrypoint() -> None:
+    runtime_config = SimpleNamespace()
+    config = SimpleNamespace(
+        schedule_time="18:00",
+        schedule_run_immediately=True,
+        agent_event_monitor_enabled=False,
+        daily_brief_enabled=False,
+    )
+    args = SimpleNamespace(no_run_immediately=False)
+
+    def _run_schedule(*, task, **_kwargs):  # type: ignore[no-untyped-def]
+        task()
+
+    with patch("src.scheduler.run_with_schedule", side_effect=_run_schedule), patch(
+        "src.services.task_queue.get_task_queue"
+    ) as get_task_queue, patch.object(
+        runtime,
+        "_reload_runtime_config",
+        return_value=runtime_config,
+    ), patch.object(
+        runtime,
+        "run_scheduled_analysis",
+        side_effect=_missing_error(),
+    ) as run_scheduled:
+        with pytest.raises(LocalDataMissingError):
+            runtime._run_schedule_mode(
+                config,
+                args,
+                ["600519"],
+                start_serve=False,
+            )
+
+    get_task_queue.return_value.recover_persisted_inflight.assert_called_once_with()
+    run_scheduled.assert_called_once_with(runtime_config, args, None)
 
 
 def test_cli_analysis_emits_structured_failure_without_notification() -> None:

@@ -188,6 +188,8 @@ def public_task_message(task: Any, default_failed_message: str = "任务执行�
     message_code = getattr(task, "message_code", None)
     if message_code == "llm_not_configured":
         return "No LLM model is configured"
+    if message_code == "local_market_data_missing":
+        return "Local market data does not cover the requested analysis window"
     if message_code == "task.analysis.failed":
         return "分析失败"
     return default_failed_message
@@ -2052,6 +2054,9 @@ class AnalysisTaskQueue:
         *,
         result: Any = None,
         diagnostic_error: Optional[str] = None,
+        failure_message: Optional[str] = None,
+        failure_message_code: Optional[str] = None,
+        failure_message_params: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Apply one terminal transition; the first lock winner owns the outcome."""
         if task.status.terminal:
@@ -2104,6 +2109,10 @@ class AnalysisTaskQueue:
                     if task.kind == "stock_analysis"
                     else {}
                 )
+            elif failure_message_code:
+                task.message = failure_message or "任务执行失败"
+                task.message_code = failure_message_code
+                task.message_params = copy.deepcopy(failure_message_params or {})
             elif task.kind == "stock_analysis":
                 task.message = "分析失败"
                 task.message_code = "task.analysis.failed"
@@ -2277,12 +2286,19 @@ class AnalysisTaskQueue:
                 if current is not None:
                     if known_failure_code:
                         current.failure_error_code = known_failure_code
-                    if isinstance(exc, KnownTaskFailure) and exc.message_params:
-                        current.message_params = copy.deepcopy(exc.message_params)
                     self._terminalize_locked(
                         current,
                         TaskStatus.FAILED,
                         diagnostic_error=diagnostic_error,
+                        failure_message=(
+                            exc.message if isinstance(exc, KnownTaskFailure) else None
+                        ),
+                        failure_message_code=known_failure_code,
+                        failure_message_params=(
+                            exc.message_params
+                            if isinstance(exc, KnownTaskFailure)
+                            else None
+                        ),
                     )
             self._cleanup_old_tasks()
             return None

@@ -4,6 +4,8 @@
 
 此功能与 `docs/local-only-mode.md` 中的 `LOCAL_ONLY_MODE` 相互独立：`PROVIDER_MARKET_DATA_MODE` 管理日线数据，`LOCAL_ONLY_MODE` 是进程级非回环 HTTP 出站策略。需要整个进程离线时应同时启用两者。
 
+在 `local_only` 模式下，分析流水线也会跳过批量日线/实时行情预取及依赖 provider 的股票名称补全；已有内存名称、静态指数名称与本地日线存储仍可使用。因此，包含至少五个标的的批次不会在逐标的本地解析前触达 provider。新闻、LLM 或通知等其他出站能力仍须依靠 `LOCAL_ONLY_MODE` 约束。
+
 ## 三种模式
 
 | `PROVIDER_MARKET_DATA_MODE` | 本地读取 | Provider 链 | Provider 失败 |
@@ -16,7 +18,7 @@
 
 ## 区间与字段覆盖
 
-持久化身份由规范化代码、复权身份和 schema 身份组成。来源名属于条目契约，不同来源的数据不会合并。`days` 只是请求提示，不再属于存储身份；精确、重叠和子区间请求复用同一标的表。
+持久化身份由规范化代码、复权身份和 schema 身份组成。TickFlow 生效时，其配置的 K 线复权方式属于该身份，因此前复权、后复权与不复权数据在进程重启后也不会交叉复用；其他 provider 使用 `provider_default`。来源名属于条目契约，不同来源的数据不会合并。`days` 只是请求提示，不再属于存储身份；精确、重叠和子区间请求复用同一标的表。
 
 成功请求会记录已覆盖的日期区间。本地读取先验证请求区间和所需列，再按日期排序、去重和切片。一天的 rollover 宽限允许已预热的默认结束日期服务下一日的重叠窗口；`auto` 的新鲜 TTL 仍会让已老化数据在线复验。
 
@@ -48,7 +50,7 @@
 
 原因可能为 `cache_disabled`、`no_local_entry`、`missing_fields`、`missing_ranges`、`missing_fields_and_ranges`、`no_rows_in_covered_window` 或 `local_entry_too_old`。
 
-股票历史 API 使用 HTTP 409 返回该类型错误，稳定错误码为 `local_market_data_missing`，结构化载荷位于 `details`。同步/异步分析暴露相同错误码和详情。任何标的缺失时，定时任务或 CLI 都会在组装分析通知前失败。
+股票历史 API 使用 HTTP 409 返回该类型错误，稳定错误码为 `local_market_data_missing`，结构化载荷位于 `details`；分析接口的 OpenAPI 会同时声明该结构化 409 与重复任务 409。同步/异步分析在任务终态化之后仍暴露相同错误码和详情。任何标的缺失时，嵌入式或独立定时 CLI 路径都会在组装分析通知前失败。
 
 ## 持久化、隐私与保留策略
 
@@ -69,7 +71,7 @@ provider 结果中的其他列会在返回持久化结果和写盘前剔除。�
 
 ### Schema-v1 兼容
 
-既有按精确请求保存的 schema-v1 JSON 会作为 `provider_default` / `normalized_daily_v1` 的独立覆盖区间读取，并在读取时执行字段白名单；匹配或子区间请求仍可命中，其他复权/schema 身份会忽略它。下一次同来源成功写入会生成 schema-v2 标的表。不支持、损坏、身份不匹配或不完整的条目都不会算作成功命中。
+既有按精确请求保存的 schema-v1 JSON 会作为 `provider_default` / `normalized_daily_v1` 的独立覆盖区间读取，并在读取时执行字段白名单；匹配或子区间请求仍可命中。多个兼容旧文件重叠时按 `stored_at` 合并，较新的观测值胜出，文件名只用于相同时间戳的确定性决胜。其他复权/schema 身份（包括 TickFlow 生效的复权身份）会忽略旧条目。下一次同来源成功写入会生成 schema-v2 标的表。不支持、损坏、身份不匹配或不完整的条目都不会算作成功命中。
 
 回滚方式为回退本变更，或取消设置/设为 `PROVIDER_MARKET_DATA_MODE=auto`。回退不会删除缓存文件；schema-v1 读取器会忽略 schema-v2 文件，如需回收空间可另行删除已配置的缓存目录。
 
@@ -81,6 +83,8 @@ python -m pytest \
   tests/data_provider/test_daily_provider_cache.py \
   tests/data_provider/test_local_first_store.py \
   tests/services/test_local_first_boundaries.py \
+  tests/app/test_main_schedule_mode.py \
+  tests/test_analysis_api_contract.py \
   -m "not network"
 ```
 

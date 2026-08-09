@@ -664,16 +664,29 @@ class DailyDataCache:
             return None
 
     def _read_persistent(self, key: DailyCacheKey) -> Optional[_DailyCacheEntry]:
-        entries = [
-            entry
+        entries_with_names = [
+            (entry, path.name)
             for path in self._candidate_paths(key)
             for entry in [self._read_path(path, key)]
             if entry is not None
         ]
-        if not entries:
+        if not entries_with_names:
             return None
-        newest = max(entries, key=lambda item: item.stored_at)
-        compatible = [entry for entry in entries if entry.source_name == newest.source_name]
+        newest, _newest_name = max(
+            entries_with_names,
+            key=lambda item: (item[0].stored_at, item[1]),
+        )
+        # Concatenate oldest to newest so deterministic keep-last
+        # deduplication always preserves the newest stored observation. Filename
+        # order is only a stable tie-breaker, never a freshness proxy.
+        compatible = [
+            entry
+            for entry, _path_name in sorted(
+                entries_with_names,
+                key=lambda item: (item[0].stored_at, item[1]),
+            )
+            if entry.source_name == newest.source_name
+        ]
         frames = [entry.frame for entry in compatible]
         ranges = [item for entry in compatible for item in entry.coverage_ranges]
         return _DailyCacheEntry(

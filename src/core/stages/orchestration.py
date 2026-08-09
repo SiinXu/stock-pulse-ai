@@ -594,9 +594,18 @@ class _OrchestrationStageMixin:
         # Freeze the unified reference time for this round of running to avoid using the same stocks across market closing boundaries with different target trading days.
         resume_reference_time = current_time or datetime.now(timezone.utc)
 
+        local_only_checker = getattr(
+            self.fetcher_manager,
+            "is_market_data_local_only",
+            None,
+        )
+        local_only_market_data = bool(
+            callable(local_only_checker) and local_only_checker() is True
+        )
+
         # === Batch Pre-fetch Real-Time Quotes (Optimization: Avoid triggering full pull for each stock) ===
         # Pre-fetch only when the number of stocks is >= 5; query small amounts of stocks individually for efficiency.
-        if len(stock_codes) >= 5:
+        if len(stock_codes) >= 5 and not local_only_market_data:
             daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(stock_codes, days=30)
             if daily_prefetch_count > 0:
                 logger.info(
@@ -616,7 +625,7 @@ class _OrchestrationStageMixin:
 
         # Issue #455: Pre-fetch stock names to avoid displaying "stockxxxxx" during concurrent analysis.
         # dry_run Just perform data retrieval, Do not fetch names, Avoid additional network overhead
-        if not dry_run:
+        if not dry_run and not local_only_market_data:
             self.fetcher_manager.prefetch_stock_names(stock_codes, use_bulk=False)
 
         # Single stock push mode (#55): Reads configuration
