@@ -1224,6 +1224,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: 'Enable Offline OCR Agent Tool',
+    summary: 'Default-off bounded Tesseract text extraction. Image bytes stay local, but redacted untrusted text enters Agent context and may reach a remote model; enable LOCAL_ONLY_MODE for zero remote egress.',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR File Root',
+    summary: 'Filesystem sandbox for single-open regular images; root escapes, special files, oversized bytes, decoded pixels, and extra frames are rejected.',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR Languages',
+    summary: 'Tesseract language codes joined by +; default chi_sim+eng requires matching system language packs.',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR Timeout Seconds',
+    summary: 'Hard 1–120 second wall-clock limit; timed-out OCR workers and descendants are terminated and reaped.',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------

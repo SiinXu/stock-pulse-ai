@@ -1,0 +1,22 @@
+{
+  "id": "tools-required-pass",
+  "title": "Required tools were called",
+  "tags": ["tool_usage", "pass"],
+  "dimensions": ["tool_usage"],
+  "context": {
+    "stock_code": "AAPL"
+  },
+  "agent_output": {
+    "signal": "hold",
+    "tool_calls": [
+      {"tool": "get_realtime_quote", "attempted": true, "completed": true, "succeeded": true, "valid_result": true, "authorized": true},
+      {"tool": "analyze_trend", "attempted": true, "completed": true, "succeeded": true, "valid_result": true, "authorized": true}
+    ]
+  },
+  "evaluation": {
+    "tool_usage": {
+      "required_tools": ["get_realtime_quote", "analyze_trend"],
+      "forbidden_tools": ["place_order"]
+    }
+  }
+}
