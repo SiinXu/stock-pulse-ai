@@ -182,30 +182,35 @@ class _HistoryMethods:
         self,
         code: Optional[str] = None,
         query_id: Optional[str] = None,
-        days: int = 30,
+        days: Optional[int] = 30,
         limit: int = 50,
         exclude_query_id: Optional[str] = None,
+        report_type: Optional[str] = None,
     ) -> List[AnalysisHistory]:
         """
         Query analysis history records.
 
         Notes:
         - If query_id is provided, perform exact lookup and ignore days window.
-        - If query_id is not provided, apply days-based time filtering.
+        - If query_id is not provided and days is not None, apply time filtering.
+        - days=None explicitly removes the age window for bounded latest-row reads.
         - exclude_query_id: exclude records with this query_id (for history comparison).
+        - report_type filters history rows to one persisted report shape.
         """
-        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_date = datetime.now() - timedelta(days=days) if days is not None else None
 
         with self.get_session() as session:
             conditions = []
 
             if query_id:
                 conditions.append(AnalysisHistory.query_id == query_id)
-            else:
+            elif cutoff_date is not None:
                 conditions.append(AnalysisHistory.created_at >= cutoff_date)
 
             if code:
                 conditions.append(AnalysisHistory.code == code)
+            if report_type:
+                conditions.append(AnalysisHistory.report_type == report_type)
 
             # exclude_query_id only applies when not doing exact lookup (query_id is None)
             if exclude_query_id and not query_id:
@@ -214,7 +219,7 @@ class _HistoryMethods:
             results = session.execute(
                 select(AnalysisHistory)
                 .where(and_(*conditions))
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
                 .limit(limit)
             ).scalars().all()
 
@@ -482,7 +487,7 @@ class _HistoryMethods:
             result = session.execute(
                 select(AnalysisHistory)
                 .where(and_(*conditions))
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
                 .limit(1)
             ).scalars().first()
             return result
