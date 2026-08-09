@@ -5015,4 +5015,9 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "設定指紋組件對比",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "無設定組件",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "無",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryDescription": "此目錄只顯示已儲存的市場資料提供者設定，不代表目前路由、可用性、健康狀態、備援結果或快取新鮮度。搜尋憑證與 Futu 投資組合匯入不由此處管理。",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryFilterAll": "所有設定",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryNoMatches": "沒有相符的提供者設定",
+  "i18n.uiText.UI_TEXT.settings.dataDirectorySearchPlaceholder": "依名稱或設定狀態篩選",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryTitle": "提供者設定",
 } as const;

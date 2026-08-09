@@ -5015,4 +5015,9 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "Perbandingan komponen cap jari konfigurasi",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "Tiada komponen konfigurasi",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "t/d",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryDescription": "Direktori ini hanya memaparkan tetapan penyedia data pasaran yang disimpan. Ia tidak melaporkan penghalaan aktif, ketersediaan, kesihatan, hasil sandaran atau kesegaran cache. Kelayakan carian dan import portfolio Futu tidak diuruskan di sini.",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryFilterAll": "Semua konfigurasi",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryNoMatches": "Tiada tetapan penyedia yang sepadan",
+  "i18n.uiText.UI_TEXT.settings.dataDirectorySearchPlaceholder": "Tapis mengikut nama atau status konfigurasi",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryTitle": "Konfigurasi penyedia",
 } as const;
