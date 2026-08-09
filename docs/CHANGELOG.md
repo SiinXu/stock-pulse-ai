@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
 
+- [Added] Revisioned watchlist groups with pre-mutation CAS write leases, version-fenced STOCK_LIST reconciliation, failure-aware accessible controls, mobile non-drag controls, and typed score/focus projections (#189).
 - [Added] Report version comparison foundation with stable history-ID selection, paginated pickers, strict typed deltas, configuration-provenance states, graded field differences, and operation-owned recovery (#188 / T18).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
