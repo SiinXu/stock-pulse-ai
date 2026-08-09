@@ -18095,6 +18095,229 @@
         "title": "ScheduledTaskTodayResponse",
         "type": "object"
       },
+      "SchedulerRunNowResponse": {
+        "description": "Acceptance and correlation data for one immediate scheduler run.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "accepted",
+          "running"
+        ],
+        "title": "SchedulerRunNowResponse",
+        "type": "object"
+      },
+      "SchedulerStatusResponse": {
+        "description": "Authoritative status for this process's legacy day-batch scheduler.",
+        "properties": {
+          "active_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Run Id"
+          },
+          "attached": {
+            "title": "Attached",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Id"
+          },
+          "last_run_outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Outcome"
+          },
+          "last_skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skip Reason"
+          },
+          "last_skipped_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skipped At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "process_mode": {
+            "enum": [
+              "serve",
+              "desktop",
+              "not_attached"
+            ],
+            "title": "Process Mode",
+            "type": "string"
+          },
+          "run_now_available": {
+            "title": "Run Now Available",
+            "type": "boolean"
+          },
+          "run_now_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Now Block Reason"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "schedule_times": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schedule Times",
+            "type": "array"
+          },
+          "schedule_timezone": {
+            "title": "Schedule Timezone",
+            "type": "string"
+          },
+          "track": {
+            "const": "legacy_day_batch",
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "track",
+          "enabled",
+          "running",
+          "attached",
+          "process_mode",
+          "schedule_timezone",
+          "run_now_available"
+        ],
+        "title": "SchedulerStatusResponse",
+        "type": "object"
+      },
       "ScorecardBucket": {
         "properties": {
           "avg_return_pct": {
@@ -22403,6 +22626,425 @@
           "message"
         ],
         "title": "WatchlistResponse",
+        "type": "object"
+      },
+      "WatchlistScoreFactor": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "analysis_sentiment",
+              "decision_signal"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 8,
+            "title": "Params",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "invalid_sentiment",
+                  "inactive_signal",
+                  "expired_signal",
+                  "incoherent_signal_source",
+                  "unknown_signal_action",
+                  "invalid_signal_confidence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source": {
+            "$ref": "#/components/schemas/WatchlistScoreFactorSource"
+          },
+          "status": {
+            "enum": [
+              "applied",
+              "ignored"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "source"
+        ],
+        "title": "WatchlistScoreFactor",
+        "type": "object"
+      },
+      "WatchlistScoreFactorSource": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "formula_version": {
+            "const": "watchlist_score_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "maxLength": 24,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "source_report_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Report Id"
+          }
+        },
+        "required": [
+          "formula_version"
+        ],
+        "title": "WatchlistScoreFactorSource",
+        "type": "object"
+      },
+      "WatchlistScoreItem": {
+        "additionalProperties": false,
+        "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "maximum": 365000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days"
+          },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "degraded_reasons": {
+            "items": {
+              "enum": [
+                "invalid_sentiment",
+                "inactive_signal",
+                "expired_signal",
+                "incoherent_signal_source",
+                "unknown_signal_action",
+                "invalid_signal_confidence"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Degraded Reasons",
+            "type": "array"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreFactor"
+            },
+            "maxItems": 2,
+            "title": "Factors",
+            "type": "array"
+          },
+          "freshness": {
+            "default": "none",
+            "enum": [
+              "none",
+              "unknown",
+              "today",
+              "recent",
+              "stale_week",
+              "stale"
+            ],
+            "title": "Freshness",
+            "type": "string"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "enum": [
+              "scored",
+              "unanalyzed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "status"
+        ],
+        "title": "WatchlistScoreItem",
+        "type": "object"
+      },
+      "WatchlistScoreQueryCount": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreQueryCount",
+        "type": "object"
+      },
+      "WatchlistScoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "sort": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "score_desc",
+              "score_asc"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "stock_codes": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Stock Codes",
+            "type": "array"
+          }
+        },
+        "title": "WatchlistScoreRequest",
+        "type": "object"
+      },
+      "WatchlistScoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "disclaimer_key": {
+            "const": "watchlist_score.disclaimer",
+            "title": "Disclaimer Key",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "watchlist_score_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreItem"
+            },
+            "maxItems": 200,
+            "title": "Items",
+            "type": "array"
+          },
+          "query_count": {
+            "$ref": "#/components/schemas/WatchlistScoreQueryCount"
+          },
+          "scoring_mode": {
+            "const": "aggregate_existing",
+            "title": "Scoring Mode",
+            "type": "string"
+          },
+          "sort": {
+            "enum": [
+              "manual",
+              "score_desc",
+              "score_asc"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "source_rows": {
+            "$ref": "#/components/schemas/WatchlistScoreSourceRows"
+          }
+        },
+        "required": [
+          "formula_version",
+          "scoring_mode",
+          "sort",
+          "items",
+          "query_count",
+          "source_rows",
+          "disclaimer_key"
+        ],
+        "title": "WatchlistScoreResponse",
+        "type": "object"
+      },
+      "WatchlistScoreSourceRows": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreSourceRows",
         "type": "object"
       }
     },
@@ -36532,9 +37174,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Run Scheduler Now Api V1 System Scheduler Run Now Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerRunNowResponse"
                 }
               }
             },
@@ -36556,9 +37196,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Scheduler Status Api V1 System Scheduler Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerStatusResponse"
                 }
               }
             },
@@ -36674,6 +37312,68 @@
         "summary": "LLM token usage summary",
         "tags": [
           "Usage"
+        ]
+      }
+    },
+    "/api/v1/watchlist/scores": {
+      "post": {
+        "description": "Batch-aggregate AI-oriented watchlist scores from the latest analysis history and same-report, unexpired decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Requests are limited to 200 unique market identities. Default sort=manual preserves the caller's order. No new LLM calls.",
+        "operationId": "scoreWatchlistSymbols",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Score aggregation failed"
+          }
+        },
+        "summary": "Score watchlist symbols from existing analysis",
+        "tags": [
+          "Watchlist"
         ]
       }
     },
