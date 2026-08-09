@@ -549,10 +549,11 @@ const SettingsModeToggleStory = () => {
 
 const SettingsAgentOnboardingHostStory = () => {
   const { t } = useUiLanguage();
+  const { text } = useStoryText();
   const [open, setOpen] = useState(true);
   return (
     <div className="space-y-3">
-      <Button variant="primary" onClick={() => setOpen(true)}>Open agent onboarding</Button>
+      <Button variant="primary" onClick={() => setOpen(true)}>{text.openAgentOnboarding}</Button>
       <SettingsAgentOnboardingHost
         open={open}
         onClose={() => setOpen(false)}
@@ -572,8 +573,8 @@ const SettingsOnboardingHostsStory = () => {
   const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(true);
   return (
     <div className="space-y-3">
-      <Button variant="secondary" onClick={() => setIsWizardOpen(true)}>Open first-run wizard</Button>
-      <Button variant="primary" onClick={() => setIsAgentOnboardingOpen(true)}>Open agent onboarding</Button>
+      <Button variant="secondary" onClick={() => setIsWizardOpen(true)}>{text.openFirstRunWizard}</Button>
+      <Button variant="primary" onClick={() => setIsAgentOnboardingOpen(true)}>{text.openAgentOnboarding}</Button>
       <SettingsOnboardingHosts
         isWizardOpen={isWizardOpen}
         isAgentOnboardingOpen={isAgentOnboardingOpen}
