@@ -21,8 +21,8 @@ bucket that is never mixed into the rule total. Offline CI never calls a
 live LLM; LLM dimensions are reported as ``skipped`` unless an explicit
 ``llm_judgements`` map is supplied by the caller.
 
-Default-off: when ``AGENT_EVAL_ENABLED`` is false, evaluation short-circuits
-with ``enabled=False`` and no scores (zero impact on production pipelines).
+The evaluator has no production runtime hook. Callers opt in by invoking the
+offline benchmark explicitly; an environment variable cannot activate it.
 
 Issues: #252 (metrics/benchmark), #141 (failure mining), #215 (harness
 slice only — no automatic prompt rewrite).
@@ -30,19 +30,47 @@ slice only — no automatic prompt rewrite).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
-import os
+import math
 import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from src.config_parts.parsers import parse_env_bool
+from pydantic import ValidationError
 
+from src.schemas.agent_output_eval import (
+    AgentEvalCase,
+    BoundaryHonestyRubric,
+    ConclusionConsistencyRubric,
+    EvidencePolarity,
+    FactualityRubric,
+    FinancialClaim,
+    FinancialFact,
+    LanguageFormatRubric,
+    LLMJudgement,
+    LLMRubric,
+    ComparisonPolicy,
+    ToolCallOutcome,
+    ToolUsageRubric,
+)
 
 logger = logging.getLogger(__name__)
+
+EVAL_SCHEMA_VERSION = "agent-output-eval-v1"
+EVALUATOR_VERSION = "agent-output-evaluator-v2"
+MANIFEST_VERSION = "agent_eval/1.0"
+MAX_CASES = 64
+MAX_CASE_FILE_BYTES = 262_144
+MAX_REPORT_CHARS = 500_000
+MAX_FAILURES = 512
+MAX_DETAIL_CHARS = 500
+MAX_JSON_DEPTH = 12
+MAX_JSON_NODES = 10_000
+MAX_STRING_CHARS = 20_000
 
 # ---------------------------------------------------------------------------
 # Dimension catalog (keep in sync with docs/agent-eval-dimensions*.md)
@@ -128,6 +156,7 @@ class EvalCheckResult:
     detail: str
     judge: str = JUDGE_RULE
     skipped: bool = False
+    status: str = "pass"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -189,35 +218,50 @@ class EvalSuiteReport:
     failure_clusters: List[FailureCluster] = field(default_factory=list)
     failure_list: List[Dict[str, Any]] = field(default_factory=list)
     message: str = ""
+    schema_version: str = EVAL_SCHEMA_VERSION
+    evaluator_version: str = EVALUATOR_VERSION
+    suite_hash: str = ""
+    case_count: int = 0
+    invalid_case_count: int = 0
+    truncated: bool = False
+    dropped_failure_count: int = 0
+    comparison: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "enabled": self.enabled,
+            "schema_version": self.schema_version,
+            "evaluator_version": self.evaluator_version,
+            "suite_hash": self.suite_hash,
+            "case_count": self.case_count,
+            "invalid_case_count": self.invalid_case_count,
+            "truncated": self.truncated,
+            "dropped_failure_count": self.dropped_failure_count,
             "message": self.message,
             "rule_score": self.rule_score,
             "llm_score": self.llm_score,
             "cases": [c.to_dict() for c in self.cases],
             "failure_clusters": [f.to_dict() for f in self.failure_clusters],
             "failure_list": list(self.failure_list),
+            "comparison": self.comparison,
         }
 
 
 # ---------------------------------------------------------------------------
-# Enable switch
+# Explicit invocation boundary
 # ---------------------------------------------------------------------------
 
 
 def is_agent_eval_enabled(config: Any = None) -> bool:
-    """Return whether agent output evaluation is enabled (default off).
+    """Compatibility helper: only an exact typed opt-in is accepted.
 
-    Resolution order:
-    1. ``config.agent_eval_enabled`` when a config object is provided
-    2. Environment variable ``AGENT_EVAL_ENABLED``
-    3. Default ``False``
+    The owned offline benchmark invokes the service directly. No environment
+    setting is advertised because there is no production runtime consumer.
     """
-    if config is not None and hasattr(config, "agent_eval_enabled"):
-        return bool(getattr(config, "agent_eval_enabled", False))
-    return parse_env_bool(os.getenv("AGENT_EVAL_ENABLED"), False)
+    return (
+        config is not None
+        and getattr(config, "agent_eval_enabled", None) is True
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -244,29 +288,50 @@ def load_eval_cases(
     if not cases_dir.is_dir():
         return []
 
-    ordered_ids: Optional[List[str]] = None
     manifest_path = root / "manifest.json"
-    if manifest_path.is_file():
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if isinstance(manifest, Mapping):
-            raw_ids = manifest.get("case_ids") or manifest.get("cases")
-            if isinstance(raw_ids, list):
-                ordered_ids = [str(x) for x in raw_ids]
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Eval manifest missing: {manifest_path}")
+    if manifest_path.stat().st_size > MAX_CASE_FILE_BYTES:
+        raise ValueError("Eval manifest exceeds size limit")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, Mapping):
+        raise ValueError("Eval manifest must be an object")
+    if manifest.get("version") != MANIFEST_VERSION:
+        raise ValueError(f"Unsupported eval manifest version: {manifest.get('version')!r}")
+    raw_ids = manifest.get("case_ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        raise ValueError("Eval manifest must declare a non-empty case_ids list")
+    ordered_ids = [str(value).strip() for value in raw_ids]
+    if any(not value for value in ordered_ids):
+        raise ValueError("Eval manifest contains a blank case id")
+    if len(ordered_ids) != len(set(ordered_ids)):
+        raise ValueError("Eval manifest contains duplicate case ids")
+    if len(ordered_ids) > MAX_CASES:
+        raise ValueError("Eval manifest exceeds the case-count limit")
 
     by_id: Dict[str, Dict[str, Any]] = {}
     for path in sorted(cases_dir.glob("*.json")):
+        if path.stat().st_size > MAX_CASE_FILE_BYTES:
+            raise ValueError(f"Eval case exceeds size limit: {path}")
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, Mapping):
             raise ValueError(f"Eval case must be an object: {path}")
         case_id = str(payload.get("id") or path.stem).strip()
         if not case_id:
             raise ValueError(f"Eval case missing id: {path}")
+        if case_id in by_id:
+            raise ValueError(f"Duplicate eval case id {case_id!r}: {path}")
         case = dict(payload)
         case["id"] = case_id
+        serialized = json.dumps(case, allow_nan=False, ensure_ascii=False, sort_keys=True)
+        if len(serialized) > MAX_CASE_FILE_BYTES:
+            raise ValueError(f"Eval case canonical payload exceeds size limit: {path}")
+        case["_artifact_hash"] = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
         by_id[case_id] = case
 
-    if ordered_ids is None:
-        return [by_id[k] for k in sorted(by_id)]
+    unlisted = sorted(set(by_id) - set(ordered_ids))
+    if unlisted:
+        raise ValueError(f"Eval cases are not listed in manifest: {unlisted}")
 
     ordered: List[Dict[str, Any]] = []
     for case_id in ordered_ids:
@@ -275,10 +340,6 @@ def load_eval_cases(
                 f"Manifest case_id {case_id!r} not found under {cases_dir}"
             )
         ordered.append(by_id[case_id])
-    # Include any on-disk cases not listed in the manifest (stable order).
-    for case_id in sorted(by_id):
-        if case_id not in ordered_ids:
-            ordered.append(by_id[case_id])
     return ordered
 
 
@@ -295,14 +356,17 @@ def _check(
     *,
     judge: str = JUDGE_RULE,
     skipped: bool = False,
+    invalid: bool = False,
 ) -> EvalCheckResult:
+    status = "invalid" if invalid else "skipped" if skipped else "pass" if passed else "fail"
     return EvalCheckResult(
         dimension=dimension,
         check_id=check_id,
         passed=bool(passed) or skipped,
-        detail=detail,
+        detail=_as_str(detail)[:MAX_DETAIL_CHARS],
         judge=judge,
         skipped=skipped,
+        status=status,
     )
 
 
@@ -310,6 +374,43 @@ def _as_str(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _validate_json_bounds(payload: Any) -> None:
+    nodes = 0
+
+    def _walk(node: Any, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > MAX_JSON_NODES:
+            raise ValueError(f"JSON payload exceeds {MAX_JSON_NODES} nodes")
+        if depth > MAX_JSON_DEPTH:
+            raise ValueError(f"JSON payload exceeds nesting depth {MAX_JSON_DEPTH}")
+        if isinstance(node, str) and len(node) > MAX_STRING_CHARS:
+            raise ValueError(f"JSON string exceeds {MAX_STRING_CHARS} characters")
+        if isinstance(node, Mapping):
+            for key, value in node.items():
+                if not isinstance(key, str):
+                    raise ValueError("JSON object keys must be strings")
+                _walk(value, depth + 1)
+        elif isinstance(node, list):
+            for value in node:
+                _walk(value, depth + 1)
+
+    _walk(payload, 0)
+
+
+def _validated_rubric(dimension: str, payload: Any) -> Dict[str, Any]:
+    models = {
+        "factuality": FactualityRubric,
+        "tool_usage": ToolUsageRubric,
+        "conclusion_consistency": ConclusionConsistencyRubric,
+        "boundary_honesty": BoundaryHonestyRubric,
+        "language_format": LanguageFormatRubric,
+        "explanation_clarity": LLMRubric,
+        "risk_framing_quality": LLMRubric,
+    }
+    return models[dimension].model_validate(payload).model_dump()
 
 
 def _collect_text(payload: Any) -> str:
@@ -438,6 +539,33 @@ def _score_bucket(
     return _ratio(total_pass, total), dim_scores
 
 
+def _suite_dimension_scores(
+    report: EvalSuiteReport,
+    judge: str,
+) -> Dict[str, float]:
+    buckets: Dict[str, List[EvalCheckResult]] = defaultdict(list)
+    for result in report.cases:
+        for check in result.checks:
+            if check.judge == judge and not check.skipped:
+                buckets[check.dimension].append(check)
+    return {
+        dimension: float(_ratio(sum(check.passed for check in checks), len(checks)) or 0.0)
+        for dimension, checks in buckets.items()
+    }
+
+
+def _suite_dimension_counts(
+    report: EvalSuiteReport,
+    judge: str,
+) -> Dict[str, int]:
+    counts: Dict[str, int] = defaultdict(int)
+    for result in report.cases:
+        for check in result.checks:
+            if check.judge == judge and not check.skipped:
+                counts[check.dimension] += 1
+    return dict(counts)
+
+
 # ---------------------------------------------------------------------------
 # Dimension scorers (deterministic rules)
 # ---------------------------------------------------------------------------
@@ -448,75 +576,67 @@ def score_factuality(
     output: Mapping[str, Any],
     rubric: Mapping[str, Any],
 ) -> List[EvalCheckResult]:
-    """Numeric claims in the output must appear in the input context."""
+    """Bind every numeric claim to one exact, typed source fact."""
     dimension = "factuality"
     checks: List[EvalCheckResult] = []
-    context_nums = _context_number_set(context)
-    claim_paths = rubric.get("claim_paths")
-    if isinstance(claim_paths, Sequence) and claim_paths:
-        claim_text_parts: List[str] = []
-        for path in claim_paths:
-            claim_text_parts.append(_as_str(_dig(output, str(path))))
-        claim_text = "\n".join(claim_text_parts)
-    else:
-        claim_text = _collect_text(output)
+    raw_facts = context.get("facts")
+    raw_claims = output.get("claims")
+    if not isinstance(raw_facts, list) or not raw_facts:
+        return [_check(dimension, "structured_facts_valid", False,
+                       "context.facts must be a non-empty list", invalid=True)]
+    if not isinstance(raw_claims, list) or not raw_claims:
+        return [_check(dimension, "structured_claims_valid", False,
+                       "agent_output.claims must be a non-empty list", invalid=True)]
 
-    claimed = _extract_numbers(claim_text)
-    # Optional allowlist of numbers that need not be grounded (e.g. step counts).
-    ignore = {
-        _normalize_number_token(str(x))
-        for x in (rubric.get("ignore_numbers") or [])
-        if x is not None
-    }
-    claimed = [n for n in claimed if n not in ignore]
+    facts: Dict[str, Mapping[str, Any]] = {}
+    for index, fact in enumerate(raw_facts):
+        try:
+            validated = FinancialFact.model_validate(fact).model_dump()
+            fact_id = validated["fact_id"]
+            if fact_id in facts:
+                raise ValueError("duplicate fact id")
+        except (ValidationError, ValueError):
+            checks.append(_check(dimension, "structured_facts_valid", False,
+                                 f"invalid or duplicate fact at index {index}", invalid=True))
+        else:
+            facts[fact_id] = validated
 
-    if not claimed:
-        # If rubric requires claims, empty is a failure; otherwise pass.
-        require_claims = bool(rubric.get("require_numeric_claims", False))
-        checks.append(
-            _check(
-                dimension,
-                "numeric_claims_present",
-                not require_claims,
-                "no numeric claims extracted from output"
-                if require_claims
-                else "no numeric claims to ground (vacuous pass)",
-            )
+    observed_claim_ids: set[str] = set()
+    for index, claim in enumerate(raw_claims):
+        try:
+            validated_claim = FinancialClaim.model_validate(claim).model_dump()
+            claim_id = validated_claim["claim_id"]
+            if claim_id in observed_claim_ids:
+                raise ValueError("duplicate claim id")
+        except (ValidationError, ValueError):
+            checks.append(_check(dimension, "structured_claims_valid", False,
+                                 f"invalid or duplicate claim at index {index}", invalid=True))
+            continue
+        observed_claim_ids.add(claim_id)
+        source_fact_id = validated_claim["source_fact_id"]
+        fact = facts.get(source_fact_id)
+        binding_ok = fact is not None and all(
+            validated_claim.get(key) == fact.get(key)
+            for key in ("field_path", "value", "unit", "as_of", "source_id")
         )
-        return checks
-
-    missing = [n for n in claimed if n not in context_nums]
-    checks.append(
-        _check(
+        checks.append(_check(
             dimension,
-            "numbers_grounded_in_context",
-            len(missing) == 0,
-            (
-                f"all {len(claimed)} claim number(s) grounded in context"
-                if not missing
-                else f"ungrounded numbers: {missing[:12]}"
-            ),
-        )
-    )
+            "claim_bound_to_source_fact",
+            binding_ok,
+            f"claim {claim_id!r} bound to fact {source_fact_id!r}"
+            if binding_ok else f"claim {claim_id!r} does not exactly match fact {source_fact_id!r}",
+        ))
 
-    # Explicit expected numbers from rubric (positive control).
-    expected = rubric.get("expected_numbers")
-    if isinstance(expected, Sequence) and expected:
-        expected_norm = [_normalize_number_token(str(x)) for x in expected]
-        output_nums = set(claimed)
-        missing_expected = [n for n in expected_norm if n not in output_nums]
-        checks.append(
-            _check(
-                dimension,
-                "expected_numbers_present",
-                len(missing_expected) == 0,
-                (
-                    "all expected numbers present in output"
-                    if not missing_expected
-                    else f"missing expected numbers: {missing_expected}"
-                ),
-            )
-        )
+    required_claim_ids = rubric.get("required_claim_ids", [])
+    if not isinstance(required_claim_ids, list) or any(
+        not isinstance(item, str) or not item.strip() for item in required_claim_ids
+    ):
+        checks.append(_check(dimension, "factuality_rubric_valid", False,
+                             "required_claim_ids must be a list of non-blank strings", invalid=True))
+    elif required_claim_ids:
+        missing = sorted(set(required_claim_ids) - observed_claim_ids)
+        checks.append(_check(dimension, "required_claims_present", not missing,
+                             "all required claims present" if not missing else f"missing claims: {missing}"))
     return checks
 
 
@@ -531,36 +651,65 @@ def score_tool_usage(
     tool_calls = output.get("tool_calls")
     if tool_calls is None:
         tool_calls = context.get("tool_calls")
-    names: List[str] = []
+    calls: List[Mapping[str, Any]] = []
+    invalid_calls = 0
     if isinstance(tool_calls, Sequence) and not isinstance(tool_calls, (str, bytes)):
         for entry in tool_calls:
-            if isinstance(entry, Mapping):
-                name = entry.get("tool") or entry.get("name")
-                if isinstance(name, str) and name.strip():
-                    names.append(name.strip())
-            elif isinstance(entry, str) and entry.strip():
-                names.append(entry.strip())
-    name_set = set(names)
+            try:
+                calls.append(ToolCallOutcome.model_validate(entry).model_dump())
+            except ValidationError:
+                invalid_calls += 1
+    elif tool_calls is not None:
+        invalid_calls += 1
 
-    required = [str(x) for x in (rubric.get("required_tools") or []) if x]
-    forbidden = [str(x) for x in (rubric.get("forbidden_tools") or []) if x]
+    if invalid_calls:
+        checks.append(_check(
+            dimension, "tool_call_records_valid", False,
+            f"invalid tool call records: {invalid_calls}", invalid=True,
+        ))
+
+    names = [_as_str(entry.get("tool") or entry.get("name")) for entry in calls]
+    successful_names = {
+        name for name, entry in zip(names, calls)
+        if all(entry.get(key) is True for key in (
+            "attempted", "completed", "succeeded", "valid_result", "authorized"
+        ))
+    }
+    attempted_names = {
+        name for name, entry in zip(names, calls) if entry.get("attempted") is True
+    }
+
+    raw_required = rubric.get("required_tools", [])
+    raw_forbidden = rubric.get("forbidden_tools", [])
+    if any(
+        not isinstance(values, list)
+        or any(not isinstance(item, str) or not item.strip() for item in values)
+        for values in (raw_required, raw_forbidden)
+    ):
+        return [_check(
+            dimension, "tool_rubric_valid", False,
+            "required_tools and forbidden_tools must be lists of non-blank strings",
+            invalid=True,
+        )]
+    required = list(raw_required)
+    forbidden = list(raw_forbidden)
 
     if required:
-        missing = [t for t in required if t not in name_set]
+        missing = [t for t in required if t not in successful_names]
         checks.append(
             _check(
                 dimension,
                 "required_tools_called",
                 len(missing) == 0,
                 (
-                    f"required tools present: {required}"
+                    f"required tools completed with valid authorized results: {required}"
                     if not missing
                     else f"missing required tools: {missing}; observed={names}"
                 ),
             )
         )
     if forbidden:
-        hit = [t for t in forbidden if t in name_set]
+        hit = [t for t in forbidden if t in attempted_names]
         checks.append(
             _check(
                 dimension,
@@ -578,8 +727,9 @@ def score_tool_usage(
             _check(
                 dimension,
                 "tool_rubric_defined",
-                True,
-                "no tool constraints in rubric (vacuous pass)",
+                False,
+                "tool rubric must define required_tools or forbidden_tools",
+                invalid=True,
             )
         )
     return checks
@@ -603,6 +753,19 @@ def score_conclusion_consistency(
     evidence = output.get("evidence")
     if evidence is None:
         evidence = context.get("evidence")
+    if evidence is not None:
+        if not isinstance(evidence, list):
+            return [_check(dimension, "evidence_schema_valid", False,
+                           "evidence must be a list", invalid=True)]
+        normalized_evidence: List[Dict[str, Any]] = []
+        try:
+            for item in evidence:
+                normalized_evidence.append(EvidencePolarity.model_validate(item).model_dump())
+        except ValidationError:
+            return [_check(dimension, "evidence_schema_valid", False,
+                           "evidence entries require exactly one bounded polarity label",
+                           invalid=True)]
+        evidence = normalized_evidence
     polarities = _evidence_polarities(evidence)
 
     if rubric.get("expected_signal"):
@@ -660,8 +823,9 @@ def score_conclusion_consistency(
             _check(
                 dimension,
                 "evidence_available",
-                True,
-                "no evidence polarities and no expected_signal (vacuous pass)",
+                False,
+                "rubric must define expected_signal or provide structured evidence",
+                invalid=True,
             )
         )
     return checks
@@ -859,8 +1023,9 @@ def score_language_format(
             _check(
                 dimension,
                 "format_rubric_defined",
-                True,
-                "no format constraints in rubric (vacuous pass)",
+                False,
+                "format rubric must define at least one constraint",
+                invalid=True,
             )
         )
     return checks
@@ -883,18 +1048,22 @@ def score_llm_dimension(
             )
         ]
     raw = llm_judgements[dimension]
-    if isinstance(raw, Mapping):
-        passed = bool(raw.get("passed", raw.get("pass", False)))
-        detail = _as_str(raw.get("detail") or raw.get("reason") or "llm judgement")
-        score = raw.get("score")
-        if score is not None and "detail" not in raw:
-            detail = f"score={score}; {detail}"
-    elif isinstance(raw, bool):
-        passed = raw
-        detail = "llm judgement bool"
-    else:
-        passed = False
-        detail = f"unusable llm judgement payload type={type(raw).__name__}"
+    try:
+        judgement = LLMJudgement.model_validate(raw)
+    except ValidationError:
+        return [_check(
+            dimension,
+            "llm_judge_payload_valid",
+            False,
+            "LLM judgement requires exact boolean passed, finite score in [0,1], and provenance",
+            judge=JUDGE_LLM,
+            invalid=True,
+        )]
+    passed = judgement.passed
+    detail = (
+        f"score={judgement.score}; judge_id={judgement.judge_id}; model={judgement.model}; "
+        f"rubric={judgement.rubric_version}; as_of={judgement.as_of}; {judgement.detail}"
+    )
     return [
         _check(
             dimension,
@@ -946,34 +1115,81 @@ class AgentEvalService:
         llm_judgements: Optional[Mapping[str, Any]] = None,
         force: bool = False,
     ) -> CaseEvalResult:
-        """Score one case. When disabled (and not ``force``), returns empty scores."""
-        case_id = str(case.get("id") or case.get("case_id") or "unknown")
-        if not force and not self.is_enabled():
+        """Score one explicitly supplied case; ``force`` is compatibility-only."""
+        del force
+        case_id = _as_str(case.get("id") or case.get("case_id"))
+        schema_errors: List[str] = []
+        canonical_case = dict(case)
+        canonical_case.pop("_artifact_hash", None)
+        if agent_output is not None:
+            canonical_case["agent_output"] = agent_output
+        try:
+            _validate_json_bounds(canonical_case)
+            canonical = json.dumps(canonical_case, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            schema_errors.append(f"case is not strict-JSON serializable: {exc}")
+            canonical = ""
+        if len(canonical) > MAX_CASE_FILE_BYTES:
+            schema_errors.append("case exceeds canonical payload limit")
+
+        dimensions: List[str] = []
+        context: Mapping[str, Any] = {}
+        output: Mapping[str, Any] = {}
+        evaluation: Dict[str, Dict[str, Any]] = {}
+        try:
+            validated_case = AgentEvalCase.model_validate(canonical_case)
+            case_id = validated_case.id
+            dimensions = list(validated_case.dimensions)
+            context = validated_case.context
+            output = validated_case.agent_output
+            evaluation = {
+                dimension: _validated_rubric(
+                    dimension, validated_case.evaluation[dimension]
+                )
+                for dimension in dimensions
+            }
+        except (ValidationError, ValueError, KeyError) as exc:
+            schema_errors.append(f"strict case/rubric validation failed: {exc}")
+            case_id = case_id or "invalid-case"
+
+        artifact_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        rubric_payload = case.get("evaluation")
+        try:
+            rubric_canonical = json.dumps(
+                rubric_payload, ensure_ascii=False, sort_keys=True, allow_nan=False
+            )
+        except (TypeError, ValueError):
+            rubric_canonical = ""
+        metadata = {
+            "enabled": True,
+            "title": case.get("title"),
+            "tags": case.get("tags") or [],
+            "artifact_hash": artifact_hash,
+            "evaluator_version": EVALUATOR_VERSION,
+            "rubric_hash": hashlib.sha256(rubric_canonical.encode("utf-8")).hexdigest(),
+            "agent_version": case.get("agent_version"),
+            "config_version": case.get("config_version"),
+        }
+        if schema_errors:
+            invalid_check = _check(
+                "case_schema", "case_schema_valid", False, "; ".join(schema_errors), invalid=True
+            )
             return CaseEvalResult(
                 case_id=case_id,
-                dimensions=[],
-                metadata={"enabled": False, "message": "AGENT_EVAL_ENABLED is off"},
+                dimensions=list(dimensions),
+                checks=[invalid_check],
+                rule_score=0.0,
+                dimension_rule_scores={"case_schema": 0.0},
+                metadata={**metadata, "invalid": True},
             )
 
-        context = case.get("context") if isinstance(case.get("context"), Mapping) else {}
-        output = (
-            agent_output
-            if isinstance(agent_output, Mapping)
-            else case.get("agent_output")
-        )
-        if not isinstance(output, Mapping):
-            output = {}
-
-        evaluation = case.get("evaluation") if isinstance(case.get("evaluation"), Mapping) else {}
-        dimensions = case.get("dimensions")
-        if not isinstance(dimensions, Sequence) or not dimensions:
-            dimensions = list(RULE_DIMENSIONS)
-        else:
-            dimensions = [str(d) for d in dimensions]
+        assert isinstance(context, Mapping)
+        assert isinstance(output, Mapping)
+        assert isinstance(evaluation, Mapping)
 
         checks: List[EvalCheckResult] = []
         for dim in dimensions:
-            rubric = evaluation.get(dim) if isinstance(evaluation.get(dim), Mapping) else {}
+            rubric = evaluation[dim]
             if dim == "factuality":
                 checks.extend(score_factuality(context, output, rubric))
             elif dim == "tool_usage":
@@ -1008,9 +1224,8 @@ class AgentEvalService:
             dimension_rule_scores=dim_rule,
             dimension_llm_scores=dim_llm,
             metadata={
-                "enabled": True,
-                "title": case.get("title"),
-                "tags": case.get("tags") or [],
+                **metadata,
+                "invalid": any(check.status == "invalid" for check in checks),
             },
         )
 
@@ -1022,13 +1237,15 @@ class AgentEvalService:
         force: bool = False,
     ) -> EvalSuiteReport:
         """Evaluate a suite of cases and attach failure-mining clusters."""
-        if not force and not self.is_enabled():
-            return EvalSuiteReport(
-                enabled=False,
-                message="AGENT_EVAL_ENABLED is off; suite not executed",
-            )
-
+        del force
         loaded = list(cases) if cases is not None else load_eval_cases(self.fixture_root)
+        if not loaded:
+            raise ValueError("agent evaluation suite must contain at least one case")
+        if len(loaded) > MAX_CASES:
+            raise ValueError(f"agent evaluation suite exceeds {MAX_CASES} cases")
+        case_ids = [_as_str(case.get("id") or case.get("case_id")) for case in loaded]
+        if len(case_ids) != len(set(case_ids)):
+            raise ValueError("agent evaluation suite contains duplicate case ids")
         results: List[CaseEvalResult] = []
         judgements = llm_judgements_by_case or {}
         for case in loaded:
@@ -1037,7 +1254,6 @@ class AgentEvalService:
                 self.evaluate_case(
                     case,
                     llm_judgements=judgements.get(case_id),
-                    force=True,
                 )
             )
 
@@ -1058,8 +1274,11 @@ class AgentEvalService:
 
         clusters = self.mine_failures(results)
         failure_list = self.build_failure_list(results)
-
-        return EvalSuiteReport(
+        suite_hash = hashlib.sha256("\n".join(
+            _as_str(result.metadata.get("artifact_hash")) for result in results
+        ).encode("utf-8")).hexdigest()
+        dropped = max(0, sum(len(result.failures) for result in results) - len(failure_list))
+        report = EvalSuiteReport(
             enabled=True,
             cases=results,
             rule_score=rule_score,
@@ -1067,7 +1286,22 @@ class AgentEvalService:
             failure_clusters=clusters,
             failure_list=failure_list,
             message="ok",
+            suite_hash=suite_hash,
+            case_count=len(results),
+            invalid_case_count=sum(bool(result.metadata.get("invalid")) for result in results),
+            dropped_failure_count=dropped,
+            truncated=dropped > 0,
         )
+        serialized = json.dumps(report.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)
+        if len(serialized) > MAX_REPORT_CHARS:
+            report.failure_list = []
+            report.failure_clusters = []
+            report.truncated = True
+            report.dropped_failure_count = sum(len(result.failures) for result in results)
+            serialized = json.dumps(report.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)
+            if len(serialized) > MAX_REPORT_CHARS:
+                raise ValueError("agent evaluation report exceeds bounded output limit")
+        return report
 
     def mine_failures(
         self,
@@ -1093,13 +1327,13 @@ class AgentEvalService:
                 if result.case_id not in cluster.case_ids:
                     cluster.case_ids.append(result.case_id)
                 cluster.count += 1
-                if len(cluster.sample_details) < max_samples:
+                if len(cluster.sample_details) < min(max_samples, 5):
                     cluster.sample_details.append(failure.detail)
         clusters = sorted(
             bucket.values(),
             key=lambda c: (-c.count, c.dimension, c.failure_mode),
         )
-        return clusters
+        return clusters[:MAX_FAILURES]
 
     def build_failure_list(
         self,
@@ -1119,7 +1353,70 @@ class AgentEvalService:
                     }
                 )
         rows.sort(key=lambda r: (r["dimension"], r["failure_mode"], r["case_id"]))
-        return rows
+        return rows[:MAX_FAILURES]
+
+    @staticmethod
+    def compare_reports(
+        baseline: EvalSuiteReport,
+        candidate: EvalSuiteReport,
+        *,
+        baseline_agent_version: str,
+        candidate_agent_version: str,
+        baseline_config_version: str,
+        candidate_config_version: str,
+        regression_threshold: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Compare exact output-quality suites without mixing judge buckets."""
+        if not math.isfinite(regression_threshold) or regression_threshold < 0:
+            raise ValueError("regression_threshold must be finite and non-negative")
+        if baseline.rule_score is None or candidate.rule_score is None:
+            raise ValueError("baseline and candidate must both have a rule score")
+        baseline_ids = {result.case_id for result in baseline.cases}
+        candidate_ids = {result.case_id for result in candidate.cases}
+        if baseline_ids != candidate_ids:
+            raise ValueError("baseline and candidate case ids must match exactly")
+        baseline_dims = _suite_dimension_scores(baseline, JUDGE_RULE)
+        candidate_dims = _suite_dimension_scores(candidate, JUDGE_RULE)
+        dimension_deltas = {
+            dim: round(candidate_dims.get(dim, 0.0) - baseline_dims.get(dim, 0.0), 4)
+            for dim in sorted(set(baseline_dims) | set(candidate_dims))
+        }
+        rule_delta = round(candidate.rule_score - baseline.rule_score, 4)
+        llm_delta = None
+        if baseline.llm_score is not None and candidate.llm_score is not None:
+            llm_delta = round(candidate.llm_score - baseline.llm_score, 4)
+        regressed = rule_delta < -regression_threshold or any(
+            delta < -regression_threshold for delta in dimension_deltas.values()
+        )
+        policy = ComparisonPolicy(regression_threshold=regression_threshold)
+        baseline_counts = _suite_dimension_counts(baseline, JUDGE_RULE)
+        candidate_counts = _suite_dimension_counts(candidate, JUDGE_RULE)
+        return {
+            "schema_version": EVAL_SCHEMA_VERSION,
+            "baseline_suite_hash": baseline.suite_hash,
+            "candidate_suite_hash": candidate.suite_hash,
+            "baseline_case_count": baseline.case_count,
+            "candidate_case_count": candidate.case_count,
+            "baseline_agent_version": baseline_agent_version,
+            "candidate_agent_version": candidate_agent_version,
+            "baseline_config_version": baseline_config_version,
+            "candidate_config_version": candidate_config_version,
+            "rule_delta": rule_delta,
+            "llm_delta": llm_delta,
+            "dimension_rule_deltas": dimension_deltas,
+            "baseline_dimension_rule_samples": baseline_counts,
+            "candidate_dimension_rule_samples": candidate_counts,
+            "baseline_rule_check_count": sum(baseline_counts.values()),
+            "candidate_rule_check_count": sum(candidate_counts.values()),
+            "regression_threshold": regression_threshold,
+            "comparison_policy": policy.model_dump(),
+            "confidence": {
+                "method": "deterministic_frozen_panel_no_interval",
+                "interval": None,
+                "reason": "The complete frozen panel is compared; no population inference is claimed.",
+            },
+            "regressed": regressed,
+        }
 
 
 def format_failure_report(report: EvalSuiteReport) -> str:

@@ -9,7 +9,7 @@
   "agent_output": {
     "signal": "buy",
     "tool_calls": [
-      {"tool": "web_search", "ok": true}
+      {"tool": "web_search", "attempted": true, "completed": true, "succeeded": true, "valid_result": true, "authorized": true}
     ]
   },
   "evaluation": {

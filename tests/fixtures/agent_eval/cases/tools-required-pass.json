@@ -9,8 +9,8 @@
   "agent_output": {
     "signal": "hold",
     "tool_calls": [
-      {"tool": "get_realtime_quote", "ok": true},
-      {"tool": "analyze_trend", "ok": true}
+      {"tool": "get_realtime_quote", "attempted": true, "completed": true, "succeeded": true, "valid_result": true, "authorized": true},
+      {"tool": "analyze_trend", "attempted": true, "completed": true, "succeeded": true, "valid_result": true, "authorized": true}
     ]
   },
   "evaluation": {

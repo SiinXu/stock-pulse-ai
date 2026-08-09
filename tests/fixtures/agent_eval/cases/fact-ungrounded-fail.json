@@ -5,16 +5,20 @@
   "dimensions": ["factuality"],
   "context": {
     "stock_code": "600519",
-    "quote": {"price": 1680.5, "change_pct": -1.2}
+    "facts": [
+      {"fact_id": "quote-price", "field_path": "quote.price", "value": 1680.5, "unit": "CNY", "as_of": "2026-08-08", "source_id": "frozen-quote"}
+    ]
   },
   "agent_output": {
     "signal": "buy",
     "summary": "Target price 9999.0 with upside to 12000 based on secret model.",
-    "claims": {"target": 9999.0, "stretch": 12000}
+    "claims": [
+      {"claim_id": "fabricated-target", "source_fact_id": "quote-price", "field_path": "quote.price", "value": 9999.0, "unit": "CNY", "as_of": "2026-08-08", "source_id": "frozen-quote"}
+    ]
   },
   "evaluation": {
     "factuality": {
-      "require_numeric_claims": true
+      "required_claim_ids": ["fabricated-target"]
     }
   }
 }
