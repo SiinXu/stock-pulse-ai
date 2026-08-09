@@ -4968,4 +4968,9 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "Comparación de componentes de huella de configuración",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "Sin componentes de configuración",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "s/d",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryDescription": "Este directorio solo muestra la configuración guardada de proveedores de mercado. No informa del enrutamiento activo, la disponibilidad, el estado, los resultados de respaldo ni la vigencia de la caché. Las credenciales de búsqueda y la importación de carteras de Futu no se gestionan aquí.",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryFilterAll": "Todas las configuraciones",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryNoMatches": "No hay configuraciones de proveedores coincidentes",
+  "i18n.uiText.UI_TEXT.settings.dataDirectorySearchPlaceholder": "Filtrar por nombre o estado de configuración",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryTitle": "Configuración de proveedores",
 } as const;

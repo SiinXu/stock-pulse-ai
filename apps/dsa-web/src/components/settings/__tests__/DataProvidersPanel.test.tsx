@@ -4,12 +4,17 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { SystemConfigItem } from '../../../types/systemConfig';
 import { DataProvidersPanel } from '../DataProvidersPanel';
+import { isDataProviderKey } from '../dataProviders';
 
-function buildItem(key: string, value: string): SystemConfigItem {
+function buildItem(
+  key: string,
+  value: string,
+  rawValueExists = value !== '',
+): SystemConfigItem {
   return {
     key,
     value,
-    rawValueExists: value !== '',
+    rawValueExists,
     isMasked: false,
     schema: {
       key,
@@ -41,18 +46,17 @@ function renderPanel(items: SystemConfigItem[], configuredOverrides?: Record<str
 }
 
 describe('DataProvidersPanel', () => {
-  it('groups provider cards into quote and search sections with configured badges', () => {
+  it('shows only market-provider configuration owners with truthful scope copy', () => {
     renderPanel(
       [
         buildItem('TUSHARE_TOKEN', ''),
         buildItem('TICKFLOW_API_KEY', 'tf-key'),
-        buildItem('TICKFLOW_PRIORITY', 'high'),
-        buildItem('TAVILY_API_KEYS', ''),
+        buildItem('TAVILY_API_KEYS', 'search-key'),
+        buildItem('FUTU_OPEND_HOST', '127.0.0.1', false),
       ],
     );
 
-    expect(screen.getByRole('heading', { name: '行情源' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '搜索源' })).toBeInTheDocument();
+    expect(screen.getByText(/只显示已保存的行情提供方设置/)).toBeInTheDocument();
 
     const tushareCard = screen.getByRole('button', { name: /Tushare/ });
     expect(within(tushareCard).getByText('未配置')).toBeInTheDocument();
@@ -60,20 +64,20 @@ describe('DataProvidersPanel', () => {
     const tickflowCard = screen.getByRole('button', { name: /TickFlow/ });
     expect(within(tickflowCard).getByText('已配置')).toBeInTheDocument();
 
-    // Providers without any matching items are not rendered.
-    expect(screen.queryByRole('button', { name: /Pytdx/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Brave/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tavily/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Futu/ })).not.toBeInTheDocument();
+    expect(isDataProviderKey('TAVILY_API_KEYS')).toBe(false);
+    expect(isDataProviderKey('FUTU_OPEND_HOST')).toBe(false);
   });
 
-  it('does not mark a provider configured from non-credential defaults', () => {
+  it('does not treat inherited endpoint defaults as explicit configuration', () => {
     renderPanel([
-      buildItem('TICKFLOW_API_KEY', ''),
-      buildItem('TICKFLOW_PRIORITY', 'high'),
-      buildItem('TICKFLOW_KLINE_ADJUST', 'qfq'),
+      buildItem('PYTDX_HOST', '127.0.0.1', false),
+      buildItem('PYTDX_PORT', '7709', false),
     ]);
 
-    const tickflowCard = screen.getByRole('button', { name: /TickFlow/ });
-    expect(within(tickflowCard).getByText('未配置')).toBeInTheDocument();
+    const pytdxCard = screen.getByRole('button', { name: /Pytdx/ });
+    expect(within(pytdxCard).getByText('未配置')).toBeInTheDocument();
   });
 
   it('honors configured overrides for externally managed providers', () => {
@@ -83,17 +87,32 @@ describe('DataProvidersPanel', () => {
     expect(within(alphasiftCard).getByText('已配置')).toBeInTheDocument();
   });
 
-  it('keeps the provider directory inline and mounts fields only in the shared dialog', () => {
+  it('filters by provider name and explicit configuration state', () => {
     renderPanel([
       buildItem('TUSHARE_TOKEN', ''),
-      buildItem('TAVILY_API_KEYS', 'key-1'),
+      buildItem('TICKFLOW_API_KEY', 'tf-key'),
+      buildItem('PYTDX_HOST', '127.0.0.1', false),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: '已配置' }));
+    expect(screen.getByRole('button', { name: /TickFlow/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tushare/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '全部配置' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: '按名称或配置状态筛选' }), {
+      target: { value: 'pytdx' },
+    });
+    expect(screen.getByRole('button', { name: /Pytdx/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /TickFlow/ })).not.toBeInTheDocument();
+  });
+
+  it('mounts the real shared SettingsField only inside the modal and returns focus', () => {
+    renderPanel([
+      buildItem('TUSHARE_TOKEN', ''),
     ]);
 
     const trigger = screen.getByRole('button', { name: /Tushare/ });
-    expect(screen.getByRole('heading', { name: '行情源' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '搜索源' })).toBeInTheDocument();
     expect(within(trigger).getByText('未配置')).toBeInTheDocument();
-    expect(within(screen.getByRole('button', { name: /Tavily/ })).getByText('已配置')).toBeInTheDocument();
     expect(document.querySelector('#setting-TUSHARE_TOKEN')).toBeNull();
 
     trigger.focus();
@@ -105,7 +124,6 @@ describe('DataProvidersPanel', () => {
     const providerField = dialog.querySelector('#setting-TUSHARE_TOKEN');
     expect(providerField).not.toBeNull();
     expect(providerField?.closest('[role="dialog"]')).toBe(dialog);
-    expect(dialog.querySelector('#setting-TAVILY_API_KEYS')).toBeNull();
 
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
