@@ -39,7 +39,7 @@ def _insert_history(
     action: str = "buy",
     sentiment_score: Any = 75,
     model_used: str = "gpt-test",
-    report_language: str = "zh",
+    report_language: Optional[str] = "zh",
     operation_advice: str = "买入",
     trend_prediction: str = "上行",
     analysis_summary: str = "summary-a",
@@ -49,12 +49,13 @@ def _insert_history(
 ) -> int:
     raw = {
         "model_used": model_used,
-        "report_language": report_language,
         "action": action,
         "operation_advice": operation_advice,
         "analysis_summary": analysis_summary,
         "trend_prediction": trend_prediction,
     }
+    if report_language is not None:
+        raw["report_language"] = report_language
     if extra_raw:
         raw.update(extra_raw)
 
@@ -318,6 +319,28 @@ class ReportVersionCompareServiceTests(unittest.TestCase):
         self.assertFalse(result["base_run"]["config_complete"])
         self.assertEqual(result["config_diff"]["comparison_status"], "unknown")
         self.assertFalse(result["config_diff"]["identical"])
+
+    def test_missing_or_invalid_persisted_language_keeps_config_unknown(self) -> None:
+        service = ReportVersionCompareService(self.db)
+
+        for index, persisted_language in enumerate((None, "not-a-language"), start=1):
+            with self.subTest(persisted_language=persisted_language):
+                run_id = _insert_history(
+                    self.db,
+                    query_id=f"language-provenance-{index}",
+                    report_language=persisted_language,
+                )
+
+                result = service.list_runs("600519", limit=20)
+                item = next(
+                    run for run in result["items"] if run["run_id"] == str(run_id)
+                )
+
+                self.assertEqual(item["report_language"], "zh")
+                self.assertEqual(item["config_components"]["report_language"], "")
+                self.assertFalse(item["config_complete"])
+                self.assertIn("report_language", item["config_missing_keys"])
+                self.assertIsNone(item["config_fingerprint"])
 
 
 if __name__ == "__main__":

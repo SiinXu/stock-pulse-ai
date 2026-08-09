@@ -235,7 +235,7 @@ class ReportVersionCompareService:
             context_snapshot=context_snapshot,
             report_type=getattr(record, "report_type", None),
             model_used=model_used,
-            report_language=report_language,
+            report_language=config_report_language,
         )
         missing_config_keys = [
             key for key in _CONFIG_REQUIRED_KEYS if not config_components.get(key)
@@ -302,9 +302,9 @@ class ReportVersionCompareService:
             routing = {}
 
         return {
-            "model_used": pick(model_used, raw_result.get("model_used")),
+            "model_used": pick(model_used),
             "report_type": pick(report_type, raw_result.get("report_type")),
-            "report_language": pick(report_language, raw_result.get("report_language")),
+            "report_language": pick(report_language),
             "provider_route": pick(
                 raw_result.get("provider_route"),
                 raw_result.get("model_provider"),

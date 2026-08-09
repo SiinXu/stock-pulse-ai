@@ -47,16 +47,18 @@ def _insert_history(
     action: str = "buy",
     sentiment_score: Any = 70,
     model_used: str = "model-a",
+    report_language: Optional[str] = "zh",
     created_at: Optional[datetime] = None,
 ) -> int:
     raw = {
         "model_used": model_used,
-        "report_language": "zh",
         "action": action,
         "operation_advice": action,
         "analysis_summary": f"summary-{query_id}",
         "trend_prediction": "flat",
     }
+    if report_language is not None:
+        raw["report_language"] = report_language
 
     def _write(session):
         row = AnalysisHistory(
@@ -258,6 +260,37 @@ class ReportVersionCompareApiTests(unittest.TestCase):
             if item["run_id"] in {str(run_id) for run_id in run_ids}
         }
         self.assertTrue(all(score is None for score in scores.values()))
+
+    def test_list_runs_does_not_fingerprint_defaulted_or_invalid_language(self) -> None:
+        run_ids = {
+            _insert_history(
+                self.db,
+                query_id="missing-language",
+                report_language=None,
+            ),
+            _insert_history(
+                self.db,
+                query_id="invalid-language",
+                report_language="not-a-language",
+            ),
+        }
+
+        resp = self.client.get(
+            "/api/v1/report-version-compare/runs",
+            params={"stock_code": "600519"},
+        )
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        items = [
+            item for item in resp.json()["items"]
+            if item["run_id"] in {str(run_id) for run_id in run_ids}
+        ]
+        self.assertEqual(len(items), 2)
+        for item in items:
+            self.assertEqual(item["report_language"], "zh")
+            self.assertFalse(item["config_complete"])
+            self.assertIn("report_language", item["config_missing_keys"])
+            self.assertIsNone(item["config_fingerprint"])
 
     def test_compare_distinguishes_rows_with_shared_query_id(self) -> None:
         shared_query_id = "shared-query"
