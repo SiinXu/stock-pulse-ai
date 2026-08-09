@@ -328,6 +328,19 @@ def test_money_flow_to_context_preserves_outcome_and_calibration():
     assert "calibration_note" in context["snapshot"]
 
 
+def test_outcome_cannot_mark_uncalibrated_or_stale_evidence_available():
+    snapshot = _snapshot()
+    common = dict(
+        code="600519", market="cn", requested_days=5,
+        fetched_at=datetime.now(timezone.utc).isoformat(), snapshot=snapshot,
+        provider_date=snapshot.date,
+    )
+    with pytest.raises(ValueError, match="calibrated"):
+        MoneyFlowOutcome(status=MoneyFlowStatus.AVAILABLE, age_days=0, **common)
+    with pytest.raises(ValueError, match="zero session age"):
+        MoneyFlowOutcome(status=MoneyFlowStatus.PARTIAL, age_days=1, **common)
+
+
 def test_service_closes_a_standalone_manager(monkeypatch):
     outcome = MoneyFlowOutcome(
         status=MoneyFlowStatus.PARTIAL, code="600519", market="cn",

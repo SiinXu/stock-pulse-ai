@@ -237,6 +237,10 @@ class MoneyFlowOutcome:
     def __post_init__(self) -> None:
         from data_provider.symbol_normalization import normalize_stock_code
 
+        try:
+            self.status = MoneyFlowStatus(self.status)
+        except (TypeError, ValueError):
+            raise ValueError("money-flow outcome status is invalid") from None
         if type(self.code) is not str or not self.code.strip():
             raise ValueError("money-flow outcome code is required")
         self.code = normalize_stock_code(self.code)
@@ -286,8 +290,23 @@ class MoneyFlowOutcome:
                 raise ValueError("money-flow outcome and snapshot windows must match")
             if self.provider_date is not None and self.provider_date != self.snapshot.date:
                 raise ValueError("money-flow outcome provider date must match the snapshot")
+            if self.provider_date is None or self.age_days is None:
+                raise ValueError("data-bearing money-flow outcome requires provider date and session age")
+        elif self.error_code is None:
+            raise ValueError("non-data money-flow outcome requires an error code")
         if self.status == MoneyFlowStatus.STALE and (self.age_days is None or self.age_days < 1):
             raise ValueError("stale money-flow outcome requires positive session age")
+        if self.status in {MoneyFlowStatus.AVAILABLE, MoneyFlowStatus.PARTIAL} and self.age_days != 0:
+            raise ValueError("current money-flow outcome requires zero session age")
+        if self.status == MoneyFlowStatus.AVAILABLE and self.snapshot is not None:
+            if (
+                self.snapshot.completeness != "complete"
+                or self.snapshot.unit == "unknown"
+                or self.snapshot.amount_scale == "unknown"
+            ):
+                raise ValueError("available money-flow outcome requires complete calibrated evidence")
+        if self.status == MoneyFlowStatus.FALLBACK and not self.fallback_from:
+            raise ValueError("fallback money-flow outcome requires fallback provenance")
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
