@@ -2605,7 +2605,14 @@ class DataFetcherManager:
                     "status": "fetch_failed",
                     "error_code": "money_flow_incompatible_signature",
                 })
-                logger.warning("[money_flow] incompatible provider signature: %s (%s)", fetcher_name, exc)
+                log_safe_exception(
+                    logger,
+                    "Money flow provider has an incompatible signature",
+                    exc,
+                    error_code="money_flow_incompatible_signature",
+                    level=logging.WARNING,
+                    context={"provider": fetcher_name},
+                )
                 continue
 
             attempt_start = time.time()
