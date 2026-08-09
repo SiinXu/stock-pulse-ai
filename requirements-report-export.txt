@@ -11,8 +11,11 @@
 # - No headless browser required.
 # - Chinese PDF still needs a local .ttf/.otf font (REPORT_EXPORT_PDF_FONT_PATH).
 #
-# This optional set is intentionally outside the universal constraints lock
-# surface so default CI and parallel dependency work stay unaffected. Pin the
-# package explicitly when you need a reproducible operator environment.
+# Versions are exact so an operator gets the same fpdf2/fontTools behavior on
+# every supported host. The base application's transitive packages continue to
+# obey constraints.txt and build-constraints.txt.
 
-fpdf2>=2.7.0,<3
+-c constraints.txt
+fpdf2==2.8.3
+fonttools==4.63.0
+markdown-it-py==4.2.0

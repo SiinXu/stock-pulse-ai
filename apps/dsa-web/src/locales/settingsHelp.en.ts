@@ -755,6 +755,24 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: 'Report Export PDF Font Path',
+    summary: 'Selects the single-face TTF/OTF used by optional PDF report export.',
+    usage:
+      'Enter an absolute path only when the server has a font that covers every visible report glyph. Leave empty to probe the documented system candidates.',
+    valueNotes: [
+      'An explicit invalid path fails closed and never falls back to another system font.',
+      'Capability checks validate representative language glyphs; each export validates the exact report glyph set again.',
+    ],
+    impact: ['Affects optional PDF export only; lossless Markdown export remains available.'],
+    notes: [
+      'TTF/OTF single faces are supported. TTC collection indices are not guessed.',
+      'Absolute paths and raw font-parser errors are omitted from public capability and error responses.',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
+    ],
+  },
   'settings.system.USE_PROXY': {
     title: 'Enable Local Proxy',
     summary:

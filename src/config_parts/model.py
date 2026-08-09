@@ -269,6 +269,8 @@ class Config:
     # Report type: simple (concise) or full (complete)
     report_type: str = "simple"
     report_language: str = "zh"
+    # Optional single-face TTF/OTF used by the bounded report PDF exporter.
+    report_export_pdf_font_path: Optional[str] = None
 
     # Only analyze the result summary: true only pushes summaries, without individual stock details (Issue #262)
     report_summary_only: bool = False

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""API tests for history report export endpoints."""
+"""API contracts for typed, bounded history report export."""
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+import json
 
 import pytest
 from fastapi import HTTPException
@@ -11,8 +11,10 @@ from fastapi import HTTPException
 from api.v1.endpoints import report_export as export_endpoint
 from src.services.history_service import MarkdownReportGenerationError
 from src.services.report_export_service import (
+    ReportExportBusyError,
     ReportExportDependencyError,
     ReportExportFontError,
+    ReportExportLimitError,
 )
 
 
@@ -27,7 +29,7 @@ class _FakeHistoryService:
 
     def get_markdown_report(self, record_id):
         if self.raise_gen:
-            raise MarkdownReportGenerationError("boom", record_id=record_id)
+            raise MarkdownReportGenerationError("raw provider detail", record_id=record_id)
         return self.markdown
 
 
@@ -35,30 +37,73 @@ def _patch_history(monkeypatch, service: _FakeHistoryService):
     monkeypatch.setattr(export_endpoint, "HistoryService", lambda _db: service)
 
 
-def test_capabilities_endpoint_returns_md_available(monkeypatch):
-    response = export_endpoint.get_report_export_capabilities()
-    assert response.status_code == 200
-    body = response.body
-    # JSONResponse stores rendered body
-    import json
+def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
+    monkeypatch.setattr(
+        export_endpoint,
+        "get_export_capabilities",
+        lambda language: {
+            "formats": {
+                "md": {
+                    "available": True,
+                    "status": "ready",
+                    "media_type": "text/markdown; charset=utf-8",
+                    "dependency": None,
+                    "dependency_installed": True,
+                    "font_validated": None,
+                    "missing_glyph_count": 0,
+                },
+                "pdf": {
+                    "available": False,
+                    "status": "font_coverage_missing",
+                    "media_type": "application/pdf",
+                    "dependency": "fpdf2",
+                    "dependency_installed": True,
+                    "dependency_version": "2.8.3",
+                    "font_validated": False,
+                    "missing_glyph_count": 4,
+                },
+            },
+            "requested_language": language,
+            "supported_query_formats": ["md", "pdf"],
+            "office_formats_status": "not_implemented",
+            "chart_handling": "markdown_images_omitted_without_destinations",
+            "pdf_limits": {
+                "max_input_bytes": 1_000_000,
+                "max_pages": 100,
+                "max_table_rows": 500,
+                "max_table_columns": 12,
+                "max_render_seconds": 20.0,
+                "max_concurrency": 2,
+            },
+        },
+    )
+    response = export_endpoint.get_report_export_capabilities("zh")
+    assert response.formats.md.available is True
+    assert response.formats.pdf.status == "font_coverage_missing"
+    assert "font_path" not in response.model_dump_json()
 
-    data = json.loads(body)
-    assert data["formats"]["md"]["available"] is True
-    assert data["office_formats_status"] == "not_implemented"
-    assert "font_path" not in data["formats"]["pdf"]
 
-
-def test_export_markdown_attachment(monkeypatch):
-    md = "# 测试报告\n\n内容"
-    _patch_history(monkeypatch, _FakeHistoryService(md, {"id": 7}))
+def test_export_markdown_attachment_uses_rfc5987_unicode_filename(monkeypatch):
+    markdown = "# 测试报告\n\n内容"
+    _patch_history(monkeypatch, _FakeHistoryService(markdown, {"id": "中钨高新"}))
     response = export_endpoint.export_history_report(
-        "7", format="md", db_manager=object()
+        "中钨高新", format="md", db_manager=object()
     )
     assert response.status_code == 200
     assert response.media_type.startswith("text/markdown")
-    assert response.body.decode("utf-8") == md
-    assert "stockpulse-report-7.md" in response.headers["content-disposition"]
-    assert response.headers["x-stockpulse-export-format"] == "md"
+    assert response.body.decode("utf-8") == markdown
+    header = response.headers["content-disposition"]
+    assert 'filename="stockpulse-report.md"' in header
+    assert "filename*=UTF-8''stockpulse-report-%E4%B8%AD" in header
+    assert len(header) < 1024
+
+
+def test_content_disposition_blocks_header_injection_and_bounds_length():
+    header = export_endpoint.build_content_disposition("报告\r\nX-Evil: yes" + "长" * 500 + ".pdf")
+    assert "\r" not in header and "\n" not in header
+    assert "X-Evil" not in header
+    assert header.startswith("attachment; filename=")
+    assert len(header) < 1024
 
 
 def test_export_not_found(monkeypatch):
@@ -69,7 +114,7 @@ def test_export_not_found(monkeypatch):
     assert exc.value.detail["error"] == "not_found"
 
 
-def test_export_invalid_format(monkeypatch):
+def test_export_invalid_format_direct_call_still_returns_stable_400(monkeypatch):
     _patch_history(monkeypatch, _FakeHistoryService("# ok", {"id": 1}))
     with pytest.raises(HTTPException) as exc:
         export_endpoint.export_history_report("1", format="xlsx", db_manager=object())
@@ -77,39 +122,50 @@ def test_export_invalid_format(monkeypatch):
     assert exc.value.detail["error"] == "export_format_invalid"
 
 
-def test_export_pdf_dependency_missing_returns_503(monkeypatch):
+@pytest.mark.parametrize(
+    ("raised", "status", "code"),
+    [
+        (ReportExportDependencyError("/secret/backend parser"), 503, "export_dependency_missing"),
+        (ReportExportFontError("/secret/font.ttf parser detail"), 503, "export_font_missing"),
+        (ReportExportLimitError("input too large"), 413, "export_limit_exceeded"),
+        (ReportExportBusyError(), 429, "export_busy"),
+    ],
+)
+def test_export_error_mapping_is_bounded_and_sanitized(monkeypatch, raised, status, code):
     _patch_history(monkeypatch, _FakeHistoryService("# ok", {"id": 1}))
 
-    def _raise(*_a, **_k):
-        raise ReportExportDependencyError("fpdf2 missing")
+    def _raise(*_args, **_kwargs):
+        raise raised
 
     monkeypatch.setattr(export_endpoint, "export_report", _raise)
     with pytest.raises(HTTPException) as exc:
         export_endpoint.export_history_report("1", format="pdf", db_manager=object())
-    assert exc.value.status_code == 503
-    assert exc.value.detail["error"] == "export_dependency_missing"
-    assert "install_hint" in exc.value.detail.get("params", {})
+    assert exc.value.status_code == status
+    assert exc.value.detail["error"] == code
+    payload = json.dumps(exc.value.detail)
+    assert "/secret/" not in payload
+    assert "parser detail" not in payload
 
 
-def test_export_pdf_font_missing_returns_503(monkeypatch):
-    _patch_history(monkeypatch, _FakeHistoryService("# ok", {"id": 1}))
-
-    def _raise(*_a, **_k):
-        raise ReportExportFontError("no font")
-
-    monkeypatch.setattr(export_endpoint, "export_report", _raise)
-    with pytest.raises(HTTPException) as exc:
-        export_endpoint.export_history_report("1", format="pdf", db_manager=object())
-    assert exc.value.status_code == 503
-    assert exc.value.detail["error"] == "export_font_missing"
-
-
-def test_export_generation_failure_returns_500(monkeypatch):
-    _patch_history(
-        monkeypatch,
-        _FakeHistoryService("# ok", {"id": 1}, raise_gen=True),
-    )
+def test_generation_failure_does_not_expose_raw_service_detail(monkeypatch):
+    _patch_history(monkeypatch, _FakeHistoryService("# ok", {"id": 1}, raise_gen=True))
     with pytest.raises(HTTPException) as exc:
         export_endpoint.export_history_report("1", format="md", db_manager=object())
     assert exc.value.status_code == 500
-    assert exc.value.detail["error"] == "generation_failed"
+    assert "raw provider detail" not in json.dumps(exc.value.detail)
+
+
+def test_openapi_has_typed_capability_enum_and_both_binary_media():
+    from api.app import create_app
+
+    schema = create_app().openapi()
+    capabilities = schema["paths"]["/api/v1/history/export/capabilities"]["get"]
+    assert capabilities["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/ReportExportCapabilitiesResponse"
+    )
+    export = schema["paths"]["/api/v1/history/{record_id}/export"]["get"]
+    format_parameter = next(item for item in export["parameters"] if item["name"] == "format")
+    assert format_parameter["schema"]["enum"] == ["md", "pdf"]
+    content = export["responses"]["200"]["content"]
+    assert content["application/pdf"]["schema"] == {"type": "string", "format": "binary"}
+    assert content["text/markdown"]["schema"] == {"type": "string", "format": "binary"}

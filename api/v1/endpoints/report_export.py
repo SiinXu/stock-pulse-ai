@@ -8,23 +8,33 @@ without editing ``history.py`` (parallel-batch ownership boundary).
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping, Optional
+import re
+import unicodedata
+from typing import Annotated, Any, Mapping, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 from api.deps import get_database_manager
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
+from api.v1.schemas.report_export import (
+    ReportExportCapabilitiesResponse,
+    ReportExportCapabilityLanguage,
+    ReportExportFormat,
+)
 from src.services.history_service import (
     HistoryService,
     MarkdownReportGenerationError,
 )
 from src.services.report_export_service import (
+    ReportExportBusyError,
     ReportExportDependencyError,
     ReportExportError,
     ReportExportFontError,
     ReportExportFormatError,
+    ReportExportLimitError,
     capabilities_public_view,
     export_report,
     get_export_capabilities,
@@ -45,8 +55,35 @@ def _filename_stem_for_record(record_id: str, detail: Optional[Mapping[str, Any]
     return f"stockpulse-report-{key}"
 
 
+def _truncate_utf8(value: str, max_bytes: int) -> str:
+    encoded = value.encode("utf-8")[:max_bytes]
+    return encoded.decode("utf-8", errors="ignore")
+
+
+def build_content_disposition(filename: str) -> str:
+    """Build a bounded ASCII fallback plus RFC 5987 UTF-8 filename."""
+    # Discard everything after the first line break instead of attempting to
+    # preserve attacker-controlled pseudo-header text in either filename form.
+    first_line = re.split(r"[\r\n]", str(filename), maxsplit=1)[0]
+    bounded = _truncate_utf8(first_line, 180)
+    normalized = unicodedata.normalize("NFKD", bounded)
+    ascii_name = normalized.encode("ascii", errors="ignore").decode("ascii")
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", ascii_name).strip("._")
+    suffix = ".pdf" if bounded.lower().endswith(".pdf") else ".md"
+    if not ascii_name or ascii_name in {"pdf", "md"}:
+        ascii_name = f"stockpulse-report{suffix}"
+    elif not ascii_name.lower().endswith(suffix):
+        ascii_name = f"{ascii_name[:56]}{suffix}"
+    else:
+        stem = ascii_name[: -len(suffix)][:56].rstrip("._-") or "stockpulse-report"
+        ascii_name = f"{stem}{suffix}"
+    encoded = quote(bounded, safe="")
+    return f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded}'
+
+
 @router.get(
     "/export/capabilities",
+    response_model=ReportExportCapabilitiesResponse,
     responses={
         200: {"description": "Available report export formats and dependency status"},
     },
@@ -58,17 +95,30 @@ def _filename_stem_for_record(record_id: str, detail: Optional[Mapping[str, Any]
         "implemented in this release."
     ),
 )
-def get_report_export_capabilities() -> JSONResponse:
-    payload = capabilities_public_view(get_export_capabilities())
-    return JSONResponse(content=payload)
+def get_report_export_capabilities(
+    language: Annotated[
+        ReportExportCapabilityLanguage,
+        Query(description="Report language whose representative glyph set must be supported."),
+    ] = "zh",
+) -> ReportExportCapabilitiesResponse:
+    payload = capabilities_public_view(get_export_capabilities(language))
+    return ReportExportCapabilitiesResponse.model_validate(payload)
 
 
 @router.get(
     "/{record_id}/export",
     response_class=Response,
     responses={
-        200: {"description": "Exported report file (Markdown or PDF)"},
+        200: {
+            "description": "Exported report file",
+            "content": {
+                "text/markdown": {"schema": {"type": "string", "format": "binary"}},
+                "application/pdf": {"schema": {"type": "string", "format": "binary"}},
+            },
+        },
         400: {"description": "Invalid export format", "model": ErrorResponse},
+        413: {"description": "Export resource limit exceeded", "model": ErrorResponse},
+        429: {"description": "PDF export capacity is busy", "model": ErrorResponse},
         404: {"description": "Report not found", "model": ErrorResponse},
         500: {"description": "Export or report generation failed", "model": ErrorResponse},
         503: {
@@ -80,19 +130,19 @@ def get_report_export_capabilities() -> JSONResponse:
     description=(
         "Export an analysis history record as Markdown (always) or PDF "
         "(optional fpdf2 + font). Content is converted from the same Markdown "
-        "intermediate representation used by GET /history/{id}/markdown; report "
-        "structure and wording are not altered. Chart/image markdown is omitted "
-        "in PDF with an explicit note. Secrets must not be present in the "
-        "rendered Markdown (export does not inject credentials)."
+        "intermediate representation used by GET /history/{id}/markdown. Markdown "
+        "is lossless. PDF preserves visible wording but drops link destinations "
+        "and complete image destinations, replaces images with an omission note, "
+        "and renders tables wider than six columns as stacked header/value rows. "
+        "Explicit byte/page/table/time/concurrency limits apply."
     ),
 )
 def export_history_report(
     record_id: str,
-    format: str = Query(
-        "md",
-        alias="format",
-        description="Export format: md (default) or pdf",
-    ),
+    format: Annotated[
+        ReportExportFormat,
+        Query(alias="format", description="Export format: md (default) or pdf"),
+    ] = "md",
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> Response:
     service = HistoryService(db_manager)
@@ -111,7 +161,7 @@ def export_history_report(
         raise api_error(
             500,
             "generation_failed",
-            f"Failed to generate report content for export: {exc.message}",
+            "Failed to generate report content for export.",
         ) from exc
     except Exception as exc:
         log_safe_exception(
@@ -131,7 +181,7 @@ def export_history_report(
         raise api_error(
             404,
             "not_found",
-            f"No analysis record found for id/query_id={record_id}",
+            "No analysis record found for the requested history id.",
         )
 
     stem = _filename_stem_for_record(record_id, detail)
@@ -148,7 +198,7 @@ def export_history_report(
         raise api_error(
             503,
             exc.error_code,
-            exc.message,
+            "The optional PDF export backend is unavailable.",
             params={
                 "dependency": "fpdf2",
                 "install_hint": exc.install_hint,
@@ -158,9 +208,13 @@ def export_history_report(
         raise api_error(
             503,
             exc.error_code,
-            exc.message,
+            "A validated font covering every report glyph is required for PDF export.",
             params={"env": "REPORT_EXPORT_PDF_FONT_PATH"},
         ) from exc
+    except ReportExportLimitError as exc:
+        raise api_error(exc.status_code, exc.error_code, exc.message) from exc
+    except ReportExportBusyError as exc:
+        raise api_error(exc.status_code, exc.error_code, exc.message) from exc
     except ReportExportError as exc:
         log_safe_exception(
             logger,
@@ -169,13 +223,13 @@ def export_history_report(
             error_code=exc.error_code,
             context={"record_id": record_id, "format": format},
         )
-        raise api_error(500, exc.error_code, exc.message) from exc
+        raise api_error(500, exc.error_code, "Report export failed.") from exc
 
     return Response(
         content=artifact.content,
         media_type=artifact.media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{artifact.filename}"',
+            "Content-Disposition": build_content_disposition(artifact.filename),
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
             "X-StockPulse-Export-Format": artifact.format,

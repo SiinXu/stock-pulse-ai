@@ -1,114 +1,155 @@
-# Report Export (PDF / Markdown)
+# Report Export (Markdown / PDF)
 
-StockPulse can export a **already-rendered** analysis report to archive-friendly
-formats. Export is a presentation-layer conversion: it does not change report
-structure or wording, and it does not re-run analysis.
+StockPulse can export the already-rendered Markdown for one history record. It
+does not rerun analysis or modify persisted history. Markdown is the lossless
+archive; PDF is an optional, bounded presentation transform.
+
+Chinese: [report-export_CN.md](report-export_CN.md)
 
 ## Formats in this release
 
-| Format | Availability | Notes |
+| Format | Availability | Contract |
 | --- | --- | --- |
-| Markdown (`.md`) | Always | Same content as `GET /api/v1/history/{id}/markdown` |
-| PDF (`.pdf`) | Optional | Requires `fpdf2` + a CJK/Unicode `.ttf`/`.otf` font |
-| DOCX / XLSX | Not implemented | Remaining scope for Issue #163 |
+| Markdown (`.md`) | Always | Exact UTF-8 content from the existing history Markdown surface |
+| PDF (`.pdf`) | Optional | Requires validated fpdf2 + a single-face TTF/OTF covering every visible report glyph |
+| DOCX / XLSX | Not implemented | Remaining Issue #163 scope |
 
-## Why fpdf2 (not WeasyPrint / browser)
+PDF remains unavailable when the dependency, font parser, representative
+language glyphs, or deterministic font/backend smoke is not ready. Markdown is
+unaffected by every PDF readiness state.
 
-| Option | Pros | Cons for StockPulse |
-| --- | --- | --- |
-| **fpdf2 (chosen)** | Pure Python; no system libraries; small optional install | Manual Markdown layout; needs explicit font file for Chinese |
-| WeasyPrint | Excellent HTML/CSS | Needs Cairo/Pango system packages — raises default install cost |
-| Headless Chromium | Pixel-perfect HTML | Large download; fragile in CI/desktop packaging |
+## Optional dependency choice
 
-Default installs must stay unaffected: PDF code is imported only when exporting
-to PDF, and missing optional deps return **HTTP 503** with an install hint.
+fpdf2 is pure Python and does not add Cairo/Pango or a headless browser to the
+default StockPulse install. Its manual layout cost is owned by the exporter:
+measured cell wrapping, page-aware rows, repeated table headers, and page limits
+are tested directly.
 
-## Install optional PDF dependency
+Install the exact optional set after the base application:
 
 ```bash
-# After the normal StockPulse requirements install:
-python -m pip install --build-constraint build-constraints.txt -r requirements-report-export.txt
+python -m pip install --build-constraint build-constraints.txt \
+  -r requirements-report-export.txt
 ```
 
-`requirements.txt` does **not** include fpdf2. Uninstalling the optional package
-removes PDF export only.
+The optional file pins `fpdf2==2.8.3`, `fonttools==4.63.0`, and
+`markdown-it-py==4.2.0`, and also applies the repository's `constraints.txt`.
+A legacy PyFPDF distribution sharing the `fpdf` import namespace is rejected
+rather than treated as fpdf2. All three imports remain lazy, so a default
+installation can start and use lossless Markdown export without the PDF set.
 
-## Chinese fonts
+## Font readiness
 
-PDF export embeds a TrueType/OpenType font. Resolution order:
+`REPORT_EXPORT_PDF_FONT_PATH` is owned by the shared Config loader and system
+configuration registry. It may point to one `.ttf` or `.otf` face. An explicit
+invalid path fails closed and never silently falls back to a different system
+font. When the field is empty, a small documented set of single-face system
+font paths is probed. `.ttc` collection indices are not guessed.
 
-1. Environment variable `REPORT_EXPORT_PDF_FONT_PATH` (absolute path to `.ttf` or `.otf`)
-2. Common OS locations (for example macOS `Arial Unicode.ttf`, Linux Noto/WenQuanYi TTF paths, Windows `msyh.ttf`)
+Readiness has two layers:
 
-**`.ttc` collection fonts are not used** without extra tooling. If no usable
-font is found, the API returns `export_font_missing` (503) instead of producing
-a PDF full of tofu boxes.
+1. The capability endpoint parses the font, checks representative glyphs for
+   the requested language, and runs a small fpdf2 render smoke.
+2. Every PDF request checks the exact visible codepoints produced from that
+   report. If even one glyph is missing, the request returns
+   `export_font_coverage_missing` instead of dropping icons or producing tofu.
+
+This distinction matters for fonts such as Arial Unicode: they may cover CJK
+text but not common report symbols such as `✅`, `⚠`, `🚨`, or `📊`.
 
 Example:
 
 ```bash
-export REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
-# Chinese reports need a CJK-capable face, e.g.:
-# export REPORT_EXPORT_PDF_FONT_PATH=/path/to/NotoSansSC-Regular.otf
+export REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf
 ```
 
-## Charts / images
+Absolute font paths and raw font-parser errors are logged only in sanitized
+operator diagnostics. They are never returned by the capability or error API.
 
-Markdown image syntax (`![alt](url)`) is **omitted** in PDF and replaced with a
-short note. Remote chart bytes are never fetched at export time (no network,
-no secret leakage into the archive). Use the Markdown attachment when images
-must be preserved for offline tools.
+## Markdown-to-PDF transformations
+
+The exporter uses `markdown-it-py` tokens rather than regular expressions.
+Visible text is preserved, while these presentation transformations are
+intentional:
+
+- headings, paragraphs, block quotes, fenced code, ordered/unordered nested
+  lists, and tables are rendered as PDF layout primitives;
+- emphasis markers and inline-code markers are removed but their visible text
+  remains;
+- link labels remain, while link destinations are omitted;
+- the complete image destination and title are discarded, the image is never
+  fetched, and the visible alt text plus an omission note remains;
+- tables with up to six columns use measured, wrapped grid cells; headers repeat
+  after page breaks and normal rows move together to the next page;
+- a single row taller than a page is split without deleting text;
+- seven-to-twelve-column tables use a complete stacked header/value layout;
+- Markdown is always available when callers need the exact source syntax,
+  destinations, or an image-aware downstream archive.
+
+The parser discards nested-parenthesis and signed image URLs as a whole, so no
+query-string fragment can remain in the PDF.
+
+## Bounded execution
+
+PDF conversion is synchronous but has an explicit owner and degradation
+contract:
+
+| Bound | Default | Failure |
+| --- | ---: | --- |
+| UTF-8 input | 1,000,000 bytes | 413 `export_input_too_large` |
+| Pages | 100 | 413 `export_page_limit_exceeded` |
+| Rows per table | 500 | 413 `export_table_rows_exceeded` |
+| Columns per table | 12 | 413 `export_table_columns_exceeded` |
+| Total table cells | 3,000 | 413 `export_table_cells_exceeded` |
+| Monotonic render deadline | 20 seconds | 503 `export_deadline_exceeded` |
+| Concurrent renders per process | 2 | 429 `export_busy` |
+
+Successful PDFs use a bounded process-local LRU cache (12 entries, 24 MiB). The
+cache key includes Markdown content, title, and font file signature; PDF bytes
+are never persisted by the exporter.
 
 ## API
 
 ### Capabilities
 
 ```http
-GET /api/v1/history/export/capabilities
+GET /api/v1/history/export/capabilities?language=zh
 ```
 
-Returns which formats are available in the current process (without leaking
-host font paths).
+`language` is one of `en`, `zh`, `zh-TW`, `ja`, or `ko`. The typed response
+contains fixed `md` and `pdf` capabilities, sanitized readiness status, optional
+dependency version, glyph count, and all public limits. It never includes a
+font path.
 
-### Export a history record
+### Export
 
 ```http
 GET /api/v1/history/{record_id}/export?format=md
 GET /api/v1/history/{record_id}/export?format=pdf
 ```
 
-Success responses are file downloads (`Content-Disposition: attachment`).
+`format` is the OpenAPI enum `md | pdf`. The 200 response declares both
+`text/markdown` and `application/pdf` binary bodies. Downloads send a short
+ASCII `filename=` fallback plus bounded RFC 5987 `filename*=UTF-8''...`, so
+Unicode history identities do not fail Starlette header encoding.
 
-| Status | Error code | Meaning |
+| Status | Representative code | Meaning |
 | --- | --- | --- |
-| 400 | `export_format_invalid` | Unknown format (e.g. docx before implementation) |
-| 404 | `not_found` | No history record |
-| 500 | `generation_failed` | Markdown rebuild failed |
-| 503 | `export_dependency_missing` | fpdf2 not installed |
-| 503 | `export_font_missing` | No usable font for PDF |
+| 400 | `export_format_invalid` | Unsupported direct-call format |
+| 404 | `not_found` | History record is absent |
+| 413 | `export_*_exceeded` | Deterministic size/table/page bound |
+| 429 | `export_busy` | All per-process render slots are occupied |
+| 500 | `generation_failed` | History Markdown generation failed |
+| 503 | `export_dependency_missing` | fpdf2 missing, incompatible, or legacy namespace conflict |
+| 503 | `export_font_*` | Font invalid, unavailable, or missing exact report glyphs |
+| 503 | `export_deadline_exceeded` | Monotonic render deadline exceeded |
 
-## Configuration
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `REPORT_EXPORT_PDF_FONT_PATH` | empty | Absolute path to a `.ttf`/`.otf` font for PDF text |
-
-No configuration is required for Markdown export.
-
-## Remaining scope (Issue #163)
+## Remaining Issue #163 scope
 
 - DOCX structured export
-- XLSX tabular export (scores / metrics sheets)
-- Optional evidence/audit appendix toggle (#127)
-- Web one-click export buttons on report / DecisionSignal views
+- XLSX score/metric sheets
+- optional evidence/audit appendix toggle (#127)
+- Web one-click export controls on report and DecisionSignal surfaces
 
-## Integration point
-
-Backend-only in this change. Web can call:
-
-```ts
-// After merge: download helper against history export
-// GET /api/v1/history/${recordId}/export?format=pdf
-```
-
-No Web UI wiring in this PR.
+This PR is backend-only; it does not change templates, report generation,
+Desktop, `pdf_parsing_service.py`, share-image, or `md2img`.

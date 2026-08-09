@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Optional history report export API for Markdown (always) and PDF via optional fpdf2 + font config (Refs #163; docx/xlsx remaining).
+- [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).

@@ -1,42 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Report export service: convert rendered Markdown reports to archive formats.
+"""Bounded Markdown and optional PDF report export.
 
-This module is a **presentation-layer converter**. It never rebuilds analysis
-results or mutates report content. Callers supply already-rendered Markdown
-(for example from ``HistoryService.get_markdown_report`` or
-``report_renderer.render``).
-
-Formats
--------
-- ``md``: always available (UTF-8 bytes of the input Markdown).
-- ``pdf``: optional; requires the ``fpdf2`` package (see
-  ``requirements-report-export.txt``). Pure-Python PDF stack chosen so default
-  installs stay free of system libraries (unlike WeasyPrint) and free of a
-  headless browser.
-
-Chinese fonts
--------------
-PDF export embeds a TrueType/OpenType font. Resolution order:
-
-1. ``REPORT_EXPORT_PDF_FONT_PATH`` (absolute path to a ``.ttf`` / ``.otf`` file)
-2. Common OS CJK / Unicode font locations
-
-When no usable font is found, export fails with an explicit message (no silent
-tofu/boxes fallback for CJK-heavy reports).
-
-Charts / images
----------------
-Markdown image syntax is replaced with a short textual omission note. Remote
-chart bytes are not fetched at export time (avoids network and secret leakage
-into the archive).
+Markdown is the lossless archive format and is always available. PDF is an
+optional presentation transform backed by fpdf2. The PDF path parses Markdown
+with ``markdown-it-py`` so image destinations and link destinations never leak
+into the archive, validates the exact report glyph set before rendering, wraps
+table cells without deleting content, and enforces explicit resource bounds.
 """
 
 from __future__ import annotations
 
+import hashlib
+import html
+import importlib
+import importlib.metadata
 import logging
-import os
 import re
+import threading
+import time
+import unicodedata
+from collections import OrderedDict
 from dataclasses import dataclass
+from functools import lru_cache
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -46,58 +32,55 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_FORMATS = ("md", "pdf")
 PDF_OPTIONAL_PACKAGE = "fpdf2"
+PDF_OPTIONAL_SUPPORT_PACKAGES: Tuple[Tuple[str, str], ...] = (
+    ("fonttools", "fontTools"),
+    ("markdown-it-py", "markdown_it"),
+)
+PDF_MIN_VERSION = (2, 7, 0)
+PDF_MAX_MAJOR = 3
 PDF_INSTALL_HINT = (
-    "PDF export requires the optional dependency set. Install after the default "
-    "StockPulse requirements:\n"
-    "  python -m pip install --build-constraint build-constraints.txt "
-    "-r requirements-report-export.txt\n"
-    "Default analysis, API, Web, and notifications do not need this package."
+    "Install the optional report-export dependency set with "
+    "'python -m pip install --build-constraint build-constraints.txt "
+    "-r requirements-report-export.txt'."
 )
 
-# Image markdown: ![alt](url) — replaced, never fetched.
-_IMAGE_MD_RE = re.compile(r"!\[([^\]]*)\]\([^)]+\)")
-# Fenced code blocks
-_FENCE_RE = re.compile(r"```([^\n`]*)\n(.*?)```", re.DOTALL)
-# ATX headings
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-# Unordered / ordered list items
-_UL_RE = re.compile(r"^(\s*)[-*+]\s+(.*)$")
-_OL_RE = re.compile(r"^(\s*)(\d+)[.)]\s+(.*)$")
-# Table separator row
-_TABLE_SEP_RE = re.compile(r"^\s*\|?(?:\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$")
-# Strip simple inline markers for PDF plain runs (content preserved, markers removed)
-_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
-_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
-_CODE_INLINE_RE = re.compile(r"`([^`]+)`")
-_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+MAX_PDF_INPUT_BYTES = 1_000_000
+MAX_PDF_PAGES = 100
+MAX_TABLE_ROWS = 500
+MAX_TABLE_COLUMNS = 12
+MAX_TOTAL_TABLE_CELLS = 3_000
+PDF_RENDER_DEADLINE_SECONDS = 20.0
+PDF_MAX_CONCURRENCY = 2
+PDF_CACHE_ENTRIES = 12
+PDF_CACHE_MAX_BYTES = 24 * 1024 * 1024
 
 _IMAGE_OMISSION_NOTE_ZH = "（图表/图片已在 PDF 导出中省略，请参阅原报告 Markdown 附件）"
-_IMAGE_OMISSION_NOTE_EN = "(Chart/image omitted in PDF export; see the Markdown attachment.)"
+_IMAGE_OMISSION_NOTE_EN = (
+    "(Chart/image omitted in PDF export; see the Markdown attachment.)"
+)
 
-# Common CJK-capable TrueType/OpenType paths (TTF/OTF only; TTC needs fonttools).
+# Only formats that fpdf2 can load as a single face are probed. Collection
+# fonts are deliberately excluded because selecting a face by platform index
+# is not a stable operator contract.
 _DEFAULT_FONT_CANDIDATES: Tuple[str, ...] = (
-    # Linux
-    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-    "/usr/share/fonts/truetype/arphic/uming.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    # macOS
     "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
     "/Library/Fonts/Arial Unicode.ttf",
-    "/System/Library/Fonts/Hiragino Sans GB.ttc",
-    "/System/Library/Fonts/STHeiti Light.ttc",
-    "/System/Library/Fonts/STHeiti Medium.ttc",
-    # Windows
-    r"C:\Windows\Fonts\msyh.ttc",
     r"C:\Windows\Fonts\msyh.ttf",
-    r"C:\Windows\Fonts\simsun.ttc",
-    r"C:\Windows\Fonts\simhei.ttf",
     r"C:\Windows\Fonts\arialuni.ttf",
     r"C:\Windows\Fonts\NotoSansSC-Regular.otf",
 )
+
+_CAPABILITY_GLYPHS: Dict[str, str] = {
+    "en": "StockPulse report Buy Hold Sell Risk 0123456789 • ✅ ⚠ 🚨 📊",
+    "zh": "股票分析报告 买入 持有 卖出 风险 0123456789 • ✅ ⚠ 🚨 📊",
+    "zh-TW": "股票分析報告 買入 持有 賣出 風險 0123456789 • ✅ ⚠ 🚨 📊",
+    "ja": "株式分析レポート 買い 保有 売り リスク 0123456789 • ✅ ⚠ 🚨 📊",
+    "ko": "주식 분석 보고서 매수 보유 매도 위험 0123456789 • ✅ ⚠ 🚨 📊",
+}
 
 
 class ReportExportError(Exception):
@@ -110,7 +93,7 @@ class ReportExportError(Exception):
 
 
 class ReportExportDependencyError(ReportExportError):
-    """Raised when an optional export backend package is not installed."""
+    """Raised when the fpdf namespace is absent, legacy, or incompatible."""
 
     def __init__(self, message: str, *, install_hint: str = PDF_INSTALL_HINT) -> None:
         super().__init__(message, error_code="export_dependency_missing")
@@ -118,10 +101,15 @@ class ReportExportDependencyError(ReportExportError):
 
 
 class ReportExportFontError(ReportExportError):
-    """Raised when PDF export cannot locate a usable font file."""
+    """Raised when a configured font is invalid or lacks report glyphs."""
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message, error_code="export_font_missing")
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "export_font_missing",
+    ) -> None:
+        super().__init__(message, error_code=error_code)
 
 
 class ReportExportFormatError(ReportExportError):
@@ -129,6 +117,31 @@ class ReportExportFormatError(ReportExportError):
 
     def __init__(self, message: str, *, error_code: str = "export_format_invalid") -> None:
         super().__init__(message, error_code=error_code)
+
+
+class ReportExportLimitError(ReportExportError):
+    """Raised when a deterministic export resource bound is exceeded."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "export_limit_exceeded",
+        status_code: int = 413,
+    ) -> None:
+        super().__init__(message, error_code=error_code)
+        self.status_code = status_code
+
+
+class ReportExportBusyError(ReportExportError):
+    """Raised when all bounded synchronous PDF render slots are occupied."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "PDF export capacity is busy; retry later.",
+            error_code="export_busy",
+        )
+        self.status_code = 429
 
 
 @dataclass(frozen=True)
@@ -141,26 +154,167 @@ class ExportArtifact:
     format: str
 
 
-def is_pdf_dependency_available() -> bool:
-    """Return True when the optional PDF package can be imported."""
+@dataclass(frozen=True)
+class PdfBackendStatus:
+    """Validated fpdf2 distribution/import status."""
+
+    available: bool
+    status: str
+    version: Optional[str] = None
+    installed: Optional[bool] = None
+
+    @property
+    def dependency_installed(self) -> bool:
+        """Distinguish an installed incompatible fpdf2 from legacy PyFPDF."""
+        return self.installed if self.installed is not None else self.version is not None
+
+
+@dataclass(frozen=True)
+class FontInspection:
+    """Sanitized font validation result plus internal Unicode coverage."""
+
+    valid: bool
+    status: str
+    codepoints: frozenset[int] = frozenset()
+
+
+_PDF_SEMAPHORE = threading.BoundedSemaphore(PDF_MAX_CONCURRENCY)
+_PDF_CACHE_LOCK = threading.Lock()
+_PDF_CACHE: "OrderedDict[str, ExportArtifact]" = OrderedDict()
+_PDF_CACHE_BYTES = 0
+
+
+def _version_tuple(value: str) -> Tuple[int, int, int]:
+    parts = [int(item) for item in re.findall(r"\d+", value)[:3]]
+    return tuple((parts + [0, 0, 0])[:3])  # type: ignore[return-value]
+
+
+def inspect_pdf_backend() -> PdfBackendStatus:
+    """Verify the fpdf2 distribution and reject the legacy PyFPDF conflict."""
     try:
-        import fpdf  # noqa: F401
-    except ImportError:
-        return False
-    return True
+        version = importlib.metadata.version(PDF_OPTIONAL_PACKAGE)
+    except importlib.metadata.PackageNotFoundError:
+        distributions = {
+            item.lower()
+            for item in importlib.metadata.packages_distributions().get("fpdf", [])
+        }
+        if "fpdf" in distributions:
+            return PdfBackendStatus(
+                False,
+                "legacy_namespace_conflict",
+                None,
+                False,
+            )
+        return PdfBackendStatus(False, "dependency_missing", installed=False)
+
+    try:
+        import fpdf
+        from fpdf import FPDF  # noqa: F401
+    except (ImportError, AttributeError):
+        return PdfBackendStatus(False, "dependency_import_invalid", version, True)
+
+    distributions = {
+        item.lower()
+        for item in importlib.metadata.packages_distributions().get("fpdf", [])
+    }
+    if "fpdf" in distributions:
+        return PdfBackendStatus(False, "legacy_namespace_conflict", version, True)
+
+    for distribution, module_name in PDF_OPTIONAL_SUPPORT_PACKAGES:
+        try:
+            importlib.metadata.version(distribution)
+            importlib.import_module(module_name)
+        except importlib.metadata.PackageNotFoundError:
+            return PdfBackendStatus(False, "dependency_missing", version, True)
+        except (ImportError, AttributeError):
+            return PdfBackendStatus(False, "dependency_import_invalid", version, True)
+
+    parsed = _version_tuple(version)
+    module_version = str(getattr(fpdf, "__version__", ""))
+    if (
+        parsed < PDF_MIN_VERSION
+        or parsed[0] >= PDF_MAX_MAJOR
+        or _version_tuple(module_version) != parsed
+    ):
+        return PdfBackendStatus(False, "dependency_version_invalid", version, True)
+    return PdfBackendStatus(True, "ready", version, True)
+
+
+def is_pdf_dependency_available() -> bool:
+    """Return whether the exact supported fpdf2 backend is ready."""
+    return inspect_pdf_backend().available
 
 
 def _configured_font_path() -> Optional[str]:
-    raw = os.environ.get("REPORT_EXPORT_PDF_FONT_PATH", "").strip()
-    return raw or None
+    """Read the font path from the shared runtime Config owner."""
+    try:
+        from src.application_services import get_application_services
+
+        raw = getattr(
+            get_application_services().config,
+            "report_export_pdf_font_path",
+            None,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - config diagnostics own details
+        log_safe_exception(
+            logger,
+            "Report export config lookup failed",
+            exc,
+            error_code="export_config_lookup_failed",
+            level=logging.WARNING,
+        )
+        raw = None
+    return str(raw).strip() if raw else None
 
 
-def _is_supported_font_file(path: Path) -> bool:
-    """fpdf2 add_font supports TTF/OTF; TTC often needs fonttools and is skipped."""
-    if not path.is_file():
-        return False
-    suffix = path.suffix.lower()
-    return suffix in {".ttf", ".otf"}
+def _font_signature(path: Path) -> Tuple[str, int, int]:
+    stat = path.stat()
+    return (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=24)
+def _inspect_font_signature(signature: Tuple[str, int, int]) -> FontInspection:
+    path = signature[0]
+    try:
+        from fontTools.ttLib import TTFont
+
+        font = TTFont(path, lazy=False)
+        try:
+            cmap = font.getBestCmap() or {}
+            codepoints = frozenset(int(value) for value in cmap)
+        finally:
+            font.close()
+    except Exception as exc:  # broad-exception: fallback_recorded - never expose parser/path
+        log_safe_exception(
+            logger,
+            "Report export font validation failed",
+            exc,
+            error_code="export_font_invalid",
+            level=logging.WARNING,
+            context={"font_path": path},
+        )
+        return FontInspection(False, "font_invalid")
+    if not codepoints:
+        return FontInspection(False, "font_empty_cmap")
+    return FontInspection(True, "font_parsed", codepoints)
+
+
+def inspect_font_file(path_value: str) -> FontInspection:
+    """Parse a single TTF/OTF file and return sanitized readiness."""
+    try:
+        path = Path(path_value).expanduser()
+        if not path.is_file() or path.suffix.lower() not in {".ttf", ".otf"}:
+            return FontInspection(False, "font_invalid")
+        return _inspect_font_signature(_font_signature(path))
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Report export font stat failed",
+            exc,
+            error_code="export_font_invalid",
+            level=logging.WARNING,
+        )
+        return FontInspection(False, "font_invalid")
 
 
 def resolve_pdf_font_path(
@@ -168,235 +322,418 @@ def resolve_pdf_font_path(
     configured: Optional[str] = None,
     candidates: Optional[Sequence[str]] = None,
 ) -> Optional[str]:
-    """Return the first usable font path, or None when none are available."""
-    ordered: List[str] = []
+    """Resolve a parsed font; an explicit invalid configured path fails closed."""
     cfg = configured if configured is not None else _configured_font_path()
     if cfg:
-        ordered.append(cfg)
-    ordered.extend(candidates if candidates is not None else _DEFAULT_FONT_CANDIDATES)
-    seen = set()
-    for item in ordered:
-        if not item or item in seen:
+        inspection = inspect_font_file(cfg)
+        return str(Path(cfg).expanduser().resolve()) if inspection.valid else None
+
+    for item in candidates if candidates is not None else _DEFAULT_FONT_CANDIDATES:
+        if not item:
             continue
-        seen.add(item)
-        path = Path(item).expanduser()
-        if _is_supported_font_file(path):
-            return str(path.resolve())
+        inspection = inspect_font_file(item)
+        if inspection.valid:
+            return str(Path(item).expanduser().resolve())
     return None
 
 
-def get_export_capabilities() -> Dict[str, Any]:
-    """Describe which export formats are available in the current process."""
-    pdf_available = is_pdf_dependency_available()
-    font_path = resolve_pdf_font_path() if pdf_available else None
+def _required_codepoints(text: str) -> frozenset[int]:
+    ignored_categories = {"Cc", "Cf", "Zl", "Zp"}
+    return frozenset(
+        ord(ch)
+        for ch in text
+        if not ch.isspace()
+        and unicodedata.category(ch) not in ignored_categories
+        and ord(ch) not in {0xFE0E, 0xFE0F}
+    )
+
+
+def missing_font_codepoints(font_path: str, text: str) -> frozenset[int]:
+    """Return report codepoints absent from an already parsed font."""
+    inspection = inspect_font_file(font_path)
+    if not inspection.valid:
+        return _required_codepoints(text)
+    return _required_codepoints(text) - inspection.codepoints
+
+
+def _resolve_font_for_text(
+    text: str,
+    *,
+    configured: Optional[str],
+) -> Tuple[Optional[str], str, int]:
+    """Resolve a font covering ``text`` while preserving explicit fail-closed config."""
+    if configured:
+        resolved = resolve_pdf_font_path(configured=configured)
+        if resolved is None:
+            return None, "configured_font_invalid", 0
+        missing = missing_font_codepoints(resolved, text)
+        if missing:
+            return None, "font_coverage_missing", len(missing)
+        return resolved, "font_parsed", 0
+
+    parsed_candidate_seen = False
+    smallest_missing: Optional[int] = None
+    for candidate in _DEFAULT_FONT_CANDIDATES:
+        if not inspect_font_file(candidate).valid:
+            continue
+        parsed_candidate_seen = True
+        missing = missing_font_codepoints(candidate, text)
+        if not missing:
+            return str(Path(candidate).expanduser().resolve()), "font_parsed", 0
+        smallest_missing = (
+            len(missing)
+            if smallest_missing is None
+            else min(smallest_missing, len(missing))
+        )
+    if parsed_candidate_seen:
+        return None, "font_coverage_missing", int(smallest_missing or 0)
+    return None, "font_not_found", 0
+
+
+@lru_cache(maxsize=24)
+def _font_smoke(signature: Tuple[str, int, int], sample: str) -> bool:
+    """Run a deterministic fpdf2 add-font/render smoke for capability truth."""
+    try:
+        from fpdf import FPDF
+
+        pdf = FPDF()
+        pdf.add_font("ReportFont", "", signature[0])
+        pdf.add_page()
+        pdf.set_font("ReportFont", size=10)
+        pdf.multi_cell(0, 6, sample)
+        raw = pdf.output()
+        return bytes(raw).startswith(b"%PDF")
+    except Exception as exc:  # broad-exception: fallback_recorded - sanitized status
+        log_safe_exception(
+            logger,
+            "Report export font/backend smoke failed",
+            exc,
+            error_code="export_font_smoke_failed",
+            level=logging.WARNING,
+            context={"font_path": signature[0]},
+        )
+        return False
+
+
+def _normalize_capability_language(language: str) -> str:
+    value = (language or "zh").strip()
+    return value if value in _CAPABILITY_GLYPHS else "zh"
+
+
+def get_export_capabilities(language: str = "zh") -> Dict[str, Any]:
+    """Return language-aware, sanitized export capability details."""
+    normalized_language = _normalize_capability_language(language)
+    backend = inspect_pdf_backend()
+    configured = _configured_font_path()
+    font_path: Optional[str] = None
+    font_status = "not_checked"
+    missing_count = 0
+
+    if backend.available:
+        sample = _CAPABILITY_GLYPHS[normalized_language]
+        font_path, font_status, missing_count = _resolve_font_for_text(
+            sample,
+            configured=configured,
+        )
+        if font_path is not None:
+            try:
+                signature = _font_signature(Path(font_path))
+                font_status = (
+                    "ready" if _font_smoke(signature, sample) else "font_smoke_failed"
+                )
+            except OSError:
+                font_status = "font_invalid"
+
+    pdf_available = backend.available and font_status == "ready"
     return {
         "formats": {
             "md": {
                 "available": True,
+                "status": "ready",
                 "media_type": "text/markdown; charset=utf-8",
                 "dependency": None,
+                "dependency_installed": True,
+                "font_validated": None,
+                "missing_glyph_count": 0,
             },
             "pdf": {
-                "available": bool(pdf_available and font_path),
+                "available": pdf_available,
+                "status": backend.status if not backend.available else font_status,
                 "media_type": "application/pdf",
                 "dependency": PDF_OPTIONAL_PACKAGE,
-                "dependency_installed": pdf_available,
-                "font_resolved": bool(font_path),
-                "font_path": font_path,
-                "install_hint": PDF_INSTALL_HINT,
-                "remaining_formats": ["docx", "xlsx"],
+                "dependency_installed": backend.dependency_installed,
+                "dependency_version": backend.version,
+                "font_validated": font_status == "ready",
+                "missing_glyph_count": missing_count,
             },
         },
+        "requested_language": normalized_language,
         "supported_query_formats": list(SUPPORTED_FORMATS),
         "office_formats_status": "not_implemented",
-        "chart_handling": "markdown_images_omitted",
+        "chart_handling": "markdown_images_omitted_without_destinations",
+        "pdf_limits": {
+            "max_input_bytes": MAX_PDF_INPUT_BYTES,
+            "max_pages": MAX_PDF_PAGES,
+            "max_table_rows": MAX_TABLE_ROWS,
+            "max_table_columns": MAX_TABLE_COLUMNS,
+            "max_render_seconds": PDF_RENDER_DEADLINE_SECONDS,
+            "max_concurrency": PDF_MAX_CONCURRENCY,
+        },
     }
 
 
 def _detect_primarily_chinese(text: str) -> bool:
     cjk = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fff")
-    return cjk >= 8 or (cjk > 0 and cjk * 3 >= max(len(text), 1) // 10)
+    return cjk >= 8 or (cjk > 0 and cjk * 30 >= max(len(text), 1))
 
 
-def _strip_images_for_pdf(markdown: str) -> Tuple[str, int]:
-    note = (
-        _IMAGE_OMISSION_NOTE_ZH
-        if _detect_primarily_chinese(markdown)
-        else _IMAGE_OMISSION_NOTE_EN
-    )
-    count = 0
+class _HTMLTextExtractor(HTMLParser):
+    """Keep HTML text nodes while dropping tags and every attribute URL."""
 
-    def _repl(match: re.Match[str]) -> str:
-        nonlocal count
-        count += 1
-        alt = (match.group(1) or "").strip()
-        if alt:
-            return f"[{alt}] {note}"
-        return note
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: List[str] = []
 
-    cleaned = _IMAGE_MD_RE.sub(_repl, markdown)
-    return cleaned, count
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
 
 
-def _plain_inline(text: str) -> str:
-    text = _BOLD_RE.sub(r"\1", text)
-    text = _ITALIC_RE.sub(r"\1", text)
-    text = _CODE_INLINE_RE.sub(r"\1", text)
-    text = _LINK_RE.sub(r"\1", text)
-    return text.strip()
+def _html_text(value: str) -> str:
+    parser = _HTMLTextExtractor()
+    parser.feed(value)
+    parser.close()
+    return html.unescape("".join(parser.parts)).strip()
 
 
-def _split_table_row(line: str) -> List[str]:
-    raw = line.strip()
-    if raw.startswith("|"):
-        raw = raw[1:]
-    if raw.endswith("|"):
-        raw = raw[:-1]
-    return [cell.strip() for cell in raw.split("|")]
+def _inline_text(children: Optional[Sequence[Any]], fallback: str, note: str) -> str:
+    if not children:
+        return fallback
+    parts: List[str] = []
+    for child in children:
+        child_type = getattr(child, "type", "")
+        if child_type in {"text", "code_inline"}:
+            parts.append(str(getattr(child, "content", "")))
+        elif child_type in {"softbreak", "hardbreak"}:
+            parts.append("\n")
+        elif child_type == "image":
+            alt = str(getattr(child, "content", "") or "").strip()
+            parts.append(f"[{alt}] {note}" if alt else note)
+        elif child_type == "html_inline":
+            parts.append(_html_text(str(getattr(child, "content", ""))))
+        # link_open/link_close and emphasis markers intentionally contribute no
+        # destination/markup; their visible child text remains in order.
+    return "".join(parts).strip()
+
+
+def _parse_table_tokens(tokens: Sequence[Any], start: int, note: str) -> Tuple[Dict[str, Any], int]:
+    rows: List[List[str]] = []
+    current_row: Optional[List[str]] = None
+    in_cell = False
+    i = start + 1
+    while i < len(tokens):
+        token = tokens[i]
+        kind = token.type
+        if kind == "table_close":
+            break
+        if kind == "tr_open":
+            current_row = []
+        elif kind in {"th_open", "td_open"}:
+            in_cell = True
+        elif kind == "inline" and in_cell and current_row is not None:
+            current_row.append(_inline_text(token.children, token.content, note))
+        elif kind in {"th_close", "td_close"}:
+            in_cell = False
+        elif kind == "tr_close" and current_row is not None:
+            rows.append(current_row)
+            current_row = None
+        i += 1
+    return {
+        "header": rows[0] if rows else [],
+        "rows": rows[1:] if len(rows) > 1 else [],
+    }, i
 
 
 def _parse_markdown_blocks(markdown: str) -> List[Tuple[str, Any]]:
-    """Parse Markdown into a small set of PDF-friendly blocks.
+    """Parse report Markdown through an AST without retaining URL targets."""
+    from markdown_it import MarkdownIt
 
-    This is intentionally lossy for exotic Markdown; structure (headings,
-    lists, tables, code, paragraphs) is preserved for stock reports.
-    """
-    text, _ = _strip_images_for_pdf(markdown)
-    fences: List[Tuple[str, str]] = []
-
-    def _fence_repl(match: re.Match[str]) -> str:
-        fences.append(((match.group(1) or "").strip(), match.group(2)))
-        return f"\n@@FENCE{len(fences) - 1}@@\n"
-
-    text = _FENCE_RE.sub(_fence_repl, text)
-    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    note = _IMAGE_OMISSION_NOTE_ZH if _detect_primarily_chinese(markdown) else _IMAGE_OMISSION_NOTE_EN
+    parser = MarkdownIt("commonmark", {"html": True}).enable("table")
+    tokens = parser.parse(markdown)
     blocks: List[Tuple[str, Any]] = []
+    list_stack: List[Dict[str, Any]] = []
+    item_depth = 0
+    quote_depth = 0
+    heading_level: Optional[int] = None
     i = 0
-    para_buf: List[str] = []
 
-    def flush_para() -> None:
-        nonlocal para_buf
-        if para_buf:
-            blocks.append(("paragraph", " ".join(para_buf).strip()))
-            para_buf = []
-
-    while i < len(lines):
-        line = lines[i]
-        stripped = line.strip()
-
-        fence_m = re.fullmatch(r"@@FENCE(\d+)@@", stripped)
-        if fence_m:
-            flush_para()
-            lang, body = fences[int(fence_m.group(1))]
-            blocks.append(("code", {"lang": lang, "body": body.rstrip("\n")}))
-            i += 1
-            continue
-
-        if not stripped:
-            flush_para()
-            i += 1
-            continue
-
-        heading_m = _HEADING_RE.match(stripped)
-        if heading_m:
-            flush_para()
-            level = len(heading_m.group(1))
-            blocks.append(("heading", {"level": level, "text": _plain_inline(heading_m.group(2))}))
-            i += 1
-            continue
-
-        if stripped.startswith(">"):
-            flush_para()
-            quote_lines = []
-            while i < len(lines) and lines[i].strip().startswith(">"):
-                quote_lines.append(lines[i].strip().lstrip(">").strip())
-                i += 1
-            blocks.append(("quote", _plain_inline(" ".join(quote_lines))))
-            continue
-
-        if "|" in stripped and i + 1 < len(lines) and _TABLE_SEP_RE.match(lines[i + 1]):
-            flush_para()
-            header = _split_table_row(stripped)
-            i += 2
-            rows: List[List[str]] = []
-            while i < len(lines) and "|" in lines[i] and lines[i].strip():
-                rows.append([_plain_inline(c) for c in _split_table_row(lines[i])])
-                i += 1
+    while i < len(tokens):
+        token = tokens[i]
+        kind = token.type
+        if kind == "table_open":
+            table, i = _parse_table_tokens(tokens, i, note)
+            blocks.append(("table", table))
+        elif kind == "heading_open":
+            heading_level = int(str(token.tag).lstrip("h") or "1")
+        elif kind == "heading_close":
+            heading_level = None
+        elif kind == "blockquote_open":
+            quote_depth += 1
+        elif kind == "blockquote_close":
+            quote_depth = max(quote_depth - 1, 0)
+        elif kind == "bullet_list_open":
+            list_stack.append({"ordered": False, "next": 1})
+        elif kind == "ordered_list_open":
+            start = token.attrGet("start")
+            list_stack.append({"ordered": True, "next": int(start or 1)})
+        elif kind in {"bullet_list_close", "ordered_list_close"}:
+            if list_stack:
+                list_stack.pop()
+        elif kind == "list_item_open":
+            item_depth += 1
+        elif kind == "list_item_close":
+            item_depth = max(item_depth - 1, 0)
+        elif kind == "inline":
+            text = _inline_text(token.children, token.content, note)
+            if heading_level is not None:
+                blocks.append(("heading", {"level": heading_level, "text": text}))
+            elif item_depth and list_stack:
+                owner = list_stack[-1]
+                marker = f"{owner['next']}." if owner["ordered"] else "•"
+                if owner["ordered"]:
+                    owner["next"] += 1
+                blocks.append(
+                    (
+                        "list_item",
+                        {"depth": len(list_stack), "marker": marker, "text": text},
+                    )
+                )
+            elif quote_depth:
+                blocks.append(("quote", text))
+            elif text:
+                blocks.append(("paragraph", text))
+        elif kind in {"fence", "code_block"}:
             blocks.append(
                 (
-                    "table",
-                    {
-                        "header": [_plain_inline(c) for c in header],
-                        "rows": rows,
-                    },
+                    "code",
+                    {"lang": str(getattr(token, "info", "") or "").strip(), "body": token.content.rstrip("\n")},
                 )
             )
-            continue
-
-        ul_m = _UL_RE.match(line)
-        if ul_m:
-            flush_para()
-            items: List[str] = []
-            while i < len(lines):
-                m = _UL_RE.match(lines[i])
-                if not m:
-                    break
-                items.append(_plain_inline(m.group(2)))
-                i += 1
-            blocks.append(("ul", items))
-            continue
-
-        ol_m = _OL_RE.match(line)
-        if ol_m:
-            flush_para()
-            items = []
-            while i < len(lines):
-                m = _OL_RE.match(lines[i])
-                if not m:
-                    break
-                items.append(_plain_inline(m.group(3)))
-                i += 1
-            blocks.append(("ol", items))
-            continue
-
-        if stripped in {"---", "***", "___"}:
-            flush_para()
+        elif kind == "hr":
             blocks.append(("hr", None))
-            i += 1
-            continue
-
-        para_buf.append(_plain_inline(stripped))
+        elif kind == "html_block":
+            text = _html_text(token.content)
+            if text:
+                blocks.append(("paragraph", text))
         i += 1
-
-    flush_para()
     return blocks
 
 
+def _table_shape_guard(blocks: Sequence[Tuple[str, Any]]) -> None:
+    total_cells = 0
+    for kind, payload in blocks:
+        if kind != "table":
+            continue
+        header = list(payload.get("header") or [])
+        rows = list(payload.get("rows") or [])
+        columns = max(len(header), max((len(row) for row in rows), default=0), 1)
+        if len(rows) > MAX_TABLE_ROWS:
+            raise ReportExportLimitError(
+                f"PDF table exceeds the {MAX_TABLE_ROWS}-row limit.",
+                error_code="export_table_rows_exceeded",
+            )
+        if columns > MAX_TABLE_COLUMNS:
+            raise ReportExportLimitError(
+                f"PDF table exceeds the {MAX_TABLE_COLUMNS}-column limit.",
+                error_code="export_table_columns_exceeded",
+            )
+        total_cells += (len(rows) + (1 if header else 0)) * columns
+        if total_cells > MAX_TOTAL_TABLE_CELLS:
+            raise ReportExportLimitError(
+                "PDF tables exceed the total cell budget.",
+                error_code="export_table_cells_exceeded",
+            )
+
+
+def _rendered_text(blocks: Sequence[Tuple[str, Any]]) -> str:
+    parts: List[str] = []
+    for kind, payload in blocks:
+        if kind == "heading":
+            parts.append(str(payload.get("text") or ""))
+        elif kind in {"paragraph", "quote"}:
+            parts.append(str(payload))
+        elif kind == "list_item":
+            parts.extend([str(payload.get("marker") or ""), str(payload.get("text") or "")])
+        elif kind == "code":
+            parts.append(str(payload.get("body") or ""))
+        elif kind == "table":
+            parts.extend(str(value) for value in payload.get("header") or [])
+            for row in payload.get("rows") or []:
+                parts.extend(str(value) for value in row)
+    return "\n".join(parts)
+
+
+def _deadline_guard(deadline: float) -> None:
+    if time.monotonic() > deadline:
+        raise ReportExportLimitError(
+            "PDF export exceeded the render deadline.",
+            error_code="export_deadline_exceeded",
+            status_code=503,
+        )
+
+
+def _wrap_cell(pdf: Any, text: str, max_width: float) -> List[str]:
+    """Character-safe measured wrapping with zero content truncation."""
+    available = max(max_width, 1.0)
+    output: List[str] = []
+    for source_line in str(text).split("\n") or [""]:
+        if not source_line:
+            output.append("")
+            continue
+        current: List[str] = []
+        width = 0.0
+        for char in source_line:
+            char_width = float(pdf.get_string_width(char))
+            if current and width + char_width > available:
+                output.append("".join(current))
+                current = [char]
+                width = char_width
+            else:
+                current.append(char)
+                width += char_width
+        output.append("".join(current))
+    return output or [""]
+
+
 def _render_pdf_bytes(
-    markdown: str,
+    blocks: Sequence[Tuple[str, Any]],
     *,
     font_path: str,
-    title: Optional[str] = None,
+    title: Optional[str],
+    deadline: float,
 ) -> bytes:
-    try:
-        from fpdf import FPDF
-    except ImportError as exc:
-        raise ReportExportDependencyError(
-            f"Optional package '{PDF_OPTIONAL_PACKAGE}' is not installed."
-        ) from exc
+    from fpdf import FPDF
 
     class _ReportPDF(FPDF):
-        def footer(self) -> None:  # noqa: D102 - fpdf hook
+        def add_page(self, *args: Any, **kwargs: Any) -> None:
+            if self.page_no() >= MAX_PDF_PAGES:
+                raise ReportExportLimitError(
+                    f"PDF export exceeds the {MAX_PDF_PAGES}-page limit.",
+                    error_code="export_page_limit_exceeded",
+                )
+            super().add_page(*args, **kwargs)
+
+        def footer(self) -> None:
             self.set_y(-12)
             self.set_font("ReportFont", size=8)
-            self.cell(0, 8, f"{self.page_no()}", align="C")
+            self.cell(0, 8, str(self.page_no()), align="C")
 
     pdf = _ReportPDF()
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.set_margins(16, 16, 16)
     try:
         pdf.add_font("ReportFont", "", font_path)
-    except Exception as exc:  # broad-exception: fallback_recorded - surface as font error for API
+    except Exception as exc:  # broad-exception: fallback_recorded - sanitized public error
         log_safe_exception(
             logger,
             "PDF font load failed for report export",
@@ -406,105 +743,172 @@ def _render_pdf_bytes(
             context={"font_path": font_path},
         )
         raise ReportExportFontError(
-            f"Failed to load PDF font at '{font_path}': {exc}. "
-            "Set REPORT_EXPORT_PDF_FONT_PATH to a .ttf/.otf font that covers Chinese glyphs."
+            "The configured PDF font could not be loaded.",
+            error_code="export_font_invalid",
         ) from exc
 
     if title:
-        pdf.set_title(title[:180])
+        pdf.set_title(str(title)[:180])
     pdf.add_page()
     pdf.set_font("ReportFont", size=11)
 
-    def _write_flow(text: str, *, h: float = 6, indent: float = 0) -> None:
-        """Write a flowing multi_cell always starting at left margin (+indent)."""
+    def write_flow(text: str, *, height: float = 6, indent: float = 0) -> None:
+        _deadline_guard(deadline)
         pdf.set_x(pdf.l_margin + indent)
-        width = pdf.epw - indent
-        if width < 10:
-            width = pdf.epw
-            pdf.set_x(pdf.l_margin)
-        pdf.multi_cell(width, h, text)
+        width = max(pdf.epw - indent, 10)
+        pdf.multi_cell(width, height, text or " ")
         pdf.set_x(pdf.l_margin)
 
-    blocks = _parse_markdown_blocks(markdown)
+    def draw_segment(lines_by_cell: Sequence[Sequence[str]], widths: Sequence[float], line_height: float) -> None:
+        row_lines = max((len(lines) for lines in lines_by_cell), default=1)
+        row_height = row_lines * line_height + 2
+        x = pdf.l_margin
+        y = pdf.get_y()
+        for lines, width in zip(lines_by_cell, widths):
+            pdf.rect(x, y, width, row_height)
+            for line_index, line in enumerate(lines):
+                pdf.set_xy(x + 1, y + 1 + line_index * line_height)
+                pdf.cell(max(width - 2, 1), line_height, line)
+            x += width
+        pdf.set_xy(pdf.l_margin, y + row_height)
+
+    def render_stacked_table(header: List[str], rows: List[List[str]]) -> None:
+        for row_index, row in enumerate(rows, start=1):
+            _deadline_guard(deadline)
+            if pdf.get_y() > pdf.page_break_trigger - 18:
+                pdf.add_page()
+            for column_index, value in enumerate(row):
+                label = header[column_index] if column_index < len(header) else f"Column {column_index + 1}"
+                write_flow(f"{label}: {value}", height=5)
+            if row_index != len(rows):
+                y = pdf.get_y() + 1
+                pdf.line(pdf.l_margin, y, pdf.l_margin + pdf.epw, y)
+                pdf.ln(3)
+
+    def render_grid_table(header: List[str], rows: List[List[str]]) -> None:
+        column_count = max(len(header), max((len(row) for row in rows), default=0), 1)
+        widths = [pdf.epw / column_count] * column_count
+        line_height = 4.5
+        pdf.set_font("ReportFont", size=8.5)
+        padded_header = (header + [""] * column_count)[:column_count]
+        header_lines = [_wrap_cell(pdf, value, widths[index] - 2) for index, value in enumerate(padded_header)]
+        header_height = max(len(lines) for lines in header_lines) * line_height + 2
+        if header_height >= pdf.page_break_trigger - pdf.t_margin:
+            raise ReportExportLimitError(
+                "PDF table header is too tall for one page.",
+                error_code="export_table_header_too_large",
+            )
+
+        def draw_header() -> None:
+            if header and pdf.get_y() + header_height > pdf.page_break_trigger:
+                pdf.add_page()
+            if header:
+                draw_segment(header_lines, widths, line_height)
+
+        draw_header()
+        for row in rows:
+            _deadline_guard(deadline)
+            padded = (list(row) + [""] * column_count)[:column_count]
+            remaining = [
+                _wrap_cell(pdf, value, widths[index] - 2)
+                for index, value in enumerate(padded)
+            ]
+            row_line_count = max(len(lines) for lines in remaining)
+            page_body_lines = int(
+                max(
+                    pdf.page_break_trigger
+                    - pdf.t_margin
+                    - (header_height if header else 0)
+                    - 2,
+                    0,
+                )
+                // line_height
+            )
+            row_height = row_line_count * line_height + 2
+            if (
+                row_line_count <= page_body_lines
+                and pdf.get_y() + row_height > pdf.page_break_trigger
+            ):
+                pdf.add_page()
+                draw_header()
+            while any(lines for lines in remaining):
+                available_lines = int(
+                    max(pdf.page_break_trigger - pdf.get_y() - 2, 0) // line_height
+                )
+                if available_lines < 1:
+                    pdf.add_page()
+                    draw_header()
+                    available_lines = int(
+                        max(pdf.page_break_trigger - pdf.get_y() - 2, 0) // line_height
+                    )
+                chunk_size = max(1, min(max(len(lines) for lines in remaining), available_lines))
+                segment = [lines[:chunk_size] for lines in remaining]
+                remaining = [lines[chunk_size:] for lines in remaining]
+                draw_segment(segment, widths, line_height)
+                if any(lines for lines in remaining):
+                    pdf.add_page()
+                    draw_header()
+        pdf.set_font("ReportFont", size=11)
+        pdf.ln(2)
+
     for kind, payload in blocks:
+        _deadline_guard(deadline)
         if kind == "heading":
-            level = int(payload["level"])
+            level = int(payload.get("level") or 1)
             size = {1: 18, 2: 15, 3: 13}.get(level, 12)
             pdf.ln(4 if level <= 2 else 2)
             pdf.set_font("ReportFont", size=size)
-            _write_flow(str(payload["text"]), h=max(size * 0.55, 6))
+            write_flow(str(payload.get("text") or ""), height=max(size * 0.55, 6))
             pdf.set_font("ReportFont", size=11)
             pdf.ln(1)
         elif kind == "paragraph":
-            _write_flow(str(payload), h=6)
+            write_flow(str(payload), height=6)
             pdf.ln(1)
         elif kind == "quote":
-            _write_flow(str(payload), h=6, indent=6)
+            write_flow(str(payload), height=6, indent=6)
             pdf.ln(1)
-        elif kind == "ul":
-            for item in payload:
-                _write_flow(f"• {item}", h=6)
-            pdf.ln(1)
-        elif kind == "ol":
-            for idx, item in enumerate(payload, start=1):
-                _write_flow(f"{idx}. {item}", h=6)
-            pdf.ln(1)
+        elif kind == "list_item":
+            indent = min(max(int(payload.get("depth") or 1) - 1, 0) * 5, 30)
+            write_flow(
+                f"{payload.get('marker') or '•'} {payload.get('text') or ''}",
+                height=6,
+                indent=indent,
+            )
         elif kind == "code":
-            body = str(payload.get("body") or "")
             pdf.set_font("ReportFont", size=9)
-            for code_line in body.split("\n") or [""]:
-                _write_flow(code_line if code_line else " ", h=5)
+            for line in str(payload.get("body") or "").split("\n") or [""]:
+                write_flow(line or " ", height=5, indent=3)
             pdf.set_font("ReportFont", size=11)
             pdf.ln(1)
         elif kind == "table":
-            # Keep table layout simple: single-line cells + explicit left margin
-            # reset. multi_cell per-cell layouts leave the cursor mid-row and
-            # break subsequent blocks with "Not enough horizontal space".
-            header: List[str] = list(payload.get("header") or [])
-            rows: List[List[str]] = list(payload.get("rows") or [])
-            col_count = max(len(header), max((len(r) for r in rows), default=0), 1)
-            col_w = pdf.epw / col_count
-            pdf.set_font("ReportFont", size=9)
-            pdf.set_x(pdf.l_margin)
-            if header:
-                for cell in header + [""] * (col_count - len(header)):
-                    pdf.cell(col_w, 7, str(cell)[:40], border=1)
-                pdf.ln()
-                pdf.set_x(pdf.l_margin)
-            for row in rows:
-                padded = row + [""] * (col_count - len(row))
-                pdf.set_x(pdf.l_margin)
-                for cell in padded:
-                    pdf.cell(col_w, 7, str(cell)[:40], border=1)
-                pdf.ln()
-            pdf.set_x(pdf.l_margin)
-            pdf.set_font("ReportFont", size=11)
-            pdf.ln(2)
+            header = [str(value) for value in payload.get("header") or []]
+            rows = [[str(value) for value in row] for row in payload.get("rows") or []]
+            column_count = max(len(header), max((len(row) for row in rows), default=0), 1)
+            if column_count > 6:
+                render_stacked_table(header, rows)
+            else:
+                render_grid_table(header, rows)
         elif kind == "hr":
             y = pdf.get_y() + 2
             pdf.line(pdf.l_margin, y, pdf.l_margin + pdf.epw, y)
             pdf.ln(4)
 
-    # fpdf2 >=2.2 returns bytes/bytearray from output() without dest=
+    _deadline_guard(deadline)
     raw = pdf.output()
-    if isinstance(raw, (bytes, bytearray)):
-        return bytes(raw)
-    return str(raw).encode("latin-1")
+    return bytes(raw) if isinstance(raw, (bytes, bytearray)) else str(raw).encode("latin-1")
 
 
 def _safe_filename_stem(stem: str) -> str:
-    cleaned = re.sub(r"[^\w.\-]+", "_", stem.strip(), flags=re.UNICODE)
+    cleaned = re.sub(r"[^\w.\-]+", "_", str(stem).strip(), flags=re.UNICODE)
     cleaned = cleaned.strip("._") or "report"
     return cleaned[:80]
 
 
 def export_markdown_bytes(markdown: str, *, filename_stem: str = "report") -> ExportArtifact:
-    """Export Markdown as UTF-8 bytes (always available, no optional deps)."""
-    if markdown is None:
-        raise ReportExportFormatError("Report content is empty", error_code="export_empty")
+    """Export exact UTF-8 Markdown without optional dependencies."""
+    if markdown is None or not str(markdown).strip():
+        raise ReportExportFormatError("Report content is empty.", error_code="export_empty")
     content = str(markdown)
-    if not content.strip():
-        raise ReportExportFormatError("Report content is empty", error_code="export_empty")
     stem = _safe_filename_stem(filename_stem)
     return ExportArtifact(
         content=content.encode("utf-8"),
@@ -514,6 +918,38 @@ def export_markdown_bytes(markdown: str, *, filename_stem: str = "report") -> Ex
     )
 
 
+def _cache_key(markdown: str, font_path: str, title: Optional[str]) -> str:
+    signature = _font_signature(Path(font_path))
+    digest = hashlib.sha256()
+    digest.update(markdown.encode("utf-8"))
+    digest.update(repr(signature).encode("utf-8"))
+    digest.update(str(title or "").encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _cache_get(key: str) -> Optional[ExportArtifact]:
+    with _PDF_CACHE_LOCK:
+        artifact = _PDF_CACHE.get(key)
+        if artifact is not None:
+            _PDF_CACHE.move_to_end(key)
+        return artifact
+
+
+def _cache_put(key: str, artifact: ExportArtifact) -> None:
+    global _PDF_CACHE_BYTES
+    if len(artifact.content) > PDF_CACHE_MAX_BYTES:
+        return
+    with _PDF_CACHE_LOCK:
+        old = _PDF_CACHE.pop(key, None)
+        if old is not None:
+            _PDF_CACHE_BYTES -= len(old.content)
+        _PDF_CACHE[key] = artifact
+        _PDF_CACHE_BYTES += len(artifact.content)
+        while len(_PDF_CACHE) > PDF_CACHE_ENTRIES or _PDF_CACHE_BYTES > PDF_CACHE_MAX_BYTES:
+            _, removed = _PDF_CACHE.popitem(last=False)
+            _PDF_CACHE_BYTES -= len(removed.content)
+
+
 def export_pdf_bytes(
     markdown: str,
     *,
@@ -521,35 +957,86 @@ def export_pdf_bytes(
     title: Optional[str] = None,
     font_path: Optional[str] = None,
 ) -> ExportArtifact:
-    """Export Markdown to PDF when the optional dependency and a font are present."""
+    """Render a bounded PDF after backend, font, glyph, and AST validation."""
     if markdown is None or not str(markdown).strip():
-        raise ReportExportFormatError("Report content is empty", error_code="export_empty")
-    if not is_pdf_dependency_available():
+        raise ReportExportFormatError("Report content is empty.", error_code="export_empty")
+    content = str(markdown)
+    input_bytes = len(content.encode("utf-8"))
+    if input_bytes > MAX_PDF_INPUT_BYTES:
+        raise ReportExportLimitError(
+            f"PDF input exceeds the {MAX_PDF_INPUT_BYTES}-byte limit.",
+            error_code="export_input_too_large",
+        )
+    deadline = time.monotonic() + PDF_RENDER_DEADLINE_SECONDS
+
+    backend = inspect_pdf_backend()
+    if not backend.available:
         raise ReportExportDependencyError(
-            f"Optional package '{PDF_OPTIONAL_PACKAGE}' is not installed. {PDF_INSTALL_HINT}"
+            "The supported fpdf2 backend is unavailable or conflicts with legacy PyFPDF."
         )
-    resolved_font = font_path or resolve_pdf_font_path()
-    if not resolved_font:
+    _deadline_guard(deadline)
+
+    blocks = _parse_markdown_blocks(content)
+    _table_shape_guard(blocks)
+    _deadline_guard(deadline)
+    configured = font_path or _configured_font_path()
+    rendered_text = _rendered_text(blocks)
+    resolved_font, font_status, _missing_count = _resolve_font_for_text(
+        rendered_text,
+        configured=configured,
+    )
+    if resolved_font is None:
+        if font_status == "font_coverage_missing":
+            raise ReportExportFontError(
+                "The validated PDF font does not cover all glyphs in this report. Use the lossless Markdown export or configure a font with complete coverage.",
+                error_code="export_font_coverage_missing",
+            )
+        code = "export_font_invalid" if configured else "export_font_missing"
         raise ReportExportFontError(
-            "No usable PDF font found for report export. "
-            "Set REPORT_EXPORT_PDF_FONT_PATH to a .ttf or .otf file that covers "
-            "the report language (Chinese reports need a CJK-capable font). "
-            "Collection TrueType fonts (.ttc) are not used without extra tooling."
+            "The configured PDF font is invalid or no validated PDF font is available.",
+            error_code=code,
         )
-    pdf_bytes = _render_pdf_bytes(
-        str(markdown),
-        font_path=resolved_font,
-        title=title or filename_stem,
-    )
-    if not pdf_bytes.startswith(b"%PDF"):
-        raise ReportExportError("PDF backend returned non-PDF bytes", error_code="export_pdf_invalid")
+    _deadline_guard(deadline)
+
     stem = _safe_filename_stem(filename_stem)
-    return ExportArtifact(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        filename=f"{stem}.pdf",
-        format="pdf",
-    )
+    try:
+        key = _cache_key(content, resolved_font, title or stem)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Report export font changed before rendering",
+            exc,
+            error_code="export_font_invalid",
+            level=logging.WARNING,
+        )
+        raise ReportExportFontError(
+            "The validated PDF font is no longer available.",
+            error_code="export_font_invalid",
+        ) from exc
+    cached = _cache_get(key)
+    if cached is not None:
+        return ExportArtifact(cached.content, cached.media_type, f"{stem}.pdf", "pdf")
+    if not _PDF_SEMAPHORE.acquire(blocking=False):
+        raise ReportExportBusyError()
+    try:
+        pdf_bytes = _render_pdf_bytes(
+            blocks,
+            font_path=resolved_font,
+            title=title or stem,
+            deadline=deadline,
+        )
+        _deadline_guard(deadline)
+    finally:
+        _PDF_SEMAPHORE.release()
+
+    if not pdf_bytes.startswith(b"%PDF"):
+        raise ReportExportError(
+            "PDF backend returned invalid output.",
+            error_code="export_pdf_invalid",
+        )
+    artifact = ExportArtifact(pdf_bytes, "application/pdf", f"{stem}.pdf", "pdf")
+    _cache_put(key, artifact)
+    return artifact
 
 
 def export_report(
@@ -560,21 +1047,11 @@ def export_report(
     title: Optional[str] = None,
     font_path: Optional[str] = None,
 ) -> ExportArtifact:
-    """Export Markdown to the requested format.
-
-    Parameters
-    ----------
-    markdown:
-        Already-rendered report text. Must not contain secrets; the service does
-        not redact beyond what callers provide.
-    fmt:
-        ``md`` or ``pdf`` (case-insensitive).
-    """
+    """Export Markdown to the requested ``md`` or ``pdf`` format."""
     normalized = (fmt or "").strip().lower()
     if normalized not in SUPPORTED_FORMATS:
         raise ReportExportFormatError(
-            f"Unsupported export format '{fmt}'. Supported: {', '.join(SUPPORTED_FORMATS)}. "
-            "Office formats (docx, xlsx) are not implemented in this release."
+            f"Unsupported export format '{fmt}'. Supported: {', '.join(SUPPORTED_FORMATS)}."
         )
     if normalized == "md":
         return export_markdown_bytes(markdown, filename_stem=filename_stem)
@@ -587,15 +1064,14 @@ def export_report(
 
 
 def capabilities_public_view(payload: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """Return capabilities without absolute font paths (safe for API clients)."""
+    """Return a detached public capability mapping with no filesystem paths."""
     data = dict(payload or get_export_capabilities())
     formats = data.get("formats")
-    if isinstance(formats, dict):
-        pdf = formats.get("pdf")
-        if isinstance(pdf, dict):
-            pdf = dict(pdf)
-            pdf.pop("font_path", None)
-            formats = dict(formats)
-            formats["pdf"] = pdf
-            data["formats"] = formats
+    if isinstance(formats, Mapping):
+        data["formats"] = {
+            key: {inner_key: inner_value for inner_key, inner_value in dict(value).items() if inner_key != "font_path"}
+            if isinstance(value, Mapping)
+            else value
+            for key, value in formats.items()
+        }
     return data

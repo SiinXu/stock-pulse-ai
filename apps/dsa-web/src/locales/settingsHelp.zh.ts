@@ -798,6 +798,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: '报告导出 PDF 字体路径',
+    summary: '选择可选 PDF 报告导出使用的单字体 TTF/OTF。',
+    usage: '仅在服务器存在覆盖报告全部可见字符的字体时填写绝对路径；留空则探测文档列出的系统候选。',
+    valueNotes: [
+      '显式无效路径会 fail-closed，不会回退到其他系统字体。',
+      '能力检查验证目标语言代表字符；每次导出还会再次验证该报告的精确字符集。',
+    ],
+    impact: ['只影响可选 PDF 导出；无损 Markdown 导出始终可用。'],
+    notes: [
+      '支持 TTF/OTF 单字体，不猜测 TTC 字体集合下标。',
+      '公共能力与错误响应不会暴露绝对路径或字体解析器原始错误。',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
+    ],
+  },
   'settings.system.USE_PROXY': {
     title: '启用本地代理',
     summary: '大陆用户友好开关：将 PROXY_HOST 与 PROXY_PORT 映射为进程级 http_proxy/https_proxy。',
