@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import { ConfirmDialog, InlineAlert } from '../common';
+import { ConfirmDialog, InlineAlert, SearchInput } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import {
@@ -8,7 +8,10 @@ import {
   MODEL_ACCESS_TEXT,
   localizeModelAccessIssue,
 } from '../../locales/settingsModelAccess';
-import { inspectConnectionSchemaDefinition } from './llmConnectionContract';
+import {
+  getProviderDisplayLabel,
+  inspectConnectionSchemaDefinition,
+} from './llmConnectionContract';
 import {
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
@@ -117,6 +120,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const testRequestIdRef = useRef(0);
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onValidityChangeRef = useRef(onValidityChange);
+  const [connectionFilter, setConnectionFilter] = useState('');
 
   const connectionSchemaDefinition = useMemo(
     () => inspectConnectionSchemaDefinition(connectionFields),
@@ -502,6 +506,29 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     setModal(null);
   };
 
+  const visibleChannels = useMemo(() => {
+    const query = connectionFilter.trim().toLowerCase();
+    return channels
+      .map((channel, index) => ({ channel, index }))
+      .filter(({ channel }) => {
+        if (!query) {
+          return true;
+        }
+        const provider = providers.find((entry) => entry.id === channel.providerId);
+        const providerLabel = provider
+          ? getProviderDisplayLabel(provider, language)
+          : channel.providerId;
+        return [
+          channel.name,
+          channel.displayName,
+          channel.providerId,
+          providerLabel,
+          channel.models,
+          channel.baseUrl,
+        ].join(' ').toLowerCase().includes(query);
+      });
+  }, [channels, connectionFilter, language, providers]);
+
   return (
     <div className="space-y-4">
       {overriddenByMode ? (
@@ -539,14 +566,31 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         />
       ) : null}
 
+      <section className="space-y-2" aria-labelledby="cloud-connections-heading">
+        <h3 id="cloud-connections-heading" className="text-sm font-semibold text-foreground">
+          {editorText.hubCloudGroup}
+        </h3>
+        <SearchInput
+          value={connectionFilter}
+          onChange={(event) => setConnectionFilter(event.target.value)}
+          placeholder={editorText.hubSearchPlaceholder}
+          aria-label={editorText.hubSearchLabel}
+          wrapperClassName="w-full sm:max-w-sm"
+        />
+      </section>
+
       {channels.length === 0 ? (
         <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
           <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
           <p className="mt-1 text-xs text-muted-text">{editorText.emptyDescription}</p>
         </div>
+      ) : visibleChannels.length === 0 ? (
+        <p className="px-1 text-sm text-muted-text" role="status">
+          {editorText.hubNoSearchMatches}
+        </p>
       ) : (
         <div className="space-y-2">
-          {channels.map((channel, index) => (
+          {visibleChannels.map(({ channel, index }) => (
             <ConnectionCard
               key={channel.id}
               channel={channel}

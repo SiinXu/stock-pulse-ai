@@ -27,6 +27,11 @@ const NON_TRANSLATABLE_PROPERTIES = new Set([
   'route',
   'path',
 ]);
+/** Keep aligned with createUiLanguageRecord.ts / check-ui-i18n-resources.mjs. */
+const SETTINGS_HELP_MAPS_NAMESPACE = 'locales.settingsHelp.SETTINGS_HELP_MAPS';
+function shouldSkipSettingsHelpExamplesContainer(namespace, propertyName) {
+  return namespace === SETTINGS_HELP_MAPS_NAMESPACE && propertyName === 'examples';
+}
 const REQUIRED_CATEGORIES = new Set([
   'trading_action',
   'risk',
@@ -149,6 +154,9 @@ function flattenValue(target, namespace, value, parts = [], propertyName) {
   }
   if (value && typeof value === 'object') {
     for (const [key, child] of Object.entries(value)) {
+      if (shouldSkipSettingsHelpExamplesContainer(namespace, key)) {
+        continue;
+      }
       flattenValue(target, namespace, child, [...parts, key], key);
     }
   }

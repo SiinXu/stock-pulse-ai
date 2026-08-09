@@ -9,7 +9,7 @@ import { useDialogA11y } from './useDialogA11y';
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   confirmDisabled?: boolean;
@@ -75,9 +75,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id={titleId} className="mb-2 text-lg font-medium text-foreground">{title}</h3>
-        <p id={messageId} className="text-sm text-secondary-text mb-6 leading-relaxed">
+        <div id={messageId} className="text-sm text-secondary-text mb-6 leading-relaxed">
           {message}
-        </p>
+        </div>
         {error ? (
           <p className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-left text-xs text-danger" role="alert">
             {error}

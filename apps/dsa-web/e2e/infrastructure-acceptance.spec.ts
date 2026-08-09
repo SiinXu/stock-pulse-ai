@@ -691,7 +691,7 @@ function backtestRow(id: number, code: string) {
 async function assertRouteChrome(page: Page, path: string, text: string, title: string) {
   await page.goto(path);
   await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveTitle(new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  await expect(page).toHaveTitle(title);
 }
 
 async function assertNoDocumentOverflow(page: Page, path: string) {
@@ -927,8 +927,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
-    await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
+    // Usage is hosted under Settings; chrome text is usage.title and document title is usage.documentTitle.
+    await assertRouteChrome(
+      page,
+      usageSettingsHref,
+      UI_TEXT.en['usage.title'],
+      UI_TEXT.en['usage.documentTitle'],
+    );
+    await assertRouteChrome(
+      page,
+      APP_ROUTE_PATHS.settings,
+      UI_TEXT.en['settings.pageTitle'],
+      UI_TEXT.en['settings.pageTitleDocument'],
+    );
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
   });
 
@@ -936,11 +947,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto(`${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#recent`);
 
+    // Settings is a large lazy chunk; wait for the embedded usage heading before URL checks.
     await expect(page.getByRole('heading', {
       level: 2,
       name: UI_TEXT.en['usage.title'],
       exact: true,
-    })).toBeVisible();
+    })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1')).toHaveCount(1);
     const redirectedUrl = new URL(page.url());
     expect(redirectedUrl.pathname).toBe(APP_ROUTE_PATHS.settings);
@@ -951,6 +963,22 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: 'Usage & cost' }))
       .toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
+
+    const canonicalUsageHref = `${redirectedUrl.pathname}${redirectedUrl.search}${redirectedUrl.hash}`;
+    // replace (not push): Back returns to the exact pre-navigation Home entry,
+    // while Forward restores the canonical Settings URL with query/hash intact.
+    await page.goBack();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(APP_ROUTE_PATHS.home);
+    await page.goForward();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(canonicalUsageHref);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
   });
 
   test('05b legacy Research deep links preserve context and replace into canonical routes', async ({ page }) => {

@@ -91,6 +91,8 @@ Architecture: [overview](docs/architecture-overview.md).
 
 ### Option A — GitHub Actions (no server)
 
+Minimal three-step path (one model Secret, `STOCK_LIST`, optional webhook): [GitHub Actions quickstart](docs/actions-quickstart.md) · [中文](docs/actions-quickstart_CN.md).
+
 1. **Fork** this repository.
 2. **Secrets** → `Settings` → `Secrets and variables` → `Actions`  
    - At least one model key: `ANSPIRE_API_KEYS` or `AIHUBMIX_KEY` (or Gemini / Anthropic / OpenAI-compatible).  

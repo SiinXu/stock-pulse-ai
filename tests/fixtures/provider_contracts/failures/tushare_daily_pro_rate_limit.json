@@ -1,0 +1,14 @@
+{
+  "meta": {
+    "provider": "tushare",
+    "api_name": "daily",
+    "failure_mode": "rate_limit",
+    "recorded_note": "Tushare Pro HTTP body with non-zero code and quota/limit wording. Offline sample 2026-08-08.",
+    "source_shape": "tests/fixtures/provider_contracts/tushare_daily_pro.json"
+  },
+  "response": {
+    "code": 40203,
+    "msg": "抱歉，您每分钟最多访问该接口200次，权限的具体详情访问：https://tushare.pro/document/1?doc_id=108。",
+    "data": null
+  }
+}
