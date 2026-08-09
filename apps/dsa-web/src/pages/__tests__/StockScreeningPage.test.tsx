@@ -202,7 +202,7 @@ describe('StockScreeningPage', () => {
     const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
     expect(emptyPanel).not.toBeNull();
     expect(within(emptyPanel as HTMLElement).getByRole('button', { name: '调整条件 · 没有符合条件的股票' })).toBeInTheDocument();
-    expect(within(emptyPanel as HTMLElement).getByRole('button', { name: '运行选股 · 没有符合条件的股票' })).toBeInTheDocument();
+    expect(within(emptyPanel as HTMLElement).getByRole('button', { name: '重试 · 没有符合条件的股票' })).toBeInTheDocument();
     expect(screen.getAllByText('没有符合条件的股票')).toHaveLength(1);
   });
 
@@ -220,6 +220,39 @@ describe('StockScreeningPage', () => {
     expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
+  it('keeps last-good candidates and renders a failed status after full source failure', async () => {
+    getAlphaSiftStatus.mockResolvedValue({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks
+      .mockResolvedValueOnce({
+        enabled: true,
+        candidates: [{ rank: 1, code: '000001', name: '数据源失败前候选', score: 88, raw: {} }],
+        candidateCount: 1,
+        snapshotCount: 120,
+      })
+      .mockResolvedValueOnce({
+        enabled: true,
+        candidates: [],
+        candidateCount: 0,
+        snapshotCount: 0,
+        sourceErrors: ['tushare: timeout'],
+      });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('数据源失败前候选')).toBeInTheDocument();
+
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(screen.getByText('数据源失败前候选')).toBeInTheDocument();
+    expect(await screen.findByText('行情数据源已降级')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('调用失败').length).toBeGreaterThan(0));
+    expect(screen.queryByText('选股完成')).not.toBeInTheDocument();
+  });
+
   it('shows adapter-unavailable once with a data-sources CTA and neutral empty results', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: true });
     render(<StockScreeningPage />);
@@ -231,6 +264,70 @@ describe('StockScreeningPage', () => {
     expect(emptyPanel).not.toBeNull();
     expect(within(emptyPanel as HTMLElement).queryByRole('button')).toBeNull();
     expect(screen.queryByText('等待开启')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      label: '401',
+      error: Object.assign(new Error('administrator session expired'), {
+        isAxiosError: true,
+        response: { status: 401, data: { detail: 'administrator session expired' } },
+      }),
+      expectsLogin: true,
+    },
+    {
+      label: 'network',
+      error: Object.assign(new Error('Network Error'), { isAxiosError: true }),
+      expectsLogin: false,
+    },
+    {
+      label: '5xx',
+      error: Object.assign(new Error('service unavailable'), {
+        isAxiosError: true,
+        response: { status: 503, data: { detail: 'service unavailable' } },
+      }),
+      expectsLogin: false,
+    },
+    {
+      label: 'schema',
+      error: {
+        title: '响应校验失败',
+        message: '状态响应缺少 enabled 字段',
+        rawMessage: 'missing enabled',
+        category: 'http_error' as const,
+        code: 'api_response_validation_failed',
+      },
+      expectsLogin: false,
+    },
+  ])('keeps $label status-check failures distinct from disabled capability', async ({
+    error: statusError,
+    expectsLogin,
+  }) => {
+    getAlphaSiftStatus.mockRejectedValueOnce(statusError);
+
+    render(<StockScreeningPage />);
+
+    const statusErrorTitle = await screen.findByText('无法确认选股状态');
+    expect(statusErrorTitle).toBeInTheDocument();
+    expect(screen.getAllByText('无法确认选股状态')).toHaveLength(1);
+    expect(statusErrorTitle.closest('[role="alert"]')?.textContent).not.toBe('无法确认选股状态');
+    expect(screen.getByRole('button', { name: '重试状态检查' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '开启 AlphaSift' })).not.toBeInTheDocument();
+    expect(screen.queryByText('AlphaSift 未开启')).not.toBeInTheDocument();
+    if (expectsLogin) {
+      fireEvent.click(screen.getByRole('button', { name: '管理员登录' }));
+      expect(navigate).toHaveBeenCalledWith('/login?redirect=%2Fresearch%2Fdiscover');
+    } else {
+      expect(screen.queryByRole('button', { name: '管理员登录' })).not.toBeInTheDocument();
+    }
+
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    fireEvent.click(screen.getByRole('button', { name: '重试状态检查' }));
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
   });
 
   it('re-syncs enabled state when AlphaSift availability check fails after config is enabled', async () => {
@@ -1215,6 +1312,144 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('当前策略：资金热度 · A 股')).toBeInTheDocument();
   });
 
+  it('preserves the last successful result after submit failure and retries exact validated parameters', async () => {
+    getAlphaSiftStatus.mockResolvedValue({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [{ rank: 1, code: '000001', name: '上次成功候选', score: 88, raw: {} }],
+      candidateCount: 1,
+      snapshotCount: 120,
+      afterFilterCount: 8,
+      snapshotSource: 'tushare',
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('上次成功候选')).toBeInTheDocument();
+    expect(screen.getByText('快照来源：tushare')).toBeInTheDocument();
+
+    startScreenTask.mockRejectedValueOnce(new Error('second submission failed'));
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(screen.getByText('上次成功候选')).toBeInTheDocument();
+    expect(screen.getByText('快照来源：tushare')).toBeInTheDocument();
+    expect(startScreenTask).toHaveBeenNthCalledWith(2, {
+      market: 'cn',
+      strategy: 'dual_low',
+      maxResults: 3,
+    });
+
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [{ rank: 1, code: '000002', name: '重试候选', score: 89, raw: {} }],
+      candidateCount: 1,
+    });
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await waitFor(() => expect(startScreenTask).toHaveBeenNthCalledWith(3, {
+      market: 'cn',
+      strategy: 'dual_low',
+      maxResults: 3,
+    }));
+    expect(await screen.findByText('重试候选')).toBeInTheDocument();
+    expect(screen.queryByText(/快照来源：/)).not.toBeInTheDocument();
+  });
+
+  it('preserves the last successful result when a later task fails', async () => {
+    getAlphaSiftStatus.mockResolvedValue({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [{ rank: 1, code: '000001', name: '任务失败前候选', score: 88, raw: {} }],
+      candidateCount: 1,
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('任务失败前候选')).toBeInTheDocument();
+
+    screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0 });
+    getScreenTask.mockResolvedValueOnce({
+      taskId: 'screen-task-2',
+      status: 'failed',
+      progress: 100,
+      error: 'provider failed',
+    } as never);
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(screen.getByText('任务失败前候选')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '参数设置' })).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: '重试' })).toBeInTheDocument();
+  });
+
+  it('preserves the last successful result when a later task cannot be restored', async () => {
+    getAlphaSiftStatus.mockResolvedValue({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [{ rank: 1, code: '000001', name: '恢复失败前候选', score: 88, raw: {} }],
+      candidateCount: 1,
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('恢复失败前候选')).toBeInTheDocument();
+
+    screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0 });
+    getScreenTask.mockRejectedValueOnce({
+      parsedError: {
+        title: '选股任务无法恢复',
+        message: '任务可能已过期。',
+        rawMessage: 'not found',
+        status: 404,
+        category: 'http_error',
+        code: 'alphasift_screen_task_not_found',
+      },
+    });
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(screen.getByText('恢复失败前候选')).toBeInTheDocument();
+    await waitFor(() => expect(window.sessionStorage.getItem(SCREEN_TASK_SESSION_STORAGE_KEY)).toBeNull());
+  });
+
+  it('preserves the last successful result during a recoverable polling error', async () => {
+    getAlphaSiftStatus.mockResolvedValue({ enabled: true, available: true, installSpecIsDefault: true });
+    screenStocks.mockResolvedValueOnce({
+      enabled: true,
+      candidates: [{ rank: 1, code: '000001', name: '轮询失败前候选', score: 88, raw: {} }],
+      candidateCount: 1,
+    });
+
+    render(<StockScreeningPage />);
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('轮询失败前候选')).toBeInTheDocument();
+
+    const timeoutError = Object.assign(new Error('timeout of 30000ms exceeded'), {
+      code: 'ECONNABORTED',
+    });
+    screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0 });
+    getScreenTask.mockRejectedValueOnce(timeoutError);
+    openScreeningConfiguration();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(screen.getByText('轮询失败前候选')).toBeInTheDocument();
+    expect(await screen.findByText('选股任务仍在后台运行，状态轮询暂时超时，将自动重试。')).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(SCREEN_TASK_SESSION_STORAGE_KEY)).toContain('screen-task-1');
+  });
+
   it('restores an in-flight screening task after remounting the page', async () => {
     getAlphaSiftStatus.mockResolvedValue({
       enabled: true,
@@ -1274,7 +1509,7 @@ describe('StockScreeningPage', () => {
 
     await waitFor(() => {
       expect(getScreenTask).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('选股运行中')).toBeInTheDocument();
+      expect(screen.getAllByText('选股运行中')).toHaveLength(2);
     });
     expect(window.sessionStorage.getItem('dsa.alphasift.activeScreenTask.v1')).toContain('screen-task-1');
 
@@ -1312,7 +1547,7 @@ describe('StockScreeningPage', () => {
     });
     await waitFor(() => {
       expect(getScreenTask).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('选股运行中')).toBeInTheDocument();
+      expect(screen.getAllByText('选股运行中')).toHaveLength(2);
       expect(screen.getByText('选股任务仍在后台运行，状态轮询暂时超时，将自动重试。')).toBeInTheDocument();
     });
     expect(screen.queryByText(/连接上游服务超时/)).not.toBeInTheDocument();
@@ -1356,6 +1591,8 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     expect(await screen.findByText('LLM 已降级')).toBeInTheDocument();
+    expect(screen.queryByText('行情数据源已降级')).not.toBeInTheDocument();
+    expect(screen.queryByText(/部分数据源已降级/)).not.toBeInTheDocument();
     expect(screen.getByText(/缺少可用 LLM API Key/)).toBeInTheDocument();
     expect(screen.queryByText(/Missing gemini_api_key/)).not.toBeInTheDocument();
     expect(screen.getByText('未重排')).toBeInTheDocument();
@@ -1402,7 +1639,9 @@ describe('StockScreeningPage', () => {
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
-    expect(await screen.findByText('AlphaSift 已降级运行')).toBeInTheDocument();
+    expect(await screen.findAllByText('AlphaSift 已降级运行')).toHaveLength(2);
+    expect(screen.getByText('行情数据源已降级')).toBeInTheDocument();
+    expect(screen.getByText('LLM 已降级')).toBeInTheDocument();
     expect(screen.getByText('数据源暂时不可用')).toBeInTheDocument();
     expect(screen.getByText('LLM 结果解析失败，已保留可用结果')).toBeInTheDocument();
     expect(screen.queryByText(/alphasift_(warning|source_error|llm_parse_error)/)).not.toBeInTheDocument();
@@ -1439,7 +1678,7 @@ describe('StockScreeningPage', () => {
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
-    expect(await screen.findByText('AlphaSift 提示')).toBeInTheDocument();
+    expect(await screen.findByText('行情数据源已降级')).toBeInTheDocument();
     expect(screen.getAllByText('数据源降级：tushare（交易日历暂无可用开市日）')).toHaveLength(1);
     expect(screen.queryByText(/trade_cal returned no open trading days/)).not.toBeInTheDocument();
   });

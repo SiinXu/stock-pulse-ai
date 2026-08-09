@@ -1308,7 +1308,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(parametersTrigger).toBeFocused();
   });
 
-  test('14 Screening restores a successful task and reports a subsequent failed task through the shared task contract', async ({ page }) => {
+  test('14 Screening restores a successful task and preserves it through subsequent failed attempts', async ({ page }) => {
     await mockScreeningBase(page);
     let submissionAttempts = 0;
     await page.route('**/api/v1/alphasift/screen/tasks/restore-success', (route) => fulfillJson(route, {
@@ -1403,7 +1403,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText('外部行情或模型服务不可用，请稍后重试。', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('raw backend failure', { exact: true })).toHaveCount(0);
     expect(submissionAttempts).toBe(2);
-    await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(SCREENING_TEXT.zh.showingLastGoodTitle, { exact: true })).toBeVisible();
+    await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
   });
 
   test('15 Alerts creation failure stays inside the modal and preserves all user input', async ({ page }) => {

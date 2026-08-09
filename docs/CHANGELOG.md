@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 
-- [Fixed] Clarify Discover/screening empty and degraded states: never-run guide, no-hits vs full data-source failure, single capability banner, and Settings data-sources CTA (#871).
+- [Fixed] Preserve the last successful screening result across failed attempts, distinguish capability/status/empty/degradation states, and provide exact-parameter retry and data-source recovery actions (Refs #871).
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
 - [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
 - [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).

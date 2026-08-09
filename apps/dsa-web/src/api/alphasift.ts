@@ -340,6 +340,7 @@ export type AlphaSiftScreenResponse = {
   strategy?: string;
   market?: string;
   snapshotCount?: number;
+  snapshotSource?: string | null;
   afterFilterCount?: number;
   llmRanked?: boolean;
   llmMarketView?: string;
