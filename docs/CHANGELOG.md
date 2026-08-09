@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
 - [Added] Versioned watchlist AI scoring from bounded existing analysis and coherent decision signals, with strict source/time/degradation provenance and a localized independent Web column (Issue #147 / T25).
 - [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
 
