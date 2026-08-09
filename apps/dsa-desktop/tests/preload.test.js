@@ -49,7 +49,6 @@ test('preload exposes desktop version from BrowserWindow additionalArguments', (
   assert.equal(typeof exposed.dsaDesktop.checkForUpdates, 'function');
   assert.equal(typeof exposed.dsaDesktop.installDownloadedUpdate, 'function');
   assert.equal(typeof exposed.dsaDesktop.openReleasePage, 'function');
-  assert.equal(typeof exposed.dsaDesktop.getEnvironmentDiagnostics, 'function');
   assert.equal(typeof exposed.dsaDesktop.onUpdateStateChange, 'function');
   assert.deepEqual(Object.keys(exposed.stockPulseLocalModels).sort(), [
     'detect',
@@ -168,11 +167,6 @@ test('createDesktopBridge delegates update actions to ipcRenderer', async (t) =>
     channel: preloadModule.DESKTOP_OPEN_RELEASE_PAGE_CHANNEL,
     payload: 'https://github.com/SiinXu/stock-pulse-ai/releases/tag/v3.13.0',
   });
-  assert.deepEqual(await desktopBridge.getEnvironmentDiagnostics(), {
-    channel: preloadModule.DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL,
-    payload: undefined,
-  });
-
   const receivedPayloads = [];
   const unsubscribe = desktopBridge.onUpdateStateChange((payload) => {
     receivedPayloads.push(payload);

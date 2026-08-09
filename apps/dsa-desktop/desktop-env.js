@@ -27,6 +27,10 @@ const DESKTOP_DIAGNOSTIC_CLI_COMMANDS = Object.freeze([
   'claude',
   'opencode',
 ]);
+const DESKTOP_DIAGNOSTIC_DEADLINE_MS = 250;
+const DESKTOP_DIAGNOSTIC_MAX_PATH_ENTRIES = 64;
+const DESKTOP_DIAGNOSTIC_CONCURRENCY = 4;
+const DESKTOP_DIAGNOSTIC_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Allowlisted basename only: letters, digits, dash, underscore, plus Windows extensions.
 const DESKTOP_DIAGNOSTIC_CLI_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
@@ -88,7 +92,11 @@ function isSafeDiagnosticCliName(command) {
   return DESKTOP_DIAGNOSTIC_CLI_NAME_PATTERN.test(name);
 }
 
-function listCandidateExecutableNames(command, platform = process.platform) {
+function listCandidateExecutableNames(
+  command,
+  platform = process.platform,
+  pathExt = process.env.PATHEXT
+) {
   const name = String(command || '').trim();
   if (!isSafeDiagnosticCliName(name)) {
     return [];
@@ -97,120 +105,203 @@ function listCandidateExecutableNames(command, platform = process.platform) {
     return [name];
   }
   const lower = name.toLowerCase();
-  if (lower.endsWith('.exe') || lower.endsWith('.cmd') || lower.endsWith('.bat')) {
+  const extensions = String(pathExt || '.COM;.EXE;.BAT;.CMD')
+    .split(';')
+    .map((extension) => extension.trim())
+    .filter((extension) => /^\.[A-Za-z0-9]+$/.test(extension));
+  if (extensions.some((extension) => lower.endsWith(extension.toLowerCase()))) {
     return [name];
   }
-  return [`${name}.exe`, `${name}.cmd`, `${name}.bat`, name];
+  return extensions.map((extension) => `${name}${extension}`);
 }
 
-function pathLooksExecutable(filePath, platform = process.platform, { fsImpl = fs } = {}) {
-  try {
-    const stats = fsImpl.statSync(filePath);
-    if (!stats.isFile()) {
-      return false;
-    }
-    if (platform === 'win32') {
-      return true;
-    }
-    // Owner/group/other execute bit (matches common CLI install modes).
-    return (stats.mode & 0o111) !== 0;
-  } catch (_error) {
-    return false;
+function stripQuotedPathEntry(value, platform) {
+  const entry = String(value || '').trim();
+  if (platform === 'win32' && entry.length >= 2 && entry.startsWith('"') && entry.endsWith('"')) {
+    return entry.slice(1, -1).trim();
   }
+  return entry;
 }
 
-/**
- * Resolve a command basename on an effective PATH without shelling out.
- * Returns the first absolute path that exists as an executable file, or null.
- */
-function resolveCommandOnPath(
-  command,
-  pathEnv,
+function executableSearchPathEntries(
+  rawPath,
   {
     platform = process.platform,
-    fsImpl = fs,
-    pathImpl = path,
+    cwd = process.cwd(),
+    pathImpl = platform === 'win32' ? path.win32 : path,
+    maxEntries = DESKTOP_DIAGNOSTIC_MAX_PATH_ENTRIES,
   } = {}
 ) {
-  if (!isSafeDiagnosticCliName(command)) {
-    return null;
+  if (rawPath === undefined || rawPath === null) {
+    return { entries: [], limited: false, unavailable: true };
   }
-
-  const entries = splitPathEntries(pathEnv, platform);
-  const candidates = listCandidateExecutableNames(command, platform);
-
-  for (const entry of entries) {
-    if (!entry || entry.includes('\0')) {
+  const delimiter = getPathDelimiter(platform);
+  const seen = new Set();
+  const rawEntries = String(rawPath).split(delimiter);
+  const entries = [];
+  for (const rawEntry of rawEntries) {
+    const cleaned = stripQuotedPathEntry(rawEntry, platform);
+    const resolved = cleaned === ''
+      ? cwd
+      : pathImpl.isAbsolute(cleaned)
+        ? pathImpl.normalize(cleaned)
+        : pathImpl.resolve(cwd, cleaned);
+    if (!resolved || resolved.includes('\0')) {
       continue;
     }
-    for (const fileName of candidates) {
-      const absolutePath = pathImpl.join(entry, fileName);
-      if (pathLooksExecutable(absolutePath, platform, { fsImpl })) {
-        return absolutePath;
-      }
+    const dedupeKey = platform === 'win32' ? resolved.toLowerCase() : resolved;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    entries.push(resolved);
+    if (entries.length >= maxEntries) {
+      break;
     }
   }
-
-  return null;
+  return {
+    entries,
+    limited: rawEntries.length > entries.length && entries.length >= maxEntries,
+    unavailable: false,
+  };
 }
 
-/**
- * Operator-facing PATH/CLI diagnostics for Desktop (#884).
- * Does not mutate env, does not run CLIs, and never includes env file values.
- */
-function buildDesktopEnvironmentDiagnostics({
+async function probeExecutableCandidate(
+  candidatePath,
+  {
+    platform = process.platform,
+    fsPromises = fs.promises,
+  } = {}
+) {
+  try {
+    await fsPromises.access(
+      candidatePath,
+      platform === 'win32' ? fs.constants.F_OK : fs.constants.X_OK
+    );
+    const stats = await fsPromises.stat(candidatePath);
+    return stats.isFile() ? 'available' : 'missing';
+  } catch (error) {
+    if (['ENOENT', 'ENOTDIR'].includes(error && error.code)) {
+      return 'missing';
+    }
+    return 'unknown';
+  }
+}
+
+async function runBoundedCandidateProbes(
+  candidates,
+  {
+    deadlineMs = DESKTOP_DIAGNOSTIC_DEADLINE_MS,
+    concurrency = DESKTOP_DIAGNOSTIC_CONCURRENCY,
+    probeCandidate = probeExecutableCandidate,
+  } = {}
+) {
+  const results = new Array(candidates.length).fill('pending');
+  let cursor = 0;
+  let timedOut = false;
+  let timer = null;
+  const worker = async () => {
+    while (!timedOut) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= candidates.length) return;
+      try {
+        results[index] = await probeCandidate(candidates[index].path, candidates[index]);
+      } catch (_error) {
+        results[index] = 'unknown';
+      }
+    }
+  };
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), Math.max(1, candidates.length)) },
+    () => worker()
+  );
+  await Promise.race([
+    Promise.all(workers),
+    new Promise((resolve) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, Math.max(1, deadlineMs));
+    }),
+  ]);
+  if (timer) clearTimeout(timer);
+  return { results, timedOut };
+}
+
+/** Build a path-safe, bounded diagnostic summary without running any CLI. */
+async function buildDesktopEnvironmentDiagnostics({
   platform = process.platform,
   sourceEnv = process.env,
-  appDir = '',
-  envFile = '',
-  envFileExists = null,
+  cwd = process.cwd(),
   commands = DESKTOP_DIAGNOSTIC_CLI_COMMANDS,
-  fsImpl = fs,
-  pathImpl = path,
+  pathImpl = platform === 'win32' ? path.win32 : path,
+  deadlineMs = DESKTOP_DIAGNOSTIC_DEADLINE_MS,
+  concurrency = DESKTOP_DIAGNOSTIC_CONCURRENCY,
+  maxPathEntries = DESKTOP_DIAGNOSTIC_MAX_PATH_ENTRIES,
+  probeCandidate = probeExecutableCandidate,
   nowMs = Date.now(),
 } = {}) {
-  const processPath = String((sourceEnv && sourceEnv.PATH) || '');
+  const rawProcessPath = sourceEnv && hasOwnValue(sourceEnv, 'PATH')
+    ? sourceEnv.PATH
+    : undefined;
+  const processPath = rawProcessPath === undefined ? undefined : String(rawProcessPath);
   const effectivePath = resolveDesktopEffectivePath(processPath, platform);
-  const processPathEntries = splitPathEntries(processPath, platform);
-  const effectivePathEntries = splitPathEntries(effectivePath, platform);
-  const pathAugmented = effectivePath !== processPath;
+  const searchPath = rawProcessPath === undefined && platform !== 'darwin'
+    ? { entries: [], limited: false, unavailable: true }
+    : executableSearchPathEntries(effectivePath, {
+        platform,
+        cwd,
+        pathImpl,
+        maxEntries: maxPathEntries,
+      });
+  const pathAugmented = platform === 'darwin'
+    && effectivePath !== String(processPath || '');
   const safeCommands = (Array.isArray(commands) ? commands : DESKTOP_DIAGNOSTIC_CLI_COMMANDS)
     .map((name) => String(name || '').trim())
     .filter((name) => isSafeDiagnosticCliName(name));
 
+  const candidates = safeCommands.flatMap((name) => (
+    searchPath.entries.flatMap((entry) => (
+      listCandidateExecutableNames(name, platform, sourceEnv && sourceEnv.PATHEXT)
+        .map((fileName) => ({
+          command: name,
+          path: pathImpl.join(entry, fileName),
+          platform,
+        }))
+    ))
+  ));
+  const { results } = searchPath.unavailable
+    ? { results: [] }
+    : await runBoundedCandidateProbes(candidates, {
+        deadlineMs,
+        concurrency,
+        probeCandidate,
+      });
   const cli = safeCommands.map((name) => {
-    const resolvedPath = resolveCommandOnPath(name, effectivePath, {
-      platform,
-      fsImpl,
-      pathImpl,
-    });
-    return {
-      name,
-      found: Boolean(resolvedPath),
-      path: resolvedPath,
-    };
+    const commandResults = results.filter((_result, index) => candidates[index].command === name);
+    if (commandResults.includes('available')) {
+      return { name, status: 'available', reason: null };
+    }
+    if (searchPath.unavailable) {
+      return { name, status: 'unknown', reason: 'path_unavailable' };
+    }
+    if (commandResults.includes('pending')) {
+      return { name, status: 'unknown', reason: 'deadline_exceeded' };
+    }
+    if (commandResults.includes('unknown')) {
+      return { name, status: 'unknown', reason: 'probe_error' };
+    }
+    return { name, status: 'missing', reason: null };
   });
 
-  let resolvedEnvFileExists = envFileExists;
-  if (resolvedEnvFileExists === null && envFile) {
-    try {
-      resolvedEnvFileExists = fsImpl.existsSync(envFile);
-    } catch (_error) {
-      resolvedEnvFileExists = false;
-    }
-  }
-
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date(nowMs).toISOString(),
     platform,
     path: {
-      process: processPath,
-      effective: effectivePath,
-      processEntryCount: processPathEntries.length,
-      effectiveEntryCount: effectivePathEntries.length,
-      processEntries: processPathEntries,
-      effectiveEntries: effectivePathEntries,
+      effectiveEntryCount: searchPath.entries.length,
+      limited: searchPath.limited,
       macHomebrewAugmented: platform === 'darwin' && pathAugmented,
       augmented: pathAugmented,
       policy: platform === 'darwin'
@@ -218,22 +309,39 @@ function buildDesktopEnvironmentDiagnostics({
         : 'inherit-process-path',
     },
     cli,
-    runtime: {
-      appDir: appDir || null,
-      envFile: envFile || null,
-      envFileExists: resolvedEnvFileExists === null ? null : Boolean(resolvedEnvFileExists),
-    },
-    notes: [
-      'CLI resolution uses the effective Desktop PATH (macOS GUI apps may lack login-shell entries until Homebrew dirs are appended).',
-      'Local CLI generation backends (codex/claude/opencode) inherit a sanitized env from the backend; secrets stay denylisted.',
-      'Ollama also has a dedicated Local Models panel with system/embedded runtime detection beyond bare PATH lookup.',
-    ],
+    deadlineMs,
+  };
+}
+
+function createDesktopEnvironmentDiagnosticsProbe({
+  build = buildDesktopEnvironmentDiagnostics,
+  cacheTtlMs = DESKTOP_DIAGNOSTIC_CACHE_TTL_MS,
+  clock = Date.now,
+} = {}) {
+  let cached = null;
+  let inFlight = null;
+  return (options = {}) => {
+    const now = clock();
+    if (cached && now - cached.completedAt < cacheTtlMs) {
+      return Promise.resolve(cached.value);
+    }
+    if (inFlight) return inFlight;
+    inFlight = Promise.resolve()
+      .then(() => build(options))
+      .then((value) => {
+        cached = { completedAt: clock(), value };
+        return value;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
+    return inFlight;
   };
 }
 
 function summarizeDesktopEnvironmentDiagnostics(diagnostics) {
   const cliSummary = (diagnostics.cli || [])
-    .map((entry) => `${entry.name}=${entry.found ? 'found' : 'missing'}`)
+    .map((entry) => `${entry.name}=${entry.status || 'unknown'}`)
     .join(' ');
   const pathInfo = diagnostics.path || {};
   return [
@@ -355,19 +463,25 @@ function readEnvFileValue(
 }
 
 module.exports = {
+  DESKTOP_DIAGNOSTIC_CACHE_TTL_MS,
+  DESKTOP_DIAGNOSTIC_CONCURRENCY,
+  DESKTOP_DIAGNOSTIC_DEADLINE_MS,
   DESKTOP_DIAGNOSTIC_CLI_COMMANDS,
   MAC_DESKTOP_CLI_PATH_ENTRIES,
   MAC_DESKTOP_SYSTEM_PATH_ENTRIES,
   buildDesktopEnvironmentDiagnostics,
+  createDesktopEnvironmentDiagnosticsProbe,
+  executableSearchPathEntries,
   extendMacDesktopBackendPath,
   getPathDelimiter,
   hasOwnValue,
   isSafeDiagnosticCliName,
   normalizeBackendHost,
+  probeExecutableCandidate,
   readEnvFileValue,
   readEnvFileValues,
-  resolveCommandOnPath,
   resolveDesktopEffectivePath,
+  runBoundedCandidateProbes,
   splitPathEntries,
   summarizeDesktopEnvironmentDiagnostics,
 };

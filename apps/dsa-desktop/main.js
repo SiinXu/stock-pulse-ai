@@ -15,7 +15,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
 const {
-  buildDesktopEnvironmentDiagnostics,
+  createDesktopEnvironmentDiagnosticsProbe,
   extendMacDesktopBackendPath,
   hasOwnValue,
   normalizeBackendHost,
@@ -84,7 +84,6 @@ const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
 const DESKTOP_PROTOCOL = 'stockpulse';
 const DESKTOP_PROTOCOL_HOST = 'app';
 const DESKTOP_DEEP_LINK_MAX_LENGTH = 4096;
-const DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL = 'desktop:get-environment-diagnostics';
 const DESKTOP_ASSISTANT_GET_STATE_CHANNEL = 'desktop-assistant:get-state';
 const DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL = 'desktop-assistant:open-action';
 const DESKTOP_ASSISTANT_SET_MAIN_VISIBILITY_CHANNEL = 'desktop-assistant:set-main-visibility';
@@ -3483,33 +3482,26 @@ function assertDesktopUpdateSender(event) {
   }
 }
 
-function assertDesktopEnvironmentDiagnosticsSender(event) {
-  if (!isLocalModelSender(event)) {
-    throw new Error('Unauthorized desktop environment diagnostics IPC sender');
-  }
-}
+const probeDesktopEnvironmentDiagnostics = createDesktopEnvironmentDiagnosticsProbe();
 
-function getDesktopEnvironmentDiagnostics({
-  platform = process.platform,
-  sourceEnv = process.env,
-  appDir = resolveAppDir(),
-  envFile = path.join(resolveAppDir(), '.env'),
-  nowMs = Date.now(),
-  fsImpl = fs,
+async function logDesktopEnvironmentDiagnosticsSummary({
+  probe = probeDesktopEnvironmentDiagnostics,
+  logImpl = logLine,
 } = {}) {
-  return buildDesktopEnvironmentDiagnostics({
-    platform,
-    sourceEnv,
-    appDir,
-    envFile,
-    nowMs,
-    fsImpl,
-  });
+  const diagnostics = await probe();
+  logImpl(`[env-diagnostics] ${summarizeDesktopEnvironmentDiagnostics(diagnostics)}`);
+  return diagnostics;
 }
 
-function logDesktopEnvironmentDiagnosticsSummary(diagnostics = getDesktopEnvironmentDiagnostics()) {
-  logLine(`[env-diagnostics] ${summarizeDesktopEnvironmentDiagnostics(diagnostics)}`);
-  return diagnostics;
+function scheduleDesktopEnvironmentDiagnosticsLog(options = {}) {
+  void Promise.resolve()
+    .then(() => logDesktopEnvironmentDiagnosticsSummary(options))
+    .catch((error) => {
+      const logImpl = options.logImpl || logLine;
+      logImpl(
+        `[env-diagnostics] summary failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
 }
 
 async function runLocalModelOperation(operation) {
@@ -3638,10 +3630,6 @@ ipcMain.handle('desktop:open-release-page', async (event, releaseUrl) => {
   await shell.openExternal(sanitizeReleaseUrl(releaseUrl));
   return true;
 });
-ipcMain.handle(DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL, (event) => {
-  assertDesktopEnvironmentDiagnosticsSender(event);
-  return getDesktopEnvironmentDiagnostics();
-});
 ipcMain.handle(DESKTOP_ASSISTANT_GET_STATE_CHANNEL, (event) => {
   assertDesktopAssistantSender(event);
   return buildDesktopAssistantState();
@@ -3721,13 +3709,7 @@ async function createWindow(brandMigrationResult) {
   const macMigrationResult = migrateMacPackagedRuntimeState();
   initLogging();
   createDesktopTray();
-  try {
-    logDesktopEnvironmentDiagnosticsSummary();
-  } catch (error) {
-    logLine(
-      `[env-diagnostics] summary failed: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
+  scheduleDesktopEnvironmentDiagnosticsLog();
   if (brandMigrationResult?.sourceDir) {
     if (brandMigrationResult.alreadyCompleted) {
       logLine(`[brand-migration] legacy user data migration already completed; rollback source retained at ${brandMigrationResult.sourceDir}`);
@@ -4113,7 +4095,6 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_STATUS,
   DESKTOP_PROTOCOL,
   DESKTOP_PROTOCOL_HOST,
-  DESKTOP_GET_ENVIRONMENT_DIAGNOSTICS_CHANNEL,
   DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES,
   UPDATE_MODE,
   UPDATE_STATUS,
@@ -4126,8 +4107,8 @@ module.exports = {
   buildBackendUrl,
   buildBackendEnvironment,
   createDesktopModelPackAttestation,
-  getDesktopEnvironmentDiagnostics,
   logDesktopEnvironmentDiagnosticsSummary,
+  scheduleDesktopEnvironmentDiagnosticsLog,
   extendMacDesktopBackendPath,
   extractReleaseMetadata,
   fetchLatestReleaseJson,
