@@ -46,6 +46,12 @@ _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
         "display_order": 60,
     },
     {
+        "category": "indicators",
+        "title": "Technical Indicators",
+        "description": "Configurable moving-average, MACD, and RSI periods for trend analysis.",
+        "display_order": 65,
+    },
+    {
         "category": "uncategorized",
         "title": "Uncategorized",
         "description": "Keys not mapped in the field registry.",

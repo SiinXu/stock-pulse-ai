@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "provider": "tushare",
+    "api_name": "daily",
+    "failure_mode": "empty",
+    "recorded_note": "Tushare Pro HTTP success body with empty items. Offline sample 2026-08-08; token never stored.",
+    "source_shape": "tests/fixtures/provider_contracts/tushare_daily_pro.json"
+  },
+  "response": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "fields": [
+        "ts_code",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "pre_close",
+        "change",
+        "pct_chg",
+        "vol",
+        "amount"
+      ],
+      "items": []
+    }
+  }
+}

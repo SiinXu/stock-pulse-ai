@@ -42,6 +42,7 @@ from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
 from data_provider.base import normalize_stock_code
+from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -52,15 +53,20 @@ router = APIRouter()
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
 
 
-def _read_watchlist_codes(service: SystemConfigService) -> list:
-    """Read STOCK_LIST codes as-is (no normalization)."""
+def _read_watchlist_snapshot(service: SystemConfigService) -> tuple[list, str]:
+    """Read STOCK_LIST and its optimistic config version from one snapshot."""
     config_data = service.get_config(include_schema=False)
     stock_list_str = ""
     for item in config_data.get("items", []):
         if item.get("key") == "STOCK_LIST":
             stock_list_str = str(item.get("value", ""))
             break
-    return split_stock_list(stock_list_str)
+    return split_stock_list(stock_list_str), str(config_data.get("config_version", ""))
+
+
+def _read_watchlist_codes(service: SystemConfigService) -> list:
+    """Read STOCK_LIST codes as-is (no normalization)."""
+    return _read_watchlist_snapshot(service)[0]
 
 
 def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
@@ -113,10 +119,7 @@ def _validate_and_normalize_stock_code(code: str) -> str:
 
 def _watchlist_match_key(code: str) -> str:
     """Return the equivalence key used for watchlist add/remove matching."""
-    normalized = normalize_stock_code(code.strip())
-    if re.fullmatch(r"\d{5}", normalized):
-        return f"HK{normalized}"
-    return normalized.upper()
+    return watchlist_match_key(code)
 
 
 @router.post(
@@ -387,10 +390,11 @@ def add_to_watchlist(
         validated = _validate_and_normalize_stock_code(request.stock_code)
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
+        display_code = request.stock_code.strip()
         if _watchlist_match_key(validated) not in existing_keys:
-            codes.append(request.stock_code.strip())
+            codes.append(display_code)
             _write_watchlist_codes(service, codes)
-        return WatchlistResponse(stock_codes=codes, message=f"已加入 {request.stock_code.strip()}")
+        return WatchlistResponse(stock_codes=codes, message=f"已加入 {display_code}")
     except HTTPException:
         raise
     except Exception as e:

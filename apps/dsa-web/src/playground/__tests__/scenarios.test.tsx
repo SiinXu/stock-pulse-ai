@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from 'next-themes';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,17 +13,29 @@ import { ALERT_HISTORY_SCENARIOS } from '../scenarios/alertHistoryScenarios';
 
 let sandbox: ReturnType<typeof installPlaygroundApiMock> | null = null;
 
+function createPlaygroundQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+}
+
 function renderStory(Renderer: React.ComponentType, scenario = 'default') {
+  const queryClient = createPlaygroundQueryClient();
   return render(
-    <ThemeProvider attribute="class" defaultTheme="dark">
-      <UiLanguageProvider initialLanguage="en">
-        <MemoryRouter>
-          <PlaygroundScenarioProvider profile="ready" scenario={scenario as 'default'}>
-            <Renderer />
-          </PlaygroundScenarioProvider>
-        </MemoryRouter>
-      </UiLanguageProvider>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="dark">
+        <UiLanguageProvider initialLanguage="en">
+          <MemoryRouter>
+            <PlaygroundScenarioProvider profile="ready" scenario={scenario as 'default'}>
+              <Renderer />
+            </PlaygroundScenarioProvider>
+          </MemoryRouter>
+        </UiLanguageProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
