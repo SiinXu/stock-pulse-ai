@@ -1346,6 +1346,10 @@ class DataFetcherManager:
                             fallback_to=fallback_to,
                             record_count=0,
                         )
+                        # Quality failure (empty/None): do not open the exception circuit,
+                        # but still surface a per-provider line in the final DataFetchError.
+                        empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                        errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                         if df is not None and df.empty:
                             self._record_daily_source_success(fetcher, market)
                     except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
@@ -1465,6 +1469,10 @@ class DataFetcherManager:
                     fallback_to=fallback_to,
                     record_count=0,
                 )
+                # Quality failure (empty/None): keep circuit closed for empty frames,
+                # but still surface a per-provider line in the final DataFetchError.
+                empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                 if df is not None and df.empty:
                     self._record_daily_source_success(fetcher, market)
 

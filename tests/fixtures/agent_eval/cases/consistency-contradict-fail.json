@@ -1,0 +1,20 @@
+{
+  "id": "consistency-contradict-fail",
+  "title": "All-bearish evidence but buy conclusion",
+  "tags": ["conclusion_consistency", "fail"],
+  "dimensions": ["conclusion_consistency"],
+  "context": {
+    "stock_code": "TSLA"
+  },
+  "agent_output": {
+    "signal": "buy",
+    "evidence": [
+      {"polarity": "bearish", "note": "volume collapse"},
+      {"polarity": "利空", "note": "lawsuit"},
+      {"sentiment": "sell", "note": "analyst downgrade"}
+    ]
+  },
+  "evaluation": {
+    "conclusion_consistency": {}
+  }
+}
