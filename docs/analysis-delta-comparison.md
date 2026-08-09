@@ -77,7 +77,7 @@ Persisted on `analysis_history` or inside `raw_result` / `dashboard`:
 **Comparable today**
 
 - Conclusion: `operation_advice`, structured `action` / `action_label`, `confidence_level`, sniper `ideal_buy` / `stop_loss` / `take_profit` (columns preferred, then dashboard)
-- Scores: `sentiment_score`; `dashboard.data_perspective.trend_status.trend_score` (and other `*_score` keys when present)
+- Scores: `sentiment_score`; dashboard trend, volume, momentum, and fundamental scores from their documented `data_perspective` locations when present
 - Evidence: `key_points`, `dashboard.intelligence.positive_catalysts`, `report_strata.verified_facts`, `data_sources`
 - Risks: `dashboard.intelligence.risk_alerts`, `risk_warning`, `report_strata.risks_counter_evidence`
 

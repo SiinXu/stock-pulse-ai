@@ -121,7 +121,7 @@ class _HistoryMethods:
                 row = session.execute(
                     select(AnalysisHistory)
                     .where(and_(*conditions))
-                    .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
+                    .order_by(desc(AnalysisHistory.created_at))
                     .limit(1)
                 ).scalars().first()
                 if row is None:
@@ -308,7 +308,7 @@ class _HistoryMethods:
             data_query = (
                 select(AnalysisHistory)
                 .where(where_clause)
-                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
+                .order_by(desc(AnalysisHistory.created_at))
                 .offset(offset)
                 .limit(limit)
             )

@@ -45,7 +45,6 @@ BASELINE_INCOMPARABLE = "incomparable_structure"
 # Direction labels for numeric score / level changes.
 DIRECTION_UP = "up"
 DIRECTION_DOWN = "down"
-DIRECTION_UNCHANGED = "unchanged"
 DIRECTION_CHANGED = "changed"
 DIRECTION_UNAVAILABLE = "unavailable"
 
@@ -73,42 +72,27 @@ def _json_safe_value(value: Any) -> Any:
 
 
 @dataclass(frozen=True)
-class ValueUnavailability:
-    """Structured reasons for unavailable numeric comparison sides."""
-
-    base: Optional[str] = None
-    target: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Optional[str]]:
-        return _json_safe_value({"base": self.base, "target": self.target})
-
-
-@dataclass(frozen=True)
 class ValueChange:
     """Single scalar or categorical field change."""
 
     field: str
     base_value: Any
     target_value: Any
+    direction: str
     delta: Optional[float] = None
-    direction: str = DIRECTION_UNCHANGED
     comparable: bool = True
-    unavailability: Optional[ValueUnavailability] = None
+    unavailability: Optional[Mapping[str, Optional[str]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return _json_safe_value(
             {
                 "field": self.field,
-                "base_value": _json_safe_value(self.base_value),
-                "target_value": _json_safe_value(self.target_value),
-                "delta": _json_safe_value(self.delta),
+                "base_value": self.base_value,
+                "target_value": self.target_value,
+                "delta": self.delta,
                 "direction": self.direction,
                 "comparable": self.comparable,
-                "unavailability": (
-                    self.unavailability.to_dict()
-                    if self.unavailability is not None
-                    else None
-                ),
+                "unavailability": self.unavailability,
             }
         )
 
@@ -139,12 +123,6 @@ class ListChange:
                 "output_truncated": self.output_truncated,
             }
         )
-
-    @property
-    def has_changes(self) -> bool:
-        return bool(self.added_total or self.removed_total or self.added or self.removed)
-
-
 @dataclass
 class AnalysisDelta:
     """
@@ -345,30 +323,30 @@ def _as_mapping(value: Any) -> Dict[str, Any]:
     return {}
 
 
-def _finite_number(value: Any) -> Optional[float]:
-    """
-    Coerce a value to a finite float.
-
-    Non-finite floats (NaN, ±Inf) and non-numeric inputs return None so callers
-    can treat them as missing rather than inventing a numeric delta.
-    """
+def _project_number(value: Any) -> Tuple[Optional[float], Optional[str]]:
+    """Return a finite number or its stable public unavailability reason."""
     if value is None:
-        return None
+        return None, UNAVAILABLE_MISSING_VALUE
     if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        number = float(value)
-        return number if math.isfinite(number) else None
+        return None, UNAVAILABLE_INVALID_NUMBER
     if isinstance(value, str):
         text = value.strip().replace(",", "")
         if not text:
-            return None
+            return None, UNAVAILABLE_MISSING_VALUE
         try:
             number = float(text)
         except ValueError:
-            return None
-        return number if math.isfinite(number) else None
-    return None
+            return None, UNAVAILABLE_INVALID_NUMBER
+    elif isinstance(value, (int, float)):
+        try:
+            number = float(value)
+        except OverflowError:
+            return None, UNAVAILABLE_NON_FINITE_NUMBER
+    else:
+        return None, UNAVAILABLE_INVALID_NUMBER
+    if not math.isfinite(number):
+        return None, UNAVAILABLE_NON_FINITE_NUMBER
+    return number, None
 
 
 def _normalize_text(value: Any) -> Optional[str]:
@@ -514,7 +492,7 @@ def _extract_comparable_snapshot(record: Any) -> Optional[Dict[str, Any]]:
     if raw_sentiment is None:
         raw_sentiment = raw.get("sentiment_score")
     # Action resolution expects a finite score; non-finite values are treated as missing.
-    finite_sentiment = _finite_number(raw_sentiment)
+    finite_sentiment, _ = _project_number(raw_sentiment)
     action_fields = display_action_fields(
         operation_advice=operation_advice,
         explicit_action=explicit_action,
@@ -593,34 +571,6 @@ def _extract_comparable_snapshot(record: Any) -> Optional[Dict[str, Any]]:
     }
 
 
-def _numeric_unavailability_reason(value: Any) -> str:
-    """Classify why a raw numeric value could not be projected."""
-    if value is None:
-        return UNAVAILABLE_MISSING_VALUE
-    if isinstance(value, bool):
-        return UNAVAILABLE_INVALID_NUMBER
-    if isinstance(value, (int, float)):
-        return (
-            UNAVAILABLE_NON_FINITE_NUMBER
-            if not math.isfinite(float(value))
-            else UNAVAILABLE_INVALID_NUMBER
-        )
-    if isinstance(value, str):
-        text = value.strip().replace(",", "")
-        if not text:
-            return UNAVAILABLE_MISSING_VALUE
-        try:
-            number = float(text)
-        except ValueError:
-            return UNAVAILABLE_INVALID_NUMBER
-        return (
-            UNAVAILABLE_NON_FINITE_NUMBER
-            if not math.isfinite(number)
-            else UNAVAILABLE_INVALID_NUMBER
-        )
-    return UNAVAILABLE_INVALID_NUMBER
-
-
 def _value_change(
     field_name: str,
     base_value: Any,
@@ -629,10 +579,8 @@ def _value_change(
     numeric: bool = False,
 ) -> Optional[ValueChange]:
     if numeric:
-        base_num = _finite_number(base_value)
-        target_num = _finite_number(target_value)
-        base_reason = None if base_num is not None else _numeric_unavailability_reason(base_value)
-        target_reason = None if target_num is not None else _numeric_unavailability_reason(target_value)
+        base_num, base_reason = _project_number(base_value)
+        target_num, target_reason = _project_number(target_value)
 
         # Two genuinely absent values carry no comparison information.
         if (
@@ -651,10 +599,7 @@ def _value_change(
                 delta=None,
                 direction=DIRECTION_UNAVAILABLE,
                 comparable=False,
-                unavailability=ValueUnavailability(
-                    base=base_reason,
-                    target=target_reason,
-                ),
+                unavailability={"base": base_reason, "target": target_reason},
             )
         delta = target_num - base_num
         if delta > 0:
@@ -806,16 +751,19 @@ def _compare_records(
     target_query_id = _normalize_text(getattr(target_record, "query_id", None))
     base_report_type = _normalize_text(getattr(base_record, "report_type", None))
     target_report_type = _normalize_text(getattr(target_record, "report_type", None))
+    identity = {
+        "stock_code": code,
+        "base_record_id": base_record_id,
+        "target_record_id": target_record_id,
+        "base_query_id": base_query_id,
+        "target_query_id": target_query_id,
+    }
 
     base_snap = _extract_comparable_snapshot(base_record)
     target_snap = _extract_comparable_snapshot(target_record)
     if base_snap is None or target_snap is None:
         return _empty_delta(
-            stock_code=code,
-            base_record_id=base_record_id,
-            target_record_id=target_record_id,
-            base_query_id=base_query_id,
-            target_query_id=target_query_id,
+            **identity,
             report_type=base_report_type or target_report_type,
             baseline_status=BASELINE_INCOMPARABLE,
             baseline_reason="one or both records lack a comparable analysis snapshot",
@@ -823,11 +771,7 @@ def _compare_records(
 
     if base_snap["code"] != code or target_snap["code"] != code:
         return _empty_delta(
-            stock_code=code,
-            base_record_id=base_record_id,
-            target_record_id=target_record_id,
-            base_query_id=base_query_id,
-            target_query_id=target_query_id,
+            **identity,
             report_type=base_report_type or target_report_type,
             baseline_status=BASELINE_INCOMPARABLE,
             baseline_reason="both records must belong to the requested stock_code",
@@ -835,11 +779,7 @@ def _compare_records(
 
     if not base_report_type or not target_report_type or base_report_type != target_report_type:
         return _empty_delta(
-            stock_code=code,
-            base_record_id=base_record_id,
-            target_record_id=target_record_id,
-            base_query_id=base_query_id,
-            target_query_id=target_query_id,
+            **identity,
             report_type=(
                 base_report_type if base_report_type == target_report_type else None
             ),
@@ -1006,13 +946,7 @@ __all__ = [
     "BASELINE_MISSING_TARGET",
     "BASELINE_OK",
     "ListChange",
-    "MAX_LIST_CHANGE_ITEMS",
-    "MAX_LIST_ITEM_LENGTH",
-    "UNAVAILABLE_INVALID_NUMBER",
-    "UNAVAILABLE_MISSING_VALUE",
-    "UNAVAILABLE_NON_FINITE_NUMBER",
     "ValueChange",
-    "ValueUnavailability",
     "compare_analyses",
     "get_latest_delta",
     "get_signal_changes",
