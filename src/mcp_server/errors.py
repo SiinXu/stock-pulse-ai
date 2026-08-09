@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from src.mcp_server.auth_gate import McpAuthError
 from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
 JSONRPC_PARSE_ERROR = -32700
@@ -104,8 +103,6 @@ def jsonrpc_error(
 
 def map_exception_to_tool_result(exc: BaseException) -> Dict[str, Any]:
     """Map handler exceptions to MCP tool error results using API codes."""
-    if isinstance(exc, McpAuthError):
-        return tool_error_result(exc.error, exc.message)
     if isinstance(exc, ValueError):
         return tool_error_result("validation_error", str(exc) or "Invalid parameters")
     if isinstance(exc, PermissionError):

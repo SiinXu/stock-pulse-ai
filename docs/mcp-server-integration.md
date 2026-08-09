@@ -1,125 +1,141 @@
 # MCP Server 集成说明
 
-状态：可选适配层（默认 **关闭**）  
-相关：Issue [#244](https://github.com/SiinXu/stock-pulse-ai/issues/244)，关联 [#138](https://github.com/SiinXu/stock-pulse-ai/issues/138)  
+状态：独立可选进程，默认关闭
+
+相关：[#244](https://github.com/SiinXu/stock-pulse-ai/issues/244)；[#138](https://github.com/SiinXu/stock-pulse-ai/issues/138) 仅作关联
+
 English: [mcp-server-integration_EN.md](mcp-server-integration_EN.md)
 
-本文说明如何通过 **Model Context Protocol (MCP)** 适配层，把 StockPulse **经过筛选** 的核心能力暴露给外部 agent（IDE、Claude Desktop、自定义 MCP 客户端）。
+StockPulse 固定使用官方 Python MCP SDK `mcp==2.0.0`，兼容线覆盖 MCP `2026-07-28` 以及由 SDK 协商的更早修订。权威资料：[MCP 2026-07-28 规范](https://modelcontextprotocol.io/specification/2026-07-28)、[官方 Python SDK](https://github.com/modelcontextprotocol/python-sdk)。
 
-## 设计原则
+MCP 只是既有 service 的薄适配层，`server.py`、`main.py --serve`、Web 和 Desktop 都不会自动启动它。
 
-1. **只做薄适配** — 工具调用既有 service（`StockService`、`HistoryService`、`PortfolioService`、`AnalysisApiService`），不在 MCP 层重写业务逻辑。
-2. **默认关闭、零影响** — `MCP_SERVER_ENABLED` 默认为 false。主 API 进程（`server.py` / `main.py --serve`）**不会**自动启动 MCP；未显式运行前不会监听任何端口。
-3. **复用管理员会话鉴权** — `ADMIN_AUTH_ENABLED=true` 时，MCP 要求有效管理员会话（与 HTTP Cookie 会话相同的 `verify_session`），不另建弱鉴权。
-4. **管理面不开放** — 配置修改、密钥管理、密码/会话管理、安全审计、插件加载、自选股写入、组合成交写入均 **不是** MCP 工具。
-5. **MCP tool ≠ Agent tool** — 不使用 `src.agent.tools.registry`（Agent ToolSurface）。
+## 传输与生命周期
 
-## 能力清单
-
-### 已暴露
-
-| 能力 | MCP 工具 | 风险 | 理由 |
+| 配置值 | 标准传输 | 鉴权 | 状态边界 |
 | --- | --- | --- | --- |
-| 实时行情 | `get_realtime_quote` | 只读 | 经 `StockService` |
-| 历史 K 线 | `get_stock_history` | 只读 | 经 `StockService` |
-| 分析历史列表 | `list_analysis_history` | 只读 | 经 `HistoryService` |
-| 分析详情 | `get_analysis_detail` | 只读 | 经 `HistoryService` |
-| Markdown 报告 | `get_analysis_report` | 只读 | 经 `HistoryService` |
-| 组合账户列表 | `list_portfolio_accounts` | 只读 | 经 `PortfolioService` |
-| 组合快照 | `get_portfolio_snapshot` | 只读 | 经 `PortfolioService`（默认不拉实时价） |
-| 分析任务状态 | `get_analysis_status` | 只读 | 任务队列状态 |
-| 触发分析 | `trigger_analysis` | 写/有成本 | 经 `AnalysisApiService`，全局分析锁 + 标的上限 + 默认异步 |
+| `stdio` | SDK stdio JSON-RPC | 本机进程边界 + 显式 `MCP_STDIO_SCOPES` | 每个子进程独立生命周期；stdout 只写协议，日志走 stderr |
+| `streamable-http`（`http` 是显式别名） | `/mcp` 上的标准 Streamable HTTP（含 JSON/SSE 协商） | 必须使用被摘要 pin 的管理员 Bearer 会话 | SDK 管理 session ID、初始化闸门、版本协商、取消与 DELETE 关闭 |
 
-### 明确不暴露
+初始化前调用、错误协议转换、缺失/错误的 HTTP 协议头和过期 session 均由官方 SDK 拒绝。这里不再提供自定义 JSON POST，也不宣称实现历史 HTTP+SSE。
 
-| 能力 | 理由 |
-| --- | --- |
-| 系统配置读写 | 管理面；可改鉴权、数据源与密钥相关项 |
-| 密码 / 会话管理 | 仅走专用鉴权 API；MCP 只复用会话，不管理凭据 |
-| API Key / 密钥管理 | 不得被外部 agent 发现或写入 |
-| 安全审计管理 | 管理员运维面 |
-| 插件加载/安装 | 进程级代码执行 |
-| 自选股变更 | 持久化运维配置，避免 agent 静默改写 |
-| 组合成交/资金写入 | 变更财务状态；V0 仅快照 |
-| Agent 对话 / Agent ToolSurface | 独立注册表与信任模型 |
+## 能力、scope 与严格输入
 
-## 配置
-
-见 `.env.example` 中 MCP 段。摘要：
-
-| 变量 | 默认 | 含义 |
+| Scope | 工具 | 边界 |
 | --- | --- | --- |
-| `MCP_SERVER_ENABLED` | `false` | 总开关 |
-| `MCP_SERVER_TRANSPORT` | `stdio` | `stdio` 或 `http` |
-| `MCP_SERVER_HOST` | `127.0.0.1` | HTTP 绑定地址 |
-| `MCP_SERVER_PORT` | `8765` | HTTP 端口 |
-| `MCP_SESSION_TOKEN` | 空 | 鉴权开启时的管理员会话值 |
-| `MCP_ANALYSIS_MAX_STOCKS` | `5` | `trigger_analysis` 标的上限 |
-| `MCP_ANALYSIS_TIMEOUT_SECONDS` | `120` | 高成本路径保留边界 |
+| `market.read` | `get_realtime_quote`、`get_stock_history` | 单个有界标识；仅 daily；1–3650 天 |
+| `history.read` | `list_analysis_history`、`get_analysis_detail`、`get_analysis_report`、`get_analysis_status` | 严格日期、分页/结果上限、有界 ID |
+| `portfolio.read` | `list_portfolio_accounts`、`get_portfolio_snapshot` | 只读；`fifo`/`avg`；实时行情必须传真实布尔值 |
+| `analysis.trigger` | `trigger_analysis` | 仅异步提交；全局提交锁、标的上限、独立速率预算 |
 
-## 启动
+`tools/list` 只返回 principal scope 允许的工具。所有发布的 input schema 都由严格 Pydantic 模型执行；额外字段、字符串布尔值、非法枚举/日期/范围、重复标的以及同步分析都会在调用 service 前被拒绝。
+
+以下管理面或持久写入能力明确不注册：系统配置、Provider/API 密钥、密码/会话管理、安全审计管理、插件加载、自选股写入、组合成交/资金/公司行动，以及内部 Agent ToolSurface 注册表。
+
+## 启动配置
+
+显式填写的非法布尔值、整数、transport、scope、host、URL 和边界都会令启动失败，不会静默 clamp 或切换 transport。
+
+### stdio
 
 ```bash
-# stdio（IDE / Claude Desktop 常见）
-MCP_SERVER_ENABLED=true python -m src.mcp_server
-
-# HTTP（本机）
 MCP_SERVER_ENABLED=true \
-MCP_SERVER_TRANSPORT=http \
-MCP_SERVER_HOST=127.0.0.1 \
-MCP_SERVER_PORT=8765 \
+MCP_SERVER_TRANSPORT=stdio \
+MCP_STDIO_SCOPES=market.read,history.read \
+MCP_STDIO_PRINCIPAL=local-operator \
 python -m src.mcp_server
 ```
 
-开启鉴权时：
+客户端示例：
+
+```json
+{
+  "mcpServers": {
+    "stockpulse": {
+      "command": "python",
+      "args": ["-m", "src.mcp_server"],
+      "env": {
+        "MCP_SERVER_ENABLED": "true",
+        "MCP_SERVER_TRANSPORT": "stdio",
+        "MCP_STDIO_SCOPES": "market.read,history.read"
+      }
+    }
+  }
+}
+```
+
+能启动该命令的进程将获得配置的 scope。本机用户不是同等信任时，应使用最小 scope 和独立 OS 账号。
+
+### Streamable HTTP
+
+HTTP 不把 loopback 当作授权。必须同时启用 `ADMIN_AUTH_ENABLED=true`，通过 `Authorization: Bearer ...` 提交有效管理员 session，配置显式 scope，并用 SHA-256 摘要 pin 唯一允许进入 MCP audience 的 session。
 
 ```bash
+# SESSION 必须经正常 /api/v1/auth/login 获得；不要把原文写进 shell history。
+printf '%s' "$SESSION" | shasum -a 256
+
 ADMIN_AUTH_ENABLED=true \
 MCP_SERVER_ENABLED=true \
-MCP_SESSION_TOKEN='<通过 /api/v1/auth/login 获得的会话 Cookie 值>' \
+MCP_SERVER_TRANSPORT=streamable-http \
+MCP_SERVER_HOST=127.0.0.1 \
+MCP_SERVER_PORT=8765 \
+MCP_HTTP_SCOPES=market.read,history.read \
+MCP_HTTP_SESSION_TOKEN_SHA256='<64 位摘要>' \
+MCP_HTTP_RESOURCE=http://127.0.0.1:8765/mcp \
 python -m src.mcp_server
 ```
 
-HTTP 也可传：
+Bearer 仍是管理员凭据。摘要 pin 让 MCP 只接受一个明确凭据，并避免在环境变量中保存 token 原文；它不会把单管理员 session 变成多租户凭据。轮换时创建新 session、替换摘要并重启 MCP；改密或轮换 session secret 会沿用现有鉴权语义撤销它。
 
-- `Authorization: Bearer <session>`
-- `X-DSA-Session: <session>`
-- `Cookie: dsa_session=<session>`
+## HTTP 与资源边界
 
-### HTTP 路径
-
-| 方法 | 路径 | 用途 |
+| 控制 | 默认 | 配置 |
 | --- | --- | --- |
-| `GET` | `/health` 或 `/mcp/health` | 存活检查 |
-| `POST` | `/mcp`、`/mcp/jsonrpc` 或 `/` | JSON-RPC 2.0 |
+| Trusted Host | loopback host pattern | `MCP_HTTP_ALLOWED_HOSTS` |
+| Trusted Origin | loopback HTTP origin | `MCP_HTTP_ALLOWED_ORIGINS` |
+| Body | 仅 JSON，1,000,000 bytes | `MCP_HTTP_MAX_BODY_BYTES` |
+| Header | 32,768 bytes 未完整事件上限 | `MCP_HTTP_MAX_HEADER_BYTES` |
+| Body 读取 | 每个 body chunk 10 秒 | `MCP_HTTP_READ_TIMEOUT_SECONDS` |
+| 连接 / backlog | 32 / 16 | `MCP_HTTP_MAX_CONNECTIONS`、`MCP_HTTP_BACKLOG` |
+| Keep-alive | 5 秒 | `MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS` |
+| 工具并发 | 8 个归属明确的 worker | `MCP_MAX_CONCURRENT_TOOLS` |
+| Principal/tool 速率 | 60/分钟 | `MCP_RATE_LIMIT_PER_MINUTE` |
+| 分析速率 | 2/分钟 | `MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE` |
+| 单次分析成本 | 5 个标的 | `MCP_ANALYSIS_MAX_STOCKS` |
 
-## 协议
+每个 HTTP 请求都检查 `Host`；带 `Origin` 时必须命中 allowlist。非法 Origin 返回 403、非法 Host 返回 421、非 JSON POST 返回 400、不兼容 Accept 返回 406，且均在工具分发前完成。浏览器跨域 preflight 不是支持的集成方式。
 
-支持方法：`initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`，以及扩展方法 `stockpulse/capabilities`（完整暴露清单）。
+非 loopback 部署必须配置精确的代理 Host/Origin，保持 `ALLOW_INSECURE_PUBLIC_BIND=false`，在可信反向代理终止 HTTPS；代理应删除客户端伪造的 forwarding header、保留 `Authorization`、限制来源网络，并设置不宽于 MCP 进程的 header/body/读取超时。不得通过明文公网链路发布 `/mcp`。
 
-stdio 使用**换行分隔**的 JSON-RPC；HTTP POST 使用 JSON body。
+## 审计与失败语义
 
-## 安全
+适配层使用耐久 `SecurityAuditService`，审计存储不可用时 fail-closed。它以有界 actor/action/target/correlation 记录：
 
-与 [安全基线](security-baseline.md) 对齐：
+- HTTP 鉴权成功/拒绝；
+- 受保护的工具发现；
+- 每次工具 attempt 及 success/accepted/denied/rejected/failure；
+- scope 不足、严格校验、速率/容量拒绝、分析 busy、取消和内部失败；
+- `AnalysisApiService` 内已有的分析提交 attempt/completion。
 
-- 单管理员信任模型 — MCP **不是**多租户隔离。
-- 非本机 HTTP 绑定复用 `enforce_http_bind_security`（无鉴权则 fail-closed，除非紧急 override）。
-- 优先 `127.0.0.1`。即使开启鉴权，公网绑定仍高风险；TLS 应由反向代理终止。
-- 立即回滚：设 `MCP_SERVER_ENABLED=false` 并停止 MCP 进程。
+参数、Bearer、组合数值、报告正文和密钥不会进入审计 target ID 或 metadata。限流是单进程、单 worker 设计，不是分布式 quota；多副本部署需要外部限流/审计架构，不在本交付范围。
 
-### 公网绑定风险提示
+MCP 不同步执行高成本分析。调用只在全局分析锁下完成有界的任务队列提交，并返回供 `get_analysis_status` 查询的 task ID；后续分析归既有任务队列所有。客户端取消时不会 abandon 正在运行的 service call，容量与所有权会保留到该调用结束。
 
-将 MCP HTTP 绑定到 `0.0.0.0` 或局域网地址，等于把工具调用面暴露到本机之外。若同时 `ADMIN_AUTH_ENABLED=false`，启动会 **fail-closed**（与主 API 一致）。开启鉴权后的公网绑定意味着持有有效管理员会话者可触发分析并读取组合/历史。请将会话令牌视为密钥。
+## 威胁映射
 
-## 集成点（Integration Point）
+| ID | 威胁 | 控制 |
+| --- | --- | --- |
+| `MCP-01` | 跨站调用 localhost / DNS rebinding | Origin + Host + JSON/Accept 严格校验 |
+| `MCP-02` | session 泄露或权限过宽 | 既有 session 校验、SHA-256 audience pin、显式 scope、过期/撤销指引 |
+| `MCP-03` | 工具/成本耗尽 | principal/tool 速率、分析速率/标的上限、有界连接/backlog/并发 |
+| `MCP-04` | 类型 coercion 扩大联网或成本 | 严格 typed projection、拒绝额外字段 |
+| `MCP-05` | timeout/cancel 后出现无归属写入 | 仅异步队列提交；无 executor timeout；service 不被 abandon |
+| `MCP-06` | 受保护访问不可追溯 | 接受边界耐久 fail-closed 审计 |
 
-本交付自包含。可选后续接线（V0 不要求）：
+## 验证、限制与回滚
 
-- 在 Claude Desktop 等客户端配置 `mcpServers` 指向 `python -m src.mcp_server`。
-- **不要**在没有产品决策前，把 MCP 自动挂到 `api/app.py` 生命周期。
+仓库测试使用官方 client 连接真实 stdio 子进程和真实 Streamable HTTP server，并覆盖版本协商/工具发现、恶意 Origin、rebind Host、明文 content type、不兼容 Accept、preflight、未鉴权、scope 不足、速率、审计不可用、严格 schema 和初始化前调用。
 
-## 回滚
+本功能仍属于单管理员部署，不是租户隔离。HTTP Bearer 兼容凭据不是 OAuth authorization server，因此进程不会发布虚假的 OAuth metadata。本次不包含管理面、webhook/connector、多节点限流或主进程自动启动，所以只关联、不关闭 #244/#138。
 
-1. `MCP_SERVER_ENABLED=false`（或删除）并停止 MCP 进程。
-2. 或 revert 引入 `src/mcp_server/` 的 PR。
+回滚：停止独立进程并删除或设 `MCP_SERVER_ENABLED=false`；若 Bearer 可能泄露，轮换管理员 session secret。Revert MCP 适配层与依赖锁即可移除功能，不涉及 MCP 数据迁移。

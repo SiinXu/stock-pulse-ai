@@ -1,171 +1,143 @@
 # -*- coding: utf-8 -*-
-"""MCP tool definitions and dispatch.
-
-This registry is **not** the Agent ToolSurface registry
-(``src.agent.tools.registry``). MCP tools and Agent tools remain separate.
-"""
+"""Strict MCP tool schemas and service dispatch."""
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from datetime import date
+from typing import Annotated, Any, Callable, Literal, Mapping
+
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, model_validator
 
 from src.mcp_server.capabilities import exposed_tool_names
-from src.mcp_server.errors import map_exception_to_tool_result, tool_success_result
 from src.mcp_server.handlers import McpToolHandlers
 
-ToolHandler = Callable[..., Any]
+
+class _ToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
 
 
-_TOOL_DEFINITIONS: List[Dict[str, Any]] = [
-    {
-        "name": "get_realtime_quote",
-        "description": "Get a realtime quote for one stock code (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "stock_code": {
-                    "type": "string",
-                    "description": "Stock code, e.g. 600519, hk00700, AAPL",
-                },
-            },
-            "required": ["stock_code"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "get_stock_history",
-        "description": "Get historical OHLCV bars for one stock (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "stock_code": {"type": "string"},
-                "period": {
-                    "type": "string",
-                    "description": "Bar period (default daily)",
-                    "default": "daily",
-                },
-                "days": {
-                    "type": "integer",
-                    "description": "Lookback days (1-3650)",
-                    "default": 30,
-                },
-            },
-            "required": ["stock_code"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "list_analysis_history",
-        "description": "List past analysis runs with optional filters (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "stock_code": {"type": "string"},
-                "report_type": {"type": "string"},
-                "start_date": {"type": "string", "description": "YYYY-MM-DD"},
-                "end_date": {"type": "string", "description": "YYYY-MM-DD"},
-                "page": {"type": "integer", "default": 1},
-                "limit": {"type": "integer", "default": 20},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "get_analysis_detail",
-        "description": "Get one analysis history record by id (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "record_id": {"type": "string"},
-            },
-            "required": ["record_id"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "get_analysis_report",
-        "description": "Get markdown report text for one analysis record (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "record_id": {"type": "string"},
-            },
-            "required": ["record_id"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "list_portfolio_accounts",
-        "description": "List portfolio accounts (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "include_inactive": {"type": "boolean", "default": False},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "get_portfolio_snapshot",
-        "description": "Get a portfolio snapshot (read-only; realtime quotes optional).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "account_id": {"type": "integer"},
-                "as_of": {"type": "string", "description": "YYYY-MM-DD"},
-                "cost_method": {"type": "string", "default": "fifo"},
-                "include_realtime": {"type": "boolean", "default": False},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "get_analysis_status",
-        "description": "Get status of an async analysis task (read-only).",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "task_id": {"type": "string"},
-            },
-            "required": ["task_id"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "trigger_analysis",
-        "description": (
-            "Trigger stock analysis (costly). Protected by a global analysis lock, "
-            "max stock count, and async submission by default."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "stock_code": {"type": "string"},
-                "stock_codes": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "report_type": {
-                    "type": "string",
-                    "default": "detailed",
-                    "description": "simple | detailed | full | brief",
-                },
-                "force_refresh": {"type": "boolean", "default": False},
-                "async_mode": {"type": "boolean", "default": True},
-            },
-            "additionalProperties": False,
-        },
-    },
-]
+StockCode = Annotated[StrictStr, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9.*+_-]+$")]
+RecordId = Annotated[StrictStr, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:@/-]+$")]
 
 
-def list_tool_definitions() -> List[Dict[str, Any]]:
-    """Return MCP tool descriptors for tools/list."""
-    allowed = set(exposed_tool_names())
-    return [t for t in _TOOL_DEFINITIONS if t["name"] in allowed]
+class QuoteInput(_ToolInput):
+    stock_code: StockCode
 
 
-def _handler_map(handlers: McpToolHandlers) -> Mapping[str, ToolHandler]:
+class StockHistoryInput(_ToolInput):
+    stock_code: StockCode
+    period: Literal["daily"] = "daily"
+    days: Annotated[StrictInt, Field(ge=1, le=3650)] = 30
+
+
+class AnalysisHistoryInput(_ToolInput):
+    stock_code: StockCode | None = None
+    report_type: Literal["simple", "detailed", "full", "brief"] | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    page: Annotated[StrictInt, Field(ge=1, le=10_000)] = 1
+    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 20
+
+    @model_validator(mode="after")
+    def dates_are_ordered(self) -> "AnalysisHistoryInput":
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValueError("start_date must be on or before end_date")
+        return self
+
+
+class AnalysisRecordInput(_ToolInput):
+    record_id: RecordId
+
+
+class PortfolioAccountsInput(_ToolInput):
+    include_inactive: StrictBool = False
+
+
+class PortfolioSnapshotInput(_ToolInput):
+    account_id: Annotated[StrictInt, Field(ge=1)] | None = None
+    as_of: date | None = None
+    cost_method: Literal["fifo", "avg"] = "fifo"
+    include_realtime: StrictBool = False
+
+
+class AnalysisStatusInput(_ToolInput):
+    task_id: RecordId
+
+
+class TriggerAnalysisInput(_ToolInput):
+    stock_code: StockCode | None = None
+    stock_codes: Annotated[list[StockCode], Field(min_length=1, max_length=50)] | None = None
+    report_type: Literal["simple", "detailed", "full", "brief"] = "detailed"
+    force_refresh: StrictBool = False
+    async_mode: Literal[True] = True
+
+    @model_validator(mode="after")
+    def one_source_and_unique_codes(self) -> "TriggerAnalysisInput":
+        if (self.stock_code is None) == (self.stock_codes is None):
+            raise ValueError("provide exactly one of stock_code or stock_codes")
+        if self.stock_codes and len(set(self.stock_codes)) != len(self.stock_codes):
+            raise ValueError("stock_codes must not contain duplicates")
+        return self
+
+
+class _Spec:
+    def __init__(self, name: str, description: str, scope: str, input_model: type[_ToolInput]) -> None:
+        self.name = name
+        self.description = description
+        self.scope = scope
+        self.input_model = input_model
+
+
+_SPECS = (
+    _Spec("get_realtime_quote", "Get a realtime quote for one stock code (read-only).", "market.read", QuoteInput),
+    _Spec("get_stock_history", "Get daily historical OHLCV bars for one stock (read-only).", "market.read", StockHistoryInput),
+    _Spec("list_analysis_history", "List past analysis runs with bounded filters (read-only).", "history.read", AnalysisHistoryInput),
+    _Spec("get_analysis_detail", "Get one analysis history record by id (read-only).", "history.read", AnalysisRecordInput),
+    _Spec("get_analysis_report", "Get markdown report text for one analysis record (read-only).", "history.read", AnalysisRecordInput),
+    _Spec("list_portfolio_accounts", "List portfolio accounts (read-only).", "portfolio.read", PortfolioAccountsInput),
+    _Spec("get_portfolio_snapshot", "Get a bounded portfolio snapshot (read-only).", "portfolio.read", PortfolioSnapshotInput),
+    _Spec("get_analysis_status", "Get status of an asynchronously submitted analysis task (read-only).", "history.read", AnalysisStatusInput),
+    _Spec("trigger_analysis", "Submit bounded analysis work asynchronously; synchronous execution is not exposed.", "analysis.trigger", TriggerAnalysisInput),
+)
+TOOL_SPECS = {spec.name: spec for spec in _SPECS}
+
+
+def list_tool_definitions(scopes: frozenset[str] | None = None) -> list[dict[str, Any]]:
+    """Return advertised definitions, optionally filtered to principal scopes."""
+    allowed_names = set(exposed_tool_names())
+    result: list[dict[str, Any]] = []
+    for spec in _SPECS:
+        if spec.name not in allowed_names or (scopes is not None and spec.scope not in scopes):
+            continue
+        result.append(
+            {
+                "name": spec.name,
+                "description": spec.description,
+                "inputSchema": spec.input_model.model_json_schema(),
+                "_meta": {"io.stockpulse/scope": spec.scope},
+            }
+        )
+    return result
+
+
+def required_scope(name: str) -> str:
+    """Return the required scope for an exposed tool."""
+    spec = TOOL_SPECS.get(name)
+    if spec is None or name not in set(exposed_tool_names()):
+        raise ValueError(f"Unknown or non-exposed tool: {name}")
+    return spec.scope
+
+
+def validate_tool_arguments(name: str, arguments: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Strictly validate the exact schema advertised for one tool."""
+    spec = TOOL_SPECS.get(name)
+    if spec is None or name not in set(exposed_tool_names()):
+        raise ValueError(f"Unknown or non-exposed tool: {name}")
+    validated = spec.input_model.model_validate(dict(arguments or {}))
+    return validated.model_dump(mode="python", exclude_none=True)
+
+
+def _handler_map(handlers: McpToolHandlers) -> Mapping[str, Callable[..., Any]]:
     return {
         "get_realtime_quote": handlers.get_realtime_quote,
         "get_stock_history": handlers.get_stock_history,
@@ -179,33 +151,10 @@ def _handler_map(handlers: McpToolHandlers) -> Mapping[str, ToolHandler]:
     }
 
 
-def call_tool(
-    handlers: McpToolHandlers,
-    name: str,
-    arguments: Optional[Mapping[str, Any]] = None,
-) -> Dict[str, Any]:
-    """Dispatch a tools/call request to the matching handler."""
-    allowed = set(exposed_tool_names())
-    if name not in allowed:
-        from src.mcp_server.errors import tool_error_result
-
-        return tool_error_result(
-            "validation_error",
-            f"Unknown or non-exposed tool: {name}",
-        )
+def call_tool(handlers: McpToolHandlers, name: str, arguments: Mapping[str, Any] | None = None) -> Any:
+    """Validate once, then invoke the existing service-backed handler."""
+    validated = validate_tool_arguments(name, arguments)
     fn = _handler_map(handlers).get(name)
     if fn is None:
-        from src.mcp_server.errors import tool_error_result
-
-        return tool_error_result("validation_error", f"Tool not implemented: {name}")
-
-    args = dict(arguments or {})
-    try:
-        payload = fn(**args)
-        return tool_success_result(payload)
-    except TypeError as exc:
-        from src.mcp_server.errors import tool_error_result
-
-        return tool_error_result("validation_error", str(exc) or "Invalid parameters")
-    except Exception as exc:  # broad-exception: map to stable MCP/API error envelope
-        return map_exception_to_tool_result(exc)
+        raise ValueError(f"Tool not implemented: {name}")
+    return fn(**validated)

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Optional MCP server adapter (`python -m src.mcp_server`) exposes a curated read-only + guarded analysis tool surface over existing services; default-off, localhost bind, reuses admin session auth, and never registers config/secrets/admin tools (#244).
+- [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
 
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).

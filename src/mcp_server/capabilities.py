@@ -88,8 +88,8 @@ CAPABILITY_INVENTORY: Sequence[CapabilityEntry] = (
         exposure="exposed",
         risk_level="write_costly",
         reason=(
-            "Triggers analysis through AnalysisApiService with global analysis lock, "
-            "timeout, and max-stock bounds. Costly LLM path; not unlimited."
+            "Submits asynchronous analysis through AnalysisApiService with a global "
+            "submission lock, per-principal rate budget, and max-stock bound."
         ),
         mcp_tool="trigger_analysis",
     ),

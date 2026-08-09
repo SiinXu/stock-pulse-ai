@@ -1,116 +1,108 @@
 # -*- coding: utf-8 -*-
-"""Authentication gate for MCP requests.
-
-Reuses the existing administrator session model from ``src.auth``
-(``is_auth_enabled`` / ``verify_session``). No parallel auth scheme is introduced.
-"""
+"""Official-SDK bearer verification for the Streamable HTTP transport."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Mapping, Optional
+import hashlib
+import hmac
+import logging
+import time
 
-from src.auth import is_auth_enabled, verify_session
+from mcp.server.auth.provider import AccessToken
+
+from src.auth import verify_session
 from src.mcp_server.config import McpServerConfig
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+    get_security_audit_service,
+    require_security_audit_recorder,
+)
+
+logger = logging.getLogger(__name__)
 
 
-class McpAuthError(Exception):
-    """Raised when an MCP request fails authentication."""
+class AdminSessionTokenVerifier:
+    """Validate one explicitly audience-pinned existing admin session."""
 
-    def __init__(self, error: str = "unauthorized", message: str = "Login required") -> None:
-        self.error = error
-        self.message = message
-        super().__init__(message)
-
-
-@dataclass(frozen=True)
-class McpAuthContext:
-    """Resolved credentials for one MCP request or session."""
-
-    session_token: Optional[str]
-    authenticated: bool
-    auth_enabled: bool
-
-
-def extract_session_token(
-    *,
-    config: McpServerConfig,
-    headers: Optional[Mapping[str, str]] = None,
-    explicit_token: Optional[str] = None,
-) -> Optional[str]:
-    """Resolve a session token from request headers, explicit arg, or env config."""
-    if explicit_token and explicit_token.strip():
-        return explicit_token.strip()
-
-    if headers:
-        lowered = {str(k).lower(): str(v) for k, v in headers.items()}
-        auth = lowered.get("authorization") or ""
-        if auth.lower().startswith("bearer "):
-            token = auth[7:].strip()
-            if token:
-                return token
-        for key in ("x-dsa-session", "x-mcp-session", "cookie"):
-            raw = lowered.get(key)
-            if not raw:
-                continue
-            if key == "cookie":
-                for part in raw.split(";"):
-                    part = part.strip()
-                    if part.lower().startswith("dsa_session="):
-                        value = part.split("=", 1)[1].strip()
-                        if value:
-                            return value
-            else:
-                value = raw.strip()
-                if value:
-                    return value
-
-    if config.session_token:
-        return config.session_token
-    return None
-
-
-def build_auth_context(
-    *,
-    config: McpServerConfig,
-    headers: Optional[Mapping[str, str]] = None,
-    explicit_token: Optional[str] = None,
-) -> McpAuthContext:
-    """Build auth context without raising (for capability probes)."""
-    auth_enabled = is_auth_enabled()
-    token = extract_session_token(
-        config=config,
-        headers=headers,
-        explicit_token=explicit_token,
-    )
-    if not auth_enabled:
-        return McpAuthContext(
-            session_token=token,
-            authenticated=True,
-            auth_enabled=False,
+    def __init__(
+        self,
+        config: McpServerConfig,
+        *,
+        security_audit: SecurityAuditRecorder | None = None,
+    ) -> None:
+        if not config.http_session_token_sha256:
+            raise ValueError("HTTP session token digest is required")
+        self.config = config
+        self._audit = require_security_audit_recorder(
+            security_audit or get_security_audit_service()
         )
-    authenticated = bool(token) and verify_session(token)
-    return McpAuthContext(
-        session_token=token,
-        authenticated=authenticated,
-        auth_enabled=True,
-    )
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        actor_id = f"session:{digest[:16]}"
+        correlation_id = SecurityAuditService.new_correlation_id()
+        fields = {
+            "event_type": "mcp.auth",
+            "actor_type": "admin_session",
+            "actor_id": actor_id,
+            "execution_id": correlation_id,
+            "action": "mcp.authenticate",
+            "target_type": "mcp_resource",
+            "target_id": "stockpulse-mcp",
+            "correlation_id": correlation_id,
+            "metadata": {"transport": "streamable-http"},
+        }
+        try:
+            self._audit.record_attempt(**fields)
+        except SecurityAuditUnavailable:
+            logger.error("MCP authentication denied because the security audit attempt was unavailable")
+            return None
+
+        pinned = hmac.compare_digest(digest, self.config.http_session_token_sha256 or "")
+        valid = pinned and verify_session(token)
+        try:
+            self._audit.record_completion(
+                **fields,
+                outcome="success" if valid else "denied",
+                reason_code="authenticated" if valid else "invalid_token",
+            )
+        except SecurityAuditUnavailable:
+            logger.error("MCP authentication denied because the security audit completion was unavailable")
+            return None
+        if not valid:
+            logger.warning(
+                "MCP authentication denied (audience_pin=%s, admin_session_valid=%s)",
+                pinned,
+                valid if pinned else False,
+            )
+            return None
+
+        timestamp = _session_timestamp(token)
+        if timestamp is None:
+            logger.warning("MCP authentication denied because the admin session timestamp was malformed")
+            return None
+        expires_at = timestamp + self.config.admin_session_max_age_hours * 3600
+        if expires_at <= int(time.time()):
+            logger.warning("MCP authentication denied because the pinned admin session expired")
+            return None
+        return AccessToken(
+            token=token,
+            client_id="stockpulse-mcp",
+            subject=actor_id,
+            scopes=sorted(self.config.http_scopes),
+            expires_at=expires_at,
+            resource=self.config.http_resource,
+            claims={"iss": "stockpulse-admin-session", "aud": self.config.http_resource},
+        )
 
 
-def require_mcp_auth(
-    *,
-    config: McpServerConfig,
-    headers: Optional[Mapping[str, str]] = None,
-    explicit_token: Optional[str] = None,
-) -> McpAuthContext:
-    """Require a valid admin session when administrator auth is enabled."""
-    ctx = build_auth_context(
-        config=config,
-        headers=headers,
-        explicit_token=explicit_token,
-    )
-    if not ctx.auth_enabled:
-        return ctx
-    if not ctx.authenticated:
-        raise McpAuthError("unauthorized", "Login required")
-    return ctx
+def _session_timestamp(token: str) -> int | None:
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[1])
+    except ValueError:
+        return None

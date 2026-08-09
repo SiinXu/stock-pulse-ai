@@ -81,9 +81,11 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 | --- | --- |
 | Safe default | `MCP_SERVER_ENABLED` is **false**; the main API/Web process does **not** start MCP |
 | How to enable | Explicit operator process: `MCP_SERVER_ENABLED=true python -m src.mcp_server` |
-| Auth model | Reuses administrator session verification (`verify_session`); does **not** introduce a parallel token scheme |
-| Bind policy | HTTP transport defaults to `127.0.0.1` and reuses the same non-local bind fail-closed policy as the HTTP API (`src/security/http_bind.py`) |
-| Capability scope | Curated read-only tools plus a guarded `trigger_analysis` tool; **configuration, secrets, auth admin, audit admin, plugins, watchlist mutation, and portfolio writes are not MCP tools** |
+| Protocol | Official Python SDK `mcp==2.0.0`; stdio and standard Streamable HTTP with SDK-owned lifecycle/version/session behavior |
+| Auth model | HTTP requires administrator auth plus one SHA-256-pinned Bearer session; stdio uses an explicit local principal. Both require per-tool scopes |
+| Bind/origin policy | HTTP defaults to `127.0.0.1`; trusted Host and Origin are enforced before dispatch and public bind still uses `src/security/http_bind.py` |
+| Capability scope | Scope-filtered read-only tools plus async-only `trigger_analysis`; **configuration, secrets, auth/audit admin, plugins, watchlist mutation, and portfolio writes are not MCP tools** |
+| Abuse/audit boundary | Per-principal/tool rate and concurrency/cost bounds; durable `SecurityAuditService` is fail-closed for discovery/calls/auth |
 | Trust model | Still the single-administrator deployment model (`AUTH-05`); MCP is not multi-tenant isolation |
 
 Full inventory, client headers, and rollback: [MCP server integration (EN)](mcp-server-integration_EN.md) / [MCP server integration (ZH)](mcp-server-integration.md).

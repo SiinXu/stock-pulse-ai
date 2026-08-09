@@ -1,157 +1,102 @@
-# -*- coding: utf-8 -*-
-"""Handler behavior: thin service calls and analysis concurrency protection."""
+"""Thin service handlers and safe asynchronous analysis submission."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from api.v1.schemas.analysis import AnalyzeRequest
 import pytest
 
-from src.mcp_server.config import McpServerConfig
-from src.mcp_server.errors import McpBusyError, map_exception_to_tool_result
+from src.mcp_server.config import ALL_MCP_SCOPES, McpServerConfig
+from src.mcp_server.errors import McpBusyError
 from src.mcp_server.handlers import McpToolHandlers
 from src.mcp_server.tools import call_tool
 
 
 def _config(**overrides) -> McpServerConfig:
-    base = dict(
-        enabled=True,
-        transport="stdio",
-        host="127.0.0.1",
-        port=8765,
-        session_token=None,
-        analysis_timeout_seconds=30,
-        analysis_max_stocks=2,
+    values = {
+        "enabled": True,
+        "transport": "stdio",
+        "stdio_scopes": ALL_MCP_SCOPES,
+        "analysis_max_stocks": 2,
+    }
+    values.update(overrides)
+    return McpServerConfig(**values)
+
+
+def test_read_handlers_forward_already_validated_values() -> None:
+    stock = MagicMock()
+    stock.get_realtime_quote.return_value = {"stock_code": "AAPL", "current_price": 1}
+    stock.get_history_data.return_value = {"data": []}
+    handlers = McpToolHandlers(config=_config(), stock_service=stock)
+    assert handlers.get_realtime_quote(stock_code="AAPL")["stock_code"] == "AAPL"
+    handlers.get_stock_history(stock_code="AAPL", period="daily", days=30)
+    stock.get_realtime_quote.assert_called_once_with("AAPL")
+    stock.get_history_data.assert_called_once_with("AAPL", period="daily", days=30)
+
+
+def test_string_boolean_is_rejected_before_portfolio_service() -> None:
+    portfolio = MagicMock()
+    handlers = McpToolHandlers(config=_config(), portfolio_service=portfolio)
+    with pytest.raises(Exception):
+        call_tool(handlers, "get_portfolio_snapshot", {"include_realtime": "false"})
+    portfolio.get_portfolio_snapshot.assert_not_called()
+
+
+def test_busy_submission_never_calls_analysis_service() -> None:
+    analysis = MagicMock()
+    handlers = McpToolHandlers(
+        config=_config(),
+        analysis_api_service=analysis,
+        get_config=lambda: SimpleNamespace(),
+        run_with_lock=lambda *args, **kwargs: False,
+        security_audit=MagicMock(),
     )
-    base.update(overrides)
-    return McpServerConfig(**base)
+    with pytest.raises(McpBusyError):
+        handlers.trigger_analysis(stock_code="600519")
+    analysis.trigger_analysis.assert_not_called()
 
 
-class TestReadHandlers:
-    def test_quote_calls_stock_service(self):
-        stock = MagicMock()
-        stock.get_realtime_quote.return_value = {"stock_code": "AAPL", "current_price": 1}
-        handlers = McpToolHandlers(config=_config(), stock_service=stock)
-        result = handlers.get_realtime_quote(stock_code="AAPL")
-        stock.get_realtime_quote.assert_called_once_with("AAPL")
-        assert result["stock_code"] == "AAPL"
+def test_trigger_submits_typed_async_request_under_global_lock() -> None:
+    analysis = MagicMock()
+    analysis.trigger_analysis.return_value = {"task_id": "t1", "status": "pending"}
+    lock_modes: list[bool] = []
 
-    def test_history_list_bounds_limit(self):
-        history = MagicMock()
-        history.get_history_list.return_value = {"total": 0, "items": []}
-        handlers = McpToolHandlers(config=_config(), history_service=history)
-        handlers.list_analysis_history(limit=9999, page=0)
-        kwargs = history.get_history_list.call_args.kwargs
-        assert kwargs["limit"] == 100
-        assert kwargs["page"] == 1
+    def fake_lock(runner, config, args, stock_codes, *, blocking=True):
+        lock_modes.append(blocking)
+        runner(config, args, stock_codes)
+        return True
 
-    def test_portfolio_snapshot_defaults_no_realtime(self):
-        portfolio = MagicMock()
-        portfolio.get_portfolio_snapshot.return_value = {"accounts": []}
-        handlers = McpToolHandlers(config=_config(), portfolio_service=portfolio)
-        handlers.get_portfolio_snapshot()
-        kwargs = portfolio.get_portfolio_snapshot.call_args.kwargs
-        assert kwargs["include_realtime"] is False
-
-
-class TestTriggerAnalysisConcurrency:
-    def test_busy_when_lock_not_acquired(self):
-        analysis = MagicMock()
-        lock_calls = []
-
-        def fake_lock(runner, config, args, stock_codes, *, blocking=True):
-            lock_calls.append(blocking)
-            return False
-
-        handlers = McpToolHandlers(
-            config=_config(),
-            analysis_api_service=analysis,
-            get_config=lambda: SimpleNamespace(),
-            run_with_lock=fake_lock,
-            security_audit=MagicMock(),
-        )
-        with pytest.raises(McpBusyError):
-            handlers.trigger_analysis(stock_code="600519")
-        analysis.trigger_analysis.assert_not_called()
-        assert lock_calls == [False]
-
-        tool_result = call_tool(
-            handlers, "trigger_analysis", {"stock_code": "600519"}
-        )
-        assert tool_result["isError"] is True
-        assert tool_result["structuredContent"]["error"] == "busy"
-
-    def test_submits_when_lock_acquired(self):
-        analysis = MagicMock()
-        analysis.trigger_analysis.return_value = {
-            "task_id": "t1",
-            "status": "pending",
-        }
-
-        def fake_lock(runner, config, args, stock_codes, *, blocking=True):
-            runner(config, args, stock_codes)
-            return True
-
-        handlers = McpToolHandlers(
-            config=_config(),
-            analysis_api_service=analysis,
-            get_config=lambda: SimpleNamespace(name="cfg"),
-            run_with_lock=fake_lock,
-            security_audit=MagicMock(),
-        )
-        result = handlers.trigger_analysis(stock_code="600519")
-        analysis.trigger_analysis.assert_called_once()
-        assert result["task_id"] == "t1"
-
-    def test_rejects_over_max_stocks(self):
-        handlers = McpToolHandlers(
-            config=_config(analysis_max_stocks=2),
-            analysis_api_service=MagicMock(),
-            run_with_lock=lambda *a, **k: True,
-        )
-        with pytest.raises(ValueError):
-            handlers.trigger_analysis(stock_codes=["a", "b", "c"])
-
-    def test_busy_error_maps_to_api_code(self):
-        payload = map_exception_to_tool_result(McpBusyError())
-        assert payload["structuredContent"]["error"] == "busy"
+    audit = MagicMock()
+    handlers = McpToolHandlers(
+        config=_config(),
+        analysis_api_service=analysis,
+        get_config=lambda: SimpleNamespace(name="cfg"),
+        run_with_lock=fake_lock,
+        security_audit=audit,
+    )
+    result = handlers.trigger_analysis(stock_code="600519")
+    request = analysis.trigger_analysis.call_args.args[0]
+    assert isinstance(request, AnalyzeRequest)
+    assert request.async_mode is True
+    assert analysis.trigger_analysis.call_args.kwargs["security_audit"] is audit
+    assert lock_modes == [False]
+    assert result["task_id"] == "t1"
 
 
-    def test_timeout_when_analysis_hangs(self):
-        import time
-        from src.mcp_server.config import McpServerConfig
+def test_trigger_rejects_more_than_configured_cost_budget() -> None:
+    handlers = McpToolHandlers(
+        config=_config(analysis_max_stocks=2),
+        analysis_api_service=MagicMock(),
+        run_with_lock=lambda *args, **kwargs: True,
+        security_audit=MagicMock(),
+    )
+    with pytest.raises(ValueError, match="At most 2"):
+        handlers.trigger_analysis(stock_codes=["AAPL", "MSFT", "NVDA"])
 
-        analysis = MagicMock()
 
-        def slow_trigger(*args, **kwargs):
-            time.sleep(2)
-            return {"task_id": "late"}
-
-        analysis.trigger_analysis.side_effect = slow_trigger
-
-        def fake_lock(runner, config, args, stock_codes, *, blocking=True):
-            runner(config, args, stock_codes)
-            return True
-
-        handlers = McpToolHandlers(
-            config=McpServerConfig(
-                enabled=True,
-                transport="stdio",
-                host="127.0.0.1",
-                port=8765,
-                session_token=None,
-                analysis_timeout_seconds=1,
-                analysis_max_stocks=2,
-            ),
-            analysis_api_service=analysis,
-            get_config=lambda: SimpleNamespace(),
-            run_with_lock=fake_lock,
-            security_audit=MagicMock(),
-        )
-        tool_result = call_tool(
-            handlers, "trigger_analysis", {"stock_code": "600519"}
-        )
-        assert tool_result["isError"] is True
-        assert tool_result["structuredContent"]["error"] == "timeout"
-
+def test_trigger_does_not_expose_synchronous_analysis() -> None:
+    handlers = McpToolHandlers(config=_config(), security_audit=MagicMock())
+    with pytest.raises(ValueError, match="async_mode=true"):
+        handlers.trigger_analysis(stock_code="AAPL", async_mode=False)
