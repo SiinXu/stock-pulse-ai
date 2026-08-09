@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 
-- [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) at Web validation and symbol normalization boundaries, rewriting them to canonical `HKxxxxx` form so analysis/watchlist entry points no longer require an explicit `hk` prefix.
+- [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
 - [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
 - [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).

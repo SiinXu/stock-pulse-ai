@@ -27,7 +27,7 @@ _OTHER_MARKET_NAMES = {
 _SUPPORTED_FORMATS_MESSAGE = (
     "支持格式 / Supported formats: "
     "A 股/A-share `600519`; "
-    "港股/Hong Kong `HK00700` or `00700.HK`; "
+    "港股/Hong Kong `0941`, `HK00700`, or `00700.HK`; "
     "美股/US `AAPL`."
 )
 

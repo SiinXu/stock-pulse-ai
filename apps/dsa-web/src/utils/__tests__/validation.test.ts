@@ -20,6 +20,13 @@ describe('stock code validation', () => {
     expect(isObviouslyInvalidStockQuery(input)).toBe(false);
   });
 
+  test.each([
+    ['2330.TW', '2330.TW'],
+    ['6505.two', '6505.TWO'],
+  ])('accepts Taiwan Yahoo suffix code %s', (input, normalized) => {
+    expect(validateStockCode(input)).toEqual({ valid: true, normalized });
+  });
+
   test.each(['005930.K', '035900.KRX'])(
     'does not treat ambiguous JP/KR-like query %s as a valid suffix code',
     (input) => {

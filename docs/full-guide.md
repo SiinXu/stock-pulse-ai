@@ -1409,11 +1409,13 @@ PUSHOVER_API_TOKEN=your_api_token
 
 ### 港股支持
 
-使用 `hk` 前缀指定港股代码：
+港股可使用裸 4/5 位数字、`hk` 前缀或 `.HK` 后缀：
 
 ```bash
 STOCK_LIST=600519,hk00700,hk01810
 ```
+
+CLI、Web、分析/自选 API、CSV/Excel/剪贴板智能导入以及 Bot 分析/深研共享同一输入规则。裸 4 位代码（如 `0941`）会先查询股票索引，未命中时规范为 `HK00941`；已收录的日股 `7203` 仍解析为 `7203.T`。`1810.HK`、`7203.T`、`2330.TW`、`005930.KS` 等显式市场形式，以及 API 中的显式市场参数，始终优先且不会被改判为港股。
 
 港股日线会跳过 efinance、pytdx、baostock 等不支持港股日线的数据源，避免把港股代码错配到非港股市场；默认改由 AkShare/Tushare/YFinance/Longbridge 等港股路径继续兜底。
 
@@ -1469,6 +1471,8 @@ LITELLM_FALLBACK_MODELS=anthropic/claude-sonnet-4-6,openai/gpt-5.4-mini
 > 兼容性说明：`/api/v1/stocks/extract-from-image` 响应在原 `codes` 基础上新增 `items` 字段。若下游客户端使用严格 JSON Schema 且不接受未知字段，请同步更新 schema。
 
 **智能导入**：除图片外，还支持 CSV/Excel 文件及剪贴板粘贴（`/api/v1/stocks/parse-import`），自动解析代码/名称列，名称→代码解析支持本地映射、拼音匹配及 AkShare 在线 fallback。依赖 `pypinyin`（拼音匹配）和 `openpyxl`（Excel 解析），已包含在 `requirements.txt` 中。
+
+- **代码规范化**：裸 4 位港股代码（如 `0941`）会输出为 `HK00941`；索引已收录的日股裸码（如 `7203`）仍优先输出 `7203.T`。显式前缀/后缀不受该默认规则影响。
 
 - **AkShare 名称解析缓存**：名称→代码解析使用 AkShare 在线 fallback 时，结果缓存 1 小时（TTL），避免频繁请求；首次调用或缓存过期后会自动刷新。
 - **CSV/Excel 列名**：支持 `code`、`股票代码`、`代码`、`name`、`股票名称`、`名称` 等（不区分大小写）；无表头时默认第 1 列为代码、第 2 列为名称。
@@ -1830,7 +1834,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 |------|------|------|
 | A股 | 6位数字 | `600519`、`000001`、`300750` |
 | 北交所 | 8/4/92 开头 6 位，支持 `BJ` 前缀或 `.BJ` 后缀 | `920748`、`BJ920493`、`920493.BJ` |
-| 港股 | hk + 5位数字 | `hk00700`、`hk09988` |
+| 港股 | 裸 4/5 位数字、`HK` 前缀或 `.HK` 后缀 | `0941`、`00700`、`hk00700`、`1810.HK` |
 | 美股 | 1-5 字母（可选 .X 后缀） | `AAPL`、`TSLA`、`BRK.B` |
 | 日股 | Yahoo 后缀 `.T` | `7203.T`、`6758.T` |
 | 韩股 | Yahoo 后缀 `.KS` / `.KQ` | `005930.KS`、`035720.KQ` |

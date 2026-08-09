@@ -236,28 +236,17 @@ def canonical_stock_code(code: str) -> str:
     which strips exchange prefixes. Apply at system input boundaries to ensure
     consistent case across BOT, WEB UI, API, and CLI paths (Issue #355).
 
-    Bare 4-digit numerics are an exception: they are rewritten to the explicit
-    ``HKxxxxx`` form so input paths that only call ``canonical_stock_code``
-    (for example CLI ``--stocks`` after index resolution) still emit the
-    shared Hong Kong identity instead of a bare digit string.
-
     Examples:
         'aapl'    -> 'AAPL'
         'AAPL'    -> 'AAPL'
         '600519'  -> '600519'  (digits are unchanged)
-        '0001'    -> 'HK00001' (bare 4-digit HK)
+        '0001'    -> '0001'    (market inference belongs to input boundaries)
         'hk00700' -> 'HK00700'
     """
     text = (code or "").strip()
     if not text:
         return ""
-    upper = text.upper()
-    # Keep case canonicalization cheap for the common path, but promote bare
-    # 4-digit HK codes so CLI/API helpers that only uppercase still align
-    # with normalize_stock_code / _is_hk_market.
-    if upper.isdigit() and len(upper) == 4:
-        return f"HK{upper.zfill(5)}"
-    return upper
+    return text.upper()
 
 
 __all__ = [

@@ -17,9 +17,12 @@ def test_bare_four_digit_hk_codes_normalize_to_canonical_prefix() -> None:
     assert normalize_stock_code("0001") == "HK00001"
     assert normalize_stock_code("0941") == "HK00941"
     assert normalize_stock_code("1810") == "HK01810"
-    assert canonical_stock_code("0001") == "HK00001"
-    assert canonical_stock_code("0941") == "HK00941"
-    assert canonical_stock_code("1810") == "HK01810"
+
+
+def test_context_free_canonical_helper_does_not_infer_a_market() -> None:
+    assert canonical_stock_code("0001") == "0001"
+    assert canonical_stock_code("0941") == "0941"
+    assert canonical_stock_code("7203") == "7203"
 
 
 def test_bare_five_digit_hk_and_a_share_and_us_unchanged_at_normalize() -> None:

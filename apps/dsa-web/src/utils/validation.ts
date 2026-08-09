@@ -16,6 +16,7 @@ const STOCK_CODE_PATTERNS = [
   /^\d{1,5}\.HK$/, // HK suffix format, for example 00700.HK
   /^\d{4,5}\.T$/, // Japan Yahoo suffix format, for example 7203.T
   /^\d{6}\.(KS|KQ)$/, // Korea Yahoo suffix format, for example 005930.KS or 035720.KQ
+  /^\d{4,6}\.(TW|TWO)$/, // Taiwan Yahoo suffix formats
   /^[A-Z]{1,5}(?:\.(?:US|[A-Z]))?$/, // Common US ticker format
 ];
 
