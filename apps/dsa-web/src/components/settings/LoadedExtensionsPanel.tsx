@@ -58,8 +58,9 @@ function sourcePath(plugin: PluginInfo, t: LoadedExtensionsPanelProps['t']): str
 
 function failureReason(plugin: PluginInfo, t: LoadedExtensionsPanelProps['t']): string | null {
   if (plugin.state !== 'failed') return null;
-  // GET /api/v1/plugins exposes lifecycle state but not last_error / error_code.
-  // Stay honest: surface the failed state and actionable checks without inventing a reason.
+  if (plugin.lastErrorCode) {
+    return t('settings.loadedExtensionsFailureCode', { code: plugin.lastErrorCode });
+  }
   return t('settings.loadedExtensionsFailureReasonUnavailable');
 }
 

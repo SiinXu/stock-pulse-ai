@@ -76,6 +76,7 @@ class Config:
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
     stock_index_remote_update_enabled: bool = True
+    plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
     alphasift_enabled: bool = False
@@ -89,6 +90,11 @@ class Config:
     # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
     multimodal_agent_tools_enabled: bool = False
     multimodal_file_root: Optional[str] = None
+    # === Optional offline OCR Agent Tool (issue #196) ===
+    ocr_agent_tool_enabled: bool = False
+    ocr_file_root: Optional[str] = None
+    ocr_langs: str = "chi_sim+eng"
+    ocr_timeout_seconds: int = 30
     # === Optional DCF / relative valuation Agent Tool (issue #238) ===
     valuation_agent_tool_enabled: bool = False
 

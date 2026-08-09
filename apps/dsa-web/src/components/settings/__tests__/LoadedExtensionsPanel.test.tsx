@@ -28,7 +28,7 @@ describe('LoadedExtensionsPanel', () => {
 
   it('lists loaded extensions with source path and states from GET /api/v1/plugins', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({
-      total: 2,
+      total: 3,
       items: [
         {
           id: 'kronos',
@@ -53,8 +53,22 @@ describe('LoadedExtensionsPanel', () => {
           reloadable: true,
           packageRoot: '/var/plugins/acme-notify',
           extensionPoints: [],
+          lastErrorCode: 'manifest_permissions_undeclared',
           description: '',
           author: 'Acme',
+        },
+        {
+          id: 'legacy-failed',
+          name: 'Legacy Failed',
+          version: '0.1.0',
+          source: 'external',
+          state: 'failed',
+          desiredEnabled: true,
+          reloadable: false,
+          packageRoot: null,
+          extensionPoints: [],
+          description: '',
+          author: '',
         },
       ],
     });
@@ -70,9 +84,12 @@ describe('LoadedExtensionsPanel', () => {
 
     expect(screen.getByText('Acme Notify')).toBeInTheDocument();
     expect(screen.getByText('/var/plugins/acme-notify')).toBeInTheDocument();
-    expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(screen.getAllByText('Failed')).toHaveLength(2);
     expect(screen.getByTestId('loaded-extension-failure-acme-notify')).toHaveTextContent(
-      /does not currently return a detailed error_code/i,
+      'Failure code: manifest_permissions_undeclared',
+    );
+    expect(screen.getByTestId('loaded-extension-failure-legacy-failed')).toHaveTextContent(
+      /no stable failure code is currently available/i,
     );
 
     expect(screen.getByTestId('settings-loaded-extensions-trust')).toHaveTextContent(
