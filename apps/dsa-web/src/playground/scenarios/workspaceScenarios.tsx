@@ -254,10 +254,11 @@ const OnboardingTodayPlanCardStory = () => {
 
 const AgentOnboardingWizardStory = () => {
   const { t } = useUiLanguage();
+  const text = useSamples();
   const [open, setOpen] = useState(true);
   return (
     <div className="space-y-3">
-      <Button variant="primary" onClick={() => setOpen(true)}>Open agent onboarding wizard</Button>
+      <Button variant="primary" onClick={() => setOpen(true)}>{text.openAgentOnboardingWizard}</Button>
       <AgentOnboardingWizard
         open={open}
         onClose={() => setOpen(false)}
