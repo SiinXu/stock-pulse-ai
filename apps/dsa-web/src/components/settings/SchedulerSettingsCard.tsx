@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -25,6 +25,8 @@ import { SettingsSwitch } from './SettingsSwitch';
 import { getConfigItem } from './settingsConfigItems';
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+/** Poll interval while this process reports analysis running (run-now / schedule). */
+const RUNNING_STATUS_POLL_MS = 3000;
 
 function isEnabledConfigValue(value: unknown) {
   return String(value ?? '').trim().toLowerCase() === 'true';
@@ -53,9 +55,22 @@ function serializeScheduleTimes(times: string[]) {
   return times.map((time) => time.trim()).filter(Boolean).join(',');
 }
 
-function formatSchedulerTimestamp(value: string | null | undefined, language: UiLanguage) {
+function formatSchedulerTimestamp(
+  value: string | null | undefined,
+  language: UiLanguage,
+  scheduleTimezone: string | undefined,
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+) {
   if (!value) {
     return '-';
+  }
+
+  const hasExplicitOffset = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+  if (!hasExplicitOffset) {
+    return `${value} · ${t('settings.schedulerTimezoneUnknown')}`;
+  }
+  if (!scheduleTimezone) {
+    return value;
   }
 
   const date = new Date(value);
@@ -63,14 +78,68 @@ function formatSchedulerTimestamp(value: string | null | undefined, language: Ui
     return value;
   }
 
-  return new Intl.DateTimeFormat(getUiLocale(language), {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
+  try {
+    const locale = getUiLocale(language);
+    const parts = new Intl.DateTimeFormat(locale, {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: scheduleTimezone,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(date);
+
+    const zone = parts.find((part) => part.type === 'timeZoneName')?.value?.replace('UTC', 'GMT');
+    const body = parts
+      .filter((part) => part.type !== 'timeZoneName')
+      .map((part) => part.value)
+      .join('')
+      .trim();
+
+    return `${body}${zone ? ` ${zone}` : ''} · ${scheduleTimezone}`;
+  } catch {
+    return `${value} · ${scheduleTimezone}`;
+  }
 }
+
+function formatSkipReason(
+  reason: string | null | undefined,
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+) {
+  if (!reason) {
+    return '';
+  }
+  const reasonKeys: Record<string, UiTextKey> = {
+    analysis_already_running: 'settings.schedulerSkipReasonBusy',
+    scheduler_not_attached: 'settings.schedulerReasonNotAttached',
+    scheduler_disabled: 'settings.schedulerReasonDisabled',
+    scheduler_state_unavailable: 'settings.schedulerReasonUnavailable',
+  };
+  if (reasonKeys[reason]) {
+    return t(reasonKeys[reason]);
+  }
+  return t('settings.schedulerReasonUnknown');
+}
+
+function formatProcessMode(
+  processMode: SchedulerStatusResponse['processMode'],
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+) {
+  const modeKeys: Record<string, UiTextKey> = {
+    serve: 'settings.schedulerProcessModeServe',
+    desktop: 'settings.schedulerProcessModeDesktop',
+    not_attached: 'settings.schedulerProcessModeNotAttached',
+  };
+  return processMode && modeKeys[processMode]
+    ? t(modeKeys[processMode])
+    : t('settings.schedulerProcessModeUnknown');
+}
+
+type TrackedRun = {
+  id: string | null;
+  state: 'running' | 'succeeded' | 'failed' | 'unknown';
+};
 
 type SchedulerSettingsCardProps = {
   items: SystemConfigItem[];
@@ -105,47 +174,106 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [isRunningNow, setIsRunningNow] = useState(false);
   const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
   const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
-  const [runNowSuccess, setRunNowSuccess] = useState('');
+  const [trackedRun, setTrackedRun] = useState<TrackedRun | null>(null);
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
   const [isAddingTime, setIsAddingTime] = useState(false);
   // Live probe: true only when list(enabled=true) succeeds with ≥1 item.
   // null = not yet known / probe failed — never invent an overlap state.
   const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
+  const mountedRef = useRef(true);
+  const statusRequestRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refreshVersionedTaskOverlap = useCallback(async () => {
     try {
       const response = await scheduledTasksApi.list({ enabled: true, limit: 1 });
       const hasItems = (response.items?.length ?? 0) > 0;
       const hasTotal = (response.total ?? 0) > 0;
-      setHasEnabledVersionedTasks(hasItems || hasTotal);
+      if (mountedRef.current) {
+        setHasEnabledVersionedTasks(hasItems || hasTotal);
+      }
     } catch {
       // Fail soft: missing versioned-task probe must not block legacy controls.
-      setHasEnabledVersionedTasks(null);
+      if (mountedRef.current) {
+        setHasEnabledVersionedTasks(null);
+      }
     }
   }, []);
 
   const refreshSchedulerStatus = useCallback(async () => {
+    const requestId = ++statusRequestRef.current;
     setStatusError(null);
     setIsRefreshingStatus(true);
     try {
-      const [payload] = await Promise.all([
-        systemConfigApi.getSchedulerStatus(),
-        refreshVersionedTaskOverlap(),
-      ]);
-      setStatus(payload);
+      const payload = await systemConfigApi.getSchedulerStatus();
+      if (mountedRef.current && requestId === statusRequestRef.current) {
+        setStatus(payload);
+        setTrackedRun((current) => {
+          if (!current) return current;
+          if (current.id && payload.activeRunId === current.id) {
+            return { ...current, state: 'running' };
+          }
+          if (current.id && payload.lastRunId === current.id) {
+            return {
+              ...current,
+              state: payload.lastRunOutcome === 'succeeded'
+                ? 'succeeded'
+                : payload.lastRunOutcome === 'failed'
+                  ? 'failed'
+                  : 'unknown',
+            };
+          }
+          if (!payload.running) {
+            return { ...current, state: 'unknown' };
+          }
+          return current;
+        });
+      }
     } catch (error: unknown) {
-      setStatusError(getParsedApiError(error));
+      if (mountedRef.current && requestId === statusRequestRef.current) {
+        setStatusError(getParsedApiError(error));
+      }
     } finally {
-      setIsRefreshingStatus(false);
+      if (mountedRef.current && requestId === statusRequestRef.current) {
+        setIsRefreshingStatus(false);
+      }
     }
-  }, [refreshVersionedTaskOverlap]);
+  }, []);
 
   useEffect(() => {
     if (!hasSchedulerSettings) {
       return;
     }
     void refreshSchedulerStatus();
-  }, [hasSchedulerSettings, refreshSchedulerStatus, statusRefreshToken]);
+    void refreshVersionedTaskOverlap();
+  }, [hasSchedulerSettings, refreshSchedulerStatus, refreshVersionedTaskOverlap, statusRefreshToken]);
+
+  // While analysis is running in this process, poll status so run-now stays trackable
+  // (accepted → running → idle with last success/error) without showing only a task id.
+  useEffect(() => {
+    if (!hasSchedulerSettings || (!status?.running && trackedRun?.state !== 'running')) {
+      return;
+    }
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      await refreshSchedulerStatus();
+      if (!cancelled) {
+        timer = window.setTimeout(() => void poll(), RUNNING_STATUS_POLL_MS);
+      }
+    };
+    timer = window.setTimeout(() => void poll(), RUNNING_STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [hasSchedulerSettings, status?.running, trackedRun?.state, refreshSchedulerStatus]);
 
   useEffect(() => {
     if (!onSchedulerStateChange) {
@@ -181,6 +309,28 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     ...(issueByKey.SCHEDULE_TIMES || []),
     ...(issueByKey.SCHEDULE_TIME || []),
   ];
+  const analysisRunning = Boolean(status?.running);
+  const runNowAvailable = status?.runNowAvailable === true;
+  const runNowBlocked = disabled || isRunningNow || analysisRunning || !runNowAvailable;
+  const nextRunDisplay = status?.nextRunAt
+    ? formatSchedulerTimestamp(status.nextRunAt, language, status.scheduleTimezone, t)
+    : (statusEnabled ? t('settings.schedulerNoNextRun') : '-');
+  const skipReasonText = formatSkipReason(status?.lastSkipReason, t);
+  const runNowBlockReasonText = analysisRunning
+    ? t('settings.schedulerSkipReasonBusy')
+    : formatSkipReason(status?.runNowBlockReason, t)
+      || (!runNowAvailable ? t('settings.schedulerReasonUnavailable') : '');
+  const attachmentText = status?.attached === true
+    ? t('settings.schedulerAttached')
+    : status?.attached === false
+      ? t('settings.schedulerNotAttached')
+      : t('settings.schedulerAttachmentUnknown');
+  const lastSkippedDisplay = status?.lastSkippedAt
+    ? [
+        formatSchedulerTimestamp(status.lastSkippedAt, language, status.scheduleTimezone, t),
+        skipReasonText,
+      ].filter(Boolean).join(' · ')
+    : (skipReasonText || null);
 
   const updateScheduleTimes = (nextTimes: string[]) => {
     if (timeTargetKey === 'SCHEDULE_TIME') {
@@ -192,16 +342,27 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
 
   const runSchedulerNow = async () => {
     setRunNowError(null);
-    setRunNowSuccess('');
+    setTrackedRun(null);
     setIsRunningNow(true);
     try {
-      await systemConfigApi.runSchedulerNow();
-      setRunNowSuccess(t('settings.schedulerRunAccepted'));
+      const result = await systemConfigApi.runSchedulerNow();
+      // Contract: accepted + running means work started in this process (no async task id).
+      if (result.accepted) {
+        setTrackedRun({
+          id: result.runId ?? null,
+          state: 'running',
+        });
+      } else if (result.running) {
+        setRunNowError(getParsedApiError(new Error(t('settings.schedulerBusyReason'))));
+      }
       await refreshSchedulerStatus();
     } catch (error: unknown) {
       setRunNowError(getParsedApiError(error));
+      await refreshSchedulerStatus();
     } finally {
-      setIsRunningNow(false);
+      if (mountedRef.current) {
+        setIsRunningNow(false);
+      }
     }
   };
 
@@ -328,8 +489,11 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             <div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
-                <span className="text-xs text-muted-text">
-                  {status?.running
+                <span
+                  className="text-xs text-muted-text"
+                  data-testid="scheduler-runtime-badge"
+                >
+                  {analysisRunning
                     ? t('settings.schedulerRunning')
                     : statusEnabled
                       ? t('settings.schedulerEnabled')
@@ -340,23 +504,50 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {t('settings.schedulerStatusScopeNote')}
               </p>
             </div>
-            <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+
+            <Surface
+              as="div"
+              level="interactive"
+              className="space-y-1 px-3 py-2"
+              data-testid="scheduler-process-mode"
+            >
+              <p className="text-xs text-muted-text">{t('settings.schedulerProcessMode')}</p>
+              <p className="text-xs font-medium text-foreground" data-testid="scheduler-process-mode-value">
+                {formatProcessMode(status?.processMode, t)} · {attachmentText}
+              </p>
+              <p
+                className="text-xs leading-5 text-muted-text"
+                data-testid="scheduler-owner-note"
+              >
+                {t('settings.schedulerOwnerNote')}
+              </p>
+            </Surface>
+
+            <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 xl:grid-cols-3">
               <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerEffectiveTimes')}</dt>
                 <dd className="mt-1 font-medium text-foreground">{effectiveStatusTimes.join(', ') || '-'}</dd>
               </Surface>
               <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerNextRun')}</dt>
-                <dd className="mt-1 font-medium text-foreground">
-                  {formatSchedulerTimestamp(status?.nextRunAt, language)}
+                <dd data-testid="scheduler-next-run" className="mt-1 font-medium text-foreground">
+                  {nextRunDisplay}
                 </dd>
               </Surface>
               <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerLastSuccess')}</dt>
                 <dd data-testid="scheduler-last-success" className="mt-1 font-medium text-foreground">
-                  {formatSchedulerTimestamp(status?.lastSuccessAt, language)}
+                  {formatSchedulerTimestamp(status?.lastSuccessAt, language, status?.scheduleTimezone, t)}
                 </dd>
               </Surface>
+              {lastSkippedDisplay ? (
+                <Surface as="div" level="interactive" className="px-3 py-2 sm:col-span-2 xl:col-span-3">
+                  <dt className="text-muted-text">{t('settings.schedulerLastSkipped')}</dt>
+                  <dd data-testid="scheduler-last-skipped" className="mt-1 font-medium text-foreground">
+                    {lastSkippedDisplay}
+                  </dd>
+                </Surface>
+              ) : null}
             </dl>
             {status?.lastError ? (
               <InlineAlert
@@ -385,15 +576,25 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 variant="primary"
                 size="default"
                 data-testid="scheduler-run-now-button"
-                disabled={disabled || isRunningNow}
-                isLoading={isRunningNow}
+                disabled={runNowBlocked}
+                isLoading={isRunningNow || analysisRunning}
                 loadingText={t('settings.schedulerRunningNow')}
+                aria-describedby={runNowBlocked && runNowBlockReasonText ? 'scheduler-run-now-busy-reason' : undefined}
                 onClick={() => void runSchedulerNow()}
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {t('settings.schedulerRunNow')}
               </Button>
             </div>
+            {runNowBlocked && runNowBlockReasonText ? (
+              <p
+                id="scheduler-run-now-busy-reason"
+                data-testid="scheduler-run-now-busy-reason"
+                className="text-xs leading-5 text-muted-text"
+              >
+                {runNowBlockReasonText}
+              </p>
+            ) : null}
           </Surface>
         </div>
 
@@ -411,8 +612,33 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
         ) : null}
         {statusError ? <ApiErrorAlert error={statusError} /> : null}
         {runNowError ? <ApiErrorAlert error={runNowError} /> : null}
-        {!runNowError && runNowSuccess ? (
-          <SettingsAlert title={t('settings.actionSuccess')} message={runNowSuccess} variant="success" />
+        {!runNowError && trackedRun?.state === 'running' ? (
+          <SettingsAlert
+            title={t('settings.actionSuccess')}
+            message={t('settings.schedulerRunAccepted')}
+            variant="success"
+          />
+        ) : null}
+        {!runNowError && trackedRun?.state === 'succeeded' ? (
+          <SettingsAlert
+            title={t('settings.actionSuccess')}
+            message={t('settings.schedulerRunSucceeded')}
+            variant="success"
+          />
+        ) : null}
+        {!runNowError && trackedRun?.state === 'failed' ? (
+          <SettingsAlert
+            title={t('settings.schedulerRunFailedTitle')}
+            message={t('settings.schedulerRunFailed')}
+            variant="error"
+          />
+        ) : null}
+        {!runNowError && trackedRun?.state === 'unknown' ? (
+          <SettingsAlert
+            title={t('settings.schedulerRunOutcomeUnknownTitle')}
+            message={t('settings.schedulerRunOutcomeUnknown')}
+            variant="warning"
+          />
         ) : null}
       </div>
     </SettingsSectionCard>

@@ -10504,6 +10504,70 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * SchedulerRunNowResponse
+         * @description Acceptance and correlation data for one immediate scheduler run.
+         */
+        SchedulerRunNowResponse: {
+            /** Accepted */
+            accepted: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at?: string | null;
+        };
+        /**
+         * SchedulerStatusResponse
+         * @description Authoritative status for this process's legacy day-batch scheduler.
+         */
+        SchedulerStatusResponse: {
+            /** Active Run Id */
+            active_run_id?: string | null;
+            /** Attached */
+            attached: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /** Last Run Id */
+            last_run_id?: string | null;
+            /** Last Run Outcome */
+            last_run_outcome?: ("succeeded" | "failed") | null;
+            /** Last Skip Reason */
+            last_skip_reason?: string | null;
+            /** Last Skipped At */
+            last_skipped_at?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /**
+             * Process Mode
+             * @enum {string}
+             */
+            process_mode: "serve" | "desktop" | "not_attached";
+            /** Run Now Available */
+            run_now_available: boolean;
+            /** Run Now Block Reason */
+            run_now_block_reason?: string | null;
+            /** Running */
+            running: boolean;
+            /** Schedule Times */
+            schedule_times?: string[];
+            /** Schedule Timezone */
+            schedule_timezone: string;
+            /**
+             * Track
+             * @constant
+             */
+            track: "legacy_day_batch";
+        };
         /** ScorecardBucket */
         ScorecardBucket: {
             /** Avg Return Pct */
@@ -21950,9 +22014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerRunNowResponse"];
                 };
             };
         };
@@ -21972,9 +22034,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerStatusResponse"];
                 };
             };
         };
