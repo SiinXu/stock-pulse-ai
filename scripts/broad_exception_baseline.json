@@ -261,7 +261,6 @@
     {"path":"src/agent/skills/aggregator.py","scope":"<module>.SkillAggregator._use_backtest_autoweight","caught":["Exception"],"digest":"01fc95b4454bc7445c28a59159dc1561dd8f0698b7edc1e9a35746e0993f335b"},
     {"path":"src/agent/skills/defaults.py","scope":"<module>._load_builtin_skill_catalog","caught":["Exception"],"digest":"201d1c0ee5edc7b55ffbbd9d9fcf92c6ceebd9fa01c373d824fe0efbcfa3baee"},
     {"path":"src/agent/skills/skill_agent.py","scope":"<module>.SkillAgent._load_skill","caught":["Exception"],"digest":"b5786df6ae33832fcbad4eec87ee4e853a7664603d386f1f66edd3b2d1f52807"},
-    {"path":"src/agent/tools/analysis_tools.py","scope":"<module>._handle_analyze_trend","caught":["Exception"],"digest":"9e363c3d0bc1ce827e1bc0a77ae92fd385ae44a8d785db2d8bfdf5d067443796"},
     {"path":"src/agent/tools/analysis_tools.py","scope":"<module>._handle_calculate_ma","caught":["Exception"],"digest":"5c5370708da5315da36d7630839afee50235b93ce524eed1b665c87a63ee6026"},
     {"path":"src/agent/tools/analysis_tools.py","scope":"<module>._handle_get_volume_analysis","caught":["Exception"],"digest":"8b7af1b94d04c62b47485f7ac688eec9dd6c9128d828875bf1b3bdfa6e88b488"},
     {"path":"src/agent/tools/backtest_tools.py","scope":"<module>._handle_get_overall_backtest_summary","caught":["Exception"],"digest":"488e58f260d713ae5e4d595f77afd1092d9afc49036abef0ca0ea0bc68d5d7fe"},

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 
 - [Added] Reusable Web financial chart components: KlineChart (volume + MA overlays + zoom, dirty OHLC guards) and RiskHeatmap (score + level labels; color not sole carrier), with playground previews and unit tests; no page wiring (#142).
+- [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
 - [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
 - [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).
 - [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
