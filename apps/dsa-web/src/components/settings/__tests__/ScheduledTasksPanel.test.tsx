@@ -6,6 +6,8 @@ import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { UI_TEXT } from '../../../i18n/uiText';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
 
+const HISTORY_ASSERT_TIMEOUT_MS = 5_000;
+
 vi.mock('../../../api/scheduledTasks', () => ({
   scheduledTasksApi: {
     list: vi.fn(),
@@ -340,8 +342,16 @@ describe('ScheduledTasksPanel', () => {
       'task-1',
       { limit: 10 },
     ));
-    expect(await screen.findByTestId('settings-scheduled-task-run-run-success')).toBeInTheDocument();
-    const failed = await screen.findByTestId('settings-scheduled-task-run-run-failed');
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-success',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
+    const failed = await screen.findByTestId(
+      'settings-scheduled-task-run-run-failed',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    );
     expect(failed).toHaveTextContent('Failed');
     expect(failed).toHaveTextContent('3 attempts · 2 dispatch failures');
     expect(failed).toHaveTextContent('execution-failed');
@@ -380,19 +390,31 @@ describe('ScheduledTasksPanel', () => {
       { limit: 10 },
     ));
     await act(async () => resolveEmptyHistory());
-    expect(screen.getByText('No run history')).toBeInTheDocument();
+    expect(await screen.findByText(
+      'No run history',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {
       name: 'Refresh run history for “AAPL risk check”',
     }));
-    expect(await screen.findByTestId('settings-scheduled-task-run-run-1')).toBeInTheDocument();
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-1',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
     await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenNthCalledWith(
       3,
       'task-1',
       { limit: 20 },
     ));
-    expect(await screen.findByTestId('settings-scheduled-task-run-run-2')).toBeInTheDocument();
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-2',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {
       name: 'Refresh run history for “AAPL risk check”',

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
 - [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
+- [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
 - [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
 - [Fixed] Keep a single primary create-rule action in an empty Signal Center and strengthen Usage redirect/title acceptance.
 - [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
