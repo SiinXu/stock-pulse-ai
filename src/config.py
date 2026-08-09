@@ -13,7 +13,7 @@ Responsibilities:
 import json
 import importlib as _importlib
 import logging
-import math
+import math as _math
 import os
 import re
 import sys as _sys
@@ -145,7 +145,7 @@ from src.config_parts.parsers import (
     normalize_news_strategy_profile,
     parse_agent_context_compression_int,
     parse_env_bool,
-    parse_env_finite_float,
+    parse_env_finite_float as _parse_env_finite_float,
     parse_env_float,
     parse_env_int,
     resolve_litellm_thinking_enabled,

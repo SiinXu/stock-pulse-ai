@@ -1,6 +1,6 @@
 """Pure value parsers and LLM route helpers for :mod:`src.config`."""
 
-import math
+import math as _math
 import os
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
@@ -138,7 +138,7 @@ def parse_env_finite_float(
         parsed = float(raw_value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{field_name} must be a finite number") from exc
-    if not math.isfinite(parsed):
+    if not _math.isfinite(parsed):
         raise ValueError(f"{field_name} must be a finite number")
     if minimum is not None and parsed < minimum:
         raise ValueError(f"{field_name} must be >= {minimum}")

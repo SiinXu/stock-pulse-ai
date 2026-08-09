@@ -1116,7 +1116,7 @@ for _offset, (_key, (_title, _default, _minimum, _maximum)) in enumerate(
             "or out-of-range values are rejected instead of clamped."
         ),
         "category": "system",
-        "data_type": "float",
+        "data_type": "number",
         "ui_control": "number",
         "is_sensitive": False,
         "is_required": False,
