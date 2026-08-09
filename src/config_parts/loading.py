@@ -1166,6 +1166,7 @@ class _ConfigLoadingMethods:
                 500_000,
                 field_name='REASONING_TRACE_EXPORT_MAX_CHARS',
                 minimum=10_000,
+                maximum=2_000_000,
             ),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False

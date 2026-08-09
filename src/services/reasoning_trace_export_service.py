@@ -9,8 +9,8 @@ read-only consumer: it does not change agent recording behaviour.
 
 Security contract (same redaction path as security audit):
 - Every export payload is passed through ``redact_sensitive_data``.
-- API keys, tokens, credentialed base URLs, and local path leakage must not
-  appear in the exported package.
+- Supported API-key, token, credentialed-URL, and local-path patterns are
+  replaced before the package is returned.
 - Export is opt-in via ``REASONING_TRACE_EXPORT_ENABLED`` (default off).
 - Oversized packages are truncated with an explicit ``truncated`` marker.
 """
@@ -20,38 +20,42 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence
-
-import re
 
 from src.utils.sanitize import log_safe_exception, redact_sensitive_data
 
 logger = logging.getLogger(__name__)
 
-# Same absolute-path class scrubbed by run diagnostics (exported hard rule).
-_LOCAL_ABSOLUTE_PATH_RE = re.compile(
-    r"(?<![\w:/.-])(?:/(?:home|Users|root|var|tmp|opt|etc)/[^\s,;]+|[A-Za-z]:\\[^\s,;]+)"
+# Export-specific local path classes. URLs are redacted by the shared helper
+# before this expression runs, so these patterns only target local paths.
+_LOCAL_PATH_RE = re.compile(
+    r"(?<![\w:])(?:"
+    r"(?:/(?:Users|home|root|private|var|tmp|opt|etc|workspace)(?:/[^\s,;|<>]*)?)|"
+    r"(?:[A-Za-z]:[\\/][^\s,;|<>]+)|"
+    r"(?:\\\\[^\\\s]+\\[^\s,;|<>]+)|"
+    r"(?:~[\\/][^\s,;|<>]+)|"
+    r"(?:\.\.?[\\/][^\s,;|<>]+)"
+    r")"
+)
+_JWT_RE = re.compile(
+    r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\."
+    r"[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])"
 )
 
 SCHEMA_VERSION = "reasoning-trace-v1"
 DEFAULT_MAX_EXPORT_CHARS = 500_000
+MIN_MAX_EXPORT_CHARS = 10_000
+MAX_MAX_EXPORT_CHARS = 2_000_000
 DEFAULT_MAX_AGENT_EVENTS = 200
 DEFAULT_MAX_TOOL_CALLS_PER_AGENT = 50
 DEFAULT_MAX_STRING_CHARS = 4_000
+DEFAULT_MAX_SOURCE_RUNS = 100
+DEFAULT_MAX_QUALITY_ITEMS = 64
 
-# Coverage inventory for delivery notes / docs. Keys are stable identifiers.
-COVERAGE_RECORDED = (
-    "run_meta",
-    "diagnostics.agent_events",
-    "diagnostics.provider_runs",
-    "diagnostics.llm_runs",
-    "diagnostics.pipeline_stage_runs",
-    "dashboard.committee_deliberation",
-    "dashboard.strategy_synthesis",
-    "dashboard.core_conclusion",
-)
 COVERAGE_NOT_RECORDED = (
     "full_agent_prompts_and_system_messages",
     "tool_arguments_without_deep_payload",
@@ -92,6 +96,10 @@ class ReasoningTraceExportResult:
     def to_json_dict(self) -> Dict[str, Any]:
         return dict(self.package)
 
+    def to_json_text(self) -> str:
+        """Return standards-compliant compact JSON used for response sizing."""
+        return _strict_json_dump(self.package)
+
 
 def _resolve_runtime_config(config: Any = None) -> Any:
     """Return an injected config or the composition-root config (no bare get_config)."""
@@ -130,7 +138,7 @@ def resolve_max_export_chars(config: Any = None) -> int:
         value = int(raw)
     except (TypeError, ValueError):
         return DEFAULT_MAX_EXPORT_CHARS
-    return max(10_000, value)
+    return min(MAX_MAX_EXPORT_CHARS, max(MIN_MAX_EXPORT_CHARS, value))
 
 
 def build_config_fingerprint(config: Any = None) -> str:
@@ -156,6 +164,8 @@ def build_config_fingerprint(config: Any = None) -> str:
 
 
 def _as_mapping(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
     if isinstance(value, Mapping):
         return dict(value)
     return {}
@@ -163,7 +173,7 @@ def _as_mapping(value: Any) -> Dict[str, Any]:
 
 def _as_list(value: Any) -> List[Any]:
     if isinstance(value, list):
-        return list(value)
+        return value
     if isinstance(value, tuple):
         return list(value)
     return []
@@ -172,17 +182,56 @@ def _as_list(value: Any) -> List[Any]:
 def _clip_text(value: Any, *, limit: int = DEFAULT_MAX_STRING_CHARS) -> Optional[str]:
     if value is None:
         return None
+    if not isinstance(value, (str, int, float, bool)):
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     text = str(value)
     if len(text) <= limit:
         return text
     return text[: max(0, limit - 16)] + "…[truncated]"
 
 
-def _safe_json_size(payload: Any) -> int:
+def _finite_float(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
     try:
-        return len(json.dumps(payload, ensure_ascii=False, default=str))
-    except (TypeError, ValueError):
-        return 0
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _nonnegative_int(value: Any) -> Optional[int]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _clip_string_list(value: Any, *, limit: int = DEFAULT_MAX_QUALITY_ITEMS) -> List[str]:
+    result: List[str] = []
+    for item in _as_list(value)[:limit]:
+        clipped = _clip_text(item, limit=256)
+        if clipped is not None:
+            result.append(clipped)
+    return result
+
+
+def _strict_json_dump(payload: Any) -> str:
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+
+
+def _safe_json_size(payload: Any) -> int:
+    return len(_strict_json_dump(payload))
 
 
 def _redact_local_paths(value: Any, *, depth: int = 0, seen: Optional[set[int]] = None) -> Any:
@@ -194,7 +243,8 @@ def _redact_local_paths(value: Any, *, depth: int = 0, seen: Optional[set[int]] 
     if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, str):
-        return _LOCAL_ABSOLUTE_PATH_RE.sub("<redacted-path>", value)
+        value = _JWT_RE.sub("[REDACTED]", value)
+        return _LOCAL_PATH_RE.sub("<redacted-path>", value)
     obj_id = id(value)
     if obj_id in seen:
         return value
@@ -219,7 +269,7 @@ def redact_export_payload(value: Any) -> Any:
     ``SecurityAuditService``). Absolute local paths are scrubbed afterwards so
     user home directories never leave the process boundary.
     """
-    redacted = redact_sensitive_data(value)
+    redacted = redact_sensitive_data(value, redact_opaque_tokens=True)
     return _redact_local_paths(redacted)
 
 
@@ -250,10 +300,10 @@ def _extract_tool_calls(event: Mapping[str, Any]) -> List[Dict[str, Any]]:
     entry = {
         "name": _clip_text(name or attrs.get("tool") or attrs.get("tool_name") or "tool", limit=120),
         "status": _clip_text(event.get("status") or attrs.get("status"), limit=64),
-        "duration_ms": event.get("duration_ms"),
-        "step": event.get("step") or attrs.get("step"),
-        "sequence": event.get("sequence"),
-        "timestamp": event.get("timestamp"),
+        "duration_ms": _finite_float(event.get("duration_ms")),
+        "step": _clip_text(event.get("step") or attrs.get("step"), limit=120),
+        "sequence": _nonnegative_int(event.get("sequence")),
+        "timestamp": _clip_text(event.get("timestamp"), limit=64),
     }
     # Deep payloads may carry sanitized argument previews; never re-expand secrets.
     for key in ("tool_call_id", "error_code"):
@@ -266,13 +316,18 @@ def _group_agents_from_events(
     agent_events: Sequence[Any],
     *,
     max_events: int = DEFAULT_MAX_AGENT_EVENTS,
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
     """Group observability events into per-agent role timelines."""
     agents: Dict[str, Dict[str, Any]] = {}
     ordered_roles: List[str] = []
 
-    for index, raw in enumerate(list(agent_events)[:max_events]):
+    malformed = 0
+    tool_original = 0
+    tool_returned = 0
+    limited_events = agent_events[:max_events]
+    for index, raw in enumerate(limited_events):
         if not isinstance(raw, Mapping):
+            malformed += 1
             continue
         event = dict(raw)
         attrs = _as_mapping(event.get("attrs"))
@@ -297,19 +352,21 @@ def _group_agents_from_events(
 
         bucket = agents[role]
         summary_event = {
-            "event_type": event.get("event_type") or event.get("type"),
+            "event_type": _clip_text(event.get("event_type") or event.get("type"), limit=120),
             "name": _clip_text(event.get("name"), limit=120),
-            "status": event.get("status"),
-            "timestamp": event.get("timestamp"),
-            "duration_ms": event.get("duration_ms"),
-            "sequence": event.get("sequence", index),
-            "phase": event.get("phase"),
+            "status": _clip_text(event.get("status"), limit=64),
+            "timestamp": _clip_text(event.get("timestamp"), limit=64),
+            "duration_ms": _finite_float(event.get("duration_ms")),
+            "sequence": _nonnegative_int(event.get("sequence", index)),
+            "phase": _clip_text(event.get("phase"), limit=64),
         }
         bucket["events"].append({k: v for k, v in summary_event.items() if v is not None})
 
         for call in _extract_tool_calls(event):
+            tool_original += 1
             if len(bucket["tool_calls"]) < DEFAULT_MAX_TOOL_CALLS_PER_AGENT:
                 bucket["tool_calls"].append(call)
+                tool_returned += 1
 
         # Prefer decision/model_end style text as opinion when present.
         event_type = str(event.get("event_type") or "")
@@ -330,7 +387,16 @@ def _group_agents_from_events(
         if input_candidate and bucket["input_summary"] is None:
             bucket["input_summary"] = _clip_text(input_candidate, limit=500)
 
-    return [agents[role] for role in ordered_roles]
+    returned_events = sum(len(agents[role]["events"]) for role in ordered_roles)
+    return [agents[role] for role in ordered_roles], {
+        "original_events": len(agent_events),
+        "returned_events": returned_events,
+        "malformed_events": malformed,
+        "event_cap_dropped": max(0, len(agent_events) - max_events),
+        "original_tools": tool_original,
+        "returned_tools": tool_returned,
+        "tool_cap_dropped": max(0, tool_original - tool_returned),
+    }
 
 
 def _extract_synthesis(raw_result: Mapping[str, Any]) -> Dict[str, Any]:
@@ -342,43 +408,121 @@ def _extract_synthesis(raw_result: Mapping[str, Any]) -> Dict[str, Any]:
     disagreement: Dict[str, Any] = {}
     if strategy:
         disagreement = {
-            "conflict_severity": strategy.get("conflict_severity"),
-            "conflict_count": strategy.get("conflict_count"),
-            "consensus_level": strategy.get("consensus_level"),
-            "supporting_skills": strategy.get("supporting_skills"),
-            "opposing_skills": strategy.get("opposing_skills"),
+            "conflict_severity": _clip_text(strategy.get("conflict_severity"), limit=64),
+            "conflict_count": _nonnegative_int(strategy.get("conflict_count")),
+            "consensus_level": _clip_text(strategy.get("consensus_level"), limit=64),
+            "supporting_skills": _clip_string_list(strategy.get("supporting_skills")),
+            "opposing_skills": _clip_string_list(strategy.get("opposing_skills")),
         }
 
     final_conclusion = {
-        "final_signal": strategy.get("final_signal") or core.get("decision_type") or raw_result.get("decision_type"),
+        "final_signal": _clip_text(
+            strategy.get("final_signal") or core.get("decision_type") or raw_result.get("decision_type"),
+            limit=64,
+        ),
         "operation_advice": _clip_text(
             core.get("operation_advice") or raw_result.get("operation_advice"),
             limit=800,
         ),
-        "confidence_level": core.get("confidence_level") or raw_result.get("confidence_level"),
+        "confidence_level": _clip_text(
+            core.get("confidence_level") or raw_result.get("confidence_level"),
+            limit=64,
+        ),
         "analysis_summary": _clip_text(
             core.get("analysis_summary") or raw_result.get("analysis_summary"),
             limit=1200,
         ),
-        "sentiment_score": raw_result.get("sentiment_score"),
+        "sentiment_score": _finite_float(raw_result.get("sentiment_score")),
     }
 
     return {
         "disagreement": {k: v for k, v in disagreement.items() if v is not None},
         "consensus": {
-            "consensus_level": strategy.get("consensus_level"),
-            "committee_status": committee.get("status") or committee.get("outcome"),
+            "consensus_level": _clip_text(strategy.get("consensus_level"), limit=64),
+            "committee_status": _clip_text(
+                committee.get("status") or committee.get("outcome"), limit=64
+            ),
         },
         "final_conclusion": {k: v for k, v in final_conclusion.items() if v is not None},
-        "committee_deliberation": committee or None,
-        "strategy_synthesis": strategy or None,
     }
 
 
-def _extract_data_sources(diagnostics: Mapping[str, Any], context_snapshot: Mapping[str, Any]) -> Dict[str, Any]:
+def _extract_token_usage(value: Any) -> Dict[str, int]:
+    usage = _as_mapping(value)
+    aliases = {
+        "prompt_tokens": ("prompt_tokens", "input_tokens"),
+        "completion_tokens": ("completion_tokens", "output_tokens"),
+        "total_tokens": ("total_tokens",),
+    }
+    result: Dict[str, int] = {}
+    for output_key, input_keys in aliases.items():
+        for input_key in input_keys:
+            parsed = _nonnegative_int(usage.get(input_key))
+            if parsed is not None:
+                result[output_key] = parsed
+                break
+    return result
+
+
+def _extract_data_quality(context_snapshot: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    overview = _as_mapping(context_snapshot.get("analysis_context_pack_overview"))
+    data_quality = overview.get("data_quality")
+    if not isinstance(data_quality, Mapping):
+        data_quality = overview.get("quality") if isinstance(overview.get("quality"), Mapping) else None
+    if not isinstance(data_quality, Mapping):
+        return None
+    projected = {
+        "status": _clip_text(
+            data_quality.get("status") or data_quality.get("quality_status"), limit=64
+        ),
+        "score": _finite_float(data_quality.get("score")),
+        "warnings": _clip_string_list(data_quality.get("warnings")),
+        "missing_fields": _clip_string_list(
+            data_quality.get("missing_fields") or data_quality.get("missing")
+        ),
+    }
+    return {key: value for key, value in projected.items() if value not in (None, [])} or None
+
+
+def _projection_loss_counts(
+    raw_result: Mapping[str, Any], context_snapshot: Mapping[str, Any]
+) -> tuple[int, int]:
+    """Count known nested fields omitted by the bounded public projection."""
+    overview = _as_mapping(context_snapshot.get("analysis_context_pack_overview"))
+    quality = overview.get("data_quality")
+    if not isinstance(quality, Mapping):
+        quality = overview.get("quality") if isinstance(overview.get("quality"), Mapping) else {}
+    quality_known = {"status", "quality_status", "score", "warnings", "missing_fields", "missing"}
+    quality_loss = len(set(quality) - quality_known) if isinstance(quality, Mapping) else 0
+    if isinstance(quality, Mapping):
+        for key in ("warnings", "missing_fields", "missing"):
+            values = _as_list(quality.get(key))
+            quality_loss += max(0, len(values) - DEFAULT_MAX_QUALITY_ITEMS)
+
+    dashboard = _as_mapping(raw_result.get("dashboard"))
+    sections = (
+        (_as_mapping(dashboard.get("strategy_synthesis")), {
+            "final_signal", "conflict_severity", "conflict_count", "consensus_level",
+            "supporting_skills", "opposing_skills",
+        }),
+        (_as_mapping(dashboard.get("committee_deliberation")), {"status", "outcome"}),
+        (_as_mapping(dashboard.get("core_conclusion")), {
+            "decision_type", "operation_advice", "confidence_level", "analysis_summary",
+        }),
+    )
+    synthesis_loss = sum(len(set(section) - known) for section, known in sections)
+    return quality_loss, synthesis_loss
+
+
+def _extract_data_sources(
+    diagnostics: Mapping[str, Any], context_snapshot: Mapping[str, Any]
+) -> tuple[Dict[str, Any], Dict[str, Dict[str, int]]]:
+    raw_provider_runs = _as_list(diagnostics.get("provider_runs"))
     provider_runs = []
-    for raw in _as_list(diagnostics.get("provider_runs"))[:100]:
+    provider_malformed = 0
+    for raw in raw_provider_runs[:DEFAULT_MAX_SOURCE_RUNS]:
         if not isinstance(raw, Mapping):
+            provider_malformed += 1
             continue
         provider_runs.append(
             {
@@ -386,161 +530,301 @@ def _extract_data_sources(diagnostics: Mapping[str, Any], context_snapshot: Mapp
                 "data_type": _clip_text(raw.get("data_type"), limit=64),
                 "operation": _clip_text(raw.get("operation"), limit=64),
                 "status": _clip_text(raw.get("status"), limit=32),
-                "duration_ms": raw.get("duration_ms"),
+                "duration_ms": _finite_float(raw.get("duration_ms")),
                 "error_code": _clip_text(raw.get("error_code"), limit=64),
             }
         )
 
-    overview = _as_mapping(context_snapshot.get("analysis_context_pack_overview"))
-    data_quality = overview.get("data_quality")
-    if not isinstance(data_quality, Mapping):
-        data_quality = overview.get("quality") if isinstance(overview.get("quality"), Mapping) else None
-
-    return {
-        "provider_trace": provider_runs,
-        "llm_runs": [
+    raw_llm_runs = _as_list(diagnostics.get("llm_runs"))
+    llm_runs = []
+    llm_malformed = 0
+    for raw in raw_llm_runs[:DEFAULT_MAX_SOURCE_RUNS]:
+        if not isinstance(raw, Mapping):
+            llm_malformed += 1
+            continue
+        llm_runs.append(
             {
                 "provider": _clip_text(raw.get("provider"), limit=64),
                 "model": _clip_text(raw.get("model"), limit=120),
                 "call_type": _clip_text(raw.get("call_type"), limit=64),
                 "status": _clip_text(raw.get("status"), limit=32),
-                "duration_ms": raw.get("duration_ms"),
-                "token_usage": raw.get("token_usage") or raw.get("usage"),
+                "duration_ms": _finite_float(raw.get("duration_ms")),
+                "usage": _extract_token_usage(raw.get("token_usage") or raw.get("usage")),
             }
-            for raw in _as_list(diagnostics.get("llm_runs"))[:100]
-            if isinstance(raw, Mapping)
-        ],
-        "data_quality_status": data_quality,
-        "pipeline_stage_runs": [
+        )
+
+    raw_stage_runs = _as_list(diagnostics.get("pipeline_stage_runs"))
+    stage_runs = []
+    stage_malformed = 0
+    for raw in raw_stage_runs[:DEFAULT_MAX_SOURCE_RUNS]:
+        if not isinstance(raw, Mapping):
+            stage_malformed += 1
+            continue
+        stage_runs.append(
             {
                 "stage": _clip_text(raw.get("stage") or raw.get("name"), limit=64),
                 "status": _clip_text(raw.get("status"), limit=32),
-                "duration_ms": raw.get("duration_ms"),
+                "duration_ms": _finite_float(raw.get("duration_ms")),
             }
-            for raw in _as_list(diagnostics.get("pipeline_stage_runs"))[:100]
-            if isinstance(raw, Mapping)
-        ],
+        )
+
+    sources = {
+        "provider_trace": provider_runs,
+        "llm_runs": llm_runs,
+        "data_quality_status": _extract_data_quality(context_snapshot),
+        "pipeline_stage_runs": stage_runs,
     }
-
-
-def _apply_size_budget(package: Dict[str, Any], *, max_chars: int) -> tuple[Dict[str, Any], bool]:
-    """Ensure JSON size stays under budget; shrink agent event lists first."""
-    if _safe_json_size(package) <= max_chars:
-        return package, False
-
-    truncated = True
-    package = dict(package)
-    package["truncated"] = True
-    package["truncation"] = {
-        "marker": "truncated",
-        "reason": "export_size_budget_exceeded",
-        "max_chars": max_chars,
-        "dropped": [],
+    stats = {
+        "diagnostics.provider_runs": {
+            "original": len(raw_provider_runs),
+            "returned": len(provider_runs),
+            "malformed": provider_malformed,
+        },
+        "diagnostics.llm_runs": {
+            "original": len(raw_llm_runs),
+            "returned": len(llm_runs),
+            "malformed": llm_malformed,
+        },
+        "diagnostics.pipeline_stage_runs": {
+            "original": len(raw_stage_runs),
+            "returned": len(stage_runs),
+            "malformed": stage_malformed,
+        },
     }
-
-    agents = list(package.get("agents") or [])
-    # Drop detailed per-agent events first, keep tool_calls and opinions.
-    for agent in agents:
-        if not isinstance(agent, dict):
-            continue
-        if agent.get("events"):
-            package["truncation"]["dropped"].append(
-                {"path": f"agents[{agent.get('role')}].events", "count": len(agent["events"])}
-            )
-            agent["events"] = []
-    package["agents"] = agents
-    if _safe_json_size(package) <= max_chars:
-        return package, truncated
-
-    # Drop provider/llm detail next.
-    for key in ("provider_trace", "llm_runs", "pipeline_stage_runs"):
-        sources = package.get("data_sources")
-        if isinstance(sources, dict) and sources.get(key):
-            package["truncation"]["dropped"].append(
-                {"path": f"data_sources.{key}", "count": len(sources[key])}
-            )
-            sources[key] = []
-    if _safe_json_size(package) <= max_chars:
-        return package, truncated
-
-    # Last resort: strip synthesis nested payloads, keep final_conclusion.
-    synthesis = package.get("synthesis")
-    if isinstance(synthesis, dict):
-        for key in ("committee_deliberation", "strategy_synthesis"):
-            if synthesis.get(key):
-                package["truncation"]["dropped"].append({"path": f"synthesis.{key}"})
-                synthesis[key] = None
-    if _safe_json_size(package) <= max_chars:
-        return package, truncated
-
-    # Absolute floor: replace agents with count-only stub.
-    package["truncation"]["dropped"].append({"path": "agents", "count": len(agents)})
-    package["agents"] = [{"role": "truncated", "note": "agent timelines omitted due to size budget"}]
-    return package, truncated
+    return sources, stats
 
 
 def _render_markdown(package: Mapping[str, Any]) -> str:
-    run = _as_mapping(package.get("run"))
-    synthesis = _as_mapping(package.get("synthesis"))
-    final = _as_mapping(synthesis.get("final_conclusion"))
-    lines = [
-        f"# Reasoning Trace ({package.get('schema_version')})",
-        "",
-        f"- run_id: `{run.get('run_id') or 'n/a'}`",
-        f"- stock: `{run.get('stock_code') or 'n/a'}`",
-        f"- market: `{run.get('market') or 'n/a'}`",
-        f"- model: `{run.get('model') or 'n/a'}`",
-        f"- started_at: `{run.get('started_at') or 'n/a'}`",
-        f"- config_fingerprint: `{run.get('config_fingerprint') or 'n/a'}`",
-        f"- truncated: `{package.get('truncated', False)}`",
-        "",
-        "## Agents",
-    ]
-    for agent in package.get("agents") or []:
-        if not isinstance(agent, Mapping):
-            continue
-        lines.append(f"### {agent.get('role') or 'agent'}")
-        if agent.get("input_summary"):
-            lines.append(f"- input: {agent['input_summary']}")
-        if agent.get("output_opinion"):
-            lines.append(f"- opinion: {agent['output_opinion']}")
-        tool_calls = agent.get("tool_calls") or []
-        if tool_calls:
-            lines.append(f"- tool_calls: {len(tool_calls)}")
-            for call in tool_calls[:10]:
-                if isinstance(call, Mapping):
-                    lines.append(
-                        f"  - {call.get('name')} status={call.get('status')} duration_ms={call.get('duration_ms')}"
-                    )
-        lines.append("")
+    """Render stored/model content only inside an inert indented code block."""
+    payload = _strict_json_dump(package)
+    safe_payload = payload.replace("<", "\\u003c").replace(">", "\\u003e")
+    return (
+        "# Reasoning Trace (reasoning-trace-v1)\n\n"
+        "Stored and model-originated values are rendered as inert code.\n\n"
+        f"    {safe_payload}\n"
+    )
 
-    lines.append("## Synthesis")
-    disagreement = _as_mapping(synthesis.get("disagreement"))
-    if disagreement:
-        lines.append(
-            f"- disagreement: severity={disagreement.get('conflict_severity')} "
-            f"count={disagreement.get('conflict_count')} consensus={disagreement.get('consensus_level')}"
-        )
-    if final:
-        lines.append(f"- final_signal: {final.get('final_signal')}")
-        if final.get("operation_advice"):
-            lines.append(f"- advice: {final['operation_advice']}")
-        if final.get("analysis_summary"):
-            lines.append(f"- summary: {final['analysis_summary']}")
-    lines.append("")
-    lines.append("## Coverage")
+
+def _response_size(
+    package: Dict[str, Any],
+    *,
+    output_format: str,
+    include_markdown: bool,
+) -> tuple[int, str]:
+    markdown = _render_markdown(package) if include_markdown else ""
+    if output_format == "markdown":
+        return len(markdown), markdown
+    candidate = dict(package)
+    if include_markdown:
+        candidate["markdown"] = markdown
+    return _safe_json_size(candidate), markdown
+
+
+def _mark_coverage_export_truncated(package: Dict[str, Any], source: str) -> None:
     coverage = _as_mapping(package.get("coverage"))
-    recorded = coverage.get("recorded") or []
-    missing = coverage.get("not_recorded") or []
-    lines.append(f"- recorded: {', '.join(str(x) for x in recorded)}")
-    lines.append(f"- not_recorded: {', '.join(str(x) for x in missing)}")
-    lines.append("")
-    return "\n".join(lines)
+    for entry in _as_list(coverage.get("sources")):
+        if isinstance(entry, dict) and entry.get("source") == source:
+            entry["export_truncated"] = True
+            reasons = entry.setdefault("reasons", [])
+            if "export_size_budget_exceeded" not in reasons:
+                reasons.append("export_size_budget_exceeded")
+
+
+def _ensure_truncation(package: Dict[str, Any], *, max_chars: int) -> Dict[str, Any]:
+    package["truncated"] = True
+    truncation = package.get("truncation")
+    if not isinstance(truncation, dict):
+        truncation = {
+            "marker": "truncated",
+            "reason": "source_or_export_truncation",
+            "max_chars": max_chars,
+            "dropped": [],
+        }
+        package["truncation"] = truncation
+    truncation["max_chars"] = max_chars
+    return truncation
+
+
+def _record_budget_drop(
+    package: Dict[str, Any],
+    *,
+    max_chars: int,
+    path: str,
+    count: Optional[int] = None,
+) -> None:
+    truncation = _ensure_truncation(package, max_chars=max_chars)
+    drop: Dict[str, Any] = {
+        "path": path,
+        "reason": "export_size_budget_exceeded",
+    }
+    if count is not None:
+        drop["count"] = count
+    truncation["dropped"].append(drop)
+
+
+def _apply_size_budget(
+    package: Dict[str, Any],
+    *,
+    max_chars: int,
+    output_format: str,
+    include_markdown: bool,
+) -> tuple[Dict[str, Any], str]:
+    """Fit the complete negotiated response inside ``max_chars`` on every exit."""
+    budget = max(1_000, min(MAX_MAX_EXPORT_CHARS, int(max_chars)))
+    size, markdown = _response_size(
+        package, output_format=output_format, include_markdown=include_markdown
+    )
+    if size <= budget:
+        if include_markdown and output_format == "json":
+            package["markdown"] = markdown
+        return package, markdown
+
+    truncation = _ensure_truncation(package, max_chars=budget)
+    truncation["reason"] = "export_size_budget_exceeded"
+
+    agents = _as_list(package.get("agents"))
+    dropped_agent_events = 0
+    dropped_tool_calls = 0
+    dropped_input_summaries = 0
+    dropped_output_opinions = 0
+    for agent in agents:
+        if not isinstance(agent, dict):
+            continue
+        events = _as_list(agent.get("events"))
+        calls = _as_list(agent.get("tool_calls"))
+        dropped_agent_events += len(events)
+        dropped_tool_calls += len(calls)
+        agent["events"] = []
+        agent["tool_calls"] = []
+        if agent.get("input_summary"):
+            dropped_input_summaries += 1
+            agent["input_summary"] = None
+        if agent.get("output_opinion"):
+            dropped_output_opinions += 1
+            agent["output_opinion"] = None
+    for path, count in (
+        ("agents.events", dropped_agent_events),
+        ("agents.tool_calls", dropped_tool_calls),
+        ("agents.input_summary", dropped_input_summaries),
+        ("agents.output_opinion", dropped_output_opinions),
+    ):
+        if count:
+            _record_budget_drop(
+                package, max_chars=budget, path=path, count=count
+            )
+    _mark_coverage_export_truncated(package, "diagnostics.agent_events")
+    size, markdown = _response_size(
+        package, output_format=output_format, include_markdown=include_markdown
+    )
+    if size <= budget:
+        if include_markdown and output_format == "json":
+            package["markdown"] = markdown
+        return package, markdown
+
+    if agents:
+        _record_budget_drop(package, max_chars=budget, path="agents", count=len(agents))
+        package["agents"] = []
+
+    sources = _as_mapping(package.get("data_sources"))
+    source_paths = {
+        "provider_trace": "diagnostics.provider_runs",
+        "llm_runs": "diagnostics.llm_runs",
+        "pipeline_stage_runs": "diagnostics.pipeline_stage_runs",
+    }
+    for key, coverage_source in source_paths.items():
+        values = _as_list(sources.get(key))
+        if values:
+            _record_budget_drop(
+                package, max_chars=budget, path=f"data_sources.{key}", count=len(values)
+            )
+            sources[key] = []
+            _mark_coverage_export_truncated(package, coverage_source)
+    if sources.get("data_quality_status"):
+        _record_budget_drop(
+            package, max_chars=budget, path="data_sources.data_quality_status"
+        )
+        sources["data_quality_status"] = None
+        _mark_coverage_export_truncated(package, "context.data_quality")
+
+    synthesis = _as_mapping(package.get("synthesis"))
+    conclusion = _as_mapping(synthesis.get("final_conclusion"))
+    for key in ("analysis_summary", "operation_advice"):
+        if conclusion.get(key):
+            _record_budget_drop(
+                package, max_chars=budget, path=f"synthesis.final_conclusion.{key}"
+            )
+            conclusion[key] = None
+
+    size, markdown = _response_size(
+        package, output_format=output_format, include_markdown=include_markdown
+    )
+    if size <= budget:
+        if include_markdown and output_format == "json":
+            package["markdown"] = markdown
+        return package, markdown
+
+    # Deterministic typed floor. The configured minimum makes this envelope fit;
+    # direct test callers with smaller budgets receive an explicit ValueError.
+    run = _as_mapping(package.get("run"))
+    minimal: Dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "run": {
+            key: run[key]
+            for key in (
+                "record_id",
+                "query_id",
+                "trace_id",
+                "run_id",
+                "lookup_key",
+                "lookup_mode",
+                "config_fingerprint",
+                "exported_at",
+            )
+            if run.get(key) is not None
+        },
+        "agents": [],
+        "synthesis": {"disagreement": {}, "consensus": {}, "final_conclusion": {}},
+        "data_sources": {
+            "provider_trace": [],
+            "llm_runs": [],
+            "data_quality_status": None,
+            "pipeline_stage_runs": [],
+        },
+        "coverage": {
+            "sources": [],
+            "not_recorded": list(COVERAGE_NOT_RECORDED),
+            "notes": "All optional evidence was omitted to satisfy the response budget.",
+        },
+        "truncated": True,
+        "truncation": {
+            "marker": "truncated",
+            "reason": "export_size_budget_exceeded",
+            "max_chars": budget,
+            "dropped": [
+                {
+                    "path": "optional_evidence",
+                    "reason": "export_size_budget_exceeded",
+                }
+            ],
+        },
+    }
+    size, markdown = _response_size(
+        minimal, output_format=output_format, include_markdown=include_markdown
+    )
+    if size > budget:
+        raise ValueError("reasoning trace response budget is too small for the minimal envelope")
+    if include_markdown and output_format == "json":
+        minimal["markdown"] = markdown
+    return minimal, markdown
 
 
 def build_reasoning_trace_package(
     *,
     run_id: str,
+    record_id: Optional[str] = None,
+    query_id: Optional[str] = None,
+    lookup_key: Optional[str] = None,
+    lookup_mode: Optional[str] = None,
     stock_code: Optional[str] = None,
     stock_name: Optional[str] = None,
     market: Optional[str] = None,
@@ -552,6 +836,7 @@ def build_reasoning_trace_package(
     config: Any = None,
     max_chars: Optional[int] = None,
     include_markdown: bool = True,
+    output_format: str = "json",
 ) -> ReasoningTraceExportResult:
     """Build a redacted reasoning-trace package from already-recorded sources.
 
@@ -563,12 +848,18 @@ def build_reasoning_trace_package(
     raw_map = _as_mapping(raw_result)
     context_map = _as_mapping(context_snapshot)
     if not diagnostics_map and isinstance(context_map.get("diagnostics"), Mapping):
-        diagnostics_map = dict(context_map["diagnostics"])
+        diagnostics_map = _as_mapping(context_map["diagnostics"])
+
+    if output_format not in {"json", "markdown"}:
+        raise ValueError("format must be json or markdown")
 
     agent_events = _as_list(diagnostics_map.get("agent_events"))
-    agents = _group_agents_from_events(agent_events)
+    agents, agent_stats = _group_agents_from_events(agent_events)
     synthesis = _extract_synthesis(raw_map)
-    data_sources = _extract_data_sources(diagnostics_map, context_map)
+    data_sources, source_stats = _extract_data_sources(diagnostics_map, context_map)
+    quality_projection_loss, synthesis_projection_loss = _projection_loss_counts(
+        raw_map, context_map
+    )
 
     llm_runs = _as_list(diagnostics_map.get("llm_runs"))
     first_llm_model = None
@@ -582,7 +873,14 @@ def build_reasoning_trace_package(
     )
 
     run_meta = {
-        "run_id": _clip_text(run_id, limit=128),
+        "record_id": _clip_text(record_id, limit=128),
+        "query_id": _clip_text(
+            query_id or diagnostics_map.get("query_id"), limit=128
+        ),
+        "trace_id": _clip_text(diagnostics_map.get("trace_id"), limit=128),
+        "run_id": _clip_text(run_id, limit=128) or "unknown",
+        "lookup_key": _clip_text(lookup_key, limit=128),
+        "lookup_mode": lookup_mode,
         "stock_code": _clip_text(
             stock_code or diagnostics_map.get("stock_code") or raw_map.get("code"),
             limit=32,
@@ -594,11 +892,134 @@ def build_reasoning_trace_package(
             started_at or diagnostics_map.get("started_at"),
             limit=64,
         ),
-        "trace_id": _clip_text(diagnostics_map.get("trace_id"), limit=128),
-        "query_id": _clip_text(diagnostics_map.get("query_id"), limit=128),
         "config_fingerprint": build_config_fingerprint(config),
         "exported_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    capture = _as_mapping(diagnostics_map.get("agent_events_capture"))
+    capture_dropped = _nonnegative_int(capture.get("dropped_count")) or 0
+    capture_original = _nonnegative_int(capture.get("original_count"))
+    if capture_original is None:
+        capture_original = len(agent_events) + capture_dropped
+
+    def coverage_entry(
+        source: str,
+        *,
+        present: bool,
+        original: Optional[int] = None,
+        returned: Optional[int] = None,
+        source_dropped: int = 0,
+        export_dropped: int = 0,
+        malformed: int = 0,
+    ) -> Dict[str, Any]:
+        reasons: List[str] = []
+        if source_dropped:
+            reasons.append("source_retention_limit")
+        if export_dropped:
+            reasons.append("export_projection_limit")
+        if malformed:
+            reasons.append("malformed_source_entries")
+        dropped = source_dropped + export_dropped + malformed
+        return {
+            "source": source,
+            "supported": True,
+            "present": present,
+            "absent": not present,
+            "source_truncated": source_dropped > 0,
+            "export_truncated": export_dropped > 0 or malformed > 0,
+            "original_count": original,
+            "returned_count": returned,
+            "dropped_count": dropped,
+            "reasons": reasons,
+        }
+
+    event_export_dropped = (
+        agent_stats["event_cap_dropped"]
+        + agent_stats["tool_cap_dropped"]
+    )
+    coverage_sources = [
+        coverage_entry("run_meta", present=True, original=1, returned=1),
+        coverage_entry(
+            "diagnostics.agent_events",
+            present=bool(agent_events),
+            original=capture_original,
+            returned=agent_stats["returned_events"],
+            source_dropped=capture_dropped,
+            export_dropped=event_export_dropped,
+            malformed=agent_stats["malformed_events"],
+        ),
+    ]
+    source_to_output = {
+        "diagnostics.provider_runs": "provider_trace",
+        "diagnostics.llm_runs": "llm_runs",
+        "diagnostics.pipeline_stage_runs": "pipeline_stage_runs",
+    }
+    for source, stats in source_stats.items():
+        output_key = source_to_output[source]
+        export_dropped = max(0, stats["original"] - DEFAULT_MAX_SOURCE_RUNS)
+        coverage_sources.append(
+            coverage_entry(
+                source,
+                present=bool(data_sources[output_key]),
+                original=stats["original"],
+                returned=stats["returned"],
+                export_dropped=export_dropped,
+                malformed=stats["malformed"],
+            )
+        )
+    coverage_sources.extend(
+        [
+            coverage_entry(
+                "context.data_quality",
+                present=data_sources.get("data_quality_status") is not None,
+                export_dropped=quality_projection_loss,
+            ),
+            coverage_entry(
+                "dashboard.synthesis",
+                present=any(bool(value) for value in synthesis.values()),
+                export_dropped=synthesis_projection_loss,
+            ),
+        ]
+    )
+
+    initial_drops: List[Dict[str, Any]] = []
+    if capture_dropped:
+        initial_drops.append(
+            {
+                "path": "diagnostics.agent_events",
+                "reason": "source_retention_limit",
+                "count": capture_dropped,
+            }
+        )
+    for path, count, reason in (
+        ("diagnostics.agent_events", agent_stats["event_cap_dropped"], "export_event_cap"),
+        ("agents.tool_calls", agent_stats["tool_cap_dropped"], "export_tool_cap"),
+        ("diagnostics.agent_events", agent_stats["malformed_events"], "malformed_source_entries"),
+    ):
+        if count:
+            initial_drops.append({"path": path, "reason": reason, "count": count})
+    for source, stats in source_stats.items():
+        cap_dropped = max(0, stats["original"] - DEFAULT_MAX_SOURCE_RUNS)
+        if cap_dropped:
+            initial_drops.append(
+                {"path": source, "reason": "export_source_cap", "count": cap_dropped}
+            )
+        if stats["malformed"]:
+            initial_drops.append(
+                {
+                    "path": source,
+                    "reason": "malformed_source_entries",
+                    "count": stats["malformed"],
+                }
+            )
+    for path, count in (
+        ("context.data_quality.unsupported_fields", quality_projection_loss),
+        ("dashboard.synthesis.unsupported_fields", synthesis_projection_loss),
+    ):
+        if count:
+            initial_drops.append(
+                {"path": path, "reason": "bounded_projection", "count": count}
+            )
 
     package: Dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -607,28 +1028,50 @@ def build_reasoning_trace_package(
         "synthesis": synthesis,
         "data_sources": data_sources,
         "coverage": {
-            "recorded": list(COVERAGE_RECORDED),
+            "sources": coverage_sources,
             "not_recorded": list(COVERAGE_NOT_RECORDED),
             "notes": (
                 "Exporter only includes fields already persisted by the analysis "
                 "pipeline. Missing stages require agent-core recording work outside T03."
             ),
         },
-        "truncated": False,
+        "truncated": bool(initial_drops),
     }
 
-    budget = int(max_chars) if max_chars is not None else resolve_max_export_chars(config)
-    package, truncated = _apply_size_budget(package, max_chars=budget)
-    package["truncated"] = bool(truncated or package.get("truncated"))
+    budget = (
+        min(MAX_MAX_EXPORT_CHARS, max(1_000, int(max_chars)))
+        if max_chars is not None
+        else resolve_max_export_chars(config)
+    )
+    if initial_drops:
+        package["truncation"] = {
+            "marker": "truncated",
+            "reason": "source_or_export_truncation",
+            "max_chars": budget,
+            "dropped": initial_drops,
+        }
 
-    # Final hard boundary: security_audit redaction + local path scrubbing.
+    # Redaction and strict serialization happen before the final response budget.
     redacted = redact_export_payload(package)
     if not isinstance(redacted, dict):
-        redacted = {"schema_version": SCHEMA_VERSION, "error": "redaction_failed", "truncated": True}
-
-    markdown = _render_markdown(redacted) if include_markdown else ""
-    if include_markdown:
-        markdown = str(redact_export_payload(markdown) or "")
+        raise ValueError("reasoning trace redaction failed")
+    _strict_json_dump(redacted)
+    redacted, markdown = _apply_size_budget(
+        redacted,
+        max_chars=budget,
+        output_format=output_format,
+        include_markdown=include_markdown,
+    )
+    # The budget mutates only typed primitives; assert both negotiated payloads
+    # remain standards-compliant and inside the hard boundary.
+    _strict_json_dump(redacted)
+    response_size, _ = _response_size(
+        redacted,
+        output_format=output_format,
+        include_markdown=False if output_format == "json" else include_markdown,
+    )
+    if response_size > budget:
+        raise ValueError("reasoning trace response exceeded its hard character budget")
 
     return ReasoningTraceExportResult(
         package=redacted,
@@ -703,14 +1146,36 @@ class ReasoningTraceExportService:
         if isinstance(context_snapshot, Mapping):
             diagnostics = context_snapshot.get("diagnostics")
 
+        primary_id = getattr(record, "id", None)
+        selected_record_id = str(primary_id) if primary_id is not None else str(record_id)
+        selected_query_id = getattr(record, "query_id", None)
+        diagnostic_trace_id = (
+            diagnostics.get("trace_id") if isinstance(diagnostics, Mapping) else None
+        )
+        stable_run_id = str(
+            diagnostic_trace_id
+            or selected_query_id
+            or f"history:{selected_record_id}"
+        )
+        try:
+            int(record_id)
+            lookup_mode = "primary_key"
+        except (TypeError, ValueError):
+            lookup_mode = "latest_by_query_id"
+
         started_at = getattr(record, "created_at", None)
         if hasattr(started_at, "isoformat"):
             started_at = started_at.isoformat()
 
         result = build_reasoning_trace_package(
-            run_id=str(getattr(record, "query_id", None) or record_id),
+            run_id=stable_run_id,
+            record_id=selected_record_id,
+            query_id=str(selected_query_id) if selected_query_id is not None else None,
+            lookup_key=str(record_id),
+            lookup_mode=lookup_mode,
             stock_code=getattr(record, "code", None),
             stock_name=getattr(record, "name", None),
+            market=getattr(record, "market", None) or getattr(record, "region", None),
             model=getattr(record, "model_used", None),
             started_at=str(started_at) if started_at is not None else None,
             diagnostics=diagnostics if isinstance(diagnostics, Mapping) else None,
@@ -718,5 +1183,6 @@ class ReasoningTraceExportService:
             context_snapshot=context_snapshot if isinstance(context_snapshot, Mapping) else None,
             config=self.config,
             include_markdown=include_markdown or format == "markdown",
+            output_format=format,
         )
         return result

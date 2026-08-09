@@ -6,18 +6,22 @@
 from __future__ import annotations
 
 import json
+import math
 from types import SimpleNamespace
 from typing import Any, Dict
 
 import pytest
 
+from api.v1.schemas.reasoning_trace import ReasoningTraceExportResponse
 from src.services.reasoning_trace_export_service import (
+    MAX_MAX_EXPORT_CHARS,
     SCHEMA_VERSION,
     ReasoningTraceExportDisabled,
     ReasoningTraceExportService,
     ReasoningTraceNotFound,
     build_reasoning_trace_package,
     is_reasoning_trace_export_enabled,
+    resolve_max_export_chars,
 )
 
 
@@ -152,8 +156,10 @@ def test_export_schema_contract() -> None:
     assert "synthesis" in package
     assert package["synthesis"]["final_conclusion"]["final_signal"] == "buy"
     assert package["data_sources"]["data_quality_status"]["status"] == "ok"
-    assert "recorded" in package["coverage"]
+    assert "sources" in package["coverage"]
     assert "not_recorded" in package["coverage"]
+    ReasoningTraceExportResponse.model_validate(package)
+    json.dumps(package, ensure_ascii=False, allow_nan=False)
     assert result.markdown.startswith("# Reasoning Trace")
 
 
@@ -287,3 +293,219 @@ def test_service_not_found() -> None:
     )
     with pytest.raises(ReasoningTraceNotFound):
         service.export_for_record("missing")
+
+
+def test_complete_json_and_markdown_responses_obey_hard_budget() -> None:
+    huge_quality = {
+        "status": "ok",
+        "warnings": ["w" * 20_000 for _ in range(100)],
+        "unprojected_blob": "x" * 100_000,
+    }
+    for output_format, include_markdown in (("json", True), ("markdown", True)):
+        result = build_reasoning_trace_package(
+            run_id="budget-run",
+            context_snapshot={
+                "analysis_context_pack_overview": {"data_quality": huge_quality}
+            },
+            raw_result={"analysis_summary": "s" * 100_000},
+            max_chars=10_000,
+            include_markdown=include_markdown,
+            output_format=output_format,
+        )
+        if output_format == "json":
+            assert len(result.to_json_text()) <= 10_000
+        else:
+            assert len(result.markdown) <= 10_000
+        assert result.package["truncated"] is True
+
+
+def test_non_finite_and_unknown_numeric_values_are_not_exported() -> None:
+    result = build_reasoning_trace_package(
+        run_id="finite-run",
+        diagnostics={
+            "provider_runs": [{"duration_ms": math.inf}],
+            "llm_runs": [{"duration_ms": math.nan, "usage": {"total_tokens": math.inf}}],
+            "pipeline_stage_runs": [{"duration_ms": -math.inf}],
+            "agent_events": [{"event_type": "agent.end", "duration_ms": math.nan}],
+        },
+        raw_result={"sentiment_score": math.inf},
+        include_markdown=True,
+    )
+    blob = result.to_json_text()
+    assert "NaN" not in blob
+    assert "Infinity" not in blob
+    ReasoningTraceExportResponse.model_validate(result.package)
+    json.dumps(result.package, allow_nan=False)
+
+
+def test_supported_credential_and_path_corpus_has_zero_hits() -> None:
+    jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signaturevalue1234567890"
+    opaque = "opaqueTokenValueABCDEF1234567890abcdefghijklmnop"
+    paths = [
+        "/private/var/folders/secret/file.txt",
+        "/workspace/project/.env",
+        r"C:\\Users\\alice\\secret.env",
+        r"\\server\share\secret.env",
+        "~/private/secret.env",
+        "../private/secret.env",
+        "./private/secret.env",
+    ]
+    narrative = " ".join([jwt, opaque, *paths])
+    result = build_reasoning_trace_package(
+        run_id="redaction-run",
+        diagnostics={
+            "agent_events": [
+                {
+                    "event_type": "agent.decision",
+                    "attrs": {"agent": "research", "summary": narrative},
+                }
+            ]
+        },
+        include_markdown=True,
+    )
+    blob = result.to_json_text() + result.markdown
+    for secret in (jwt, opaque, *paths):
+        assert secret not in blob
+
+
+def test_event_and_source_caps_are_explicit() -> None:
+    events = [
+        {"event_type": "agent.phase", "sequence": index, "attrs": {"agent": "a"}}
+        for index in range(201)
+    ]
+    result = build_reasoning_trace_package(
+        run_id="cap-run",
+        diagnostics={"agent_events": events},
+        include_markdown=False,
+    )
+    assert result.package["truncated"] is True
+    entry = next(
+        item
+        for item in result.package["coverage"]["sources"]
+        if item["source"] == "diagnostics.agent_events"
+    )
+    assert entry["original_count"] == 201
+    assert entry["returned_count"] == 200
+    assert entry["dropped_count"] == 1
+    assert entry["export_truncated"] is True
+    assert any(
+        drop["reason"] == "export_event_cap"
+        for drop in result.package["truncation"]["dropped"]
+    )
+
+
+def test_source_retention_marker_is_preserved() -> None:
+    result = build_reasoning_trace_package(
+        run_id="capture-run",
+        diagnostics={
+            "agent_events": [{"event_type": "agent.phase", "attrs": {"agent": "a"}}],
+            "agent_events_capture": {
+                "original_count": 250,
+                "returned_count": 200,
+                "dropped_count": 50,
+                "truncated": True,
+            },
+        },
+        include_markdown=False,
+    )
+    entry = next(
+        item
+        for item in result.package["coverage"]["sources"]
+        if item["source"] == "diagnostics.agent_events"
+    )
+    assert entry["source_truncated"] is True
+    assert entry["original_count"] == 250
+    assert entry["dropped_count"] == 50
+
+
+def test_record_query_and_trace_identities_are_distinct() -> None:
+    def export(record_id: int):
+        record = SimpleNamespace(
+            id=record_id,
+            query_id="shared-query",
+            code="AAPL",
+            name="Apple",
+            model_used="test",
+            created_at=None,
+            context_snapshot={"diagnostics": {"trace_id": f"trace-{record_id}"}},
+            raw_result={},
+        )
+        history = SimpleNamespace(
+            _resolve_record=lambda value: record,
+            _parse_diagnostic_json_field=lambda value, field: value,
+        )
+        return ReasoningTraceExportService(
+            history_service=history,
+            config=SimpleNamespace(reasoning_trace_export_enabled=True),
+        ).export_for_record(str(record_id), include_markdown=False)
+
+    first = export(1).package["run"]
+    second = export(2).package["run"]
+    assert first["record_id"] == "1"
+    assert second["record_id"] == "2"
+    assert first["query_id"] == second["query_id"] == "shared-query"
+    assert first["trace_id"] != second["trace_id"]
+
+
+def test_runtime_budget_is_defensively_clamped() -> None:
+    assert resolve_max_export_chars(
+        SimpleNamespace(reasoning_trace_export_max_chars=10**12)
+    ) == MAX_MAX_EXPORT_CHARS
+
+
+def test_markdown_keeps_untrusted_markup_in_code() -> None:
+    dangerous = '<img src="https://tracker.invalid/pixel"> [click](https://evil.invalid)'
+    result = build_reasoning_trace_package(
+        run_id="markdown-run",
+        diagnostics={
+            "agent_events": [
+                {
+                    "event_type": "agent.decision",
+                    "attrs": {"agent": "research", "summary": dangerous},
+                }
+            ]
+        },
+        output_format="markdown",
+        include_markdown=True,
+    )
+    assert "\n    {" in result.markdown
+    assert "<img" not in result.markdown
+    assert "\\u003cimg" in result.markdown
+
+
+def test_run_diagnostics_persists_capture_loss_counts() -> None:
+    from src.services.run_diagnostics import RunDiagnosticContext
+
+    context = RunDiagnosticContext(trace_id="capture-counter")
+    for index in range(205):
+        context.record_agent_event(
+            {"event_type": "agent.phase", "sequence": index, "attrs": {"agent": "a"}}
+        )
+    snapshot = context.snapshot()
+    assert len(snapshot["agent_events"]) == 200
+    assert snapshot["agent_events_capture"] == {
+        "original_count": 205,
+        "returned_count": 200,
+        "dropped_count": 5,
+        "truncated": True,
+    }
+
+
+def test_many_agent_budget_drops_keep_truncation_ledger_typed() -> None:
+    events = [
+        {
+            "event_type": "agent.decision",
+            "sequence": index,
+            "attrs": {"agent": f"agent-{index}", "summary": "x" * 500},
+        }
+        for index in range(200)
+    ]
+    result = build_reasoning_trace_package(
+        run_id="many-agents",
+        diagnostics={"agent_events": events},
+        max_chars=10_000,
+        include_markdown=True,
+    )
+    assert len(result.to_json_text()) <= 10_000
+    ReasoningTraceExportResponse.model_validate(result.package)
+    assert len(result.package["truncation"]["dropped"]) <= 128

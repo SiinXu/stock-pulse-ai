@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Opt-in reasoning-trace export (`REASONING_TRACE_EXPORT_ENABLED`, default off) with `reasoning-trace-v1` package, shared redaction, size-budget truncation markers, and `GET /api/v1/reasoning-trace/{record_id}` (Issue #135).
+- [Added] Opt-in reasoning-trace export (`REASONING_TRACE_EXPORT_ENABLED`, default off) with a strict finite `reasoning-trace-v1` contract, bounded redacted JSON/Markdown responses, completeness metadata, durable access audit, and `GET /api/v1/reasoning-trace/{record_id}` (Issue #135).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).

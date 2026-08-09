@@ -2269,7 +2269,7 @@ export interface paths {
         };
         /**
          * Export multi-agent reasoning trace for an analysis history record
-         * @description Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Secrets are never exported.
+         * @description Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Supported credential and local-path classes are redacted; operators must still treat exports as sensitive.
          */
         get: operations["exportReasoningTrace"];
         put?: never;
@@ -9049,50 +9049,277 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ReasoningTraceAgent */
+        ReasoningTraceAgent: {
+            /** Events */
+            events?: components["schemas"]["ReasoningTraceAgentEvent"][];
+            /** Input Summary */
+            input_summary?: string | null;
+            /** Output Opinion */
+            output_opinion?: string | null;
+            /** Role */
+            role: string;
+            /** Tool Calls */
+            tool_calls?: components["schemas"]["ReasoningTraceToolCall"][];
+        };
+        /** ReasoningTraceAgentEvent */
+        ReasoningTraceAgentEvent: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Event Type */
+            event_type?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Phase */
+            phase?: string | null;
+            /** Sequence */
+            sequence?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Timestamp */
+            timestamp?: string | null;
+        };
+        /** ReasoningTraceConclusion */
+        ReasoningTraceConclusion: {
+            /** Analysis Summary */
+            analysis_summary?: string | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Final Signal */
+            final_signal?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Sentiment Score */
+            sentiment_score?: number | null;
+        };
+        /** ReasoningTraceConsensus */
+        ReasoningTraceConsensus: {
+            /** Committee Status */
+            committee_status?: string | null;
+            /** Consensus Level */
+            consensus_level?: string | null;
+        };
+        /** ReasoningTraceCoverage */
+        ReasoningTraceCoverage: {
+            /** Not Recorded */
+            not_recorded?: string[];
+            /** Notes */
+            notes: string;
+            /** Sources */
+            sources?: components["schemas"]["ReasoningTraceCoverageSource"][];
+        };
+        /** ReasoningTraceCoverageSource */
+        ReasoningTraceCoverageSource: {
+            /** Absent */
+            absent: boolean;
+            /** Dropped Count */
+            dropped_count?: number | null;
+            /**
+             * Export Truncated
+             * @default false
+             */
+            export_truncated: boolean;
+            /** Original Count */
+            original_count?: number | null;
+            /** Present */
+            present: boolean;
+            /** Reasons */
+            reasons?: string[];
+            /** Returned Count */
+            returned_count?: number | null;
+            /** Source */
+            source: string;
+            /**
+             * Source Truncated
+             * @default false
+             */
+            source_truncated: boolean;
+            /** Supported */
+            supported: boolean;
+        };
+        /** ReasoningTraceDataQuality */
+        ReasoningTraceDataQuality: {
+            /** Missing Fields */
+            missing_fields?: string[];
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** ReasoningTraceDataSources */
+        ReasoningTraceDataSources: {
+            data_quality_status?: components["schemas"]["ReasoningTraceDataQuality"] | null;
+            /** Llm Runs */
+            llm_runs?: components["schemas"]["ReasoningTraceLlmRun"][];
+            /** Pipeline Stage Runs */
+            pipeline_stage_runs?: components["schemas"]["ReasoningTracePipelineStage"][];
+            /** Provider Trace */
+            provider_trace?: components["schemas"]["ReasoningTraceProviderRun"][];
+        };
+        /** ReasoningTraceDisagreement */
+        ReasoningTraceDisagreement: {
+            /** Conflict Count */
+            conflict_count?: number | null;
+            /** Conflict Severity */
+            conflict_severity?: string | null;
+            /** Consensus Level */
+            consensus_level?: string | null;
+            /** Opposing Skills */
+            opposing_skills?: string[];
+            /** Supporting Skills */
+            supporting_skills?: string[];
+        };
         /**
          * ReasoningTraceExportResponse
          * @description JSON export envelope for ``reasoning-trace-v1``.
          */
         ReasoningTraceExportResponse: {
             /** Agents */
-            agents?: {
-                [key: string]: unknown;
-            }[];
-            /** Coverage */
-            coverage?: {
-                [key: string]: unknown;
-            };
-            /** Data Sources */
-            data_sources?: {
-                [key: string]: unknown;
-            };
-            /**
-             * Markdown
-             * @description Optional human-readable markdown companion (redacted)
-             */
+            agents?: components["schemas"]["ReasoningTraceAgent"][];
+            coverage: components["schemas"]["ReasoningTraceCoverage"];
+            data_sources?: components["schemas"]["ReasoningTraceDataSources"];
+            /** Markdown */
             markdown?: string | null;
-            /** Run */
-            run?: {
-                [key: string]: unknown;
-            };
+            run: components["schemas"]["ReasoningTraceRun"];
             /**
              * Schema Version
-             * @description Export contract version
+             * @constant
              */
-            schema_version: string;
-            /** Synthesis */
-            synthesis?: {
-                [key: string]: unknown;
-            };
+            schema_version: "reasoning-trace-v1";
+            synthesis?: components["schemas"]["ReasoningTraceSynthesis"];
             /**
              * Truncated
              * @default false
              */
             truncated: boolean;
-            /** Truncation */
-            truncation?: {
-                [key: string]: unknown;
-            } | null;
+            truncation?: components["schemas"]["ReasoningTraceTruncation"] | null;
+        };
+        /** ReasoningTraceLlmRun */
+        ReasoningTraceLlmRun: {
+            /** Call Type */
+            call_type?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Status */
+            status?: string | null;
+            usage?: components["schemas"]["ReasoningTraceTokenUsage"];
+        };
+        /** ReasoningTracePipelineStage */
+        ReasoningTracePipelineStage: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Stage */
+            stage?: string | null;
+            /** Status */
+            status?: string | null;
+        };
+        /** ReasoningTraceProviderRun */
+        ReasoningTraceProviderRun: {
+            /** Data Type */
+            data_type?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Operation */
+            operation?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Status */
+            status?: string | null;
+        };
+        /** ReasoningTraceRun */
+        ReasoningTraceRun: {
+            /** Config Fingerprint */
+            config_fingerprint: string;
+            /** Exported At */
+            exported_at: string;
+            /** Lookup Key */
+            lookup_key?: string | null;
+            /** Lookup Mode */
+            lookup_mode?: ("primary_key" | "latest_by_query_id") | null;
+            /** Market */
+            market?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Query Id */
+            query_id?: string | null;
+            /** Record Id */
+            record_id?: string | null;
+            /** Run Id */
+            run_id: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Stock Name */
+            stock_name?: string | null;
+            /** Trace Id */
+            trace_id?: string | null;
+        };
+        /** ReasoningTraceSynthesis */
+        ReasoningTraceSynthesis: {
+            consensus?: components["schemas"]["ReasoningTraceConsensus"];
+            disagreement?: components["schemas"]["ReasoningTraceDisagreement"];
+            final_conclusion?: components["schemas"]["ReasoningTraceConclusion"];
+        };
+        /** ReasoningTraceTokenUsage */
+        ReasoningTraceTokenUsage: {
+            /** Completion Tokens */
+            completion_tokens?: number | null;
+            /** Prompt Tokens */
+            prompt_tokens?: number | null;
+            /** Total Tokens */
+            total_tokens?: number | null;
+        };
+        /** ReasoningTraceToolCall */
+        ReasoningTraceToolCall: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Name */
+            name: string;
+            /** Sequence */
+            sequence?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Step */
+            step?: string | null;
+            /** Timestamp */
+            timestamp?: string | null;
+            /** Tool Call Id */
+            tool_call_id?: string | null;
+        };
+        /** ReasoningTraceTruncation */
+        ReasoningTraceTruncation: {
+            /** Dropped */
+            dropped?: components["schemas"]["ReasoningTraceTruncationDrop"][];
+            /**
+             * Marker
+             * @default truncated
+             * @constant
+             */
+            marker: "truncated";
+            /** Max Chars */
+            max_chars: number;
+            /** Reason */
+            reason: string;
+        };
+        /** ReasoningTraceTruncationDrop */
+        ReasoningTraceTruncationDrop: {
+            /** Count */
+            count?: number | null;
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * ReportDetails
@@ -18526,13 +18753,23 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Strict JSON trace package or inert Markdown export */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ReasoningTraceExportResponse"];
+                    "text/markdown": string;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unauthorized */
@@ -18562,17 +18799,26 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
