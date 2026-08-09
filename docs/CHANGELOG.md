@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
+- [Added] Report version comparison foundation with stable history-ID selection, paginated pickers, strict typed deltas, configuration-provenance states, graded field differences, and operation-owned recovery (#188 / T18).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).

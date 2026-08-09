@@ -32,6 +32,7 @@ from api.v1.endpoints import (
     portfolio,
     portfolio_risk_metrics,
     report_export,
+    report_version_compare,
     scheduled_tasks,
     scorecard,
     security_audit,
@@ -81,6 +82,12 @@ router.include_router(
     report_export.router,
     prefix="/history",
     tags=["History"],
+)
+
+router.include_router(
+    report_version_compare.router,
+    prefix="/report-version-compare",
+    tags=["ReportVersionCompare"],
 )
 
 router.include_router(
