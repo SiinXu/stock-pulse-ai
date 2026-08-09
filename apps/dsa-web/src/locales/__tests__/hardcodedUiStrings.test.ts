@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   collectHardcodedUiStrings,
+  collectHardcodedUiStringsFromSources,
   findHardcodedUiStrings,
   findUnusedUiStringAllowances,
   type HardcodedUiStringAllowance,
@@ -140,10 +141,10 @@ function productionCandidates(): ReturnType<typeof collectHardcodedUiStrings> {
   if (productionCandidateCache) {
     return productionCandidateCache;
   }
-  productionCandidateCache = collectSourceFiles(sourceRoot).flatMap((filename) => {
+  productionCandidateCache = collectHardcodedUiStringsFromSources(collectSourceFiles(sourceRoot).map((filename) => {
     const relative = path.relative(sourceRoot, filename);
-    return collectHardcodedUiStrings(relative, fs.readFileSync(filename, 'utf8'));
-  });
+    return [relative, fs.readFileSync(filename, 'utf8')] as const;
+  }));
   return productionCandidateCache;
 }
 
