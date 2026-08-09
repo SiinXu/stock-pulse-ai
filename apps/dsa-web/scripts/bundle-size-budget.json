@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-08",
-  "baselineNote": "Rebaselined AlertsWorkspace only against current main production build after AdvancedFilterSheet growth; other measuredGzipBytes still from 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined AlertsWorkspace only against the current main production build after the Alert Rule List mobile-filter work from PR #909; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791

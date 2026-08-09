@@ -115,7 +115,7 @@ docs: update the README deployment guide
 | pydanticai-installed | 安装可选 PydanticAI 依赖并执行不允许跳过的实验运行时测试 | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
 | openapi-types-gate | 重新生成后端 OpenAPI 快照与 Web TypeScript 类型并拒绝已提交产物漂移 | ✅ |
-| web-gate | Web 或关联 API/配置/服务契约变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` + bundle size budget | ✅（触发时） |
+| web-gate | 始终给出结论；Web 变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build`，并在构建后阻断执行 bundle size budget；无 Web 变更时记录摘要；变更检测不可用时 fail closed | ✅ |
 | web-e2e | 同一关联路径触发；以隔离运行时启动真实后端、Vite 与本地 fake 模型端点并执行 `npm run test:smoke` | ✅（触发时） |
 | pr-review | 辅助 `pull_request` 审查：变更文件语法/flake8、约 1000 行规模提示（排除 lock/生成文件）、同仓 AI 审查（需仓库 Secrets `GEMINI_API_KEY` 和/或 `OPENAI_API_KEY`）、自动标签与机器人评论。Fork PR 只读（无 secrets、无写操作）。AI 审查不阻断合入。 | ❌（辅助项） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
