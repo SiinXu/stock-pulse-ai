@@ -691,7 +691,7 @@ function backtestRow(id: number, code: string) {
 async function assertRouteChrome(page: Page, path: string, text: string, title: string) {
   await page.goto(path);
   await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveTitle(new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  await expect(page).toHaveTitle(title);
 }
 
 async function assertNoDocumentOverflow(page: Page, path: string) {
@@ -963,13 +963,22 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: 'Usage & cost' }))
       .toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
-    await expect(page).toHaveTitle(
-      new RegExp(UI_TEXT.en['usage.documentTitle'].replace(/[.*+?^${}()|[\]\]/g, '\$&'), 'i'),
-    );
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
 
-    // replace (not push): back must not return to the retired /usage route.
+    const canonicalUsageHref = `${redirectedUrl.pathname}${redirectedUrl.search}${redirectedUrl.hash}`;
+    // replace (not push): Back returns to the exact pre-navigation Home entry,
+    // while Forward restores the canonical Settings URL with query/hash intact.
     await page.goBack();
-    await expect.poll(() => new URL(page.url()).pathname).not.toBe(LEGACY_ROUTE_PATHS.usage);
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(APP_ROUTE_PATHS.home);
+    await page.goForward();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(canonicalUsageHref);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
   });
 
   test('05b legacy Research deep links preserve context and replace into canonical routes', async ({ page }) => {
@@ -1412,10 +1421,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(LEGACY_ROUTE_PATHS.alerts);
-    // Signal Center can render multiple primary "创建告警规则" CTAs (header + empty state).
-    // Scope to main so the open action stays unambiguous without weakening failure-preservation checks.
-    const main = page.locator('main');
-    await main.getByRole('button', { name: '创建告警规则' }).first().click();
+    await page.getByRole('button', { name: '创建告警规则' }).click();
     const dialog = page.getByRole('dialog', { name: '创建告警规则' });
     await dialog.getByLabel('规则名称').fill('保留输入的失败规则');
     await dialog.getByLabel('标的代码').fill('AAPL');
