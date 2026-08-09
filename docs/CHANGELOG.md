@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 
+- [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).
 - [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
 - [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
 - [Changed] Desktop startup records a bounded asynchronous path-safe CLI visibility summary and documents Desktop/Web capability boundaries for #884 without exposing raw paths to the renderer.

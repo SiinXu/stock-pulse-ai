@@ -4,8 +4,11 @@
 
 from .agent_tools import (
     AgentToolRegistrationBackend,
+    agent_tool_manifest_permissions_error,
     build_agent_tool_extension_contract,
     build_agent_tool_extension_registry,
+    find_undeclared_agent_tool_permissions,
+    undeclared_agent_tool_permissions,
     validate_agent_tool_definition,
 )
 from .analysis_strategies import (
@@ -65,7 +68,11 @@ from .manager import (
     PluginState,
 )
 from .state_store import PluginLifecycleStateStore
-from .manifest import PluginManifest
+from .manifest import (
+    MANIFEST_PERMISSIONS_UNDECLARED,
+    PERMISSION_ID_PATTERN,
+    PluginManifest,
+)
 from .notification_channels import (
     NotificationAdapterResult,
     NotificationChannelAdapter,
@@ -123,6 +130,7 @@ __all__ = [
     "ExtensionRegistry",
     "JSONValue",
     "LifecycleAuditRecorder",
+    "MANIFEST_PERMISSIONS_UNDECLARED",
     "NativeRegistrationBackend",
     "NotificationAdapterResult",
     "NotificationChannelAdapter",
@@ -131,6 +139,7 @@ __all__ = [
     "NotificationChannelRegistry",
     "NotificationChannelSnapshot",
     "NotificationRequest",
+    "PERMISSION_ID_PATTERN",
     "PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV",
     "PLUGIN_LIFECYCLE_EVENT_TYPE",
     "Plugin",
@@ -162,6 +171,7 @@ __all__ = [
     "RegistrationHandle",
     "SUPPORTED_REPORT_PLATFORMS",
     "RegisteredAnalysisStrategy",
+    "agent_tool_manifest_permissions_error",
     "available_notification_channel_snapshot",
     "build_agent_tool_extension_contract",
     "build_agent_tool_extension_registry",
@@ -177,9 +187,11 @@ __all__ = [
     "dispatch_market_review_event",
     "event_hook_extension_contract",
     "extract_data_provider_contract",
+    "find_undeclared_agent_tool_permissions",
     "resolve_data_provider_registry",
     "normalize_report_platform",
     "try_build_auto_bound_registry",
+    "undeclared_agent_tool_permissions",
     "validate_agent_tool_definition",
     "validate_analysis_strategy_definition",
     "validate_event_hook_registration",

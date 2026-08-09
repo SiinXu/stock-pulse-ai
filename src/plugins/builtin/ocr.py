@@ -36,7 +36,7 @@ class OcrAgentToolPlugin(Plugin):
                         "redacted, untrusted document text (issue #196)."
                     ),
                     "author": "StockPulse contributors",
-                    "permissions": ["multimodal.read"],
+                    "permissions": ["multimodal:read"],
                 }
             )
         )

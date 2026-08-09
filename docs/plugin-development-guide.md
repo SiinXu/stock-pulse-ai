@@ -39,8 +39,18 @@ OS privileges as StockPulse. There is:
 
 - no remote marketplace or auto-download;
 - no dependency installer for plugins;
-- no enforced permission sandbox from manifest `permissions` (metadata only);
+- no OS/process sandbox from manifest `permissions` (declaration only; agent_tool load-time subset check is not containment);
 - no hot reload (change requires process restart).
+
+
+### Manifest `permissions` (declaration, not sandbox)
+
+- List every capability your `agent_tool` `ToolPolicy.permissions` will require
+  (use ToolSurface strings such as `market_data:read`).
+- At load/enable, StockPulse rejects the plugin with
+  `manifest_permissions_undeclared` if a tool requires an undeclared capability.
+- Extra declared permissions are allowed; empty means tools must require none.
+- This is **not** sandbox isolation: plugin code still runs with process privileges.
 
 Review every line before enabling a package. Keep `PLUGINS_DIR` unset in
 production unless the packages are reviewed and pinned. The operator trust

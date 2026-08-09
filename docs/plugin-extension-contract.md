@@ -345,7 +345,7 @@ Example `manifest.json`:
 | `minAppVersion` | Required minimum compatible StockPulse application version. |
 | `description` | Required non-empty operator-facing summary. |
 | `author` | Required non-empty author or organization name. |
-| `permissions` | Required list of descriptive permission IDs; metadata only and not enforced in this batch. |
+| `permissions` | Required list of permission IDs using plugin-id syntax or ToolSurface `name:action` capability form. Visible in startup logs, health snapshots, and lifecycle audit metadata. For `agent_tool` plugins, every `ToolPolicy.permissions` entry must be a subset of this list at load time (stable error `manifest_permissions_undeclared`); extra declarations are allowed. **Not a sandbox** — declaration does not isolate process privileges. |
 | `apiVersion` | Optional plugin API major; defaults to `"1"`. |
 | `entrypoint` | Optional external entrypoint; defaults to `plugin.py:Plugin`. It must remain relative to the plugin directory. |
 
@@ -754,8 +754,10 @@ This completes the ToolSurface execution boundary in #191, not an OS or Python
 process-containment sandbox. URL-bearing tool-call arguments use the shared
 outbound policy, but external plugin handlers remain reviewed,
 process-equivalent Python and can initiate raw network or other process access
-internally. The top-level plugin manifest `permissions` list remains
-descriptive; it is distinct from enforced `ToolPolicy.permissions`.
+internally. The top-level plugin manifest `permissions` list is a load-time
+declaration distinct from runtime ToolSurface enforcement of
+`ToolPolicy.permissions`: agent tools must declare required capabilities on the
+manifest (subset check), but that declaration still does not sandbox the process.
 
 ### Notification Channels
 
@@ -1029,11 +1031,16 @@ route, imported module, or in-memory object available to that process. The
 plugin manager provides availability isolation, not confidentiality or code
 containment.
 
-The `permissions` manifest field is schema and documentation only. It may help
-reviewers understand intended access and may support a future enforcement
-design, but the application does not grant, deny, intercept, or audit Python
-capabilities from that list in this batch. An empty list does not mean a plugin
-is safe.
+The `permissions` manifest field is a **declaration**, not a sandbox. It is
+surfaced in startup logs, plugin health snapshots, and lifecycle audit metadata
+so operators can see what a package claims. For plugins that register
+`agent_tool` extensions, load/enable refuses the plugin (isolated failure,
+stable code `manifest_permissions_undeclared`) when a tool's
+`ToolPolicy.permissions` are not a subset of the manifest list. That check does
+**not** intercept arbitrary Python, OS privileges, network, or filesystem access
+inside the plugin process. An empty list means tools must declare no capabilities;
+it does not mean the plugin is safe. Runtime Agent ToolSurface capability gates
+remain separate and unchanged.
 
 Operators must review and trust external plugin code and dependencies. Keeping
 `PLUGINS_DIR` unset or blank is the safe default and loads no external code.
@@ -1043,6 +1050,22 @@ signature verification, sandbox, or subprocess boundary in scope. Basic
 in-process hot-reload for external packages is described in
 [Lifecycle Controls](#lifecycle-controls-enable--disable--hot-reload);
 it never fetches remote code or auto-enables new packages.
+
+## Manifest Permissions Semantics And Validation Timing
+
+| Stage | Behavior |
+| --- | --- |
+| Manifest parse | `permissions` must be a unique list of plugin-id style IDs or `name:action` capability IDs. |
+| Register / external load | Declared permissions are written to startup logs. |
+| Load / enable (`onload`) | If the plugin registered any `agent_tool`, every `ToolPolicy.permissions` entry must be ⊆ manifest `permissions`. Failure yields `manifest_permissions_undeclared`, rolls back that plugin only, and does not stop core startup or other plugins. |
+| Health / audit | Health snapshots and lifecycle audit metadata include the declared `permissions` list. |
+| Runtime tool execute | Unchanged ToolSurface capability gate in `tool_surface` (out of scope for this declaration check). |
+
+**Declaration ≠ sandbox isolation.** Declaring fewer permissions does not contain
+process-equivalent Python. Declaring more than tools use is allowed (extra
+declarations are informational). Align `agent_tool` plugins with ToolSurface
+capability strings (for example `market_data:read`) rather than free-form labels
+when tools are registered.
 
 ## Deferred Surfaces
 

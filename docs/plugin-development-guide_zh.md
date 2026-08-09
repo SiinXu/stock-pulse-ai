@@ -35,13 +35,20 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 - 无远程应用商店或自动下载；
 - 无插件依赖安装器；
-- manifest `permissions` 仅为描述元数据，**不**形成强制沙箱；
+- manifest `permissions` 是声明而非进程沙箱；`agent_tool` 在 load/enable 时做声明子集校验（非权限隔离）；
 - 无热加载（修改后需重启进程）。
 
 启用任何包前请逐行审阅。生产环境默认保持 `PLUGINS_DIR` 未设置，除非包已审阅并固定。
 运维信任边界亦见
 [安全基线](security-baseline.md#operator-security-boundaries) 与
 [ADR-007](adr/ADR-007-versioned-plugin-extension-boundary.md)。
+
+### Manifest `permissions`（声明 ≠ 沙箱）
+
+- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read`）。
+- 加载/启用时若工具要求未声明能力，将以稳定错误码 `manifest_permissions_undeclared` 拒绝该插件（失败隔离，不影响核心与其它插件）。
+- 允许声明多余权限；空列表表示工具不得要求任何能力。
+- **声明 ≠ 沙箱隔离**：插件代码仍以进程同等权限运行。
 
 ### Agent 工具限制（#539）
 

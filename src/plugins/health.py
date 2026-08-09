@@ -27,6 +27,7 @@ class PluginHealthEntry:
     state: PluginHealthState
     desired_enabled: bool
     extension_points: tuple[str, ...]
+    permissions: tuple[str, ...] = ()
     last_error_code: str | None = None
     package_root: str | None = None
     reloadable: bool = False
@@ -55,6 +56,7 @@ class PluginHealthReport:
                     "state": entry.state,
                     "desired_enabled": entry.desired_enabled,
                     "extension_points": list(entry.extension_points),
+                    "permissions": list(entry.permissions),
                     "last_error_code": entry.last_error_code,
                     "package_root": entry.package_root,
                     "reloadable": entry.reloadable,
@@ -75,6 +77,7 @@ def health_entry_from_snapshot(snapshot: "PluginSnapshot") -> PluginHealthEntry:
         state=snapshot.state,
         desired_enabled=snapshot.desired_enabled,
         extension_points=tuple(snapshot.extension_points),
+        permissions=tuple(snapshot.manifest.permissions),
         last_error_code=snapshot.last_error_code,
         package_root=snapshot.package_root,
         reloadable=snapshot.reloadable,
