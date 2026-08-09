@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { systemConfigApi } from '../../../api/systemConfig';
 import { UI_TEXT } from '../../../i18n/uiText';
-import type { SystemConfigItem } from '../../../types/systemConfig';
+import type { SchedulerStatusResponse, SystemConfigItem } from '../../../types/systemConfig';
 import SchedulerSettingsCard from '../SchedulerSettingsCard';
 
 vi.mock('../../../api/scheduledTasks', () => ({
@@ -50,14 +50,28 @@ function scheduleItem(key: string, value: string): SystemConfigItem {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 const defaultItems: SystemConfigItem[] = [
   scheduleItem('SCHEDULE_ENABLED', 'true'),
   scheduleItem('SCHEDULE_TIMES', '09:20,15:10'),
 ];
 
-const idleStatus = {
+const idleStatus: SchedulerStatusResponse = {
+  track: 'legacy_day_batch',
   enabled: true,
   running: false,
+  attached: true,
+  processMode: 'serve',
+  scheduleTimezone: 'Asia/Shanghai',
+  runNowAvailable: true,
+  runNowBlockReason: null,
   scheduleTimes: ['09:20', '15:10'],
   nextRunAt: '2026-06-21T09:20:00+08:00',
   lastRunAt: null,
@@ -65,6 +79,9 @@ const idleStatus = {
   lastError: null,
   lastSkippedAt: null,
   lastSkipReason: null,
+  activeRunId: null,
+  lastRunId: null,
+  lastRunOutcome: null,
 };
 
 describe('SchedulerSettingsCard observability', () => {
@@ -98,13 +115,17 @@ describe('SchedulerSettingsCard observability', () => {
     expect(screen.queryByTestId('scheduler-legacy-track-note')).not.toBeInTheDocument();
 
     const nextRun = await screen.findByTestId('scheduler-next-run');
-    // Explicit TZ label (marketFormat shortOffset convention); offset may be GMT+8 or local.
+    // Explicit server TZ label; never the browser-local zone.
     expect(nextRun.textContent).toMatch(/GMT[+-]\d+/i);
+    expect(nextRun).toHaveTextContent('Asia/Shanghai');
 
     const processMode = screen.getByTestId('scheduler-process-mode');
     expect(processMode).toHaveTextContent(UI_TEXT.en['settings.schedulerProcessMode']);
     expect(screen.getByTestId('scheduler-process-mode-value')).toHaveTextContent(
-      UI_TEXT.en['settings.schedulerProcessModeValue'],
+      UI_TEXT.en['settings.schedulerProcessModeServe'],
+    );
+    expect(screen.getByTestId('scheduler-process-mode-value')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerAttached'],
     );
     expect(screen.getByTestId('scheduler-owner-note')).toHaveTextContent(/GitHub Actions/i);
     expect(screen.getByTestId('scheduler-owner-note')).toHaveTextContent(/--serve/i);
@@ -118,6 +139,8 @@ describe('SchedulerSettingsCard observability', () => {
     vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
       ...idleStatus,
       running: true,
+      runNowAvailable: false,
+      runNowBlockReason: 'analysis_already_running',
       nextRunAt: null,
     });
 
@@ -147,12 +170,23 @@ describe('SchedulerSettingsCard observability', () => {
     vi.mocked(systemConfigApi.runSchedulerNow).mockResolvedValue({
       accepted: true,
       running: true,
+      runId: 'run-1',
+      startedAt: '2026-06-21T01:00:00+00:00',
     });
     vi.mocked(systemConfigApi.getSchedulerStatus)
       .mockResolvedValueOnce({ ...idleStatus })
       .mockResolvedValueOnce({
         ...idleStatus,
         running: true,
+        runNowAvailable: false,
+        runNowBlockReason: 'analysis_already_running',
+        activeRunId: 'run-1',
+        lastRunAt: '2026-06-21T09:00:00+08:00',
+      })
+      .mockResolvedValueOnce({
+        ...idleStatus,
+        lastRunId: 'run-1',
+        lastRunOutcome: 'succeeded',
         lastRunAt: '2026-06-21T09:00:00+08:00',
       });
 
@@ -179,6 +213,114 @@ describe('SchedulerSettingsCard observability', () => {
     expect(success).toHaveTextContent(/Running until complete/i);
     expect(success.textContent).not.toMatch(/^task[_-]?[a-z0-9-]+$/i);
     await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByTestId('scheduler-refresh-status-button'));
+    expect(await screen.findByText(UI_TEXT.en['settings.schedulerRunSucceeded'])).toBeInTheDocument();
+  });
+
+  it('fails closed for an older status contract instead of inventing ownership or availability', async () => {
+    vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
+      enabled: true,
+      running: false,
+      scheduleTimes: ['09:20'],
+      nextRunAt: '2026-06-21T09:20:00',
+      lastRunAt: null,
+      lastSuccessAt: null,
+      lastError: null,
+    });
+
+    render(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    const runNow = await screen.findByTestId('scheduler-run-now-button');
+    expect(runNow).toBeDisabled();
+    expect(screen.getByTestId('scheduler-process-mode-value')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerProcessModeUnknown'],
+    );
+    expect(screen.getByTestId('scheduler-run-now-busy-reason')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerReasonUnavailable'],
+    );
+    expect(screen.getByTestId('scheduler-next-run')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerTimezoneUnknown'],
+    );
+  });
+
+  it('keeps versioned-task probing out of status-only refreshes', async () => {
+    render(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    await waitFor(() => expect(scheduledTasksApi.list).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByTestId('scheduler-refresh-status-button'));
+    await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(2));
+    expect(scheduledTasksApi.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a stale status response after a newer refresh wins', async () => {
+    const first = deferred<typeof idleStatus>();
+    const second = deferred<typeof idleStatus>();
+    vi.mocked(systemConfigApi.getSchedulerStatus)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    const { rerender } = render(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+    await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={1}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+    await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(2));
+
+    second.resolve({
+      ...idleStatus,
+      enabled: false,
+      runNowAvailable: false,
+      runNowBlockReason: 'scheduler_disabled',
+    });
+    await waitFor(() => expect(screen.getByTestId('scheduler-runtime-badge')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerDisabled'],
+    ));
+
+    first.resolve({ ...idleStatus, enabled: true });
+    await Promise.resolve();
+    expect(screen.getByTestId('scheduler-runtime-badge')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerDisabled'],
+    );
   });
 
   it('shows last skipped from status when present', async () => {
@@ -203,6 +345,7 @@ describe('SchedulerSettingsCard observability', () => {
     const skipped = await screen.findByTestId('scheduler-last-skipped');
     expect(skipped).toHaveTextContent(UI_TEXT.en['settings.schedulerSkipReasonBusy']);
     expect(skipped.textContent).toMatch(/GMT[+-]\d+/i);
+    expect(skipped).toHaveTextContent('Asia/Shanghai');
   });
 
   it('uses the both-active migration copy when a versioned task is also enabled', async () => {
