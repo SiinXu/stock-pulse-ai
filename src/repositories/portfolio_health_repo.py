@@ -141,13 +141,18 @@ class PortfolioHealthRepository(BaseRepository):
                     context=context,
                 )
             except Exception as exc:  # broad-exception: fallback_recorded - repository boundary
-                self._log_and_raise(
+                log_safe_exception(
                     logger,
                     "upsert portfolio health snapshot failed",
                     exc,
                     error_code="portfolio_health_upsert_error",
                     context=context,
                 )
+                raise RepositoryError(
+                    "upsert portfolio health snapshot failed",
+                    error_code="portfolio_health_upsert_error",
+                    context=context,
+                ) from exc
 
     def get_snapshot(
         self,
