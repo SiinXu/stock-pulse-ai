@@ -81,7 +81,7 @@ function parseDaysParam(value: string | null): number {
 
 /** Non-price quantities (volume/amount) — host-locale grouping only. */
 function formatQuantity(value: number | null | undefined, language: UiLanguage, fractionDigits = 2): string {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
   return formatUiNumber(Number(value), language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: fractionDigits,
@@ -94,7 +94,7 @@ function formatPriceCell(
   language: UiLanguage,
 ): string {
   if (market) return formatPrice(value, market, language);
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
   return formatUiNumber(Number(value), language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -102,7 +102,7 @@ function formatPriceCell(
 }
 
 function formatSignedFallback(value: number | null | undefined, language: UiLanguage): string {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
   const numeric = Number(value);
   const body = formatUiNumber(Math.abs(numeric), language, {
     minimumFractionDigits: 0,

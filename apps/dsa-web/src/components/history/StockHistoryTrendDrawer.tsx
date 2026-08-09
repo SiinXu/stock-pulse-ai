@@ -51,9 +51,6 @@ const RANGE_OPTIONS: Array<{ value: StockHistoryRange; labelKey: UiTextKey }> = 
   { value: '90d', labelKey: 'stockTrend.window90' },
 ];
 
-const isPresent = <T,>(value: T | null | undefined): value is T =>
-  value !== undefined && value !== null && value !== '';
-
 const formatNumber = (value?: number, digits = 2, language: UiLanguage = 'en'): string => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
   return formatUiNumber(value, language, {
@@ -271,7 +268,8 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
       header: t('stockTrend.score'),
       widthPercent: 7,
       cell: (item) => {
-        const sentimentColor = isPresent(item.sentimentScore)
+        const sentimentColor = typeof item.sentimentScore === 'number'
+          && Number.isFinite(item.sentimentScore)
           ? getSentimentColor(item.sentimentScore)
           : undefined;
         return (
@@ -301,7 +299,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
           className="font-mono font-semibold"
           style={getPriceChangeStyle(item.changePct, marketId, changeColorPref)}
           data-change-color={
-            marketId && typeof item.changePct === 'number'
+            marketId && typeof item.changePct === 'number' && Number.isFinite(item.changePct)
               ? changeSemantics(item.changePct, marketId, changeColorPref).color
               : undefined
           }
@@ -324,7 +322,8 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
       widthPercent: 9,
       cell: (item) => (
         <span className="font-mono">
-          {formatNumber(item.turnoverRate, 2, language)}{isPresent(item.turnoverRate) ? '%' : ''}
+          {formatNumber(item.turnoverRate, 2, language)}
+          {typeof item.turnoverRate === 'number' && Number.isFinite(item.turnoverRate) ? '%' : ''}
         </span>
       ),
     },

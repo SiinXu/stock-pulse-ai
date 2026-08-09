@@ -86,7 +86,7 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
 }
 
 function renderPage(code = '600519') {
-  render(
+  return render(
     wrapWithQueryClient(
       <UiLanguageProvider initialLanguage="en">
         <MemoryRouter initialEntries={[`/stocks/${code}`]}>
@@ -178,6 +178,72 @@ describe('StockDetailsPage', () => {
     const changeNode = screen.getByText(/-1\.500/);
     expect(changeNode.getAttribute('data-change-color')).toBe('green');
     expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
+  });
+
+  it('renders non-finite known-market quote and candle numbers as missing and neutral', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote({
+      currentPrice: Number.POSITIVE_INFINITY,
+      change: Number.POSITIVE_INFINITY,
+      changePercent: Number.NEGATIVE_INFINITY,
+      open: Number.NEGATIVE_INFINITY,
+      high: Number.POSITIVE_INFINITY,
+      low: Number.NEGATIVE_INFINITY,
+      prevClose: Number.POSITIVE_INFINITY,
+      volume: Number.POSITIVE_INFINITY,
+      amount: Number.NEGATIVE_INFINITY,
+    }));
+    getHistoryMock.mockResolvedValue({
+      ...makeHistory(),
+      data: [{
+        date: '2026-01-05',
+        open: Number.POSITIVE_INFINITY,
+        high: Number.NEGATIVE_INFINITY,
+        low: Number.POSITIVE_INFINITY,
+        close: Number.NEGATIVE_INFINITY,
+        volume: Number.POSITIVE_INFINITY,
+        changePercent: Number.NEGATIVE_INFINITY,
+      }],
+    });
+
+    const { container } = renderPage();
+
+    await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
+    const changeNode = screen.getByText('— (—)');
+    expect(changeNode).toHaveAttribute('data-change-direction', 'flat');
+    expect(changeNode).toHaveAttribute('data-change-color', 'neutral');
+    expect(changeNode).not.toHaveStyle({ color: 'var(--home-price-up)' });
+    expect(changeNode).not.toHaveStyle({ color: 'var(--home-price-down)' });
+    expect(container.textContent).not.toMatch(/∞|Infinity/);
+  });
+
+  it('renders non-finite unknown-market fallback numbers as missing', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote({
+      stockCode: '7203.T',
+      stockName: 'Toyota',
+      currentPrice: Number.POSITIVE_INFINITY,
+      change: Number.NEGATIVE_INFINITY,
+      changePercent: Number.POSITIVE_INFINITY,
+      open: Number.NEGATIVE_INFINITY,
+      high: Number.POSITIVE_INFINITY,
+      low: Number.NEGATIVE_INFINITY,
+      prevClose: Number.POSITIVE_INFINITY,
+      volume: Number.NEGATIVE_INFINITY,
+      amount: Number.POSITIVE_INFINITY,
+    }));
+    getHistoryMock.mockResolvedValue({
+      ...makeHistory(),
+      stockCode: '7203.T',
+      stockName: 'Toyota',
+      data: [],
+    });
+
+    const { container } = renderPage('7203.T');
+
+    await waitFor(() => expect(screen.getByText('Toyota')).toBeTruthy());
+    const changeNode = screen.getByText('— (—)');
+    expect(changeNode).not.toHaveAttribute('data-change-direction');
+    expect(changeNode).not.toHaveAttribute('data-change-color');
+    expect(container.textContent).not.toMatch(/∞|Infinity/);
   });
 
   it('fails quote and history independently', async () => {

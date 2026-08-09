@@ -217,13 +217,13 @@ export function changeColorCssVar(color: ChangeColor): string | undefined {
 }
 
 /**
- * Signed change percent for display (e.g. `+1.25%`, `-0.50%`). Missing → em dash.
+ * Signed change percent for display (e.g. `+1.25%`, `-0.50%`). Missing or non-finite → em dash.
  */
 export function formatSignedChangePercent(
   value: number | null | undefined,
   fractionDigits = 2,
 ): string {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
     return EMPTY_PRICE;
   }
   const numeric = Number(value);
@@ -234,6 +234,7 @@ export function formatSignedChangePercent(
 /**
  * Signed absolute change amount using market price precision (no currency code).
  * Prefer pairing with `formatPrice` for the absolute level and this for the delta.
+ * Missing or non-finite values render as an em dash.
  */
 export function formatSignedChangeAmount(
   value: number | null | undefined,
@@ -243,7 +244,7 @@ export function formatSignedChangeAmount(
   if (!isMarketId(market)) {
     throw new Error(`Unsupported market for formatSignedChangeAmount: ${String(market)}`);
   }
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
     return EMPTY_PRICE;
   }
   const numeric = Number(value);

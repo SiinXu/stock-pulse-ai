@@ -255,6 +255,8 @@ describe('marketFormat contract', () => {
       expect(formatSignedChangePercent(-0.5)).toBe('-0.50%');
       expect(formatSignedChangePercent(0)).toBe('0.00%');
       expect(formatSignedChangePercent(null)).toBe('—');
+      expect(formatSignedChangePercent(Number.POSITIVE_INFINITY)).toBe('—');
+      expect(formatSignedChangePercent(Number.NEGATIVE_INFINITY)).toBe('—');
     });
 
     it('formats signed amount with market precision', () => {
@@ -262,6 +264,10 @@ describe('marketFormat contract', () => {
       expect(formatSignedChangeAmount(-1.2345, 'hk', 'en')).toBe('-1.235');
       expect(formatSignedChangeAmount(0.1, 'us', 'en')).toBe('+0.10');
       expect(formatSignedChangeAmount(undefined, 'cn')).toBe('—');
+      for (const market of MARKETS) {
+        expect(formatSignedChangeAmount(Number.POSITIVE_INFINITY, market, 'en')).toBe('—');
+        expect(formatSignedChangeAmount(Number.NEGATIVE_INFINITY, market, 'en')).toBe('—');
+      }
     });
   });
 });

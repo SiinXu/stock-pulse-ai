@@ -112,6 +112,44 @@ describe('StockHistoryTrendDrawer', () => {
     expect(changeNode).toHaveStyle({ color: 'var(--home-price-down)' });
   });
 
+  it('renders non-finite history metrics as missing without percent suffixes or paint', () => {
+    const { container } = render(
+      <UiLanguageProvider initialLanguage="en">
+        <StockHistoryTrendDrawer
+          report={{
+            ...report,
+            meta: { ...report.meta, stockCode: 'AAPL', stockName: 'Apple' },
+          }}
+          items={[{
+            ...items[0],
+            stockCode: 'AAPL',
+            stockName: 'Apple',
+            sentimentScore: Number.POSITIVE_INFINITY,
+            currentPrice: Number.NEGATIVE_INFINITY,
+            changePct: Number.POSITIVE_INFINITY,
+            volumeRatio: Number.NEGATIVE_INFINITY,
+            turnoverRate: Number.POSITIVE_INFINITY,
+          }]}
+          total={1}
+          hasMore={false}
+          isLoading={false}
+          isLoadingMore={false}
+          filters={{ range: 'all', model: 'all', sort: 'desc' }}
+          onClose={vi.fn()}
+          onRangeChange={vi.fn()}
+          onLoadMore={vi.fn()}
+          onSelectRecord={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(5);
+    expect(container.textContent).not.toMatch(/∞|Infinity|—%/);
+    expect(container.querySelector('[data-change-color]')).toBeNull();
+    expect(container.querySelector('[style*="#10b981"]')).toBeNull();
+  });
+
   it('keeps fixed proportional columns, keyboard row selection, and nested report actions isolated', () => {
     const onClose = vi.fn();
     const onSelectRecord = vi.fn();
