@@ -17970,6 +17970,229 @@
         "title": "ScheduledTaskTodayResponse",
         "type": "object"
       },
+      "SchedulerRunNowResponse": {
+        "description": "Acceptance and correlation data for one immediate scheduler run.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "accepted",
+          "running"
+        ],
+        "title": "SchedulerRunNowResponse",
+        "type": "object"
+      },
+      "SchedulerStatusResponse": {
+        "description": "Authoritative status for this process's legacy day-batch scheduler.",
+        "properties": {
+          "active_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Run Id"
+          },
+          "attached": {
+            "title": "Attached",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Id"
+          },
+          "last_run_outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Outcome"
+          },
+          "last_skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skip Reason"
+          },
+          "last_skipped_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skipped At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "process_mode": {
+            "enum": [
+              "serve",
+              "desktop",
+              "not_attached"
+            ],
+            "title": "Process Mode",
+            "type": "string"
+          },
+          "run_now_available": {
+            "title": "Run Now Available",
+            "type": "boolean"
+          },
+          "run_now_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Now Block Reason"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "schedule_times": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schedule Times",
+            "type": "array"
+          },
+          "schedule_timezone": {
+            "title": "Schedule Timezone",
+            "type": "string"
+          },
+          "track": {
+            "const": "legacy_day_batch",
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "track",
+          "enabled",
+          "running",
+          "attached",
+          "process_mode",
+          "schedule_timezone",
+          "run_now_available"
+        ],
+        "title": "SchedulerStatusResponse",
+        "type": "object"
+      },
       "ScorecardBucket": {
         "properties": {
           "avg_return_pct": {
@@ -36779,9 +37002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Run Scheduler Now Api V1 System Scheduler Run Now Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerRunNowResponse"
                 }
               }
             },
@@ -36803,9 +37024,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Scheduler Status Api V1 System Scheduler Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerStatusResponse"
                 }
               }
             },

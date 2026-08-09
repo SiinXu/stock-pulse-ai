@@ -848,13 +848,24 @@ function registerSettingsPageBeforeEach(): void {
       updatedAt: '2026-03-21T00:00:00Z',
     });
     getSchedulerStatus.mockResolvedValue({
+      track: 'legacy_day_batch',
       enabled: true,
       running: false,
+      attached: true,
+      processMode: 'serve',
+      scheduleTimezone: 'Asia/Shanghai',
+      runNowAvailable: true,
+      runNowBlockReason: null,
       scheduleTimes: ['09:20', '15:10'],
       nextRunAt: '2026-06-21T09:20:00+08:00',
       lastRunAt: null,
       lastSuccessAt: null,
       lastError: null,
+      lastSkippedAt: null,
+      lastSkipReason: null,
+      activeRunId: null,
+      lastRunId: null,
+      lastRunOutcome: null,
     });
     getSetupStatus.mockResolvedValue({
       isComplete: true,

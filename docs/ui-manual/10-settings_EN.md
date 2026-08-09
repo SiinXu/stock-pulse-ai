@@ -140,7 +140,7 @@ Presets enable Agent and clear “Agent acknowledged off,” but do not change c
 
 ### Scheduling
 
-When enabled, a **long-running** Web/API/Desktop process must stay up. You may see next-run times and “run once” actions. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
+When enabled, a **long-running** Web/API/Desktop process must stay up. The status card reports this API process's mode, attachment state, and server schedule time zone without substituting the browser zone. **Run once** is available only when this process is attached, the legacy batch is enabled, and no analysis is running. An accepted run is correlated through success or failure; an older server without correlation data is shown as outcome unavailable rather than treating idle as success. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
 
 The legacy day-batch card keeps only its switch, times, and runtime status instead of repeating deprecation and process-ownership explanations. Enabled/Disabled appears on the same row as the status title; the migration warning still appears when the legacy batch is enabled.
 
