@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Earnings-call transcript parsing (`earnings-transcript-v2`) with exact source coordinates, typed metrics, page-aware PDF provenance, compact chunk retrieval, untrusted-document privacy boundaries, and bounded valid-JSON Agent results; default-off tool `parse_earnings_transcript` behind existing multimodal gates (#253 remaining).
 
+- [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
 - [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
 - [Fixed] Keep a single primary create-rule action in an empty Signal Center and strengthen Usage redirect/title acceptance.
 - [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
