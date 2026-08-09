@@ -4994,4 +4994,9 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "設定フィンガープリント構成の比較",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "設定構成がありません",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "なし",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryDescription": "このディレクトリに表示されるのは、保存済みの市場データプロバイダー設定だけです。現在のルーティング、可用性、稼働状態、フォールバック結果、キャッシュの鮮度は示しません。検索用認証情報と Futu のポートフォリオインポートはここでは管理しません。",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryFilterAll": "すべての設定",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryNoMatches": "一致するプロバイダー設定がありません",
+  "i18n.uiText.UI_TEXT.settings.dataDirectorySearchPlaceholder": "名前または設定状態で絞り込む",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryTitle": "プロバイダー設定",
 } as const;
