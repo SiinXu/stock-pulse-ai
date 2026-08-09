@@ -20,7 +20,6 @@
 {% set intel = dashboard.get('intelligence') or {} %}
 
 ### {{ e.signal_emoji }} **{{ e.signal_text }}** | {{ e.stock_name }}({{ result.code }})
-
 {{ decision_card(e, compact=true) }}
 {% if e.truncation_notice %}
 {{ e.truncation_notice }}

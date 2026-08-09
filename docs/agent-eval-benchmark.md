@@ -102,4 +102,5 @@ python scripts/run_agent_benchmark.py --write-baseline
 | #215 | 更广 harness / 反馈 / 自改进 — 范围外 |
 | #617 / 分析质量面板 | 互补：报告信任 vs Agent 运行纪律 |
 | AR-01 agent_runtime fixtures | 只读转写源 |
+| 输出质量评估服务 | [agent-eval-dimensions.md](agent-eval-dimensions.md) 对单次输出产物打分（`agent_eval_service`），由本统一 runner 调用并单独计分 |
 | CI merge queue / workflow 归属 | 本 PR 不改 `.github/workflows/**` |

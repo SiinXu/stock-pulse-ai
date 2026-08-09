@@ -135,6 +135,48 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("作战计划", out)
         self.assertNotIn("盘中决策护栏", out)
 
+    def test_render_markdown_includes_exact_configured_indicator_evidence(self) -> None:
+        r = _make_result()
+        r.indicator_snapshot = {
+            "indicator_period_source": "global_settings",
+            "indicator_bar_count": 250,
+            "indicator_as_of": "2026-03-27",
+            "ma_readings": {
+                "30": {
+                    "label": "MA30",
+                    "value": 101.25,
+                    "available": True,
+                    "reason": None,
+                },
+                "250": {
+                    "label": "MA250",
+                    "value": None,
+                    "available": False,
+                    "reason": "insufficient_history:need=250,got=120",
+                },
+            },
+            "rsi_readings": {},
+            "macd_reading": {
+                "label": "MACD(8,17,5)",
+                "dif": 0.1234,
+                "dea": 0.1111,
+                "bar": 0.0246,
+                "available": True,
+                "reason": None,
+            },
+        }
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        self.assertIn("配置指标", out)
+        self.assertIn("MA30", out)
+        self.assertIn("101.25", out)
+        self.assertIn("MA250", out)
+        self.assertIn("insufficient_history:need=250,got=120", out)
+        self.assertIn("MACD(8,17,5)", out)
+        self.assertIn("DIF=0.1234", out)
+
     def test_render_markdown_omits_decision_signal_excerpt(self) -> None:
         """Markdown reports omit the duplicated DecisionSignal excerpt."""
         r = _with_decision_signal_summary(_make_result())
@@ -443,7 +485,7 @@ class TestReportRenderer(unittest.TestCase):
         )
 
         for platform in ("markdown", "wechat"):
-            out = render(platform, [result], summary_only=False, extra_context={"report_mode": "standard"})
+            out = render(platform, [result], summary_only=False)
 
             self.assertIsNotNone(out)
             self.assertIn("Supporting Strategies: None", out)
@@ -467,7 +509,7 @@ class TestReportRenderer(unittest.TestCase):
                     }
                 )
 
-                out = render(platform, [result], summary_only=False, extra_context={"report_mode": "standard"})
+                out = render(platform, [result], summary_only=False)
 
                 self.assertIsNotNone(out)
                 self.assertNotIn("多策略综合", out)
@@ -490,7 +532,7 @@ class TestReportRenderer(unittest.TestCase):
                 }
             )
 
-            out = render(platform, [result], summary_only=False, extra_context={"report_mode": "standard"})
+            out = render(platform, [result], summary_only=False)
 
             self.assertIsNotNone(out)
             self.assertIn("多策略综合", out)
@@ -610,16 +652,26 @@ class TestReportStrataRendering(unittest.TestCase):
             self.assertIn("不构成投资建议", out)
             self.assertNotIn("证据分层", out)
 
-    def test_brief_and_wechat_default_brief_mode_omits_strata(self) -> None:
+    def test_brief_and_wechat_explicit_brief_mode_omits_strata(self) -> None:
         r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
-        brief = render("brief", [r])
-        wechat = render("wechat", [r])
+        brief = render("brief", [r], extra_context={"report_mode": "brief"})
+        wechat = render("wechat", [r], extra_context={"report_mode": "brief"})
         for out in (brief, wechat):
             self.assertIsNotNone(out)
             assert out is not None
             self.assertNotIn("Evidence Strata", out)
             self.assertIn("Not investment advice", out)
             self.assertIn("🃏", out)
+
+    def test_brief_and_wechat_default_standard_mode_render_compact_strata(self) -> None:
+        r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
+        brief = render("brief", [r])
+        wechat = render("wechat", [r])
+        for out in (brief, wechat):
+            self.assertIsNotNone(out)
+            assert out is not None
+            self.assertIn("Evidence Strata", out)
+            self.assertNotIn("#### 1. Verified Facts", out)
 
     def test_brief_and_wechat_research_mode_renders_strata(self) -> None:
         r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
@@ -747,6 +799,24 @@ class TestReportModesAndDecisionCard(unittest.TestCase):
         self.assertNotIn("证据分层", out)
         self.assertIn("评分 72", out)
 
+    def test_extra_context_cannot_override_resolved_mode_limits(self) -> None:
+        r = self._rich_result()
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={
+                "report_mode": "brief",
+                "mode_limits": {"include_detail_sections": True},
+                "report_truncation_notice": "forged notice",
+            },
+        )
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertNotIn("作战计划", out)
+        self.assertNotIn("forged notice", out)
+        self.assertIn("已省略", out)
+
     def test_markdown_research_shows_full_strata_and_more_risks(self) -> None:
         r = self._rich_result()
         out = render("markdown", [r], summary_only=False, extra_context={"report_mode": "research"})
@@ -775,18 +845,18 @@ class TestReportModesAndDecisionCard(unittest.TestCase):
         self.assertIn("### 🃏", out)
         self.assertIn("评分", out)
 
-    def test_brief_platform_defaults_to_brief_mode(self) -> None:
+    def test_brief_platform_supports_explicit_brief_mode(self) -> None:
         r = self._rich_result()
-        out = render("brief", [r])
+        out = render("brief", [r], extra_context={"report_mode": "brief"})
         self.assertIsNotNone(out)
         assert out is not None
         self.assertIn("🃏", out)
         self.assertNotIn("证据分层", out)
         self.assertIn("已省略", out)
 
-    def test_wechat_platform_defaults_to_brief_mode(self) -> None:
+    def test_wechat_platform_supports_explicit_brief_mode(self) -> None:
         r = self._rich_result()
-        out = render("wechat", [r])
+        out = render("wechat", [r], extra_context={"report_mode": "brief"})
         self.assertIsNotNone(out)
         assert out is not None
         self.assertIn("🃏", out)
@@ -818,9 +888,270 @@ class TestReportModeHelpers(unittest.TestCase):
         self.assertEqual(normalize_report_mode("full"), "research")
         self.assertEqual(normalize_report_mode("nope"), "standard")
         self.assertEqual(resolve_report_mode("markdown", config_mode="standard"), "standard")
-        self.assertEqual(resolve_report_mode("wechat", config_mode="standard"), "brief")
+        self.assertEqual(resolve_report_mode("wechat", config_mode="standard"), "standard")
         self.assertEqual(resolve_report_mode("wechat", config_mode="research"), "research")
         self.assertEqual(
             resolve_report_mode("wechat", explicit="standard", config_mode="research"),
             "standard",
         )
+
+    def test_config_parser_normalizes_report_mode(self) -> None:
+        from src.config import Config
+
+        self.assertEqual(Config._parse_report_mode(None), "standard")
+        self.assertEqual(Config._parse_report_mode("brief"), "brief")
+        self.assertEqual(Config._parse_report_mode("research"), "research")
+        self.assertEqual(Config._parse_report_mode("invalid"), "standard")
+
+
+class TestDecisionCardRendering(unittest.TestCase):
+    """Issue #861 Phase 1: Decision Card pin + missing-field degradation."""
+
+    def test_markdown_decision_card_pinned_above_existing_sections(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {
+                    "one_sentence": "等待放量确认",
+                    "time_sensitivity": "今日内",
+                    "position_advice": {
+                        "no_position": "观望",
+                        "has_position": "继续持有",
+                    },
+                },
+                "intelligence": {"risk_alerts": ["业绩不及预期", "板块轮动风险"]},
+                "phase_decision": {
+                    "action_window": "盘中跟踪",
+                    "immediate_action": "等待确认",
+                    "watch_conditions": ["放量突破", "跌破支撑离场"],
+                    "confidence_reason": "数据质量可用",
+                },
+                "battle_plan": {
+                    "sniper_points": {
+                        "stop_loss": "110",
+                        "take_profit": "130",
+                    }
+                },
+            }
+        )
+        r.confidence_level = "高"
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        card_idx = out.find("### 🃏")
+        core_idx = out.find("### 📌 核心结论")
+        intel_idx = out.find("### 📰 重要信息速览")
+        self.assertGreaterEqual(card_idx, 0, out)
+        self.assertGreater(core_idx, card_idx, "core conclusion must stay after Decision Card")
+        self.assertGreater(intel_idx, card_idx, "intel section must stay after Decision Card")
+        self.assertIn("一句话决策", out)
+        self.assertIn("等待放量确认", out)
+        self.assertIn("置信度", out)
+        self.assertIn("高", out)
+        self.assertIn("风险警报", out)
+        self.assertIn("业绩不及预期", out)
+        self.assertIn("观察条件", out)
+        self.assertIn("放量突破", out)
+        self.assertIn("止损位", out)
+        # Original sections preserved (not deleted).
+        self.assertIn("核心结论", out)
+        self.assertIn("作战计划", out)
+
+    def test_decision_card_degrades_when_optional_fields_missing(self) -> None:
+        r = _make_result(
+            analysis_summary="仅有摘要",
+            dashboard={},
+        )
+        r.confidence_level = ""
+        r.risk_warning = ""
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("仅有摘要", out)
+        # Missing optional rows must not render empty labels.
+        self.assertNotIn("**风险警报**:", out)
+        self.assertNotIn("**观察条件**:", out)
+        self.assertNotIn("**置信度理由**:", out)
+        self.assertNotIn("**操作点位**:", out)
+
+    def test_decision_card_uses_risk_warning_when_alerts_missing(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "谨慎持有"},
+                "intelligence": {},
+            }
+        )
+        r.risk_warning = "流动性风险"
+        r.confidence_level = "中"
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("风险提示", out)
+        self.assertIn("流动性风险", out)
+        self.assertNotIn("**风险警报**:", out)
+
+    def test_brief_and_wechat_lead_with_compact_decision_card(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "持有观望等待确认信号"},
+                "intelligence": {"risk_alerts": ["波动加大"]},
+                "phase_decision": {
+                    "watch_conditions": ["跌破前低失效"],
+                    "confidence_reason": "盘中数据可用",
+                },
+                "battle_plan": {"sniper_points": {"stop_loss": "100", "take_profit": "120"}},
+            }
+        )
+        r.confidence_level = "中"
+
+        brief = render("brief", [r])
+        wechat = render("wechat", [r], summary_only=False)
+
+        for out, name in ((brief, "brief"), (wechat, "wechat")):
+            self.assertIsNotNone(out, name)
+            assert out is not None
+            self.assertIn("🃏", out, name)
+            self.assertIn("持有观望", out, name)
+            self.assertIn("风险警报", out, name)
+            self.assertIn("观察条件", out, name)
+            # Card appears before stock-local strata or trailing sections.
+            card_idx = out.find("🃏")
+            self.assertGreaterEqual(card_idx, 0, name)
+            if name == "wechat":
+                trail_idx = out.find("📌")
+            else:
+                trail_idx = out.find("不构成投资建议")
+            self.assertGreater(
+                trail_idx,
+                card_idx,
+                f"{name}: Decision Card must appear before trailing stock-local / footer content",
+            )
+
+    def test_brief_decision_card_respects_push_length_budget(self) -> None:
+        """Brief Decision Card must honor the documented push length budget.
+
+        Contract (templates/_macros.j2 decision_card compact='brief' + report_brief.j2):
+        - At most 2 non-empty body lines per stock (1 primary + optional 1 supplementary).
+        - Primary line keeps origin/main parity fields: signal_emoji, signal_text,
+          score label + sentiment_score, and one-sentence conclusion.
+        - After markdown_to_plain_text, a 10-stock watchlist must fit in one
+          Pushover message (src/notification_parts/senders/pushover_sender.py
+          max_length = 1024).
+        """
+        from src.formatters import markdown_to_plain_text
+
+        results = []
+        for i in range(10):
+            r = _make_result(
+                code=str(600519 + i),
+                name="贵州茅台",
+                sentiment_score=72,
+                operation_advice="买入",
+                analysis_summary="等待放量确认后再加仓",
+                decision_type="buy",
+                dashboard={
+                    "core_conclusion": {
+                        "one_sentence": "等待放量确认后再加仓",
+                        "time_sensitivity": "今日内",
+                        "position_advice": {
+                            "no_position": "观望",
+                            "has_position": "继续持有",
+                        },
+                    },
+                    "intelligence": {
+                        "risk_alerts": ["业绩不及预期", "板块轮动风险"],
+                    },
+                    "phase_decision": {
+                        "immediate_action": "等待确认",
+                        "watch_conditions": ["放量突破前高", "跌破支撑离场"],
+                        "confidence_reason": "数据质量可用",
+                    },
+                    "battle_plan": {
+                        "sniper_points": {
+                            "stop_loss": "110",
+                            "take_profit": "130",
+                        }
+                    },
+                },
+            )
+            r.confidence_level = "中"
+            results.append(r)
+
+        out = render("brief", results)
+        self.assertIsNotNone(out)
+        assert out is not None
+
+        # Per-stock line budget: body lines between first stock marker and
+        # the disclaimer line (exclude footer lines that start with '*').
+        body_start = out.find("**贵州茅台")
+        self.assertGreaterEqual(body_start, 0, out)
+        disclaimer_line_idx = out.find("*AI生成")
+        if disclaimer_line_idx < 0:
+            disclaimer_line_idx = out.find("不构成投资建议")
+        self.assertGreater(disclaimer_line_idx, body_start, out)
+        body = out[body_start:disclaimer_line_idx]
+        # Split into per-stock blocks on the stock name marker.
+        blocks = [b for b in body.split("**贵州茅台") if b.strip()]
+        self.assertEqual(len(blocks), 10, body)
+        for i, block in enumerate(blocks):
+            stock_block = "**贵州茅台" + block
+            non_empty = [
+                ln
+                for ln in stock_block.splitlines()
+                if ln.strip()
+                # Exclude italic footer lines (*disclaimer*) but keep **name** primaries.
+                and not (
+                    ln.strip().startswith("*") and not ln.strip().startswith("**")
+                )
+            ]
+            self.assertLessEqual(
+                len(non_empty),
+                2,
+                f"stock[{i}] exceeds 2-line brief budget ({len(non_empty)} lines):\n"
+                + "\n".join(non_empty),
+            )
+            # Primary-line parity with origin/main one-liner fields.
+            primary = non_empty[0]
+            self.assertRegex(primary, r"🟢|🟡|🔴")
+            self.assertIn("评分", primary)
+            self.assertIn("72", primary)
+            self.assertIn("等待放量确认后再加仓", primary)
+
+        plain = markdown_to_plain_text(out)
+        self.assertLessEqual(
+            len(plain),
+            1024,
+            f"brief plain text for 10 stocks exceeds Pushover max_length=1024 "
+            f"(len={len(plain)}):\n{plain}",
+        )
+
+    def test_english_decision_card_reuses_existing_labels(self) -> None:
+        r = _make_result(
+            name="Apple",
+            operation_advice="Buy",
+            analysis_summary="Momentum remains constructive.",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Buy on pullbacks"},
+                "intelligence": {"risk_alerts": ["Macro risk"]},
+                "phase_decision": {"watch_conditions": ["Break of support"]},
+            },
+        )
+        r.confidence_level = "High"
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("### 🃏", out)
+        self.assertIn("One-line Decision", out)
+        self.assertIn("Buy on pullbacks", out)
+        self.assertIn("Confidence", out)
+        self.assertIn("Risk Alerts", out)
+        self.assertIn("Watch Conditions", out)

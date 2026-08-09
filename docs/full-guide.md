@@ -117,7 +117,7 @@ stock-pulse-ai/
 | `SINGLE_STOCK_NOTIFY` | 单股推送模式：设为 `true` 则每分析完一只股票立即推送 | 可选 |
 | `REPORT_TYPE` | 报告类型：`simple`(精简)、`full`(完整)、`brief`(3-5句概括)，Docker环境推荐设为 `full` | 可选 |
 | `REPORT_LANGUAGE` | 报告与 Agent Chat 的默认输出语言：`zh`(默认中文) / `en`(英文) / `ko`(韩文)；会同步影响 Prompt、模板、通知 fallback、Web 报告页固定文案，以及未显式传入 `context.report_language` 的问股回复。`ko` 复用英文结构骨架并通过输出语言指令约束模型用韩文输出，通知按报告语言渲染本地化标签。仓库自带 `00-daily-analysis.yml` 已显式映射该变量，直接在 Actions Secrets/Variables 中配置即可生效 | 可选 |
-| `REPORT_MODE` | Jinja 报告呈现模式（`brief` / `standard` / `research`，默认 `standard`）。`brief` 仅 Decision Card + 关键风险；`standard` 为 Decision Card + 主要分析段落；`research` 为全量细节与完整 strata。硬性上限永不丢弃 Decision Card。单次可通过 `extra_context.report_mode` 覆盖。全局为 standard 时推送平台 brief/wechat 仍默认 brief。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
+| `REPORT_MODE` | Jinja 报告呈现模式（`brief` / `standard` / `research`，默认 `standard`）。`brief` 仅 Decision Card + 关键风险；`standard` 为 Decision Card + 主要分析段落；`research` 为全量细节与更高 strata 上限。硬性上限永不丢弃 Decision Card。单次可通过 `extra_context.report_mode` 覆盖。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
 | `REPORT_SUMMARY_ONLY` | 仅分析结果摘要：设为 `true` 时只推送汇总，不含个股详情；多股时适合快速浏览（默认 false，Issue #262） | 可选 |
 | `REPORT_SHOW_LLM_MODEL` | 通知报告底部是否显示本次分析使用的 LLM 模型名称，默认 `true`；设为 `false` 可隐藏运行时模型信息。该变量仅调整展示，不影响 provider/model/Base URL、LiteLLM 路由或运行时模型保存/迁移/清理语义。 | 可选 |
 | `REPORT_TEMPLATES_DIR` | Jinja2 模板目录（相对项目根，默认 `templates`） | 可选 |
@@ -1036,7 +1036,7 @@ P5 在个股分析报告的 `dashboard.phase_decision` 中追加阶段化决策�
 
 #### 报告三模式与 Decision Card（Issue #861）
 
-在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。Decision Card 仅用已有字段拼装；硬性上限永不丢弃决策卡；省略内容显式标注。全局 standard 时推送平台 brief/wechat 仍默认 brief。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
+在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
 
 #### 信号归因分析（Issue #1742）
 
@@ -1047,6 +1047,27 @@ Issue #1742 在个股分析报告的 `dashboard.signal_attribution` 中新增信
 - `generate_single_stock_report()`（单股推送报告）
 - `templates/report_markdown.j2`（Jinja2 模板）
 - `HistoryService._generate_single_stock_markdown()`（Web 历史抽屉）
+
+#### 报告 Decision Card 前置（Issue #861 Phase 1）
+
+Phase 1 只做呈现层重排：在 Jinja 报告模板的每只股票详情中，将「方向/评分、一句话结论、置信度、关键风险、观察/失效条件、止损止盈」等**已有字段**聚合成 Decision Card 并置顶展示。
+
+| 模板 | 行为 |
+| --- | --- |
+| `templates/report_markdown.j2` | 每只股票 `##` 标题下先渲染完整 Decision Card；原有「重要信息 / 核心结论 / 盘中护栏 / 作战计划」等段落整体后移，不删除。 |
+| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card（约 4–5 行）作为首屏内容；后续原有精简段落保留。 |
+| `templates/report_brief.j2` | 使用 brief 专用长度预算形态（`decision_card(..., compact='brief')`）：每股 **1 行主行 + 至多 1 行补充行**。主行保留与 `origin/main` 单行 brief 同等字段（信号 emoji/文案、评分、一句话结论），并标记 🃏；补充行最多打包 1 条风险 + 1 条观察条件（硬截断）。不输出 wechat 风格 5 行卡，也不在 brief 中重复止损/目标位（留给 wechat/markdown）。 |
+| 共享宏 | `templates/_macros.j2` 的 `decision_card`；`compact=false` 完整卡、`compact=true` 推送紧凑卡、`compact='brief'` 推送预算形态；字段缺失时省略对应行，不输出空卡字段。 |
+
+**brief 长度预算与体积影响**（相对未预算的 5 行紧凑卡）：
+- 契约依据：`ReportType.BRIEF`（3–5 句、适合移动端/推送）与 Pushover `max_length = 1024`（超长按 `\n\n` 分片）。
+- 目标：典型 10 只自选股的 brief 经 `markdown_to_plain_text` 后落在单条 Pushover 消息内；回归测试以 ≥10 只 fixture 锁定每股 ≤2 行与 plain 总长 ≤1024。
+- WeCom markdown 默认约 4000 字节：wechat 仍保留完整紧凑卡作首屏，常规 5–10 只规模可能比无卡时多 1 个分片，属有意取舍（首屏完整性优先），见 PR 证据中的字节/分片对照。
+
+边界与兼容：
+- 不改上游提取器、Prompt、Schema 或 notification 发送链；仅模板呈现。
+- 仅影响 `REPORT_RENDERER_ENABLED=true` 时的 Jinja 路径；默认关闭时仍走 `src/notification_parts/rendering.py` 硬编码 fallback。
+- 通知按 `###` / `---` 切块的逻辑仍以股票标题块为边界；Decision Card 使用 `### 🃏`（markdown）、wechat 紧凑多行块或 brief 预算行，不改变数据契约。
 
 归一化函数在 `_parse_response()` 和 `parse_dashboard_json()` 中显式调用，确保：
 - 字符串百分比转为 int（如 `"35%"` → `35`）

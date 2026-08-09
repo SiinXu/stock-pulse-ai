@@ -47,7 +47,6 @@ from src.schemas.decision_action import (
 from src.schemas.report_strata import resolve_report_strata
 from src.services.report_mode import (
     apply_list_limits_to_dashboard_view,
-    build_decision_card_payload,
     get_mode_limits,
     resolve_report_mode,
     truncation_notice,
@@ -321,13 +320,6 @@ def render(
         strata_model = resolve_report_strata(r, language=report_language)
         strata_public = strata_model.to_public_dict() if strata_model else None
         localized_trend = localize_trend_prediction(r.trend_prediction, report_language)
-        decision_card = build_decision_card_payload(
-            r,
-            signal_text=display_advice,
-            signal_emoji=se,
-            localized_trend=localized_trend,
-            limits=mode_limits,
-        )
         raw_dashboard = getattr(r, "dashboard", None) or {}
         if strata_public is not None and isinstance(raw_dashboard, dict):
             merged_dashboard = dict(raw_dashboard)
@@ -341,7 +333,7 @@ def render(
         limited_strata = limited_dashboard.get("report_strata") if limited_dashboard else strata_public
         if mode_limits.get("strata_style") == "none":
             limited_strata = None
-        total_omitted = int(decision_card.get("omitted_count") or 0) + int(list_omitted)
+        total_omitted = int(list_omitted)
         if not mode_limits.get("include_detail_sections"):
             detail_present = any(
                 [
@@ -365,7 +357,6 @@ def render(
             "localized_operation_advice": display_advice,
             "localized_trend_prediction": localized_trend,
             "report_strata": limited_strata,
-            "decision_card": decision_card,
             "dashboard_view": limited_dashboard,
             "omitted_count": total_omitted,
             "truncation_notice": truncation_notice(total_omitted, report_language),
@@ -424,6 +415,10 @@ def render(
         "report_language": report_language,
         "report_mode": report_mode,
         "mode_limits": mode_limits,
+        "report_truncation_notice": truncation_notice(
+            sum(int(item.get("omitted_count") or 0) for item in sorted_enriched),
+            report_language,
+        ),
         "models_used": models_used,
         "show_llm_model": show_llm_model,
         "market_status_line": market_status_line(),
@@ -455,6 +450,8 @@ def render(
         safe_extra_context.pop("labels", None)
         safe_extra_context.pop("report_language", None)
         safe_extra_context.pop("report_mode", None)
+        safe_extra_context.pop("mode_limits", None)
+        safe_extra_context.pop("report_truncation_notice", None)
         context.update(safe_extra_context)
 
     try:
@@ -464,7 +461,7 @@ def render(
         )
         template = env.get_template(template_name)
         return template.render(**context)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - Jinja failures preserve the legacy None fallback.
         log_safe_exception(
             logger,
             "Report rendering failed",

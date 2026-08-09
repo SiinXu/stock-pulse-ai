@@ -18,13 +18,6 @@ VALID_REPORT_MODES = frozenset(
     {REPORT_MODE_BRIEF, REPORT_MODE_STANDARD, REPORT_MODE_RESEARCH}
 )
 
-# Platform defaults when neither extra_context nor a non-default config forces a mode.
-_PLATFORM_DEFAULT_MODE = {
-    "brief": REPORT_MODE_BRIEF,
-    "wechat": REPORT_MODE_BRIEF,
-    "markdown": REPORT_MODE_STANDARD,
-}
-
 # Hard limits from issue #861. Decision Card itself is never omitted as a block;
 # individual card fields still honor character caps so the card stays scannable.
 _MODE_LIMITS: Dict[str, Dict[str, Any]] = {
@@ -119,7 +112,7 @@ def normalize_report_mode(value: Optional[str], *, default: str = REPORT_MODE_ST
 
 
 def resolve_report_mode(
-    platform: str,
+    _platform: str,
     *,
     explicit: Optional[str] = None,
     config_mode: Optional[str] = None,
@@ -128,31 +121,15 @@ def resolve_report_mode(
 
     Precedence:
     1. explicit per-request ``report_mode``
-    2. For push platforms (``brief`` / ``wechat``): brief unless config forces
-       ``brief`` or ``research`` (default ``standard`` still maps push → brief so
-       unconfigured installs stay push-friendly without dual long reports)
-    3. Config ``REPORT_MODE`` (default standard)
-    4. standard
+    2. Config ``REPORT_MODE`` (default standard)
+    3. standard
     """
     if explicit is not None and str(explicit).strip():
         return normalize_report_mode(str(explicit), default=REPORT_MODE_STANDARD)
 
-    platform_key = (platform or "").strip().lower()
-    config_normalized: Optional[str] = None
     if config_mode is not None and str(config_mode).strip():
-        config_normalized = normalize_report_mode(
-            str(config_mode), default=REPORT_MODE_STANDARD
-        )
-
-    if platform_key in ("brief", "wechat"):
-        if config_normalized in {REPORT_MODE_BRIEF, REPORT_MODE_RESEARCH}:
-            return config_normalized
-        # standard (default) or unset → push-oriented brief
-        return REPORT_MODE_BRIEF
-
-    if config_normalized is not None:
-        return config_normalized
-    return _PLATFORM_DEFAULT_MODE.get(platform_key, REPORT_MODE_STANDARD)
+        return normalize_report_mode(str(config_mode), default=REPORT_MODE_STANDARD)
+    return REPORT_MODE_STANDARD
 
 
 def get_mode_limits(mode: str) -> Dict[str, Any]:
@@ -208,99 +185,6 @@ def truncation_notice(omitted_count: int, report_language: str = "zh") -> str:
     return f"_（已省略 {omitted_count} 段/项，完整报告见 research 模式）_"
 
 
-def build_decision_card_payload(
-    result: Any,
-    *,
-    signal_text: str,
-    signal_emoji: str,
-    localized_trend: str,
-    limits: Mapping[str, Any],
-) -> Dict[str, Any]:
-    """Assemble a Decision Card dict from existing result/dashboard fields.
-
-    Missing fields are omitted (None / empty) rather than filled with placeholders.
-    List/character hard limits are applied; the card block itself is always returned.
-    """
-    dashboard = getattr(result, "dashboard", None) or {}
-    if not isinstance(dashboard, Mapping):
-        dashboard = {}
-    core = dashboard.get("core_conclusion") or {}
-    if not isinstance(core, Mapping):
-        core = {}
-    intel = dashboard.get("intelligence") or {}
-    if not isinstance(intel, Mapping):
-        intel = {}
-    battle = dashboard.get("battle_plan") or {}
-    if not isinstance(battle, Mapping):
-        battle = {}
-    phase_decision = dashboard.get("phase_decision") or {}
-    if not isinstance(phase_decision, Mapping):
-        phase_decision = {}
-    sniper = battle.get("sniper_points") or {}
-    if not isinstance(sniper, Mapping):
-        sniper = {}
-    pos_advice = core.get("position_advice") or {}
-    if not isinstance(pos_advice, Mapping):
-        pos_advice = {}
-
-    one_sentence_raw = core.get("one_sentence") or getattr(result, "analysis_summary", None) or ""
-    one_sentence, one_sentence_clipped = _clip_text(
-        one_sentence_raw, int(limits.get("one_sentence_max", 50))
-    )
-
-    risk_source: List[Any] = []
-    if isinstance(intel.get("risk_alerts"), list):
-        risk_source = list(intel.get("risk_alerts") or [])
-    elif getattr(result, "risk_warning", None):
-        risk_source = [getattr(result, "risk_warning")]
-
-    risks, risks_omitted, risks_char_trunc = _limit_string_list(
-        risk_source,
-        max_items=int(limits.get("max_risks", 3)),
-        max_chars=int(limits.get("risk_max_chars", 40)),
-    )
-
-    trigger_source: List[Any] = []
-    watch = phase_decision.get("watch_conditions")
-    if isinstance(watch, list):
-        trigger_source = list(watch)
-    triggers, triggers_omitted, triggers_char_trunc = _limit_string_list(
-        trigger_source,
-        max_items=int(limits.get("max_triggers", 2)),
-        max_chars=int(limits.get("trigger_max_chars", 40)),
-    )
-
-    confidence_level = str(getattr(result, "confidence_level", None) or "").strip()
-    confidence_reason = str(phase_decision.get("confidence_reason") or "").strip()
-    time_sensitivity = str(core.get("time_sensitivity") or "").strip()
-    immediate_action = str(phase_decision.get("immediate_action") or "").strip()
-    stop_loss = sniper.get("stop_loss")
-    take_profit = sniper.get("take_profit")
-
-    omitted = risks_omitted + triggers_omitted
-    truncated_fields = risks_char_trunc + triggers_char_trunc + (1 if one_sentence_clipped else 0)
-
-    return {
-        "signal_text": signal_text,
-        "signal_emoji": signal_emoji,
-        "score": getattr(result, "sentiment_score", None),
-        "one_sentence": one_sentence or None,
-        "trend": (localized_trend or "").strip() or None,
-        "confidence_level": confidence_level or None,
-        "confidence_reason": confidence_reason or None,
-        "immediate_action": immediate_action or None,
-        "time_sensitivity": time_sensitivity or None,
-        "position_no": str(pos_advice.get("no_position") or "").strip() or None,
-        "position_has": str(pos_advice.get("has_position") or "").strip() or None,
-        "risks": risks,
-        "triggers": triggers,
-        "stop_loss": stop_loss if stop_loss not in (None, "", "N/A") else None,
-        "take_profit": take_profit if take_profit not in (None, "", "N/A") else None,
-        "omitted_count": omitted,
-        "truncated_field_count": truncated_fields,
-    }
-
-
 def apply_list_limits_to_dashboard_view(
     dashboard: Optional[Mapping[str, Any]],
     limits: Mapping[str, Any],
@@ -315,25 +199,36 @@ def apply_list_limits_to_dashboard_view(
     view: Dict[str, Any] = dict(dashboard)
     omitted = 0
 
+    core = dict(view.get("core_conclusion") or {}) if isinstance(
+        view.get("core_conclusion"), Mapping
+    ) else {}
+    if core and core.get("one_sentence"):
+        clipped_summary, summary_truncated = _clip_text(
+            core["one_sentence"], int(limits.get("one_sentence_max", 50))
+        )
+        core["one_sentence"] = clipped_summary
+        omitted += int(summary_truncated)
+        view["core_conclusion"] = core
+
     intel = dict(view.get("intelligence") or {}) if isinstance(view.get("intelligence"), Mapping) else {}
     if intel:
         risks = intel.get("risk_alerts") if isinstance(intel.get("risk_alerts"), list) else []
-        limited_risks, risk_omitted, _ = _limit_string_list(
+        limited_risks, risk_omitted, risk_truncated = _limit_string_list(
             risks,
             max_items=int(limits.get("max_risks", 3)),
             max_chars=int(limits.get("risk_max_chars", 40)),
         )
-        omitted += risk_omitted
+        omitted += risk_omitted + risk_truncated
         if risks:
             intel["risk_alerts"] = limited_risks
 
         cats = intel.get("positive_catalysts") if isinstance(intel.get("positive_catalysts"), list) else []
-        limited_cats, cat_omitted, _ = _limit_string_list(
+        limited_cats, cat_omitted, cat_truncated = _limit_string_list(
             cats,
             max_items=int(limits.get("max_catalysts", 2)),
             max_chars=int(limits.get("risk_max_chars", 40)),
         )
-        omitted += cat_omitted
+        omitted += cat_omitted + cat_truncated
         if cats:
             intel["positive_catalysts"] = limited_cats
         view["intelligence"] = intel
@@ -341,12 +236,12 @@ def apply_list_limits_to_dashboard_view(
     phase = dict(view.get("phase_decision") or {}) if isinstance(view.get("phase_decision"), Mapping) else {}
     if phase:
         watch = phase.get("watch_conditions") if isinstance(phase.get("watch_conditions"), list) else []
-        limited_watch, watch_omitted, _ = _limit_string_list(
+        limited_watch, watch_omitted, watch_truncated = _limit_string_list(
             watch,
             max_items=int(limits.get("max_triggers", 2)),
             max_chars=int(limits.get("trigger_max_chars", 40)),
         )
-        omitted += watch_omitted
+        omitted += watch_omitted + watch_truncated
         if watch:
             phase["watch_conditions"] = limited_watch
         view["phase_decision"] = phase
@@ -421,6 +316,5 @@ __all__ = [
     "resolve_report_mode",
     "get_mode_limits",
     "truncation_notice",
-    "build_decision_card_payload",
     "apply_list_limits_to_dashboard_view",
 ]
