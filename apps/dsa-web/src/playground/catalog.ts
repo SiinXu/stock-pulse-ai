@@ -242,6 +242,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),
   entry('tasks', 'task-panel', 'TaskPanel', 'components/tasks/TaskPanel.tsx', ['default', 'loading', 'states']),
   entry('watchlist', 'home-stock-workspace', 'HomeStockWorkspace', 'components/watchlist/HomeStockWorkspace.tsx', ['interactive', 'loading', 'empty', 'error']),
+  entry('watchlist', 'home-watchlist-groups-section', 'HomeWatchlistGroupsSection', 'components/watchlist/HomeWatchlistGroupsSection.tsx', ['default', 'loading', 'error']),
+  entry('watchlist', 'watchlist-groups-panel', 'WatchlistGroupsPanel', 'components/watchlist/WatchlistGroupsPanel.tsx', ['interactive', 'empty', 'error']),
 ];
 
 export const PLAYGROUND_ENTRY_BY_ID = new Map(PLAYGROUND_CATALOG.map((item) => [item.id, item]));

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   collectHardcodedUiStrings,
+  collectHardcodedUiStringsFromSources,
   findHardcodedUiStrings,
   findUnusedUiStringAllowances,
   type HardcodedUiStringAllowance,
@@ -149,13 +150,15 @@ function productionCandidates(): ReturnType<typeof collectHardcodedUiStrings> {
   if (productionCandidateCache) {
     return productionCandidateCache;
   }
-  productionCandidateCache = collectSourceFiles(sourceRoot).flatMap((filename) => {
+  const candidateSources: Array<readonly [string, string]> = [];
+  for (const filename of collectSourceFiles(sourceRoot)) {
     const relative = path.relative(sourceRoot, filename);
     const sourceText = fs.readFileSync(filename, 'utf8');
-    return canContainUserCopyContext(filename, sourceText)
-      ? collectHardcodedUiStrings(relative, sourceText)
-      : [];
-  });
+    if (canContainUserCopyContext(filename, sourceText)) {
+      candidateSources.push([relative, sourceText]);
+    }
+  }
+  productionCandidateCache = collectHardcodedUiStringsFromSources(candidateSources);
   return productionCandidateCache;
 }
 
@@ -373,6 +376,17 @@ describe('hardcoded UI string scanner', () => {
     expect(findHardcodedUiStrings('other.tsx', sourceText, [allowance])).toHaveLength(1);
     expect(findHardcodedUiStrings('fixture.tsx', 'const View = () => <span>Stream</span>;', [allowance])).toHaveLength(1);
     expect(findHardcodedUiStrings('fixture.tsx', 'const View = () => <span title="JSON" />;', [allowance])).toHaveLength(1);
+  });
+
+  it('keeps batch results equivalent to isolated module scans', () => {
+    const sources = [
+      ['first.tsx', "const label = 'First label'; const View = () => <p>{label}</p>;"],
+      ['second.tsx', "const label = 'Second label'; const View = () => <p>{label}</p>;"],
+    ] as const;
+
+    expect(collectHardcodedUiStringsFromSources(sources)).toEqual(
+      sources.flatMap(([filename, source]) => collectHardcodedUiStrings(filename, source)),
+    );
   });
 });
 
