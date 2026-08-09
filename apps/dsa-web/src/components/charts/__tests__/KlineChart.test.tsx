@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ComponentProps } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { StockHistoryCandle } from '../../../types/stocks';
@@ -39,5 +39,33 @@ describe('KlineChart', () => {
   it('MA path', () => {
     renderChart(Array.from({ length: 12 }, (_, i) => candle(i + 1, 10 + i, 10.5 + i)), { maPeriods: [5] });
     expect(screen.getByTestId('kline-chart-ma5')).toBeInTheDocument();
+  });
+  it('computes moving averages from full history before slicing the viewport', () => {
+    renderChart(Array.from({ length: 25 }, (_, i) => candle(i + 1, 10 + i, 10.5 + i)), { maPeriods: [5] });
+    fireEvent.change(screen.getByTestId('kline-chart-zoom'), { target: { value: '1' } });
+    expect(screen.getByTestId('kline-chart-ma5').getAttribute('d')).toMatch(/^M99\.00 /);
+  });
+  it('exposes truthful date bounds, keeps five candles visible, and resets zoom for new data', async () => {
+    const initial = Array.from({ length: 25 }, (_, i) => candle(i + 1, 10 + i, 10.5 + i));
+    const rendered = renderChart(initial);
+    const zoom = screen.getByTestId('kline-chart-zoom');
+    expect(zoom).toHaveAttribute('max', '20');
+    fireEvent.change(zoom, { target: { value: '20' } });
+    expect(zoom).toHaveAttribute('aria-valuetext', 'Showing 2026-01-21 to 2026-01-25');
+
+    const replacement = Array.from({ length: 22 }, (_, i) => candle(i + 1, 30 + i, 30.5 + i));
+    rendered.rerender(
+      <UiLanguageProvider initialLanguage="en"><KlineChart candles={replacement} /></UiLanguageProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('kline-chart-zoom')).toHaveValue('0'));
+  });
+  it('uses shared market-aware price and localized volume formatting', () => {
+    renderChart([candle(1, 10, 11)], { market: 'hk' });
+    expect(screen.getByTestId('kline-chart-readout')).toHaveTextContent('HKD 10.000');
+    expect(screen.getByTestId('kline-chart-readout')).toHaveTextContent('1K');
+  });
+  it('guards non-finite chart height', () => {
+    renderChart([candle(1, 10, 11)], { height: Number.POSITIVE_INFINITY });
+    expect(screen.getByTestId('kline-chart-canvas').querySelector('svg')).toHaveAttribute('viewBox', '0 0 640 222');
   });
 });

@@ -3,11 +3,18 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { EmptyState, Surface } from '../common';
+import { DataTable, type DataTableColumn } from '../common/DataTable';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { CHARTS_TEXT } from '../../locales/charts';
 import { cn } from '../../utils/cn';
-import { normalizeRiskScore, riskScoreFill } from './chartUtils';
+import {
+  MAX_RISK_HEATMAP_CELLS,
+  MAX_RISK_HEATMAP_COLUMNS,
+  MAX_RISK_HEATMAP_ROWS,
+  normalizeRiskScore,
+  riskScoreFill,
+} from './chartUtils';
 
 export type RiskHeatmapCell = {
   rowId: string;
@@ -27,6 +34,14 @@ type NormalizedCell = {
   rowId: string; rowLabel: string; columnId: string; columnLabel: string; score: number | null;
 };
 
+type RiskRow = { id: string; label: string };
+
+const MAX_RISK_HEATMAP_INPUTS = MAX_RISK_HEATMAP_CELLS * 4;
+
+function coordinateKey(rowId: string, columnId: string): string {
+  return JSON.stringify([rowId, columnId]);
+}
+
 function levelLabel(level: ReturnType<typeof riskScoreFill>['level'], text: (typeof CHARTS_TEXT)['en']): string {
   switch (level) {
     case 'low': return text.riskLevelLow;
@@ -42,73 +57,105 @@ export const RiskHeatmap: React.FC<RiskHeatmapProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const text = CHARTS_TEXT[language];
-  const normalized = useMemo((): NormalizedCell[] => {
-    if (!cells || cells.length === 0) return [];
-    return cells.filter((c) => c && c.rowId && c.columnId).map((c) => ({
-      rowId: c.rowId, rowLabel: c.rowLabel || c.rowId,
-      columnId: c.columnId, columnLabel: c.columnLabel || c.columnId,
-      score: normalizeRiskScore(c.score),
-    }));
-  }, [cells]);
   const { rows, columns, matrix } = useMemo(() => {
     const rowMap = new Map<string, string>();
     const columnMap = new Map<string, string>();
     const cellMap = new Map<string, NormalizedCell>();
-    for (const cell of normalized) {
-      if (!rowMap.has(cell.rowId)) rowMap.set(cell.rowId, cell.rowLabel);
-      if (!columnMap.has(cell.columnId)) columnMap.set(cell.columnId, cell.columnLabel);
-      cellMap.set(`${cell.rowId}::${cell.columnId}`, cell);
+    for (const rawCell of cells?.slice(0, MAX_RISK_HEATMAP_INPUTS) ?? []) {
+      if (!rawCell) continue;
+      const rowId = typeof rawCell.rowId === 'string' ? rawCell.rowId.trim() : '';
+      const columnId = typeof rawCell.columnId === 'string' ? rawCell.columnId.trim() : '';
+      if (!rowId || !columnId) continue;
+      if (!rowMap.has(rowId) && rowMap.size >= MAX_RISK_HEATMAP_ROWS) continue;
+      if (!columnMap.has(columnId) && columnMap.size >= MAX_RISK_HEATMAP_COLUMNS) continue;
+      const rowLabel = typeof rawCell.rowLabel === 'string' && rawCell.rowLabel.trim()
+        ? rawCell.rowLabel.trim()
+        : rowId;
+      const columnLabel = typeof rawCell.columnLabel === 'string' && rawCell.columnLabel.trim()
+        ? rawCell.columnLabel.trim()
+        : columnId;
+      if (!rowMap.has(rowId)) rowMap.set(rowId, rowLabel);
+      if (!columnMap.has(columnId)) columnMap.set(columnId, columnLabel);
+      // The last valid declaration wins for duplicate row/column coordinates.
+      cellMap.set(coordinateKey(rowId, columnId), {
+        rowId,
+        rowLabel: rowMap.get(rowId) as string,
+        columnId,
+        columnLabel: columnMap.get(columnId) as string,
+        score: normalizeRiskScore(rawCell.score),
+      });
     }
     return {
       rows: [...rowMap.entries()].map(([id, label]) => ({ id, label })),
       columns: [...columnMap.entries()].map(([id, label]) => ({ id, label })),
       matrix: cellMap,
     };
-  }, [normalized]);
+  }, [cells]);
 
   if (rows.length === 0 || columns.length === 0) {
-    return <EmptyState data-testid={`${testId}-empty`} title={text.riskEmptyTitle} description={text.riskEmptyDescription} className={className} />;
+    return (
+      <div className={className} data-testid={testId}>
+        <EmptyState data-testid={`${testId}-empty`} title={text.riskEmptyTitle} description={text.riskEmptyDescription} />
+      </div>
+    );
   }
   const ariaLabel = formatUiText(text.riskChartLabel, { rows: String(rows.length), columns: String(columns.length) });
-  return (
-    <Surface level="section" padding="sm" className={cn('flex flex-col gap-3', className)} data-testid={testId}>
-      <p className="text-xs text-muted-text" data-testid={`${testId}-legend`}>{text.riskLegend}</p>
-      <div role="table" aria-label={ariaLabel} className="w-full overflow-x-auto" data-testid={`${testId}-grid`}>
-        <div role="rowgroup" className="inline-grid min-w-full gap-1"
-          style={{ gridTemplateColumns: `minmax(5.5rem, max-content) repeat(${columns.length}, minmax(4.5rem, 1fr))` }}>
-          <div role="row" className="contents">
-            <div role="columnheader" className="px-1 py-1 text-xs font-medium text-muted-text" />
-            {columns.map((column) => (
-              <div key={column.id} role="columnheader" className="px-1 py-1 text-center text-xs font-medium text-muted-text">{column.label}</div>
-            ))}
+  const tableColumns: DataTableColumn<RiskRow>[] = [
+    {
+      id: 'dimension',
+      header: text.riskDimension,
+      rowHeader: true,
+      nowrap: true,
+      cell: (row) => <span className="font-medium text-foreground">{row.label}</span>,
+    },
+    ...columns.map((column): DataTableColumn<RiskRow> => ({
+      id: `risk:${column.id}`,
+      header: column.label,
+      align: 'center',
+      cell: (row) => {
+        const cell = matrix.get(coordinateKey(row.id, column.id));
+        const score = cell?.score ?? null;
+        const fill = riskScoreFill(score);
+        const level = levelLabel(fill.level, text);
+        const scoreText = score === null ? text.riskMissing : score.toFixed(0);
+        const cellLabel = formatUiText(text.riskScore, { score: scoreText });
+        return (
+          <div
+            data-testid={`${testId}-cell-${row.id}-${column.id}`}
+            data-risk-level={fill.level}
+            aria-label={`${row.label}, ${column.label}, ${cellLabel}, ${level}`}
+            className={cn(
+              'flex min-h-14 flex-col items-center justify-center rounded-md border border-border/60 px-1 py-1 text-center',
+              fill.textClass,
+            )}
+            style={{ background: fill.background }}
+          >
+            <span className="text-sm font-semibold tabular-nums">{scoreText}</span>
+            <span className="text-label leading-tight text-muted-text">{level}</span>
           </div>
-          {rows.map((row) => (
-            <div key={row.id} role="row" className="contents">
-              <div role="rowheader" className="flex items-center px-1 py-1 text-xs font-medium text-foreground">{row.label}</div>
-              {columns.map((column) => {
-                const cell = matrix.get(`${row.id}::${column.id}`);
-                const score = cell?.score ?? null;
-                const fill = riskScoreFill(score);
-                const level = levelLabel(fill.level, text);
-                const scoreText = score === null ? text.riskMissing : score.toFixed(0);
-                const cellLabel = formatUiText(text.riskScore, { score: scoreText });
-                return (
-                  <div key={`${row.id}-${column.id}`} role="cell"
-                    data-testid={`${testId}-cell-${row.id}-${column.id}`} data-risk-level={fill.level}
-                    title={`${row.label} · ${column.label}: ${cellLabel} (${level})`}
-                    aria-label={`${row.label}, ${column.label}, ${cellLabel}, ${level}`}
-                    className={cn('flex min-h-14 flex-col items-center justify-center rounded-md border border-border/60 px-1 py-1 text-center', fill.textClass)}
-                    style={{ background: fill.background }}>
-                    <span className="text-sm font-semibold tabular-nums">{scoreText}</span>
-                    <span className="text-[10px] leading-tight text-muted-text">{level}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        );
+      },
+    })),
+  ];
+  return (
+    <div className={className} data-testid={testId}>
+      <Surface level="section" padding="sm" className="flex flex-col gap-3" data-testid={`${testId}-surface`}>
+      <p className="text-xs text-muted-text" data-testid={`${testId}-legend`}>{text.riskLegend}</p>
+      <div data-testid={`${testId}-grid`}>
+        <DataTable
+          caption={ariaLabel}
+          scrollAreaLabel={ariaLabel}
+          columns={tableColumns}
+          rows={rows}
+          getRowKey={(row) => row.id}
+          getRowTestId={(row) => `${testId}-row-${row.id}`}
+          emptyState={{ title: text.riskEmptyTitle, description: text.riskEmptyDescription }}
+          density="compact"
+          frame="embedded"
+          minWidth="container"
+        />
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-text" aria-hidden="true">
+      <div className="flex flex-wrap items-center gap-2 text-label text-muted-text" aria-hidden="true">
         {([['low', 12, text.riskLevelLow], ['medium', 40, text.riskLevelMedium], ['high', 65, text.riskLevelHigh], ['critical', 90, text.riskLevelCritical]] as const).map(([level, sample, label]) => {
           const fill = riskScoreFill(sample);
           return (
@@ -119,7 +166,8 @@ export const RiskHeatmap: React.FC<RiskHeatmapProps> = ({
           );
         })}
       </div>
-    </Surface>
+      </Surface>
+    </div>
   );
 };
 RiskHeatmap.displayName = 'RiskHeatmap';

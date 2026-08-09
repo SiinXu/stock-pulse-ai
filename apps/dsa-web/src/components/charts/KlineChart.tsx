@@ -7,15 +7,16 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { CHARTS_TEXT } from '../../locales/charts';
 import type { StockHistoryCandle } from '../../types/stocks';
-import { changeSemantics, type ChangeColorPreference, type MarketId } from '../../utils/marketFormat';
-import { cn } from '../../utils/cn';
+import { changeSemantics, formatPrice, type ChangeColorPreference, type MarketId } from '../../utils/marketFormat';
+import { formatUiNumber } from '../../utils/uiLocale';
 import {
   changeColorToCss, computeMovingAverages, directionMarker, directionWord,
-  priceExtent, sanitizeCandles, summarizeCandleSeries, volumeExtent, type ChartCandle,
+  normalizeMaPeriods, priceExtent, sanitizeCandles, summarizeCandleSeries, volumeExtent, type ChartCandle,
 } from './chartUtils';
 
 const DEFAULT_MA_PERIODS = [5, 10, 20] as const;
-const MA_STROKES = ['hsl(var(--primary))', 'hsl(var(--warning))', 'hsl(var(--color-purple))'] as const;
+const MA_STROKES = ['hsl(var(--primary))', 'hsl(var(--warning))', 'hsl(var(--info))'] as const;
+const MIN_VISIBLE_CANDLES = 5;
 
 export type KlineChartProps = {
   candles: readonly StockHistoryCandle[] | null | undefined;
@@ -28,20 +29,17 @@ export type KlineChartProps = {
   'data-testid'?: string;
 };
 
-function formatPrice(value: number | null): string {
+function formatChangePct(value: number | null, language: Parameters<typeof formatUiNumber>[1]): string {
   if (value === null || !Number.isFinite(value)) return '—';
-  const abs = Math.abs(value);
-  return value.toFixed(abs >= 1 ? 2 : 4);
+  return `${formatUiNumber(value, language, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    signDisplay: 'exceptZero',
+  })}%`;
 }
-function formatChangePct(value: number | null): string {
+function formatVolume(value: number | null, language: Parameters<typeof formatUiNumber>[1]): string {
   if (value === null || !Number.isFinite(value)) return '—';
-  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
-}
-function formatVolume(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return '—';
-  if (value >= 1e8) return `${(value / 1e8).toFixed(2)}e8`;
-  if (value >= 1e4) return `${(value / 1e4).toFixed(1)}e4`;
-  return String(Math.round(value));
+  return formatUiNumber(value, language, { notation: 'compact', maximumFractionDigits: 2 });
 }
 function buildMaPath(
   candles: readonly ChartCandle[], values: readonly (number | null)[],
@@ -64,21 +62,39 @@ export const KlineChart: React.FC<KlineChartProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const text = CHARTS_TEXT[language];
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [windowStart, setWindowStart] = useState(0);
   const sanitized = useMemo(() => sanitizeCandles(candles, market, colorPreference), [candles, market, colorPreference]);
-  const maxStart = Math.max(0, sanitized.length - 1);
+  const [hoverState, setHoverState] = useState<{ source: readonly ChartCandle[]; index: number | null }>(
+    () => ({ source: sanitized, index: null }),
+  );
+  const [windowState, setWindowState] = useState<{ source: readonly ChartCandle[]; start: number }>(
+    () => ({ source: sanitized, start: 0 }),
+  );
+  const hoverIndex = hoverState.source === sanitized ? hoverState.index : null;
+  const windowStart = windowState.source === sanitized ? windowState.start : 0;
+  const normalizedPeriods = useMemo(() => normalizeMaPeriods(maPeriods), [maPeriods]);
+  const fullMaSeries = useMemo(() => computeMovingAverages(sanitized, normalizedPeriods), [sanitized, normalizedPeriods]);
+  const maxStart = Math.max(0, sanitized.length - Math.min(MIN_VISIBLE_CANDLES, sanitized.length));
   const clampedStart = Math.min(Math.max(0, windowStart), maxStart);
   const visible = useMemo(() => (sanitized.length === 0 ? [] : sanitized.slice(clampedStart)), [sanitized, clampedStart]);
-  const maSeries = useMemo(() => computeMovingAverages(visible, maPeriods), [visible, maPeriods]);
-  const summary = useMemo(() => summarizeCandleSeries(visible, formatChangePct), [visible]);
+  const maSeries = useMemo(() => Object.fromEntries(
+    Object.entries(fullMaSeries).map(([key, values]) => [key, values.slice(clampedStart)]),
+  ), [fullMaSeries, clampedStart]);
+  const summary = useMemo(
+    () => summarizeCandleSeries(visible, (value) => formatChangePct(value, language)),
+    [visible, language],
+  );
 
   if (sanitized.length === 0) {
-    return <EmptyState data-testid={`${testId}-empty`} title={text.klineEmptyTitle} description={text.klineEmptyDescription} className={className} />;
+    return (
+      <div className={className} data-testid={testId}>
+        <EmptyState data-testid={`${testId}-empty`} title={text.klineEmptyTitle} description={text.klineEmptyDescription} />
+      </div>
+    );
   }
 
-  const volumeHeight = showVolume ? Math.round(height * 0.28) : 0;
-  const priceHeight = height - volumeHeight - (showVolume ? 8 : 0);
+  const chartHeight = Number.isFinite(height) ? Math.min(720, Math.max(200, height)) : 320;
+  const volumeHeight = showVolume ? Math.round(chartHeight * 0.28) : 0;
+  const priceHeight = chartHeight - volumeHeight - (showVolume ? 8 : 0);
   const width = 640, padLeft = 8, padRight = 8, padTop = 12, padBottom = 20;
   const plotWidth = width - padLeft - padRight;
   const plotHeight = priceHeight - padTop - padBottom;
@@ -95,15 +111,16 @@ export const KlineChart: React.FC<KlineChartProps> = ({
   const ariaLabel = formatUiText(text.klineChartLabel, { count: String(summary.count) });
   const summaryText = formatUiText(text.klineSummary, {
     start: visible[0]?.date ?? '—', end: visible[count - 1]?.date ?? '—',
-    first: formatPrice(summary.firstClose), last: formatPrice(summary.lastClose),
-    change: summary.changeText, high: formatPrice(summary.high), low: formatPrice(summary.low),
+    first: formatPrice(summary.firstClose, market, language), last: formatPrice(summary.lastClose, market, language),
+    change: summary.changeText, high: formatPrice(summary.high, market, language), low: formatPrice(summary.low, market, language),
   });
   const directionLabels = { up: text.klineLegendUp, down: text.klineLegendDown, flat: text.klineLegendFlat };
   const upPaint = changeColorToCss(changeSemantics(1, market, colorPreference).color);
   const downPaint = changeColorToCss(changeSemantics(-1, market, colorPreference).color);
 
   return (
-    <Surface level="section" padding="sm" className={cn('flex flex-col gap-2', className)} data-testid={testId}>
+    <div className={className} data-testid={testId}>
+      <Surface level="section" padding="sm" className="flex flex-col gap-2" data-testid={`${testId}-surface`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-text">
         <div className="flex flex-wrap items-center gap-3" data-testid={`${testId}-legend`}>
           <span className="inline-flex items-center gap-1">
@@ -113,7 +130,7 @@ export const KlineChart: React.FC<KlineChartProps> = ({
             <span aria-hidden="true" style={{ color: downPaint }}>{directionMarker('down')}</span>
             <span>{text.klineLegendDown}</span>
           </span>
-          {maPeriods.filter((p) => Number.isInteger(p) && p >= 1).map((period, index) => (
+          {normalizedPeriods.map((period, index) => (
             <span key={period} className="inline-flex items-center gap-1">
               <span className="inline-block h-0.5 w-3 rounded" style={{ background: MA_STROKES[index % MA_STROKES.length] }} aria-hidden="true" />
               {formatUiText(text.klineMa, { period: String(period) })}
@@ -125,12 +142,16 @@ export const KlineChart: React.FC<KlineChartProps> = ({
             <label className="inline-flex items-center gap-1">
               <span className="sr-only">{text.klineZoomIn}</span>
               <input type="range" min={0} max={maxStart} value={clampedStart}
-                onChange={(e) => setWindowStart(Number(e.target.value))}
+                onChange={(e) => setWindowState({ source: sanitized, start: Number(e.target.value) })}
                 aria-label={text.klineZoomIn} data-testid={`${testId}-zoom`}
+                aria-valuetext={formatUiText(text.klineZoomRange, {
+                  start: visible[0]?.date ?? '—',
+                  end: visible[count - 1]?.date ?? '—',
+                })}
                 className="h-1.5 w-28 accent-[hsl(var(--primary))]" />
             </label>
-            <button type="button" className="rounded border border-border px-1.5 py-0.5 text-[11px] text-foreground hover:bg-hover"
-              onClick={() => setWindowStart(0)} data-testid={`${testId}-zoom-reset`}>{text.klineZoomOut}</button>
+            <button type="button" className="rounded border border-border px-1.5 py-0.5 text-label text-foreground hover:bg-hover"
+              onClick={() => setWindowState({ source: sanitized, start: 0 })} data-testid={`${testId}-zoom-reset`}>{text.klineZoomOut}</button>
           </div>
         )}
       </div>
@@ -139,14 +160,15 @@ export const KlineChart: React.FC<KlineChartProps> = ({
         {' · '}
         <span aria-hidden="true" style={{ color: changeColorToCss(active.color) }}>{directionMarker(active.direction)}</span>
         {' '}<span className="sr-only">{directionWord(active.direction, directionLabels)}</span>
-        <span>{text.klineOpen} {formatPrice(active.open)}</span>{' '}
-        <span>{text.klineHigh} {formatPrice(active.high)}</span>{' '}
-        <span>{text.klineLow} {formatPrice(active.low)}</span>{' '}
-        <span>{text.klineClose} {formatPrice(active.close)}</span>
-        {showVolume && <>{' · '}<span>{text.klineVolume} {formatVolume(active.volume)}</span></>}
+        <span>{text.klineOpen} {formatPrice(active.open, market, language)}</span>{' '}
+        <span>{text.klineHigh} {formatPrice(active.high, market, language)}</span>{' '}
+        <span>{text.klineLow} {formatPrice(active.low, market, language)}</span>{' '}
+        <span>{text.klineClose} {formatPrice(active.close, market, language)}</span>
+        {showVolume && <>{' · '}<span>{text.klineVolume} {formatVolume(active.volume, language)}</span></>}
       </div>
       <div role="img" aria-label={`${ariaLabel}. ${summaryText}`} className="w-full" data-testid={`${testId}-canvas`}>
-        <svg viewBox={`0 0 ${width} ${priceHeight}`} className="h-auto w-full" preserveAspectRatio="none" onMouseLeave={() => setHoverIndex(null)}>
+        <svg viewBox={`0 0 ${width} ${priceHeight}`} className="h-auto w-full" preserveAspectRatio="none"
+          onMouseLeave={() => setHoverState({ source: sanitized, index: null })}>
           {[0.25, 0.5, 0.75].map((ratio) => {
             const y = padTop + plotHeight * ratio;
             return <line key={ratio} x1={padLeft} x2={width - padRight} y1={y} y2={y} stroke="hsl(var(--border))" strokeDasharray="3 3" />;
@@ -160,7 +182,7 @@ export const KlineChart: React.FC<KlineChartProps> = ({
             const stroke = changeColorToCss(candle.color);
             return (
               <g key={`${candle.date}-${index}`} data-testid={`${testId}-candle-${index}`}
-                onMouseEnter={() => setHoverIndex(index)} onFocus={() => setHoverIndex(index)}>
+                onMouseEnter={() => setHoverState({ source: sanitized, index })}>
                 <rect x={cx - slot / 2} y={padTop} width={slot} height={plotHeight} fill="transparent" />
                 <line x1={cx} x2={cx} y1={yHigh} y2={yLow} stroke={stroke} strokeWidth={index === activeIndex ? 1.5 : 1} />
                 <rect x={cx - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyH}
@@ -178,7 +200,7 @@ export const KlineChart: React.FC<KlineChartProps> = ({
             .filter((v, i, a) => a.indexOf(v) === i && v >= 0 && v < count)
             .map((index) => (
               <text key={`label-${index}`} x={xAt(index)} y={priceHeight - 4} textAnchor="middle"
-                className="fill-[hsl(var(--muted-text))]" fontSize={10}>{visible[index].date}</text>
+                className="fill-[hsl(var(--muted-text))] text-label">{visible[index].date}</text>
             ))}
         </svg>
         {showVolume && (
@@ -190,15 +212,17 @@ export const KlineChart: React.FC<KlineChartProps> = ({
               return (
                 <rect key={`vol-${candle.date}-${index}`} x={cx - bodyWidth / 2} y={volYAt(candle.volume)}
                   width={bodyWidth} height={Math.max(1, volumeHeight - volYAt(candle.volume))}
-                  fill={changeColorToCss(candle.color)} opacity={0.55} onMouseEnter={() => setHoverIndex(index)} />
+                  fill={changeColorToCss(candle.color)} opacity={0.55}
+                  onMouseEnter={() => setHoverState({ source: sanitized, index })} />
               );
             })}
-            <text x={padLeft} y={12} className="fill-[hsl(var(--muted-text))]" fontSize={10}>{text.klineVolume}</text>
+            <text x={padLeft} y={12} className="fill-[hsl(var(--muted-text))] text-label">{text.klineVolume}</text>
           </svg>
         )}
       </div>
       <p className="sr-only" data-testid={`${testId}-summary`}>{summaryText}</p>
-    </Surface>
+      </Surface>
+    </div>
   );
 };
 KlineChart.displayName = 'KlineChart';

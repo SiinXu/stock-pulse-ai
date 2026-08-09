@@ -15,6 +15,7 @@ const zh = {
   klineMa: 'MA{period}',
   klineZoomIn: '放大可见区间',
   klineZoomOut: '显示全部区间',
+  klineZoomRange: '当前显示 {start} 至 {end}',
   klineOpen: '开',
   klineHigh: '高',
   klineLow: '低',
@@ -22,13 +23,14 @@ const zh = {
   riskEmptyTitle: '暂无风险热力数据',
   riskEmptyDescription: '提供行/列维度与风险分数后即可渲染热力图。',
   riskChartLabel: '风险热力图，{rows} 行 × {columns} 列',
+  riskDimension: '标的',
   riskMissing: '缺失',
   riskScore: '风险分 {score}',
   riskLevelLow: '低',
   riskLevelMedium: '中',
   riskLevelHigh: '偏高',
   riskLevelCritical: '高',
-  riskLegend: '颜色表示风险强度，单元格内同时显示数值与等级文字。',
+  riskLegend: '风险分范围为 0–100：低 <25，中 25–49，偏高 50–74，高 75–100；缺失或无效值不参与分级。',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -43,6 +45,7 @@ const en: Record<keyof typeof zh, string> = {
   klineMa: 'MA{period}',
   klineZoomIn: 'Zoom visible range',
   klineZoomOut: 'Show full range',
+  klineZoomRange: 'Showing {start} to {end}',
   klineOpen: 'O',
   klineHigh: 'H',
   klineLow: 'L',
@@ -50,13 +53,14 @@ const en: Record<keyof typeof zh, string> = {
   riskEmptyTitle: 'No risk heatmap data',
   riskEmptyDescription: 'Provide row/column dimensions and risk scores to render the heatmap.',
   riskChartLabel: 'Risk heatmap, {rows} rows × {columns} columns',
+  riskDimension: 'Instrument',
   riskMissing: 'Missing',
   riskScore: 'Risk score {score}',
   riskLevelLow: 'Low',
   riskLevelMedium: 'Medium',
   riskLevelHigh: 'Elevated',
   riskLevelCritical: 'High',
-  riskLegend: 'Color encodes risk intensity; each cell also shows a numeric score and level label.',
+  riskLegend: 'Risk scores use 0–100: Low <25, Medium 25–49, Elevated 50–74, High 75–100; missing or invalid values are unclassified.',
 };
 
 export const CHARTS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord(

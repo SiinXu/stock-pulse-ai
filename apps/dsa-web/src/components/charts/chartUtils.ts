@@ -11,6 +11,8 @@ import {
 
 export function finiteNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return null;
   return numeric;
@@ -18,8 +20,19 @@ export function finiteNumber(value: unknown): number | null {
 
 export function normalizeRiskScore(value: unknown): number | null {
   const numeric = finiteNumber(value);
-  if (numeric === null) return null;
-  return Math.max(0, Math.min(100, numeric));
+  if (numeric === null || numeric < 0 || numeric > 100) return null;
+  return numeric;
+}
+
+const CANDLE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function canonicalCandleDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const date = value.trim();
+  if (!CANDLE_DATE_PATTERN.test(date)) return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
+  return date;
 }
 
 export type ChartCandle = {
@@ -39,9 +52,11 @@ export function sanitizeCandles(
   colorPreference?: ChangeColorPreference | null,
 ): ChartCandle[] {
   if (!candles || candles.length === 0) return [];
-  const result: ChartCandle[] = [];
+  const byDate = new Map<string, ChartCandle>();
   for (const candle of candles) {
-    if (!candle || typeof candle.date !== 'string' || !candle.date.trim()) continue;
+    if (!candle) continue;
+    const date = canonicalCandleDate(candle.date);
+    if (date === null) continue;
     const open = finiteNumber(candle.open);
     const close = finiteNumber(candle.close);
     if (open === null || close === null) continue;
@@ -49,14 +64,32 @@ export function sanitizeCandles(
     const lowRaw = finiteNumber(candle.low);
     const high = highRaw === null ? Math.max(open, close) : Math.max(highRaw, open, close);
     const low = lowRaw === null ? Math.min(open, close) : Math.min(lowRaw, open, close);
-    const volume = finiteNumber(candle.volume);
+    const volumeRaw = finiteNumber(candle.volume);
+    const volume = volumeRaw !== null && volumeRaw >= 0 ? volumeRaw : null;
     const semantics = changeSemantics(close - open, market, colorPreference);
-    result.push({
-      date: candle.date.trim(), open, high, low, close, volume,
+    // The last valid declaration wins so duplicate provider rows resolve predictably.
+    byDate.set(date, {
+      date, open, high, low, close, volume,
       direction: semantics.direction, color: semantics.color,
     });
   }
-  return result;
+  return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
+}
+
+export const MAX_MA_PERIOD = 200;
+export const MAX_MA_SERIES = 5;
+export const MAX_RISK_HEATMAP_ROWS = 40;
+export const MAX_RISK_HEATMAP_COLUMNS = 12;
+export const MAX_RISK_HEATMAP_CELLS = MAX_RISK_HEATMAP_ROWS * MAX_RISK_HEATMAP_COLUMNS;
+
+export function normalizeMaPeriods(periods: readonly number[]): number[] {
+  const normalized: number[] = [];
+  for (const period of periods) {
+    if (!Number.isInteger(period) || period < 1 || period > MAX_MA_PERIOD || normalized.includes(period)) continue;
+    normalized.push(period);
+    if (normalized.length === MAX_MA_SERIES) break;
+  }
+  return normalized;
 }
 
 export function computeMovingAverages(
@@ -108,10 +141,11 @@ export function riskScoreFill(score: number | null): {
   textClass: string;
   level: 'missing' | 'low' | 'medium' | 'high' | 'critical';
 } {
-  if (score === null) return { background: 'hsl(var(--muted) / 0.35)', textClass: 'text-muted-text', level: 'missing' };
-  if (score < 25) return { background: 'hsl(var(--success) / 0.22)', textClass: 'text-foreground', level: 'low' };
-  if (score < 50) return { background: 'hsl(var(--warning) / 0.28)', textClass: 'text-foreground', level: 'medium' };
-  if (score < 75) return { background: 'hsl(var(--warning) / 0.55)', textClass: 'text-foreground', level: 'high' };
+  const normalized = normalizeRiskScore(score);
+  if (normalized === null) return { background: 'hsl(var(--muted) / 0.35)', textClass: 'text-muted-text', level: 'missing' };
+  if (normalized < 25) return { background: 'hsl(var(--success) / 0.22)', textClass: 'text-foreground', level: 'low' };
+  if (normalized < 50) return { background: 'hsl(var(--warning) / 0.28)', textClass: 'text-foreground', level: 'medium' };
+  if (normalized < 75) return { background: 'hsl(var(--warning) / 0.55)', textClass: 'text-foreground', level: 'high' };
   return { background: 'hsl(var(--danger) / 0.55)', textClass: 'text-foreground', level: 'critical' };
 }
 
@@ -128,7 +162,10 @@ export function priceExtent(candles: readonly ChartCandle[], paddingRatio = 0.06
     const pad = Math.max(Math.abs(min) * 0.01, 1);
     return { min: min - pad, max: max + pad };
   }
-  const pad = (max - min) * paddingRatio;
+  const safePaddingRatio = Number.isFinite(paddingRatio) && paddingRatio >= 0
+    ? Math.min(paddingRatio, 0.5)
+    : 0.06;
+  const pad = (max - min) * safePaddingRatio;
   return { min: min - pad, max: max + pad };
 }
 

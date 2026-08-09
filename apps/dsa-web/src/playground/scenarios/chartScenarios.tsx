@@ -12,8 +12,10 @@ function buildDemoCandles(count: number): StockHistoryCandle[] {
     const open = close;
     const drift = Math.sin(index / 3) * 2.2 + (index % 5 === 0 ? -1.5 : 0.8);
     close = Math.max(40, open + drift);
+    const date = new Date(Date.UTC(2026, 0, 1));
+    date.setUTCDate(date.getUTCDate() + index);
     candles.push({
-      date: `2026-01-${String((index % 28) + 1).padStart(2, '0')}`,
+      date: date.toISOString().slice(0, 10),
       open: Number(open.toFixed(2)),
       high: Number((Math.max(open, close) + 1.2).toFixed(2)),
       low: Number((Math.min(open, close) - 1.1).toFixed(2)),
