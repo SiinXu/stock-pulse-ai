@@ -1142,6 +1142,19 @@ class _ConfigLoadingMethods:
                 os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
             ),
             multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
+            ocr_agent_tool_enabled=parse_env_bool(
+                os.getenv('OCR_AGENT_TOOL_ENABLED'), default=False
+            ),
+            ocr_file_root=os.getenv('OCR_FILE_ROOT', '').strip() or None,
+            ocr_langs=(
+                os.getenv('OCR_LANGS', 'chi_sim+eng').strip() or 'chi_sim+eng'
+            ),
+            ocr_timeout_seconds=parse_env_int(
+                os.getenv('OCR_TIMEOUT_SECONDS'),
+                30,
+                field_name='OCR_TIMEOUT_SECONDS',
+                minimum=1,
+            ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
