@@ -30,6 +30,7 @@ from src.services.security_audit_service import (
     get_security_audit_service,
     require_security_audit_recorder,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +235,13 @@ class McpProtocolServer:
         except SecurityAuditUnavailable:
             return _error_result("security_audit_unavailable", "Security audit storage is unavailable")
         except Exception as exc:  # broad-exception: fallback_recorded - Keep the official MCP session alive after a service boundary failure.
-            logger.exception("MCP tool %s failed", params.name)
+            log_safe_exception(
+                logger,
+                "MCP tool call failed",
+                exc,
+                error_code="mcp_tool_call_failed",
+                context={"tool_name": params.name},
+            )
             self._record_completion_if_available(
                 actor_type,
                 actor_id,

@@ -8,9 +8,13 @@ import json
 from types import SimpleNamespace
 from typing import Any, Callable
 
-from api.v1.schemas.analysis import AnalyzeRequest
 from src.mcp_server.config import McpServerConfig
 from src.mcp_server.errors import McpBusyError
+from src.services.analysis_submission_service import (
+    AnalysisSubmissionResult,
+    AnalysisSubmissionService,
+    build_submission_command,
+)
 from src.services.security_audit_service import (
     SecurityAuditRecorder,
     get_security_audit_service,
@@ -28,7 +32,7 @@ class McpToolHandlers:
         stock_service: Any = None,
         history_service: Any = None,
         portfolio_service: Any = None,
-        analysis_api_service: Any = None,
+        analysis_submission_service: Any = None,
         task_queue: Any = None,
         get_config: Callable[[], Any] | None = None,
         security_audit: SecurityAuditRecorder | None = None,
@@ -38,7 +42,7 @@ class McpToolHandlers:
         self._stock_service = stock_service
         self._history_service = history_service
         self._portfolio_service = portfolio_service
-        self._analysis_api_service = analysis_api_service
+        self._analysis_submission_service = analysis_submission_service
         self._task_queue = task_queue
         self._get_config = get_config
         self._security_audit = security_audit
@@ -65,12 +69,12 @@ class McpToolHandlers:
             self._portfolio_service = PortfolioService()
         return self._portfolio_service
 
-    def analysis_api_service(self) -> Any:
-        if self._analysis_api_service is None:
-            from api.v1.services.analysis_api_service import AnalysisApiService
-
-            self._analysis_api_service = AnalysisApiService()
-        return self._analysis_api_service
+    def analysis_submission_service(self) -> Any:
+        if self._analysis_submission_service is None:
+            self._analysis_submission_service = AnalysisSubmissionService(
+                get_task_queue=self.task_queue,
+            )
+        return self._analysis_submission_service
 
     def task_queue(self) -> Any:
         if self._task_queue is None:
@@ -186,20 +190,18 @@ class McpToolHandlers:
         codes = [stock_code] if stock_code else list(stock_codes or [])
         if len(codes) > self.config.analysis_max_stocks:
             raise ValueError(f"At most {self.config.analysis_max_stocks} stocks are allowed")
-        request = AnalyzeRequest(
-            stock_code=stock_code,
-            stock_codes=stock_codes,
+        command = build_submission_command(
+            stock_codes=codes,
             report_type=report_type,
             force_refresh=force_refresh,
-            async_mode=True,
             analysis_phase="auto",
         )
         result_box: dict[str, Any] = {}
 
         def submit(config: Any, _args: Any, _stock_codes: list[str] | None) -> None:
-            result_box["raw"] = self.analysis_api_service().trigger_analysis(
-                request,
-                config=config,
+            del config
+            result_box["raw"] = self.analysis_submission_service().submit(
+                command,
                 security_audit=self.security_audit(),
             )
 
@@ -216,6 +218,27 @@ class McpToolHandlers:
 
 
 def _normalize_analysis_trigger_result(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, AnalysisSubmissionResult):
+        accepted = [
+            {
+                "task_id": task.task_id,
+                "stock_code": task.stock_code,
+                "status": "pending",
+                "analysis_phase": task.analysis_phase,
+            }
+            for task in raw.accepted_tasks
+        ]
+        duplicates = [
+            {
+                "stock_code": duplicate.stock_code,
+                "existing_task_id": duplicate.existing_task_id,
+                "message": str(duplicate),
+            }
+            for duplicate in raw.duplicate_errors
+        ]
+        if len(accepted) == 1 and not duplicates:
+            return accepted[0]
+        return {"accepted": accepted, "duplicates": duplicates}
     if raw is None:
         return {"status": "accepted"}
     if hasattr(raw, "body") and hasattr(raw, "status_code"):

@@ -26,6 +26,7 @@ from src.services.security_audit_service import (
     get_security_audit_service,
     require_security_audit_recorder,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -289,11 +290,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return run()
     except McpServerDisabledError as exc:
-        logger.error("%s", exc)
+        log_safe_exception(
+            logger,
+            "MCP server is disabled",
+            exc,
+            error_code="mcp_server_disabled",
+        )
         return 2
     except (McpConfigError, McpServerStartError) as exc:
-        logger.error("%s", exc)
+        log_safe_exception(
+            logger,
+            "MCP server configuration or startup failed",
+            exc,
+            error_code="mcp_server_start_failed",
+        )
         return 3
     except Exception as exc:  # broad-exception: fallback_recorded - Dedicated process entry logs and exits nonzero on fatal startup/runtime failure.
-        logger.exception("MCP server failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "MCP server failed",
+            exc,
+            error_code="mcp_server_failed",
+        )
         return 1

@@ -5,13 +5,16 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from api.v1.schemas.analysis import AnalyzeRequest
 import pytest
 
 from src.mcp_server.config import ALL_MCP_SCOPES, McpServerConfig
 from src.mcp_server.errors import McpBusyError
 from src.mcp_server.handlers import McpToolHandlers
 from src.mcp_server.tools import call_tool
+from src.services.analysis_submission_service import (
+    AnalysisSubmissionCommand,
+    AnalysisSubmissionResult,
+)
 
 
 def _config(**overrides) -> McpServerConfig:
@@ -48,19 +51,20 @@ def test_busy_submission_never_calls_analysis_service() -> None:
     analysis = MagicMock()
     handlers = McpToolHandlers(
         config=_config(),
-        analysis_api_service=analysis,
+        analysis_submission_service=analysis,
         get_config=lambda: SimpleNamespace(),
         run_with_lock=lambda *args, **kwargs: False,
         security_audit=MagicMock(),
     )
     with pytest.raises(McpBusyError):
         handlers.trigger_analysis(stock_code="600519")
-    analysis.trigger_analysis.assert_not_called()
+    analysis.submit.assert_not_called()
 
 
 def test_trigger_submits_typed_async_request_under_global_lock() -> None:
     analysis = MagicMock()
-    analysis.trigger_analysis.return_value = {"task_id": "t1", "status": "pending"}
+    task = SimpleNamespace(task_id="t1", stock_code="600519", analysis_phase="auto")
+    analysis.submit.return_value = AnalysisSubmissionResult((task,), ())
     lock_modes: list[bool] = []
 
     def fake_lock(runner, config, args, stock_codes, *, blocking=True):
@@ -71,16 +75,16 @@ def test_trigger_submits_typed_async_request_under_global_lock() -> None:
     audit = MagicMock()
     handlers = McpToolHandlers(
         config=_config(),
-        analysis_api_service=analysis,
+        analysis_submission_service=analysis,
         get_config=lambda: SimpleNamespace(name="cfg"),
         run_with_lock=fake_lock,
         security_audit=audit,
     )
     result = handlers.trigger_analysis(stock_code="600519")
-    request = analysis.trigger_analysis.call_args.args[0]
-    assert isinstance(request, AnalyzeRequest)
-    assert request.async_mode is True
-    assert analysis.trigger_analysis.call_args.kwargs["security_audit"] is audit
+    request = analysis.submit.call_args.args[0]
+    assert isinstance(request, AnalysisSubmissionCommand)
+    assert request.stock_codes == ("600519",)
+    assert analysis.submit.call_args.kwargs["security_audit"] is audit
     assert lock_modes == [False]
     assert result["task_id"] == "t1"
 
@@ -88,7 +92,7 @@ def test_trigger_submits_typed_async_request_under_global_lock() -> None:
 def test_trigger_rejects_more_than_configured_cost_budget() -> None:
     handlers = McpToolHandlers(
         config=_config(analysis_max_stocks=2),
-        analysis_api_service=MagicMock(),
+        analysis_submission_service=MagicMock(),
         run_with_lock=lambda *args, **kwargs: True,
         security_audit=MagicMock(),
     )
