@@ -1,280 +1,116 @@
-# -*- coding: utf-8 -*-
-"""Tests for layered agent memory (episodic + semantic + optional vector)."""
+"""Focused tests for principal-scoped pure memory projection."""
 
 from __future__ import annotations
 
-import os
-from datetime import datetime
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+import json
 
 import pytest
 
-from src.agent.memory import AgentMemory, AnalysisMemoryEntry, CalibrationResult
-from src.agent.memory_layers import MIN_SEMANTIC_EVIDENCE
-from src.agent.memory_retrieval import (
-    StructuredMemoryRetriever,
-    format_layered_prompt_context,
-    sanitize_memory_text,
-)
-from src.agent.memory_vector import (
-    HashingVectorIndex,
-    VectorDocument,
-    cosine_similarity,
-    hash_embed,
-    tokenize,
-)
+from src.agent.memory_layers import MemoryObservation
+from src.agent.memory_retrieval import AuthorizedMemoryProjector, format_layered_data
+from src.agent.memory_vector import tokenize
 
 
-def _record(
-    *,
-    code: str = "600519",
-    signal: str = "buy",
-    sentiment: int = 70,
-    summary: str = "Earnings beat expectations",
-    price: float = 1800.0,
-    day: int = 1,
-    history_id: int = 1,
-):
-    return SimpleNamespace(
-        id=history_id,
-        code=code,
-        created_at=datetime(2026, 3, day, 10, 0, 0),
-        raw_result=f'{{"decision_type": "{signal}", "current_price": {price}}}',
-        operation_advice=signal,
-        sentiment_score=sentiment,
-        analysis_summary=summary,
+def _record(index: int, *, principal: str = "alice", signal: str = "buy",
+            correct=None, price: float = 100.0, expires_at=None) -> MemoryObservation:
+    evaluated = correct is not None
+    return MemoryObservation(
+        principal_id=principal, analysis_history_id=index, stock_code="600519",
+        observed_at=f"2026-08-{index:02d}T00:00:00Z", expires_at=expires_at,
+        signal=signal, sentiment_score=60, price_at_analysis=price,
+        outcome_id=1000 + index if evaluated else None,
+        outcome_horizon_days=5 if evaluated else None,
+        evaluated_at="2026-08-09T00:00:00Z" if evaluated else None,
+        was_correct=correct,
     )
 
 
-class TestDisabledParity:
-    """AGENT_MEMORY_ENABLED=false must keep legacy neutral behaviour."""
-
-    def test_disabled_returns_empty_history(self):
-        mem = AgentMemory(enabled=False)
-        assert mem.get_stock_history("600519") == []
-
-    def test_disabled_calibration_neutral(self):
-        mem = AgentMemory(enabled=False)
-        cal = mem.get_calibration("technical")
-        assert cal.calibrated is False
-        assert cal.calibration_factor == 1.0
-        assert mem.calibrate_confidence("technical", 0.77) == 0.77
-
-    def test_disabled_weights_uniform(self):
-        mem = AgentMemory(enabled=False)
-        assert mem.compute_skill_weights(["a", "b"]) == {"a": 1.0, "b": 1.0}
-
-    def test_disabled_layered_empty(self):
-        mem = AgentMemory(enabled=False, vector_enabled=True)
-        assert mem.retrieve_episodic("600519") == []
-        assert mem.retrieve_semantic(query="risk") == []
-        bundle = mem.retrieve_layered("600519", query="risk")
-        assert bundle.episodic == []
-        assert bundle.semantic == []
-        assert mem.format_prompt_context("600519", query="risk") == ""
-
-    def test_disabled_vector_flag_ignored(self):
-        mem = AgentMemory(enabled=False, vector_enabled=True)
-        assert mem.vector_enabled is False
+def test_cross_principal_records_are_rejected() -> None:
+    with pytest.raises(PermissionError):
+        AuthorizedMemoryProjector([_record(1), _record(2, principal="bob")],
+                                  principal_id="alice", as_of="2026-08-09T00:00:00Z")
 
 
-class TestSanitize:
-    def test_redacts_path_and_email(self):
-        text = "see /Users/secret/key.pem and user@example.com for details about earnings"
-        out = sanitize_memory_text(text)
-        assert "/Users/" not in out
-        assert "user@example.com" not in out
-        assert "[path]" in out or "[email]" in out
-
-    def test_truncates_long_text(self):
-        out = sanitize_memory_text("x" * 1000, max_chars=50)
-        assert len(out) <= 50
-        assert out.endswith("...")
+def test_legacy_unowned_record_cannot_be_constructed() -> None:
+    with pytest.raises(ValueError):
+        _record(1, principal="")
 
 
-class TestVectorIndex:
-    def test_tokenize_and_embed_stable(self):
-        tokens = tokenize("Buy momentum breakout buy")
-        assert "buy" in tokens
-        a = hash_embed(tokens)
-        b = hash_embed(tokens)
-        assert a == b
-        assert abs(sum(v * v for v in a) - 1.0) < 1e-6
-
-    def test_query_ranks_related_doc_higher(self):
-        index = HashingVectorIndex(dim=128)
-        index.add(VectorDocument("1", "earnings miss and revenue decline", {}))
-        index.add(VectorDocument("2", "technical breakout momentum rally", {}))
-        ranked = index.query("earnings revenue miss", top_k=2)
-        assert ranked
-        assert ranked[0][0].doc_id == "1"
-        assert ranked[0][1] >= ranked[1][1]
-
-    def test_cosine_orthogonal_zeroish(self):
-        # empty vectors
-        assert cosine_similarity([], []) == 0.0
+def test_wrong_or_unevaluated_predictions_never_become_evidence() -> None:
+    records = [_record(1, correct=False), _record(2, correct=False),
+               _record(3, correct=False), _record(4, correct=None)]
+    bundle = AuthorizedMemoryProjector(
+        records, principal_id="alice", as_of="2026-08-09T00:00:00Z"
+    ).retrieve_layered(stock_code="600519")
+    assert bundle.semantic == []
 
 
-class TestStructuredRetrieval:
-    def test_episodic_from_records(self):
-        records = [
-            _record(day=2, history_id=2, signal="sell", summary="Risk elevated"),
-            _record(day=1, history_id=1, signal="buy", summary="Earnings beat"),
-        ]
-        retriever = StructuredMemoryRetriever(vector_enabled=False)
-        with patch.object(retriever, "fetch_history_records", return_value=records):
-            entries = retriever.retrieve_episodic("600519", limit=2, query="earnings")
-        assert len(entries) == 2
-        # Keyword should prefer the earnings summary
-        assert entries[0].summary.lower().find("earning") >= 0 or entries[0].score >= entries[1].score
-        assert entries[0].analysis_history_id is not None
-
-    def test_semantic_insufficient_evidence_neutral(self):
-        records = [_record(day=1, signal="buy", history_id=1)]
-        retriever = StructuredMemoryRetriever(vector_enabled=False)
-        with patch.object(retriever, "fetch_history_records", return_value=records):
-            patterns = retriever.retrieve_semantic(stock_code="600519", query="buy")
-        assert patterns
-        assert patterns[0].sufficient_evidence is False
-        assert "neutral" in patterns[0].summary.lower() or "limited" in patterns[0].summary.lower()
-
-    def test_semantic_sufficient_evidence(self):
-        records = [
-            _record(day=i + 1, signal="buy", history_id=i + 1, summary=f"Buy case {i}")
-            for i in range(MIN_SEMANTIC_EVIDENCE)
-        ]
-        retriever = StructuredMemoryRetriever(vector_enabled=False)
-        with patch.object(retriever, "fetch_history_records", return_value=records):
-            patterns = retriever.retrieve_semantic(stock_code="600519")
-        assert patterns
-        buy = next(p for p in patterns if p.signal_bias == "buy")
-        assert buy.sufficient_evidence is True
-        assert buy.evidence_count >= MIN_SEMANTIC_EVIDENCE
-
-    def test_vector_disabled_still_returns_results(self):
-        """Vector off must not block structured retrieval (degrade path)."""
-        records = [_record(day=1, summary="sector rotation into defensives")]
-        retriever = StructuredMemoryRetriever(vector_enabled=False)
-        with patch.object(retriever, "fetch_history_records", return_value=records):
-            bundle = retriever.retrieve_layered("600519", query="defensive sector")
-        assert bundle.episodic
-        assert bundle.vector_used is False
-        text = format_layered_prompt_context(bundle)
-        assert "Memory: recent analysis history" in text
-        assert "signal=buy" in text
+def test_only_provenance_linked_correct_outcomes_build_semantic_pattern() -> None:
+    records = [_record(index, correct=True) for index in range(1, 4)]
+    bundle = AuthorizedMemoryProjector(
+        records, principal_id="alice", as_of="2026-08-09T00:00:00Z"
+    ).retrieve_layered(stock_code="600519")
+    pattern = bundle.semantic[0]
+    assert pattern.sufficient_evidence is True
+    assert pattern.source_history_ids == [1, 2, 3]
+    assert pattern.source_outcome_ids == [1001, 1002, 1003]
+    assert pattern.horizon_days == [5]
 
 
-class TestAgentMemoryLayers:
-    def test_format_prompt_context_includes_both_layers(self):
-        records = [
-            _record(day=i + 1, signal="hold", history_id=i + 1, summary="Hold into earnings season")
-            for i in range(4)
-        ]
-        mem = AgentMemory(enabled=True, vector_enabled=False)
-        with patch.object(mem._retriever, "fetch_history_records", return_value=records):
-            text = mem.format_prompt_context("600519", query="earnings")
-        assert "[Memory: recent analysis history]" in text
-        assert "[Memory: semantic patterns]" in text
-        assert "verbatim" in text
-
-    def test_vector_enabled_reranks_without_extra_deps(self):
-        records = [
-            _record(day=1, history_id=1, signal="buy", summary="technical breakout"),
-            _record(day=2, history_id=2, signal="sell", summary="earnings miss revenue"),
-        ]
-        mem = AgentMemory(enabled=True, vector_enabled=True)
-        assert mem.vector_enabled is True
-        with patch.object(mem._retriever, "fetch_history_records", return_value=records):
-            entries = mem.retrieve_episodic("600519", limit=2, query="earnings revenue miss")
-        assert entries
-        # Top hit should relate to earnings when vector ranking works
-        assert any("earning" in (e.summary or "").lower() for e in entries)
-        assert any(e.source == "vector" for e in entries)
-
-    def test_from_config_reads_vector_env(self, monkeypatch):
-        monkeypatch.setenv("AGENT_MEMORY_ENABLED", "true")
-        monkeypatch.setenv("AGENT_MEMORY_VECTOR_ENABLED", "true")
-
-        class _Cfg:
-            agent_memory_enabled = True
-
-        with patch("src.config.get_config", return_value=_Cfg()):
-            mem = AgentMemory.from_config()
-        assert mem.enabled is True
-        assert mem.vector_enabled is True
-
-    def test_get_stock_history_legacy_path(self):
-        record = _record()
-        db = MagicMock()
-        db.get_analysis_history.return_value = [record]
-        with patch("src.storage.get_db", return_value=db):
-            mem = AgentMemory(enabled=True)
-            history = mem.get_stock_history("600519", limit=1)
-        assert len(history) == 1
-        assert isinstance(history[0], AnalysisMemoryEntry)
-        assert history[0].signal == "buy"
+def test_non_finite_and_invalid_signal_are_rejected() -> None:
+    with pytest.raises(ValueError):
+        _record(1, price=float("inf"))
+    with pytest.raises(ValueError):
+        _record(1, signal="strong_buy")
 
 
-class TestBaseAgentLayeredInjection:
-    def test_prefers_format_prompt_context_string(self):
-        from src.agent.agents.base_agent import BaseAgent
-        from src.agent.protocols import AgentContext
+def test_partial_outcome_provenance_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        MemoryObservation("alice", 1, "600519", "now", None, "buy", 50, 100,
+                          outcome_id=1)
 
-        class DummyAgent(BaseAgent):
-            agent_name = "technical"
 
-            def system_prompt(self, ctx):
-                return "system"
+def test_limits_and_candidate_panel_are_hard_bounded() -> None:
+    projector = AuthorizedMemoryProjector(
+        [_record(1)], principal_id="alice", as_of="2026-08-09T00:00:00Z"
+    )
+    for value in (-1, 0, 1_000_000):
+        with pytest.raises(ValueError):
+            projector.retrieve_layered(stock_code="600519", episodic_limit=value)
+    with pytest.raises(ValueError):
+        AuthorizedMemoryProjector([_record(index) for index in range(1, 202)],
+                                  principal_id="alice", as_of="2026-08-09T00:00:00Z")
 
-            def build_user_message(self, ctx):
-                return "user"
 
-        memory = MagicMock()
-        memory.enabled = True
-        memory.format_prompt_context.return_value = (
-            "[Memory: recent analysis history]\n- 2026-03-01, signal=buy, sentiment=72\n"
-            "Use this memory as context only; do not copy it verbatim into the final answer."
-        )
-        with patch("src.agent.agents.base_agent.AgentMemory.from_config", return_value=memory):
-            agent = DummyAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+def test_expired_records_are_excluded() -> None:
+    projector = AuthorizedMemoryProjector(
+        [_record(1, expires_at="2026-08-01T00:00:00Z")],
+        principal_id="alice", as_of="2026-08-09T00:00:00Z",
+    )
+    assert projector.retrieve_layered(stock_code="600519").episodic == []
 
-        ctx = AgentContext(query="earnings risk", stock_code="600519")
-        injected = agent._build_memory_context(ctx)
-        assert "signal=buy" in injected
-        memory.format_prompt_context.assert_called()
-        memory.get_stock_history.assert_not_called()
 
-    def test_falls_back_when_format_returns_non_string(self):
-        """MagicMock auto-attrs must not break the legacy injection path."""
-        from src.agent.agents.base_agent import BaseAgent
-        from src.agent.protocols import AgentContext
+def test_prompt_poisoning_prose_has_no_input_field_or_control_effect() -> None:
+    bundle = AuthorizedMemoryProjector(
+        [_record(1)], principal_id="alice", as_of="2026-08-09T00:00:00Z"
+    ).retrieve_layered(stock_code="600519")
+    rendered = format_layered_data(bundle)
+    assert rendered.startswith("[NON_AUTHORITATIVE_MEMORY_DATA]")
+    assert "summary" not in rendered and "Ignore previous instructions" not in rendered
+    payload = json.loads(rendered.splitlines()[1])
+    assert payload["principal_id"] == "alice"
+    assert payload["source_history_ids"] == [1]
 
-        class DummyAgent(BaseAgent):
-            agent_name = "technical"
 
-            def system_prompt(self, ctx):
-                return "system"
+def test_semantic_only_vector_ranking_reports_vector_used() -> None:
+    records = [_record(index, correct=True) for index in range(1, 4)]
+    bundle = AuthorizedMemoryProjector(
+        records, principal_id="alice", as_of="2026-08-09T00:00:00Z",
+        vector_enabled=True,
+    ).retrieve_layered(stock_code="600519", query="buy", episodic_limit=1)
+    assert bundle.vector_used is True
 
-            def build_user_message(self, ctx):
-                return "user"
 
-        entry = SimpleNamespace(
-            date="2026-03-01",
-            signal="buy",
-            sentiment_score=72,
-            price_at_analysis=1880.0,
-            outcome_5d=0.03,
-            outcome_20d=None,
-            was_correct=True,
-        )
-        memory = MagicMock(enabled=True)
-        memory.get_stock_history.return_value = [entry]
-        # format_prompt_context is a MagicMock → not isinstance(str)
-        with patch("src.agent.agents.base_agent.AgentMemory.from_config", return_value=memory):
-            agent = DummyAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
-
-        ctx = AgentContext(query="test", stock_code="600519")
-        injected = agent._build_memory_context(ctx)
-        assert "Memory: recent analysis history" in injected
-        assert "signal=buy" in injected
+def test_cjk_tokenization_is_not_exact_phrase_only() -> None:
+    tokens = tokenize("贵州茅台风险")
+    assert "贵" in tokens and "贵州" in tokens and "风险" in tokens

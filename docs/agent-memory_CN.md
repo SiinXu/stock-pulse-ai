@@ -1,30 +1,24 @@
-# Agent 记忆契约（情景 + 语义）
+# Principal-scoped Agent 记忆投影基础
 
-本文对应 Issue #250 引入的分层 Agent 记忆。完整英文契约见 [`agent-memory.md`](./agent-memory.md)。
+**状态**：Issue [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198) 的纯函数基础切片
 
-## 本轮交付范围
+**English**: [agent-memory.md](agent-memory.md)
 
-| 层级 | 状态 | 说明 |
-| --- | --- | --- |
-| 短期工作记忆 | 沿用现有 | `AgentContext` / 预取数据 / 消息列表 |
-| 情景（episodic） | **已交付** | 指向具体历史分析（`AnalysisHistory`） |
-| 语义（semantic） | **已交付** | 跨分析提炼的信号偏好/模式；样本不足保持中性表述 |
-| 长期用户偏好 | **延后** | 风险偏好、沟通风格等用户画像本轮不做 |
+三个 `src/agent/memory_*` 模块只投影调用方已授权的记录；不读存储、不推断 owner、不持久化/缓存派生结果、不注入生产 prompt。既有 `AgentMemory` 与 `BaseAgent` 行为不变。
 
-## 开关
+## 契约
 
-- `AGENT_MEMORY_ENABLED=false`（默认）：全部 API 返回空/中性，与改动前一致
-- `AGENT_MEMORY_VECTOR_ENABLED=false`（默认）：纯结构化检索；开启后使用进程内 hashing 向量重排（无 faiss/chroma 依赖）
+- 每条记录必须有 `principal_id`；跨 principal 行、重复 id 和 legacy 无 owner 行均被拒绝。
+- 输入最多 200 条；输出 limit 必须为正且最多 3；过期记录排除。
+- signal 规范化；数值有限且有范围；outcome id、5/20 日 horizon、evaluation time 和 correctness 必须成组出现。
+- 错误/未评估预测只是 observation；semantic evidence 仅使用带 provenance 的正确 outcome。
+- 投影仅含 typed fact 与 source id，不含历史模型 prose，并序列化为 `NON_AUTHORITATIVE_MEMORY_DATA` 中的有界 strict JSON。
+- vector 粗排只能显式开启，不新增配置；CJK unigram/bigram 支持粗排；`vector_used` 覆盖任一层。
 
-## 注入与安全
+## 剩余范围
 
-- 注入摘要经脱敏（密钥模式、路径、邮箱）并限长
-- 样本不足时不强化结论（与 skill 权重服务的中性原则一致）
-- 无新建持久记忆表；回滚 = revert，无需 drop 表
+生产使用仍需权威 principal 与 legacy migration、按用户/层 consent、view/export/correct/delete/clear、retention、派生删除/cache invalidation、run audit 及带 owner 的存储查询。两个 issue 均保持 open。
 
-## 模块
+## 回滚
 
-- `src/agent/memory.py` — 门面与兼容 API
-- `src/agent/memory_layers.py` — 分层数据结构
-- `src/agent/memory_retrieval.py` — 结构化检索 + 注入格式化
-- `src/agent/memory_vector.py` — 可选轻量向量重排
+回退新增模块、测试、文档和 changelog 行即可；没有 runtime hook、config、migration 或持久派生物。

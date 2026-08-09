@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Optional lightweight vector ranking for agent memory (no faiss/chroma).
-
-Uses pure-Python feature hashing (bag-of-words over word tokens) and cosine
-similarity. Enabled only when ``AGENT_MEMORY_VECTOR_ENABLED=true``. When the
-flag is off, callers must not invoke this module for production retrieval.
-"""
+"""Explicit lightweight vector ranking for authorized memory records."""
 
 from __future__ import annotations
 
@@ -14,7 +9,8 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, List, Sequence, Tuple
 
-_TOKEN_RE = re.compile(r"[A-Za-z0-9_\u4e00-\u9fff]{2,}")
+_LATIN_TOKEN_RE = re.compile(r"[A-Za-z0-9_]{2,}")
+_CJK_RUN_RE = re.compile(r"[\u4e00-\u9fff]+")
 _DEFAULT_DIM = 256
 
 
@@ -34,10 +30,15 @@ class VectorDocument:
 
 
 def tokenize(text: str) -> List[str]:
-    """Split text into lowercase alphanumeric / CJK tokens (min length 2)."""
+    """Tokenize Latin words plus CJK unigrams/bigrams for coarse ranking."""
     if not text:
         return []
-    return [m.group(0).lower() for m in _TOKEN_RE.finditer(text)]
+    tokens = [match.group(0).lower() for match in _LATIN_TOKEN_RE.finditer(text)]
+    for match in _CJK_RUN_RE.finditer(text):
+        run = match.group(0)
+        tokens.extend(run)
+        tokens.extend(run[index:index + 2] for index in range(len(run) - 1))
+    return tokens
 
 
 def hash_embed(tokens: Sequence[str], dim: int = _DEFAULT_DIM) -> List[float]:
