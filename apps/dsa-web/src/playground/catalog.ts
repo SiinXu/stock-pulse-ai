@@ -193,6 +193,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('runFlow', 'run-flow-summary-bar', 'RunFlowSummaryBar', 'components/run-flow/RunFlowSummaryBar.tsx'),
 
   entry('settings', 'ai-overview-matrix', 'AiOverviewMatrix', 'components/settings/AiOverviewMatrix.tsx', ['default', 'states']),
+  entry('settings', 'agent-behavior-panel', 'AgentBehaviorPanel', 'components/settings/AgentBehaviorPanel.tsx', ['interactive', 'states', 'empty', 'error']),
   entry('settings', 'auth-settings-card', 'AuthSettingsCard', 'components/settings/AuthSettingsCard.tsx', ['interactive', 'error']),
   entry('settings', 'change-password-card', 'ChangePasswordCard', 'components/settings/ChangePasswordCard.tsx', ['interactive', 'error']),
   entry('settings', 'data-providers-panel', 'DataProvidersPanel', 'components/settings/DataProvidersPanel.tsx', ['interactive', 'empty']),
