@@ -136,18 +136,43 @@ function collectSourceFiles(directory: string): string[] {
 
 let productionCandidateCache: ReturnType<typeof collectHardcodedUiStrings> | null = null;
 
+const nonJsxUserCopyContext = /(?:\btoast(?:\s*\.|\s*\()|\bnotify\s*\(|\b(?:set|show|add|push)[A-Za-z0-9]*Toast\s*\(|\bset[A-Za-z0-9]*Error(?:Message)?\s*\(|\bset[A-Za-z0-9]*(?:Notice|Feedback|Banner)\s*\(|\b(?:document|window\s*\.\s*document|globalThis\s*\.\s*document)\s*\.\s*title\s*=)/;
+
+function canContainUserCopyContext(filename: string, sourceText: string): boolean {
+  // JSX is not valid in .ts files. Avoid constructing a TypeScript Program for
+  // non-UI modules unless they contain one of the non-JSX contexts the guard
+  // intentionally scans (toast/notice/error calls or document.title).
+  return filename.endsWith('.tsx') || nonJsxUserCopyContext.test(sourceText);
+}
+
 function productionCandidates(): ReturnType<typeof collectHardcodedUiStrings> {
   if (productionCandidateCache) {
     return productionCandidateCache;
   }
   productionCandidateCache = collectSourceFiles(sourceRoot).flatMap((filename) => {
     const relative = path.relative(sourceRoot, filename);
-    return collectHardcodedUiStrings(relative, fs.readFileSync(filename, 'utf8'));
+    const sourceText = fs.readFileSync(filename, 'utf8');
+    return canContainUserCopyContext(filename, sourceText)
+      ? collectHardcodedUiStrings(relative, sourceText)
+      : [];
   });
   return productionCandidateCache;
 }
 
 describe('hardcoded UI string scanner', () => {
+  it.each([
+    ['component.tsx', 'export const Component = () => <p>Save changes</p>;'],
+    ['feedback.ts', "toast.error('Could not save settings');"],
+    ['notice.ts', "setSaveBanner({ title: 'Settings saved' });"],
+    ['document.ts', "window.document.title = 'Settings';"],
+  ])('keeps %s in the production candidate scan', (filename, sourceText) => {
+    expect(canContainUserCopyContext(filename, sourceText)).toBe(true);
+  });
+
+  it('skips non-JSX modules without a user-copy call or document title assignment', () => {
+    expect(canContainUserCopyContext('api.ts', "export const route = '/api/v1/stocks';")).toBe(false);
+  });
+
   it.each<[string, string, HardcodedUiStringContext]>([
     ['JSX text', 'const View = () => <p>Save changes</p>;', 'jsx-text'],
     ['JSX expression literal', "const View = () => <p>{'Save changes'}</p>;", 'jsx-expression'],
