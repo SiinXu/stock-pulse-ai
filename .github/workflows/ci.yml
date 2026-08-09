@@ -65,7 +65,6 @@ jobs:
             # web-gate only: frontend lint/unit/build (genuinely frontend-only)
             frontend:
               - 'apps/dsa-web/**'
-              - '.github/workflows/ci.yml'
             # web-e2e boots a real backend; re-run when the stack it imports changes
             web_e2e:
               - 'apps/dsa-web/**'
@@ -490,31 +489,65 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [changes, ai-governance]
-    if: needs.changes.outputs.frontend == 'true'
+    if: ${{ always() && !cancelled() }}
     permissions:
       contents: read
     defaults:
       run:
         working-directory: apps/dsa-web
     steps:
+      - name: 🔒 Validate web-gate prerequisites
+        if: >-
+          ${{ always() &&
+          (needs.ai-governance.result != 'success' ||
+          needs.changes.result != 'success' ||
+          (needs.changes.outputs.frontend != 'true' &&
+          needs.changes.outputs.frontend != 'false')) }}
+        working-directory: .
+        run: |
+          {
+            echo "## Web gate"
+            echo ""
+            echo "A required prerequisite failed or frontend change detection returned an unavailable result, so web-gate fails closed."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - name: No frontend changes
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'false' }}
+        working-directory: .
+        run: |
+          {
+            echo "## Web gate"
+            echo ""
+            echo "No frontend changes were detected. The full Web lint, i18n, unit test, and build matrix was not required."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: 📥 Checkout
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: 🟢 Setup Node
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: apps/dsa-web/package-lock.json
       - name: 📦 Install
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm ci
       - name: 🔎 Lint
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run lint
       - name: 🌐 i18n guards
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run test:i18n
       - name: 🧪 Unit tests
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run test
       - name: 🏗️ Build
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run build
+      - name: 📦 Bundle size budget
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
+        run: node scripts/check-bundle-size.mjs --print
 
   # Observation only: not in the main ruleset required checks. Skip on pull_request
   # so PR throughput stays on the blocking gate; still run on push-to-main when paths match.
