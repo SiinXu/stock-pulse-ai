@@ -9,6 +9,7 @@ import logging
 from threading import Lock
 from typing import Any, Optional, Protocol, cast
 import uuid
+from weakref import WeakKeyDictionary
 
 from src.repositories.security_audit_repo import SecurityAuditRepository
 from src.schemas.security_audit import (
@@ -56,6 +57,11 @@ def require_security_audit_recorder(value: object) -> SecurityAuditRecorder:
 
 class SecurityAuditService:
     """Sanitize, validate, retain, append, and query security audit events."""
+
+    _shared_retention_lock = Lock()
+    _retention_by_database: WeakKeyDictionary[object, dict[int, date]] = (
+        WeakKeyDictionary()
+    )
 
     def __init__(
         self,
@@ -227,6 +233,24 @@ class SecurityAuditService:
         with self._retention_lock:
             if self._retention_applied_on == today:
                 return
+            if type(repository) is SecurityAuditRepository:
+                with self._shared_retention_lock:
+                    retained = self._retention_by_database.get(repository.db)
+                    if (
+                        retained is not None
+                        and retained.get(self._retention_days) == today
+                    ):
+                        self._retention_applied_on = today
+                        return
+                    repository.apply_retention(
+                        cutoff=now - timedelta(days=self._retention_days)
+                    )
+                    if retained is None:
+                        retained = {}
+                        self._retention_by_database[repository.db] = retained
+                    retained[self._retention_days] = today
+                    self._retention_applied_on = today
+                    return
             repository.apply_retention(
                 cutoff=now - timedelta(days=self._retention_days)
             )

@@ -165,6 +165,35 @@ def test_retention_failure_is_retried_before_later_append(isolated_database) -> 
     assert persisted.action == "auth.login"
 
 
+def test_default_repositories_share_daily_retention_for_one_database(
+    isolated_database,
+    monkeypatch,
+) -> None:
+    original_apply_retention = SecurityAuditRepository.apply_retention
+    retention_calls = 0
+
+    def count_retention(repository, *, cutoff):
+        nonlocal retention_calls
+        retention_calls += 1
+        return original_apply_retention(repository, cutoff=cutoff)
+
+    monkeypatch.setattr(SecurityAuditRepository, "apply_retention", count_retention)
+    first_service = SecurityAuditService(
+        SecurityAuditRepository(isolated_database)
+    )
+    second_service = SecurityAuditService(
+        SecurityAuditRepository(isolated_database)
+    )
+
+    _record_attempt(first_service)
+    _record_attempt(
+        second_service,
+        correlation_id="1029384756abcdef1029384756abcdef",
+    )
+
+    assert retention_calls == 1
+
+
 class _FailingRepository:
     def apply_retention(self, *, cutoff):
         del cutoff
