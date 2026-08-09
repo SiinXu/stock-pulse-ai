@@ -138,7 +138,7 @@ def test_web_gate_concludes_successfully_without_frontend_changes():
     assert web_job["name"] == "web-gate"
     assert web_job["needs"] == ["changes", "ai-governance"]
     assert web_job["if"] == "${{ always() && !cancelled() }}"
-    no_frontend = steps_by_name["ℹ️ No frontend changes"]
+    no_frontend = steps_by_name["No frontend changes"]
     assert no_frontend["if"] == (
         "${{ needs.ai-governance.result == 'success' && "
         "needs.changes.result == 'success' && "

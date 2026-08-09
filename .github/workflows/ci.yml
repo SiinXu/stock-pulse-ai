@@ -511,7 +511,7 @@ jobs:
             echo "A required prerequisite failed or frontend change detection returned an unavailable result, so web-gate fails closed."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
-      - name: ℹ️ No frontend changes
+      - name: No frontend changes
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'false' }}
         working-directory: .
         run: |
