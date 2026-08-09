@@ -17,7 +17,26 @@ from .analysis_strategies import (
     validate_analysis_strategy_definition,
 )
 from .constants import PLUGIN_APPLICATION_VERSION
+from .data_provider_binding import (
+    DATA_PROVIDER_BIND_ERROR_INTERFACE,
+    DATA_PROVIDER_BIND_ERROR_PRIORITY,
+    DATA_PROVIDER_BIND_ERROR_UNAVAILABLE,
+    PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV,
+    DataProviderAutoBindError,
+    build_data_provider_bound_contracts,
+    build_data_provider_bound_registry,
+    data_provider_auto_bind_enabled,
+    extract_data_provider_contract,
+    resolve_data_provider_registry,
+    try_build_auto_bound_registry,
+)
 from .errors import PluginContextClosedError, PluginError, PluginRegistryError
+from .health import PluginHealthEntry, PluginHealthReport, build_plugin_health_report
+from .lifecycle_audit import (
+    PLUGIN_LIFECYCLE_EVENT_TYPE,
+    LifecycleAuditRecorder,
+    PluginLifecycleAuditor,
+)
 from .surface import (
     PLUGIN_EXTENSION_SURFACE_VERSION,
     PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS,
@@ -37,6 +56,7 @@ from .event_hooks import (
 )
 from .loader import ExternalPluginLoader, ExternalPluginResult
 from .manager import (
+    PluginLifecycleAuditCompletionUnavailable,
     PluginManager,
     PluginOperationResult,
     PluginReloadResult,
@@ -86,6 +106,10 @@ __all__ = [
     "AnalysisStrategyCatalogSnapshot",
     "AnalysisStrategyDefinition",
     "AnalysisStrategyRegistry",
+    "DATA_PROVIDER_BIND_ERROR_INTERFACE",
+    "DATA_PROVIDER_BIND_ERROR_PRIORITY",
+    "DATA_PROVIDER_BIND_ERROR_UNAVAILABLE",
+    "DataProviderAutoBindError",
     "EXTENSION_POINTS",
     "EVENT_HOOK_NAMES",
     "EVENT_HOOK_SCHEMA_VERSION",
@@ -98,6 +122,7 @@ __all__ = [
     "ExtensionRegistration",
     "ExtensionRegistry",
     "JSONValue",
+    "LifecycleAuditRecorder",
     "NativeRegistrationBackend",
     "NotificationAdapterResult",
     "NotificationChannelAdapter",
@@ -106,6 +131,8 @@ __all__ = [
     "NotificationChannelRegistry",
     "NotificationChannelSnapshot",
     "NotificationRequest",
+    "PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV",
+    "PLUGIN_LIFECYCLE_EVENT_TYPE",
     "Plugin",
     "PluginEvent",
     "PLUGIN_APPLICATION_VERSION",
@@ -116,6 +143,10 @@ __all__ = [
     "PluginContext",
     "PluginContextClosedError",
     "PluginError",
+    "PluginHealthEntry",
+    "PluginHealthReport",
+    "PluginLifecycleAuditor",
+    "PluginLifecycleAuditCompletionUnavailable",
     "PluginManager",
     "PluginManifest",
     "PluginOperationResult",
@@ -136,12 +167,19 @@ __all__ = [
     "build_agent_tool_extension_registry",
     "build_analysis_strategy_extension_contract",
     "build_application_extension_registry",
+    "build_data_provider_bound_contracts",
+    "build_data_provider_bound_registry",
     "build_notification_channel_extension_contract",
+    "build_plugin_health_report",
+    "data_provider_auto_bind_enabled",
     "default_extension_contracts",
     "dispatch_analysis_event",
     "dispatch_market_review_event",
     "event_hook_extension_contract",
+    "extract_data_provider_contract",
+    "resolve_data_provider_registry",
     "normalize_report_platform",
+    "try_build_auto_bound_registry",
     "validate_agent_tool_definition",
     "validate_analysis_strategy_definition",
     "validate_event_hook_registration",

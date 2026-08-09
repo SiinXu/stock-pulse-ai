@@ -76,6 +76,7 @@ class Config:
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
     stock_index_remote_update_enabled: bool = True
+    plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
     alphasift_enabled: bool = False

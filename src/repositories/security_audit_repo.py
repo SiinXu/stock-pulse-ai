@@ -51,9 +51,12 @@ class SecurityAuditRepository:
         )
         with self.db.get_session() as session:
             session.add(row)
+            session.flush()
+            row_id = int(row.id)
             session.commit()
-            session.refresh(row)
-            return self._to_event(row)
+        return SecurityAuditEvent.model_validate(
+            {"id": row_id, **event.model_dump()}
+        )
 
     def apply_retention(self, *, cutoff: datetime) -> int:
         cutoff_utc_naive = cutoff.astimezone(timezone.utc).replace(tzinfo=None)
