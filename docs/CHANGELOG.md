@@ -11,8 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
 - [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
+- [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
+- [Fixed] Keep a single primary create-rule action in an empty Signal Center and strengthen Usage redirect/title acceptance.
 - [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
 - [Added] Versioned watchlist AI scoring from bounded existing analysis and coherent decision signals, with strict source/time/degradation provenance and a localized independent Web column (Issue #147 / T25).
+- [Changed] Settings scheduler card shows next run with timezone, honest process-mode/deployment copy, run-now busy tracking, and last-skipped status (#869).
 - [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
 
 - [Added] Revisioned watchlist groups with pre-mutation CAS write leases, version-fenced STOCK_LIST reconciliation, failure-aware accessible controls, mobile non-drag controls, and typed score/focus projections (#189).
