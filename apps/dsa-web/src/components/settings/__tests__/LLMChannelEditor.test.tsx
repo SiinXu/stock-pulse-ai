@@ -316,6 +316,37 @@ describe('LLMChannelEditor', () => {
     expect(container.textContent).not.toMatch(/生成后端状态|主后端|备用后端|运行时能力检测/);
   });
 
+  it('filters cloud connections by provider and model without changing ownership', () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          ...OPENAI_ITEMS.map((item) => (
+            item.key === 'LLM_CHANNELS' ? { ...item, value: 'openai,deepseek' } : item
+          )),
+          { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
+          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
+          { key: 'LLM_DEEPSEEK_API_KEY', value: 'secret-key' },
+          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat' },
+        ]}
+        providers={PROVIDERS}
+        maskToken="******"
+      />,
+    );
+
+    const filter = screen.getByRole('searchbox', { name: '筛选云端模型连接' });
+    expect(connectionCard('openai')).toBeInTheDocument();
+    expect(connectionCard('deepseek')).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: 'deepseek-chat' } });
+    expect(screen.queryByTestId('connection-card-openai')).not.toBeInTheDocument();
+    expect(connectionCard('deepseek')).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: 'missing-provider' } });
+    expect(screen.getByRole('status')).toHaveTextContent('没有匹配的云端模型连接');
+  });
+
   it.each([
     'LLM_OPENAI_DISPLAY_NAME',
     'LLM_OPENAI_PROVIDER',
