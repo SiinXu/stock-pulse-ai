@@ -130,6 +130,14 @@ On desktop, the category navigation uses a compact sidebar so the active setting
 | Advanced · config backup | Export before reinstall; import on recovery |
 | Advanced · diagnostics | Troubleshooting |
 
+### Agent behavior presets
+
+**Agent behavior → Execution** offers Simple Q&A, Standard research, and Deep + governed as starting points. Preset status is derived from saved server values: a confirmed draft remains pending until autosave succeeds, and failed or conflicted saves never appear active. The summary also reports the effective Agent model source/readiness, Risk Agent/HITL boundary, and deep-tool state; `auto` alone is not proof that a model is configured.
+
+Selecting a preset opens confirmation without mutating the draft. Review every old/new value plus step/timeout, memory, Critic, and multi-strategy cost effects. Confirmation submits all changes as one Agent Settings batch for autosave. Cancel, Escape, focus, and hover write nothing. After failure or conflict, discard that preset draft before retrying or loading the server version.
+
+Presets enable Agent and clear “Agent acknowledged off,” but do not change credentials, skill lists, global Deep Research budgets, Risk Agent veto, or HITL approval policy. The default surface shows essentials; Advanced preserves the registry-owned runtime, skills, research, memory/context, and other semantic groups.
+
 ### Scheduling
 
 When enabled, a **long-running** Web/API/Desktop process must stay up. The status card reports this API process's mode, attachment state, and server schedule time zone without substituting the browser zone. **Run once** is available only when this process is attached, the legacy batch is enabled, and no analysis is running. An accepted run is correlated through success or failure; an older server without correlation data is shown as outcome unavailable rather than treating idle as success. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
