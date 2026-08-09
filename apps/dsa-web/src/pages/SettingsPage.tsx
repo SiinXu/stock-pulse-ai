@@ -24,7 +24,7 @@ import {
   ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
-  LocalModelsWithKronos,
+  LoadedExtensionsPanel, LocalModelsWithKronos,
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
@@ -1369,7 +1369,7 @@ const SettingsPage: React.FC = () => {
     && !isInvestmentFrameworkView
     && !isTopLevelAdvanced
     && !(isAlertsSection && activeView === 'events')
-    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
+    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about' || activeView === 'extensions'));
   const showActiveConfigEmptyState = !(
     activeSection === 'overview'
     || activeSection === 'ai_models'
@@ -1669,6 +1669,7 @@ const SettingsPage: React.FC = () => {
             {activeCategory === 'system' && activeView === 'about' ? (
               <SystemAboutCard />
             ) : null}
+            {activeCategory === 'system' && activeView === 'extensions' ? <LoadedExtensionsPanel disabled={isSaving || isLoading} t={t} language={uiLanguage} /> : null}
             {isTopLevelAdvanced && activeView === 'backup' ? (
               <>
                 <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
