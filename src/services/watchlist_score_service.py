@@ -1,22 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Watchlist AI score aggregation from existing analysis + decision signals (Issue #147 / T25).
-
-Route A: reuse stored analysis history and active decision signals. Never invents a
-score when a symbol has no analysis history, and never triggers a new LLM call.
-"""
+"""Bounded watchlist scoring from existing analysis and decision signals."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import math
+import re
+from datetime import datetime, timezone, tzinfo
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
-from sqlalchemy import desc, select
+from sqlalchemy import case, desc, func, or_, select
 
-from src.services.stock_code_utils import canonicalize_analysis_stock_code
-from src.storage import DatabaseManager
+from src.repositories.decision_signal_repo import DecisionSignalRepository
+from src.services.stock_code_utils import resolve_daily_stock_identity
+from src.storage import DatabaseManager, to_utc_naive_datetime
 from src.storage_parts.schema import AnalysisHistory, DecisionSignalRecord
 
-# Public contract values
 SCORE_STATUS_SCORED = "scored"
 SCORE_STATUS_UNANALYZED = "unanalyzed"
 SORT_MANUAL = "manual"
@@ -24,12 +22,10 @@ SORT_SCORE_DESC = "score_desc"
 SORT_SCORE_ASC = "score_asc"
 ALLOWED_SORT_MODES = frozenset({SORT_MANUAL, SORT_SCORE_DESC, SORT_SCORE_ASC})
 SCORING_MODE_AGGREGATE_EXISTING = "aggregate_existing"
+FORMULA_VERSION = "watchlist_score_v1"
 
-# Blend weights when both analysis sentiment and an active signal are present.
 _WEIGHT_SENTIMENT = 0.75
 _WEIGHT_SIGNAL = 0.25
-
-# Map decision-signal actions to a 0-100 style contribution (explainable only).
 _ACTION_SCORE_HINT: Mapping[str, int] = {
     "strong_buy": 90,
     "buy": 75,
@@ -38,12 +34,12 @@ _ACTION_SCORE_HINT: Mapping[str, int] = {
     "sell": 25,
     "strong_sell": 10,
 }
-
 _MAX_CODES = 200
+_STOCK_CODE_RE = re.compile(r"^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$")
 
 
 class WatchlistScoreService:
-    """Aggregate per-symbol watchlist scores from stored history and signals."""
+    """Aggregate a versioned, explainable score without triggering an LLM."""
 
     def __init__(
         self,
@@ -52,11 +48,13 @@ class WatchlistScoreService:
         analysis_loader: Optional[Callable[[Sequence[str]], Mapping[str, Any]]] = None,
         signal_loader: Optional[Callable[[Sequence[str]], Mapping[str, Any]]] = None,
         clock: Optional[Callable[[], datetime]] = None,
+        analysis_timezone: Optional[tzinfo] = None,
     ) -> None:
         self._db_manager = db_manager
         self._analysis_loader = analysis_loader
         self._signal_loader = signal_loader
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._analysis_timezone = analysis_timezone
 
     @property
     def db(self) -> DatabaseManager:
@@ -70,47 +68,39 @@ class WatchlistScoreService:
         *,
         sort: str = SORT_MANUAL,
     ) -> Dict[str, Any]:
-        """Score symbols from existing analysis + signals.
-
-        Parameters
-        ----------
-        stock_codes:
-            Ordered watchlist codes. Empty/None yields an empty item list.
-        sort:
-            ``manual`` keeps input order (default). ``score_desc`` / ``score_asc``
-            reorder scored items while keeping unanalyzed rows after scored ones
-            and preserving relative order within each band when scores tie.
-        """
         sort_mode = self._normalize_sort(sort)
         ordered_codes = self._normalize_input_codes(stock_codes)
         if not ordered_codes:
             return self._empty_payload(sort_mode)
 
-        # Canonical + raw forms so a single batch query covers code variants.
-        query_codes = self._expand_query_codes(ordered_codes)
-        analyses, analysis_queries = self._load_latest_analyses(query_codes)
-        signals, signal_queries = self._load_latest_active_signals(query_codes)
+        candidate_to_key, code_to_key = self._query_identity_plan(ordered_codes)
+        query_codes = list(candidate_to_key)
+        analyses, analysis_queries, analysis_rows = self._load_latest_analyses(
+            query_codes,
+            candidate_to_key,
+        )
+        signals, signal_queries, signal_rows = self._load_latest_active_signals(
+            query_codes,
+            candidate_to_key,
+            analyses,
+        )
 
-        items: List[Dict[str, Any]] = []
-        for code in ordered_codes:
-            match_key = self._match_key(code)
-            analysis = analyses.get(match_key)
-            signal = signals.get(match_key)
-            items.append(self._build_item(stock_code=code, analysis=analysis, signal=signal))
-
-        ordered = self.order_items(items, sort_mode=sort_mode, input_codes=ordered_codes)
+        items = [
+            self._build_item(
+                stock_code=code,
+                analysis=analyses.get(code_to_key[code]),
+                signal=signals.get(code_to_key[code]),
+            )
+            for code in ordered_codes
+        ]
         return {
+            "formula_version": FORMULA_VERSION,
             "scoring_mode": SCORING_MODE_AGGREGATE_EXISTING,
             "sort": sort_mode,
-            "items": ordered,
-            "query_count": {
-                "analysis": analysis_queries,
-                "signals": signal_queries,
-            },
-            "disclaimer": (
-                "Scores aggregate existing analysis and decision-signal history. "
-                "They are not investment advice and may lag the market."
-            ),
+            "items": self.order_items(items, sort_mode=sort_mode, input_codes=ordered_codes),
+            "query_count": {"analysis": analysis_queries, "signals": signal_queries},
+            "source_rows": {"analysis": analysis_rows, "signals": signal_rows},
+            "disclaimer_key": "watchlist_score.disclaimer",
         }
 
     @staticmethod
@@ -120,316 +110,421 @@ class WatchlistScoreService:
         sort_mode: str = SORT_MANUAL,
         input_codes: Optional[Sequence[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """Order score items. Default ``manual`` preserves the input watchlist order."""
         mode = WatchlistScoreService._normalize_sort(sort_mode)
         rows = [dict(item) for item in items]
+        manual_index = {
+            str(code): index for index, code in enumerate(input_codes or ())
+        }
         if mode == SORT_MANUAL:
-            if input_codes is None:
-                return rows
-            index = {str(code): i for i, code in enumerate(input_codes)}
-            rows.sort(key=lambda row: index.get(str(row.get("stock_code")), len(index)))
+            if input_codes is not None:
+                rows.sort(key=lambda row: manual_index.get(str(row.get("stock_code")), len(manual_index)))
             return rows
 
-        reverse = mode == SORT_SCORE_DESC
+        descending = mode == SORT_SCORE_DESC
 
-        def _sort_key(row: Mapping[str, Any]) -> tuple:
-            status = str(row.get("status") or "")
-            scored = 0 if status == SCORE_STATUS_SCORED else 1
-            score = row.get("score")
-            # Unanalyzed always after scored; among scored use numeric score.
-            numeric = float(score) if isinstance(score, (int, float)) else float("-inf")
-            if not reverse:
-                # Ascending: lower score first among scored.
-                return (scored, numeric if scored == 0 else float("inf"))
-            # Descending: higher score first.
-            return (scored, -numeric if scored == 0 else float("inf"))
-
-        # Stable sort: ties keep relative order (manual order within equal scores).
-        if input_codes is not None:
-            index = {str(code): i for i, code in enumerate(input_codes)}
-            rows.sort(
-                key=lambda row: (
-                    *_sort_key(row),
-                    index.get(str(row.get("stock_code")), len(index)),
-                )
+        def sort_key(row: Mapping[str, Any]) -> tuple[int, float, int]:
+            scored = 0 if row.get("status") == SCORE_STATUS_SCORED else 1
+            raw_score = row.get("score")
+            numeric = float(raw_score) if isinstance(raw_score, (int, float)) else 0.0
+            score_key = -numeric if descending else numeric
+            return (
+                scored,
+                score_key if scored == 0 else 0.0,
+                manual_index.get(str(row.get("stock_code")), len(manual_index)),
             )
-        else:
-            rows.sort(key=_sort_key)
+
+        rows.sort(key=sort_key)
         return rows
 
-    # ---- loaders ---------------------------------------------------------
-
     def _load_latest_analyses(
-        self, query_codes: Sequence[str]
-    ) -> tuple[Dict[str, Any], int]:
+        self,
+        query_codes: Sequence[str],
+        candidate_to_key: Mapping[str, str],
+    ) -> tuple[Dict[str, Any], int, int]:
         if self._analysis_loader is not None:
             loaded = dict(self._analysis_loader(query_codes) or {})
-            return self._rekey_by_match(loaded), 1
+            rekeyed = self._rekey_loaded(loaded)
+            return rekeyed, 1, len(rekeyed)
         if not query_codes:
-            return {}, 0
+            return {}, 0, 0
+
+        identity_case = case(candidate_to_key, value=AnalysisHistory.code)
+        ranked = (
+            select(
+                AnalysisHistory.id.label("row_id"),
+                identity_case.label("identity_key"),
+                func.row_number().over(
+                    partition_by=identity_case,
+                    order_by=(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id)),
+                ).label("row_rank"),
+            )
+            .where(AnalysisHistory.code.in_(list(query_codes)))
+            .subquery()
+        )
         with self.db.get_session() as session:
             rows = session.execute(
-                select(AnalysisHistory)
-                .where(AnalysisHistory.code.in_(list(query_codes)))
-                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
-            ).scalars().all()
-        latest: Dict[str, Any] = {}
-        for row in rows:
-            key = self._match_key(getattr(row, "code", "") or "")
-            if key and key not in latest:
-                latest[key] = row
-        return latest, 1
+                select(AnalysisHistory, ranked.c.identity_key)
+                .join(ranked, AnalysisHistory.id == ranked.c.row_id)
+                .where(ranked.c.row_rank == 1)
+            ).all()
+        result = {str(identity_key): row for row, identity_key in rows}
+        return result, 1, len(rows)
 
     def _load_latest_active_signals(
-        self, query_codes: Sequence[str]
-    ) -> tuple[Dict[str, Any], int]:
+        self,
+        query_codes: Sequence[str],
+        candidate_to_key: Mapping[str, str],
+        analyses: Mapping[str, Any],
+    ) -> tuple[Dict[str, Any], int, int]:
         if self._signal_loader is not None:
             loaded = dict(self._signal_loader(query_codes) or {})
-            return self._rekey_by_match(loaded), 1
+            rekeyed = self._rekey_loaded(loaded)
+            return rekeyed, 1, len(rekeyed)
         if not query_codes:
-            return {}, 0
+            return {}, 0, 0
+
+        now = self._now_utc()
+        # Use the canonical lifecycle authority before selecting active rows.
+        DecisionSignalRepository(self.db).expire_due_signals(now=now)
+        now_naive = to_utc_naive_datetime(now)
+        identity_case = case(candidate_to_key, value=DecisionSignalRecord.stock_code)
+        report_by_candidate = {
+            candidate: self._positive_int(getattr(analyses.get(identity_key), "id", None))
+            for candidate, identity_key in candidate_to_key.items()
+        }
+        report_by_candidate = {
+            candidate: report_id
+            for candidate, report_id in report_by_candidate.items()
+            if report_id is not None
+        }
+        if not report_by_candidate:
+            return {}, 1, 0
+        report_case = case(report_by_candidate, value=DecisionSignalRecord.stock_code)
+        ranked = (
+            select(
+                DecisionSignalRecord.id.label("row_id"),
+                identity_case.label("identity_key"),
+                func.row_number().over(
+                    partition_by=identity_case,
+                    order_by=(
+                        desc(DecisionSignalRecord.created_at),
+                        desc(DecisionSignalRecord.id),
+                    ),
+                ).label("row_rank"),
+            )
+            .where(
+                DecisionSignalRecord.status == "active",
+                DecisionSignalRecord.source_type == "analysis",
+                DecisionSignalRecord.stock_code.in_(list(query_codes)),
+                DecisionSignalRecord.source_report_id == report_case,
+                or_(
+                    DecisionSignalRecord.expires_at.is_(None),
+                    DecisionSignalRecord.expires_at > now_naive,
+                ),
+            )
+            .subquery()
+        )
         with self.db.get_session() as session:
             rows = session.execute(
-                select(DecisionSignalRecord)
-                .where(
-                    DecisionSignalRecord.status == "active",
-                    DecisionSignalRecord.stock_code.in_(list(query_codes)),
-                )
-                .order_by(
-                    desc(DecisionSignalRecord.created_at),
-                    desc(DecisionSignalRecord.id),
-                )
-            ).scalars().all()
-        latest: Dict[str, Any] = {}
-        for row in rows:
-            key = self._match_key(getattr(row, "stock_code", "") or "")
-            if key and key not in latest:
-                latest[key] = row
-        return latest, 1
+                select(DecisionSignalRecord, ranked.c.identity_key)
+                .join(ranked, DecisionSignalRecord.id == ranked.c.row_id)
+                .where(ranked.c.row_rank == 1)
+            ).all()
+        result = {str(identity_key): row for row, identity_key in rows}
+        return result, 1, len(rows)
 
-    # ---- item construction -----------------------------------------------
-
-    def _build_item(
-        self,
-        *,
-        stock_code: str,
-        analysis: Any,
-        signal: Any,
-    ) -> Dict[str, Any]:
+    def _build_item(self, *, stock_code: str, analysis: Any, signal: Any) -> Dict[str, Any]:
         if analysis is None:
-            return {
-                "stock_code": stock_code,
-                "status": SCORE_STATUS_UNANALYZED,
-                "score": None,
-                "as_of": None,
-                "age_days": None,
-                "analysis_id": None,
-                "operation_advice": None,
-                "factors": [],
-                "freshness": "none",
-            }
+            return self._unanalyzed_item(stock_code)
 
-        sentiment = getattr(analysis, "sentiment_score", None)
+        analysis_at = self._analysis_datetime(getattr(analysis, "created_at", None))
+        analysis_id = self._positive_int(getattr(analysis, "id", None))
+        base = {
+            "stock_code": stock_code,
+            "as_of": analysis_at,
+            "age_days": self._age_days(analysis_at),
+            "analysis_id": analysis_id,
+            "operation_advice": self._optional_text(getattr(analysis, "operation_advice", None), 64),
+            "freshness": self._freshness_label(analysis_at),
+        }
+        sentiment = self._finite_number(getattr(analysis, "sentiment_score", None), 0.0, 100.0)
         if sentiment is None:
-            # History row without a score is still "unanalyzed" for scoring purposes —
-            # never invent 0.
             return {
-                "stock_code": stock_code,
+                **base,
                 "status": SCORE_STATUS_UNANALYZED,
                 "score": None,
-                "as_of": self._iso(getattr(analysis, "created_at", None)),
-                "age_days": self._age_days(getattr(analysis, "created_at", None)),
-                "analysis_id": getattr(analysis, "id", None),
-                "operation_advice": getattr(analysis, "operation_advice", None),
-                "factors": [],
-                "freshness": self._freshness_label(getattr(analysis, "created_at", None)),
+                "factors": [self._analysis_factor(analysis, analysis_at, "ignored", "invalid_sentiment")],
+                "degraded_reasons": ["invalid_sentiment"],
             }
 
-        sentiment_int = int(sentiment)
-        factors: List[Dict[str, Any]] = [
-            {
-                "key": "analysis_sentiment",
-                "label": "Analysis sentiment score",
-                "value": sentiment_int,
-                "detail": self._analysis_detail(analysis),
-            }
-        ]
+        factors = [self._analysis_factor(analysis, analysis_at, "applied", None)]
+        degraded: List[str] = []
         signal_component: Optional[float] = None
         if signal is not None:
-            action = str(getattr(signal, "action", "") or "").strip().lower()
-            hint = _ACTION_SCORE_HINT.get(action)
-            confidence = getattr(signal, "confidence", None)
-            if hint is not None:
-                if isinstance(confidence, (int, float)):
-                    # Blend action hint with confidence toward neutral 50.
-                    conf = max(0.0, min(1.0, float(confidence)))
-                    signal_component = hint * conf + 50.0 * (1.0 - conf)
-                else:
-                    signal_component = float(hint)
-            factors.append(
-                {
-                    "key": "decision_signal",
-                    "label": "Active decision signal",
-                    "value": action or "unknown",
-                    "detail": self._signal_detail(signal),
-                }
+            signal_component, signal_factor, reason = self._evaluate_signal(
+                signal,
+                analysis_id=analysis_id,
             )
+            factors.append(signal_factor)
+            if reason:
+                degraded.append(reason)
 
-        if signal_component is None:
-            composite = float(sentiment_int)
-        else:
-            composite = (
-                _WEIGHT_SENTIMENT * float(sentiment_int)
-                + _WEIGHT_SIGNAL * float(signal_component)
-            )
-        score = int(round(max(0.0, min(100.0, composite))))
-        created_at = getattr(analysis, "created_at", None)
+        composite = sentiment
+        if signal_component is not None:
+            composite = _WEIGHT_SENTIMENT * sentiment + _WEIGHT_SIGNAL * signal_component
         return {
-            "stock_code": stock_code,
+            **base,
             "status": SCORE_STATUS_SCORED,
-            "score": score,
-            "as_of": self._iso(created_at),
-            "age_days": self._age_days(created_at),
-            "analysis_id": getattr(analysis, "id", None),
-            "operation_advice": getattr(analysis, "operation_advice", None),
+            "score": int(round(min(100.0, max(0.0, composite)))),
             "factors": factors,
-            "freshness": self._freshness_label(created_at),
+            "degraded_reasons": degraded,
         }
 
-    # ---- helpers ---------------------------------------------------------
+    def _evaluate_signal(
+        self,
+        signal: Any,
+        *,
+        analysis_id: Optional[int],
+    ) -> tuple[Optional[float], Dict[str, Any], Optional[str]]:
+        reason: Optional[str] = None
+        status = str(getattr(signal, "status", "active") or "").lower()
+        expires_at = self._signal_datetime(getattr(signal, "expires_at", None))
+        source_type = str(getattr(signal, "source_type", "") or "").lower()
+        source_report_id = self._positive_int(getattr(signal, "source_report_id", None))
+        action = str(getattr(signal, "action", "") or "").strip().lower()
+        confidence_raw = getattr(signal, "confidence", None)
+
+        if status != "active":
+            reason = "inactive_signal"
+        elif expires_at is not None and expires_at <= self._now_utc():
+            reason = "expired_signal"
+        elif source_type != "analysis" or analysis_id is None or source_report_id != analysis_id:
+            reason = "incoherent_signal_source"
+        elif action not in _ACTION_SCORE_HINT:
+            reason = "unknown_signal_action"
+
+        confidence: Optional[float] = None
+        if reason is None and confidence_raw is not None:
+            confidence = self._finite_number(confidence_raw, 0.0, 1.0)
+            if confidence is None:
+                reason = "invalid_signal_confidence"
+
+        component: Optional[float] = None
+        if reason is None:
+            hint = float(_ACTION_SCORE_HINT[action])
+            component = hint if confidence is None else hint * confidence + 50.0 * (1.0 - confidence)
+
+        factor = {
+            "key": "decision_signal",
+            "status": "ignored" if reason else "applied",
+            "value": action or "unknown",
+            "params": {
+                "confidence": confidence,
+                "profile": self._optional_text(getattr(signal, "decision_profile", None), 24),
+            },
+            "reason": reason,
+            "source": {
+                "id": self._positive_int(getattr(signal, "id", None)),
+                "source_report_id": source_report_id,
+                "profile": self._optional_text(getattr(signal, "decision_profile", None), 24),
+                "as_of": self._signal_datetime(getattr(signal, "created_at", None)),
+                "expires_at": expires_at,
+                "formula_version": FORMULA_VERSION,
+            },
+        }
+        return component, factor, reason
+
+    def _analysis_factor(
+        self,
+        analysis: Any,
+        analysis_at: Optional[datetime],
+        status: str,
+        reason: Optional[str],
+    ) -> Dict[str, Any]:
+        return {
+            "key": "analysis_sentiment",
+            "status": status,
+            "value": (
+                getattr(analysis, "sentiment_score", None)
+                if status == "applied"
+                else None
+            ),
+            "params": {
+                "operation_advice": self._optional_text(getattr(analysis, "operation_advice", None), 64),
+                "report_type": self._optional_text(getattr(analysis, "report_type", None), 32),
+            },
+            "reason": reason,
+            "source": {
+                "id": self._positive_int(getattr(analysis, "id", None)),
+                "source_report_id": self._positive_int(getattr(analysis, "id", None)),
+                "profile": None,
+                "as_of": analysis_at,
+                "expires_at": None,
+                "formula_version": FORMULA_VERSION,
+            },
+        }
 
     @staticmethod
     def _normalize_sort(sort: Optional[str]) -> str:
         value = str(sort or SORT_MANUAL).strip().lower()
         if value not in ALLOWED_SORT_MODES:
-            raise ValueError(
-                f"Unsupported sort mode: {sort!r}. "
-                f"Allowed: {', '.join(sorted(ALLOWED_SORT_MODES))}"
-            )
+            raise ValueError("Unsupported watchlist score sort mode")
         return value
 
-    @staticmethod
-    def _normalize_input_codes(stock_codes: Optional[Sequence[str]]) -> List[str]:
+    @classmethod
+    def _normalize_input_codes(cls, stock_codes: Optional[Sequence[str]]) -> List[str]:
         if not stock_codes:
             return []
+        if len(stock_codes) > _MAX_CODES:
+            raise ValueError("stock_codes must contain at most 200 symbols")
         ordered: List[str] = []
         seen: set[str] = set()
         for raw in stock_codes:
-            if raw is None:
-                continue
-            code = str(raw).strip()
-            if not code:
-                continue
-            key = WatchlistScoreService._match_key(code)
+            code = str(raw or "").strip().upper()
+            if not _STOCK_CODE_RE.fullmatch(code):
+                raise ValueError("stock_codes contains an invalid symbol")
+            identity = resolve_daily_stock_identity(code)
+            if identity is None:
+                raise ValueError("stock_codes contains an unsupported symbol")
+            key = cls._identity_key_from_resolved(identity.market, identity.normalized_code)
             if key in seen:
-                continue
+                raise ValueError("stock_codes must not contain duplicate market identities")
             seen.add(key)
             ordered.append(code)
-            if len(ordered) >= _MAX_CODES:
-                break
         return ordered
 
     @classmethod
-    def _expand_query_codes(cls, codes: Sequence[str]) -> List[str]:
-        expanded: List[str] = []
-        seen: set[str] = set()
+    def _query_identity_plan(
+        cls,
+        codes: Sequence[str],
+    ) -> tuple[Dict[str, str], Dict[str, str]]:
+        candidate_to_key: Dict[str, str] = {}
+        ambiguous: set[str] = set()
+        code_to_key: Dict[str, str] = {}
         for code in codes:
-            for candidate in (code, cls._match_key(code)):
-                if candidate and candidate not in seen:
-                    seen.add(candidate)
-                    expanded.append(candidate)
-        return expanded
+            identity = resolve_daily_stock_identity(code)
+            if identity is None:
+                raise ValueError("stock_codes contains an unsupported symbol")
+            key = cls._identity_key_from_resolved(identity.market, identity.normalized_code)
+            code_to_key[code] = key
+            for candidate in identity.code_candidates:
+                normalized_candidate = str(candidate).strip().upper()
+                existing = candidate_to_key.get(normalized_candidate)
+                if existing is not None and existing != key:
+                    ambiguous.add(normalized_candidate)
+                else:
+                    candidate_to_key[normalized_candidate] = key
+        for candidate in ambiguous:
+            candidate_to_key.pop(candidate, None)
+        return candidate_to_key, code_to_key
 
     @staticmethod
-    def _match_key(code: str) -> str:
-        canonical = canonicalize_analysis_stock_code(code)
-        if canonical:
-            return canonical
-        return str(code or "").strip().upper()
+    def _identity_key_from_resolved(market: str, normalized_code: str) -> str:
+        return f"{market}:{normalized_code}"
 
-    def _rekey_by_match(self, loaded: Mapping[str, Any]) -> Dict[str, Any]:
+    @classmethod
+    def _identity_key(cls, code: str) -> str:
+        identity = resolve_daily_stock_identity(code)
+        if identity is None:
+            return str(code or "").strip().upper()
+        return cls._identity_key_from_resolved(identity.market, identity.normalized_code)
+
+    @classmethod
+    def _rekey_loaded(cls, loaded: Mapping[str, Any]) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
         for raw_key, value in loaded.items():
-            key = self._match_key(str(raw_key))
-            if key and key not in result:
-                result[key] = value
+            key = cls._identity_key(str(raw_key))
+            result.setdefault(key, value)
         return result
 
-    def _age_days(self, created_at: Any) -> Optional[int]:
+    def _now_utc(self) -> datetime:
+        value = self._clock()
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def _analysis_datetime(self, value: Any) -> Optional[datetime]:
+        if not isinstance(value, datetime):
+            return None
+        if value.tzinfo is not None and value.utcoffset() is not None:
+            return value.astimezone(timezone.utc)
+        if self._analysis_timezone is not None:
+            return value.replace(tzinfo=self._analysis_timezone).astimezone(timezone.utc)
+        try:
+            return value.astimezone(timezone.utc)
+        except (OverflowError, OSError):
+            return value.replace(tzinfo=timezone.utc)
+
+    @staticmethod
+    def _signal_datetime(value: Any) -> Optional[datetime]:
+        if not isinstance(value, datetime):
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def _age_days(self, created_at: Optional[datetime]) -> Optional[int]:
         if created_at is None:
             return None
-        now = self._clock()
-        if isinstance(created_at, datetime):
-            created = created_at
-        else:
-            return None
-        if created.tzinfo is None and now.tzinfo is not None:
-            created = created.replace(tzinfo=timezone.utc)
-        elif created.tzinfo is not None and now.tzinfo is None:
-            now = now.replace(tzinfo=timezone.utc)
-        delta = now - created
-        return max(0, int(delta.total_seconds() // 86400))
+        seconds = (self._now_utc() - created_at).total_seconds()
+        return max(0, int(seconds // 86400))
 
-    def _freshness_label(self, created_at: Any) -> str:
+    def _freshness_label(self, created_at: Optional[datetime]) -> str:
         age = self._age_days(created_at)
         if age is None:
             return "unknown"
-        if age <= 0:
+        if age == 0:
             return "today"
-        if age == 1:
-            return "1d"
         if age <= 3:
-            return f"{age}d"
+            return "recent"
         if age <= 7:
             return "stale_week"
         return "stale"
 
     @staticmethod
-    def _iso(value: Any) -> Optional[str]:
-        if isinstance(value, datetime):
-            return value.isoformat()
-        return None
+    def _finite_number(value: Any, minimum: float, maximum: float) -> Optional[float]:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        numeric = float(value)
+        if not math.isfinite(numeric) or numeric < minimum or numeric > maximum:
+            return None
+        return numeric
 
     @staticmethod
-    def _analysis_detail(analysis: Any) -> str:
-        parts: List[str] = []
-        advice = getattr(analysis, "operation_advice", None)
-        if advice:
-            parts.append(f"advice={advice}")
-        report_type = getattr(analysis, "report_type", None)
-        if report_type:
-            parts.append(f"report_type={report_type}")
-        created = getattr(analysis, "created_at", None)
-        if isinstance(created, datetime):
-            parts.append(f"as_of={created.date().isoformat()}")
-        return "; ".join(parts) if parts else "from latest analysis history"
+    def _positive_int(value: Any) -> Optional[int]:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return None
+        return value
 
     @staticmethod
-    def _signal_detail(signal: Any) -> str:
-        parts: List[str] = []
-        label = getattr(signal, "action_label", None)
-        if label:
-            parts.append(f"label={label}")
-        confidence = getattr(signal, "confidence", None)
-        if isinstance(confidence, (int, float)):
-            parts.append(f"confidence={float(confidence):.2f}")
-        created = getattr(signal, "created_at", None)
-        if isinstance(created, datetime):
-            parts.append(f"signal_at={created.date().isoformat()}")
-        signal_id = getattr(signal, "id", None)
-        if signal_id is not None:
-            parts.append(f"signal_id={signal_id}")
-        return "; ".join(parts) if parts else "active decision signal"
+    def _optional_text(value: Any, max_length: int) -> Optional[str]:
+        if value in (None, ""):
+            return None
+        return str(value)[:max_length]
+
+    @staticmethod
+    def _unanalyzed_item(stock_code: str) -> Dict[str, Any]:
+        return {
+            "stock_code": stock_code,
+            "status": SCORE_STATUS_UNANALYZED,
+            "score": None,
+            "as_of": None,
+            "age_days": None,
+            "analysis_id": None,
+            "operation_advice": None,
+            "factors": [],
+            "freshness": "none",
+            "degraded_reasons": [],
+        }
 
     @staticmethod
     def _empty_payload(sort_mode: str) -> Dict[str, Any]:
         return {
+            "formula_version": FORMULA_VERSION,
             "scoring_mode": SCORING_MODE_AGGREGATE_EXISTING,
             "sort": sort_mode,
             "items": [],
             "query_count": {"analysis": 0, "signals": 0},
-            "disclaimer": (
-                "Scores aggregate existing analysis and decision-signal history. "
-                "They are not investment advice and may lag the market."
-            ),
+            "source_rows": {"analysis": 0, "signals": 0},
+            "disclaimer_key": "watchlist_score.disclaimer",
         }

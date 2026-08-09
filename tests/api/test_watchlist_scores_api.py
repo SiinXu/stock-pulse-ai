@@ -1,75 +1,106 @@
 # -*- coding: utf-8 -*-
-"""API tests for watchlist score endpoint (Issue #147 / T25)."""
+"""Real HTTP contract tests for watchlist scores."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any, Dict, Sequence
 
-from api.v1.endpoints.watchlist_scores import score_watchlist_symbols
-from api.v1.schemas.watchlist_scores import WatchlistScoreRequest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from api.v1.endpoints import watchlist_scores
 from src.services.watchlist_score_service import WatchlistScoreService
 
 
-def test_score_endpoint_returns_unanalyzed_without_fabricated_score(monkeypatch) -> None:
-    def _factory() -> WatchlistScoreService:
+def _client(monkeypatch, *, analyses=None, signals=None) -> TestClient:
+    def factory() -> WatchlistScoreService:
         return WatchlistScoreService(
-            analysis_loader=lambda _codes: {},
-            signal_loader=lambda _codes: {},
-            clock=lambda: datetime(2026, 8, 9, tzinfo=timezone.utc),
-        )
-
-    monkeypatch.setattr(
-        "api.v1.endpoints.watchlist_scores.WatchlistScoreService",
-        _factory,
-    )
-    response = score_watchlist_symbols(
-        WatchlistScoreRequest(stock_codes=["AAPL", "600519"], sort="manual")
-    )
-    assert response.scoring_mode == "aggregate_existing"
-    assert response.sort == "manual"
-    assert len(response.items) == 2
-    for item in response.items:
-        assert item.status == "unanalyzed"
-        assert item.score is None
-
-
-def test_score_endpoint_manual_default_and_batch_query_count(monkeypatch) -> None:
-    analyses: Dict[str, Any] = {
-        "MSFT": SimpleNamespace(
-            id=2,
-            code="MSFT",
-            sentiment_score=88,
-            operation_advice="Buy",
-            created_at=datetime(2026, 8, 9, 1, 0, tzinfo=timezone.utc),
-            report_type="detailed",
-        ),
-        "AAPL": SimpleNamespace(
-            id=1,
-            code="AAPL",
-            sentiment_score=40,
-            operation_advice="Hold",
-            created_at=datetime(2026, 8, 8, 1, 0, tzinfo=timezone.utc),
-            report_type="detailed",
-        ),
-    }
-
-    def _factory() -> WatchlistScoreService:
-        return WatchlistScoreService(
-            analysis_loader=lambda codes: analyses,
-            signal_loader=lambda codes: {},
+            analysis_loader=lambda _codes: analyses or {},
+            signal_loader=lambda _codes: signals or {},
             clock=lambda: datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc),
         )
 
-    monkeypatch.setattr(
-        "api.v1.endpoints.watchlist_scores.WatchlistScoreService",
-        _factory,
+    monkeypatch.setattr(watchlist_scores, "WatchlistScoreService", factory)
+    app = FastAPI()
+    app.include_router(watchlist_scores.router, prefix="/api/v1/watchlist")
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def test_real_endpoint_returns_strict_unanalyzed_contract(monkeypatch) -> None:
+    response = _client(monkeypatch).post(
+        "/api/v1/watchlist/scores",
+        json={"stock_codes": ["AAPL", "600519"], "sort": "manual"},
     )
-    response = score_watchlist_symbols(
-        WatchlistScoreRequest(stock_codes=["AAPL", "MSFT"])
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["formula_version"] == "watchlist_score_v1"
+    assert payload["disclaimer_key"] == "watchlist_score.disclaimer"
+    assert payload["source_rows"] == {"analysis": 0, "signals": 0}
+    assert [item["score"] for item in payload["items"]] == [None, None]
+
+
+def test_real_endpoint_serializes_aware_utc_and_factor_provenance(monkeypatch) -> None:
+    analysis = SimpleNamespace(
+        id=5,
+        code="AAPL",
+        sentiment_score=72,
+        operation_advice="Buy <script>",
+        created_at=datetime(2026, 8, 8, 9, 0, tzinfo=timezone.utc),
+        report_type="detailed",
     )
-    assert [item.stock_code for item in response.items] == ["AAPL", "MSFT"]
-    assert response.query_count.analysis == 1
-    assert response.query_count.signals == 1
-    assert "not investment advice" in response.disclaimer.lower()
+    signal = SimpleNamespace(
+        id=8,
+        stock_code="AAPL",
+        action="buy",
+        confidence=0.8,
+        status="active",
+        source_type="analysis",
+        source_report_id=5,
+        decision_profile="balanced",
+        created_at=datetime(2026, 8, 8, 10, 0),
+        expires_at=datetime(2026, 8, 10, 10, 0),
+    )
+    response = _client(
+        monkeypatch,
+        analyses={"AAPL": analysis},
+        signals={"AAPL": signal},
+    ).post("/api/v1/watchlist/scores", json={"stock_codes": ["AAPL"]})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["as_of"].endswith("Z")
+    assert item["operation_advice"] == "Buy <script>"
+    assert item["factors"][1]["source"]["source_report_id"] == 5
+    assert "label" not in item["factors"][0]
+    assert "detail" not in item["factors"][0]
+
+
+def test_request_overflow_invalid_symbol_duplicate_and_sort_are_stable_422(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    cases = [
+        {"stock_codes": ["AAPL"] * 201},
+        {"stock_codes": ["AAPL", "AAPL"]},
+        {"stock_codes": ["bad symbol"]},
+        {"stock_codes": ["AAPL"], "sort": "random"},
+    ]
+    for body in cases:
+        response = client.post("/api/v1/watchlist/scores", json=body)
+        assert response.status_code == 422
+
+    alias_duplicate = client.post(
+        "/api/v1/watchlist/scores",
+        json={"stock_codes": ["00700", "HK00700"]},
+    )
+    assert alias_duplicate.status_code == 400
+    assert alias_duplicate.json()["detail"]["error"] == "validation_error"
+
+
+def test_openapi_exposes_enums_bounds_and_datetime_contract(monkeypatch) -> None:
+    schema = _client(monkeypatch).app.openapi()
+    components = schema["components"]["schemas"]
+    request = components["WatchlistScoreRequest"]
+    item = components["WatchlistScoreItem"]
+    assert request["properties"]["stock_codes"]["maxItems"] == 200
+    assert request["properties"]["sort"]["enum"] == ["manual", "score_desc", "score_asc"]
+    assert item["properties"]["score"]["anyOf"][0]["maximum"] == 100
+    assert item["properties"]["as_of"]["anyOf"][0]["format"] == "date-time"

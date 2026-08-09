@@ -3170,7 +3170,7 @@ export interface paths {
         put?: never;
         /**
          * Score watchlist symbols from existing analysis
-         * @description Batch-aggregate AI-oriented watchlist scores from the latest analysis history and active decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Default sort=manual preserves the caller's order. No new LLM calls.
+         * @description Batch-aggregate AI-oriented watchlist scores from the latest analysis history and same-report, unexpired decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Requests are limited to 200 unique market identities. Default sort=manual preserves the caller's order. No new LLM calls.
          */
         post: operations["scoreWatchlistSymbols"];
         delete?: never;
@@ -11767,14 +11767,43 @@ export interface components {
         };
         /** WatchlistScoreFactor */
         WatchlistScoreFactor: {
-            /** Detail */
-            detail?: string | null;
-            /** Key */
-            key: string;
-            /** Label */
-            label: string;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "analysis_sentiment" | "decision_signal";
+            /** Params */
+            params?: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Reason */
+            reason?: ("invalid_sentiment" | "inactive_signal" | "expired_signal" | "incoherent_signal_source" | "unknown_signal_action" | "invalid_signal_confidence") | null;
+            source: components["schemas"]["WatchlistScoreFactorSource"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "ignored";
             /** Value */
-            value: string | number;
+            value?: string | number | null;
+        };
+        /** WatchlistScoreFactorSource */
+        WatchlistScoreFactorSource: {
+            /** As Of */
+            as_of?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "watchlist_score_v1";
+            /** Id */
+            id?: number | null;
+            /** Profile */
+            profile?: string | null;
+            /** Source Report Id */
+            source_report_id?: number | null;
         };
         /** WatchlistScoreItem */
         WatchlistScoreItem: {
@@ -11784,25 +11813,25 @@ export interface components {
             analysis_id?: number | null;
             /** As Of */
             as_of?: string | null;
+            /** Degraded Reasons */
+            degraded_reasons?: ("invalid_sentiment" | "inactive_signal" | "expired_signal" | "incoherent_signal_source" | "unknown_signal_action" | "invalid_signal_confidence")[];
             /** Factors */
             factors?: components["schemas"]["WatchlistScoreFactor"][];
             /**
              * Freshness
              * @default none
+             * @enum {string}
              */
-            freshness: string;
+            freshness: "none" | "unknown" | "today" | "recent" | "stale_week" | "stale";
             /** Operation Advice */
             operation_advice?: string | null;
-            /**
-             * Score
-             * @description 0-100 composite when scored; null when unanalyzed (never invented as 0)
-             */
+            /** Score */
             score?: number | null;
             /**
              * Status
-             * @description 'scored' or 'unanalyzed'
+             * @enum {string}
              */
-            status: string;
+            status: "scored" | "unanalyzed";
             /** Stock Code */
             stock_code: string;
         };
@@ -11817,27 +11846,46 @@ export interface components {
         WatchlistScoreRequest: {
             /**
              * Sort
-             * @description Sort mode: manual (default, preserve input order), score_desc, score_asc
              * @default manual
+             * @enum {string}
              */
-            sort: string;
-            /**
-             * Stock Codes
-             * @description Ordered watchlist symbols to score (max 200). Empty list returns empty items.
-             */
+            sort: "manual" | "score_desc" | "score_asc";
+            /** Stock Codes */
             stock_codes?: string[];
         };
         /** WatchlistScoreResponse */
         WatchlistScoreResponse: {
-            /** Disclaimer */
-            disclaimer: string;
+            /**
+             * Disclaimer Key
+             * @constant
+             */
+            disclaimer_key: "watchlist_score.disclaimer";
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "watchlist_score_v1";
             /** Items */
             items: components["schemas"]["WatchlistScoreItem"][];
             query_count: components["schemas"]["WatchlistScoreQueryCount"];
-            /** Scoring Mode */
-            scoring_mode: string;
-            /** Sort */
-            sort: string;
+            /**
+             * Scoring Mode
+             * @constant
+             */
+            scoring_mode: "aggregate_existing";
+            /**
+             * Sort
+             * @enum {string}
+             */
+            sort: "manual" | "score_desc" | "score_asc";
+            source_rows: components["schemas"]["WatchlistScoreSourceRows"];
+        };
+        /** WatchlistScoreSourceRows */
+        WatchlistScoreSourceRows: {
+            /** Analysis */
+            analysis: number;
+            /** Signals */
+            signals: number;
         };
     };
     responses: never;

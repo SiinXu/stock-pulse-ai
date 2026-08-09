@@ -282,19 +282,38 @@ const scoredFixture: WatchlistScoreItem = {
   ageDays: 1,
   analysisId: 5,
   operationAdvice: 'Buy',
-  freshness: '1d',
+  freshness: 'recent',
+  degradedReasons: [],
   factors: [
     {
       key: 'analysis_sentiment',
-      label: 'Analysis sentiment score',
+      status: 'applied',
       value: 72,
-      detail: 'advice=Buy; as_of=2026-08-08',
+      params: { operationAdvice: 'Buy', reportType: 'detailed' },
+      reason: null,
+      source: {
+        id: 5,
+        sourceReportId: 5,
+        profile: null,
+        asOf: '2026-08-08T09:00:00+00:00',
+        expiresAt: null,
+        formulaVersion: 'watchlist_score_v1',
+      },
     },
     {
       key: 'decision_signal',
-      label: 'Active decision signal',
+      status: 'applied',
       value: 'buy',
-      detail: 'confidence=0.80',
+      params: { confidence: 0.8, profile: 'balanced' },
+      reason: null,
+      source: {
+        id: 8,
+        sourceReportId: 5,
+        profile: 'balanced',
+        asOf: '2026-08-08T10:00:00+00:00',
+        expiresAt: '2026-08-10T10:00:00+00:00',
+        formulaVersion: 'watchlist_score_v1',
+      },
     },
   ],
 };
@@ -305,8 +324,11 @@ const unanalyzedFixture: WatchlistScoreItem = {
   score: null,
   asOf: null,
   ageDays: null,
+  analysisId: null,
+  operationAdvice: null,
   factors: [],
   freshness: 'none',
+  degradedReasons: [],
 };
 
 const WatchlistScoreColumnStory = () => {

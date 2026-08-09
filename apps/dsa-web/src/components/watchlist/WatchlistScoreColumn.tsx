@@ -5,10 +5,14 @@ import { useId, useState } from 'react';
 import { ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
-import type { WatchlistScoreItem } from '../../types/watchlistScore';
+import type {
+  WatchlistScoreDegradationReason,
+  WatchlistScoreFactor,
+  WatchlistScoreItem,
+} from '../../types/watchlistScore';
 import { getSentimentColor } from '../../types/analysis';
 import { cn } from '../../utils/cn';
-import { Badge, InlineAlert } from '../common';
+import { Badge, InlineAlert, Tooltip } from '../common';
 
 export type WatchlistScoreColumnProps = {
   item: WatchlistScoreItem;
@@ -36,6 +40,39 @@ function freshnessLabel(
   return t('watchlistScore.freshnessUnknown');
 }
 
+const FACTOR_LABELS: Record<WatchlistScoreFactor['key'], UiTextKey> = {
+  analysis_sentiment: 'watchlistScore.factorAnalysisSentiment',
+  decision_signal: 'watchlistScore.factorDecisionSignal',
+};
+
+const DEGRADATION_LABELS: Record<WatchlistScoreDegradationReason, UiTextKey> = {
+  invalid_sentiment: 'watchlistScore.reasonInvalidSentiment',
+  inactive_signal: 'watchlistScore.reasonInactiveSignal',
+  expired_signal: 'watchlistScore.reasonExpiredSignal',
+  incoherent_signal_source: 'watchlistScore.reasonIncoherentSignal',
+  unknown_signal_action: 'watchlistScore.reasonUnknownAction',
+  invalid_signal_confidence: 'watchlistScore.reasonInvalidConfidence',
+};
+
+function factorDetail(
+  factor: WatchlistScoreFactor,
+  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
+): string {
+  if (factor.reason) return t(DEGRADATION_LABELS[factor.reason]);
+  if (factor.key === 'analysis_sentiment') {
+    return t('watchlistScore.analysisProvenance', {
+      advice: String(factor.params.operationAdvice ?? t('common.noData')),
+      reportType: String(factor.params.reportType ?? t('common.noData')),
+    });
+  }
+  return t('watchlistScore.signalProvenance', {
+    confidence: factor.params.confidence == null
+      ? t('common.noData')
+      : String(factor.params.confidence),
+    reportId: factor.source.sourceReportId ?? t('common.noData'),
+  });
+}
+
 /**
  * Independent score cell for a watchlist row (Issue #147 / T25).
  *
@@ -51,6 +88,7 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
 }) => {
   const { t } = useUiLanguage();
   const panelId = useId();
+  const toggleId = useId();
   const [internalExpanded, setInternalExpanded] = useState(false);
   const expanded = expandedProp ?? internalExpanded;
 
@@ -77,7 +115,7 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
         >
           {t('watchlistScore.unanalyzed')}
         </Badge>
-        <span className="text-[11px] text-muted-text">{t('watchlistScore.unanalyzedHint')}</span>
+        <span className="text-label text-muted-text">{t('watchlistScore.unanalyzedHint')}</span>
       </div>
     );
   }
@@ -93,6 +131,7 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
     >
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <button
+          id={toggleId}
           type="button"
           className="inline-flex min-h-8 items-center gap-1 rounded-md border border-transparent px-0.5 text-left hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={toggle}
@@ -115,19 +154,22 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
             {t('watchlistScore.scoreLabel', { score: item.score })}
           </Badge>
         </button>
-        <span
-          className="inline-flex items-center gap-0.5 text-[11px] text-muted-text"
-          data-testid="watchlist-score-freshness"
-          title={item.asOf ?? undefined}
-        >
-          <Info className="size-3 shrink-0" aria-hidden />
-          {freshnessLabel(item, t)}
-        </span>
+        <Tooltip content={item.asOf} focusable>
+          <span
+            className="inline-flex items-center gap-0.5 text-label text-muted-text"
+            data-testid="watchlist-score-freshness"
+          >
+            <Info className="size-3 shrink-0" aria-hidden />
+            {freshnessLabel(item, t)}
+          </span>
+        </Tooltip>
       </div>
 
       {expanded ? (
         <div
           id={panelId}
+          role="region"
+          aria-labelledby={toggleId}
           className="rounded-md border border-border/70 bg-muted/30 px-2.5 py-2 text-xs"
           data-testid="watchlist-score-factors"
         >
@@ -139,18 +181,22 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
               {item.factors.map((factor) => (
                 <li key={factor.key} className="min-w-0">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                    <span className="text-muted-text">{factor.label}</span>
-                    <span className="font-medium text-foreground">{String(factor.value)}</span>
+                    <span className="text-muted-text">{t(FACTOR_LABELS[factor.key])}</span>
+                    <span className="font-medium text-foreground">
+                      {factor.status === 'ignored'
+                        ? t('watchlistScore.factorIgnored')
+                        : String(factor.value)}
+                    </span>
                   </div>
-                  {factor.detail ? (
-                    <p className="mt-0.5 text-[11px] text-muted-text">{factor.detail}</p>
-                  ) : null}
+                  <p className="mt-0.5 break-words text-label text-muted-text">
+                    {factorDetail(factor, t)}
+                  </p>
                 </li>
               ))}
             </ul>
           )}
           {item.asOf ? (
-            <p className="mt-2 text-[11px] text-muted-text">
+            <p className="mt-2 text-label text-muted-text">
               {t('watchlistScore.asOf', { date: item.asOf })}
             </p>
           ) : null}

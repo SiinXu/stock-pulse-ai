@@ -35,9 +35,10 @@ router = APIRouter()
     summary="Score watchlist symbols from existing analysis",
     description=(
         "Batch-aggregate AI-oriented watchlist scores from the latest analysis "
-        "history and active decision signals. Symbols without analysis history "
+        "history and same-report, unexpired decision signals. Symbols without analysis history "
         "return status=unanalyzed with score=null (never a fabricated 0). "
-        "Default sort=manual preserves the caller's order. No new LLM calls."
+        "Requests are limited to 200 unique market identities. Default "
+        "sort=manual preserves the caller's order. No new LLM calls."
     ),
     operation_id="scoreWatchlistSymbols",
 )
