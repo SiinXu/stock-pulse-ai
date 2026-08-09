@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
+- [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
+- [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
 - [Fixed] Keep a single primary create-rule action in an empty Signal Center and strengthen Usage redirect/title acceptance.
 - [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
 - [Added] Versioned watchlist AI scoring from bounded existing analysis and coherent decision signals, with strict source/time/degradation provenance and a localized independent Web column (Issue #147 / T25).
