@@ -358,6 +358,66 @@ def test_pdf_rejects_report_glyphs_missing_from_otherwise_valid_font():
     not export_mod.is_pdf_dependency_available(),
     reason="optional fpdf2 not installed",
 )
+def test_representative_multilingual_fixture_is_complete_or_explicitly_rejected():
+    pypdf = pytest.importorskip("pypdf")
+    fixture_path = (
+        Path(__file__).parents[1]
+        / "fixtures"
+        / "report_export"
+        / "representative_full_report.md"
+    )
+    markdown = fixture_path.read_text(encoding="utf-8")
+    blocks = export_mod._parse_markdown_blocks(markdown)
+    visible = export_mod._rendered_text(blocks)
+    parsed_fonts = [
+        candidate
+        for candidate in export_mod._DEFAULT_FONT_CANDIDATES
+        if inspect_font_file(candidate).valid
+    ]
+    assert parsed_fonts, "the test host must expose one documented parsed font candidate"
+    covering_font = next(
+        (
+            candidate
+            for candidate in parsed_fonts
+            if not missing_font_codepoints(candidate, visible)
+        ),
+        None,
+    )
+    _clear_pdf_cache()
+
+    if covering_font is None:
+        with pytest.raises(ReportExportFontError) as exc:
+            export_pdf_bytes(
+                markdown,
+                font_path=parsed_fonts[0],
+                filename_stem="representative-multilingual-report",
+            )
+        assert exc.value.error_code == "export_font_coverage_missing"
+        assert missing_font_codepoints(parsed_fonts[0], visible)
+        return
+
+    artifact = export_pdf_bytes(
+        markdown,
+        font_path=covering_font,
+        filename_stem="representative-multilingual-report",
+    )
+    reader = pypdf.PdfReader(BytesIO(artifact.content))
+    extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
+    for marker in (
+        "Representative full multilingual report",
+        "결론 요약",
+        "TREND-EVIDENCE-END",
+        "估值证据结束",
+        "Nested condition B",
+        "Disclaimer / 免责声明 / 면책조항",
+    ):
+        assert marker in extracted
+
+
+@pytest.mark.skipif(
+    not export_mod.is_pdf_dependency_available(),
+    reason="optional fpdf2 not installed",
+)
 def test_pdf_long_table_wraps_across_pages_without_text_deletion():
     pypdf = pytest.importorskip("pypdf")
     long_evidence = "Complete evidence sentence " * 18
