@@ -29277,6 +29277,16 @@
               }
             },
             "description": "Lifecycle operation failed unexpectedly"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable"
           }
         },
         "security": [

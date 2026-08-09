@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from data_provider import DataFetcherManager, DataProvider
+from data_provider import DataFetcherManager, DataProvider, DataProviderRegistration
 from src.plugins import (
     PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV,
     PLUGIN_LIFECYCLE_EVENT_TYPE,
@@ -128,6 +129,37 @@ class _FallbackProvider(DataProvider):
         )
 
 
+class _FailingProvider(DataProvider):
+    name = "ObservabilityFailingProvider"
+    priority = 10
+
+    def get_daily_data(
+        self,
+        stock_code: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days: int = 30,
+    ) -> pd.DataFrame:
+        del stock_code, start_date, end_date, days
+        raise RuntimeError("provider unavailable")
+
+
+class _FailingProviderPlugin(Plugin):
+    def onload(self, context: PluginContext) -> None:
+        context.register(
+            "data_provider",
+            "observability-failing-provider",
+            DataProviderRegistration(
+                provider_id="observability-failing-provider",
+                factory=_FailingProvider,
+                markets=frozenset({"cn"}),
+                capabilities=frozenset({"daily_data"}),
+            ),
+            contract_version="1",
+            priority=_FailingProvider.priority,
+        )
+
+
 def test_lifecycle_audit_records_load_enable_disable_and_onload_failed() -> None:
     audit = SecurityAuditRecorderStub()
     manager = _manager(audit)
@@ -211,16 +243,22 @@ def test_lifecycle_audit_records_reload_completion(tmp_path: Path) -> None:
     assert loaded.success is True
     assert manager.load("stockpulse.reload-audit").success is True
 
+    attempts_before = len(audit.attempts)
+    completions_before = len(audit.completions)
     reload_result = manager.reload("stockpulse.reload-audit")
     assert reload_result.success is True
     assert reload_result.reloaded is True
 
-    reload_completions = [
-        item for item in audit.completions if item["action"] == "plugin.reload"
-    ]
-    assert len(reload_completions) == 1
+    reload_attempts = audit.attempts[attempts_before:]
+    reload_completions = audit.completions[completions_before:]
+    assert [item["action"] for item in reload_attempts] == ["plugin.reload"]
+    assert [item["action"] for item in reload_completions] == ["plugin.reload"]
     assert reload_completions[0]["outcome"] == "success"
     assert reload_completions[0]["target_id"] == "stockpulse.reload-audit"
+    assert (
+        reload_completions[0]["correlation_id"]
+        == reload_attempts[0]["correlation_id"]
+    )
 
 
 def test_lifecycle_audit_failure_does_not_block_plugin_load() -> None:
@@ -233,6 +271,27 @@ def test_lifecycle_audit_failure_does_not_block_plugin_load() -> None:
     assert result.success is True
     assert result.state == "enabled"
     assert plugin.load_count == 1
+
+
+def test_operator_enable_of_registered_plugin_audits_enable_not_startup_load() -> None:
+    audit = SecurityAuditRecorderStub()
+    manager = _manager(audit)
+    plugin = _RecordingPlugin(_manifest("stockpulse.operator-enable"))
+    manager.register(plugin, source="builtin")
+
+    result = manager.set_enabled(
+        "stockpulse.operator-enable",
+        True,
+        require_audit=True,
+        actor_type="administrator",
+        actor_id="local_operator",
+    )
+
+    assert result.success is True
+    assert result.operation == "enable"
+    assert [event["action"] for event in audit.attempts] == ["plugin.enable"]
+    assert [event["action"] for event in audit.completions] == ["plugin.enable"]
+    assert audit.attempts[0]["actor_type"] == "administrator"
 
 
 def test_health_check_exposes_state_and_last_error_code() -> None:
@@ -263,6 +322,26 @@ def test_health_check_exposes_state_and_last_error_code() -> None:
     assert as_dict["total"] == 2
     assert isinstance(as_dict["generated_at"], str)
     assert as_dict["plugins"][0]["plugin_id"]
+
+
+def test_last_error_survives_disable_and_clears_after_successful_recovery() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(
+        _manifest("stockpulse.recovery-plugin"),
+        fail_onload=True,
+    )
+    manager.register(plugin, source="builtin")
+
+    assert manager.load("stockpulse.recovery-plugin").success is False
+    assert manager.disable("stockpulse.recovery-plugin").success is True
+    assert (
+        manager.health_check().plugins[0].last_error_code
+        == "plugin_onload_failed"
+    )
+
+    plugin.fail_onload = False
+    assert manager.enable("stockpulse.recovery-plugin").success is True
+    assert manager.health_check().plugins[0].last_error_code is None
 
 
 def test_single_plugin_failure_does_not_block_other_plugins() -> None:
@@ -297,6 +376,19 @@ def test_data_provider_auto_bind_flag_defaults_off(
     assert data_provider_auto_bind_enabled() is False
     monkeypatch.setenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, "true")
     assert data_provider_auto_bind_enabled() is True
+
+
+def test_data_provider_auto_bind_flag_loads_through_shared_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.config import Config
+
+    monkeypatch.setenv("ENV_FILE", os.devnull)
+    monkeypatch.setenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, "true")
+    config = Config._load_from_env()
+
+    assert config.plugin_data_provider_auto_bind_enabled is True
+    assert data_provider_auto_bind_enabled(config) is True
 
 
 def test_data_provider_auto_bind_discovers_providers_when_enabled(
@@ -399,13 +491,20 @@ def test_build_data_provider_bound_registry_requires_live_backend() -> None:
     assert error is None
     assert bound is providers.plugin_registry
 
+
 def test_application_services_auto_bind_composition_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     """Default ApplicationServices must call auto-bind when the flag is on."""
 
-    from src.application_services import ApplicationServices
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+    from src.config import Config
+    from src.services.stock_service import StockService
 
     example = (
         Path(__file__).resolve().parents[2]
@@ -417,7 +516,9 @@ def test_application_services_auto_bind_composition_root(
 
     shutil.copytree(example, tmp_path / "example-provider")
     monkeypatch.setenv("PLUGINS_DIR", str(tmp_path))
-    monkeypatch.setenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, "true")
+    # The application root must honor its injected Config without consulting
+    # the ambient environment a second time.
+    monkeypatch.delenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, raising=False)
     monkeypatch.setenv("PROVIDER_ADAPTIVE_PRIORITY_ENABLED", "false")
     monkeypatch.setenv("PROVIDER_CIRCUIT_BREAKER_ENABLED", "false")
     monkeypatch.setenv("PROVIDER_DAILY_CACHE_ENABLED", "false")
@@ -426,20 +527,55 @@ def test_application_services_auto_bind_composition_root(
     # Inject a manager with one fallback so offline daily data still resolves.
     providers = DataFetcherManager(fetchers=[_FallbackProvider()])
     services = ApplicationServices(
+        config=Config(plugin_data_provider_auto_bind_enabled=True),
         data_fetcher_manager=providers,
         plugins_dir=tmp_path,
     )
+    set_application_services(services)
     try:
         assert services.data_fetcher_manager is providers
         assert services.plugin_manager.registry is providers.plugin_registry
         loads = services.start_plugins()
         assert any(result.success for result in loads)
         assert "ExampleReferenceProvider" in providers.available_fetchers
-        frame, source = providers.get_daily_data("600519")
-        assert source == "ExampleReferenceProvider"
-        assert len(frame) == 2
+        result = StockService().get_history_data("600519")
+        assert [item["close"] for item in result["data"]] == [100.5, 101.25]
     finally:
-        services.close()
+        reset_application_services()
+        DataFetcherManager.reset_daily_source_health()
+
+
+def test_application_services_bound_provider_failure_uses_service_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+    from src.config import Config
+    from src.services.stock_service import StockService
+
+    monkeypatch.setenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, "true")
+    monkeypatch.setenv("PROVIDER_ADAPTIVE_PRIORITY_ENABLED", "false")
+    monkeypatch.setenv("PROVIDER_CIRCUIT_BREAKER_ENABLED", "false")
+    monkeypatch.setenv("PROVIDER_DAILY_CACHE_ENABLED", "false")
+    DataFetcherManager.reset_daily_source_health()
+    providers = DataFetcherManager(fetchers=[_FallbackProvider()])
+    plugin = _FailingProviderPlugin(_manifest("stockpulse.failing-provider"))
+    services = ApplicationServices(
+        config=Config(plugin_data_provider_auto_bind_enabled=True),
+        data_fetcher_manager=providers,
+        builtin_plugins=(plugin,),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    try:
+        assert services.start_plugins()[0].success is True
+        result = StockService().get_history_data("600519")
+        assert [item["close"] for item in result["data"]] == [1.0]
+    finally:
+        reset_application_services()
         DataFetcherManager.reset_daily_source_health()
 
 
@@ -447,13 +583,16 @@ def test_application_services_auto_bind_defaults_off_keeps_unbound_registry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.application_services import ApplicationServices
+    from src.config import Config
 
     monkeypatch.delenv(PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV, raising=False)
-    services = ApplicationServices(builtin_plugins=())
+    services = ApplicationServices(
+        config=Config(plugin_data_provider_auto_bind_enabled=False),
+        builtin_plugins=(),
+    )
     try:
         assert services.data_fetcher_manager is None
         # Unbound process registry is not a DataFetcherManager registry.
         assert services.plugin_manager.registry is not None
     finally:
         services.close()
-

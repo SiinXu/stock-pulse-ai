@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, HTTPException, Security
 from fastapi.security import APIKeyCookie
@@ -18,8 +19,13 @@ from api.v1.schemas.plugins import (
     PluginLifecycleResponse,
     PluginListResponse,
 )
-from src.auth import COOKIE_NAME
-from src.plugins import PluginManager, PluginSnapshot
+from src.auth import COOKIE_NAME, is_auth_enabled
+from src.plugins import (
+    PluginLifecycleAuditCompletionUnavailable,
+    PluginManager,
+    PluginSnapshot,
+)
+from src.services.security_audit_service import SecurityAuditUnavailable
 from src.utils.sanitize import log_safe_exception
 
 
@@ -44,6 +50,16 @@ def _plugin_manager() -> PluginManager:
     from src.application_services import get_application_services
 
     return get_application_services().plugin_manager
+
+
+def _plugin_lifecycle_actor_id() -> str:
+    """Return the attributable operator class for the single-admin model."""
+
+    if os.getenv("DSA_DESKTOP_MODE") == "true":
+        return "desktop_operator"
+    if is_auth_enabled():
+        return "authenticated_admin"
+    return "local_operator"
 
 
 def _to_info(snapshot: PluginSnapshot) -> PluginInfo:
@@ -124,6 +140,7 @@ def get_plugin_health() -> PluginHealthResponse:
         404: {"model": ErrorResponse, "description": "Plugin not found"},
         400: {"model": ErrorResponse, "description": "Invalid lifecycle request"},
         500: {"model": ErrorResponse, "description": "Lifecycle operation failed unexpectedly"},
+        503: {"model": ErrorResponse, "description": "Security audit storage unavailable"},
     },
     summary="Enable, disable, or hot-reload one plugin",
     description=(
@@ -147,8 +164,13 @@ def update_plugin_lifecycle(
             },
         )
     try:
+        audit_fields = {
+            "require_audit": True,
+            "actor_type": "administrator",
+            "actor_id": _plugin_lifecycle_actor_id(),
+        }
         if request.action == "enable":
-            result = manager.set_enabled(plugin_id, True)
+            result = manager.set_enabled(plugin_id, True, **audit_fields)
             snapshot = manager.snapshot(plugin_id)
             return PluginLifecycleResponse(
                 plugin_id=plugin_id,
@@ -166,7 +188,7 @@ def update_plugin_lifecycle(
                 plugin=None if snapshot is None else _to_info(snapshot),
             )
         if request.action == "disable":
-            result = manager.set_enabled(plugin_id, False)
+            result = manager.set_enabled(plugin_id, False, **audit_fields)
             snapshot = manager.snapshot(plugin_id)
             return PluginLifecycleResponse(
                 plugin_id=plugin_id,
@@ -184,7 +206,7 @@ def update_plugin_lifecycle(
                 plugin=None if snapshot is None else _to_info(snapshot),
             )
         # reload
-        reload_result = manager.reload(plugin_id)
+        reload_result = manager.reload(plugin_id, **audit_fields)
         snapshot = manager.snapshot(plugin_id)
         return PluginLifecycleResponse(
             plugin_id=plugin_id,
@@ -197,6 +219,30 @@ def update_plugin_lifecycle(
             message=reload_result.message,
             plugin=None if snapshot is None else _to_info(snapshot),
         )
+    except PluginLifecycleAuditCompletionUnavailable as exc:
+        result = exc.result
+        detail = {
+            "error": "security_audit_unavailable",
+            "message": (
+                "Plugin lifecycle operation completed, but its audit completion "
+                "could not be persisted"
+            ),
+            "operation_completed": True,
+            "operation_success": result.success,
+            "state": result.state,
+        }
+        if hasattr(result, "reloaded"):
+            detail["reloaded"] = result.reloaded
+        raise HTTPException(status_code=503, detail=detail) from None
+    except SecurityAuditUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": "Security audit storage is unavailable",
+                "operation_completed": False,
+            },
+        ) from None
     except HTTPException:
         raise
     except Exception as exc:  # broad-exception: fallback_recorded - map unexpected lifecycle failures to a sanitized API error

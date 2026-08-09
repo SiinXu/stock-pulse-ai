@@ -167,7 +167,11 @@ class ApplicationServices:
                 "event_hook": event_hook_extension_contract(),
             }
             registry = None
-            if data_provider_auto_bind_enabled():
+            # Preserve composition-root construction laziness: an explicitly
+            # injected Config is authoritative, while the default root uses
+            # the helper's environment compatibility path until Config is
+            # first requested by a real service.
+            if data_provider_auto_bind_enabled(config):
                 # Opt-in process composition: bind PluginManager to the exact
                 # DataFetcherManager.plugin_registry so provider plugins route.
                 from data_provider import DataFetcherManager
@@ -177,7 +181,8 @@ class ApplicationServices:
                         extension_contracts=process_contracts,
                     )
                 bound_registry, bind_error = try_build_auto_bound_registry(
-                    self._data_fetcher_manager
+                    self._data_fetcher_manager,
+                    config=config,
                 )
                 if bound_registry is not None:
                     registry = bound_registry

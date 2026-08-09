@@ -171,9 +171,11 @@ class Plugin(BasePlugin):
 
 ### 生命周期审计
 
-enable / disable / reload / load 会通过既有安全审计设施写入 best-effort 事件
-（`event_type=plugin.lifecycle`）。可通过管理员安全审计 API 查询。审计写入失败
-仅记录日志，**不会**阻断插件启动或其它插件。
+生命周期变更会通过既有安全审计设施写入事件（`event_type=plugin.lifecycle`）。
+自动启动加载采用 best-effort，审计存储不可用时不会阻断其它插件。管理员发起
+enable / disable / reload 时，如果 attempt 事件无法持久化，会在状态变更前以
+fail-closed 方式返回错误；如果操作完成后 completion 写入失败，API 会返回
+`503 security_audit_unavailable` 并说明真实完成状态，不会声称已回滚。
 
 ### Data Provider 自动绑定（显式开关）
 
@@ -183,7 +185,9 @@ enable / disable / reload / load 会通过既有安全审计设施写入 best-ef
 
 保持关闭即可维持历史手动模式。开启且未注入 manager 时，`ApplicationServices`
 会构造一个 `DataFetcherManager` 并通过 `services.data_fetcher_manager` 暴露。
-自定义组合根仍可直接调用 `try_build_auto_bound_registry`。
+股票行情与历史服务会解析这个已安装 owner，因此插件 provider 与内置 fallback
+共用同一个 registry。自定义组合根仍可直接调用
+`try_build_auto_bound_registry`。
 
 ```python
 from data_provider import DataFetcherManager
@@ -211,7 +215,8 @@ for entry in report.plugins:
     print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
 ```
 
-失败插件查看 `last_error_code`（例如 `plugin_onload_failed`）。单个插件失败不得
+`last_error_code` 表示最近一次稳定失败（例如 `plugin_onload_failed`）；禁用或
+修改意图不会清除它，成功 load / reload 才表示恢复并清除。单个插件失败不得
 影响其它插件与核心启动。
 
 ## 验证命令

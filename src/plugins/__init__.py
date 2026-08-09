@@ -55,6 +55,7 @@ from .event_hooks import (
 )
 from .loader import ExternalPluginLoader, ExternalPluginResult
 from .manager import (
+    PluginLifecycleAuditCompletionUnavailable,
     PluginManager,
     PluginOperationResult,
     PluginReloadResult,
@@ -143,6 +144,7 @@ __all__ = [
     "PluginHealthEntry",
     "PluginHealthReport",
     "PluginLifecycleAuditor",
+    "PluginLifecycleAuditCompletionUnavailable",
     "PluginManager",
     "PluginManifest",
     "PluginOperationResult",

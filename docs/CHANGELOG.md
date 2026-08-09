@@ -8,10 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Chore] Raise backend-gate job timeout to 45 minutes so broad PR selective offline suites are not cancelled at the 30-minute job ceiling.
-- [Changed] ApplicationServices composition root calls data-provider auto-bind when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled so provider plugins route through the process PluginManager.
-
-- [Added] Plugin lifecycle security-audit trail (load/enable/disable/reload), opt-in Data Provider auto-bind helper (`PLUGIN_DATA_PROVIDER_AUTO_BIND`), plugin health_check snapshots with last error codes, and GET `/api/v1/plugins/health` plus list `last_error_code` for diagnostics consumers.
+- [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root owns the data manager used by stock quote/history services so provider plugins and built-in fallback share one registry.
+- [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
 - [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).

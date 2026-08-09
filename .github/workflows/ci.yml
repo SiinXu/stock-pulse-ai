@@ -107,8 +107,7 @@ jobs:
   backend-gate:
     name: backend-gate
     runs-on: ubuntu-latest
-    # PR selective suite with broad backend/API surface regularly approaches 30m under runner load.
-    timeout-minutes: 45
+    timeout-minutes: 30
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true'
     permissions:
