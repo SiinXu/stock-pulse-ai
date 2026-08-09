@@ -108,8 +108,9 @@ class CryptoCoingeckoFetcher(BaseFetcher):
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         if config is None:
-            from src.config import get_config
-            config = get_config()
+            from src.application_services import get_application_services
+
+            config = get_application_services().config
         self.priority = int(getattr(config, "crypto_coingecko_priority", 10))
         if self.priority < 0 or self.priority > 99:
             raise ValueError("crypto CoinGecko priority must be between 0 and 99")
