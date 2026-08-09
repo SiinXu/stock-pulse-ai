@@ -252,15 +252,15 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
         className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-subtle bg-background/40 p-2"
       >
         <div className="flex flex-col">
-          <span className="text-[10px] uppercase tracking-wide text-muted-text">{text.completedCount}</span>
+          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.completedCount}</span>
           <span className="font-mono text-sm text-success">{completed}</span>
         </div>
         <div className="flex flex-col">
-          <span className="text-[10px] uppercase tracking-wide text-muted-text">{text.insufficientCount}</span>
+          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.insufficientCount}</span>
           <span className="font-mono text-sm text-warning">{insufficient}</span>
         </div>
         <div className="flex flex-col">
-          <span className="text-[10px] uppercase tracking-wide text-muted-text">{text.evaluationCount}</span>
+          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.evaluationCount}</span>
           <span className="font-mono text-sm text-secondary-text">{total}</span>
         </div>
       </div>
@@ -800,7 +800,6 @@ const BacktestPage: React.FC = () => {
             <span
               data-testid="backtest-resolution-notes"
               className="block max-w-48 truncate text-xs text-secondary-text"
-              title={content}
             >
               {content}
             </span>
@@ -818,9 +817,9 @@ const BacktestPage: React.FC = () => {
       <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
           {/* #879 B2: mobile disclosure; page-scoped name avoids legacy "筛选" action. */}
-          <Button type="button" variant="secondary" size="default" aria-expanded={mobileFiltersOpen} aria-controls={filtersPanelId} aria-label={mobileFiltersToggleLabel} data-testid="backtest-mobile-filters-toggle" onClick={() => setMobileFiltersOpen((open) => !open)} className="min-h-11 whitespace-nowrap text-xs md:hidden">
+          <Button type="button" variant="secondary" size="comfortable" aria-expanded={mobileFiltersOpen} aria-controls={filtersPanelId} aria-label={mobileFiltersToggleLabel} data-testid="backtest-mobile-filters-toggle" onClick={() => setMobileFiltersOpen((open) => !open)} className="whitespace-nowrap md:hidden">
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-            <span aria-hidden="true">{text.filter}</span>
+            <span>{text.filter}</span>
             <ChevronDown className={cn('h-4 w-4 transition-transform', mobileFiltersOpen && 'rotate-180')} aria-hidden="true" />
           </Button>
           <div id={filtersPanelId} data-testid="backtest-run-filters" className={cn('flex min-w-0 flex-1 flex-wrap items-end gap-1.5', !mobileFiltersOpen && 'max-md:hidden')}>
@@ -908,7 +907,7 @@ const BacktestPage: React.FC = () => {
               </Tooltip>
             </div>
           </div>
-          <Button type="button" onClick={handleRun} variant="primary" size="primary" isLoading={isRunning} loadingText={text.running} className="min-h-11 whitespace-nowrap text-xs">
+          <Button type="button" onClick={handleRun} variant="primary" size="primary" isLoading={isRunning} loadingText={text.running} className="whitespace-nowrap">
             {text.runBacktest}
           </Button>
         </div>

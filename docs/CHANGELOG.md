@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] ApplicationServices composition root calls data-provider auto-bind when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled so provider plugins route through the process PluginManager.
 
 - [Added] Plugin lifecycle security-audit trail (load/enable/disable/reload), opt-in Data Provider auto-bind helper (`PLUGIN_DATA_PROVIDER_AUTO_BIND`), plugin health_check snapshots with last error codes, and GET `/api/v1/plugins/health` plus list `last_error_code` for diagnostics consumers.
+- [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
+- [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
+- [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).
+- [Fixed] Ensure the `web-gate` check always concludes on pull requests, reports successful no-frontend runs, and fails closed when change detection is unavailable.
+- [Fixed] Shared ScrollArea no longer applies touch-pan-y, restoring pinch-to-zoom inside chat and history rails while keeping the min-h-0 height chain.
+- [Fixed] Treat non-finite numbers (±Infinity) as missing values in marketFormat price and change-color guards so sentinel/overflow inputs never render as prices or paint as up/down moves.
+- [Added] Report templates pin a Decision Card (direction/score, conclusion, confidence, key risks, watch/invalidation conditions) at the top of each stock section using existing dashboard fields only; brief uses a 1+1 line push length budget so a typical 10-stock brief stays within Pushover max_length=1024 (#861 Phase 1).
+- [Fixed] Restore Simplified Chinese Settings help source for RSS news feeds and multi-strategy deliberation so UI i18n resource extraction no longer fails at import.
+- [Fixed] Treat settings-help `examples` as non-translatable config literals (SETTINGS_HELP_MAPS only), regenerate English inventory and 8 locale bundles, and shrink the identical-to-English baseline without growth.
+- [Fixed] Localize four Playground story control labels through PLAYGROUND_TEXT samples and keep hardcoded-string scanning on the real scenario renderers.
+- [Fixed] Route Outbound Activity panel through shared DataTable instead of a bare table.
+- [Fixed] Backtest production-design/UI-governance: design token text sizes, remove native title on notes, restore shared Button size semantics without min-h overrides.
+- [Fixed] Scope i18n e2e route assertions to main content and real document title keys; wait for Settings field controls before label checks.
+- [Fixed] Playground scenario tests provide QueryClient for TanStack Query Alerts workspace; Settings env-import tests target the ConfigBackup file input after ConfigPresetsPanel landed.
+- [Tests] Add settings-help examples literal parity coverage and update localeConsistency for Scheme 3 inventory skip.
 - [Docs] Add GitHub Actions three-step quickstart (`docs/actions-quickstart.md` / `docs/actions-quickstart_CN.md`) and a README Quick start entry link (#852).
 - [Fixed] Daily provider all-empty/all-None failures now include per-provider detail lines in DataFetchError (no longer a bare failure header).
 - [Tests] Offline provider fallback contract suite with failure-mode fixtures (empty/rate-limit/missing-field/malformed) covering single-source failover, all-fail DataFetchError, STANDARD_COLUMNS normalization, and bounded retry.
