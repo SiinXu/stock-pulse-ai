@@ -1,0 +1,26 @@
+{
+  "id": "fact-grounded-pass",
+  "title": "Numeric claims grounded in context",
+  "tags": ["factuality", "pass"],
+  "dimensions": ["factuality"],
+  "context": {
+    "stock_code": "600519",
+    "facts": [
+      {"fact_id": "quote-price", "field_path": "quote.price", "value": 1680.5, "unit": "CNY", "as_of": "2026-08-08", "source_id": "frozen-quote"},
+      {"fact_id": "valuation-pe", "field_path": "fundamentals.pe", "value": 28.4, "unit": "ratio", "as_of": "2026-08-08", "source_id": "frozen-fundamentals"}
+    ]
+  },
+  "agent_output": {
+    "signal": "hold",
+    "summary": "Price at 1680.5 with change -1.2%; PE 28.4; revenue 326.5.",
+    "claims": [
+      {"claim_id": "reported-price", "source_fact_id": "quote-price", "field_path": "quote.price", "value": 1680.5, "unit": "CNY", "as_of": "2026-08-08", "source_id": "frozen-quote"},
+      {"claim_id": "reported-pe", "source_fact_id": "valuation-pe", "field_path": "fundamentals.pe", "value": 28.4, "unit": "ratio", "as_of": "2026-08-08", "source_id": "frozen-fundamentals"}
+    ]
+  },
+  "evaluation": {
+    "factuality": {
+      "required_claim_ids": ["reported-price", "reported-pe"]
+    }
+  }
+}
