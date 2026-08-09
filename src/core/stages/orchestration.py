@@ -11,6 +11,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from data_provider.base import normalize_stock_code
+from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.analyzer import AnalysisResult
 from src.core.pipeline_stage_results import (
     PipelineStageName,
@@ -195,6 +196,11 @@ class _OrchestrationStageMixin:
 
             return True, None
 
+        except __LocalDataMissingError__:
+            # Preserve the typed offline miss so API, CLI, and scheduler
+            # boundaries can surface actionable ranges without implying that a
+            # provider was attempted.
+            raise
         except Exception as e:  # broad-exception: fallback_recorded - Market-data failures are logged and returned as stage failure details.
             error_msg = f"获取/保存数据失败: {str(e)}"
             log_safe_exception(
@@ -482,6 +488,22 @@ class _OrchestrationStageMixin:
                     )
             return result
 
+        except __LocalDataMissingError__:
+            record_missing_pipeline_stages_as_skipped(
+                PIPELINE_STAGE_NAMES,
+                input_summary={"stock_code": code},
+                reason=__LocalDataMissingError__.error_code,
+            )
+            if analysis_event_started:
+                dispatch_analysis_event(
+                    "analysis.failed",
+                    task_id=effective_query_id,
+                    trace_id=effective_trace_id,
+                    stock_code=code,
+                    trigger_source=getattr(self, "query_source", None) or "system",
+                    error_code=__LocalDataMissingError__.error_code,
+                )
+            raise
         except Exception as e:  # broad-exception: fallback_recorded - Per-stock failures are safely logged so the batch can continue.
             # Capture all exceptions to ensure individual stock failure does not affect the overall result
             record_missing_pipeline_stages_as_skipped(
@@ -618,6 +640,7 @@ class _OrchestrationStageMixin:
             )
 
         results: List[AnalysisResult] = []
+        local_missing_errors: List[__LocalDataMissingError__] = []
 
         # Use thread pool for concurrent processing
         # Note: Set `max_workers` to a lower value (default 3) to avoid triggering anti-crawling.
@@ -673,6 +696,16 @@ class _OrchestrationStageMixin:
                         )
                         time.sleep(analysis_delay)
 
+                except __LocalDataMissingError__ as exc:
+                    local_missing_errors.append(exc)
+                    log_safe_exception(
+                        logger,
+                        "Local-only market data is incomplete",
+                        exc,
+                        error_code=exc.error_code,
+                        level=logging.WARNING,
+                        context={"stock_code": code},
+                    )
                 except Exception as e:  # broad-exception: fallback_recorded - Worker failures are safely logged and the remaining stock tasks continue.
                     log_safe_exception(
                         logger,
@@ -681,6 +714,12 @@ class _OrchestrationStageMixin:
                         error_code="pipeline_stock_task_failed",
                         context={"stock_code": code},
                     )
+
+        # Any local-only miss is a typed run failure. Raise before notification
+        # assembly so scheduled and CLI callers receive actionable coverage
+        # details instead of silently reporting a partial batch as complete.
+        if local_missing_errors:
+            raise local_missing_errors[0]
 
         # Statistics
         elapsed_time = time.time() - start_time

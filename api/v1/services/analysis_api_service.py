@@ -587,6 +587,7 @@ class AnalysisApiService:
         from src.services.analysis_service import (
             AnalysisService,
             LLM_NOT_CONFIGURED_ERROR_CODE,
+            LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
             is_llm_not_configured_error,
         )
     
@@ -608,6 +609,15 @@ class AnalysisApiService:
 
             if result is None:
                 error_message = service.last_error or f"分析股票 {stock_code} 失败"
+                if service.last_error_code == LOCAL_MARKET_DATA_MISSING_ERROR_CODE:
+                    details = getattr(service, "last_error_details", None)
+                    raise api_error(
+                        409,
+                        LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
+                        "Local market data does not cover the requested analysis window",
+                        params={"stock_code": stock_code},
+                        details=details,
+                    )
                 # Known first-run configuration gap: map only this condition to a
                 # stable 422 so clients can show setup guidance instead of a generic 500.
                 if is_llm_not_configured_error(service.last_error_code, error_message):

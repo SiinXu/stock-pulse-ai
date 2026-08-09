@@ -15,6 +15,7 @@ import copy
 import uuid
 from typing import Optional, Dict, Any, Callable, List
 
+from data_provider.daily_cache import LocalDataMissingError
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
     get_sentiment_label,
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 # Stable public code for the known "no usable LLM configured" first-run failure.
 LLM_NOT_CONFIGURED_ERROR_CODE = "llm_not_configured"
+LOCAL_MARKET_DATA_MISSING_ERROR_CODE = LocalDataMissingError.error_code
 
 _LLM_NOT_CONFIGURED_MARKERS = (
     "llm api key is not configured",
@@ -81,6 +83,7 @@ class AnalysisService:
         self.repo = AnalysisRepository()
         self.last_error: Optional[str] = None
         self.last_error_code: Optional[str] = None
+        self.last_error_details: Optional[Dict[str, Any]] = None
     
     def analyze_stock(
         self,
@@ -124,6 +127,7 @@ class AnalysisService:
         try:
             self.last_error = None
             self.last_error_code = None
+            self.last_error_details = None
             # Import analysis related modules
             from src.config import get_config
             from src.core.pipeline import StockAnalysisPipeline
@@ -200,6 +204,15 @@ class AnalysisService:
             # Build the response
             return self._build_analysis_response(result, query_id, report_type=rt.value)
             
+        except LocalDataMissingError as exc:
+            self.last_error = str(exc)
+            self.last_error_code = LOCAL_MARKET_DATA_MISSING_ERROR_CODE
+            self.last_error_details = exc.to_dict()
+            logger.warning(
+                "Stock analysis stopped because local market data is incomplete: %s",
+                self.last_error,
+            )
+            return None
         except Exception as exc:
             # broad-exception: fallback_recorded - analysis fail-safe contract; records a sanitized last_error and safe log, then returns None for any pipeline failure.
             self.last_error = sanitize_exception_chain(exc)

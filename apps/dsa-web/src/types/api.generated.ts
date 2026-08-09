@@ -19479,6 +19479,15 @@ export interface operations {
                     "application/json": components["schemas"]["StockHistoryResponse"];
                 };
             };
+            /** @description Local-only market data is incomplete */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description 不支持的周期参数 */
             422: {
                 headers: {

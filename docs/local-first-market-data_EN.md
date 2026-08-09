@@ -1,142 +1,126 @@
-# Local-first market data store
+# Local-first daily market data
 
-This document describes the **market-data** local-first modes built on the
-existing layered daily cache (`data_provider/daily_cache.py`).
+`DataFetcherManager.get_daily_data` is the runtime owner of the local-first
+daily-data contract. It reuses the existing provider routing, priority,
+plugin, health/circuit, diagnostics, and fallback behavior; the cache does not
+introduce a second provider path.
 
-It is **not** the same switch as privacy egress mode (`LOCAL_ONLY_MODE` in
-`docs/local-only-mode_EN.md`), which blocks non-loopback HTTP at the outbound
-policy layer. Operators who need both offline bars and no cloud LLM should set
-both knobs intentionally.
+This feature is separate from `LOCAL_ONLY_MODE` in
+`docs/local-only-mode_EN.md`. `PROVIDER_MARKET_DATA_MODE` governs daily bars;
+`LOCAL_ONLY_MODE` is the process-wide non-loopback HTTP policy. Enable both
+when the complete process must be offline.
 
-## Storage choice
+## Modes
 
-| Choice | Reason |
-| --- | --- |
-| Reuse L1 process memory + L2 atomic JSON tables under `PROVIDER_DAILY_CACHE_DIR` | Already shipped for provider-manager daily cache; no new DB or package dependency |
-| No SQLite/Redis introduction | Keeps desktop and zero-config installs lightweight and consistent with the existing cache layout |
+| `PROVIDER_MARKET_DATA_MODE` | Local read | Provider chain | Provider failure |
+| --- | --- | --- | --- |
+| `auto` (default) | Use a complete, fresh range | Once on miss, incomplete range/fields, or expiry | Return one complete stale candidate only while `PERSISTENT_TTL + STALE_IF_ERROR` remains valid; otherwise raise `DataFetchError` |
+| `local_only` | Use a complete range within `LOCAL_ONLY_MAX_AGE` | Never constructed or called | Raise `LocalDataMissingError`; no provider availability callback or socket path is entered |
+| `refresh` | Skipped | Exactly once | Raise the provider-chain error; never fall back to stale data |
 
-Secrets never belong in this store: entries are OHLCV-style frames plus source name and timestamps only.
+Unset mode keeps the compatible `auto` default. Any non-empty value other than
+`auto`, `local_only`, or `refresh` stops configuration loading with an
+actionable `ValueError`; an offline typo can never become network-capable.
 
-## Three modes (`PROVIDER_MARKET_DATA_MODE`)
+## Range and field coverage
 
-| Mode | Value | Behavior |
-| --- | --- | --- |
-| Auto (default) | `auto` | Prefer **fresh** local data; on miss, upstream fetch is allowed and successful results update the local store. Equivalent to historical cache-as-accelerator behavior. |
-| Local only | `local_only` | Use **only** the local store (including aged entries). On miss, raise `LocalDataMissingError` with a structured payload. **Never** invokes the network fetch callback. |
-| Refresh | `refresh` | Always call upstream, then write the local store. Does not return a cache-only hit. |
+The persistent identity is normalized symbol + adjustment identity + schema
+identity. The persisted source name is part of the entry contract, and ranges
+from different sources are never merged. The `days` hint is not storage
+identity: exact, overlapping, and subset windows reuse one symbol table.
 
-Unset or invalid values resolve to `auto` so existing deployments keep working without configuration.
+Successful requests record covered date intervals. Local reads verify that the
+requested interval is covered, verify the requested columns, then sort,
+deduplicate, and slice by date. A one-day rollover grace lets a warmed default
+end date serve the following calendar day's overlapping window; the normal
+freshness TTL still causes online `auto` to revalidate aged data.
 
-```env
-# Default — no behavior change for current users
-# PROVIDER_MARKET_DATA_MODE=auto
+Partial policy:
 
-# Offline / privacy data path: serve bars only from local store
-# PROVIDER_MARKET_DATA_MODE=local_only
+- `local_only` fails with only the missing columns and bounded missing ranges.
+- `auto` calls the existing provider chain once for the full requested window,
+  then merges a successful same-source result into the symbol table.
+- `refresh` replaces or same-source-merges the successful requested window.
 
-# Force re-download and repopulate the local store
-# PROVIDER_MARKET_DATA_MODE=refresh
-```
-
-TTL knobs (`PROVIDER_DAILY_CACHE_*`) still control **freshness** for `auto` and
-stale-if-error fallback. In `local_only`, presence in the local store is enough
-to serve data; `is_stale` on the result reflects age past the persistent TTL so
-callers can show honesty about freshness without going online.
-
-## Structured missing payload (`local_only`)
-
-When local data cannot satisfy a request:
+Example error payload:
 
 ```json
 {
-  "symbol": "AAPL",
-  "start_date": "2026-06-01",
-  "end_date": "2026-07-01",
-  "days": 20,
-  "fields": ["daily_ohlcv", "volume"],
+  "symbol": "600519",
+  "start_date": "2026-07-01",
+  "end_date": "2026-07-20",
+  "days": 30,
+  "fields": ["volume"],
+  "missing_ranges": [
+    {"start_date": "2026-07-01", "end_date": "2026-07-09"}
+  ],
   "mode": "local_only",
-  "reason": "no_local_entry"
+  "reason": "missing_fields_and_ranges",
+  "available_start_date": "2026-07-10",
+  "available_end_date": "2026-07-20",
+  "age_seconds": 12
 }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `symbol` | Normalized request symbol |
-| `start_date` / `end_date` / `days` | Requested window (empty strings when not provided) |
-| `fields` | Which logical datasets were required (default `daily_ohlcv`) |
-| `mode` | Always `local_only` for this error path |
-| `reason` | `no_local_entry` or `cache_disabled` |
+Possible reasons include `cache_disabled`, `no_local_entry`,
+`missing_fields`, `missing_ranges`, `missing_fields_and_ranges`,
+`no_rows_in_covered_window`, and `local_entry_too_old`.
 
-Python exception: `data_provider.daily_cache.LocalDataMissingError` with
-`.missing` / `.to_dict()`.
+The typed error reaches the stock-history API as HTTP 409 with
+`error=local_market_data_missing` and the payload in `details`. Synchronous and
+queued analysis expose the same stable code/details. Any missed symbol makes a
+scheduled or CLI batch fail before analysis notifications are assembled.
 
-## Public API (data layer)
+## Persistence, privacy, and retention
 
-```python
-from data_provider.daily_cache import (
-    DailyCacheKey,
-    DailyDataCache,
-    LocalDataMissingError,
-    MarketDataFetchMode,
-)
+Schema v2 stores JSON records using an explicit allowlist:
 
-cache = DailyDataCache.from_env()
-key = DailyCacheKey(symbol="600519", start_date="", end_date="", days=30)
+`date`, `code`, `open`, `high`, `low`, `close`, `volume`, `amount`,
+`pct_chg`, `ma5`, `ma10`, `ma20`, `volume_ratio`.
 
-try:
-    result = cache.resolve(
-        key,
-        network_fetch=lambda: upstream_get_daily(key),  # never called in local_only
-        required_fields=("daily_ohlcv",),
-    )
-except LocalDataMissingError as exc:
-    print(exc.to_dict())
-```
+Unexpected columns are stripped before returning the persisted provider result
+or writing disk. Configuration values, tokens, headers, URLs, and exception
+text have no schema location and are never serialized. Writes use a temporary
+file, `fsync`, and atomic replacement; same-manager concurrent callers share a
+per-identity request guard so one warm-up performs one provider chain.
 
-Helpers:
+| Setting | Default | Policy |
+| --- | ---: | --- |
+| `PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS` | `7776000` (90 days) | Delete older files during lookup/write |
+| `PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES` | `512` | Delete oldest entries first, with filename as deterministic tie-breaker |
+| `PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS` | `2592000` (30 days) | A complete older entry is a structured offline miss |
+| `PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS` | `1` | Calendar-day end rollover allowed for an otherwise covered range |
 
-- `lookup` / `store` / `use_stale` — unchanged accelerator contracts used by the manager today
-- `lookup_local_store` — any local entry regardless of fresh TTL
-- `resolve` — mode-aware orchestration for local-first workflows
+The existing memory/persistent TTL and stale-if-error settings keep their
+freshness meanings. The cache directory remains
+`data/provider_cache/daily` unless `PROVIDER_DAILY_CACHE_DIR` is set.
 
-## Integration with `DataFetcherManager`
+### Schema-v1 compatibility
 
-This release delivers the store, modes, errors, tests, and configuration on
-`daily_cache.py` (ownership for the parallel batch). Wiring into
-`DataFetcherManager.get_daily_data` is a short post-merge integration:
+Existing exact-request schema-v1 JSON tables are read as `provider_default` /
+`normalized_daily_v1` coverage ranges, allowlisted on read, and can satisfy
+matching/subset requests. Other adjustment/schema identities ignore them. The
+next successful same-source write creates the schema-v2 symbol table.
+Unsupported, corrupt, identity-mismatched, or incomplete entries never count as
+hits.
 
-1. After building `cache_key` / `daily_cache`, call `daily_cache.resolve(...)`
-   with `network_fetch` wrapping the existing provider loop, **or**
-2. Branch on `daily_cache.fetch_mode`:
-   - `local_only` → `lookup_local_store` / raise `LocalDataMissingError`
-   - `refresh` → skip fresh hit, always provider loop, then `store`
-   - `auto` → keep the current lookup → provider → store / stale path
-
-Until that wiring lands, setting `PROVIDER_MARKET_DATA_MODE` alone does not
-change `get_daily_data` runtime paths; callers and tests can already use
-`DailyDataCache.resolve` directly.
-
-## Relation to `LOCAL_ONLY_MODE` (egress privacy)
-
-| Knob | Layer | Effect |
-| --- | --- | --- |
-| `PROVIDER_MARKET_DATA_MODE=local_only` | Market data store | No upstream bar fetch via `resolve`; structured local miss |
-| `LOCAL_ONLY_MODE=true` | Outbound HTTP policy | Blocks non-loopback destinations for all `safe_*` HTTP |
-
-Use both for a full privacy offline profile (local bars + no cloud LLM/search).
-
-## Remaining scope (not in this change)
-
-- LLM / Ollama local model preference (see issue #159 remainder / T28)
-- Web UI cache status badges
-- Prefetch / cache warming from watchlists
-- Changes to individual provider fetchers
+Rollback is either reverting this change or unsetting/setting
+`PROVIDER_MARKET_DATA_MODE=auto`. Reverting does not delete cache files;
+schema-v1 readers ignore schema-v2 files, so operators may remove the configured
+cache directory separately if reclaiming the footprint is desired.
 
 ## Verification
 
 ```bash
-python -m pytest tests/data_provider/test_local_first_store.py tests/data_provider/test_daily_provider_cache.py -m "not network"
+python -m pytest \
+  tests/data_provider/test_local_first_manager.py \
+  tests/data_provider/test_daily_provider_cache.py \
+  tests/data_provider/test_local_first_store.py \
+  tests/services/test_local_first_boundaries.py \
+  -m "not network"
 ```
 
-`local_only` tests assert the network callback is never invoked and additionally
-block `socket.socket` construction on the miss path.
+The manager suite asserts provider and socket call counts, persistence across
+restart, concurrent callers, overlap/rollover/partial coverage, stale expiry,
+refresh failure policy, schema-v1 reads, retention, corrupt entries, and
+secret-shaped column stripping.

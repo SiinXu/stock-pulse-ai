@@ -33076,6 +33076,16 @@
             },
             "description": "历史行情数据"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Local-only market data is incomplete"
+          },
           "422": {
             "content": {
               "application/json": {

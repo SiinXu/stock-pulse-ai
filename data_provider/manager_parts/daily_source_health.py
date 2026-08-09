@@ -10,7 +10,7 @@ existing call sites and tests keep working without behavior changes.
 
 from __future__ import annotations
 
-import json
+import json as _json
 import logging
 import os
 import time
@@ -363,7 +363,7 @@ class _DailySourceHealthMethods:
                     sanitize_diagnostic_text(fetcher.name, max_length=120)
                     for fetcher in selected_order
                 ),
-                json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
+                _json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
             )
         return selected_order
 
@@ -573,7 +573,7 @@ class _DailySourceHealthMethods:
         logger.info(
             "provider_health event=snapshot data_type=daily_data market=%s payload=%s",
             report["market"],
-            json.dumps(report, sort_keys=True, separators=(",", ":")),
+            _json.dumps(report, sort_keys=True, separators=(",", ":")),
         )
         return report
 

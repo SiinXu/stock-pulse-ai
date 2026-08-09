@@ -117,7 +117,8 @@ def test_parse_market_data_fetch_mode_values() -> None:
     assert parse_market_data_fetch_mode("LOCAL_ONLY") is MarketDataFetchMode.LOCAL_ONLY
     assert parse_market_data_fetch_mode("local-only") is MarketDataFetchMode.LOCAL_ONLY
     assert parse_market_data_fetch_mode("refresh") is MarketDataFetchMode.REFRESH
-    assert parse_market_data_fetch_mode("bogus") is MarketDataFetchMode.AUTO
+    with pytest.raises(ValueError, match="Invalid PROVIDER_MARKET_DATA_MODE"):
+        parse_market_data_fetch_mode("bogus")
 
 
 def test_environment_defaults_include_auto_mode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -128,6 +129,10 @@ def test_environment_defaults_include_auto_mode(monkeypatch: pytest.MonkeyPatch)
         "PROVIDER_DAILY_CACHE_PERSISTENT_TTL_SECONDS",
         "PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS",
         "PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES",
+        "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS",
         "PROVIDER_MARKET_DATA_MODE",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -279,17 +284,23 @@ def test_local_only_miss_raises_structured_missing_and_never_networks(
     err = exc_info.value
     assert probe.calls == 0
     payload = err.to_dict()
-    assert payload == {
-        "symbol": "AAPL",
-        "start_date": "2026-06-01",
-        "end_date": "2026-07-01",
-        "days": 20,
-        "fields": ["daily_ohlcv", "volume"],
-        "mode": "local_only",
-        "reason": "no_local_entry",
-    }
+    assert payload["symbol"] == "AAPL"
+    assert payload["start_date"] == "2026-06-01"
+    assert payload["end_date"] == "2026-07-01"
+    assert payload["days"] == 20
+    assert payload["fields"] == [
+        "date", "open", "high", "low", "close", "volume", "amount", "pct_chg"
+    ]
+    assert payload["missing_ranges"] == [
+        {"start_date": "2026-06-01", "end_date": "2026-07-01"}
+    ]
+    assert payload["mode"] == "local_only"
+    assert payload["reason"] == "no_local_entry"
+    assert payload["available_start_date"] is None
+    assert payload["available_end_date"] is None
+    assert payload["age_seconds"] is None
     assert "symbol=AAPL" in str(err)
-    assert "fields=daily_ohlcv,volume" in str(err)
+    assert "fields=date,open,high,low,close,volume,amount,pct_chg" in str(err)
     assert cache.stats_snapshot()["local_only_misses"] == 1
 
 

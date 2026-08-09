@@ -154,10 +154,17 @@ _STABLE_TASK_ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 class KnownTaskFailure(Exception):
     """Command failure that already carries a stable public error code."""
 
-    def __init__(self, error_code: str, message: str) -> None:
+    def __init__(
+        self,
+        error_code: str,
+        message: str,
+        *,
+        message_params: Optional[Dict[str, Any]] = None,
+    ) -> None:
         super().__init__(message)
         self.error_code = str(error_code or "").strip() or "task_failed"
         self.message = str(message or "").strip() or self.error_code
+        self.message_params = copy.deepcopy(message_params or {})
 
 
 def public_task_error(task: Any, default_error_code: str = "task_failed") -> Optional[str]:
@@ -2169,6 +2176,7 @@ class AnalysisTaskQueue:
             error_message = service.last_error or "分析返回空结果"
             from src.services.analysis_service import (
                 LLM_NOT_CONFIGURED_ERROR_CODE,
+                LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
                 is_llm_not_configured_error,
             )
 
@@ -2176,6 +2184,12 @@ class AnalysisTaskQueue:
                 raise KnownTaskFailure(
                     LLM_NOT_CONFIGURED_ERROR_CODE,
                     error_message,
+                )
+            if service.last_error_code == LOCAL_MARKET_DATA_MISSING_ERROR_CODE:
+                raise KnownTaskFailure(
+                    LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
+                    error_message,
+                    message_params=getattr(service, "last_error_details", None),
                 )
             raise RuntimeError(error_message)
         return result
@@ -2263,6 +2277,8 @@ class AnalysisTaskQueue:
                 if current is not None:
                     if known_failure_code:
                         current.failure_error_code = known_failure_code
+                    if isinstance(exc, KnownTaskFailure) and exc.message_params:
+                        current.message_params = copy.deepcopy(exc.message_params)
                     self._terminalize_locked(
                         current,
                         TaskStatus.FAILED,
