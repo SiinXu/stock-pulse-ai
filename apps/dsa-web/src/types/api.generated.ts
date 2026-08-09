@@ -6119,6 +6119,16 @@ export interface components {
              */
             name?: string | null;
         };
+        /** FxStressShock */
+        FxStressShock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            factor: "fx";
+            /** Value Pct */
+            value_pct: number;
+        };
         /**
          * GenerationBackendStatus
          * @description Cheap status for one generation backend.
@@ -7638,6 +7648,16 @@ export interface components {
              */
             send_notification: boolean;
         };
+        /** MarketStressShock */
+        MarketStressShock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            factor: "market";
+            /** Value Pct */
+            value_pct: number;
+        };
         /** ModelBreakdown */
         ModelBreakdown: {
             /** Calls */
@@ -8989,73 +9009,77 @@ export interface components {
         };
         /**
          * PortfolioStressTestRequest
-         * @description Optional body for POST custom / overridden stress runs.
+         * @description Exactly one preset id or custom shock list is required.
          */
         PortfolioStressTestRequest: {
             /** Account Id */
             account_id?: number | null;
-            /**
-             * As Of
-             * @description ISO date YYYY-MM-DD; default today
-             */
+            /** As Of */
             as_of?: string | null;
-            /**
-             * Betas
-             * @description Optional per-symbol market beta; missing names use beta=1 with label
-             */
+            /** Betas */
             betas?: {
                 [key: string]: number;
             } | null;
             /**
              * Cost Method
              * @default fifo
+             * @enum {string}
              */
-            cost_method: string;
-            /**
-             * Custom Shocks
-             * @description When set, builds a custom scenario instead of a preset id
-             */
-            custom_shocks?: components["schemas"]["StressShock"][] | null;
-            /**
-             * Rate Sensitivity Pct Per 100Bp
-             * @description Override default equity sensitivity to rate moves
-             */
+            cost_method: "fifo" | "avg";
+            /** Custom Shocks */
+            custom_shocks?: (components["schemas"]["MarketStressShock"] | components["schemas"]["SectorStressShock"] | components["schemas"]["FxStressShock"] | components["schemas"]["RateStressShock"])[] | null;
+            /** Rate Sensitivity Pct Per 100Bp */
             rate_sensitivity_pct_per_100bp?: number | null;
-            /**
-             * Scenario Id
-             * @description Built-in or YAML scenario id; omit when custom_shocks is set
-             */
+            /** Scenario Id */
             scenario_id?: string | null;
-            /**
-             * Sector Map
-             * @description Optional per-symbol sector labels for sector shocks
-             */
+            /** Sector Map */
             sector_map?: {
                 [key: string]: string;
             } | null;
-            /**
-             * Target Sector
-             * @description Required for sector scenarios
-             */
+            /** Target Sector */
             target_sector?: string | null;
         };
         /** PortfolioStressTestResponse */
         PortfolioStressTestResponse: {
             /** Account Id */
             account_id?: number | null;
-            /** As Of */
+            /**
+             * As Of
+             * Format: date
+             */
             as_of: string;
             assumptions: components["schemas"]["StressAssumptions"];
+            /**
+             * Authoritative Portfolio Value
+             * @default 0
+             */
+            authoritative_portfolio_value: number;
+            /**
+             * Calculated At
+             * Format: date-time
+             */
+            calculated_at: string;
             concentration: components["schemas"]["StressConcentrationBlock"];
-            /** Cost Method */
-            cost_method: string;
+            /**
+             * Cost Method
+             * @enum {string}
+             */
+            cost_method: "fifo" | "avg";
             /** Currency */
             currency: string;
             /**
+             * Excluded Position Count
+             * @default 0
+             */
+            excluded_position_count: number;
+            /** Excluded Positions */
+            excluded_positions?: components["schemas"]["StressExcludedPosition"][];
+            /**
              * Historical Replay Available
              * @default false
+             * @constant
              */
-            historical_replay_available: boolean;
+            historical_replay_available: false;
             /** Missing Data */
             missing_data?: string[];
             /** Portfolio Pnl */
@@ -9074,17 +9098,42 @@ export interface components {
              * @default 0
              */
             positions_used: number;
+            /**
+             * Reconciliation Delta
+             * @default 0
+             */
+            reconciliation_delta: number;
             scenario: components["schemas"]["StressScenarioBlock"];
             /**
              * Simulation Method
-             * @default deterministic_factor_shock
+             * @constant
              */
-            simulation_method: string;
+            simulation_method: "deterministic_factor_shock";
+            /**
+             * Snapshot Data Quality
+             * @default ok
+             * @enum {string}
+             */
+            snapshot_data_quality: "ok" | "partial";
+            /**
+             * Snapshot Fx Stale
+             * @default false
+             */
+            snapshot_fx_stale: boolean;
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Snapshot Limitations */
+            snapshot_limitations?: string[];
+            /**
+             * Snapshot Version
+             * @constant
+             */
+            snapshot_version: "portfolio_snapshot_v1";
             /**
              * Status
-             * @description 'ok', 'empty_portfolio', or 'partial'
+             * @enum {string}
              */
-            status: string;
+            status: "ok" | "empty_portfolio" | "partial" | "unavailable";
             /** Status Message */
             status_message?: string | null;
             /** Stressed Portfolio Value */
@@ -9179,6 +9228,16 @@ export interface components {
             page_size: number;
             /** Total */
             total: number;
+        };
+        /** RateStressShock */
+        RateStressShock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            factor: "rate";
+            /** Value Bp */
+            value_bp: number;
         };
         /**
          * ReportDetails
@@ -10216,6 +10275,16 @@ export interface components {
             /** Share Pct */
             share_pct?: number | null;
         };
+        /** SectorStressShock */
+        SectorStressShock: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            factor: "sector";
+            /** Value Pct */
+            value_pct: number;
+        };
         /**
          * SecurityAuditActor
          * @description Bounded actor identity for the current single-admin execution model.
@@ -10849,32 +10918,45 @@ export interface components {
             /**
              * Cash Excluded
              * @default true
+             * @constant
              */
-            cash_excluded: boolean;
-            /** Data Source */
-            data_source: string;
+            cash_excluded: true;
+            /**
+             * Data Source
+             * @constant
+             */
+            data_source: "portfolio_read_only_replay";
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "portfolio_stress_linear_v2";
             /** Fx Policy */
             fx_policy: string;
             /**
              * Historical Replay
              * @default false
+             * @constant
              */
-            historical_replay: boolean;
+            historical_replay: false;
             /**
              * Instantaneous Shock
              * @default true
+             * @constant
              */
-            instantaneous_shock: boolean;
+            instantaneous_shock: true;
             /**
              * Linear Factor Additivity
              * @default true
+             * @constant
              */
-            linear_factor_additivity: boolean;
+            linear_factor_additivity: true;
             /**
              * Provider Calls On Hot Path
              * @default false
+             * @constant
              */
-            provider_calls_on_hot_path: boolean;
+            provider_calls_on_hot_path: false;
             /** Rate Policy */
             rate_policy: string;
             /** Rate Sensitivity Pct Per 100Bp */
@@ -10882,18 +10964,25 @@ export interface components {
             /**
              * Reuses Risk Metrics Concentration
              * @default true
+             * @constant
              */
-            reuses_risk_metrics_concentration: boolean;
+            reuses_risk_metrics_concentration: true;
             /** Scenario Category */
             scenario_category?: string | null;
             /** Sector Policy */
             sector_policy: string;
             /** Simplified Assumptions */
             simplified_assumptions?: string[];
-            /** Simulation Method */
-            simulation_method: string;
-            /** Weight Basis */
-            weight_basis: string;
+            /**
+             * Simulation Method
+             * @constant
+             */
+            simulation_method: "deterministic_factor_shock";
+            /**
+             * Weight Basis
+             * @constant
+             */
+            weight_basis: "response_base_market_value";
         };
         /** StressConcentrationBlock */
         StressConcentrationBlock: {
@@ -10908,81 +10997,129 @@ export interface components {
              * @default 0
              */
             position_count: number;
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty_portfolio";
             /** Top Weight Pct */
             top_weight_pct?: number | null;
             /** Weights */
-            weights?: {
-                [key: string]: unknown;
-            }[];
+            weights?: components["schemas"]["StressWeightRow"][];
+        };
+        /** StressExcludedPosition */
+        StressExcludedPosition: {
+            /** Account Id */
+            account_id: number;
+            /** Instrument Currency */
+            instrument_currency: string;
+            /** Limitations */
+            limitations?: string[];
+            /** Price Date */
+            price_date?: string | null;
+            /** Price Source */
+            price_source?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "price_unavailable" | "non_positive_market_value";
+            /** Symbol */
+            symbol: string;
         };
         /** StressPositionImpact */
         StressPositionImpact: {
+            /** Account Base Currency */
+            account_base_currency: string;
+            /** Account Id */
+            account_id: number;
+            /** Beta As Of */
+            beta_as_of?: string | null;
             /** Beta Source */
             beta_source?: string | null;
             /** Beta Used */
             beta_used?: number | null;
+            /** Classification As Of */
+            classification_as_of?: string | null;
+            /** Classification Source */
+            classification_source?: string | null;
+            /**
+             * Data Quality
+             * @default ok
+             * @enum {string}
+             */
+            data_quality: "ok" | "partial";
+            /**
+             * Fx As Of
+             * Format: date
+             */
+            fx_as_of: string;
+            /**
+             * Fx Rate Method
+             * @enum {string}
+             */
+            fx_rate_method: "zero" | "identity" | "direct_rate" | "inverse_rate" | "fallback_1_to_1";
+            /** Fx Rate Source */
+            fx_rate_source: string;
+            /** Fx Rate To Response Base */
+            fx_rate_to_response_base: number;
+            /** Fx Stale */
+            fx_stale: boolean;
+            /** Instrument Currency */
+            instrument_currency: string;
+            /** Limitations */
+            limitations?: string[];
             /** Market Value */
             market_value: number;
             /** Pnl */
             pnl: number;
+            /** Position Key */
+            position_key: string;
+            /**
+             * Price Available
+             * @default true
+             */
+            price_available: boolean;
+            /** Price Date */
+            price_date?: string | null;
+            /** Price Provider */
+            price_provider?: string | null;
+            /** Price Source */
+            price_source?: string | null;
+            /**
+             * Price Stale
+             * @default false
+             */
+            price_stale: boolean;
+            /** Response Base Currency */
+            response_base_currency: string;
             /** Sector */
             sector?: string | null;
             /** Shock Pct */
             shock_pct: number;
+            /** Source Market Value */
+            source_market_value: number;
             /** Stressed Market Value */
             stressed_market_value: number;
             /** Symbol */
             symbol: string;
-            /** Valuation Currency */
-            valuation_currency?: string | null;
             /** Weight Pct */
             weight_pct: number;
         };
         /** StressScenarioBlock */
         StressScenarioBlock: {
             /**
-             * Category
-             * @default custom
+             * Availability
+             * @default ready
+             * @enum {string}
              */
-            category: string;
-            /**
-             * Description
-             * @default
-             */
-            description: string;
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Shocks */
-            shocks?: components["schemas"]["StressShock"][];
-            /** Target Sector */
-            target_sector?: string | null;
-        };
-        /** StressScenarioListResponse */
-        StressScenarioListResponse: {
-            /**
-             * Historical Replay Available
-             * @default false
-             */
-            historical_replay_available: boolean;
-            /** Scenarios */
-            scenarios?: components["schemas"]["StressScenarioSummary"][];
-            /**
-             * Simulation Method
-             * @default deterministic_factor_shock
-             */
-            simulation_method: string;
-        };
-        /** StressScenarioSummary */
-        StressScenarioSummary: {
+            availability: "ready" | "requires_parameters";
             /**
              * Category
              * @default custom
+             * @enum {string}
              */
-            category: string;
+            category: "market" | "sector" | "fx" | "rate" | "custom";
             /**
              * Description
              * @default
@@ -10997,26 +11134,83 @@ export interface components {
              * @default false
              */
             requires_target_sector: boolean;
+            /** Scenario Hash */
+            scenario_hash: string;
             /** Shocks */
-            shocks?: components["schemas"]["StressShock"][];
+            shocks: (components["schemas"]["MarketStressShock"] | components["schemas"]["SectorStressShock"] | components["schemas"]["FxStressShock"] | components["schemas"]["RateStressShock"])[];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "built_in" | "yaml" | "custom_api";
+            /** Target Sector */
+            target_sector?: string | null;
+            /** Version */
+            version: number;
         };
-        /** StressShock */
-        StressShock: {
+        /** StressScenarioListResponse */
+        StressScenarioListResponse: {
             /**
-             * Factor
-             * @description market | sector | fx | rate
+             * Historical Replay Available
+             * @default false
+             * @constant
              */
-            factor: string;
+            historical_replay_available: false;
+            /** Scenarios */
+            scenarios?: components["schemas"]["StressScenarioSummary"][];
             /**
-             * Value Bp
-             * @description Shock magnitude in basis points (rate factor)
+             * Simulation Method
+             * @default deterministic_factor_shock
+             * @constant
              */
-            value_bp?: number | null;
+            simulation_method: "deterministic_factor_shock";
+        };
+        /** StressScenarioSummary */
+        StressScenarioSummary: {
             /**
-             * Value Pct
-             * @description Shock magnitude in percent points (market/sector/fx)
+             * Availability
+             * @default ready
+             * @enum {string}
              */
-            value_pct?: number | null;
+            availability: "ready" | "requires_parameters";
+            /**
+             * Category
+             * @default custom
+             * @enum {string}
+             */
+            category: "market" | "sector" | "fx" | "rate" | "custom";
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Requires Target Sector
+             * @default false
+             */
+            requires_target_sector: boolean;
+            /** Scenario Hash */
+            scenario_hash: string;
+            /** Shocks */
+            shocks: (components["schemas"]["MarketStressShock"] | components["schemas"]["SectorStressShock"] | components["schemas"]["FxStressShock"] | components["schemas"]["RateStressShock"])[];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "built_in" | "yaml" | "custom_api";
+            /** Version */
+            version: number;
+        };
+        /** StressWeightRow */
+        StressWeightRow: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
         };
         /**
          * SystemConfigCategorySchema
@@ -18601,8 +18795,8 @@ export interface operations {
                 /** @description As-of date; default today */
                 as_of?: string | null;
                 /** @description Cost method: fifo or avg */
-                cost_method?: string;
-                /** @description Required for sector scenarios (e.g. sector_down_30) */
+                cost_method?: "fifo" | "avg";
+                /** @description Sector presets are POST-only because they also require sector_map */
                 target_sector?: string | null;
                 /** @description Equity return percent points per +100bp rate move (simplified) */
                 rate_sensitivity_pct_per_100bp?: number;
@@ -18642,6 +18836,15 @@ export interface operations {
             };
             /** @description Stress test computation failed */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Scenario catalog unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18700,6 +18903,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Scenario catalog unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     listPortfolioStressScenarios: {
@@ -18720,8 +18932,8 @@ export interface operations {
                     "application/json": components["schemas"]["StressScenarioListResponse"];
                 };
             };
-            /** @description Scenario catalog failed */
-            500: {
+            /** @description Scenario catalog unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

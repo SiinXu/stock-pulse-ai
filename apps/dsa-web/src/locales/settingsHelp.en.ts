@@ -1445,6 +1445,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects scheduled brief generation and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
   },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: 'Portfolio Stress Scenario Catalog',
+    summary: 'Optional bounded YAML catalog for deterministic portfolio stress scenarios.',
+    usage: 'Set PORTFOLIO_STRESS_SCENARIOS_PATH to a readable local YAML file, or leave it empty to use only built-in scenarios.',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: 'Save Context Snapshot',
     summary: 'Controls whether the full analysis history context_snapshot is persisted to the database.',

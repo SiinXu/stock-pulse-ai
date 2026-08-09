@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "종목 선별 중",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "스크리닝 작업이 대기열에 있음",
   "utils.taskMessage.TASK_STATUS_UPDATED": "작업 상태 업데이트",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "결정론적 포트폴리오 스트레스 시나리오를 위한 선택적이고 제한된 YAML 카탈로그입니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "포트폴리오 스트레스 시나리오 카탈로그",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "PORTFOLIO_STRESS_SCENARIOS_PATH를 읽을 수 있는 로컬 YAML 파일로 설정하거나 비워 두어 기본 시나리오만 사용합니다.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "포트폴리오 스트레스 시나리오 카탈로그",
 } as const;

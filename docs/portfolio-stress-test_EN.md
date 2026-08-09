@@ -1,25 +1,12 @@
 # Portfolio Stress Test (Deterministic Shocks)
 
-Backend-only portfolio stress testing ([#158](https://github.com/SiinXu/stock-pulse-ai/issues/158); related [#210](https://github.com/SiinXu/stock-pulse-ai/issues/210)).
+The portfolio stress-test API provides read-only deterministic factor shocks
+for [#158](https://github.com/SiinXu/stock-pulse-ai/issues/158), with related
+portfolio-risk context from [#210](https://github.com/SiinXu/stock-pulse-ai/issues/210).
+Historical replay, Monte Carlo simulation, full instrument revaluation, and Web
+visualization remain out of scope.
 
-This page documents the **deterministic factor-shock** engine, assumptions, and
-honesty rules. A Web Portfolio surface is intentionally out of scope for this
-delivery (Portfolio Web work is owned by a separate track).
-
-## Scope
-
-| Included | Not included (remaining) |
-| --- | --- |
-| Declarative built-in scenarios (YAML-overridable) | Historical extreme-window path replay |
-| Deterministic market / sector / FX / rate shocks | Monte Carlo or full revaluation paths |
-| Explicit unit-beta and rate-sensitivity labels | Calibrated multi-factor risk models |
-| `partial` when beta/sector data is missing | Web UI charts |
-| Concentration block reused from risk-metrics helpers | Agent / report embedding |
-
-**Simulation method this delivery:** `deterministic_factor_shock` only.
-`historical_replay_available` is always `false` in the API payload.
-
-## Endpoints
+## API
 
 ```http
 GET  /api/v1/portfolio/stress-test/scenarios
@@ -27,115 +14,99 @@ GET  /api/v1/portfolio/stress-test?scenario_id=market_down_10
 POST /api/v1/portfolio/stress-test
 ```
 
-Auth matches neighboring `/api/v1/portfolio/*` routes.
+`GET /stress-test` supports ready presets. The sector preset is explicitly a
+parameterized template and must use `POST` with both `target_sector` and a
+caller-supplied `sector_map`; the service does not fabricate classifications.
+`POST` requires exactly one of `scenario_id` and `custom_shocks`.
 
-### Query / body parameters (run)
+Shocks are a discriminated union:
 
-| Parameter | Notes |
-| --- | --- |
-| `scenario_id` | Built-in or YAML scenario id (GET required; POST optional if `custom_shocks`) |
-| `target_sector` | Required for sector scenarios |
-| `account_id` / `as_of` / `cost_method` | Same snapshot contract as risk-metrics |
-| `betas` (POST) | Optional per-symbol market beta |
-| `sector_map` (POST) | Optional per-symbol sector labels |
-| `custom_shocks` (POST) | Optional list of `{factor, value_pct|value_bp}` |
-| `rate_sensitivity_pct_per_100bp` | Default `2.0` (simplified) |
+- `market`, `sector`, and `fx` require `value_pct` in `[-100, 100]`.
+- `rate` requires `value_bp` in `[-1000, 1000]`.
+- Extra fields, wrong units, non-finite values, more than 16 shocks, and a
+  composed position return below `-100%` are rejected.
+- Beta and sector maps contain at most 256 entries. Beta values are finite and
+  bounded to `[-5, 5]`.
 
 ## Built-in scenarios
 
-| id | Shock |
+| id | Meaning | Availability |
+| --- | --- | --- |
+| `market_down_10` | Broad market −10% | Ready |
+| `market_down_20` | Broad market −20% | Ready |
+| `sector_down_30` | Caller-selected sector −30% | POST parameters required |
+| `fx_up_5` / `fx_down_5` | Instrument currency ±5% versus response base | Ready |
+| `rate_up_100bp` | Rates +100bp through the disclosed equity sensitivity | Ready |
+
+## Valuation and formulas
+
+The service uses `PortfolioService.preview_portfolio_snapshot()`. This replays
+the canonical holdings snapshot without market-provider calls and without
+writing derived position, lot, or snapshot rows.
+
+Each position remains separate by account, even when symbols repeat. Its
+`market_value_base` is first converted from that account's base currency into
+the response base currency. Portfolio totals, weights, PnL, concentration, and
+rankings use only these converted values:
+
+\[
+w_i = \frac{V_i^{response}}{\sum_j V_j^{response}},\qquad
+PnL = \sum_i V_i^{response}\frac{r_i}{100}
+\]
+
+The converted position sum is reconciled to the authoritative snapshot
+`total_market_value`; a material mismatch makes the result `partial`.
+
+Market transmission is `r_i = beta_i × market_shock`. Missing beta uses `1.0`
+and is labeled `partial`. Sector transmission applies only to caller-classified
+matching positions. Rate transmission is
+`r_i = -sensitivity × (basis_points / 100)`, with a default sensitivity of 2
+percentage points per +100bp.
+
+FX shock direction is the instrument/trade currency return versus the response
+base currency. It applies when `position.currency` differs from the response
+base. `valuation_currency` is the account base and is not used to decide FX
+exposure.
+
+## Data quality and provenance
+
+The response includes:
+
+- snapshot hash/version and calculation timestamp;
+- scenario source/version/hash and formula version;
+- per-position account, instrument/account/response currencies, conversion
+  rate/source/as-of/staleness, and price source/provider/date/staleness;
+- beta and classification source/as-of when relevant;
+- excluded held positions whose price is unavailable or valuation is not
+  positive; and
+- snapshot limitations, quality, FX staleness, and reconciliation delta.
+
+`top_losers` contains strictly negative PnL rows and `top_winners` strictly
+positive rows. Zero-PnL rows appear in neither list; ordering is deterministic.
+
+| Status | Meaning |
 | --- | --- |
-| `market_down_10` | Market −10% |
-| `market_down_20` | Market −20% |
-| `sector_down_30` | Named sector −30% (needs `target_sector`) |
-| `fx_up_5` / `fx_down_5` | FX ±5% on non-base currency holdings |
-| `rate_up_100bp` | Rates +100bp via equity sensitivity assumption |
+| `ok` | Complete deterministic result for the supplied inputs |
+| `partial` | Result exists but defaults, stale/incomplete data, exclusions, or reconciliation limits apply |
+| `unavailable` | Held positions exist, but none can be valued |
+| `empty_portfolio` | No held positions exist |
 
-Optional env: `PORTFOLIO_STRESS_SCENARIOS_PATH` pointing at a YAML file that
-lists additional scenarios or overrides by `id`. **Unset = built-ins only.**
+## Scenario catalog configuration
 
-## Transmission formulas
+`PORTFOLIO_STRESS_SCENARIOS_PATH` is an optional local YAML catalog path
+(maximum 1,024 characters). It is exposed through the shared Config loader and
+configuration registry. The catalog is limited to 256 KiB, 64 scenarios, 16
+shocks per scenario, 32 YAML alias markers, and nesting depth 8. YAML uses safe
+loading and scenario IDs override built-ins.
 
-### Market
+Reload is atomic: an invalid later file keeps the last validated catalog for
+that path. If no valid catalog has loaded, the API returns a sanitized `503`
+without exposing the configured filesystem path. An unset path uses built-ins.
 
-\[
-r_i = \beta_i \cdot s_{\mathrm{market}}
-\]
+## Deliberate limitations
 
-If \(\beta_i\) is not provided, \(\beta_i = 1\) and the response status becomes
-`partial` with `missing_data` containing `beta` and
-`simplified_assumptions` containing `unit_beta_default`.
-
-### Sector
-
-\[
-r_i =
-\begin{cases}
-s_{\mathrm{sector}} & \mathrm{sector}(i)=\mathrm{target} \\
-0 & \text{otherwise}
-\end{cases}
-\]
-
-Names without sector classification do **not** receive a fabricated sector hit;
-they contribute `sector` to `missing_data` and overall `partial` when relevant.
-
-### FX
-
-Applied only when `valuation_currency` differs from the portfolio base currency.
-
-### Rate
-
-\[
-r_i = -\,k \cdot \frac{\Delta \mathrm{bp}}{100}
-\]
-
-Default \(k = 2.0\) percent points per +100bp for every equity name
-(`uniform_equity_rate_sensitivity`). This is **not** bond duration or a
-calibrated equity rate beta.
-
-### Portfolio PnL
-
-\[
-\mathrm{PnL} = \sum_i V_i \cdot \frac{r_i}{100},\quad
-\mathrm{PnL\%} = 100 \cdot \frac{\mathrm{PnL}}{\sum_i V_i}
-\]
-
-Multiple shocks in one scenario are **linearly additive** (documented
-simplification; no second-order correlation or liquidity effects).
-
-## Honesty statuses
-
-| status | Meaning |
-| --- | --- |
-| `ok` | Shock applied with sufficient classification / beta inputs |
-| `empty_portfolio` | No positive market-value equity holdings |
-| `partial` | Result computed but uses defaults or incomplete sector map |
-
-Never invent beta/sector data to look complete. Prefer `partial` + `missing_data`.
-
-## Concentration
-
-Position weights feed `compute_concentration_metrics` from
-`portfolio_risk_metrics_service` (read-only reuse). The risk-metrics service
-file is **not** modified.
-
-## Implementation map
-
-| Piece | Path |
-| --- | --- |
-| Scenario catalog | `src/services/portfolio_stress_scenarios.py` |
-| Service | `src/services/portfolio_stress_test_service.py` |
-| Endpoint | `api/v1/endpoints/portfolio_stress_test.py` |
-| Schemas | `api/v1/schemas/portfolio_stress_test.py` |
-| Service tests | `tests/services/test_portfolio_stress_test_service.py` |
-| API tests | `tests/api/test_portfolio_stress_test_api.py` |
-
-## Assumption checklist (delivery note)
-
-1. Instantaneous, one-shot factor shocks (not multi-day paths).
-2. Linear additivity across factors.
-3. Missing market beta → unit beta with `partial`.
-4. Uniform equity rate sensitivity default.
-5. FX only on currency mismatch vs base.
-6. No provider calls on the hot path.
-7. Historical extreme-window replay **not** implemented.
+- Deterministic instantaneous shocks only; no historical path replay.
+- Linear factor additivity; no nonlinear, liquidity, or correlation effects.
+- Missing market beta falls back to unit beta with an explicit label.
+- Rate sensitivity is uniform unless the caller supplies a bounded override.
+- No market data provider calls occur on the stress-test hot path.

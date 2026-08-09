@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -25,6 +25,7 @@ from api.v1.schemas.portfolio_stress_test import (
 )
 from src.services.portfolio_stress_scenarios import (
     DEFAULT_EQUITY_RATE_SENSITIVITY_PCT_PER_100BP,
+    ScenarioCatalogUnavailableError,
 )
 from src.services.portfolio_stress_test_service import PortfolioStressTestService
 from src.utils.sanitize import log_safe_exception
@@ -38,21 +39,15 @@ def _bad_request(exc: Exception) -> HTTPException:
     return api_error(400, "validation_error", str(exc))
 
 
-def _parse_as_of(raw: Optional[str]) -> Optional[date]:
-    if raw is None or str(raw).strip() == "":
-        return None
-    text = str(raw).strip()
-    try:
-        return date.fromisoformat(text)
-    except ValueError as exc:
-        raise ValueError(f"as_of must be an ISO date (YYYY-MM-DD); got '{text}'") from exc
+def _catalog_unavailable(exc: Exception) -> HTTPException:
+    return api_error(503, "portfolio_stress_catalog_unavailable", str(exc))
 
 
 @router.get(
     "/stress-test/scenarios",
     response_model=StressScenarioListResponse,
     responses={
-        500: {"model": ErrorResponse, "description": "Scenario catalog failed"},
+        503: {"model": ErrorResponse, "description": "Scenario catalog unavailable"},
     },
     summary="List portfolio stress scenarios",
     description=(
@@ -71,6 +66,8 @@ def list_portfolio_stress_scenarios() -> StressScenarioListResponse:
             simulation_method="deterministic_factor_shock",
             historical_replay_available=False,
         )
+    except ScenarioCatalogUnavailableError as exc:
+        raise _catalog_unavailable(exc)
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitize catalog failures
@@ -92,6 +89,7 @@ def list_portfolio_stress_scenarios() -> StressScenarioListResponse:
     response_model=PortfolioStressTestResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Invalid query parameters"},
+        503: {"model": ErrorResponse, "description": "Scenario catalog unavailable"},
         500: {"model": ErrorResponse, "description": "Stress test computation failed"},
     },
     summary="Run a built-in portfolio stress scenario",
@@ -104,17 +102,21 @@ def list_portfolio_stress_scenarios() -> StressScenarioListResponse:
     operation_id="getPortfolioStressTest",
 )
 def get_portfolio_stress_test(
-    scenario_id: str = Query(..., description="Built-in or YAML scenario id"),
-    account_id: Optional[int] = Query(None, description="Optional account id"),
+    scenario_id: str = Query(..., min_length=1, max_length=64, description="Built-in or YAML scenario id"),
+    account_id: Optional[int] = Query(None, gt=0, description="Optional account id"),
     as_of: Optional[date] = Query(None, description="As-of date; default today"),
-    cost_method: str = Query("fifo", description="Cost method: fifo or avg"),
+    cost_method: Literal["fifo", "avg"] = Query("fifo", description="Cost method: fifo or avg"),
     target_sector: Optional[str] = Query(
         None,
-        description="Required for sector scenarios (e.g. sector_down_30)",
+        min_length=1,
+        max_length=80,
+        description="Sector presets are POST-only because they also require sector_map",
     ),
     rate_sensitivity_pct_per_100bp: float = Query(
         DEFAULT_EQUITY_RATE_SENSITIVITY_PCT_PER_100BP,
         gt=0,
+        le=20,
+        allow_inf_nan=False,
         description="Equity return percent points per +100bp rate move (simplified)",
     ),
 ) -> PortfolioStressTestResponse:
@@ -129,6 +131,8 @@ def get_portfolio_stress_test(
             rate_sensitivity_pct_per_100bp=rate_sensitivity_pct_per_100bp,
         )
         return PortfolioStressTestResponse(**data)
+    except ScenarioCatalogUnavailableError as exc:
+        raise _catalog_unavailable(exc)
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - map stress failures
@@ -146,6 +150,7 @@ def get_portfolio_stress_test(
     response_model=PortfolioStressTestResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Invalid request body"},
+        503: {"model": ErrorResponse, "description": "Scenario catalog unavailable"},
         500: {"model": ErrorResponse, "description": "Stress test computation failed"},
     },
     summary="Run portfolio stress test with optional custom shocks",
@@ -161,7 +166,6 @@ def post_portfolio_stress_test(
 ) -> PortfolioStressTestResponse:
     service = PortfolioStressTestService()
     try:
-        as_of_date = _parse_as_of(body.as_of)
         custom_shocks = None
         if body.custom_shocks:
             custom_shocks = [shock.model_dump(exclude_none=True) for shock in body.custom_shocks]
@@ -172,7 +176,7 @@ def post_portfolio_stress_test(
         )
         data = service.run_stress_test(
             account_id=body.account_id,
-            as_of=as_of_date,
+            as_of=body.as_of,
             cost_method=body.cost_method,
             scenario_id=body.scenario_id,
             target_sector=body.target_sector,
@@ -182,6 +186,8 @@ def post_portfolio_stress_test(
             rate_sensitivity_pct_per_100bp=rate_sens,
         )
         return PortfolioStressTestResponse(**data)
+    except ScenarioCatalogUnavailableError as exc:
+        raise _catalog_unavailable(exc)
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - map stress failures

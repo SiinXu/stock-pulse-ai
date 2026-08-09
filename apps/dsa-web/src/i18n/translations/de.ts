@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Screening läuft",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Screening-Aufgabe in der Warteschlange",
   "utils.taskMessage.TASK_STATUS_UPDATED": "Aufgabenstatus aktualisiert",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "Optionaler, begrenzter YAML-Katalog für deterministische Portfolio-Stresstests.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "Szenariokatalog für Portfolio-Stresstests",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "PORTFOLIO_STRESS_SCENARIOS_PATH auf eine lesbare lokale YAML-Datei setzen oder leer lassen, um nur integrierte Szenarien zu verwenden.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "Szenariokatalog für Portfolio-Stresstests",
 } as const;

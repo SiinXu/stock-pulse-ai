@@ -371,6 +371,7 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+    portfolio_stress_scenarios_path: Optional[str] = None
 
     # Discord Bot status
     discord_bot_status: str = "A股智能分析 | /help"
@@ -444,6 +445,11 @@ class Config:
 
     def __post_init__(self) -> None:
         _log = logging.getLogger(__name__)
+        if (
+            self.portfolio_stress_scenarios_path is not None
+            and len(self.portfolio_stress_scenarios_path) > 1024
+        ):
+            raise ValueError("PORTFOLIO_STRESS_SCENARIOS_PATH exceeds 1024 characters")
         if self.agent_arch not in self._VALID_AGENT_ARCH:
             _log.warning(
                 "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",

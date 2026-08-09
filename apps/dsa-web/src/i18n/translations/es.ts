@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Selección en curso",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Tarea de selección en cola",
   "utils.taskMessage.TASK_STATUS_UPDATED": "Estado de la tarea actualizado",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "Catálogo YAML opcional y acotado para escenarios deterministas de estrés de cartera.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "Catálogo de escenarios de estrés de cartera",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "Defina PORTFOLIO_STRESS_SCENARIOS_PATH con un archivo YAML local legible o déjelo vacío para usar solo los escenarios integrados.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "Catálogo de escenarios de estrés de cartera",
 } as const;

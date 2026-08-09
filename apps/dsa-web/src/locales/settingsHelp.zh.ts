@@ -1475,6 +1475,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响计划简报生成与准确率回顾展示。'],
     notes: ['定时投递需要 schedule 模式。'],
   },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: '组合压力测试情景目录',
+    summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',
+    usage: '将 PORTFOLIO_STRESS_SCENARIOS_PATH 设为可读取的本地 YAML 文件；留空时仅使用内置情景。',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: '保存分析上下文快照',
     summary: '控制是否将分析历史的整份 context_snapshot 持久化到数据库。',

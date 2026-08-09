@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Sélection en cours",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Tâche de sélection en file d’attente",
   "utils.taskMessage.TASK_STATUS_UPDATED": "Statut de la tâche mis à jour",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "Catalogue YAML facultatif et borné pour les scénarios déterministes de stress de portefeuille.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "Catalogue de scénarios de stress de portefeuille",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "Définissez PORTFOLIO_STRESS_SCENARIOS_PATH sur un fichier YAML local lisible, ou laissez-le vide pour utiliser uniquement les scénarios intégrés.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "Catalogue de scénarios de stress de portefeuille",
 } as const;

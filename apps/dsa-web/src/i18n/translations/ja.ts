@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "スクリーニング中",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "スクリーニングタスクはキューで待機中",
   "utils.taskMessage.TASK_STATUS_UPDATED": "タスクステータス更新",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "決定論的なポートフォリオ・ストレスシナリオ用の任意かつ制限付き YAML カタログです。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "ポートフォリオ・ストレスシナリオカタログ",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "PORTFOLIO_STRESS_SCENARIOS_PATH に読み取り可能なローカル YAML ファイルを設定するか、空のままにして組み込みシナリオのみを使用します。",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "ポートフォリオ・ストレスシナリオカタログ",
 } as const;

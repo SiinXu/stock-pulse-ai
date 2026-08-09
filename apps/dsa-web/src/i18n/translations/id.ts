@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Penyaringan sedang berlangsung",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Tugas penyaringan dalam antrean",
   "utils.taskMessage.TASK_STATUS_UPDATED": "Status tugas diperbarui",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "Katalog YAML opsional dan terbatas untuk skenario uji tekanan portofolio deterministik.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "Katalog Skenario Uji Tekanan Portofolio",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "Atur PORTFOLIO_STRESS_SCENARIOS_PATH ke berkas YAML lokal yang dapat dibaca atau biarkan kosong untuk hanya memakai skenario bawaan.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "Katalog Skenario Uji Tekanan Portofolio",
 } as const;

@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
@@ -101,96 +101,74 @@ class PortfolioStressTestApiTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 400, resp.text)
 
-    @patch(
-        "src.services.portfolio_stress_test_service.PortfolioStressTestService.run_stress_test"
-    )
-    def test_post_custom_shocks_payload_shape(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = {
-            "as_of": "2026-06-01",
-            "account_id": 1,
-            "cost_method": "fifo",
-            "currency": "CNY",
-            "status": "ok",
-            "status_message": "Deterministic factor shock applied to current holdings.",
-            "portfolio_value": 10000.0,
-            "positions_used": 2,
-            "simulation_method": "deterministic_factor_shock",
-            "historical_replay_available": False,
-            "scenario": {
-                "id": "custom",
-                "name": "Custom scenario",
-                "description": "Caller-supplied deterministic factor shocks.",
-                "category": "custom",
-                "shocks": [{"factor": "market", "value_pct": -8.0}],
-                "target_sector": None,
-            },
-            "assumptions": {
-                "simulation_method": "deterministic_factor_shock",
-                "historical_replay": False,
-                "linear_factor_additivity": True,
-                "instantaneous_shock": True,
-                "cash_excluded": True,
-                "weight_basis": "market_value_base",
-                "provider_calls_on_hot_path": False,
-                "beta_policy": "caller_provided_betas",
-                "sector_policy": "position_sector_field_or_missing",
-                "fx_policy": (
-                    "apply_only_when_valuation_currency_differs_from_portfolio_base"
-                ),
-                "rate_policy": "equity_return_pct = -rate_sensitivity_pct_per_100bp * (value_bp / 100)",
-                "rate_sensitivity_pct_per_100bp": 2.0,
-                "reuses_risk_metrics_concentration": True,
-                "data_source": "portfolio_holdings_snapshot_only",
-                "simplified_assumptions": ["deterministic_instantaneous_factor_shock"],
-                "scenario_category": "custom",
-            },
-            "missing_data": [],
-            "portfolio_pnl": -800.0,
-            "portfolio_pnl_pct": -8.0,
-            "stressed_portfolio_value": 9200.0,
-            "position_impacts": [
-                {
-                    "symbol": "AAA",
-                    "market_value": 6000.0,
-                    "weight_pct": 60.0,
-                    "shock_pct": -8.0,
-                    "pnl": -480.0,
-                    "stressed_market_value": 5520.0,
-                    "beta_used": 1.0,
-                    "beta_source": "provided",
-                    "sector": None,
-                    "valuation_currency": "CNY",
-                }
-            ],
-            "top_losers": [],
-            "top_winners": [],
-            "concentration": {
-                "status": "ok",
-                "hhi": 0.52,
-                "effective_n": 1.923077,
-                "diversification_score": 0.96,
-                "top_weight_pct": 60.0,
-                "position_count": 2,
-                "weights": [
-                    {"symbol": "AAA", "weight_pct": 60.0},
-                    {"symbol": "BBB", "weight_pct": 40.0},
-                ],
-            },
-        }
+    def test_post_custom_shocks_payload_shape(self) -> None:
         resp = self.client.post(
             "/api/v1/portfolio/stress-test",
             json={
                 "as_of": "2026-06-01",
-                "account_id": 1,
                 "custom_shocks": [{"factor": "market", "value_pct": -8.0}],
                 "betas": {"AAA": 1.0, "BBB": 1.0},
             },
         )
         self.assertEqual(resp.status_code, 200, resp.text)
         payload = resp.json()
-        self.assertEqual(payload["status"], "ok")
-        self.assertAlmostEqual(payload["portfolio_pnl"], -800.0, places=4)
-        mock_run.assert_called_once()
-        kwargs = mock_run.call_args.kwargs
-        self.assertEqual(kwargs["custom_shocks"][0]["factor"], "market")
-        self.assertEqual(kwargs["betas"]["AAA"], 1.0)
+        self.assertEqual(payload["status"], "empty_portfolio")
+        self.assertEqual(payload["scenario"]["source"], "custom_api")
+        self.assertEqual(payload["scenario"]["shocks"][0]["factor"], "market")
+
+    def test_sector_get_is_not_a_false_ready_path(self) -> None:
+        resp = self.client.get(
+            "/api/v1/portfolio/stress-test",
+            params={"scenario_id": "sector_down_30", "target_sector": "banks"},
+        )
+        self.assertEqual(resp.status_code, 400, resp.text)
+        self.assertIn("POST", resp.text)
+
+    def test_request_union_and_numeric_bounds_are_strict(self) -> None:
+        invalid_bodies = [
+            {
+                "scenario_id": "market_down_10",
+                "custom_shocks": [{"factor": "market", "value_pct": -10}],
+            },
+            {"custom_shocks": [{"factor": "rate", "value_pct": 100}]},
+            {"custom_shocks": [{"factor": "market", "value_pct": -101}]},
+            {"custom_shocks": [{"factor": "market", "value_pct": -10, "unexpected": True}]},
+            {
+                "scenario_id": "market_down_10",
+                "betas": {f"S{i}": 1 for i in range(257)},
+            },
+        ]
+        for body in invalid_bodies:
+            with self.subTest(body=body):
+                response = self.client.post("/api/v1/portfolio/stress-test", json=body)
+                self.assertEqual(response.status_code, 422, response.text)
+
+        nonfinite = self.client.post(
+            "/api/v1/portfolio/stress-test",
+            content='{"custom_shocks":[{"factor":"market","value_pct":NaN}]}',
+            headers={"content-type": "application/json"},
+        )
+        self.assertEqual(nonfinite.status_code, 422, nonfinite.text)
+
+    def test_get_query_contract_is_bounded(self) -> None:
+        too_long = self.client.get(
+            "/api/v1/portfolio/stress-test", params={"scenario_id": "x" * 65}
+        )
+        self.assertEqual(too_long.status_code, 422)
+        bad_rate = self.client.get(
+            "/api/v1/portfolio/stress-test",
+            params={"scenario_id": "rate_up_100bp", "rate_sensitivity_pct_per_100bp": 21},
+        )
+        self.assertEqual(bad_rate.status_code, 422)
+
+    def test_invalid_configured_catalog_returns_sanitized_503(self) -> None:
+        missing = self.data_dir / "secret-catalog-name.yaml"
+        os.environ["PORTFOLIO_STRESS_SCENARIOS_PATH"] = str(missing)
+        Config.reset_instance()
+        try:
+            response = self.client.get("/api/v1/portfolio/stress-test/scenarios")
+        finally:
+            os.environ.pop("PORTFOLIO_STRESS_SCENARIOS_PATH", None)
+            Config.reset_instance()
+        self.assertEqual(response.status_code, 503, response.text)
+        self.assertNotIn(str(missing), response.text)

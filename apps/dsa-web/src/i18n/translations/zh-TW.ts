@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "正在執行選股任務",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "選股任務已加入佇列",
   "utils.taskMessage.TASK_STATUS_UPDATED": "任務狀態已更新",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "用於確定性投資組合壓力測試的可選、有界 YAML 情境目錄。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "投資組合壓力測試情境目錄",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "將 PORTFOLIO_STRESS_SCENARIOS_PATH 設為可讀取的本機 YAML 檔案；留空時僅使用內建情境。",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "投資組合壓力測試情境目錄",
 } as const;

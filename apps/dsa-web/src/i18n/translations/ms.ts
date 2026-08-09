@@ -4858,4 +4858,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Saringan sedang dijalankan",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Tugasan saringan dalam baris gilir",
   "utils.taskMessage.TASK_STATUS_UPDATED": "Status tugas dikemas kini",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.summary": "Katalog YAML pilihan dan terhad untuk senario tekanan portfolio deterministik.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.title": "Katalog Senario Tekanan Portfolio",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH.usage": "Tetapkan PORTFOLIO_STRESS_SCENARIOS_PATH kepada fail YAML setempat yang boleh dibaca atau biarkan kosong untuk menggunakan senario terbina dalam sahaja.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_STRESS_SCENARIOS_PATH": "Katalog Senario Tekanan Portfolio",
 } as const;
