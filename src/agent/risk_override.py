@@ -1017,7 +1017,7 @@ def _unit_interval_fact(
     if isinstance(value, bool):
         return None, True
     try:
-        parsed = float(value)
+        parsed = float(str(value))
     except (TypeError, ValueError):
         return None, True
     if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
@@ -1045,7 +1045,7 @@ def _historical_loss_rate(ctx: AgentContext) -> Tuple[Optional[float], bool]:
     if isinstance(value, bool):
         return None, True
     try:
-        parsed = float(value)
+        parsed = float(str(value))
     except (TypeError, ValueError):
         return None, True
     if not isfinite(parsed) or not 0.0 <= parsed <= 1.0:
@@ -1133,13 +1133,7 @@ def evaluate_risk_manager_gate(
             outcome=RiskGateOutcome.PASS,
             original_signal=normalized,
             final_signal=normalized,
-            reasons=(
-                (
-                    "risk_evidence_within_profile_limits"
-                    if provenance
-                    else "no_risk_evidence"
-                ),
-            ),
+            reasons=("no_risk_evidence",),
             warnings=(),
             evidence_codes=(),
             enabled=True,
