@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
+- [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
+- [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
 - [Changed] Desktop startup records a bounded asynchronous path-safe CLI visibility summary and documents Desktop/Web capability boundaries for #884 without exposing raw paths to the renderer.
 - [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
 - [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
