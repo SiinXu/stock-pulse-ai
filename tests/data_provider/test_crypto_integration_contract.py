@@ -210,3 +210,5 @@ def test_crypto_fundamentals_are_explicitly_not_supported(monkeypatch) -> None:
     assert result["market"] == "crypto"
     assert result["status"] == "not_supported"
     assert "do not apply" in " ".join(result.get("errors", [])).lower()
+    assert manager.get_chip_distribution("crypto:BTC") is None
+    assert manager.get_belong_boards("crypto:BTC") == []

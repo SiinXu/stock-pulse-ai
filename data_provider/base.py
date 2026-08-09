@@ -2355,6 +2355,9 @@ class DataFetcherManager:
         """
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
+        if _market_tag(stock_code) == "crypto":
+            logger.debug("[chip distribution] not applicable to crypto asset %s", stock_code)
+            return None
 
         from .realtime_types import get_chip_circuit_breaker
         from src.config import get_config
