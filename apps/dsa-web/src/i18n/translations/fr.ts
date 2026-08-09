@@ -4977,4 +4977,9 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableCaption": "Comparaison des composants d’empreinte de configuration",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.configTableEmpty": "Aucun composant de configuration",
   "locales.reportVersionCompare.REPORT_VERSION_COMPARE_TEXT.emptyValue": "n. d.",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryDescription": "Ce répertoire affiche uniquement les paramètres enregistrés des fournisseurs de données de marché. Il n’indique ni le routage actif, ni la disponibilité, ni l’état, ni les résultats de repli, ni la fraîcheur du cache. Les identifiants de recherche et l’import de portefeuille Futu ne sont pas gérés ici.",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryFilterAll": "Toutes les configurations",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryNoMatches": "Aucun paramètre de fournisseur correspondant",
+  "i18n.uiText.UI_TEXT.settings.dataDirectorySearchPlaceholder": "Filtrer par nom ou état de configuration",
+  "i18n.uiText.UI_TEXT.settings.dataDirectoryTitle": "Configuration des fournisseurs",
 } as const;
