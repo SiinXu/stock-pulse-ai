@@ -280,7 +280,10 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
             else DataFetcherManager()
         )
         # No longer create akshare_fetcher separately, use fetcher_manager to get enhanced data
-        self.trend_analyzer = StockTrendAnalyzer()  # Technical analyzer
+        from src.utils.indicator_periods import periods_from_config
+
+        # Issue #172: inject configured MA/MACD/RSI periods (defaults preserve history).
+        self.trend_analyzer = StockTrendAnalyzer(periods=periods_from_config(self.config))
         self.analyzer = GeminiAnalyzer(
             config=self.config,
             skills=self.analysis_skills,

@@ -11418,7 +11418,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**

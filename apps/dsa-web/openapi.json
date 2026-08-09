@@ -20379,6 +20379,7 @@
               "system",
               "agent",
               "backtest",
+              "indicators",
               "uncategorized"
             ],
             "title": "Category",
