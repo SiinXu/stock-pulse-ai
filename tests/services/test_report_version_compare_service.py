@@ -35,9 +35,9 @@ def _insert_history(
     code: str = "600519",
     name: str = "贵州茅台",
     query_id: str = "q1",
-    report_type: str = "detailed",
+    report_type: Optional[str] = "detailed",
     action: str = "buy",
-    sentiment_score: int = 75,
+    sentiment_score: Any = 75,
     model_used: str = "gpt-test",
     report_language: str = "zh",
     operation_advice: str = "买入",
@@ -58,6 +58,16 @@ def _insert_history(
     if extra_raw:
         raw.update(extra_raw)
 
+    persisted_context = (
+        {
+            "routing": {"provider": "test-provider", "model": model_used},
+            "config_profile": "test-profile",
+            "config_version": "v1",
+        }
+        if context_snapshot is None
+        else context_snapshot
+    )
+
     def _write(session):
         row = AnalysisHistory(
             query_id=query_id,
@@ -70,7 +80,7 @@ def _insert_history(
             analysis_summary=analysis_summary,
             raw_result=json.dumps(raw, ensure_ascii=False),
             news_content=None,
-            context_snapshot=json.dumps(context_snapshot or {}, ensure_ascii=False),
+            context_snapshot=json.dumps(persisted_context, ensure_ascii=False),
             created_at=created_at or datetime.now(),
         )
         session.add(row)
@@ -118,6 +128,7 @@ class ReportVersionCompareServiceTests(unittest.TestCase):
         item = next(i for i in result["items"] if i["run_id"] == str(run_id))
         self.assertEqual(item["model_used"], "model-a")
         self.assertTrue(item["config_fingerprint"])
+        self.assertTrue(item["config_complete"])
         self.assertIn("model_used", item["config_components"])
         self.assertEqual(item["config_components"]["model_used"], "model-a")
 
@@ -169,7 +180,8 @@ class ReportVersionCompareServiceTests(unittest.TestCase):
         self.assertIsNotNone(result["delta"])
         assert result["delta"] is not None
         self.assertTrue(result["delta"]["has_baseline"])
-        self.assertEqual(result["delta"]["base_run_id"], str(base_id))
+        self.assertEqual(result["delta"]["base_record_id"], base_id)
+        self.assertEqual(result["delta"]["target_record_id"], target_id)
         self.assertEqual(len(result["delta"]["conclusion_changes"]), 1)
 
     def test_no_baseline_is_not_no_change(self) -> None:
@@ -202,6 +214,110 @@ class ReportVersionCompareServiceTests(unittest.TestCase):
         self.assertEqual(severity_major, SEVERITY_MAJOR)
         severity_mod = service._grade_field_severity("action", "hold", "buy")
         self.assertEqual(severity_mod, SEVERITY_MODERATE)
+
+    def test_market_review_filter_is_applied_before_count_and_pagination(self) -> None:
+        eligible_old = _insert_history(
+            self.db,
+            query_id="eligible-old",
+            created_at=datetime.now() - timedelta(days=3),
+        )
+        _insert_history(
+            self.db,
+            query_id="eligible-new",
+            created_at=datetime.now() - timedelta(days=2),
+        )
+        eligible_without_type = _insert_history(
+            self.db,
+            query_id="eligible-without-type",
+            report_type=None,
+            created_at=datetime.now() - timedelta(days=1),
+        )
+        _insert_history(
+            self.db,
+            query_id="market-newest",
+            report_type="market_review",
+            created_at=datetime.now(),
+        )
+
+        service = ReportVersionCompareService(self.db)
+        first_page = service.list_runs("600519", page=1, limit=1)
+        second_page = service.list_runs("600519", page=2, limit=1)
+        third_page = service.list_runs("600519", page=3, limit=1)
+
+        self.assertEqual(first_page["total"], 3)
+        self.assertEqual(second_page["total"], 3)
+        self.assertEqual(third_page["total"], 3)
+        returned = {
+            first_page["items"][0]["run_id"],
+            second_page["items"][0]["run_id"],
+            third_page["items"][0]["run_id"],
+        }
+        self.assertIn(str(eligible_old), returned)
+        self.assertIn(str(eligible_without_type), returned)
+        self.assertTrue(
+            all(item["report_type"] != "market_review" for item in first_page["items"])
+        )
+
+    def test_non_finite_and_out_of_range_scores_are_strict_json_safe(self) -> None:
+        run_ids = [
+            _insert_history(self.db, query_id="nan", sentiment_score=float("nan")),
+            _insert_history(self.db, query_id="pos-inf", sentiment_score=float("inf")),
+            _insert_history(self.db, query_id="neg-inf", sentiment_score=float("-inf")),
+            _insert_history(self.db, query_id="out-of-range", sentiment_score=101),
+        ]
+
+        result = ReportVersionCompareService(self.db).list_runs("600519", limit=20)
+        json.dumps(result, allow_nan=False)
+        scores = {
+            item["run_id"]: item["sentiment_score"]
+            for item in result["items"]
+            if item["run_id"] in {str(run_id) for run_id in run_ids}
+        }
+        self.assertEqual(set(scores), {str(run_id) for run_id in run_ids})
+        self.assertTrue(all(score is None for score in scores.values()))
+
+    def test_merged_engine_uses_primary_ids_when_query_id_is_shared(self) -> None:
+        shared_query_id = "shared-query"
+        base_id = _insert_history(
+            self.db,
+            query_id=shared_query_id,
+            action="buy",
+            sentiment_score=80,
+            created_at=datetime.now() - timedelta(days=1),
+        )
+        target_id = _insert_history(
+            self.db,
+            query_id=shared_query_id,
+            action="sell",
+            sentiment_score=20,
+            created_at=datetime.now(),
+        )
+
+        result = ReportVersionCompareService(self.db).compare_runs(
+            "600519", str(base_id), str(target_id)
+        )
+
+        self.assertEqual(result["status"], "ok")
+        delta = result["delta"]
+        self.assertEqual(delta["base_record_id"], base_id)
+        self.assertEqual(delta["target_record_id"], target_id)
+        self.assertEqual(delta["base_query_id"], shared_query_id)
+        self.assertEqual(delta["target_query_id"], shared_query_id)
+        self.assertTrue(delta["has_material_changes"])
+        json.dumps(result, allow_nan=False)
+
+    def test_incomplete_config_is_unknown_not_identical(self) -> None:
+        base_id = _insert_history(self.db, query_id="base", context_snapshot={})
+        target_id = _insert_history(self.db, query_id="target", context_snapshot={})
+
+        result = ReportVersionCompareService(self.db).compare_runs(
+            "600519", str(base_id), str(target_id)
+        )
+
+        self.assertIsNone(result["base_run"]["config_fingerprint"])
+        self.assertFalse(result["base_run"]["config_complete"])
+        self.assertEqual(result["config_diff"]["comparison_status"], "unknown")
+        self.assertFalse(result["config_diff"]["identical"])
 
 
 if __name__ == "__main__":

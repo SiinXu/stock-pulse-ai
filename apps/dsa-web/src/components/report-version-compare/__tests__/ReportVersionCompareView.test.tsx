@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReportVersionCompareResponse } from '../../../api/reportVersionCompare';
 import { ReportVersionCompareView } from '../ReportVersionCompareView';
@@ -29,6 +29,8 @@ const baseRun = {
     strategy_mode: '',
     config_profile: '',
   },
+  configComplete: true,
+  configMissingKeys: [],
 };
 
 const targetRun = {
@@ -62,6 +64,11 @@ function buildResult(
       targetFingerprint: 'bbb222',
       identical: false,
       hasDifferences: true,
+      comparisonStatus: 'different',
+      baseComplete: true,
+      targetComplete: true,
+      baseMissingKeys: [],
+      targetMissingKeys: [],
       components: [
         {
           key: 'model_used',
@@ -102,12 +109,27 @@ function buildResult(
     ],
     delta: {
       hasBaseline: true,
-      conclusionChanges: [{ field: 'action', base: 'buy', target: 'sell' }],
+      baselineStatus: 'ok',
+      baselineReason: null,
+      stockCode: '600519',
+      baseRecordId: 1,
+      targetRecordId: 2,
+      baseQueryId: 'q-base',
+      targetQueryId: 'q-target',
+      reportType: 'detailed',
+      hasMaterialChanges: true,
+      conclusionChanges: [{
+        field: 'action',
+        baseValue: 'buy',
+        targetValue: 'sell',
+        delta: null,
+        direction: 'changed',
+        comparable: true,
+        unavailability: null,
+      }],
       scoreChanges: [],
       evidenceChanges: [],
       riskChanges: [],
-      baseRunId: '1',
-      targetRunId: '2',
     },
     engineStatus: 'ok',
     ...overrides,
@@ -156,17 +178,61 @@ describe('ReportVersionCompareView', () => {
           status: 'no_baseline',
           delta: {
             hasBaseline: false,
+            baselineStatus: 'missing_history',
+            baselineReason: 'No prior comparable history',
+            stockCode: '600519',
+            baseRecordId: 1,
+            targetRecordId: 2,
+            baseQueryId: 'q-base',
+            targetQueryId: 'q-target',
+            reportType: 'detailed',
+            hasMaterialChanges: false,
             conclusionChanges: [],
             scoreChanges: [],
             evidenceChanges: [],
             riskChanges: [],
-            baseRunId: '1',
-            targetRunId: '2',
           },
         })}
       />,
     );
-    expect(screen.getByTestId('report-version-compare-status-no_baseline')).toBeInTheDocument();
-    expect(screen.getByText(/No baseline available/i)).toBeInTheDocument();
+    const status = screen.getByTestId('report-version-compare-status-no_baseline');
+    expect(status).toBeInTheDocument();
+    expect(within(status).getByText(/No baseline available/i)).toBeInTheDocument();
+  });
+
+  it('shows incomplete configuration provenance as unknown, not identical', () => {
+    render(
+      <ReportVersionCompareView
+        language="en"
+        result={buildResult({
+          baseRun: {
+            ...baseRun,
+            configFingerprint: null,
+            configComplete: false,
+            configMissingKeys: ['provider_route'],
+          },
+          targetRun: {
+            ...targetRun,
+            configFingerprint: null,
+            configComplete: false,
+            configMissingKeys: ['provider_route'],
+          },
+          configDiff: {
+            baseFingerprint: null,
+            targetFingerprint: null,
+            identical: false,
+            hasDifferences: false,
+            comparisonStatus: 'unknown',
+            baseComplete: false,
+            targetComplete: false,
+            baseMissingKeys: ['provider_route'],
+            targetMissingKeys: ['provider_route'],
+            components: [],
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText(/provenance is incomplete/i)).toBeInTheDocument();
+    expect(screen.queryByText(/fingerprints match/i)).not.toBeInTheDocument();
   });
 });

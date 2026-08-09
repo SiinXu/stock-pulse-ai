@@ -43,20 +43,45 @@ function formatRunOption(
   });
 }
 
+const RUN_PAGE_SIZE = 50;
+
+type FailedOperation =
+  | {
+    kind: 'list';
+    stockCode: string;
+    page: number;
+    append: boolean;
+  }
+  | {
+    kind: 'compare';
+    stockCode: string;
+    baseRunId: string;
+    targetRunId: string;
+  };
+
+function normalizeStockIdentity(value: string): string {
+  return value.trim().toUpperCase();
+}
+
 const ReportVersionComparePage: React.FC = () => {
   const { language } = useUiLanguage();
   const text = REPORT_VERSION_COMPARE_TEXT[language];
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const requestIdRef = useRef(0);
 
-  const [stockCode, setStockCode] = useState('');
+  const [draftStockCode, setDraftStockCode] = useState('');
+  const [loadedStockCode, setLoadedStockCode] = useState<string | null>(null);
   const [runs, setRuns] = useState<ReportVersionRunItem[]>([]);
+  const [totalRuns, setTotalRuns] = useState(0);
+  const [runPage, setRunPage] = useState(1);
   const [baseRunId, setBaseRunId] = useState('');
   const [targetRunId, setTargetRunId] = useState('');
   const [result, setResult] = useState<ReportVersionCompareResponse | null>(null);
   const [loadingRuns, setLoadingRuns] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const [failedOperation, setFailedOperation] = useState<FailedOperation | null>(null);
   const [hasLoadedRuns, setHasLoadedRuns] = useState(false);
 
   useRouteFocusTarget({
@@ -78,41 +103,72 @@ const ReportVersionComparePage: React.FC = () => {
     [runs, text],
   );
 
-  const loadRuns = useCallback(async () => {
+  const draftIdentity = normalizeStockIdentity(draftStockCode);
+  const loadedIdentityMatchesDraft = Boolean(
+    loadedStockCode && draftIdentity === loadedStockCode,
+  );
+
+  const loadRuns = useCallback(async ({
+    stockCode,
+    page,
+    append,
+  }: Extract<FailedOperation, { kind: 'list' }>) => {
     const code = stockCode.trim();
     if (!code) return;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    setLoadingRuns(true);
+    if (append) setLoadingMore(true);
+    else setLoadingRuns(true);
     setError(null);
-    setResult(null);
+    setFailedOperation(null);
+    if (!append) setResult(null);
     try {
       const response = await reportVersionCompareApi.listRuns({
         stockCode: code,
-        page: 1,
-        limit: 50,
+        page,
+        limit: RUN_PAGE_SIZE,
       });
       if (requestIdRef.current !== requestId) return;
-      setRuns(response.items ?? []);
+      if (append) {
+        setRuns((current) => {
+          const byId = new Map(current.map((run) => [run.runId, run]));
+          for (const run of response.items ?? []) byId.set(run.runId, run);
+          return [...byId.values()];
+        });
+      } else {
+        setRuns(response.items ?? []);
+        setBaseRunId('');
+        setTargetRunId('');
+      }
+      setLoadedStockCode(normalizeStockIdentity(response.stockCode || code));
+      setTotalRuns(response.total);
+      setRunPage(response.page);
       setHasLoadedRuns(true);
-      setBaseRunId('');
-      setTargetRunId('');
     } catch (cause) {
       if (requestIdRef.current !== requestId) return;
-      setRuns([]);
-      setHasLoadedRuns(true);
+      if (!append) {
+        setRuns([]);
+        setTotalRuns(0);
+        setLoadedStockCode(null);
+        setHasLoadedRuns(true);
+      }
       setError(getParsedApiError(cause));
+      setFailedOperation({ kind: 'list', stockCode: code, page, append });
     } finally {
       if (requestIdRef.current === requestId) {
-        setLoadingRuns(false);
+        if (append) setLoadingMore(false);
+        else setLoadingRuns(false);
       }
     }
-  }, [stockCode]);
+  }, []);
 
-  const runCompare = useCallback(async () => {
-    const code = stockCode.trim();
-    if (!code || !baseRunId || !targetRunId) return;
-    if (baseRunId === targetRunId) {
+  const compareRuns = useCallback(async ({
+    stockCode,
+    baseRunId: baseId,
+    targetRunId: targetId,
+  }: Extract<FailedOperation, { kind: 'compare' }>) => {
+    if (!stockCode || !baseId || !targetId) return;
+    if (baseId === targetId) {
       setError(null);
       setResult(null);
       return;
@@ -121,11 +177,12 @@ const ReportVersionComparePage: React.FC = () => {
     requestIdRef.current = requestId;
     setComparing(true);
     setError(null);
+    setFailedOperation(null);
     try {
       const response = await reportVersionCompareApi.compare({
-        stockCode: code,
-        baseRunId,
-        targetRunId,
+        stockCode,
+        baseRunId: baseId,
+        targetRunId: targetId,
       });
       if (requestIdRef.current !== requestId) return;
       setResult(response);
@@ -133,12 +190,64 @@ const ReportVersionComparePage: React.FC = () => {
       if (requestIdRef.current !== requestId) return;
       setResult(null);
       setError(getParsedApiError(cause));
+      setFailedOperation({
+        kind: 'compare',
+        stockCode,
+        baseRunId: baseId,
+        targetRunId: targetId,
+      });
     } finally {
       if (requestIdRef.current === requestId) {
         setComparing(false);
       }
     }
-  }, [baseRunId, stockCode, targetRunId]);
+  }, []);
+
+  const loadDraftRuns = useCallback(() => {
+    const code = draftStockCode.trim();
+    if (!code) return;
+    void loadRuns({ kind: 'list', stockCode: code, page: 1, append: false });
+  }, [draftStockCode, loadRuns]);
+
+  const runCompare = useCallback(() => {
+    if (!loadedStockCode || !loadedIdentityMatchesDraft) return;
+    void compareRuns({
+      kind: 'compare',
+      stockCode: loadedStockCode,
+      baseRunId,
+      targetRunId,
+    });
+  }, [baseRunId, compareRuns, loadedIdentityMatchesDraft, loadedStockCode, targetRunId]);
+
+  const retryFailedOperation = useCallback(() => {
+    if (!failedOperation) return;
+    if (failedOperation.kind === 'compare') {
+      void compareRuns(failedOperation);
+    } else {
+      void loadRuns(failedOperation);
+    }
+  }, [compareRuns, failedOperation, loadRuns]);
+
+  const handleDraftStockChange = useCallback((value: string) => {
+    setDraftStockCode(value);
+    const nextIdentity = normalizeStockIdentity(value);
+    if (loadedStockCode && nextIdentity !== loadedStockCode) {
+      requestIdRef.current += 1;
+      setLoadedStockCode(null);
+      setRuns([]);
+      setTotalRuns(0);
+      setRunPage(1);
+      setBaseRunId('');
+      setTargetRunId('');
+      setResult(null);
+      setError(null);
+      setFailedOperation(null);
+      setHasLoadedRuns(false);
+      setLoadingRuns(false);
+      setLoadingMore(false);
+      setComparing(false);
+    }
+  }, [loadedStockCode]);
 
   const selectionHint = (() => {
     if (!hasLoadedRuns) return null;
@@ -194,8 +303,8 @@ const ReportVersionComparePage: React.FC = () => {
         actions={(
           <IconButton
             aria-label={text.loadRuns}
-            onClick={() => void loadRuns()}
-            disabled={loadingRuns || !stockCode.trim()}
+            onClick={loadDraftRuns}
+            disabled={loadingRuns || !draftStockCode.trim()}
           >
             <RefreshCw className={loadingRuns ? 'animate-spin' : undefined} />
           </IconButton>
@@ -212,13 +321,13 @@ const ReportVersionComparePage: React.FC = () => {
               id="report-version-compare-stock"
               data-testid="report-version-compare-stock-input"
               className="w-full min-h-11 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-foreground/10 sm:min-h-9"
-              value={stockCode}
-              onChange={(event) => setStockCode(event.target.value)}
+              value={draftStockCode}
+              onChange={(event) => handleDraftStockChange(event.target.value)}
               placeholder={text.stockPlaceholder}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  void loadRuns();
+                  loadDraftRuns();
                 }
               }}
             />
@@ -227,8 +336,8 @@ const ReportVersionComparePage: React.FC = () => {
             type="button"
             variant="secondary"
             data-testid="report-version-compare-load-runs"
-            onClick={() => void loadRuns()}
-            disabled={loadingRuns || !stockCode.trim()}
+            onClick={loadDraftRuns}
+            disabled={loadingRuns || !draftStockCode.trim()}
             isLoading={loadingRuns}
           >
             {loadingRuns ? text.loadingRuns : text.loadRuns}
@@ -243,7 +352,7 @@ const ReportVersionComparePage: React.FC = () => {
             onChange={setBaseRunId}
             options={runOptions}
             placeholder={text.selectPlaceholder}
-            disabled={runOptions.length === 0}
+            disabled={runOptions.length === 0 || !loadedIdentityMatchesDraft}
           />
           <Select
             label={text.targetLabel}
@@ -252,7 +361,7 @@ const ReportVersionComparePage: React.FC = () => {
             onChange={setTargetRunId}
             options={runOptions}
             placeholder={text.selectPlaceholder}
-            disabled={runOptions.length === 0}
+            disabled={runOptions.length === 0 || !loadedIdentityMatchesDraft}
           />
         </div>
 
@@ -261,25 +370,46 @@ const ReportVersionComparePage: React.FC = () => {
             type="button"
             variant="primary"
             data-testid="report-version-compare-submit"
-            onClick={() => void runCompare()}
+            onClick={runCompare}
             disabled={
               comparing
               || !baseRunId
               || !targetRunId
               || baseRunId === targetRunId
-              || !stockCode.trim()
+              || !loadedIdentityMatchesDraft
             }
             isLoading={comparing}
           >
             <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
             {comparing ? text.comparing : text.compare}
           </Button>
+          {loadedIdentityMatchesDraft && runs.length < totalRuns ? (
+            <Button
+              type="button"
+              variant="secondary"
+              data-testid="report-version-compare-load-more"
+              onClick={() => void loadRuns({
+                kind: 'list',
+                stockCode: loadedStockCode!,
+                page: runPage + 1,
+                append: true,
+              })}
+              disabled={loadingMore}
+              isLoading={loadingMore}
+            >
+              {loadingMore ? text.loadingRuns : text.loadMore}
+            </Button>
+          ) : null}
         </div>
       </Surface>
 
       {error ? (
         <div className="space-y-3" data-testid="report-version-compare-error">
-          <ApiErrorAlert error={error} actionLabel={text.retry} onAction={() => void loadRuns()} />
+          <ApiErrorAlert
+            error={error}
+            actionLabel={text.retry}
+            onAction={retryFailedOperation}
+          />
         </div>
       ) : null}
 

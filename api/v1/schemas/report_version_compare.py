@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,7 +27,12 @@ class ReportVersionRunItem(BaseModel):
     action: Optional[str] = Field(None, description="Structured decision action taxonomy")
     action_label: Optional[str] = Field(None, description="Localized action label snapshot")
     operation_advice: Optional[str] = Field(None, description="Legacy operation advice text")
-    sentiment_score: Optional[int] = Field(None, description="Sentiment / confidence score")
+    sentiment_score: Optional[float] = Field(
+        None,
+        ge=0,
+        le=100,
+        description="Finite sentiment / confidence score in the supported 0-100 range",
+    )
     trend_prediction: Optional[str] = Field(None, description="Trend prediction text")
     analysis_summary: Optional[str] = Field(None, description="Short analysis summary")
     config_fingerprint: Optional[str] = Field(
@@ -37,6 +42,14 @@ class ReportVersionRunItem(BaseModel):
     config_components: Dict[str, str] = Field(
         default_factory=dict,
         description="Human-readable configuration components that form the fingerprint",
+    )
+    config_complete: bool = Field(
+        False,
+        description="Whether the persisted run contains the minimum reproducibility provenance",
+    )
+    config_missing_keys: List[str] = Field(
+        default_factory=list,
+        description="Required provenance keys absent from the persisted run",
     )
 
 
@@ -60,6 +73,11 @@ class ConfigFingerprintDiff(BaseModel):
     target_fingerprint: Optional[str] = None
     identical: bool = False
     has_differences: bool = False
+    comparison_status: Literal["identical", "different", "unknown"] = "unknown"
+    base_complete: bool = False
+    target_complete: bool = False
+    base_missing_keys: List[str] = Field(default_factory=list)
+    target_missing_keys: List[str] = Field(default_factory=list)
     components: List[ConfigComponentDiff] = Field(default_factory=list)
 
 
@@ -71,16 +89,58 @@ class ReportFieldDiff(BaseModel):
     severity: Literal["major", "moderate", "minor", "none", "unknown"] = "none"
 
 
+JsonScalar = Union[str, int, float, bool]
+
+
+class ValueUnavailabilityPayload(BaseModel):
+    base: Optional[str] = None
+    target: Optional[str] = None
+
+
+class AnalysisValueChangePayload(BaseModel):
+    field: str
+    base_value: Optional[JsonScalar] = None
+    target_value: Optional[JsonScalar] = None
+    delta: Optional[JsonScalar] = None
+    direction: Literal["up", "down", "changed", "unavailable"]
+    comparable: bool = True
+    unavailability: Optional[ValueUnavailabilityPayload] = None
+
+
+class AnalysisListChangePayload(BaseModel):
+    field: str
+    added: List[str] = Field(default_factory=list)
+    removed: List[str] = Field(default_factory=list)
+    unchanged: List[str] = Field(default_factory=list)
+    added_total: int = Field(0, ge=0)
+    removed_total: int = Field(0, ge=0)
+    unchanged_total: int = Field(0, ge=0)
+    output_truncated: bool = False
+
+
 class AnalysisDeltaPayload(BaseModel):
-    """Presentation projection of T17 AnalysisDelta (contract A)."""
+    """Typed presentation projection of the merged T17 AnalysisDelta contract."""
 
     has_baseline: bool = False
-    conclusion_changes: List[Any] = Field(default_factory=list)
-    score_changes: List[Any] = Field(default_factory=list)
-    evidence_changes: List[Any] = Field(default_factory=list)
-    risk_changes: List[Any] = Field(default_factory=list)
-    base_run_id: str
-    target_run_id: str
+    baseline_status: Literal[
+        "ok",
+        "missing_history",
+        "missing_base",
+        "missing_target",
+        "incomparable_structure",
+    ]
+    baseline_reason: Optional[str] = None
+    stock_code: Optional[str] = None
+    base_record_id: int = Field(..., ge=1)
+    target_record_id: int = Field(..., ge=1)
+    base_query_id: Optional[str] = None
+    target_query_id: Optional[str] = None
+    report_type: Optional[str] = None
+    has_material_changes: bool = False
+    conclusion_changes: List[AnalysisValueChangePayload] = Field(default_factory=list)
+    score_changes: List[AnalysisValueChangePayload] = Field(default_factory=list)
+    evidence_changes: List[AnalysisListChangePayload] = Field(default_factory=list)
+    risk_changes: List[AnalysisListChangePayload] = Field(default_factory=list)
 
 
 class ReportVersionCompareResponse(BaseModel):

@@ -135,8 +135,8 @@ def list_report_version_runs(
     summary="Compare two analysis report versions",
     description=(
         "Compare two selected analysis runs: side-by-side field snapshots, "
-        "configuration fingerprint differences, and optional T17 AnalysisDelta "
-        "when compare_analyses is available. engine_pending and no_baseline are "
+        "configuration provenance differences, and the typed T17 AnalysisDelta. "
+        "engine_pending and no_baseline are "
         "never presented as 'no change'."
     ),
     operation_id="compareReportVersions",
@@ -181,6 +181,11 @@ def compare_report_versions(
         target_fingerprint=config_raw.get("target_fingerprint"),
         identical=bool(config_raw.get("identical")),
         has_differences=bool(config_raw.get("has_differences")),
+        comparison_status=config_raw.get("comparison_status") or "unknown",
+        base_complete=bool(config_raw.get("base_complete")),
+        target_complete=bool(config_raw.get("target_complete")),
+        base_missing_keys=list(config_raw.get("base_missing_keys") or []),
+        target_missing_keys=list(config_raw.get("target_missing_keys") or []),
         components=[
             ConfigComponentDiff(**component)
             for component in config_raw.get("components") or []

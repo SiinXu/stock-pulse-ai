@@ -30,6 +30,8 @@ const baseRun = {
     strategy_mode: '',
     config_profile: '',
   },
+  configComplete: true,
+  configMissingKeys: [],
 };
 
 const targetRun = {
@@ -60,6 +62,11 @@ const compareResult: ReportVersionCompareResponse = {
     targetFingerprint: 'bbb222',
     identical: false,
     hasDifferences: true,
+    comparisonStatus: 'different',
+    baseComplete: true,
+    targetComplete: true,
+    baseMissingKeys: [],
+    targetMissingKeys: [],
     components: [
       {
         key: 'model_used',
@@ -100,18 +107,25 @@ const noBaselineResult: ReportVersionCompareResponse = {
   status: 'no_baseline',
   delta: {
     hasBaseline: false,
+    baselineStatus: 'missing_history',
+    baselineReason: 'No prior comparable history',
+    stockCode: '600519',
+    baseRecordId: 1,
+    targetRecordId: 2,
+    baseQueryId: 'q-base',
+    targetQueryId: 'q-target',
+    reportType: 'detailed',
+    hasMaterialChanges: false,
     conclusionChanges: [],
     scoreChanges: [],
     evidenceChanges: [],
     riskChanges: [],
-    baseRunId: '1',
-    targetRunId: '2',
   },
   engineStatus: 'ok',
 };
 
 function ReportVersionCompareScenario() {
-  const scenario = usePlaygroundScenario();
+  const { scenario } = usePlaygroundScenario();
   if (scenario === 'empty') {
     return <ReportVersionCompareView language="en" result={null} idle />;
   }

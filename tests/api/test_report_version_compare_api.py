@@ -45,7 +45,7 @@ def _insert_history(
     code: str = "600519",
     query_id: str = "q1",
     action: str = "buy",
-    sentiment_score: int = 70,
+    sentiment_score: Any = 70,
     model_used: str = "model-a",
     created_at: Optional[datetime] = None,
 ) -> int:
@@ -70,7 +70,13 @@ def _insert_history(
             analysis_summary=f"summary-{query_id}",
             raw_result=json.dumps(raw, ensure_ascii=False),
             news_content=None,
-            context_snapshot="{}",
+            context_snapshot=json.dumps(
+                {
+                    "routing": {"provider": "test-provider", "model": model_used},
+                    "config_profile": "test-profile",
+                    "config_version": "v1",
+                }
+            ),
             created_at=created_at or datetime.now(),
         )
         session.add(row)
@@ -229,6 +235,61 @@ class ReportVersionCompareApiTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 400, resp.text)
         self.assertEqual(resp.json()["error"], "same_run_ids")
+
+    def test_list_runs_normalizes_corrupt_scores_before_response_serialization(self) -> None:
+        run_ids = [
+            _insert_history(self.db, query_id="nan", sentiment_score=float("nan")),
+            _insert_history(self.db, query_id="inf", sentiment_score=float("inf")),
+            _insert_history(self.db, query_id="out-of-range", sentiment_score=101),
+        ]
+
+        resp = self.client.get(
+            "/api/v1/report-version-compare/runs",
+            params={"stock_code": "600519"},
+        )
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        payload = resp.json()
+        encoded = json.dumps(payload, allow_nan=False)
+        self.assertTrue(encoded)
+        scores = {
+            item["run_id"]: item["sentiment_score"]
+            for item in payload["items"]
+            if item["run_id"] in {str(run_id) for run_id in run_ids}
+        }
+        self.assertTrue(all(score is None for score in scores.values()))
+
+    def test_compare_distinguishes_rows_with_shared_query_id(self) -> None:
+        shared_query_id = "shared-query"
+        base_id = _insert_history(
+            self.db,
+            query_id=shared_query_id,
+            action="buy",
+            sentiment_score=80,
+            created_at=datetime.now() - timedelta(days=1),
+        )
+        target_id = _insert_history(
+            self.db,
+            query_id=shared_query_id,
+            action="sell",
+            sentiment_score=20,
+        )
+
+        resp = self.client.get(
+            "/api/v1/report-version-compare/compare",
+            params={
+                "stock_code": "600519",
+                "base_run_id": str(base_id),
+                "target_run_id": str(target_id),
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        delta = resp.json()["delta"]
+        self.assertEqual(delta["base_record_id"], base_id)
+        self.assertEqual(delta["target_record_id"], target_id)
+        self.assertEqual(delta["base_query_id"], shared_query_id)
+        self.assertEqual(delta["target_query_id"], shared_query_id)
 
 
 if __name__ == "__main__":

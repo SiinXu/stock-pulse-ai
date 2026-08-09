@@ -30,6 +30,8 @@ describe('reportVersionCompareApi', () => {
             model_used: 'model-a',
             config_fingerprint: 'abc123',
             config_components: { model_used: 'model-a' },
+            config_complete: true,
+            config_missing_keys: [],
           },
         ],
       },
@@ -55,25 +57,34 @@ describe('reportVersionCompareApi', () => {
   it('compares runs and camelCases nested payloads', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: {
-        status: 'engine_pending',
+        status: 'ok',
         stock_code: '600519',
         base_run: {
           run_id: '1',
           query_id: 'a',
           stock_code: '600519',
           config_components: {},
+          config_complete: true,
+          config_missing_keys: [],
         },
         target_run: {
           run_id: '2',
           query_id: 'b',
           stock_code: '600519',
           config_components: {},
+          config_complete: true,
+          config_missing_keys: [],
         },
         config_diff: {
           base_fingerprint: 'aaa',
           target_fingerprint: 'bbb',
           identical: false,
           has_differences: true,
+          comparison_status: 'different',
+          base_complete: true,
+          target_complete: true,
+          base_missing_keys: [],
+          target_missing_keys: [],
           components: [
             {
               key: 'model_used',
@@ -92,8 +103,33 @@ describe('reportVersionCompareApi', () => {
             severity: 'major',
           },
         ],
-        delta: null,
-        engine_status: 'engine_pending',
+        delta: {
+          has_baseline: true,
+          baseline_status: 'ok',
+          baseline_reason: null,
+          stock_code: '600519',
+          base_record_id: 1,
+          target_record_id: 2,
+          base_query_id: 'shared-query',
+          target_query_id: 'shared-query',
+          report_type: 'detailed',
+          has_material_changes: true,
+          conclusion_changes: [
+            {
+              field: 'action',
+              base_value: 'buy',
+              target_value: 'sell',
+              delta: null,
+              direction: 'changed',
+              comparable: true,
+              unavailability: null,
+            },
+          ],
+          score_changes: [],
+          evidence_changes: [],
+          risk_changes: [],
+        },
+        engine_status: 'ok',
       },
     });
 
@@ -113,10 +149,13 @@ describe('reportVersionCompareApi', () => {
         },
       }),
     );
-    expect(result.status).toBe('engine_pending');
+    expect(result.status).toBe('ok');
     expect(result.baseRun.runId).toBe('1');
     expect(result.configDiff.hasDifferences).toBe(true);
     expect(result.configDiff.components[0]?.baseValue).toBe('a');
     expect(result.fieldDiffs[0]?.severity).toBe('major');
+    expect(result.delta?.baseRecordId).toBe(1);
+    expect(result.delta?.baseQueryId).toBe('shared-query');
+    expect(result.delta?.conclusionChanges[0]?.baseValue).toBe('buy');
   });
 });

@@ -2951,19 +2951,57 @@
         "type": "object"
       },
       "AnalysisDeltaPayload": {
-        "description": "Presentation projection of T17 AnalysisDelta (contract A).",
+        "description": "Typed presentation projection of the merged T17 AnalysisDelta contract.",
         "properties": {
-          "base_run_id": {
-            "title": "Base Run Id",
+          "base_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Query Id"
+          },
+          "base_record_id": {
+            "minimum": 1.0,
+            "title": "Base Record Id",
+            "type": "integer"
+          },
+          "baseline_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Reason"
+          },
+          "baseline_status": {
+            "enum": [
+              "ok",
+              "missing_history",
+              "missing_base",
+              "missing_target",
+              "incomparable_structure"
+            ],
+            "title": "Baseline Status",
             "type": "string"
           },
           "conclusion_changes": {
-            "items": {},
+            "items": {
+              "$ref": "#/components/schemas/AnalysisValueChangePayload"
+            },
             "title": "Conclusion Changes",
             "type": "array"
           },
           "evidence_changes": {
-            "items": {},
+            "items": {
+              "$ref": "#/components/schemas/AnalysisListChangePayload"
+            },
             "title": "Evidence Changes",
             "type": "array"
           },
@@ -2972,26 +3010,127 @@
             "title": "Has Baseline",
             "type": "boolean"
           },
+          "has_material_changes": {
+            "default": false,
+            "title": "Has Material Changes",
+            "type": "boolean"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Type"
+          },
           "risk_changes": {
-            "items": {},
+            "items": {
+              "$ref": "#/components/schemas/AnalysisListChangePayload"
+            },
             "title": "Risk Changes",
             "type": "array"
           },
           "score_changes": {
-            "items": {},
+            "items": {
+              "$ref": "#/components/schemas/AnalysisValueChangePayload"
+            },
             "title": "Score Changes",
             "type": "array"
           },
-          "target_run_id": {
-            "title": "Target Run Id",
-            "type": "string"
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "target_query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Query Id"
+          },
+          "target_record_id": {
+            "minimum": 1.0,
+            "title": "Target Record Id",
+            "type": "integer"
           }
         },
         "required": [
-          "base_run_id",
-          "target_run_id"
+          "baseline_status",
+          "base_record_id",
+          "target_record_id"
         ],
         "title": "AnalysisDeltaPayload",
+        "type": "object"
+      },
+      "AnalysisListChangePayload": {
+        "properties": {
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "added_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Added Total",
+            "type": "integer"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "output_truncated": {
+            "default": false,
+            "title": "Output Truncated",
+            "type": "boolean"
+          },
+          "removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Removed",
+            "type": "array"
+          },
+          "removed_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Removed Total",
+            "type": "integer"
+          },
+          "unchanged": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unchanged",
+            "type": "array"
+          },
+          "unchanged_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unchanged Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AnalysisListChangePayload",
         "type": "object"
       },
       "AnalysisReport": {
@@ -3139,6 +3278,105 @@
           "created_at"
         ],
         "title": "AnalysisResultResponse",
+        "type": "object"
+      },
+      "AnalysisValueChangePayload": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "comparable": {
+            "default": true,
+            "title": "Comparable",
+            "type": "boolean"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "direction": {
+            "enum": [
+              "up",
+              "down",
+              "changed",
+              "unavailable"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "unavailability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueUnavailabilityPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "direction"
+        ],
+        "title": "AnalysisValueChangePayload",
         "type": "object"
       },
       "AnalyzeRequest": {
@@ -4771,6 +5009,11 @@
       },
       "ConfigFingerprintDiff": {
         "properties": {
+          "base_complete": {
+            "default": false,
+            "title": "Base Complete",
+            "type": "boolean"
+          },
           "base_fingerprint": {
             "anyOf": [
               {
@@ -4781,6 +5024,23 @@
               }
             ],
             "title": "Base Fingerprint"
+          },
+          "base_missing_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Base Missing Keys",
+            "type": "array"
+          },
+          "comparison_status": {
+            "default": "unknown",
+            "enum": [
+              "identical",
+              "different",
+              "unknown"
+            ],
+            "title": "Comparison Status",
+            "type": "string"
           },
           "components": {
             "items": {
@@ -4799,6 +5059,11 @@
             "title": "Identical",
             "type": "boolean"
           },
+          "target_complete": {
+            "default": false,
+            "title": "Target Complete",
+            "type": "boolean"
+          },
           "target_fingerprint": {
             "anyOf": [
               {
@@ -4809,6 +5074,13 @@
               }
             ],
             "title": "Target Fingerprint"
+          },
+          "target_missing_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Target Missing Keys",
+            "type": "array"
           }
         },
         "title": "ConfigFingerprintDiff",
@@ -16216,6 +16488,12 @@
             "description": "Short analysis summary",
             "title": "Analysis Summary"
           },
+          "config_complete": {
+            "default": false,
+            "description": "Whether the persisted run contains the minimum reproducibility provenance",
+            "title": "Config Complete",
+            "type": "boolean"
+          },
           "config_components": {
             "additionalProperties": {
               "type": "string"
@@ -16235,6 +16513,14 @@
             ],
             "description": "Short hash of configuration components used for this run",
             "title": "Config Fingerprint"
+          },
+          "config_missing_keys": {
+            "description": "Required provenance keys absent from the persisted run",
+            "items": {
+              "type": "string"
+            },
+            "title": "Config Missing Keys",
+            "type": "array"
           },
           "created_at": {
             "anyOf": [
@@ -16309,13 +16595,15 @@
           "sentiment_score": {
             "anyOf": [
               {
-                "type": "integer"
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Sentiment / confidence score",
+            "description": "Finite sentiment / confidence score in the supported 0-100 range",
             "title": "Sentiment Score"
           },
           "stock_code": {
@@ -21595,6 +21883,34 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "ValueUnavailabilityPayload": {
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "title": "ValueUnavailabilityPayload",
         "type": "object"
       },
       "WatchlistRequest": {
@@ -31836,7 +32152,7 @@
     },
     "/api/v1/report-version-compare/compare": {
       "get": {
-        "description": "Compare two selected analysis runs: side-by-side field snapshots, configuration fingerprint differences, and optional T17 AnalysisDelta when compare_analyses is available. engine_pending and no_baseline are never presented as 'no change'.",
+        "description": "Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.",
         "operationId": "compareReportVersions",
         "parameters": [
           {

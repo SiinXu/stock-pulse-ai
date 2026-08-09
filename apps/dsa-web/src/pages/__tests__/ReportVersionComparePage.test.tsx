@@ -48,6 +48,8 @@ const runs = [
     modelUsed: 'm1',
     configFingerprint: 'fp1',
     configComponents: {},
+    configComplete: true,
+    configMissingKeys: [],
   },
   {
     runId: '2',
@@ -60,8 +62,61 @@ const runs = [
     modelUsed: 'm2',
     configFingerprint: 'fp2',
     configComponents: {},
+    configComplete: true,
+    configMissingKeys: [],
   },
 ];
+
+const compareResult = {
+  status: 'engine_pending' as const,
+  stockCode: '600519',
+  baseRun: runs[0],
+  targetRun: runs[1],
+  configDiff: {
+    baseFingerprint: 'fp1',
+    targetFingerprint: 'fp2',
+    identical: false,
+    hasDifferences: true,
+    comparisonStatus: 'different' as const,
+    baseComplete: true,
+    targetComplete: true,
+    baseMissingKeys: [],
+    targetMissingKeys: [],
+    components: [
+      {
+        key: 'model_used',
+        baseValue: 'm1',
+        targetValue: 'm2',
+        changed: true,
+      },
+    ],
+  },
+  fieldDiffs: [
+    {
+      field: 'action',
+      baseValue: 'buy',
+      targetValue: 'sell',
+      changed: true,
+      severity: 'major' as const,
+    },
+  ],
+  delta: null,
+  engineStatus: 'engine_pending' as const,
+};
+
+async function loadAndSelectRuns() {
+  fireEvent.change(screen.getByTestId('report-version-compare-stock-input'), {
+    target: { value: '600519' },
+  });
+  fireEvent.click(screen.getByTestId('report-version-compare-load-runs'));
+  await waitFor(() => {
+    expect(screen.getByRole('combobox', { name: 'Baseline version' })).toBeEnabled();
+  });
+  fireEvent.click(screen.getByRole('combobox', { name: 'Baseline version' }));
+  fireEvent.click(within(await screen.findByRole('listbox')).getAllByRole('option')[0]);
+  fireEvent.click(screen.getByRole('combobox', { name: 'Candidate version' }));
+  fireEvent.click(within(await screen.findByRole('listbox')).getAllByRole('option')[1]);
+}
 
 describe('ReportVersionComparePage', () => {
   beforeEach(() => {
@@ -118,55 +173,10 @@ describe('ReportVersionComparePage', () => {
       limit: 50,
       items: runs,
     });
-    vi.mocked(reportVersionCompareApi.compare).mockResolvedValue({
-      status: 'engine_pending',
-      stockCode: '600519',
-      baseRun: { ...runs[0], configComponents: {} },
-      targetRun: { ...runs[1], configComponents: {} },
-      configDiff: {
-        baseFingerprint: 'fp1',
-        targetFingerprint: 'fp2',
-        identical: false,
-        hasDifferences: true,
-        components: [
-          {
-            key: 'model_used',
-            baseValue: 'm1',
-            targetValue: 'm2',
-            changed: true,
-          },
-        ],
-      },
-      fieldDiffs: [
-        {
-          field: 'action',
-          baseValue: 'buy',
-          targetValue: 'sell',
-          changed: true,
-          severity: 'major',
-        },
-      ],
-      delta: null,
-      engineStatus: 'engine_pending',
-    });
+    vi.mocked(reportVersionCompareApi.compare).mockResolvedValue(compareResult);
 
     renderPage();
-    fireEvent.change(screen.getByTestId('report-version-compare-stock-input'), {
-      target: { value: '600519' },
-    });
-    fireEvent.click(screen.getByTestId('report-version-compare-load-runs'));
-
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: 'Baseline version' })).toBeEnabled();
-    });
-
-    fireEvent.click(screen.getByRole('combobox', { name: 'Baseline version' }));
-    const baseList = await screen.findByRole('listbox');
-    fireEvent.click(within(baseList).getAllByRole('option')[0]);
-
-    fireEvent.click(screen.getByRole('combobox', { name: 'Candidate version' }));
-    const targetList = await screen.findByRole('listbox');
-    fireEvent.click(within(targetList).getAllByRole('option')[1]);
+    await loadAndSelectRuns();
 
     fireEvent.click(screen.getByTestId('report-version-compare-submit'));
 
@@ -185,5 +195,69 @@ describe('ReportVersionComparePage', () => {
       'major',
     );
     expect(screen.getByTestId('report-version-compare-status-engine_pending')).toBeInTheDocument();
+  });
+
+  it('retries the failed compare with the same inputs without reloading runs', async () => {
+    vi.mocked(reportVersionCompareApi.listRuns).mockResolvedValue({
+      stockCode: '600519', total: 2, page: 1, limit: 50, items: runs,
+    });
+    vi.mocked(reportVersionCompareApi.compare)
+      .mockRejectedValueOnce(new Error('compare failed'))
+      .mockResolvedValueOnce(compareResult);
+
+    renderPage();
+    await loadAndSelectRuns();
+    fireEvent.click(screen.getByTestId('report-version-compare-submit'));
+    await screen.findByTestId('report-version-compare-error');
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    await screen.findByTestId('report-version-compare-result');
+    expect(reportVersionCompareApi.compare).toHaveBeenCalledTimes(2);
+    expect(reportVersionCompareApi.compare).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ stockCode: '600519', baseRunId: '1', targetRunId: '2' }),
+    );
+    expect(reportVersionCompareApi.listRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidates loaded runs when the draft stock identity changes', async () => {
+    vi.mocked(reportVersionCompareApi.listRuns).mockResolvedValue({
+      stockCode: '600519', total: 2, page: 1, limit: 50, items: runs,
+    });
+
+    renderPage();
+    await loadAndSelectRuns();
+    fireEvent.change(screen.getByTestId('report-version-compare-stock-input'), {
+      target: { value: 'AAPL' },
+    });
+
+    expect(screen.getByRole('combobox', { name: 'Baseline version' })).toBeDisabled();
+    expect(screen.getByTestId('report-version-compare-submit')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('report-version-compare-submit'));
+    expect(reportVersionCompareApi.compare).not.toHaveBeenCalled();
+  });
+
+  it('loads later pages without replacing already selected versions', async () => {
+    vi.mocked(reportVersionCompareApi.listRuns)
+      .mockResolvedValueOnce({
+        stockCode: '600519', total: 3, page: 1, limit: 50, items: runs,
+      })
+      .mockResolvedValueOnce({
+        stockCode: '600519', total: 3, page: 2, limit: 50, items: [
+          { ...runs[0], runId: '3', queryId: 'c' },
+        ],
+      });
+
+    renderPage();
+    await loadAndSelectRuns();
+    fireEvent.click(screen.getByTestId('report-version-compare-load-more'));
+
+    await waitFor(() => {
+      expect(reportVersionCompareApi.listRuns).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ stockCode: '600519', page: 2, limit: 50 }),
+      );
+    });
+    expect(screen.getByRole('combobox', { name: 'Baseline version' })).toBeEnabled();
   });
 });

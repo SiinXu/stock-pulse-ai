@@ -2269,7 +2269,7 @@ export interface paths {
         };
         /**
          * Compare two analysis report versions
-         * @description Compare two selected analysis runs: side-by-side field snapshots, configuration fingerprint differences, and optional T17 AnalysisDelta when compare_analyses is available. engine_pending and no_baseline are never presented as 'no change'.
+         * @description Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.
          */
         get: operations["compareReportVersions"];
         put?: never;
@@ -4196,26 +4196,77 @@ export interface components {
         };
         /**
          * AnalysisDeltaPayload
-         * @description Presentation projection of T17 AnalysisDelta (contract A).
+         * @description Typed presentation projection of the merged T17 AnalysisDelta contract.
          */
         AnalysisDeltaPayload: {
-            /** Base Run Id */
-            base_run_id: string;
+            /** Base Query Id */
+            base_query_id?: string | null;
+            /** Base Record Id */
+            base_record_id: number;
+            /** Baseline Reason */
+            baseline_reason?: string | null;
+            /**
+             * Baseline Status
+             * @enum {string}
+             */
+            baseline_status: "ok" | "missing_history" | "missing_base" | "missing_target" | "incomparable_structure";
             /** Conclusion Changes */
-            conclusion_changes?: unknown[];
+            conclusion_changes?: components["schemas"]["AnalysisValueChangePayload"][];
             /** Evidence Changes */
-            evidence_changes?: unknown[];
+            evidence_changes?: components["schemas"]["AnalysisListChangePayload"][];
             /**
              * Has Baseline
              * @default false
              */
             has_baseline: boolean;
+            /**
+             * Has Material Changes
+             * @default false
+             */
+            has_material_changes: boolean;
+            /** Report Type */
+            report_type?: string | null;
             /** Risk Changes */
-            risk_changes?: unknown[];
+            risk_changes?: components["schemas"]["AnalysisListChangePayload"][];
             /** Score Changes */
-            score_changes?: unknown[];
-            /** Target Run Id */
-            target_run_id: string;
+            score_changes?: components["schemas"]["AnalysisValueChangePayload"][];
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Target Query Id */
+            target_query_id?: string | null;
+            /** Target Record Id */
+            target_record_id: number;
+        };
+        /** AnalysisListChangePayload */
+        AnalysisListChangePayload: {
+            /** Added */
+            added?: string[];
+            /**
+             * Added Total
+             * @default 0
+             */
+            added_total: number;
+            /** Field */
+            field: string;
+            /**
+             * Output Truncated
+             * @default false
+             */
+            output_truncated: boolean;
+            /** Removed */
+            removed?: string[];
+            /**
+             * Removed Total
+             * @default 0
+             */
+            removed_total: number;
+            /** Unchanged */
+            unchanged?: string[];
+            /**
+             * Unchanged Total
+             * @default 0
+             */
+            unchanged_total: number;
         };
         /**
          * AnalysisReport
@@ -4306,6 +4357,28 @@ export interface components {
              * @description 诊断 trace ID
              */
             trace_id?: string | null;
+        };
+        /** AnalysisValueChangePayload */
+        AnalysisValueChangePayload: {
+            /** Base Value */
+            base_value?: string | number | boolean | null;
+            /**
+             * Comparable
+             * @default true
+             */
+            comparable: boolean;
+            /** Delta */
+            delta?: string | number | boolean | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "changed" | "unavailable";
+            /** Field */
+            field: string;
+            /** Target Value */
+            target_value?: string | number | boolean | null;
+            unavailability?: components["schemas"]["ValueUnavailabilityPayload"] | null;
         };
         /**
          * AnalyzeRequest
@@ -5031,8 +5104,21 @@ export interface components {
         };
         /** ConfigFingerprintDiff */
         ConfigFingerprintDiff: {
+            /**
+             * Base Complete
+             * @default false
+             */
+            base_complete: boolean;
             /** Base Fingerprint */
             base_fingerprint?: string | null;
+            /** Base Missing Keys */
+            base_missing_keys?: string[];
+            /**
+             * Comparison Status
+             * @default unknown
+             * @enum {string}
+             */
+            comparison_status: "identical" | "different" | "unknown";
             /** Components */
             components?: components["schemas"]["ConfigComponentDiff"][];
             /**
@@ -5045,8 +5131,15 @@ export interface components {
              * @default false
              */
             identical: boolean;
+            /**
+             * Target Complete
+             * @default false
+             */
+            target_complete: boolean;
             /** Target Fingerprint */
             target_fingerprint?: string | null;
+            /** Target Missing Keys */
+            target_missing_keys?: string[];
         };
         /**
          * ConfigPresetApplyRequest
@@ -9546,6 +9639,12 @@ export interface components {
              */
             analysis_summary?: string | null;
             /**
+             * Config Complete
+             * @description Whether the persisted run contains the minimum reproducibility provenance
+             * @default false
+             */
+            config_complete: boolean;
+            /**
              * Config Components
              * @description Human-readable configuration components that form the fingerprint
              */
@@ -9557,6 +9656,11 @@ export interface components {
              * @description Short hash of configuration components used for this run
              */
             config_fingerprint?: string | null;
+            /**
+             * Config Missing Keys
+             * @description Required provenance keys absent from the persisted run
+             */
+            config_missing_keys?: string[];
             /**
              * Created At
              * @description ISO created_at timestamp
@@ -9594,7 +9698,7 @@ export interface components {
             run_id: string;
             /**
              * Sentiment Score
-             * @description Sentiment / confidence score
+             * @description Finite sentiment / confidence score in the supported 0-100 range
              */
             sentiment_score?: number | null;
             /**
@@ -11961,6 +12065,13 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValueUnavailabilityPayload */
+        ValueUnavailabilityPayload: {
+            /** Base */
+            base?: string | null;
+            /** Target */
+            target?: string | null;
         };
         /**
          * WatchlistRequest

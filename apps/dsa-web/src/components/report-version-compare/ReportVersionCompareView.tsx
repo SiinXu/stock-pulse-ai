@@ -3,6 +3,8 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import {
+  type AnalysisListChange,
+  type AnalysisValueChange,
   type ConfigComponentDiff,
   type ReportFieldDiff,
   type ReportVersionCompareResponse,
@@ -74,20 +76,106 @@ function formatCell(
   return value;
 }
 
-function renderDeltaBucket(items: unknown[] | undefined, emptyLabel: string): React.ReactNode {
+function directionLabel(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  direction: AnalysisValueChange['direction'],
+): string {
+  switch (direction) {
+    case 'up':
+      return text.deltaDirectionUp;
+    case 'down':
+      return text.deltaDirectionDown;
+    case 'unavailable':
+      return text.deltaDirectionUnavailable;
+    default:
+      return text.deltaDirectionChanged;
+  }
+}
+
+function baselineStatusLabel(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  status: NonNullable<ReportVersionCompareResponse['delta']>['baselineStatus'],
+): string {
+  if (status === 'ok') return text.statusOk;
+  if (status === 'incomparable_structure') return text.statusIncomparableTitle;
+  return text.statusNoBaselineTitle;
+}
+
+function renderValueChanges(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  items: AnalysisValueChange[] | undefined,
+  emptyLabel: string,
+  emptyValue: string,
+): React.ReactNode {
   if (!items || items.length === 0) {
     return <p className="text-sm text-secondary-text">{emptyLabel}</p>;
   }
   return (
     <ul className="space-y-2">
-      {items.map((item, index) => (
+      {items.map((item) => {
+        const baseValue = item.unavailability?.base ?? item.baseValue;
+        const targetValue = item.unavailability?.target ?? item.targetValue;
+        return (
+          <li
+            key={item.field}
+            className="rounded-lg border border-border/50 bg-elevated/50 px-3 py-2 text-sm text-foreground"
+          >
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{fieldLabel(text, item.field)}</span>
+              <Badge variant={item.comparable ? 'history' : 'warning'} size="sm">
+                {directionLabel(text, item.direction)}
+              </Badge>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <div className="text-xs text-secondary-text">{text.baseValue}</div>
+                <div className="break-words">{formatCell(String(baseValue ?? ''), emptyValue)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-secondary-text">{text.targetValue}</div>
+                <div className="break-words">{formatCell(String(targetValue ?? ''), emptyValue)}</div>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function renderListChanges(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  items: AnalysisListChange[] | undefined,
+  emptyLabel: string,
+): React.ReactNode {
+  if (!items || items.length === 0) {
+    return <p className="text-sm text-secondary-text">{emptyLabel}</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
         <li
-          key={`delta-${index}`}
-          className="rounded-lg border border-border/50 bg-elevated/50 px-3 py-2 text-sm text-foreground"
+          key={item.field}
+          className="space-y-2 rounded-lg border border-border/50 bg-elevated/50 px-3 py-2 text-sm"
         >
-          <pre className="whitespace-pre-wrap break-words font-sans text-sm">
-            {typeof item === 'string' ? item : JSON.stringify(item, null, 2)}
-          </pre>
+          <div className="font-medium text-foreground">{fieldLabel(text, item.field)}</div>
+          {[
+            { label: text.deltaAdded, total: item.addedTotal, values: item.added },
+            { label: text.deltaRemoved, total: item.removedTotal, values: item.removed },
+            { label: text.deltaUnchanged, total: item.unchangedTotal, values: item.unchanged },
+          ].map(({ label, total, values }) => (
+            total > 0 ? (
+              <div key={label}>
+                <div className="text-xs font-medium text-secondary-text">{label} ({total})</div>
+                <ul className="list-disc space-y-1 pl-5 text-foreground">
+                  {values.map((value) => <li key={value} className="break-words">{value}</li>)}
+                </ul>
+              </div>
+            ) : null
+          ))}
+          {item.outputTruncated ? (
+            <p className="text-xs text-secondary-text">{text.deltaOutputTruncated}</p>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -217,8 +305,12 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
       <Surface className="space-y-3 p-4" data-testid="report-version-config-diff">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-foreground">{text.configTitle}</h3>
-          <Badge variant={result.configDiff.hasDifferences ? 'warning' : 'history'}>
-            {result.configDiff.hasDifferences ? text.configDifferent : text.configIdentical}
+          <Badge variant={result.configDiff.comparisonStatus === 'identical' ? 'history' : 'warning'}>
+            {result.configDiff.comparisonStatus === 'unknown'
+              ? text.configUnknown
+              : result.configDiff.hasDifferences
+                ? text.configDifferent
+                : text.configIdentical}
           </Badge>
         </div>
         <p className="text-sm text-secondary-text">
@@ -281,30 +373,62 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
       {result.delta ? (
         <Surface className="space-y-4 p-4" data-testid="report-version-engine-delta">
           <h3 className="text-sm font-semibold text-foreground">{text.deltaTitle}</h3>
+          <dl className="grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+            <dt className="text-secondary-text">{text.deltaBaselineStatus}</dt>
+            <dd className="text-foreground">
+              {baselineStatusLabel(text, result.delta.baselineStatus)}
+              {' '}
+              <span className="font-mono text-xs text-secondary-text">
+                ({result.delta.baselineStatus})
+              </span>
+            </dd>
+            {result.delta.baselineReason ? (
+              <>
+                <dt className="text-secondary-text">{text.deltaBaselineReason}</dt>
+                <dd className="break-words text-foreground">{result.delta.baselineReason}</dd>
+              </>
+            ) : null}
+            <dt className="text-secondary-text">{text.deltaTitle}</dt>
+            <dd className="text-foreground">
+              {result.delta.hasMaterialChanges
+                ? text.deltaMaterialChanges
+                : text.deltaNoMaterialChanges}
+            </dd>
+          </dl>
           <div className="space-y-3">
             <div>
               <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-secondary-text">
                 {text.deltaConclusion}
               </h4>
-              {renderDeltaBucket(result.delta.conclusionChanges, text.deltaEmpty)}
+              {renderValueChanges(
+                text,
+                result.delta.conclusionChanges,
+                text.deltaEmpty,
+                emptyValue,
+              )}
             </div>
             <div>
               <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-secondary-text">
                 {text.deltaScore}
               </h4>
-              {renderDeltaBucket(result.delta.scoreChanges, text.deltaEmpty)}
+              {renderValueChanges(
+                text,
+                result.delta.scoreChanges,
+                text.deltaEmpty,
+                emptyValue,
+              )}
             </div>
             <div>
               <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-secondary-text">
                 {text.deltaEvidence}
               </h4>
-              {renderDeltaBucket(result.delta.evidenceChanges, text.deltaEmpty)}
+              {renderListChanges(text, result.delta.evidenceChanges, text.deltaEmpty)}
             </div>
             <div>
               <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-secondary-text">
                 {text.deltaRisk}
               </h4>
-              {renderDeltaBucket(result.delta.riskChanges, text.deltaEmpty)}
+              {renderListChanges(text, result.delta.riskChanges, text.deltaEmpty)}
             </div>
           </div>
         </Surface>

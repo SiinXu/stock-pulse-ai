@@ -31,6 +31,8 @@ export type ReportVersionRunItem = {
   analysisSummary?: string | null;
   configFingerprint?: string | null;
   configComponents: Record<string, string>;
+  configComplete: boolean;
+  configMissingKeys: string[];
 };
 
 export type ReportVersionRunListResponse = {
@@ -53,6 +55,11 @@ export type ConfigFingerprintDiff = {
   targetFingerprint?: string | null;
   identical: boolean;
   hasDifferences: boolean;
+  comparisonStatus: 'identical' | 'different' | 'unknown';
+  baseComplete: boolean;
+  targetComplete: boolean;
+  baseMissingKeys: string[];
+  targetMissingKeys: string[];
   components: ConfigComponentDiff[];
 };
 
@@ -64,14 +71,50 @@ export type ReportFieldDiff = {
   severity: ReportVersionSeverity;
 };
 
+export type AnalysisValueChange = {
+  field: string;
+  baseValue?: string | number | boolean | null;
+  targetValue?: string | number | boolean | null;
+  delta?: string | number | boolean | null;
+  direction: 'up' | 'down' | 'changed' | 'unavailable';
+  comparable: boolean;
+  unavailability?: {
+    base?: string | null;
+    target?: string | null;
+  } | null;
+};
+
+export type AnalysisListChange = {
+  field: string;
+  added: string[];
+  removed: string[];
+  unchanged: string[];
+  addedTotal: number;
+  removedTotal: number;
+  unchangedTotal: number;
+  outputTruncated: boolean;
+};
+
 export type AnalysisDeltaPayload = {
   hasBaseline: boolean;
-  conclusionChanges: unknown[];
-  scoreChanges: unknown[];
-  evidenceChanges: unknown[];
-  riskChanges: unknown[];
-  baseRunId: string;
-  targetRunId: string;
+  baselineStatus:
+    | 'ok'
+    | 'missing_history'
+    | 'missing_base'
+    | 'missing_target'
+    | 'incomparable_structure';
+  baselineReason?: string | null;
+  stockCode?: string | null;
+  baseRecordId: number;
+  targetRecordId: number;
+  baseQueryId?: string | null;
+  targetQueryId?: string | null;
+  reportType?: string | null;
+  hasMaterialChanges: boolean;
+  conclusionChanges: AnalysisValueChange[];
+  scoreChanges: AnalysisValueChange[];
+  evidenceChanges: AnalysisListChange[];
+  riskChanges: AnalysisListChange[];
 };
 
 export type ReportVersionCompareResponse = {
