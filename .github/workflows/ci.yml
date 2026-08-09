@@ -545,6 +545,9 @@ jobs:
       - name: 🏗️ Build
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run build
+      - name: 📦 Bundle size budget
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
+        run: node scripts/check-bundle-size.mjs --print
 
   # Observation only: not in the main ruleset required checks. Skip on pull_request
   # so PR throughput stays on the blocking gate; still run on push-to-main when paths match.
