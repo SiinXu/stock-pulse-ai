@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-08",
-  "baselineNote": "Measured on origin/main-era production vite build; budgets are current gzip + 10%.",
+  "baselineNote": "Rebaselined AlertsWorkspace only against the current main production build after the Alert Rule List mobile-filter work from PR #909; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -134,8 +134,8 @@
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 41087,
-      "measuredGzipBytes": 37351
+      "maxGzipBytes": 46602,
+      "measuredGzipBytes": 42365
     },
     {
       "id": "PortfolioPage",

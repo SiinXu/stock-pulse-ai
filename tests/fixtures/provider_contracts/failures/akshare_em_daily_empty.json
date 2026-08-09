@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "provider": "akshare",
+    "api": "stock_zh_a_hist",
+    "failure_mode": "empty",
+    "recorded_note": "Shape-faithful empty Eastmoney daily table (Chinese headers, zero rows). Offline sample 2026-08-08; not a live recording.",
+    "source_shape": "tests/fixtures/provider_contracts/akshare_em_daily.json"
+  },
+  "columns": [
+    "日期",
+    "开盘",
+    "收盘",
+    "最高",
+    "最低",
+    "成交量",
+    "成交额",
+    "振幅",
+    "涨跌幅",
+    "涨跌额",
+    "换手率"
+  ],
+  "rows": []
+}
