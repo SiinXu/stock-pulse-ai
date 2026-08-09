@@ -1,0 +1,10 @@
+# Optional offline OCR dependencies for the extract_image_text Agent Tool.
+#
+# This file is not included by requirements.txt. Install the base StockPulse
+# requirements first, then install this optional set. You must also install the
+# system Tesseract binary and language packs (chi_sim for Simplified Chinese).
+# See docs/agent-ocr-tool_EN.md.
+-c constraints.txt
+
+Pillow>=10.0.0,<12
+pytesseract>=0.3.10,<0.4

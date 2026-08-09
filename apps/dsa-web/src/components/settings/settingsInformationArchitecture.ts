@@ -141,6 +141,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { id: 'service', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.service.label", { zh: '服务与日志', en: 'Web & Logs' }) },
       { id: 'security', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.security.label", { zh: '认证与安全', en: 'Auth & Security' }) },
       { id: 'about', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.about.label", { zh: '版本与更新', en: 'Version & Updates' }) },
+      { id: 'extensions', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.extensions.label", { zh: '已加载扩展', en: 'Extensions' }) },
     ],
     defaultView: 'runtime',
   },
@@ -261,6 +262,9 @@ export function legacyToSectionView(category: string, sub: string | null): Secti
       return { section: 'agent_behavior', view: 'execution' };
     case 'backtest':
       return { section: 'backtesting', view: 'engine' };
+    case 'indicators':
+      // Trend-analysis MA/MACD/RSI periods live next to market data settings.
+      return { section: 'data_sources', view: 'sources' };
     case 'system':
       return { section: 'system_security', view: 'runtime' };
     default:
