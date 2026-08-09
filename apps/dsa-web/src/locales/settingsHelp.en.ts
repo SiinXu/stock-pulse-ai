@@ -1538,6 +1538,13 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.portfolio_health': {
+    title: 'Portfolio Health Formula',
+    summary: 'Controls the fixed-denominator health-score weights and alert thresholds.',
+    usage: 'Use finite values within the displayed ranges. Invalid values are rejected rather than clamped.',
+    notes: ['Changing these values changes the configuration hash and requires an explicit health refresh.'],
+  },
+
 };
 
 export default settingsHelpEnUS;

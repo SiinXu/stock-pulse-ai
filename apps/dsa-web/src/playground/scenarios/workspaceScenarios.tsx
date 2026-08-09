@@ -13,11 +13,14 @@ import {
   type HomeWatchlistRow,
   type HomeWorkspaceTab,
 } from '../../components/watchlist/HomeStockWorkspace';
+import { HomeWatchlistGroupsSection } from '../../components/watchlist/HomeWatchlistGroupsSection';
+import { WatchlistGroupsPanel } from '../../components/watchlist/WatchlistGroupsPanel';
 import { createParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
+import type { WatchlistGroup } from '../../types/watchlist';
 import { DEFAULT_ONBOARDING_PROFILE, type OnboardingPlan } from '../../types/onboarding';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
@@ -128,6 +131,72 @@ const HomeStockWorkspaceStory = () => {
     />
   );
 };
+
+const WATCHLIST_GROUP_FIXTURES: WatchlistGroup[] = [
+  {
+    id: 'default',
+    name: '__default__',
+    nameKey: 'watchlist.defaultGroupName',
+    sortOrder: 0,
+    isDefault: true,
+    createdAt: '2026-08-09T00:00:00+00:00',
+    updatedAt: '2026-08-09T00:00:00+00:00',
+    members: [
+      { stockCode: '600519', sortOrder: 0, attrs: { schemaVersion: 1, aiScore: 91, focus: true } },
+      { stockCode: 'AAPL', sortOrder: 1, attrs: { schemaVersion: 1 } },
+    ],
+  },
+  {
+    id: 'growth',
+    name: 'Growth',
+    nameKey: null,
+    sortOrder: 1,
+    isDefault: false,
+    createdAt: '2026-08-09T00:00:00+00:00',
+    updatedAt: '2026-08-09T00:00:00+00:00',
+    members: [],
+  },
+];
+
+const WatchlistGroupsPanelStory = () => {
+  const [groups, setGroups] = useState(WATCHLIST_GROUP_FIXTURES);
+  return (
+    <div className="max-w-3xl rounded-xl border border-border bg-card p-4">
+      <WatchlistGroupsPanel
+        groups={groups}
+        watchlistRows={[
+          { code: '600519', analyzedToday: true, latestItem: fixtureStockBarItems[0] },
+          { code: 'AAPL', analyzedToday: false, latestItem: fixtureStockBarItems[1] },
+        ]}
+        onCreateGroup={async (name) => {
+          setGroups((current) => [...current, {
+            id: `group-${current.length}`,
+            name,
+            sortOrder: current.length,
+            isDefault: false,
+            createdAt: '2026-08-09T00:00:00+00:00',
+            updatedAt: '2026-08-09T00:00:00+00:00',
+            members: [],
+          }]);
+          return true;
+        }}
+        onDeleteGroup={async (groupId) => {
+          setGroups((current) => current.filter((group) => group.id !== groupId));
+          return true;
+        }}
+        onReorderGroups={async (orderedIds) => {
+          setGroups((current) => orderedIds.map((id) => current.find((group) => group.id === id)!).filter(Boolean));
+          return true;
+        }}
+        onReorderMembers={async () => true}
+        onMoveMember={async () => true}
+        onRemoveFromWatchlist={async () => true}
+      />
+    </div>
+  );
+};
+
+const HomeWatchlistGroupsSectionStory = () => <HomeWatchlistGroupsSection />;
 
 const FIXTURE_SETUP_STATUS: SetupStatusResponse = {
   isComplete: false,
@@ -276,6 +345,8 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'suggestions-list': SuggestionsListStory,
   'task-panel': TaskPanelStory,
   'home-stock-workspace': HomeStockWorkspaceStory,
+  'home-watchlist-groups-section': HomeWatchlistGroupsSectionStory,
+  'watchlist-groups-panel': WatchlistGroupsPanelStory,
   'home-readiness-card': HomeReadinessCardStory,
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,

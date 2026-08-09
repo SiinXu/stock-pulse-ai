@@ -4,6 +4,7 @@
 import errno
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -78,6 +79,54 @@ class ConfigManagerTestCase(unittest.TestCase):
         second_manager = ConfigManager(env_path=self.env_path)
 
         self.assertIs(self.manager._lock, second_manager._lock)
+
+    def test_read_snapshot_keeps_values_and_version_under_the_write_lock(self) -> None:
+        self.env_path.write_text("STOCK_LIST=AAPL\n", encoding="utf-8")
+        values_read = threading.Event()
+        release_snapshot = threading.Event()
+        original_parse = self.manager._config_map_from_content
+
+        def blocking_parse(content: bytes, *, normalize_values: bool):
+            values = original_parse(content, normalize_values=normalize_values)
+            if not values_read.is_set():
+                values_read.set()
+                self.assertTrue(release_snapshot.wait(timeout=5))
+            return values
+
+        self.manager._config_map_from_content = blocking_parse
+        snapshot: dict[str, object] = {}
+
+        def read_snapshot() -> None:
+            values, version, updated_at = self.manager.read_config_snapshot()
+            snapshot.update(values=values, version=version, updated_at=updated_at)
+
+        reader = threading.Thread(target=read_snapshot)
+        reader.start()
+        self.assertTrue(values_read.wait(timeout=5))
+
+        writer_started = threading.Event()
+
+        def write_update() -> None:
+            writer_started.set()
+            self.manager.apply_updates(
+                updates=[("STOCK_LIST", "TSLA")],
+                sensitive_keys=set(),
+                mask_token="******",
+            )
+
+        writer = threading.Thread(target=write_update)
+        writer.start()
+        self.assertTrue(writer_started.wait(timeout=5))
+        self.assertTrue(writer.is_alive())
+        release_snapshot.set()
+        reader.join(timeout=5)
+        writer.join(timeout=5)
+
+        self.assertFalse(reader.is_alive())
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(snapshot["values"], {"STOCK_LIST": "AAPL"})
+        self.assertNotEqual(snapshot["version"], self.manager.get_config_version())
+        self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "TSLA")
 
     def test_apply_updates_only_rewrites_last_duplicate_assignment(self) -> None:
         self.env_path.write_text(

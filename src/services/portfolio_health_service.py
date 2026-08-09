@@ -14,12 +14,16 @@ Hard contract:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
-import os
-from datetime import date
+import math
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.repositories.portfolio_health_repo import PortfolioHealthRepository
+from src.config import Config
 from src.services.portfolio_risk_metrics_service import PortfolioRiskMetricsService
 from src.services.portfolio_service import PortfolioService
 from src.utils.sanitize import log_safe_exception
@@ -27,6 +31,8 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 _EPS = 1e-12
+MIN_COMPLETE_COVERAGE = 1.0
+FORMULA_VERSION = "portfolio_health_v2"
 
 # ---------------------------------------------------------------------------
 # Explicit default weights (must sum to 1.0). Documented in docs/portfolio-health-score.md
@@ -89,8 +95,46 @@ DISCLAIMER = (
 LlmInsightPolisher = Callable[[Sequence[Mapping[str, Any]]], List[Dict[str, Any]]]
 
 
+def _finite_number(
+    value: Any,
+    field: str,
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be a finite number") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be a finite number")
+    if minimum is not None and number < minimum:
+        raise ValueError(f"{field} must be >= {minimum}")
+    if maximum is not None and number > maximum:
+        raise ValueError(f"{field} must be <= {maximum}")
+    return number
+
+
+def _canonical_hash(payload: Mapping[str, Any]) -> str:
+    try:
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "portfolio health provenance input must contain finite JSON values"
+        ) from exc
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
-    return max(low, min(high, value))
+    finite = _finite_number(value, "score", minimum=low, maximum=high)
+    return max(low, min(high, finite))
 
 
 def _linear_score(
@@ -126,7 +170,9 @@ def score_concentration(top_weight_pct: float) -> float:
     """Sub-score from top single-name weight percent (lower concentration → healthier)."""
     return round(
         _linear_score(
-            value=float(top_weight_pct),
+            value=_finite_number(
+                top_weight_pct, "top_weight_pct", minimum=0.0, maximum=100.0
+            ),
             ideal=CONCENTRATION_IDEAL_TOP_PCT,
             poor=CONCENTRATION_POOR_TOP_PCT,
             higher_is_better=False,
@@ -139,7 +185,7 @@ def score_risk_exposure(var_pct: float) -> float:
     """Sub-score from 1-day historical VaR percent (lower VaR → healthier)."""
     return round(
         _linear_score(
-            value=float(var_pct),
+            value=_finite_number(var_pct, "var_pct", minimum=0.0, maximum=100.0),
             ideal=RISK_VAR_IDEAL_PCT,
             poor=RISK_VAR_POOR_PCT,
             higher_is_better=False,
@@ -150,7 +196,13 @@ def score_risk_exposure(var_pct: float) -> float:
 
 def score_diversification(diversification_score: float) -> float:
     """Sub-score from risk-metrics diversification_score in [0, 1]."""
-    return round(_clamp(float(diversification_score) * 100.0), 4)
+    value = _finite_number(
+        diversification_score,
+        "diversification_score",
+        minimum=0.0,
+        maximum=1.0,
+    )
+    return round(_clamp(value * 100.0), 4)
 
 
 def score_pnl(unrealized_pnl_pct: float) -> float:
@@ -158,7 +210,7 @@ def score_pnl(unrealized_pnl_pct: float) -> float:
 
     Piecewise linear: PNL_STRONG_PCT → 100, 0% → PNL_NEUTRAL_SCORE, PNL_POOR_PCT → 0.
     """
-    pnl = float(unrealized_pnl_pct)
+    pnl = _finite_number(unrealized_pnl_pct, "unrealized_pnl_pct")
     if pnl >= PNL_STRONG_PCT:
         return 100.0
     if pnl >= 0.0:
@@ -178,7 +230,7 @@ def score_pnl(unrealized_pnl_pct: float) -> float:
 
 def score_cash_ratio(cash_pct: float) -> float:
     """Sub-score from cash / equity percent; ideal band scores 100."""
-    cash = float(cash_pct)
+    cash = _finite_number(cash_pct, "cash_pct", minimum=0.0, maximum=10000.0)
     if CASH_IDEAL_LOW_PCT <= cash <= CASH_IDEAL_HIGH_PCT:
         return 100.0
     if cash < CASH_IDEAL_LOW_PCT:
@@ -197,7 +249,7 @@ def score_cash_ratio(cash_pct: float) -> float:
 def band_for_score(score: Optional[float]) -> Optional[str]:
     if score is None:
         return None
-    value = float(score)
+    value = _finite_number(score, "score", minimum=0.0, maximum=100.0)
     for low, high, name in SCORE_BANDS:
         if low <= value < high or (name == "healthy" and value == 100.0):
             return name
@@ -213,36 +265,20 @@ def band_for_score(score: Optional[float]) -> Optional[str]:
 
 
 def resolve_weights(overrides: Optional[Mapping[str, float]] = None) -> Dict[str, float]:
-    """Return normalized positive weights for all dimensions.
-
-    Env overrides (optional, still sum-normalized):
-    PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION, _RISK_EXPOSURE, _DIVERSIFICATION, _PNL, _CASH_RATIO
-    """
+    """Return normalized finite non-negative weights for all dimensions."""
     weights = dict(DEFAULT_WEIGHTS)
-    env_map = {
-        "concentration": "PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION",
-        "risk_exposure": "PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE",
-        "diversification": "PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION",
-        "pnl": "PORTFOLIO_HEALTH_WEIGHT_PNL",
-        "cash_ratio": "PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO",
-    }
-    for key, env_name in env_map.items():
-        raw = os.environ.get(env_name)
-        if raw is None or str(raw).strip() == "":
-            continue
-        try:
-            weights[key] = float(raw)
-        except (TypeError, ValueError):
-            logger.warning("Ignoring invalid %s=%r", env_name, raw)
-
     if overrides:
         for key, value in overrides.items():
-            if key in weights:
-                weights[key] = float(value)
+            if key not in weights:
+                raise ValueError(f"unknown portfolio health weight: {key}")
+            weights[key] = _finite_number(
+                value, f"weight.{key}", minimum=0.0, maximum=1.0
+            )
 
     for key in DIMENSION_KEYS:
-        if weights[key] < 0:
-            raise ValueError(f"weight for {key} must be non-negative")
+        weights[key] = _finite_number(
+            weights[key], f"weight.{key}", minimum=0.0, maximum=1.0
+        )
 
     total = sum(weights[k] for k in DIMENSION_KEYS)
     if total <= _EPS:
@@ -250,11 +286,105 @@ def resolve_weights(overrides: Optional[Mapping[str, float]] = None) -> Dict[str
     return {k: weights[k] / total for k in DIMENSION_KEYS}
 
 
+@dataclass(frozen=True)
+class PortfolioHealthSettings:
+    """Resolved, finite, cross-field validated scoring configuration."""
+
+    weights: Dict[str, float]
+    concentration_alert_pct: float
+    cash_low_alert_pct: float
+    cash_high_alert_pct: float
+    var_alert_pct: float
+    diversification_alert: float
+    pnl_loss_alert_pct: float
+    source: str = "shared_config"
+
+    @classmethod
+    def from_config(
+        cls,
+        config: Config,
+        *,
+        weight_overrides: Optional[Mapping[str, float]] = None,
+        concentration_alert_override: Optional[float] = None,
+    ) -> "PortfolioHealthSettings":
+        configured_weights = {
+            "concentration": config.portfolio_health_weight_concentration,
+            "risk_exposure": config.portfolio_health_weight_risk_exposure,
+            "diversification": config.portfolio_health_weight_diversification,
+            "pnl": config.portfolio_health_weight_pnl,
+            "cash_ratio": config.portfolio_health_weight_cash_ratio,
+        }
+        if weight_overrides:
+            configured_weights.update(weight_overrides)
+        weights = resolve_weights(configured_weights)
+        concentration_alert = _finite_number(
+            concentration_alert_override
+            if concentration_alert_override is not None
+            else config.portfolio_health_concentration_alert_pct,
+            "PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT",
+            minimum=0.0,
+            maximum=100.0,
+        )
+        cash_low = _finite_number(
+            config.portfolio_health_cash_low_alert_pct,
+            "PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT",
+            minimum=0.0,
+            maximum=100.0,
+        )
+        cash_high = _finite_number(
+            config.portfolio_health_cash_high_alert_pct,
+            "PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT",
+            minimum=0.0,
+            maximum=100.0,
+        )
+        if cash_low >= cash_high:
+            raise ValueError(
+                "PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT must be lower than "
+                "PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT"
+            )
+        return cls(
+            weights=weights,
+            concentration_alert_pct=concentration_alert,
+            cash_low_alert_pct=cash_low,
+            cash_high_alert_pct=cash_high,
+            var_alert_pct=_finite_number(
+                config.portfolio_health_var_alert_pct,
+                "PORTFOLIO_HEALTH_VAR_ALERT_PCT",
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            diversification_alert=_finite_number(
+                config.portfolio_health_diversification_alert,
+                "PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            pnl_loss_alert_pct=_finite_number(
+                config.portfolio_health_pnl_loss_alert_pct,
+                "PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT",
+                minimum=-100.0,
+                maximum=0.0,
+            ),
+        )
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "weights": {key: round(value, 12) for key, value in self.weights.items()},
+            "concentration_alert_pct": self.concentration_alert_pct,
+            "cash_low_alert_pct": self.cash_low_alert_pct,
+            "cash_high_alert_pct": self.cash_high_alert_pct,
+            "var_alert_pct": self.var_alert_pct,
+            "diversification_alert": self.diversification_alert,
+            "pnl_loss_alert_pct": self.pnl_loss_alert_pct,
+            "source": self.source,
+        }
+
+
 def aggregate_score(
     dimension_scores: Mapping[str, Optional[float]],
     weights: Mapping[str, float],
 ) -> Tuple[Optional[float], List[str], Dict[str, float]]:
-    """Weighted average over available dimensions; reweights when some are missing.
+    """Return a fixed-denominator estimate; missing dimensions contribute zero.
 
     Returns (score_or_None, unavailable_keys, effective_weights_used).
     """
@@ -265,16 +395,19 @@ def aggregate_score(
         if value is None:
             unavailable.append(key)
             continue
-        available[key] = float(value)
+        available[key] = _finite_number(
+            value, f"dimension.{key}.score", minimum=0.0, maximum=100.0
+        )
 
     if not available:
         return None, unavailable, {}
 
-    weight_sum = sum(float(weights[k]) for k in available)
-    if weight_sum <= _EPS:
+    normalized_weights = resolve_weights(weights)
+    covered_weight = sum(normalized_weights[k] for k in available)
+    if covered_weight <= _EPS:
         return None, unavailable, {}
 
-    effective = {k: float(weights[k]) / weight_sum for k in available}
+    effective = {k: normalized_weights[k] for k in available}
     score = sum(available[k] * effective[k] for k in available)
     return round(_clamp(score), 4), unavailable, effective
 
@@ -292,16 +425,40 @@ def build_rule_insights(
     var_alert_pct: float,
     diversification_alert: float,
     pnl_loss_alert_pct: float,
+    unavailable_dimensions: Sequence[str] = (),
 ) -> List[Dict[str, Any]]:
     """Build actionable, threshold-bound insights from concrete metrics."""
     insights: List[Dict[str, Any]] = []
+    concentration_alert_pct = _finite_number(
+        concentration_alert_pct, "concentration_alert_pct", minimum=0.0, maximum=100.0
+    )
+    cash_low_alert_pct = _finite_number(
+        cash_low_alert_pct, "cash_low_alert_pct", minimum=0.0, maximum=100.0
+    )
+    cash_high_alert_pct = _finite_number(
+        cash_high_alert_pct, "cash_high_alert_pct", minimum=0.0, maximum=100.0
+    )
+    var_alert_pct = _finite_number(
+        var_alert_pct, "var_alert_pct", minimum=0.0, maximum=100.0
+    )
+    diversification_alert = _finite_number(
+        diversification_alert, "diversification_alert", minimum=0.0, maximum=1.0
+    )
+    pnl_loss_alert_pct = _finite_number(
+        pnl_loss_alert_pct, "pnl_loss_alert_pct", minimum=-100.0, maximum=0.0
+    )
 
     weights = list(concentration.get("weights") or [])
     top_weight_pct = concentration.get("top_weight_pct")
     if weights and top_weight_pct is not None:
         top = weights[0]
         symbol = str(top.get("symbol") or "").strip().upper() or "UNKNOWN"
-        w = float(top.get("weight_pct") or top_weight_pct)
+        w = _finite_number(
+            top.get("weight_pct") if top.get("weight_pct") is not None else top_weight_pct,
+            "concentration.weight_pct",
+            minimum=0.0,
+            maximum=100.0,
+        )
         if w >= concentration_alert_pct:
             insights.append(
                 {
@@ -322,7 +479,12 @@ def build_rule_insights(
         # Secondary names over threshold
         for row in weights[1:5]:
             symbol_i = str(row.get("symbol") or "").strip().upper()
-            w_i = float(row.get("weight_pct") or 0.0)
+            w_i = _finite_number(
+                row.get("weight_pct") or 0.0,
+                "concentration.weight_pct",
+                minimum=0.0,
+                maximum=100.0,
+            )
             if symbol_i and w_i >= concentration_alert_pct:
                 insights.append(
                     {
@@ -343,7 +505,13 @@ def build_rule_insights(
 
     if (
         diversification_score is not None
-        and float(diversification_score) < diversification_alert
+        and _finite_number(
+            diversification_score,
+            "diversification_score",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        < diversification_alert
     ):
         insights.append(
             {
@@ -362,7 +530,9 @@ def build_rule_insights(
             }
         )
 
-    if risk_var_pct is not None and float(risk_var_pct) >= var_alert_pct:
+    if risk_var_pct is not None and _finite_number(
+        risk_var_pct, "var_pct", minimum=0.0, maximum=100.0
+    ) >= var_alert_pct:
         insights.append(
             {
                 "code": "elevated_var",
@@ -381,7 +551,7 @@ def build_rule_insights(
         )
 
     if cash_pct is not None:
-        cash = float(cash_pct)
+        cash = _finite_number(cash_pct, "cash_pct", minimum=0.0, maximum=10000.0)
         if cash <= cash_low_alert_pct:
             insights.append(
                 {
@@ -415,7 +585,9 @@ def build_rule_insights(
                 }
             )
 
-    if unrealized_pnl_pct is not None and float(unrealized_pnl_pct) <= pnl_loss_alert_pct:
+    if unrealized_pnl_pct is not None and _finite_number(
+        unrealized_pnl_pct, "unrealized_pnl_pct"
+    ) <= pnl_loss_alert_pct:
         insights.append(
             {
                 "code": "unrealized_loss",
@@ -429,6 +601,25 @@ def build_rule_insights(
                 "metric": "unrealized_pnl_pct",
                 "value": round(float(unrealized_pnl_pct), 4),
                 "threshold": float(pnl_loss_alert_pct),
+                "source": "rule",
+            }
+        )
+
+    for dimension in DIMENSION_KEYS:
+        if dimension not in unavailable_dimensions:
+            continue
+        insights.append(
+            {
+                "code": f"{dimension}_unavailable",
+                "severity": "warning",
+                "message": (
+                    f"{dimension} was not evaluated for this snapshot; coverage is "
+                    "incomplete and no within-threshold claim is made for this dimension."
+                ),
+                "symbol": None,
+                "metric": dimension,
+                "value": None,
+                "threshold": None,
                 "source": "rule",
             }
         )
@@ -500,6 +691,7 @@ class PortfolioHealthService:
         risk_metrics_service: Optional[PortfolioRiskMetricsService] = None,
         health_repo: Optional[PortfolioHealthRepository] = None,
         llm_polisher: Optional[LlmInsightPolisher] = None,
+        config: Optional[Config] = None,
     ) -> None:
         self.portfolio_service = portfolio_service or PortfolioService()
         self.risk_metrics_service = risk_metrics_service or PortfolioRiskMetricsService(
@@ -507,6 +699,7 @@ class PortfolioHealthService:
         )
         self.health_repo = health_repo or PortfolioHealthRepository()
         self.llm_polisher = llm_polisher
+        self.config = config
 
     def get_health(
         self,
@@ -518,23 +711,18 @@ class PortfolioHealthService:
         weights: Optional[Mapping[str, float]] = None,
         concentration_alert_pct: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Compute health for (account_id, as_of), optionally upserting the daily snapshot."""
+        """Preview one immutable portfolio input and optionally persist health."""
         as_of_date = as_of or date.today()
         method = str(cost_method or "fifo").strip().lower() or "fifo"
-        weight_map = resolve_weights(weights)
-        conc_alert = float(
-            concentration_alert_pct
-            if concentration_alert_pct is not None
-            else os.environ.get(
-                "PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT",
-                os.environ.get(
-                    "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT",
-                    str(DEFAULT_CONCENTRATION_ALERT_PCT),
-                ),
-            )
+        if method not in {"fifo", "avg"}:
+            raise ValueError("cost_method must be fifo or avg")
+        settings = PortfolioHealthSettings.from_config(
+            self.config or Config.get_instance(),
+            weight_overrides=weights,
+            concentration_alert_override=concentration_alert_pct,
         )
 
-        snapshot = self.portfolio_service.get_portfolio_snapshot(
+        snapshot = self.portfolio_service.preview_portfolio_snapshot(
             account_id=account_id,
             as_of=as_of_date,
             cost_method=method,
@@ -544,6 +732,7 @@ class PortfolioHealthService:
             account_id=account_id,
             as_of=as_of_date,
             cost_method=method,
+            snapshot=snapshot,
         )
 
         result = self._score_from_inputs(
@@ -552,10 +741,10 @@ class PortfolioHealthService:
             account_id=account_id,
             as_of_date=as_of_date,
             cost_method=method,
-            weights=weight_map,
-            concentration_alert_pct=conc_alert,
+            settings=settings,
         )
 
+        result["persisted"] = bool(persist)
         if persist:
             self.health_repo.upsert_snapshot(
                 account_id=account_id,
@@ -563,9 +752,6 @@ class PortfolioHealthService:
                 cost_method=method,
                 payload=result,
             )
-            result["persisted"] = True
-        else:
-            result["persisted"] = False
 
         return result
 
@@ -593,14 +779,22 @@ class PortfolioHealthService:
         account_id: Optional[int],
         as_of_date: date,
         cost_method: str,
-        weights: Mapping[str, float],
-        concentration_alert_pct: float,
+        settings: PortfolioHealthSettings,
     ) -> Dict[str, Any]:
         currency = str(snapshot.get("currency") or risk.get("currency") or "CNY")
-        total_equity = float(snapshot.get("total_equity") or 0.0)
-        total_cash = float(snapshot.get("total_cash") or 0.0)
-        total_mv = float(snapshot.get("total_market_value") or 0.0)
-        unrealized = float(snapshot.get("unrealized_pnl") or 0.0)
+        total_equity = _finite_number(
+            snapshot.get("total_equity") or 0.0, "snapshot.total_equity"
+        )
+        total_cash = _finite_number(
+            snapshot.get("total_cash") or 0.0, "snapshot.total_cash"
+        )
+        total_mv = _finite_number(
+            snapshot.get("total_market_value") or 0.0,
+            "snapshot.total_market_value",
+        )
+        unrealized = _finite_number(
+            snapshot.get("unrealized_pnl") or 0.0, "snapshot.unrealized_pnl"
+        )
         fx_stale = bool(snapshot.get("fx_stale"))
         data_quality = str(snapshot.get("data_quality") or "ok")
         limitations = list(snapshot.get("limitations") or [])
@@ -617,26 +811,52 @@ class PortfolioHealthService:
             "disclaimer": DISCLAIMER,
             "score_source": "rules",
             "llm_can_modify_score": False,
-            "weights": {k: round(float(weights[k]), 6) for k in DIMENSION_KEYS},
+            "weights": {k: round(settings.weights[k], 6) for k in DIMENSION_KEYS},
             "bands": [
                 {"name": name, "min_inclusive": low, "max_exclusive": high if name != "healthy" else 100.0}
                 for low, high, name in SCORE_BANDS
             ],
-            "formula_version": "portfolio_health_v1",
+            "formula_version": FORMULA_VERSION,
+            "config": settings.as_dict(),
+            "provenance": {
+                "snapshot_hash": _canonical_hash(snapshot),
+                "risk_hash": _canonical_hash(risk),
+                "config_hash": _canonical_hash(settings.as_dict()),
+                "calculated_at": datetime.now(timezone.utc).isoformat(),
+                "risk_history": dict(risk.get("history") or {}),
+                "price_provenance": self._price_provenance(snapshot),
+                "fx_provenance": self._fx_provenance(snapshot),
+            },
         }
 
         # Empty portfolio: no equity MV and no cash positions of interest
-        position_count = int(concentration.get("position_count") or 0)
-        if position_count <= 0 and total_mv <= _EPS:
+        position_count_value = _finite_number(
+            concentration.get("position_count") or 0,
+            "risk.concentration.position_count",
+            minimum=0.0,
+            maximum=1_000_000.0,
+        )
+        if not position_count_value.is_integer():
+            raise ValueError("risk.concentration.position_count must be an integer")
+        position_count = int(position_count_value)
+        if (
+            position_count <= 0
+            and abs(total_mv) <= _EPS
+            and abs(total_cash) <= _EPS
+            and abs(total_equity) <= _EPS
+        ):
             return {
                 **base,
                 "status": "empty_portfolio",
                 "status_message": "No held equity positions with positive market value.",
                 "score": None,
+                "partial_score": None,
                 "band": None,
                 "dimensions": self._empty_dimensions(),
                 "unavailable_dimensions": list(DIMENSION_KEYS),
                 "effective_weights": {},
+                "coverage_ratio": 0.0,
+                "comparable": False,
                 "insights": [],
                 "data_quality": {
                     "status": "empty",
@@ -645,6 +865,56 @@ class PortfolioHealthService:
                     "limitations": limitations,
                     "missing_price_symbols": [],
                     "risk_metrics_status": risk_status,
+                },
+                "inputs": {
+                    "top_weight_pct": None,
+                    "var_pct": None,
+                    "diversification_score": None,
+                    "unrealized_pnl_pct": None,
+                    "cash_pct": None,
+                    "total_equity": round(total_equity, 6),
+                    "total_cash": round(total_cash, 6),
+                    "total_market_value": round(total_mv, 6),
+                },
+            }
+
+        if total_equity < -_EPS:
+            return {
+                **base,
+                "status": "unavailable",
+                "status_message": "Portfolio equity is negative; health scoring is undefined.",
+                "score": None,
+                "partial_score": None,
+                "band": None,
+                "dimensions": self._empty_dimensions(reason="negative_equity"),
+                "unavailable_dimensions": list(DIMENSION_KEYS),
+                "effective_weights": {},
+                "coverage_ratio": 0.0,
+                "comparable": False,
+                "insights": self._finalize_insights(
+                    build_rule_insights(
+                        concentration={},
+                        risk_var_pct=None,
+                        diversification_score=None,
+                        cash_pct=None,
+                        unrealized_pnl_pct=None,
+                        concentration_alert_pct=settings.concentration_alert_pct,
+                        cash_low_alert_pct=settings.cash_low_alert_pct,
+                        cash_high_alert_pct=settings.cash_high_alert_pct,
+                        var_alert_pct=settings.var_alert_pct,
+                        diversification_alert=settings.diversification_alert,
+                        pnl_loss_alert_pct=settings.pnl_loss_alert_pct,
+                        unavailable_dimensions=DIMENSION_KEYS,
+                    )
+                ),
+                "data_quality": {
+                    "status": "unavailable",
+                    "fx_stale": fx_stale,
+                    "snapshot_data_quality": data_quality,
+                    "limitations": limitations,
+                    "missing_price_symbols": [],
+                    "risk_metrics_status": risk_status,
+                    "partial_reasons": ["negative_equity"],
                 },
                 "inputs": {
                     "top_weight_pct": None,
@@ -680,12 +950,19 @@ class PortfolioHealthService:
 
         # --- concentration ---
         top_weight = concentration.get("top_weight_pct")
+        if top_weight is not None:
+            top_weight = _finite_number(
+                top_weight,
+                "risk.concentration.top_weight_pct",
+                minimum=0.0,
+                maximum=100.0,
+            )
         if concentration.get("status") == "ok" and top_weight is not None:
-            dim_scores["concentration"] = score_concentration(float(top_weight))
+            dim_scores["concentration"] = score_concentration(top_weight)
             dim_details["concentration"] = {
                 "status": "ok",
                 "score": dim_scores["concentration"],
-                "input": {"top_weight_pct": float(top_weight)},
+                "input": {"top_weight_pct": top_weight},
                 "formula": (
                     f"linear map top_weight_pct: "
                     f"<={CONCENTRATION_IDEAL_TOP_PCT}→100, "
@@ -703,12 +980,16 @@ class PortfolioHealthService:
         # --- risk exposure (VaR) ---
         var_status = str(var_block.get("status") or "")
         var_pct = var_block.get("var_pct")
+        if var_pct is not None:
+            var_pct = _finite_number(
+                var_pct, "risk.var.var_pct", minimum=0.0, maximum=100.0
+            )
         if var_status == "ok" and var_pct is not None:
-            dim_scores["risk_exposure"] = score_risk_exposure(float(var_pct))
+            dim_scores["risk_exposure"] = score_risk_exposure(var_pct)
             dim_details["risk_exposure"] = {
                 "status": "ok",
                 "score": dim_scores["risk_exposure"],
-                "input": {"var_pct": float(var_pct)},
+                "input": {"var_pct": var_pct},
                 "formula": (
                     f"linear map var_pct: <={RISK_VAR_IDEAL_PCT}→100, "
                     f">={RISK_VAR_POOR_PCT}→0"
@@ -726,12 +1007,19 @@ class PortfolioHealthService:
 
         # --- diversification ---
         div_score = concentration.get("diversification_score")
+        if div_score is not None:
+            div_score = _finite_number(
+                div_score,
+                "risk.concentration.diversification_score",
+                minimum=0.0,
+                maximum=1.0,
+            )
         if concentration.get("status") == "ok" and div_score is not None:
-            dim_scores["diversification"] = score_diversification(float(div_score))
+            dim_scores["diversification"] = score_diversification(div_score)
             dim_details["diversification"] = {
                 "status": "ok",
                 "score": dim_scores["diversification"],
-                "input": {"diversification_score": float(div_score)},
+                "input": {"diversification_score": div_score},
                 "formula": "diversification_score * 100",
             }
         else:
@@ -804,17 +1092,21 @@ class PortfolioHealthService:
             }
             partial_reasons.append("cash_zero_equity")
 
-        overall, unavailable, effective = aggregate_score(dim_scores, weights)
+        partial_score, unavailable, effective = aggregate_score(
+            dim_scores, settings.weights
+        )
+        coverage_ratio = round(sum(effective.values()), 6)
 
         # Status honesty
-        if overall is None:
+        if partial_score is None:
             status = "unavailable"
             status_message = "No health dimensions could be scored from available data."
         elif unavailable or partial_reasons:
             status = "partial"
             status_message = (
-                "Health score uses available dimensions only; "
-                f"unavailable={unavailable or []}; reasons={sorted(set(partial_reasons))}."
+                "Primary score and band are suppressed because coverage or source quality "
+                f"is incomplete; unavailable={unavailable or []}; "
+                f"reasons={sorted(set(partial_reasons))}."
             )
         else:
             status = "ok"
@@ -844,47 +1136,46 @@ class PortfolioHealthService:
         }
 
         rule_insights = build_rule_insights(
-            concentration=concentration,
-            risk_var_pct=inputs["var_pct"],
-            diversification_score=inputs["diversification_score"],
-            cash_pct=inputs["cash_pct"],
-            unrealized_pnl_pct=inputs["unrealized_pnl_pct"],
-            concentration_alert_pct=concentration_alert_pct,
-            cash_low_alert_pct=float(
-                os.environ.get(
-                    "PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT",
-                    str(DEFAULT_CASH_LOW_ALERT_PCT),
-                )
+            concentration=(
+                concentration
+                if dim_details["concentration"]["status"] == "ok"
+                else {}
             ),
-            cash_high_alert_pct=float(
-                os.environ.get(
-                    "PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT",
-                    str(DEFAULT_CASH_HIGH_ALERT_PCT),
-                )
+            risk_var_pct=(
+                inputs["var_pct"]
+                if dim_details["risk_exposure"]["status"] == "ok"
+                else None
             ),
-            var_alert_pct=float(
-                os.environ.get(
-                    "PORTFOLIO_HEALTH_VAR_ALERT_PCT",
-                    str(DEFAULT_VAR_ALERT_PCT),
-                )
+            diversification_score=(
+                inputs["diversification_score"]
+                if dim_details["diversification"]["status"] == "ok"
+                else None
             ),
-            diversification_alert=float(
-                os.environ.get(
-                    "PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT",
-                    str(DEFAULT_DIVERSIFICATION_ALERT),
-                )
+            cash_pct=(
+                inputs["cash_pct"]
+                if dim_details["cash_ratio"]["status"] == "ok"
+                else None
             ),
-            pnl_loss_alert_pct=float(
-                os.environ.get(
-                    "PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT",
-                    str(DEFAULT_PNL_LOSS_ALERT_PCT),
-                )
+            unrealized_pnl_pct=(
+                inputs["unrealized_pnl_pct"]
+                if dim_details["pnl"]["status"] == "ok"
+                else None
             ),
+            concentration_alert_pct=settings.concentration_alert_pct,
+            cash_low_alert_pct=settings.cash_low_alert_pct,
+            cash_high_alert_pct=settings.cash_high_alert_pct,
+            var_alert_pct=settings.var_alert_pct,
+            diversification_alert=settings.diversification_alert,
+            pnl_loss_alert_pct=settings.pnl_loss_alert_pct,
+            unavailable_dimensions=unavailable,
         )
         insights = self._finalize_insights(rule_insights)
 
         # Freeze score before any insight path (LLM cannot touch this).
-        score_locked = overall
+        comparable = (
+            status == "ok" and coverage_ratio >= MIN_COMPLETE_COVERAGE - _EPS
+        )
+        score_locked = partial_score if comparable else None
         band_locked = band_for_score(score_locked)
 
         return {
@@ -892,10 +1183,13 @@ class PortfolioHealthService:
             "status": status,
             "status_message": status_message,
             "score": score_locked,
+            "partial_score": partial_score if not comparable else None,
             "band": band_locked,
             "dimensions": dim_details,
             "unavailable_dimensions": unavailable,
             "effective_weights": {k: round(v, 6) for k, v in effective.items()},
+            "coverage_ratio": coverage_ratio,
+            "comparable": comparable,
             "insights": insights,
             "data_quality": {
                 "status": "partial" if status == "partial" else ("ok" if status == "ok" else status),
@@ -939,9 +1233,15 @@ class PortfolioHealthService:
                 symbol = str(pos.get("symbol") or "").strip().upper()
                 if not symbol:
                     continue
-                mv = float(pos.get("market_value_base") or 0.0)
+                mv = _finite_number(
+                    pos.get("market_value_base") or 0.0,
+                    f"position.{symbol}.market_value_base",
+                )
                 price_stale = bool(pos.get("price_stale"))
-                qty = float(pos.get("quantity") or pos.get("qty") or 0.0)
+                qty = _finite_number(
+                    pos.get("quantity") or pos.get("qty") or 0.0,
+                    f"position.{symbol}.quantity",
+                )
                 # Held quantity without usable market value or explicitly stale price.
                 if qty > _EPS and (mv <= _EPS or price_stale):
                     missing.append(symbol)
@@ -957,8 +1257,52 @@ class PortfolioHealthService:
         return ordered
 
     @staticmethod
-    def _empty_dimensions() -> Dict[str, Dict[str, Any]]:
+    def _price_provenance(snapshot: Mapping[str, Any]) -> Dict[str, Any]:
+        rows: List[Dict[str, Any]] = []
+        total = 0
+        for account in snapshot.get("accounts", []) or []:
+            for position in account.get("positions", []) or []:
+                total += 1
+                if len(rows) >= 256:
+                    continue
+                rows.append(
+                    {
+                        "symbol": str(position.get("symbol") or "").strip().upper(),
+                        "source": str(position.get("price_source") or "unknown"),
+                        "price_date": position.get("price_date"),
+                        "stale": bool(position.get("price_stale")),
+                    }
+                )
+        return {"positions": rows, "total": total, "truncated": total > len(rows)}
+
+    @staticmethod
+    def _fx_provenance(snapshot: Mapping[str, Any]) -> Dict[str, Any]:
+        accounts = []
+        for account in snapshot.get("accounts", []) or []:
+            accounts.append(
+                {
+                    "account_id": account.get("account_id") or account.get("id"),
+                    "currency": str(
+                        account.get("base_currency")
+                        or account.get("currency")
+                        or snapshot.get("currency")
+                        or ""
+                    ),
+                    "fx_stale": bool(account.get("fx_stale")),
+                }
+            )
         return {
-            key: {"status": "unavailable", "score": None, "reason": "empty_portfolio"}
+            "response_currency": str(snapshot.get("currency") or ""),
+            "fx_stale": bool(snapshot.get("fx_stale")),
+            "accounts": accounts[:256],
+            "truncated": len(accounts) > 256,
+        }
+
+    @staticmethod
+    def _empty_dimensions(
+        *, reason: str = "empty_portfolio"
+    ) -> Dict[str, Dict[str, Any]]:
+        return {
+            key: {"status": "unavailable", "score": None, "reason": reason}
             for key in DIMENSION_KEYS
         }

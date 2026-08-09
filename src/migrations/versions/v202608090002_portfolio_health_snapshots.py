@@ -5,7 +5,7 @@
 from src.migrations.types import Migration, MigrationExecution
 
 
-MIGRATION_ID = "202608090001_portfolio_health_snapshots"
+MIGRATION_ID = "202608090002_portfolio_health_snapshots"
 DESCRIPTION = "Create portfolio_health_snapshots daily health score table"
 
 
@@ -20,6 +20,10 @@ _TABLE_STATEMENTS = (
         status VARCHAR(32) NOT NULL,
         band VARCHAR(16),
         payload_json TEXT NOT NULL,
+        snapshot_hash VARCHAR(64) NOT NULL,
+        risk_hash VARCHAR(64) NOT NULL,
+        config_hash VARCHAR(64) NOT NULL,
+        calculated_at DATETIME NOT NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL
     )

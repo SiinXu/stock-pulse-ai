@@ -1067,3 +1067,76 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
 
 }
+
+
+_PORTFOLIO_HEALTH_NUMBER_FIELDS = {
+    "PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION": (
+        "Portfolio Health Concentration Weight", "0.25", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE": (
+        "Portfolio Health Risk Exposure Weight", "0.25", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION": (
+        "Portfolio Health Diversification Weight", "0.20", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_PNL": (
+        "Portfolio Health PnL Weight", "0.15", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO": (
+        "Portfolio Health Cash Ratio Weight", "0.15", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT": (
+        "Portfolio Health Concentration Alert (%)", "35.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_VAR_ALERT_PCT": (
+        "Portfolio Health VaR Alert (%)", "5.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT": (
+        "Portfolio Health Diversification Alert", "0.35", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT": (
+        "Portfolio Health Low Cash Alert (%)", "2.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT": (
+        "Portfolio Health High Cash Alert (%)", "50.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT": (
+        "Portfolio Health PnL Loss Alert (%)", "-15.0", -100.0, 0.0
+    ),
+}
+
+for _offset, (_key, (_title, _default, _minimum, _maximum)) in enumerate(
+    _PORTFOLIO_HEALTH_NUMBER_FIELDS.items(),
+    start=0,
+):
+    SYSTEM_FIELD_DEFINITIONS[_key] = {
+        "title": _title,
+        "description": (
+            "Finite portfolio-health formula configuration. Invalid, non-finite, "
+            "or out-of-range values are rejected instead of clamped."
+        ),
+        "category": "system",
+        "data_type": "float",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": _default,
+        "options": [],
+        "validation": {"min": _minimum, "max": _maximum},
+        "display_order": 170 + _offset,
+        "help_key": "settings.system.portfolio_health",
+        "examples": [f"{_key}={_default}"],
+        "docs": [
+            {
+                "label": "Portfolio health score",
+                "href": (
+                    "https://github.com/SiinXu/stock-pulse-ai/blob/main/"
+                    "docs/portfolio-health-score_EN.md"
+                ),
+            }
+        ],
+        "warning_codes": [],
+    }
+
+del _offset, _key, _title, _default, _minimum, _maximum

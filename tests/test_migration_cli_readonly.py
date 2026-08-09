@@ -28,6 +28,7 @@ from src.migrations.registry import (
     INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
+    PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
     SECURITY_AUDIT_EVENTS_MIGRATION,
@@ -36,6 +37,7 @@ from src.migrations.registry import (
     BACKTEST_RESOLUTION_NOTES_MIGRATION,
     TASK_QUEUE_INFLIGHT_MIGRATION,
     TARGET_VERSION,
+    WATCHLIST_GROUPS_SCHEMA_MIGRATION,
     get_migrations,
 )
 from src.migrations.runner import verify
@@ -205,6 +207,8 @@ def test_pending_cli_subprocess_is_read_only(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
         TASK_QUEUE_INFLIGHT_MIGRATION.id,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION.id,
+        PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -274,6 +278,8 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
         TASK_QUEUE_INFLIGHT_MIGRATION.id,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION.id,
+        PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}

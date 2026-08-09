@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""API contract tests for GET /api/v1/portfolio/health (issue #151)."""
+"""API contracts for stored GET and explicit portfolio-health refresh."""
 
 from __future__ import annotations
 
@@ -8,9 +7,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 try:
     import litellm  # noqa: F401
@@ -60,95 +60,87 @@ class PortfolioHealthApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         DatabaseManager.reset_instance()
         Config.reset_instance()
-        os.environ.pop("ENV_FILE", None)
-        os.environ.pop("DATABASE_PATH", None)
+        for key in (
+            "ENV_FILE",
+            "DATABASE_PATH",
+            "PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE",
+        ):
+            os.environ.pop(key, None)
         self.temp_dir.cleanup()
 
-    def test_empty_portfolio_endpoint(self) -> None:
-        resp = self.client.get(
+    def _health_row_count(self) -> int:
+        database = DatabaseManager.get_instance()
+        with database.get_session() as session:
+            value = session.execute(
+                text("SELECT COUNT(*) FROM portfolio_health_snapshots")
+            ).scalar_one()
+        return int(value)
+
+    def test_get_is_read_only_and_returns_not_found_before_refresh(self) -> None:
+        before = self._health_row_count()
+        response = self.client.get(
             "/api/v1/portfolio/health",
+            params={"as_of": "2026-01-15"},
+        )
+        self.assertEqual(response.status_code, 404, response.text)
+        self.assertEqual(response.json()["error"], "portfolio_health_not_found")
+        self.assertEqual(self._health_row_count(), before)
+
+    def test_preview_zero_writes_then_refresh_round_trips_through_get(self) -> None:
+        preview = self.client.post(
+            "/api/v1/portfolio/health/refresh",
             params={"as_of": "2026-01-15", "persist": "false"},
         )
-        self.assertEqual(resp.status_code, 200, resp.text)
-        payload = resp.json()
-        self.assertEqual(payload["status"], "empty_portfolio")
-        self.assertIsNone(payload["score"])
-        self.assertEqual(payload["score_source"], "rules")
-        self.assertFalse(payload["llm_can_modify_score"])
-        self.assertIn("not investment advice", payload["disclaimer"].lower())
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertFalse(preview.json()["persisted"])
+        self.assertEqual(preview.json()["status"], "empty_portfolio")
+        self.assertEqual(self._health_row_count(), 0)
 
-    def test_endpoint_returns_partial_path_fields(self) -> None:
-        fake = {
-            "as_of": "2026-03-01",
-            "account_id": None,
-            "cost_method": "fifo",
-            "currency": "CNY",
-            "status": "partial",
-            "status_message": "unavailable risk_exposure",
-            "score": 72.5,
-            "band": "fair",
-            "disclaimer": (
-                "Portfolio health is a structural portfolio metric, not investment advice. "
-                "Scores are deterministic and fully recomputable from documented formulas."
-            ),
-            "score_source": "rules",
-            "llm_can_modify_score": False,
-            "formula_version": "portfolio_health_v1",
-            "weights": {
-                "concentration": 0.25,
-                "risk_exposure": 0.25,
-                "diversification": 0.20,
-                "pnl": 0.15,
-                "cash_ratio": 0.15,
-            },
-            "effective_weights": {
-                "concentration": 0.333333,
-                "diversification": 0.266667,
-                "pnl": 0.2,
-                "cash_ratio": 0.2,
-            },
-            "bands": [],
-            "dimensions": {
-                "risk_exposure": {"status": "unavailable", "score": None},
-            },
-            "unavailable_dimensions": ["risk_exposure"],
-            "insights": [],
-            "data_quality": {
-                "status": "partial",
-                "fx_stale": False,
-                "snapshot_data_quality": "ok",
-                "limitations": [],
-                "missing_price_symbols": [],
-                "risk_metrics_status": "insufficient_history",
-                "partial_reasons": ["risk_exposure_insufficient_history"],
-            },
-            "inputs": {
-                "top_weight_pct": 20.0,
-                "var_pct": None,
-                "diversification_score": 0.9,
-                "unrealized_pnl_pct": 5.0,
-                "cash_pct": 10.0,
-                "total_equity": 100000.0,
-                "total_cash": 10000.0,
-                "total_market_value": 90000.0,
-            },
-            "persisted": False,
-        }
-        with patch(
-            "api.v1.endpoints.portfolio_health.PortfolioHealthService"
-        ) as mock_cls:
-            mock_cls.return_value.get_health.return_value = fake
-            resp = self.client.get(
-                "/api/v1/portfolio/health",
-                params={"as_of": "2026-03-01", "persist": "false"},
+        refresh = self.client.post(
+            "/api/v1/portfolio/health/refresh",
+            params={"as_of": "2026-01-15", "persist": "true"},
+        )
+        self.assertEqual(refresh.status_code, 200, refresh.text)
+        self.assertTrue(refresh.json()["persisted"])
+        self.assertEqual(self._health_row_count(), 1)
+
+        stored = self.client.get(
+            "/api/v1/portfolio/health",
+            params={"as_of": "2026-01-15"},
+        )
+        self.assertEqual(stored.status_code, 200, stored.text)
+        self.assertEqual(stored.json(), refresh.json())
+
+    def test_missing_migration_is_stable_503_and_not_recreated(self) -> None:
+        database = DatabaseManager.get_instance()
+        with database.get_session() as session:
+            session.execute(text("DROP TABLE portfolio_health_snapshots"))
+            session.commit()
+        response = self.client.get(
+            "/api/v1/portfolio/health",
+            params={"as_of": "2026-01-15"},
+        )
+        self.assertEqual(response.status_code, 503, response.text)
+        self.assertEqual(
+            response.json()["error"], "portfolio_health_migration_required"
+        )
+        with database.get_session() as session:
+            names = set(
+                session.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table'")
+                ).scalars()
             )
-        self.assertEqual(resp.status_code, 200, resp.text)
-        payload = resp.json()
-        self.assertEqual(payload["status"], "partial")
-        self.assertIn("risk_exposure", payload["unavailable_dimensions"])
-        self.assertFalse(payload["llm_can_modify_score"])
-        self.assertEqual(payload["score_source"], "rules")
-        self.assertIsNone(payload["inputs"]["var_pct"])
+        self.assertNotIn("portfolio_health_snapshots", names)
+
+    def test_non_finite_operator_config_fails_closed(self) -> None:
+        os.environ["PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE"] = "NaN"
+        Config.reset_instance()
+        response = self.client.post(
+            "/api/v1/portfolio/health/refresh",
+            params={"as_of": "2026-01-15", "persist": "false"},
+        )
+        self.assertEqual(response.status_code, 503, response.text)
+        self.assertEqual(response.json()["error"], "portfolio_health_input_invalid")
 
 
 if __name__ == "__main__":

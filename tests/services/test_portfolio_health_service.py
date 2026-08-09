@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Mapping, Sequence
 from unittest.mock import MagicMock
 
 from src.repositories.portfolio_health_repo import PortfolioHealthRepository
+from src.config import Config
 from src.services.portfolio_health_service import (
     DEFAULT_WEIGHTS,
     PortfolioHealthService,
@@ -52,7 +53,7 @@ class PureFormulaTests(unittest.TestCase):
         self.assertAlmostEqual(score_cash_ratio(0.0), 0.0, places=4)
         self.assertAlmostEqual(score_cash_ratio(80.0), 0.0, places=4)
 
-    def test_aggregate_reweights_when_dimension_missing(self) -> None:
+    def test_aggregate_uses_fixed_denominator_when_dimension_missing(self) -> None:
         scores = {
             "concentration": 80.0,
             "risk_exposure": None,
@@ -63,13 +64,13 @@ class PureFormulaTests(unittest.TestCase):
         overall, unavailable, effective = aggregate_score(scores, DEFAULT_WEIGHTS)
         self.assertEqual(unavailable, ["risk_exposure"])
         self.assertNotIn("risk_exposure", effective)
-        self.assertAlmostEqual(sum(effective.values()), 1.0, places=8)
-        # Manual: remaining weights 0.25+0.20+0.15+0.15 = 0.75
+        self.assertAlmostEqual(sum(effective.values()), 0.75, places=8)
+        # Missing risk keeps its 0.25 denominator share and can never improve the estimate.
         expected = (
-            80.0 * (0.25 / 0.75)
-            + 100.0 * (0.20 / 0.75)
-            + 70.0 * (0.15 / 0.75)
-            + 100.0 * (0.15 / 0.75)
+            80.0 * 0.25
+            + 100.0 * 0.20
+            + 70.0 * 0.15
+            + 100.0 * 0.15
         )
         self.assertAlmostEqual(overall or 0.0, expected, places=4)
 
@@ -184,7 +185,7 @@ class PortfolioHealthServiceTests(unittest.TestCase):
         health_repo=None,
     ) -> PortfolioHealthService:
         portfolio_service = MagicMock()
-        portfolio_service.get_portfolio_snapshot.return_value = snapshot
+        portfolio_service.preview_portfolio_snapshot.return_value = snapshot
         risk_service = MagicMock()
         risk_service.get_risk_metrics.return_value = risk
         return PortfolioHealthService(
@@ -192,6 +193,7 @@ class PortfolioHealthServiceTests(unittest.TestCase):
             risk_metrics_service=risk_service,
             health_repo=health_repo or MagicMock(),
             llm_polisher=llm_polisher,
+            config=Config(stock_list=["600519"]),
         )
 
     @staticmethod
@@ -319,6 +321,7 @@ class PortfolioHealthServiceTests(unittest.TestCase):
             self.assertIsNotNone(stored)
             assert stored is not None
             self.assertAlmostEqual(float(stored["score"]), float(first["score"]), places=4)
+            self.assertEqual(stored, second)
 
             # Count rows == 1
             from sqlalchemy import text
@@ -347,13 +350,21 @@ class PortfolioHealthServiceTests(unittest.TestCase):
         result = service.get_health(as_of=date(2026, 3, 1), persist=False)
         self.assertEqual(result["status"], "partial")
         self.assertIn("risk_exposure", result["unavailable_dimensions"])
-        self.assertIsNotNone(result["score"])
+        self.assertIsNone(result["score"])
+        self.assertIsNone(result["band"])
+        self.assertIsNotNone(result["partial_score"])
+        self.assertLess(result["coverage_ratio"], 1.0)
+        self.assertFalse(result["comparable"])
         self.assertEqual(
             result["dimensions"]["risk_exposure"]["status"], "unavailable"
         )
         # Score must not pretend VaR was 0
         self.assertIsNone(result["dimensions"]["risk_exposure"]["score"])
         self.assertIsNone(result["inputs"]["var_pct"])
+        self.assertTrue(
+            any(i["code"] == "risk_exposure_unavailable" for i in result["insights"])
+        )
+        self.assertFalse(any(i["code"] == "within_thresholds" for i in result["insights"]))
 
     def test_partial_when_price_stale(self) -> None:
         service = self._service(
@@ -390,6 +401,7 @@ class PortfolioHealthServiceTests(unittest.TestCase):
             risk_metrics_service=service.risk_metrics_service,
             health_repo=MagicMock(),
             llm_polisher=None,
+            config=service.config,
         ).get_health(as_of=date(2026, 4, 1), persist=False)
 
         with_llm = service.get_health(as_of=date(2026, 4, 1), persist=False)

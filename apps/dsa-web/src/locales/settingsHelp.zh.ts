@@ -1572,6 +1572,13 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.portfolio_health': {
+    title: '投资组合健康度公式',
+    summary: '配置健康度的固定分母权重和预警阈值。',
+    usage: '只能使用界面范围内的有限数值；非法值会被拒绝，不会被静默修正。',
+    notes: ['修改后配置哈希会变化，需要显式刷新健康度快照。'],
+  },
+
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: '投委会模式',
     summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',

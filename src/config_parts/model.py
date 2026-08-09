@@ -371,6 +371,17 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+    portfolio_health_weight_concentration: float = 0.25
+    portfolio_health_weight_risk_exposure: float = 0.25
+    portfolio_health_weight_diversification: float = 0.20
+    portfolio_health_weight_pnl: float = 0.15
+    portfolio_health_weight_cash_ratio: float = 0.15
+    portfolio_health_concentration_alert_pct: float = 35.0
+    portfolio_health_var_alert_pct: float = 5.0
+    portfolio_health_diversification_alert: float = 0.35
+    portfolio_health_cash_low_alert_pct: float = 2.0
+    portfolio_health_cash_high_alert_pct: float = 50.0
+    portfolio_health_pnl_loss_alert_pct: float = -15.0
 
     # Discord Bot status
     discord_bot_status: str = "A股智能分析 | /help"

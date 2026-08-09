@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import date, datetime
 from typing import Any, Dict, Optional
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from src.repositories.base import BaseRepository, RepositoryError
 from src.storage import DatabaseManager
@@ -22,6 +24,15 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 _ACCOUNT_KEY_ALL = "all"
+_BUSY_RETRY_DELAYS_SECONDS = (0.02, 0.05, 0.10)
+
+
+def _is_missing_schema(exc: BaseException) -> bool:
+    return "no such table: portfolio_health_snapshots" in str(exc).lower()
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
 
 
 def account_key_for(account_id: Optional[int]) -> str:
@@ -35,55 +46,6 @@ class PortfolioHealthRepository(BaseRepository):
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None) -> None:
         super().__init__(db_manager)
-        self._ensured = False
-
-    def ensure_schema(self) -> None:
-        """Create the snapshot table if missing (restart-idempotent)."""
-        if self._ensured:
-            return
-        try:
-            with self.db.get_session() as session:
-                session.execute(
-                    text(
-                        """
-                        CREATE TABLE IF NOT EXISTS portfolio_health_snapshots (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            account_key VARCHAR(32) NOT NULL,
-                            snapshot_date DATE NOT NULL,
-                            cost_method VARCHAR(8) NOT NULL DEFAULT 'fifo',
-                            score FLOAT,
-                            status VARCHAR(32) NOT NULL,
-                            band VARCHAR(16),
-                            payload_json TEXT NOT NULL,
-                            created_at DATETIME NOT NULL,
-                            updated_at DATETIME NOT NULL
-                        )
-                        """
-                    )
-                )
-                session.execute(
-                    text(
-                        """
-                        CREATE UNIQUE INDEX IF NOT EXISTS
-                        uix_portfolio_health_account_date_method
-                        ON portfolio_health_snapshots
-                        (account_key, snapshot_date, cost_method)
-                        """
-                    )
-                )
-                session.commit()
-            self._ensured = True
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            log_safe_exception(
-                logger,
-                "ensure portfolio_health_snapshots schema failed",
-                exc,
-                error_code="portfolio_health_schema_error",
-            )
-            raise RepositoryError(
-                "ensure portfolio_health_snapshots schema failed",
-                error_code="portfolio_health_schema_error",
-            ) from exc
 
     def upsert_snapshot(
         self,
@@ -94,100 +56,98 @@ class PortfolioHealthRepository(BaseRepository):
         payload: Dict[str, Any],
     ) -> None:
         """Insert or overwrite the daily health snapshot."""
-        self.ensure_schema()
         key = account_key_for(account_id)
         method = str(cost_method or "fifo").strip().lower() or "fifo"
         score = payload.get("score")
         status = str(payload.get("status") or "unknown")
         band = payload.get("band")
-        payload_json = json.dumps(payload, ensure_ascii=False, default=str)
+        payload_json = json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            default=str,
+        )
         now = datetime.now().replace(microsecond=0)
         context = {"account_key": key, "snapshot_date": snapshot_date.isoformat()}
-        try:
-            with self.db.get_session() as session:
-                existing = session.execute(
-                    text(
-                        """
-                        SELECT id FROM portfolio_health_snapshots
-                        WHERE account_key = :account_key
-                          AND snapshot_date = :snapshot_date
-                          AND cost_method = :cost_method
-                        LIMIT 1
-                        """
-                    ),
-                    {
-                        "account_key": key,
-                        "snapshot_date": snapshot_date.isoformat(),
-                        "cost_method": method,
-                    },
-                ).fetchone()
-                if existing is None:
-                    session.execute(
-                        text(
-                            """
-                            INSERT INTO portfolio_health_snapshots (
-                                account_key, snapshot_date, cost_method,
-                                score, status, band, payload_json,
-                                created_at, updated_at
-                            ) VALUES (
-                                :account_key, :snapshot_date, :cost_method,
-                                :score, :status, :band, :payload_json,
-                                :created_at, :updated_at
-                            )
-                            """
-                        ),
-                        {
-                            "account_key": key,
-                            "snapshot_date": snapshot_date.isoformat(),
-                            "cost_method": method,
-                            "score": score,
-                            "status": status,
-                            "band": band,
-                            "payload_json": payload_json,
-                            "created_at": now.isoformat(sep=" "),
-                            "updated_at": now.isoformat(sep=" "),
-                        },
-                    )
-                else:
-                    session.execute(
-                        text(
-                            """
-                            UPDATE portfolio_health_snapshots
-                            SET score = :score,
-                                status = :status,
-                                band = :band,
-                                payload_json = :payload_json,
-                                updated_at = :updated_at
-                            WHERE account_key = :account_key
-                              AND snapshot_date = :snapshot_date
-                              AND cost_method = :cost_method
-                            """
-                        ),
-                        {
-                            "account_key": key,
-                            "snapshot_date": snapshot_date.isoformat(),
-                            "cost_method": method,
-                            "score": score,
-                            "status": status,
-                            "band": band,
-                            "payload_json": payload_json,
-                            "updated_at": now.isoformat(sep=" "),
-                        },
-                    )
-                session.commit()
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            log_safe_exception(
-                logger,
-                "upsert portfolio health snapshot failed",
-                exc,
-                error_code="portfolio_health_upsert_error",
-                context=context,
+        parameters = {
+            "account_key": key,
+            "snapshot_date": snapshot_date.isoformat(),
+            "cost_method": method,
+            "score": score,
+            "status": status,
+            "band": band,
+            "payload_json": payload_json,
+            "snapshot_hash": str(payload.get("provenance", {}).get("snapshot_hash") or ""),
+            "risk_hash": str(payload.get("provenance", {}).get("risk_hash") or ""),
+            "config_hash": str(payload.get("provenance", {}).get("config_hash") or ""),
+            "calculated_at": str(payload.get("provenance", {}).get("calculated_at") or ""),
+            "created_at": now.isoformat(sep=" "),
+            "updated_at": now.isoformat(sep=" "),
+        }
+        statement = text(
+            """
+            INSERT INTO portfolio_health_snapshots (
+                account_key, snapshot_date, cost_method,
+                score, status, band, payload_json,
+                snapshot_hash, risk_hash, config_hash, calculated_at,
+                created_at, updated_at
+            ) VALUES (
+                :account_key, :snapshot_date, :cost_method,
+                :score, :status, :band, :payload_json,
+                :snapshot_hash, :risk_hash, :config_hash, :calculated_at,
+                :created_at, :updated_at
             )
-            raise RepositoryError(
-                "upsert portfolio health snapshot failed",
-                error_code="portfolio_health_upsert_error",
-                context=context,
-            ) from exc
+            ON CONFLICT(account_key, snapshot_date, cost_method) DO UPDATE SET
+                score = excluded.score,
+                status = excluded.status,
+                band = excluded.band,
+                payload_json = excluded.payload_json,
+                snapshot_hash = excluded.snapshot_hash,
+                risk_hash = excluded.risk_hash,
+                config_hash = excluded.config_hash,
+                calculated_at = excluded.calculated_at,
+                updated_at = excluded.updated_at
+            """
+        )
+        for attempt, delay in enumerate(_BUSY_RETRY_DELAYS_SECONDS, start=1):
+            try:
+                with self.db.get_session() as session:
+                    session.execute(
+                        statement,
+                        parameters,
+                    )
+                    session.commit()
+                return
+            except OperationalError as exc:
+                if _is_missing_schema(exc):
+                    raise RepositoryError(
+                        "Portfolio health migration is required",
+                        error_code="portfolio_health_migration_required",
+                        context=context,
+                    ) from exc
+                if "database is locked" in str(exc).lower() and attempt < len(
+                    _BUSY_RETRY_DELAYS_SECONDS
+                ):
+                    time.sleep(delay)
+                    continue
+                self._log_and_raise(
+                    logger,
+                    "upsert portfolio health snapshot failed",
+                    exc,
+                    error_code="portfolio_health_upsert_busy"
+                    if "database is locked" in str(exc).lower()
+                    else "portfolio_health_upsert_error",
+                    context=context,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - repository boundary
+                self._log_and_raise(
+                    logger,
+                    "upsert portfolio health snapshot failed",
+                    exc,
+                    error_code="portfolio_health_upsert_error",
+                    context=context,
+                )
 
     def get_snapshot(
         self,
@@ -197,7 +157,6 @@ class PortfolioHealthRepository(BaseRepository):
         cost_method: str = "fifo",
     ) -> Optional[Dict[str, Any]]:
         """Return the stored payload for the day, or None."""
-        self.ensure_schema()
         key = account_key_for(account_id)
         method = str(cost_method or "fifo").strip().lower() or "fifo"
         context = {"account_key": key, "snapshot_date": snapshot_date.isoformat()}
@@ -222,11 +181,28 @@ class PortfolioHealthRepository(BaseRepository):
             if row is None:
                 return None
             payload_json = row[0] if not hasattr(row, "payload_json") else row.payload_json
-            data = json.loads(payload_json or "{}")
+            data = json.loads(
+                payload_json or "{}",
+                parse_constant=_reject_json_constant,
+            )
             if not isinstance(data, dict):
                 return None
             return data
-        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
+        except OperationalError as exc:
+            if _is_missing_schema(exc):
+                raise RepositoryError(
+                    "Portfolio health migration is required",
+                    error_code="portfolio_health_migration_required",
+                    context=context,
+                ) from exc
+            self._log_and_raise(
+                logger,
+                "get portfolio health snapshot failed",
+                exc,
+                error_code="portfolio_health_get_error",
+                context=context,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - repository boundary
             log_safe_exception(
                 logger,
                 "get portfolio health snapshot failed",

@@ -2071,12 +2071,32 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get daily portfolio health score
-         * @description Deterministic 0-100 portfolio health score with dimension breakdown and actionable insights. Aggregates existing snapshot and risk-metrics inputs; never calls market data providers on the hot path. Scores are rule-based (LLM cannot modify them). Partial data quality is reported explicitly. This is a structural metric, not investment advice.
+         * Get a stored daily portfolio health snapshot
+         * @description Read-only lookup. This endpoint never replays the portfolio and never writes portfolio caches or health rows. Use POST /health/refresh for explicit computation.
          */
         get: operations["getPortfolioHealth"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/health/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explicitly refresh a daily portfolio health snapshot
+         * @description Replays one side-effect-free portfolio snapshot, passes that immutable input to risk metrics, and optionally performs one atomic health upsert. With persist=false the complete operation performs zero writes.
+         */
+        post: operations["refreshPortfolioHealth"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2275,6 +2295,46 @@ export interface paths {
         post?: never;
         /** Delete trade event */
         delete: operations["delete_trade_api_v1_portfolio_trades__trade_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-version-compare/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare two analysis report versions
+         * @description Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.
+         */
+        get: operations["compareReportVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-version-compare/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List analysis runs for version comparison
+         * @description List historical analysis runs for a symbol with run id, time, model, and configuration fingerprint for the report version picker.
+         */
+        get: operations["listReportVersionRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2630,6 +2690,130 @@ export interface paths {
          */
         post: operations["add_to_watchlist_api_v1_stocks_watchlist_add_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List watchlist groups
+         * @description Reconcile groups from authoritative STOCK_LIST before returning revisioned state.
+         */
+        get: operations["list_watchlist_groups_api_v1_stocks_watchlist_groups_get"];
+        put?: never;
+        /** Create a watchlist group */
+        post: operations["create_watchlist_group_api_v1_stocks_watchlist_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/move-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move or copy a symbol between groups */
+        post: operations["move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Atomically reorder every watchlist group */
+        put: operations["reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a watchlist group */
+        delete: operations["delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename a watchlist group */
+        patch: operations["rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add an authoritative symbol to a group */
+        post: operations["add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Atomically reorder every member in one group */
+        put: operations["reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/{stock_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a symbol from one group */
+        delete: operations["remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4175,6 +4359,80 @@ export interface components {
             stock_name?: string | null;
         };
         /**
+         * AnalysisDeltaPayload
+         * @description Typed presentation projection of the merged T17 AnalysisDelta contract.
+         */
+        AnalysisDeltaPayload: {
+            /** Base Query Id */
+            base_query_id?: string | null;
+            /** Base Record Id */
+            base_record_id: number;
+            /** Baseline Reason */
+            baseline_reason?: string | null;
+            /**
+             * Baseline Status
+             * @enum {string}
+             */
+            baseline_status: "ok" | "missing_history" | "missing_base" | "missing_target" | "incomparable_structure";
+            /** Conclusion Changes */
+            conclusion_changes?: components["schemas"]["AnalysisValueChangePayload"][];
+            /** Evidence Changes */
+            evidence_changes?: components["schemas"]["AnalysisListChangePayload"][];
+            /**
+             * Has Baseline
+             * @default false
+             */
+            has_baseline: boolean;
+            /**
+             * Has Material Changes
+             * @default false
+             */
+            has_material_changes: boolean;
+            /** Report Type */
+            report_type?: string | null;
+            /** Risk Changes */
+            risk_changes?: components["schemas"]["AnalysisListChangePayload"][];
+            /** Score Changes */
+            score_changes?: components["schemas"]["AnalysisValueChangePayload"][];
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Target Query Id */
+            target_query_id?: string | null;
+            /** Target Record Id */
+            target_record_id: number;
+        };
+        /** AnalysisListChangePayload */
+        AnalysisListChangePayload: {
+            /** Added */
+            added?: string[];
+            /**
+             * Added Total
+             * @default 0
+             */
+            added_total: number;
+            /** Field */
+            field: string;
+            /**
+             * Output Truncated
+             * @default false
+             */
+            output_truncated: boolean;
+            /** Removed */
+            removed?: string[];
+            /**
+             * Removed Total
+             * @default 0
+             */
+            removed_total: number;
+            /** Unchanged */
+            unchanged?: string[];
+            /**
+             * Unchanged Total
+             * @default 0
+             */
+            unchanged_total: number;
+        };
+        /**
          * AnalysisReport
          * @description 完整分析报告
          * @example {
@@ -4263,6 +4521,28 @@ export interface components {
              * @description 诊断 trace ID
              */
             trace_id?: string | null;
+        };
+        /** AnalysisValueChangePayload */
+        AnalysisValueChangePayload: {
+            /** Base Value */
+            base_value?: string | number | boolean | null;
+            /**
+             * Comparable
+             * @default true
+             */
+            comparable: boolean;
+            /** Delta */
+            delta?: string | number | boolean | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "changed" | "unavailable";
+            /** Field */
+            field: string;
+            /** Target Value */
+            target_value?: string | number | boolean | null;
+            unavailability?: components["schemas"]["ValueUnavailabilityPayload"] | null;
         };
         /**
          * AnalyzeRequest
@@ -4971,6 +5251,59 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+        };
+        /** ConfigComponentDiff */
+        ConfigComponentDiff: {
+            /** Base Value */
+            base_value?: string | null;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /** Key */
+            key: string;
+            /** Target Value */
+            target_value?: string | null;
+        };
+        /** ConfigFingerprintDiff */
+        ConfigFingerprintDiff: {
+            /**
+             * Base Complete
+             * @default false
+             */
+            base_complete: boolean;
+            /** Base Fingerprint */
+            base_fingerprint?: string | null;
+            /** Base Missing Keys */
+            base_missing_keys?: string[];
+            /**
+             * Comparison Status
+             * @default unknown
+             * @enum {string}
+             */
+            comparison_status: "identical" | "different" | "unknown";
+            /** Components */
+            components?: components["schemas"]["ConfigComponentDiff"][];
+            /**
+             * Has Differences
+             * @default false
+             */
+            has_differences: boolean;
+            /**
+             * Identical
+             * @default false
+             */
+            identical: boolean;
+            /**
+             * Target Complete
+             * @default false
+             */
+            target_complete: boolean;
+            /** Target Fingerprint */
+            target_fingerprint?: string | null;
+            /** Target Missing Keys */
+            target_missing_keys?: string[];
         };
         /**
          * ConfigPresetApplyRequest
@@ -8631,8 +8964,11 @@ export interface components {
             max_exclusive: number;
             /** Min Inclusive */
             min_inclusive: number;
-            /** Name */
-            name: string;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "healthy" | "fair" | "caution" | "poor";
         };
         /** PortfolioHealthDataQuality */
         PortfolioHealthDataQuality: {
@@ -8651,8 +8987,52 @@ export interface components {
             risk_metrics_status?: string | null;
             /** Snapshot Data Quality */
             snapshot_data_quality?: string | null;
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial" | "empty" | "unavailable";
+        };
+        /** PortfolioHealthDimension */
+        PortfolioHealthDimension: {
+            /** Formula */
+            formula?: string | null;
+            /** Input */
+            input?: {
+                [key: string]: number;
+            };
+            /** Reason */
+            reason?: string | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+            /** Status Message */
+            status_message?: string | null;
+        };
+        /** PortfolioHealthDimensions */
+        PortfolioHealthDimensions: {
+            cash_ratio: components["schemas"]["PortfolioHealthDimension"];
+            concentration: components["schemas"]["PortfolioHealthDimension"];
+            diversification: components["schemas"]["PortfolioHealthDimension"];
+            pnl: components["schemas"]["PortfolioHealthDimension"];
+            risk_exposure: components["schemas"]["PortfolioHealthDimension"];
+        };
+        /** PortfolioHealthEffectiveWeights */
+        PortfolioHealthEffectiveWeights: {
+            /** Cash Ratio */
+            cash_ratio?: number | null;
+            /** Concentration */
+            concentration?: number | null;
+            /** Diversification */
+            diversification?: number | null;
+            /** Pnl */
+            pnl?: number | null;
+            /** Risk Exposure */
+            risk_exposure?: number | null;
         };
         /** PortfolioHealthInputs */
         PortfolioHealthInputs: {
@@ -8692,15 +9072,15 @@ export interface components {
             metric?: string | null;
             /**
              * Severity
-             * @description 'info' or 'warning'
+             * @enum {string}
              */
-            severity: string;
+            severity: "info" | "warning";
             /**
              * Source
-             * @description 'rule' or 'rule+llm_polish' — LLM never changes score fields
              * @default rule
+             * @enum {string}
              */
-            source: string;
+            source: "rule" | "rule+llm_polish";
             /** Symbol */
             symbol?: string | null;
             /** Threshold */
@@ -8708,77 +9088,143 @@ export interface components {
             /** Value */
             value?: number | null;
         };
+        /** PortfolioHealthProvenance */
+        PortfolioHealthProvenance: {
+            /**
+             * Calculated At
+             * Format: date-time
+             */
+            calculated_at: string;
+            /** Config Hash */
+            config_hash: string;
+            /** Fx Provenance */
+            fx_provenance?: {
+                [key: string]: unknown;
+            };
+            /** Price Provenance */
+            price_provenance?: {
+                [key: string]: unknown;
+            };
+            /** Risk Hash */
+            risk_hash: string;
+            /** Risk History */
+            risk_history?: {
+                [key: string]: unknown;
+            };
+            /** Snapshot Hash */
+            snapshot_hash: string;
+        };
+        /** PortfolioHealthResolvedConfig */
+        PortfolioHealthResolvedConfig: {
+            /** Cash High Alert Pct */
+            cash_high_alert_pct: number;
+            /** Cash Low Alert Pct */
+            cash_low_alert_pct: number;
+            /** Concentration Alert Pct */
+            concentration_alert_pct: number;
+            /** Diversification Alert */
+            diversification_alert: number;
+            /** Pnl Loss Alert Pct */
+            pnl_loss_alert_pct: number;
+            /**
+             * Source
+             * @constant
+             */
+            source: "shared_config";
+            /** Var Alert Pct */
+            var_alert_pct: number;
+            weights: components["schemas"]["PortfolioHealthWeights"];
+        };
         /** PortfolioHealthResponse */
         PortfolioHealthResponse: {
             /** Account Id */
             account_id?: number | null;
-            /** As Of */
-            as_of: string;
             /**
-             * Band
-             * @description 'healthy' | 'fair' | 'caution' | 'poor'
+             * As Of
+             * Format: date
              */
-            band?: string | null;
+            as_of: string;
+            /** Band */
+            band?: ("healthy" | "fair" | "caution" | "poor") | null;
             /** Bands */
             bands?: components["schemas"]["PortfolioHealthBand"][];
-            /** Cost Method */
-            cost_method: string;
+            /** Comparable */
+            comparable: boolean;
+            config: components["schemas"]["PortfolioHealthResolvedConfig"];
+            /**
+             * Cost Method
+             * @enum {string}
+             */
+            cost_method: "fifo" | "avg";
+            /** Coverage Ratio */
+            coverage_ratio: number;
             /** Currency */
             currency: string;
             data_quality: components["schemas"]["PortfolioHealthDataQuality"];
-            /** Dimensions */
-            dimensions?: {
-                [key: string]: unknown;
-            };
+            dimensions: components["schemas"]["PortfolioHealthDimensions"];
             /** Disclaimer */
             disclaimer: string;
-            /** Effective Weights */
-            effective_weights?: {
-                [key: string]: number;
-            };
+            effective_weights: components["schemas"]["PortfolioHealthEffectiveWeights"];
             /**
              * Formula Version
-             * @default portfolio_health_v1
+             * @default portfolio_health_v2
+             * @constant
              */
-            formula_version: string;
+            formula_version: "portfolio_health_v2";
             inputs: components["schemas"]["PortfolioHealthInputs"];
             /** Insights */
             insights?: components["schemas"]["PortfolioHealthInsight"][];
             /**
              * Llm Can Modify Score
-             * @description Hard contract flag; always false
              * @default false
+             * @constant
              */
-            llm_can_modify_score: boolean;
+            llm_can_modify_score: false;
+            /**
+             * Partial Score
+             * @description Fixed-denominator diagnostic estimate. Missing dimensions contribute zero; never compare this value with complete daily scores.
+             */
+            partial_score?: number | null;
             /**
              * Persisted
              * @default false
              */
             persisted: boolean;
+            provenance: components["schemas"]["PortfolioHealthProvenance"];
             /**
              * Score
-             * @description Deterministic 0-100 health score; null when unscorable
+             * @description Comparable deterministic score; null for incomplete coverage.
              */
             score?: number | null;
             /**
              * Score Source
-             * @description Always 'rules' — LLM cannot modify the score
              * @default rules
+             * @constant
              */
-            score_source: string;
+            score_source: "rules";
             /**
              * Status
-             * @description 'ok', 'partial', 'empty_portfolio', or 'unavailable'
+             * @enum {string}
              */
-            status: string;
+            status: "ok" | "partial" | "empty_portfolio" | "unavailable";
             /** Status Message */
             status_message?: string | null;
             /** Unavailable Dimensions */
-            unavailable_dimensions?: string[];
-            /** Weights */
-            weights?: {
-                [key: string]: number;
-            };
+            unavailable_dimensions?: ("concentration" | "risk_exposure" | "diversification" | "pnl" | "cash_ratio")[];
+            weights: components["schemas"]["PortfolioHealthWeights"];
+        };
+        /** PortfolioHealthWeights */
+        PortfolioHealthWeights: {
+            /** Cash Ratio */
+            cash_ratio: number;
+            /** Concentration */
+            concentration: number;
+            /** Diversification */
+            diversification: number;
+            /** Pnl */
+            pnl: number;
+            /** Risk Exposure */
+            risk_exposure: number;
         };
         /** PortfolioHistoricalVaRBlock */
         PortfolioHistoricalVaRBlock: {
@@ -9264,6 +9710,26 @@ export interface components {
             /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
         };
+        /** ReportFieldDiff */
+        ReportFieldDiff: {
+            /** Base Value */
+            base_value?: string | null;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /** Field */
+            field: string;
+            /**
+             * Severity
+             * @default none
+             * @enum {string}
+             */
+            severity: "major" | "moderate" | "minor" | "none" | "unknown";
+            /** Target Value */
+            target_value?: string | null;
+        };
         /**
          * ReportMeta
          * @description 报告元信息
@@ -9556,6 +10022,145 @@ export interface components {
              * @description 趋势预测
              */
             trend_prediction?: string | null;
+        };
+        /**
+         * ReportVersionCompareResponse
+         * @description Compare two selected analysis runs for one symbol.
+         */
+        ReportVersionCompareResponse: {
+            base_run: components["schemas"]["ReportVersionRunItem"];
+            config_diff: components["schemas"]["ConfigFingerprintDiff"];
+            /** @description T17 AnalysisDelta projection when the comparison engine is available */
+            delta?: components["schemas"]["AnalysisDeltaPayload"] | null;
+            /**
+             * Engine Status
+             * @description Whether T17 compare_analyses was invoked successfully
+             * @enum {string}
+             */
+            engine_status: "ok" | "engine_pending";
+            /** Field Diffs */
+            field_diffs?: components["schemas"]["ReportFieldDiff"][];
+            /**
+             * Status
+             * @description ok: T17 delta available with baseline; engine_pending: T17 compare_analyses not wired yet; no_baseline: T17 returned has_baseline=false (distinct from no changes); incomparable: runs cannot be compared
+             * @enum {string}
+             */
+            status: "ok" | "engine_pending" | "no_baseline" | "incomparable";
+            /** Stock Code */
+            stock_code: string;
+            target_run: components["schemas"]["ReportVersionRunItem"];
+        };
+        /**
+         * ReportVersionRunItem
+         * @description One selectable analysis run for a symbol.
+         */
+        ReportVersionRunItem: {
+            /**
+             * Action
+             * @description Structured decision action taxonomy
+             */
+            action?: string | null;
+            /**
+             * Action Label
+             * @description Localized action label snapshot
+             */
+            action_label?: string | null;
+            /**
+             * Analysis Summary
+             * @description Short analysis summary
+             */
+            analysis_summary?: string | null;
+            /**
+             * Config Complete
+             * @description Whether the persisted run contains the minimum reproducibility provenance
+             * @default false
+             */
+            config_complete: boolean;
+            /**
+             * Config Components
+             * @description Human-readable configuration components that form the fingerprint
+             */
+            config_components?: {
+                [key: string]: string;
+            };
+            /**
+             * Config Fingerprint
+             * @description Short hash of configuration components used for this run
+             */
+            config_fingerprint?: string | null;
+            /**
+             * Config Missing Keys
+             * @description Required provenance keys absent from the persisted run
+             */
+            config_missing_keys?: string[];
+            /**
+             * Created At
+             * @description ISO created_at timestamp
+             */
+            created_at?: string | null;
+            /**
+             * Model Used
+             * @description Model snapshot for display only; not used for runtime routing
+             */
+            model_used?: string | null;
+            /**
+             * Operation Advice
+             * @description Legacy operation advice text
+             */
+            operation_advice?: string | null;
+            /**
+             * Query Id
+             * @description Analysis query_id (may repeat in batch runs)
+             */
+            query_id: string;
+            /**
+             * Report Language
+             * @description Report language snapshot
+             */
+            report_language?: string | null;
+            /**
+             * Report Type
+             * @description Report type snapshot
+             */
+            report_type?: string | null;
+            /**
+             * Run Id
+             * @description Stable analysis history primary key as string
+             */
+            run_id: string;
+            /**
+             * Sentiment Score
+             * @description Finite sentiment / confidence score in the supported 0-100 range
+             */
+            sentiment_score?: number | null;
+            /**
+             * Stock Code
+             * @description Display stock code
+             */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @description Stock name when available
+             */
+            stock_name?: string | null;
+            /**
+             * Trend Prediction
+             * @description Trend prediction text
+             */
+            trend_prediction?: string | null;
+        };
+        /** ReportVersionRunListResponse */
+        ReportVersionRunListResponse: {
+            /** Items */
+            items?: components["schemas"]["ReportVersionRunItem"][];
+            /** Limit */
+            limit: number;
+            /** Page */
+            page: number;
+            /** Stock Code */
+            stock_code: string;
+            /** Total */
+            total: number;
         };
         /** ResearchRequest */
         ResearchRequest: {
@@ -11892,6 +12497,124 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValueUnavailabilityPayload */
+        ValueUnavailabilityPayload: {
+            /** Base */
+            base?: string | null;
+            /** Target */
+            target?: string | null;
+        };
+        /**
+         * WatchlistComputedAttrsSchema
+         * @description Read-only computed projection owned by T25/T26 services.
+         */
+        WatchlistComputedAttrsSchema: {
+            /** Ai Score */
+            ai_score?: number | null;
+            /** Focus */
+            focus?: boolean | null;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+        };
+        /** WatchlistGroupCreateRequest */
+        WatchlistGroupCreateRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
+            name: string;
+        };
+        /** WatchlistGroupMemberAddRequest */
+        WatchlistGroupMemberAddRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistGroupMemberMoveRequest */
+        WatchlistGroupMemberMoveRequest: {
+            /**
+             * Copy Membership
+             * @default false
+             */
+            copy_membership: boolean;
+            /** Expected Revision */
+            expected_revision: number;
+            /** Source Group Id */
+            source_group_id: string;
+            /** Stock Code */
+            stock_code: string;
+            /** Target Group Id */
+            target_group_id: string;
+            /** Target Index */
+            target_index?: number | null;
+        };
+        /** WatchlistGroupMemberReorderRequest */
+        WatchlistGroupMemberReorderRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Ordered Codes */
+            ordered_codes: string[];
+        };
+        /** WatchlistGroupMemberSchema */
+        WatchlistGroupMemberSchema: {
+            attrs?: components["schemas"]["WatchlistComputedAttrsSchema"];
+            /** Sort Order */
+            sort_order: number;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistGroupRenameRequest */
+        WatchlistGroupRenameRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
+            name: string;
+        };
+        /** WatchlistGroupReorderRequest */
+        WatchlistGroupReorderRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Ordered Ids */
+            ordered_ids: string[];
+        };
+        /** WatchlistGroupSchema */
+        WatchlistGroupSchema: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Members */
+            members?: components["schemas"]["WatchlistGroupMemberSchema"][];
+            /** Name */
+            name: string;
+            /** Name Key */
+            name_key?: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** WatchlistGroupsResponse */
+        WatchlistGroupsResponse: {
+            /** Groups */
+            groups?: components["schemas"]["WatchlistGroupSchema"][];
+            /** Message */
+            message: string;
+            /** Revision */
+            revision: number;
         };
         /**
          * WatchlistRequest
@@ -17927,11 +18650,72 @@ export interface operations {
             query?: {
                 /** @description Optional account id */
                 account_id?: number | null;
+                /** @description Snapshot date; default today */
+                as_of?: string | null;
+                cost_method?: "fifo" | "avg";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioHealthResponse"];
+                };
+            };
+            /** @description No stored daily health snapshot */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Health snapshot retrieval failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Portfolio health migration required */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refreshPortfolioHealth: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
                 /** @description As-of date; default today */
                 as_of?: string | null;
-                /** @description Cost method: fifo or avg */
-                cost_method?: string;
-                /** @description Upsert the daily snapshot (overwrite same day); set false for dry compute */
+                cost_method?: "fifo" | "avg";
+                /** @description Persist one atomic daily health upsert */
                 persist?: boolean;
             };
             header?: never;
@@ -17949,15 +18733,6 @@ export interface operations {
                     "application/json": components["schemas"]["PortfolioHealthResponse"];
                 };
             };
-            /** @description Invalid query parameters */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -17969,6 +18744,15 @@ export interface operations {
             };
             /** @description Health score computation failed */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Inputs or migration unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18666,6 +19450,152 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compareReportVersions: {
+        parameters: {
+            query: {
+                /** @description Stock code for the selected runs */
+                stock_code: string;
+                /** @description Baseline analysis history id */
+                base_run_id: string;
+                /** @description Target analysis history id */
+                target_run_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersionCompareResponse"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not authenticated when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Runs are incomparable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listReportVersionRuns: {
+        parameters: {
+            query: {
+                /** @description Stock code filter */
+                stock_code: string;
+                /** @description Page number (1-based) */
+                page?: number;
+                /** @description Page size */
+                limit?: number;
+                /** @description Optional report type filter; market_review rows are skipped when omitted */
+                report_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersionRunListResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not authenticated when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -19624,6 +20554,603 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_watchlist_groups_api_v1_stocks_watchlist_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_watchlist_group_api_v1_stocks_watchlist_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete: {
+        parameters: {
+            query: {
+                expected_revision: number;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete: {
+        parameters: {
+            query: {
+                expected_revision: number;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;

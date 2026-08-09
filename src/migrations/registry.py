@@ -49,7 +49,10 @@ from src.migrations.versions.v202608050001_backtest_resolution_notes import (
 from src.migrations.versions.v202608060001_task_queue_inflight import (
     MIGRATION as TASK_QUEUE_INFLIGHT_MIGRATION,
 )
-from src.migrations.versions.v202608090001_portfolio_health_snapshots import (
+from src.migrations.versions.v202608090001_watchlist_groups_schema import (
+    MIGRATION as WATCHLIST_GROUPS_SCHEMA_MIGRATION,
+)
+from src.migrations.versions.v202608090002_portfolio_health_snapshots import (
     MIGRATION as PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
 )
 
@@ -70,6 +73,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
         BACKTEST_RESOLUTION_NOTES_MIGRATION,
         TASK_QUEUE_INFLIGHT_MIGRATION,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION,
         PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
     )
 )
