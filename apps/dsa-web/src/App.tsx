@@ -42,6 +42,7 @@ const ResearchAnalysisWorkbenchPage = lazy(() => import('./pages/ResearchAnalysi
 const MarketReviewPage = lazy(() => import('./pages/MarketReviewPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const SkillOutcomesPage = lazy(() => import('./pages/SkillOutcomesPage'));
+const ReportVersionComparePage = lazy(() => import('./pages/ReportVersionComparePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -184,6 +185,10 @@ const routes = [
           },
           { path: APP_ROUTE_PATHS.researchBacktest, element: <BacktestPage /> },
           { path: APP_ROUTE_PATHS.researchSkillOutcomes, element: <SkillOutcomesPage /> },
+          {
+            path: APP_ROUTE_PATHS.researchReportCompare,
+            element: <ReportVersionComparePage />,
+          },
           {
             path: LEGACY_ROUTE_PATHS.decisionSignals,
             element: (
