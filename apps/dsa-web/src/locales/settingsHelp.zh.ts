@@ -1572,17 +1572,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
 
-  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
-    title: '多策略合议',
-    summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',
-    usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持 Phase-1 合成路径不变。',
-    valueNotes: [
-      '关闭时按字节级兼容保留既有合成行为。',
-      '开启后启用多策略合议与最终分歧说明。',
-    ],
-    impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
-    notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
-  },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: '投委会模式',
     summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',

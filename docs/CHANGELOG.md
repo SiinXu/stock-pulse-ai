@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Fixed] Sync Web Settings i18n inventory for local-runtime/RSS/multi-strategy help keys so the Settings lazy chunk loads in DEV/e2e and Usage deep links render English chrome and document titles.
 - [Added] Versioned watchlist AI scoring from bounded existing analysis and coherent decision signals, with strict source/time/degradation provenance and a localized independent Web column (Issue #147 / T25).
 - [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
 
