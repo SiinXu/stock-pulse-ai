@@ -10,6 +10,7 @@ import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
 import { CHART_SCENARIOS } from './chartScenarios';
+import { REPORT_VERSION_COMPARE_SCENARIOS } from './reportVersionCompareScenarios';
 
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
@@ -21,6 +22,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
   ...CHART_SCENARIOS,
+  ...REPORT_VERSION_COMPARE_SCENARIOS,
 };
 
 /**
