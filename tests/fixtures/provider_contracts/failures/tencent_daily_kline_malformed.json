@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "provider": "tencent",
+    "endpoint": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+    "failure_mode": "format_error",
+    "recorded_note": "Tencent fqkline payload with non-list qfqday and truncated rows. Offline sample 2026-08-08.",
+    "source_shape": "tests/fixtures/provider_contracts/tencent_daily_kline.json"
+  },
+  "payload": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "sz000001": {
+        "qfqday": "not-a-list",
+        "day": [
+          [
+            "only-date"
+          ],
+          [
+            "2026-05-06",
+            "10.00"
+          ]
+        ]
+      }
+    }
+  }
+}
