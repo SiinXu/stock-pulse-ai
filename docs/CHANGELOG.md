@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Agent Behavior setup presets (Simple Q&A / Standard research / Deep + governed) with progressive disclosure so the default view shows essentials only (#868).
+- [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
 - [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
 
 - [Added] Revisioned watchlist groups with pre-mutation CAS write leases, version-fenced STOCK_LIST reconciliation, failure-aware accessible controls, mobile non-drag controls, and typed score/focus projections (#189).
