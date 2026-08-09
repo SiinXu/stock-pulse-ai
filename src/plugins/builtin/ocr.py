@@ -32,8 +32,8 @@ class OcrAgentToolPlugin(Plugin):
                     "version": "1.0.0",
                     "minAppVersion": PLUGIN_APPLICATION_VERSION,
                     "description": (
-                        "Optional local Tesseract OCR Agent Tool for statements "
-                        "and screenshots (issue #196)."
+                        "Optional bounded Tesseract OCR Agent Tool that returns "
+                        "redacted, untrusted document text (issue #196)."
                     ),
                     "author": "StockPulse contributors",
                     "permissions": ["multimodal.read"],
@@ -63,7 +63,9 @@ class OcrAgentToolPlugin(Plugin):
             tool,
             metadata={
                 "builtin": True,
-                "local_only": True,
+                "image_bytes_local": True,
+                "result_egress": "redacted_tool_context",
+                "zero_remote_egress_requires": "LOCAL_ONLY_MODE=true",
                 "capability": "ocr",
             },
         )

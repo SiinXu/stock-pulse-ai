@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from src.agent.tools.ocr_tools import OCR_TOOL_NAME, build_ocr_tool, register_ocr_tools
 from src.agent.tools.registry import ToolRegistry, validate_tool_capability_contract
-from src.services.ocr_extraction_service import OcrExtractionService
+from src.services.ocr_extraction_service import OCR_SCHEMA_VERSION, OcrExtractionService
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "ocr"
 
@@ -56,9 +56,11 @@ def test_build_and_register_ocr_tool_when_enabled(tmp_path: Path) -> None:
     )
     assert names == [OCR_TOOL_NAME]
     payload = tool.handler(file_path="statement.png")
-    assert payload["schema_version"] == "ocr-extract-v1"
+    assert payload["schema_version"] == OCR_SCHEMA_VERSION
     assert payload["status"] == "available"
     assert "AAPL" in payload["text"]
+    assert payload["content"]["instructions_authoritative"] is False
+    assert payload["privacy"]["zero_remote_egress_requires"] == "LOCAL_ONLY_MODE=true"
 
 
 def test_file_root_falls_back_to_multimodal_root(tmp_path: Path) -> None:

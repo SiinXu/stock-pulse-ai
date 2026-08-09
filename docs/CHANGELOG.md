@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Added] Optional default-off offline OCR Agent Tool (`extract_image_text`) for local statement/screenshot text extraction via Tesseract, with optional `requirements-ocr.txt`, path sandbox, and docs on OCR vs multimodal Vision boundaries (#196).
+- [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
 - [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).

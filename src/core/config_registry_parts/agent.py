@@ -996,12 +996,13 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "OCR_AGENT_TOOL_ENABLED": {
         "title": "Enable Offline OCR Agent Tool",
         "description": (
-            "Opt-in local Tesseract OCR Agent Tool (issue #196). Default is off. "
+            "Opt-in bounded Tesseract OCR Agent Tool (issue #196). Default is off. "
             "When enabled with OCR_FILE_ROOT or MULTIMODAL_FILE_ROOT and optional "
             "requirements-ocr.txt + system Tesseract, Agents may call "
-            "extract_image_text after a process restart. Local only; never uploads "
-            "image bytes. Prefer for statements and dense tables; use "
-            "read_price_chart for semantic chart reading. See docs/agent-ocr-tool_EN.md."
+            "extract_image_text after a process restart. Image bytes stay local; "
+            "redacted, untrusted OCR text enters Agent context and may reach a remote "
+            "model unless LOCAL_ONLY_MODE=true. This phase is bounded raw-text "
+            "extraction, not verified table parsing. See docs/agent-ocr-tool_EN.md."
         ),
         "category": "agent",
         "data_type": "boolean",
