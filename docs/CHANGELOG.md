@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] In-app notification inbox and header bell share best-effort durable event sources, versioned occurrence identities, server read state, stable cursor pagination, source provenance, and localized Web rendering (Refs #181).
+- [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).
 - [Changed] Adopt multi-market `marketFormat` for Stock Details quote/history and history trend drawer price/change colors (CN/HK/US precision, currency, and red_up/green_up semantics; issue #889).
 - [Added] Web report Decision Card view pins verdict/confidence/risks/watch conditions above evidence strata (default collapsed) across page, panel, and drawer report surfaces (#874).
 - [Added] Report three modes (brief/standard/research) with hard length limits, existing Decision Card integration, and explicit truncation notices for Jinja reports (#861 Phase 2).
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Explicit proposal-only Agent planning foundation with a single limit authority, strict schema/tool validation, an unwidenable public step cap, projectability-guaranteed acceptance, one projected-string contract that makes the advisory boundary unforgeable and every accepted plan UTF-8 encodable, interruptible planner deadlines, truthful retry evidence, cancellation fencing, sanitized metadata, and no production runtime hook (refs #199).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
+- [Changed] Wire zero-config first success into Home, lead FirstRunWizard and bilingual Quick Start with the local path, and cover the no-key demo report in browser E2E (Refs #796).
 - [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.
 - [Fixed] Report→Chat Stop and disconnect handling now uses durable turn acknowledgements, exact-session reconciliation, and idempotent turn IDs so persisted prompts are not restored or submitted twice.
 - [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
