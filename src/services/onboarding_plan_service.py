@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from src.core.config_secret_keys import is_secret_config_key
 from src.report_language import SUPPORTED_REPORT_LANGUAGES
 from src.services.demo_analysis_fixture import build_demo_analysis
 from src.services.local_runtime_detect import (
@@ -86,9 +87,6 @@ REPORT_LANGUAGES = frozenset(SUPPORTED_REPORT_LANGUAGES)
 
 FEATURE_STAGES = ("L0", "L1", "L2", "L3")
 
-_SECRET_KEY_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-_SECRET_KEY_SUFFIXES = ("_EXTRA_HEADERS",)
-_SECRET_KEY_EXACT = frozenset({"LITELLM_CONFIG"})
 
 # Seed symbols used only when STOCK_LIST is empty (never overwrite a user list).
 _MARKET_SEED_SYMBOLS: Dict[str, str] = {
@@ -179,19 +177,6 @@ class OnboardingSecretRejectedError(OnboardingPlanError):
 
     error_code = "onboarding_secret_rejected"
 
-
-def is_secret_config_key(key: str) -> bool:
-    """Return True when a config key must never be written by onboarding."""
-    normalized = str(key or "").strip().upper()
-    if not normalized:
-        return True
-    if normalized in _SECRET_KEY_EXACT:
-        return True
-    if any(normalized.endswith(suffix) for suffix in _SECRET_KEY_SUFFIXES):
-        return True
-    if any(marker in normalized for marker in _SECRET_KEY_MARKERS):
-        return True
-    return False
 
 
 def is_fresh_environment(

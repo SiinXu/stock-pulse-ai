@@ -18,6 +18,7 @@ from src.config import (
     AGENT_MAX_STEPS_DEFAULT,
     DEFAULT_ALPHASIFT_INSTALL_SPEC,
 )
+from src.core.config_secret_keys import is_sensitive_config_key_name
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
@@ -329,8 +330,8 @@ def build_schema_response() -> Dict[str, Any]:
 
 
 def _is_sensitive_key(key: str) -> bool:
-    markers = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-    return key.endswith("_EXTRA_HEADERS") or any(marker in key for marker in markers)
+    """Infer whether an unregistered config key carries a secret value."""
+    return is_sensitive_config_key_name(key)
 
 
 def _infer_category(key: str) -> str:

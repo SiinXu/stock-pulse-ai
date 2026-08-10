@@ -10,14 +10,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Tuple
 
+from src.core.config_secret_keys import is_secret_config_key
+
 
 PROFILE_API_VERSION = "stockpulse/v1"
 PROFILE_KIND = "Profile"
 MAX_PROFILE_YAML_BYTES = 256 * 1024
 
-_SECRET_KEY_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-_SECRET_KEY_SUFFIXES = ("_EXTRA_HEADERS",)
-_SECRET_KEY_EXACT = frozenset({"LITELLM_CONFIG"})
 
 PROFILE_EXPORT_KEY_ALLOWLIST = frozenset(
     {
@@ -51,19 +50,6 @@ PROFILE_EXPORT_KEY_ALLOWLIST = frozenset(
     }
 )
 
-
-def is_secret_config_key(key: str) -> bool:
-    """Return True when a config key must never enter a profile YAML."""
-    normalized = str(key or "").strip().upper()
-    if not normalized:
-        return True
-    if normalized in _SECRET_KEY_EXACT:
-        return True
-    if any(normalized.endswith(suffix) for suffix in _SECRET_KEY_SUFFIXES):
-        return True
-    if any(marker in normalized for marker in _SECRET_KEY_MARKERS):
-        return True
-    return False
 
 
 def is_exportable_config_key(key: str) -> bool:
