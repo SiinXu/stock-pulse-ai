@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909 and PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories. Locale budgets record the deterministic output of current main plus the DCF, screening-state, and what-if translations with 60-75 bytes of headroom; unchanged assets retain the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, and locale chunks enlarged by the Notifications hub, screening-state, and what-if translations. Locale caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -25,50 +25,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 131675,
-      "measuredGzipBytes": 131613
+      "maxGzipBytes": 133032,
+      "measuredGzipBytes": 132832,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 125650,
-      "measuredGzipBytes": 125577
+      "maxGzipBytes": 126943,
+      "measuredGzipBytes": 126743,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 125575,
-      "measuredGzipBytes": 125512
+      "maxGzipBytes": 126859,
+      "measuredGzipBytes": 126659,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 125850,
-      "measuredGzipBytes": 125786
+      "maxGzipBytes": 127148,
+      "measuredGzipBytes": 126948,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 121800,
-      "measuredGzipBytes": 121736
+      "maxGzipBytes": 123101,
+      "measuredGzipBytes": 122901,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 119350,
-      "measuredGzipBytes": 119275
+      "maxGzipBytes": 120564,
+      "measuredGzipBytes": 120364,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 112650,
-      "measuredGzipBytes": 112590
+      "maxGzipBytes": 113839,
+      "measuredGzipBytes": 113639,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 112800,
-      "measuredGzipBytes": 112729
+      "maxGzipBytes": 113989,
+      "measuredGzipBytes": 113789,
+      "note": "Tight rebaseline for Notifications hub, screening-state, and what-if translations; retains 200 bytes of headroom."
     },
     {
       "id": "vendor-charts",
