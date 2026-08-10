@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
+import { formatUiText } from '../i18n/uiText';
+import type { NotificationInboxItem } from '../types/notificationInbox';
 
 export const NOTIFICATION_CENTER_TEXT = createUiLanguageRecord(
   'locales.notificationCenter.NOTIFICATION_CENTER_TEXT',
@@ -28,13 +30,7 @@ export const NOTIFICATION_CENTER_TEXT = createUiLanguageRecord(
       open: '打开',
       read: '已读',
       unread: '未读',
-      analysisCompleteTitle: '分析完成：{label}',
-      alertTriggeredTitle: '告警触发：{target}',
-      scheduledTaskResultTitle: '调度任务结果：{taskId}',
-      decisionSignalTitle: '决策信号：{label}',
-      partialSourceWarning: '部分通知来源暂时不可用，当前列表可能不完整。',
       loadMore: '加载更多',
-      loadingMore: '正在加载',
     },
     en: {
       title: 'Notification Center',
@@ -59,13 +55,25 @@ export const NOTIFICATION_CENTER_TEXT = createUiLanguageRecord(
       open: 'Open',
       read: 'Read',
       unread: 'Unread',
-      analysisCompleteTitle: 'Analysis complete: {label}',
-      alertTriggeredTitle: 'Alert triggered: {target}',
-      scheduledTaskResultTitle: 'Scheduled task result: {taskId}',
-      decisionSignalTitle: 'Decision signal: {label}',
-      partialSourceWarning: 'Some notification sources are temporarily unavailable. This list may be incomplete.',
       loadMore: 'Load more',
-      loadingMore: 'Loading',
     },
   } as const,
 );
+
+type NotificationCenterText = (typeof NOTIFICATION_CENTER_TEXT)[keyof typeof NOTIFICATION_CENTER_TEXT];
+
+export function formatNotificationInboxTitle(
+  item: Pick<NotificationInboxItem, 'titleKey' | 'titleParams'>,
+  text: NotificationCenterText,
+): string {
+  if (item.titleKey === 'analysisCompleteTitle') {
+    return formatUiText(`${text.kindAnalysis}: {label}`, item.titleParams);
+  }
+  if (item.titleKey === 'alertTriggeredTitle') {
+    return formatUiText(`${text.kindAlert}: {target}`, item.titleParams);
+  }
+  if (item.titleKey === 'scheduledTaskResultTitle') {
+    return formatUiText(`${text.kindScheduled}: {taskId}`, item.titleParams);
+  }
+  return formatUiText(`${text.kindSignal}: {label}`, item.titleParams);
+}

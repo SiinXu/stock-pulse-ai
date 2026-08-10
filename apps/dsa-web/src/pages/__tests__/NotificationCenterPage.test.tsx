@@ -192,7 +192,7 @@ describe('NotificationCenterPage', () => {
     renderPage();
 
     expect(await screen.findByTestId('notification-center-partial-source')).toHaveTextContent(
-      'Some notification sources are temporarily unavailable',
+      'Some notifications are temporarily unavailable.',
     );
     expect(screen.getByTestId('notification-center-empty')).toBeInTheDocument();
   });

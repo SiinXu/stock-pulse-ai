@@ -6,7 +6,10 @@ import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications';
 import { formatUiText } from '../../i18n/uiText';
-import { NOTIFICATION_CENTER_TEXT } from '../../locales/notificationCenter';
+import {
+  formatNotificationInboxTitle,
+  NOTIFICATION_CENTER_TEXT,
+} from '../../locales/notificationCenter';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import type { NotificationInboxItem } from '../../types/notificationInbox';
@@ -42,7 +45,7 @@ function NotificationKindIcon({ kind }: { kind: NotificationInboxItem['kind'] })
 function NotificationRow({ item, close }: { item: NotificationInboxItem; close: () => void }) {
   const { language } = useUiLanguage();
   const text = NOTIFICATION_CENTER_TEXT[language];
-  const title = formatUiText(text[item.titleKey], item.titleParams);
+  const title = formatNotificationInboxTitle(item, text);
   return (
     <Link
       to={item.href}

@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, and only locale chunks enlarged by the Notifications hub's genuine translations; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting plus the notification inbox scenario, and only locale chunks enlarged by genuine Notifications hub and inbox translations; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -32,9 +32,9 @@
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 126365,
-      "measuredGzipBytes": 126165,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 127046,
+      "measuredGzipBytes": 126846,
+      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ko",
@@ -46,16 +46,16 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 125911,
-      "measuredGzipBytes": 125711,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 126510,
+      "measuredGzipBytes": 126310,
+      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 121757,
-      "measuredGzipBytes": 121557,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 122510,
+      "measuredGzipBytes": 122310,
+      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-zh-TW",
@@ -67,15 +67,16 @@
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 112483,
-      "measuredGzipBytes": 102257
+      "maxGzipBytes": 113346,
+      "measuredGzipBytes": 113146,
+      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 112828,
-      "measuredGzipBytes": 112628,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 113552,
+      "measuredGzipBytes": 113352,
+      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "vendor-charts",
@@ -129,9 +130,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57000,
-      "measuredGzipBytes": 56827,
-      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
+      "maxGzipBytes": 57230,
+      "measuredGzipBytes": 57030,
+      "note": "Measured after lazy scenario splitting and the notification inbox registration; retains 200 bytes of headroom."
     },
     {
       "id": "SettingsPage",

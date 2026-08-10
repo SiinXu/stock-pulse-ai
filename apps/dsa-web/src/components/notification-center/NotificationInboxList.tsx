@@ -3,8 +3,10 @@
 import { Activity, Bell, CheckCheck, FlaskConical, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { formatUiText } from '../../i18n/uiText';
-import { NOTIFICATION_CENTER_TEXT } from '../../locales/notificationCenter';
+import {
+  formatNotificationInboxTitle,
+  NOTIFICATION_CENTER_TEXT,
+} from '../../locales/notificationCenter';
 import type { NotificationInboxItem } from '../../types/notificationInbox';
 import { cn } from '../../utils/cn';
 import { formatUiDateTime } from '../../utils/uiLocale';
@@ -52,8 +54,7 @@ export function NotificationInboxList({
     <ul className="divide-y divide-border rounded-xl border border-border bg-card" data-testid="notification-center-list">
       {items.map((item) => {
         const Icon = kindIcon(item.kind);
-        const titleTemplate = text[item.titleKey];
-        const title = formatUiText(titleTemplate, item.titleParams);
+        const title = formatNotificationInboxTitle(item, text);
         return (
           <li
             key={item.id}

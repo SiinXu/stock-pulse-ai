@@ -18,6 +18,7 @@ import { NotificationInboxList } from '../components/notification-center';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import { NOTIFICATION_CENTER_TEXT } from '../locales/notificationCenter';
+import { NOTIFICATIONS_TEXT } from '../locales/notifications';
 import type {
   NotificationInboxItem,
   NotificationInboxKind,
@@ -37,6 +38,7 @@ const KIND_OPTIONS: Array<{ value: '' | NotificationInboxKind; labelKey: keyof t
 const NotificationCenterPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const text = NOTIFICATION_CENTER_TEXT[language];
+  const notificationText = NOTIFICATIONS_TEXT[language];
   const [pageData, setPageData] = useState<NotificationInboxPage | null>(null);
   const [items, setItems] = useState<NotificationInboxItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +204,7 @@ const NotificationCenterPage: React.FC = () => {
           role="status"
           data-testid="notification-center-partial-source"
         >
-          {text.partialSourceWarning}
+          {notificationText.partialUnavailable}
         </div>
       ) : null}
 
@@ -229,7 +231,7 @@ const NotificationCenterPage: React.FC = () => {
                 disabled={loadingMore}
               >
                 <RefreshCw className={loadingMore ? 'size-4 animate-spin' : 'size-4'} aria-hidden="true" />
-                {loadingMore ? text.loadingMore : text.loadMore}
+                {loadingMore ? t('common.loading') : text.loadMore}
               </Button>
             </div>
           ) : null}
