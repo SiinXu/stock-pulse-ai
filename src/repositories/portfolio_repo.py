@@ -957,6 +957,49 @@ class PortfolioRepository:
                     identities.append(identity)
             return identities
 
+    def list_cached_positions(
+        self,
+        *,
+        account_id: Optional[int] = None,
+        cost_method: str = "fifo",
+    ) -> List[Dict[str, Any]]:
+        """Read the latest persisted position cache without replaying or writing."""
+        method = str(cost_method or "").strip().lower()
+        if method not in {"fifo", "avg"}:
+            raise ValueError("cost_method must be fifo or avg")
+        with self.db.get_session() as session:
+            query = (
+                select(PortfolioPosition)
+                .join(PortfolioAccount, PortfolioPosition.account_id == PortfolioAccount.id)
+                .where(
+                    PortfolioPosition.quantity > 0,
+                    PortfolioPosition.cost_method == method,
+                    PortfolioAccount.is_active.is_(True),
+                )
+            )
+            if account_id is not None:
+                query = query.where(PortfolioPosition.account_id == account_id)
+            rows = session.execute(
+                query.order_by(
+                    PortfolioPosition.account_id.asc(),
+                    PortfolioPosition.market.asc(),
+                    PortfolioPosition.symbol.asc(),
+                    PortfolioPosition.id.asc(),
+                )
+            ).scalars().all()
+            return [
+                {
+                    "account_id": int(row.account_id),
+                    "symbol": row.symbol,
+                    "market": row.market,
+                    "quantity": row.quantity,
+                    "market_value_base": row.market_value_base,
+                    "last_price": row.last_price,
+                    "updated_at": row.updated_at,
+                }
+                for row in rows
+            ]
+
     # ------------------------------------------------------------------
     # Snapshot / position cache
     # ------------------------------------------------------------------
