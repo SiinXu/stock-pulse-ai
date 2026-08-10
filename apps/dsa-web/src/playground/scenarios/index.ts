@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, lazy, type ReactNode } from 'react';
 import { PLAYGROUND_CATALOG } from '../catalog';
 import type { PlaygroundScenarioRenderer } from '../types';
 import { ALERT_HISTORY_SCENARIOS } from './alertHistoryScenarios';
@@ -9,8 +9,16 @@ import { SETTINGS_SCENARIOS } from './settingsScenarios';
 import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
-import { VALUATION_SCENARIOS } from './valuationScenarios';
 import { REPORT_VERSION_COMPARE_SCENARIOS } from './reportVersionCompareScenarios';
+
+const LazyDcfSensitivityPanelStory = lazy(async () => {
+  const module = await import('./valuationScenarios');
+  return { default: module.VALUATION_SCENARIOS['dcf-sensitivity-panel'] };
+});
+
+const VALUATION_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'dcf-sensitivity-panel': () => createElement(LazyDcfSensitivityPanelStory),
+};
 
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,

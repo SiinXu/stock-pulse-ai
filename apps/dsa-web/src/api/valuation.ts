@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import apiClient from './index';
-import { createApiError } from './error';
+import { createApiError, getParsedApiError } from './error';
 import { toCamelCase } from './utils';
 
 const sensitivityRowSchema = z.object({
@@ -64,6 +64,6 @@ export async function estimateStockValuation(params: ValuationEstimateParams): P
     });
     return valuationEstimateSchema.parse(toCamelCase(response.data) as unknown);
   } catch (error) {
-    throw createApiError(error);
+    throw createApiError(getParsedApiError(error), { cause: error });
   }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import {
   estimateStockValuation,
   type ValuationEstimate,
@@ -66,6 +66,12 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const text = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
+  const formId = useId();
+  const stockCodeId = `${formId}-stock-code`;
+  const growthRateId = `${formId}-growth-rate`;
+  const discountRateId = `${formId}-discount-rate`;
+  const terminalGrowthId = `${formId}-terminal-growth`;
+  const projectionYearsId = `${formId}-projection-years`;
   const [estimate, setEstimate] = useState<ValuationEstimate | null>(initialEstimate ?? null);
   const [stockCode, setStockCode] = useState(initialStockCode || initialEstimate?.stockCode || '');
   const initialAssumptions = readAssumptions(initialEstimate);
@@ -187,8 +193,9 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
             data-testid="dcf-assumptions-form"
             aria-label={text.assumptions}
           >
-            <Field label={text.stockCode}>
+            <Field controlId={stockCodeId} label={text.stockCode}>
               <input
+                id={stockCodeId}
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={stockCode}
                 onChange={(event) => setStockCode(event.target.value)}
@@ -196,8 +203,10 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
                 data-testid="dcf-stock-code"
               />
             </Field>
-            <Field label={text.growthRate} hint={text.percentHint}>
+            <Field controlId={growthRateId} label={text.growthRate} hint={text.percentHint} hintId={`${growthRateId}-hint`}>
               <input
+                id={growthRateId}
+                aria-describedby={`${growthRateId}-hint`}
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={growthRate}
                 onChange={(event) => setGrowthRate(event.target.value)}
@@ -205,8 +214,10 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
                 data-testid="dcf-growth-rate"
               />
             </Field>
-            <Field label={text.discountRate} hint={text.percentHint}>
+            <Field controlId={discountRateId} label={text.discountRate} hint={text.percentHint} hintId={`${discountRateId}-hint`}>
               <input
+                id={discountRateId}
+                aria-describedby={`${discountRateId}-hint`}
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={discountRate}
                 onChange={(event) => setDiscountRate(event.target.value)}
@@ -214,8 +225,10 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
                 data-testid="dcf-discount-rate"
               />
             </Field>
-            <Field label={text.terminalGrowth} hint={text.percentHint}>
+            <Field controlId={terminalGrowthId} label={text.terminalGrowth} hint={text.percentHint} hintId={`${terminalGrowthId}-hint`}>
               <input
+                id={terminalGrowthId}
+                aria-describedby={`${terminalGrowthId}-hint`}
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={terminalGrowth}
                 onChange={(event) => setTerminalGrowth(event.target.value)}
@@ -223,8 +236,9 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
                 data-testid="dcf-terminal-growth"
               />
             </Field>
-            <Field label={text.projectionYears}>
+            <Field controlId={projectionYearsId} label={text.projectionYears}>
               <input
+                id={projectionYearsId}
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
                 value={projectionYears}
                 onChange={(event) => setProjectionYears(event.target.value)}
@@ -233,7 +247,7 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
               />
             </Field>
             <div className="flex items-end">
-              <Button type="button" onClick={() => void handleRecompute()} disabled={loading} data-testid="dcf-recompute">
+              <Button variant="primary" type="button" onClick={() => void handleRecompute()} disabled={loading} data-testid="dcf-recompute">
                 {loading ? text.recomputing : text.recompute}
               </Button>
             </div>

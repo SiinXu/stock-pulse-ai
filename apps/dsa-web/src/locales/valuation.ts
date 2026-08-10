@@ -69,7 +69,7 @@ const en = {
   noEstimate: 'No valuation estimate provided',
 } as const;
 
-export type ValuationText = typeof en;
+export type ValuationText = { readonly [Key in keyof typeof en]: string };
 
 /** Bilingual copy for the DCF sensitivity panel (zh source + en; other UI langs fall back to en). */
 export const VALUATION_TEXT: Record<UiLanguage, ValuationText> = {
