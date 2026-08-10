@@ -146,12 +146,20 @@ export const TodaysFocusPanel: React.FC<TodaysFocusPanelProps> = ({
   const isEmpty = !isLoading && !error && (data?.status === 'empty' || items.length === 0);
 
   return (
-    <Surface className="p-4" data-testid="todays-focus-panel">
+    <Surface
+      as="section"
+      level="interactive"
+      padding="md"
+      aria-labelledby="todays-focus-heading"
+      data-testid="todays-focus-panel"
+    >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Focus className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-foreground">{t('home.todaysFocus.title')}</h2>
+            <h2 id="todays-focus-heading" className="text-base font-semibold text-foreground">
+              {t('home.todaysFocus.title')}
+            </h2>
           </div>
           <p className="mt-1 text-xs text-secondary-text">{t('home.todaysFocus.subtitle')}</p>
         </div>

@@ -3,7 +3,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity,
   ArrowRight,
   BellRing,
   CalendarClock,
@@ -20,6 +19,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { historyApi } from '../api/history';
 import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
+import { getTodaysFocus } from '../api/todaysFocus';
 import type { ParsedApiError } from '../api/error';
 import { parseApiError } from '../api/error';
 import {
@@ -35,6 +35,7 @@ import {
 } from '../components/common';
 import {
   HomeReadinessCard,
+  TodaysFocusPanel,
   getBrowserTimezone,
   getScheduledTaskStatusPresentation,
   getScheduledTaskTypeLabel,
@@ -59,8 +60,7 @@ import type {
   ScheduledTaskTodayItem,
 } from '../types/scheduledTasks';
 import type { SetupStatusResponse } from '../types/systemConfig';
-import { buildDecisionActionLabelMap } from '../utils/decisionAction';
-import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
+import type { TodaysFocusResponse } from '../types/todaysFocus';
 import { buildDeepLink } from '../utils/deepLink';
 import { formatDateTime } from '../utils/format';
 import {
@@ -93,7 +93,6 @@ function writeHomeConfigurableExpanded(expanded: boolean): void {
 
 
 const SIGNAL_PAGE_SIZE = 12;
-const FOCUS_ITEM_LIMIT = 3;
 const RECENT_ANALYSIS_LIMIT = 4;
 const REASSESSMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const STOCK_REPORT_TYPES: readonly StockReportType[] = ['simple', 'detailed', 'full', 'brief'];
@@ -226,6 +225,10 @@ const HomePage: React.FC = () => {
   const [configurableExpanded, setConfigurableExpanded] = useState(
     readHomeConfigurableExpanded,
   );
+  const todaysFocusRequestIdRef = useRef(0);
+  const [todaysFocusData, setTodaysFocusData] = useState<TodaysFocusResponse | null>(null);
+  const [todaysFocusLoading, setTodaysFocusLoading] = useState(true);
+  const [todaysFocusError, setTodaysFocusError] = useState<ParsedApiError | null>(null);
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.home,
     headingRef: pageHeadingRef,
@@ -247,6 +250,28 @@ const HomePage: React.FC = () => {
     applyAttentionData(result);
   }, [applyAttentionData]);
 
+  const loadTodaysFocus = useCallback(async () => {
+    const requestId = todaysFocusRequestIdRef.current + 1;
+    todaysFocusRequestIdRef.current = requestId;
+    setTodaysFocusLoading(true);
+    setTodaysFocusError(null);
+    try {
+      const response = await getTodaysFocus({
+        language: language === 'zh' ? 'zh' : 'en',
+      });
+      if (todaysFocusRequestIdRef.current !== requestId) return;
+      setTodaysFocusData(response);
+    } catch (error) {
+      if (todaysFocusRequestIdRef.current !== requestId) return;
+      setTodaysFocusData(null);
+      setTodaysFocusError(parseApiError(error));
+    } finally {
+      if (todaysFocusRequestIdRef.current === requestId) {
+        setTodaysFocusLoading(false);
+      }
+    }
+  }, [language]);
+
   useEffect(() => {
     document.title = t('home.pageTitle');
   }, [t]);
@@ -261,6 +286,13 @@ const HomePage: React.FC = () => {
       requestIdRef.current += 1;
     };
   }, [applyAttentionData]);
+
+  useEffect(() => {
+    void loadTodaysFocus();
+    return () => {
+      todaysFocusRequestIdRef.current += 1;
+    };
+  }, [loadTodaysFocus]);
 
   const loadSetupStatus = useCallback(async () => {
     setSetupStatusLoading(true);
@@ -298,11 +330,6 @@ const HomePage: React.FC = () => {
     };
   }, []);
 
-  const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
-  const focusSignals = useMemo(
-    () => data.activeSignals.slice(0, FOCUS_ITEM_LIMIT),
-    [data.activeSignals],
-  );
   const latestMarketReview = data.latestMarketReview;
   const lastSuccessSignal = useMemo(() => {
     if (isLoading || !availability.recentAnalyses) return null;
@@ -348,7 +375,8 @@ const HomePage: React.FC = () => {
     setIsLoading(true);
     void loadAttentionData();
     void loadSetupStatus();
-  }, [loadAttentionData, loadSetupStatus]);
+    void loadTodaysFocus();
+  }, [loadAttentionData, loadSetupStatus, loadTodaysFocus]);
 
   const analysisHref = buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
@@ -432,64 +460,14 @@ const HomePage: React.FC = () => {
       {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
           avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
       <div data-testid="home-core-blocks" className="grid min-w-0 gap-4 xl:grid-cols-3">
-        <Section
-          title={t('home.todayFocus')}
-          description={t('home.todayFocusDescription')}
-          level="interactive"
-          padding="md"
-          actions={<Activity className="h-5 w-5 text-primary" aria-hidden="true" />}
-        >
-          {isLoading ? (
-            <StatePanel state="loading" title={t('common.loading')} size="compact" />
-          ) : !availability.activeSignals ? (
-            <StatePanel
-              state="error"
-              title={t('home.partialDataTitle')}
-              description={t('home.partialDataMessage')}
-              action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
-              size="compact"
-              titleAs="p"
-            />
-          ) : focusSignals.length > 0 ? (
-            <div className="divide-y divide-border/70">
-              {focusSignals.map((item) => {
-                const presentation = getDecisionSignalPresentation(item, actionLabels);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:text-primary"
-                    onClick={() => navigate(buildSignalCenterHref({
-                      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
-                      stock: item.stockCode,
-                    }))}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-foreground">
-                        {item.stockName || item.stockCode}
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-secondary-text">
-                        {presentation.label} · {item.stockCode}
-                      </span>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState
-              compact
-              title={t('home.noFocusTitle')}
-              description={t('home.noFocusDescription')}
-              action={(
-                <Button variant="primary" size="default" onClick={() => navigate(analysisHref)}>
-                  {t('home.startAnalysisTitle')}
-                </Button>
-              )}
-            />
-          )}
-        </Section>
+                <TodaysFocusPanel
+          data={todaysFocusData}
+          isLoading={todaysFocusLoading}
+          error={todaysFocusError}
+          onRefresh={() => { void loadTodaysFocus(); }}
+          onSelectSymbol={(code) => navigate(`/stocks/${encodeURIComponent(code)}`)}
+          t={t}
+        />
 
         <Section
           title={t('home.todos')}
