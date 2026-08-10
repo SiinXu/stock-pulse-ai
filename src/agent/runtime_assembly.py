@@ -301,6 +301,29 @@ def get_tool_registry():
             level=logging.WARNING,
         )
 
+    # Optional earnings-transcript tool (issue #253 remaining): default-off.
+    # Separate module/name from OCR (T29) and PDF/chart multimodal tools.
+    try:
+        from src.agent.tools.earnings_transcript_tools import (
+            build_earnings_transcript_tools,
+        )
+        from src.application_services import get_application_services
+
+        transcript_tools = build_earnings_transcript_tools(
+            get_application_services().config
+        )
+        if transcript_tools:
+            for tool_def in transcript_tools:
+                registry.register(tool_def)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
+        log_safe_exception(
+            logger,
+            "Optional earnings transcript tool registration skipped",
+            exc,
+            error_code="earnings_transcript_tool_registration_failed",
+            level=logging.WARNING,
+        )
+
     # Optional valuation tool (issue #238): default-off, registered only when enabled.
     try:
         from src.agent.tools.valuation_tools import (
