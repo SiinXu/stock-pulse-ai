@@ -1552,24 +1552,29 @@ class PortfolioService:
 
             if price_info.is_available:
                 local_market_value = qty * float(last_price)
-                market_base, stale_market, _ = self._convert_amount(
+                market_conversion = self._convert_amount_with_provenance(
                     amount=local_market_value,
                     from_currency=currency,
                     to_currency=account.base_currency,
                     as_of_date=as_of_date,
                 )
-                cost_base, stale_cost, _ = self._convert_amount(
+                cost_conversion = self._convert_amount_with_provenance(
                     amount=total_cost,
                     from_currency=currency,
                     to_currency=account.base_currency,
                     as_of_date=as_of_date,
                 )
+                market_base = float(market_conversion["converted_amount"])
+                cost_base = float(cost_conversion["converted_amount"])
+                stale_market = bool(market_conversion["is_stale"])
+                stale_cost = bool(cost_conversion["is_stale"])
                 unrealized_base = market_base - cost_base
                 fx_stale = fx_stale or stale_market or stale_cost
             else:
                 market_base = 0.0
                 cost_base = 0.0
                 unrealized_base = 0.0
+                market_conversion = None
 
             unrealized_pct = None
             if abs(cost_base) > EPS:
@@ -1585,6 +1590,34 @@ class PortfolioService:
                     "total_cost": round(total_cost, 8),
                     "last_price": round(float(last_price), 8),
                     "market_value_base": round(market_base, 8),
+                    "valuation_fx_rate_to_account_base": (
+                        round(float(market_conversion["rate"]), 12)
+                        if market_conversion is not None
+                        else None
+                    ),
+                    "valuation_fx_rate_source": (
+                        str(market_conversion["source"])
+                        if market_conversion is not None
+                        else None
+                    ),
+                    "valuation_fx_rate_method": (
+                        str(market_conversion["method"])
+                        if market_conversion is not None
+                        else None
+                    ),
+                    "valuation_fx_as_of": (
+                        market_conversion["rate_date"].isoformat()
+                        if (
+                            market_conversion is not None
+                            and market_conversion.get("rate_date") is not None
+                        )
+                        else None
+                    ),
+                    "valuation_fx_stale": (
+                        bool(market_conversion["is_stale"])
+                        if market_conversion is not None
+                        else False
+                    ),
                     "unrealized_pnl_base": round(unrealized_base, 8),
                     "unrealized_pnl_pct": round(unrealized_pct, 8) if unrealized_pct is not None else None,
                     "valuation_currency": account.base_currency,
@@ -1924,12 +1957,47 @@ class PortfolioService:
         to_currency: str,
         as_of_date: date,
     ) -> Tuple[float, bool, str]:
+        provenance = self._convert_amount_with_provenance(
+            amount=amount,
+            from_currency=from_currency,
+            to_currency=to_currency,
+            as_of_date=as_of_date,
+        )
+        return (
+            float(provenance["converted_amount"]),
+            bool(provenance["is_stale"]),
+            str(provenance["method"]),
+        )
+
+    def _convert_amount_with_provenance(
+        self,
+        *,
+        amount: float,
+        from_currency: str,
+        to_currency: str,
+        as_of_date: date,
+    ) -> Dict[str, Any]:
+        """Convert an amount and retain the exact cached-rate provenance."""
         from_norm = self._normalize_currency(from_currency)
         to_norm = self._normalize_currency(to_currency)
         if abs(amount) <= EPS:
-            return 0.0, False, "zero"
+            return {
+                "converted_amount": 0.0,
+                "rate": 1.0,
+                "is_stale": False,
+                "method": "zero",
+                "source": "not_applicable",
+                "rate_date": None,
+            }
         if from_norm == to_norm:
-            return float(amount), False, "identity"
+            return {
+                "converted_amount": float(amount),
+                "rate": 1.0,
+                "is_stale": False,
+                "method": "identity",
+                "source": "identity",
+                "rate_date": None,
+            }
 
         direct = self.repo.get_latest_fx_rate(
             from_currency=from_norm,
@@ -1937,7 +2005,15 @@ class PortfolioService:
             as_of=as_of_date,
         )
         if direct is not None and direct.rate > 0:
-            return float(amount) * float(direct.rate), bool(direct.is_stale), "direct_rate"
+            rate = float(direct.rate)
+            return {
+                "converted_amount": float(amount) * rate,
+                "rate": rate,
+                "is_stale": bool(direct.is_stale),
+                "method": "direct_rate",
+                "source": str(direct.source or "unknown"),
+                "rate_date": direct.rate_date,
+            }
 
         inverse = self.repo.get_latest_fx_rate(
             from_currency=to_norm,
@@ -1945,10 +2021,25 @@ class PortfolioService:
             as_of=as_of_date,
         )
         if inverse is not None and inverse.rate > 0:
-            return float(amount) / float(inverse.rate), bool(inverse.is_stale), "inverse_rate"
+            rate = 1.0 / float(inverse.rate)
+            return {
+                "converted_amount": float(amount) * rate,
+                "rate": rate,
+                "is_stale": bool(inverse.is_stale),
+                "method": "inverse_rate",
+                "source": str(inverse.source or "unknown"),
+                "rate_date": inverse.rate_date,
+            }
 
         # P0 fallback: keep pipeline available even when FX cache is missing.
-        return float(amount), True, "fallback_1_to_1"
+        return {
+            "converted_amount": float(amount),
+            "rate": 1.0,
+            "is_stale": True,
+            "method": "fallback_1_to_1",
+            "source": "fallback",
+            "rate_date": None,
+        }
 
     def convert_amount(
         self,
@@ -1960,6 +2051,22 @@ class PortfolioService:
     ) -> Tuple[float, bool, str]:
         """Public conversion entry for cross-service consumers."""
         return self._convert_amount(
+            amount=amount,
+            from_currency=from_currency,
+            to_currency=to_currency,
+            as_of_date=as_of_date,
+        )
+
+    def convert_amount_with_provenance(
+        self,
+        *,
+        amount: float,
+        from_currency: str,
+        to_currency: str,
+        as_of_date: date,
+    ) -> Dict[str, Any]:
+        """Public conversion entry with rate source, date, method, and quality."""
+        return self._convert_amount_with_provenance(
             amount=amount,
             from_currency=from_currency,
             to_currency=to_currency,

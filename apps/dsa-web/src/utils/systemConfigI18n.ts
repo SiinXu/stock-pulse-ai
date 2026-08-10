@@ -290,6 +290,7 @@ const fieldTitleMapZh = {
   PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT: '投资组合健康度低现金预警阈值（%）',
   PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT: '投资组合健康度高现金预警阈值（%）',
   PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT: '投资组合健康度亏损预警阈值（%）',
+  PORTFOLIO_STRESS_SCENARIOS_PATH: '组合压力测试情景目录',
   LOCAL_ONLY_MODE: '仅本地模式',
 
 } as const;
@@ -541,6 +542,7 @@ const fieldTitleMapEn = {
   PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT: 'Portfolio Health Low Cash Alert (%)',
   PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT: 'Portfolio Health High Cash Alert (%)',
   PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT: 'Portfolio Health PnL Loss Alert (%)',
+  PORTFOLIO_STRESS_SCENARIOS_PATH: 'Portfolio Stress Scenario Catalog',
   LOCAL_ONLY_MODE: 'Local Only Mode',
 
 } satisfies Record<SystemConfigFieldTitleKey, string>;
