@@ -2940,7 +2940,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.screening.SCREENING_TEXT.marketCn": "Actions A",
   "locales.screening.SCREENING_TEXT.missingFields": "Champs manquants :{fields}",
   "locales.screening.SCREENING_TEXT.name": "Nom",
-  "locales.screening.SCREENING_TEXT.neverRunDescription": "Choisissez une stratégie, puis lancez le screening.",
+  "locales.screening.SCREENING_TEXT.neverRunDescription": "Lancez AlphaSift.",
   "locales.screening.SCREENING_TEXT.neverRunTitle": "Le screening n’a pas encore été exécuté",
   "locales.screening.SCREENING_TEXT.noCachedHotspots": "Pas de points chauds mis en cache. Développez cette section et rafraîchissez pour récupérer des données en temps réel.",
   "locales.screening.SCREENING_TEXT.noCandidateSummary": "AlphaSift A renvoyé ce candidat sans résumé écrit. Examinez ci-dessous les facteurs, les risques et les champs bruts.",
