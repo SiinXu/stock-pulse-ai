@@ -330,7 +330,9 @@ describe('StockDetailsPage', () => {
 
     renderPage('600519');
 
-    expect(await screen.findByTestId('stock-details-dcf-section')).toBeInTheDocument();
+    const section = await screen.findByTestId('stock-details-dcf-section');
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveAttribute('aria-label', 'DCF sensitivity');
     expect(screen.getByTestId('dcf-sensitivity-panel')).toBeInTheDocument();
     expect(screen.getByTestId('dcf-stock-code')).toHaveValue('600519');
   });
