@@ -41,6 +41,7 @@ from api.v1.endpoints import (
     stocks,
     system_config,
     usage,
+    valuation,
     watchlist_scores,
     watchlist_groups,
 )
@@ -110,6 +111,12 @@ router.include_router(
     watchlist_groups.router,
     prefix="/stocks",
     tags=["Stocks"],
+)
+
+router.include_router(
+    valuation.router,
+    prefix="/valuation",
+    tags=["Valuation"],
 )
 
 router.include_router(
