@@ -271,6 +271,39 @@ class HistoryService:
             )
             raise
 
+    def search_history(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """Return a bounded set of history summaries matching a literal query."""
+        normalized_query = str(query or "").strip()
+        if len(normalized_query) < 3:
+            raise HistoryValidationError("History search query must contain at least 3 characters")
+        bounded_limit = max(1, min(int(limit), 10))
+        records = self.db.search_analysis_history(normalized_query, bounded_limit)
+        items = []
+        for record in records:
+            summary = self._first_present(
+                record.get("analysis_summary"),
+                record.get("operation_advice"),
+                record.get("trend_prediction"),
+            )
+            if summary:
+                summary = " ".join(str(summary).split())
+                if len(summary) > 240:
+                    summary = f"{summary[:237].rstrip()}..."
+            created_at = record.get("created_at")
+            items.append({
+                "id": record.get("id"),
+                "stock_code": str(record.get("stock_code") or ""),
+                "stock_name": record.get("stock_name"),
+                "report_type": record.get("report_type"),
+                "summary": summary,
+                "created_at": (
+                    self._serialize_created_at(created_at)
+                    if isinstance(created_at, datetime)
+                    else str(created_at) if created_at is not None else None
+                ),
+            })
+        return items
+
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:
         if value is None:
