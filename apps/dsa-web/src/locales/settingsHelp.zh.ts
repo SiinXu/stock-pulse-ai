@@ -1322,6 +1322,43 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['除非明确要求切换版本，否则保持默认。'],
   },
   // ------------------------------------------------------------------
+  // 技术指标周期（Issue #172）
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: '均线周期',
+    summary: '趋势分析使用的均线周期列表（交易日，默认 5,10,20,60）。',
+    usage: '留空使用历史默认值。可追加 120/250 等长周期用于长线趋势。历史取数窗口会随最长周期自动放宽。',
+    valueNotes: [
+      '每个周期须为正整数，上限 500。',
+      '配置周期按真实 MA 标签写入 ma_by_period 与类型化指标快照。',
+      '可用 K 线不足时该均线返回空并标注数据不足，不会用更短周期静默顶替。',
+    ],
+    impact: ['影响趋势判定、乖离率、支撑判断与报告中的均线数值。'],
+    notes: ['在数据充足时，默认配置与改造前行为一致。'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD 周期',
+    summary: 'MACD 快线/慢线/信号线 EMA 周期（默认 12/26/9）。',
+    usage: 'INDICATOR_MACD_FAST 必须小于 INDICATOR_MACD_SLOW；信号线为 DEA 平滑周期。',
+    valueNotes: [
+      '标准设置为 12/26/9；更短周期更灵敏但噪声更大。',
+      '显式非法值在进程启动与 Settings 保存时都会按同一规则拒绝。',
+    ],
+    impact: ['影响 MACD DIF/DEA/柱体及综合评分中的 MACD 分量。'],
+    notes: ['除非有意更换 MACD 口径，否则保持默认。'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI 周期',
+    summary: 'RSI 周期列表（默认 6,12,24）。',
+    usage: '配置值按真实 RSI 标签输出；第二个值（仅配置一个时为第一个）用于超买超卖主判定。',
+    valueNotes: [
+      '周期须为正整数，上限 250。',
+      'RSI 使用 Wilder/SMMA 平滑，与告警路径 RSI 一致。',
+    ],
+    impact: ['影响 RSI 数值及趋势分析中的超买超卖评分。'],
+    notes: ['兼容字段 rsi_6/rsi_12/rsi_24 始终表示对应的真实历史周期，不按位置改名。'],
+  },
+  // ------------------------------------------------------------------
   // Report configuration
   // ------------------------------------------------------------------
   'settings.report.REPORT_SUMMARY_ONLY': {

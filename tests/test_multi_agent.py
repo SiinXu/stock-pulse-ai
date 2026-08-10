@@ -1882,7 +1882,13 @@ class TestOrchestratorExecution(unittest.TestCase):
                 result = orch.chat("hello", "session-1")
 
         self.assertTrue(result.success)
-        add_user_message.assert_called_once_with("session-1", "hello", None)
+        add_user_message.assert_called_once_with(
+            "session-1",
+            "hello",
+            None,
+            turn_id=None,
+            context={},
+        )
         add_message.assert_called_once_with("session-1", "assistant", "assistant reply")
 
     def test_chat_persists_failure_message(self):

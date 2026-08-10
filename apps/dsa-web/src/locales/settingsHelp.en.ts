@@ -1293,6 +1293,43 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Keep the default unless instructed to switch versions.'],
   },
   // ------------------------------------------------------------------
+  // Technical indicator periods (Issue #172)
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: 'Moving Average Periods',
+    summary: 'Comma-separated MA periods in trading days used by trend analysis (default 5,10,20,60).',
+    usage: 'Leave empty for historical defaults. Add longer horizons such as 120 or 250 for long-term trend context. The analysis history window expands automatically to cover the longest configured period.',
+    valueNotes: [
+      'Each value must be a positive integer up to 500.',
+      'Configured periods appear under their exact MA labels in ma_by_period and the typed indicator snapshot.',
+      'When bars are fewer than a period, that MA is omitted and annotated as insufficient data (no silent shorter-period substitute).',
+    ],
+    impact: ['Affects trend classification, bias ratios, support checks, and report MA values.'],
+    notes: ['Defaults preserve pre-configuration MA behavior when enough history is available.'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD Periods',
+    summary: 'MACD fast, slow, and signal EMA periods (default 12/26/9).',
+    usage: 'INDICATOR_MACD_FAST must be less than INDICATOR_MACD_SLOW. Signal is the DEA smoothing period.',
+    valueNotes: [
+      'Standard settings are 12/26/9; shorter pairs react faster but are noisier.',
+      'Explicit invalid values are rejected consistently at process start and by Settings validation.',
+    ],
+    impact: ['Affects MACD DIF/DEA/histogram and derived buy/sell scoring.'],
+    notes: ['Keep defaults unless you intentionally change the MACD convention.'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI Periods',
+    summary: 'Comma-separated RSI periods (default 6,12,24).',
+    usage: 'Configured values are exposed under their exact RSI labels. The second value (or first when only one is configured) drives RSI status thresholds.',
+    valueNotes: [
+      'Periods must be positive integers up to 250.',
+      'RSI uses Wilder/SMMA smoothing, consistent with alert-path RSI.',
+    ],
+    impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
+    notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
+  },
+  // ------------------------------------------------------------------
   // Report configuration
   // ------------------------------------------------------------------
   'settings.report.REPORT_SUMMARY_ONLY': {

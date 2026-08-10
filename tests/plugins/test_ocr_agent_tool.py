@@ -47,6 +47,7 @@ def test_plugin_registers_agent_tool_when_ready(tmp_path: Path) -> None:
     registry = ToolRegistry()
     manager = PluginManager(application_version="3.26.3", registry=build_agent_tool_extension_registry(registry))
     plugin = OcrAgentToolPlugin(_config(tmp_path, enabled=True), service_factory=factory, require_engine_at_register=False)
+    assert plugin.manifest.permissions == ("multimodal:read",)
     assert manager.register(plugin, source="builtin").success is True
     assert manager.load(plugin.manifest.id).success is True
     tool = registry.get(OCR_TOOL_NAME)
