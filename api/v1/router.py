@@ -19,6 +19,7 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    calculators,
     capabilities,
     config_profiles,
     decision_signals,
@@ -32,6 +33,7 @@ from api.v1.endpoints import (
     onboarding,
     portfolio,
     portfolio_risk_metrics,
+    report_version_compare,
     scheduled_tasks,
     scorecard,
     security_audit,
@@ -39,6 +41,8 @@ from api.v1.endpoints import (
     stocks,
     system_config,
     usage,
+    watchlist_scores,
+    watchlist_groups,
 )
 
 # Create v1 main route.
@@ -76,9 +80,28 @@ router.include_router(
 )
 
 router.include_router(
+    report_version_compare.router,
+    prefix="/report-version-compare",
+    tags=["ReportVersionCompare"],
+)
+
+router.include_router(
     stocks.router,
     prefix="/stocks",
     tags=["Stocks"]
+)
+
+
+router.include_router(
+    watchlist_scores.router,
+    prefix="/watchlist",
+    tags=["Watchlist"],
+)
+
+router.include_router(
+    watchlist_groups.router,
+    prefix="/stocks",
+    tags=["Stocks"],
 )
 
 router.include_router(
@@ -109,6 +132,12 @@ router.include_router(
     portfolio_risk_metrics.router,
     prefix="/portfolio",
     tags=["Portfolio"]
+)
+
+router.include_router(
+    calculators.router,
+    prefix="/calculators",
+    tags=["Calculators"],
 )
 
 router.include_router(

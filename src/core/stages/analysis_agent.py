@@ -168,7 +168,13 @@ class _AgentAnalysisStageMixin:
             if chip_data:
                 initial_context["chip_distribution"] = self._safe_to_dict(chip_data)
             if trend_result:
-                initial_context["trend_result"] = self._safe_to_dict(trend_result)
+                from data_provider.data_validation import project_technical_indicators
+
+                initial_context["trend_result"] = project_technical_indicators(
+                    trend_result,
+                    market=get_market_for_stock(normalize_stock_code(code)),
+                    stock_code=code,
+                )
 
             active_stage = observe_pipeline_stage(
                 "intelligence",
