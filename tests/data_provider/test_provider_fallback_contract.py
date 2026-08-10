@@ -125,6 +125,7 @@ def test_builtin_daily_provider_market_support_inventory() -> None:
         "LongbridgeFetcher": {"hk", "us"},
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
+        "CryptoCoingeckoFetcher": {"crypto"},
     }
     assert _DAILY_MARKET_FETCHER_SUPPORT == expected
 
