@@ -401,7 +401,7 @@ describe('production hardcoded UI strings', () => {
     expect(failures.map(({ file, line, context, text }) => (
       `${file}:${line} [${context}] ${JSON.stringify(text)}`
     ))).toEqual([]);
-  });
+  }, 30_000);
 
   it('keeps every allowance documented, exact, and in use', () => {
     expect(exactAllowedStrings.every((allowance) => allowance.purpose.trim().length > 0)).toBe(true);

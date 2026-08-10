@@ -802,4 +802,456 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
     },
+
+    # --- Cryptocurrency market data (CoinGecko; default off) ---
+    "CRYPTO_PROVIDER_ENABLED": {
+        "title": "Enable Crypto Provider",
+        "description": (
+            "When true, newly created production data managers register the "
+            "CoinGecko crypto provider for crypto:TICKER identities. Default "
+            "false leaves equity paths unchanged. See docs/crypto-market-support.md."
+        ),
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 80,
+        "help_key": "settings.data_source.CRYPTO_PROVIDER_ENABLED",
+        "examples": [
+            "CRYPTO_PROVIDER_ENABLED=false",
+            "CRYPTO_PROVIDER_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Cryptocurrency market support",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/crypto-market-support.md",
+            },
+        ],
+    },
+    "COINGECKO_API_PLAN": {
+        "title": "CoinGecko API Plan",
+        "description": (
+            "Authentication mode for CoinGecko: keyless (public, no key), demo "
+            "(demo key + official public origin), or pro (pro key + pro origin). "
+            "Invalid values fall back to keyless at load time."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "keyless",
+        "options": ["keyless", "demo", "pro"],
+        "validation": {"enum": ["keyless", "demo", "pro"]},
+        "display_order": 81,
+        "help_key": "settings.data_source.COINGECKO_API_PLAN",
+        "examples": [
+            "COINGECKO_API_PLAN=keyless",
+            "COINGECKO_API_PLAN=demo",
+            "COINGECKO_API_PLAN=pro",
+        ],
+        "docs": [
+            {
+                "label": "Cryptocurrency market support",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/crypto-market-support.md",
+            },
+        ],
+    },
+    "COINGECKO_API_KEY": {
+        "title": "CoinGecko API Key",
+        "description": (
+            "Optional CoinGecko Demo or Pro API key. Leave empty in keyless mode. "
+            "Credentials are never sent to custom COINGECKO_API_BASE origins."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {},
+        "display_order": 82,
+        "help_key": "settings.data_source.COINGECKO_API_KEY",
+        "examples": [
+            "COINGECKO_API_KEY=",
+            "COINGECKO_API_KEY=CG-xxxxxxxx",
+        ],
+        "docs": [
+            {
+                "label": "Cryptocurrency market support",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/crypto-market-support.md",
+            },
+        ],
+        "warning_codes": ["secret_value"],
+    },
+    "COINGECKO_API_BASE": {
+        "title": "CoinGecko API Base URL",
+        "description": (
+            "Optional custom HTTPS base for CoinGecko in keyless mode only. "
+            "Demo and Pro always use official origins; credentials are never "
+            "sent to a custom base."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "item_type": "url",
+            "allowed_schemes": ["https"],
+        },
+        "display_order": 83,
+        "help_key": "settings.data_source.COINGECKO_API_BASE",
+        "examples": [
+            "COINGECKO_API_BASE=",
+            "COINGECKO_API_BASE=https://api.coingecko.com/api/v3",
+        ],
+        "docs": [
+            {
+                "label": "Cryptocurrency market support",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/crypto-market-support.md",
+            },
+            {
+                "label": "出站 HTTP 安全策略",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md",
+            },
+        ],
+    },
+    "CRYPTO_COINGECKO_PRIORITY": {
+        "title": "CoinGecko Crypto Provider Priority",
+        "description": (
+            "Priority for the CoinGecko crypto market-data provider among "
+            "crypto-market sources. Lower numbers are tried earlier. Default 10. "
+            "Does not reorder equity daily or realtime providers."
+        ),
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10",
+        "options": [],
+        "validation": {"min": 0, "max": 99},
+        "display_order": 84,
+        "help_key": "settings.data_source.CRYPTO_COINGECKO_PRIORITY",
+        "examples": [
+            "CRYPTO_COINGECKO_PRIORITY=10",
+        ],
+        "docs": [
+            {
+                "label": "Cryptocurrency market support",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/crypto-market-support.md",
+            },
+        ],
+    },
+    "PROVIDER_MARKET_DATA_MODE": {
+        "title": "Provider Market Data Mode",
+        "description": (
+            "Manager-level daily-data policy: auto (fresh local, then provider "
+            "chain, then eligible stale), local_only (complete local range only; "
+            "never enters provider/socket paths), or refresh (skip local read, "
+            "run provider chain once). Empty or unset defaults to auto. Invalid "
+            "values fail closed at configuration load. Independent of "
+            "LOCAL_ONLY_MODE (process-wide outbound HTTP gate)."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "auto",
+        "options": ["auto", "local_only", "refresh"],
+        "validation": {"enum": ["auto", "local_only", "refresh"]},
+        "display_order": 85,
+        "help_key": "settings.data_source.PROVIDER_MARKET_DATA_MODE",
+        "examples": [
+            "PROVIDER_MARKET_DATA_MODE=auto",
+            "PROVIDER_MARKET_DATA_MODE=local_only",
+            "PROVIDER_MARKET_DATA_MODE=refresh",
+        ],
+        "docs": [
+            {
+                "label": "Local-first market data",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-first-market-data_EN.md",
+            },
+        ],
+    },
+    "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS": {
+        "title": "Local-Only Cache Max Age",
+        "description": (
+            "Maximum age in seconds of a complete local daily-cache entry that "
+            "local_only mode may still serve. Older complete entries are treated "
+            "as structured offline misses. Default 2592000 (30 days). Must be "
+            "greater than zero."
+        ),
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2592000",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 1, "max": 315360000},
+        "display_order": 86,
+        "help_key": "settings.data_source.PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS",
+        "examples": [
+            "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS=2592000",
+        ],
+        "docs": [
+            {
+                "label": "Local-first market data",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-first-market-data_EN.md",
+            },
+        ],
+    },
+    "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS": {
+        "title": "Persistent Daily Cache Max Age",
+        "description": (
+            "Delete persistent daily-cache files older than this age in seconds "
+            "on read and write. Default 7776000 (90 days). Set 0 to disable "
+            "age-based deletion."
+        ),
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "7776000",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 315360000},
+        "display_order": 87,
+        "help_key": "settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS",
+        "examples": [
+            "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS=7776000",
+        ],
+        "docs": [
+            {
+                "label": "Local-first market data",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-first-market-data_EN.md",
+            },
+        ],
+    },
+    "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES": {
+        "title": "Persistent Daily Cache Max Entries",
+        "description": (
+            "Maximum number of persistent daily-cache entries retained. Oldest "
+            "entries are removed first; equal timestamps break ties by filename. "
+            "Default 512."
+        ),
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "512",
+        "options": [],
+        "validation": {"min": 1, "max": 100000},
+        "display_order": 88,
+        "help_key": "settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES",
+        "examples": [
+            "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES=512",
+        ],
+        "docs": [
+            {
+                "label": "Local-first market data",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-first-market-data_EN.md",
+            },
+        ],
+    },
+    "PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS": {
+        "title": "Daily Cache Rollover Grace Days",
+        "description": (
+            "Allow reuse of a covered local daily range across this many "
+            "calendar-day default-end-date rollovers. Default 1. Must be at "
+            "least 1."
+        ),
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "unit": "d",
+        "options": [],
+        "validation": {"min": 1, "max": 30},
+        "display_order": 89,
+        "help_key": "settings.data_source.PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS",
+        "examples": [
+            "PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS=1",
+        ],
+        "docs": [
+            {
+                "label": "Local-first market data",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-first-market-data_EN.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_ENABLED": {
+        "title": "Enable Data Validation",
+        "description": (
+            "Run the unified numeric contract for daily, realtime, fundamental, "
+            "and selected technical fields, and emit versioned diagnostic "
+            "evidence. Default true (warn-oriented). Set false to disable the "
+            "validation layer."
+        ),
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 90,
+        "help_key": "settings.data_source.DATA_VALIDATION_ENABLED",
+        "examples": [
+            "DATA_VALIDATION_ENABLED=true",
+            "DATA_VALIDATION_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_STRICT": {
+        "title": "Data Validation Strict Mode",
+        "description": (
+            "When true, reject provider candidates with reject-severity findings "
+            "before acceptance or cache so the existing bounded fallback loop "
+            "can try the next source. Default false."
+        ),
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 91,
+        "help_key": "settings.data_source.DATA_VALIDATION_STRICT",
+        "examples": [
+            "DATA_VALIDATION_STRICT=false",
+            "DATA_VALIDATION_STRICT=true",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_STRICT_SCOPES": {
+        "title": "Data Validation Strict Scopes",
+        "description": (
+            "Comma-separated market/instrument selectors that apply strict mode, "
+            "for example cn/equity,hk/etf,us/index. Supported instruments include "
+            "equity, etf, and index. * is a wildcard. Default */*."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "*/*",
+        "options": [],
+        "validation": {"multi_value": True, "delimiter": ","},
+        "display_order": 92,
+        "help_key": "settings.data_source.DATA_VALIDATION_STRICT_SCOPES",
+        "examples": [
+            "DATA_VALIDATION_STRICT_SCOPES=*/*",
+            "DATA_VALIDATION_STRICT_SCOPES=cn/equity,hk/etf,us/index",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_INSTRUMENT_OVERRIDES": {
+        "title": "Data Validation Instrument Overrides",
+        "description": (
+            "Comma-separated authoritative SYMBOL=instrument identities for "
+            "offshore symbols whose ETF/index type cannot be inferred safely "
+            "from the market code alone, for example SPY=etf,HK02800=etf,1306.T=etf. "
+            "Empty leaves classification to built-in rules."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"multi_value": True, "delimiter": ","},
+        "display_order": 93,
+        "help_key": "settings.data_source.DATA_VALIDATION_INSTRUMENT_OVERRIDES",
+        "examples": [
+            "DATA_VALIDATION_INSTRUMENT_OVERRIDES=",
+            "DATA_VALIDATION_INSTRUMENT_OVERRIDES=SPY=etf,HK02800=etf,1306.T=etf",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_UPPER_LAYER_MODE": {
+        "title": "Data Validation Upper-Layer Mode",
+        "description": (
+            "Final aggregated-fundamental policy: warn keeps the result and "
+            "records evidence; reject raises explicitly at that upper boundary. "
+            "This is not provider failover. Default warn. Other values normalize "
+            "to warn at load time."
+        ),
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "warn",
+        "options": ["warn", "reject"],
+        "validation": {"enum": ["warn", "reject"]},
+        "display_order": 94,
+        "help_key": "settings.data_source.DATA_VALIDATION_UPPER_LAYER_MODE",
+        "examples": [
+            "DATA_VALIDATION_UPPER_LAYER_MODE=warn",
+            "DATA_VALIDATION_UPPER_LAYER_MODE=reject",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+
 }
