@@ -333,7 +333,6 @@
     {"path":"src/services/decision_signal_service.py","scope":"<module>.DecisionSignalService._backfill_analysis_signal_from_history","caught":["Exception"],"digest":"eb51df9d467ec6cb896c0edad62e15abb759f37fb0a77397d0990234b86a8967"},
     {"path":"src/services/generation_backend_status_service.py","scope":"<module>.GenerationBackendStatusService._json_smoke_validator","caught":["Exception"],"digest":"71c058df2c785fe49529d4aeebdec48159b0c6da28a27ad54e4595ef55178aeb"},
     {"path":"src/services/generation_backend_status_service.py","scope":"<module>.GenerationBackendStatusService.smoke_test","caught":["Exception"],"digest":"d2130e8bcbb581df4749a7e998ada3fef0bce58dbbe39e8ed3dfdaa6a803b3c3"},
-    {"path":"src/services/history_comparison_service.py","scope":"<module>._record_to_signal","caught":["Exception"],"digest":"0196934e3131aa21a7e55a3225b7852e46744ef80e16cfde1f2247319719caa6"},
     {"path":"src/services/history_loader.py","scope":"<module>._bar_date","caught":["Exception"],"digest":"42b490085811c5b44dfb31a871c61307844f7ee32300b2d7e4b850767fb8e5db"},
     {"path":"src/services/history_loader.py","scope":"<module>._coerce_bar_date","caught":["Exception"],"digest":"f295a9f34e64e4348ddb75656610baf3e9661d71ee54efa910f8390e7df933a3"},
     {"path":"src/services/history_loader.py","scope":"<module>.load_history_df","caught":["Exception"],"digest":"987ea2d4c7f809bf6663fde9450b82cb21d4438d8b6fd6dc99057e6260bcd949"},
