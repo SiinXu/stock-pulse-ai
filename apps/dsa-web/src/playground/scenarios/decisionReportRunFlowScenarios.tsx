@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/common';
 import { ChatComposer } from '../../components/chat/ChatComposer';
+import { ChatSendFeedbackAlert } from '../../components/chat/ChatSendFeedback';
 import { ChatMessageList } from '../../components/chat/ChatMessageList'
 import { WhatIfScenarioPanel } from '../../components/chat/WhatIfScenarioPanel'
 import { DEFAULT_WHAT_IF_DRAFT } from '../../components/chat/whatIfScenario';
@@ -448,6 +449,25 @@ const ChatComposerStory = () => {
   );
 };
 
+const ChatSendFeedbackAlertStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const toast = scenario === 'empty'
+    ? null
+    : {
+        type: scenario === 'error' ? 'error' as const : 'success' as const,
+        message: scenario === 'error'
+          ? 'The message was not sent. Retry when the connection is restored.'
+          : 'Message sent successfully.',
+      };
+  return (
+    <ChatSendFeedbackAlert
+      toast={toast}
+      successTitle="Sent"
+      failureTitle="Send failed"
+    />
+  );
+};
+
 const ChatMessageListStory = () => {
   const { scenario } = usePlaygroundScenario();
   const t = useChatTranslate();
@@ -841,6 +861,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,
   'chat-composer': ChatComposerStory,
+  'chat-send-feedback-alert': ChatSendFeedbackAlertStory,
   'chat-message-list': ChatMessageListStory,
   'what-if-scenario-panel': WhatIfScenarioPanelStory,
   'chat-session-sidebar': ChatSessionSidebarStory,
