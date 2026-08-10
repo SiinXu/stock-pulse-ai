@@ -25,9 +25,9 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 131610,
-      "measuredGzipBytes": 131410,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 131982,
+      "measuredGzipBytes": 131782,
+      "note": "Tight Linux-CI rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-de",
@@ -39,9 +39,9 @@
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 125550,
-      "measuredGzipBytes": 125350,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 125924,
+      "measuredGzipBytes": 125724,
+      "note": "Tight Linux-CI rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-fr",
@@ -60,9 +60,9 @@
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 119284,
-      "measuredGzipBytes": 119084,
-      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 119673,
+      "measuredGzipBytes": 119473,
+      "note": "Tight Linux-CI rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ms",
@@ -130,9 +130,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57230,
-      "measuredGzipBytes": 57030,
-      "note": "Measured after lazy scenario splitting and the notification inbox registration; retains 200 bytes of headroom."
+      "maxGzipBytes": 57371,
+      "measuredGzipBytes": 57171,
+      "note": "Linux CI measurement after lazy scenario splitting and the notification inbox registration; retains 200 bytes of headroom."
     },
     {
       "id": "SettingsPage",
