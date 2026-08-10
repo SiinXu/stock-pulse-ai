@@ -9257,12 +9257,22 @@ export interface components {
             /** Currency */
             currency: string;
             /**
+             * Excluded Known Market Value
+             * @default 0
+             */
+            excluded_known_market_value: number;
+            /**
              * Excluded Position Count
              * @default 0
              */
             excluded_position_count: number;
             /** Excluded Positions */
             excluded_positions?: components["schemas"]["StressExcludedPosition"][];
+            /**
+             * Excluded Unknown Value Count
+             * @default 0
+             */
+            excluded_unknown_value_count: number;
             /**
              * Historical Replay Available
              * @default false
@@ -11357,10 +11367,14 @@ export interface components {
         };
         /** StressExcludedPosition */
         StressExcludedPosition: {
+            /** Account Base Currency */
+            account_base_currency: string;
             /** Account Id */
             account_id: number;
             /** Instrument Currency */
             instrument_currency: string;
+            /** Known Market Value */
+            known_market_value?: number | null;
             /** Limitations */
             limitations?: string[];
             /** Price Date */
@@ -11372,8 +11386,15 @@ export interface components {
              * @enum {string}
              */
             reason: "price_unavailable" | "non_positive_market_value";
+            /** Response Base Currency */
+            response_base_currency: string;
             /** Symbol */
             symbol: string;
+            /**
+             * Value Status
+             * @enum {string}
+             */
+            value_status: "known" | "unknown";
         };
         /** StressPositionImpact */
         StressPositionImpact: {
@@ -11397,11 +11418,8 @@ export interface components {
              * @enum {string}
              */
             data_quality: "ok" | "partial";
-            /**
-             * Fx As Of
-             * Format: date
-             */
-            fx_as_of: string;
+            /** Fx As Of */
+            fx_as_of?: string | null;
             /**
              * Fx Rate Method
              * @enum {string}
@@ -11451,6 +11469,19 @@ export interface components {
             stressed_market_value: number;
             /** Symbol */
             symbol: string;
+            /** Valuation Fx As Of */
+            valuation_fx_as_of?: string | null;
+            /** Valuation Fx Rate Method */
+            valuation_fx_rate_method?: ("zero" | "identity" | "direct_rate" | "inverse_rate" | "fallback_1_to_1" | "unknown") | null;
+            /** Valuation Fx Rate Source */
+            valuation_fx_rate_source?: string | null;
+            /** Valuation Fx Rate To Account Base */
+            valuation_fx_rate_to_account_base?: number | null;
+            /**
+             * Valuation Fx Stale
+             * @default false
+             */
+            valuation_fx_stale: boolean;
             /** Weight Pct */
             weight_pct: number;
         };

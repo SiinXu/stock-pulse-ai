@@ -45,6 +45,9 @@ _BUILTIN_SCENARIOS: List[Dict[str, Any]] = [
 
 _catalog_lock = threading.RLock()
 _last_good: Dict[str, tuple[int, List[Dict[str, Any]]]] = {}
+_active_catalog: Optional[List[Dict[str, Any]]] = None
+_active_requested_path = ""
+_unavailable_requested_paths: set[str] = set()
 
 
 def _bounded_text(value: Any, *, field: str, maximum: int, required: bool = False) -> str:
@@ -193,10 +196,63 @@ def load_scenarios(*, scenarios_path: Optional[str] = None) -> List[Dict[str, An
         raise ScenarioCatalogUnavailableError("Configured scenario catalog is unavailable") from exc
 
 
+def activate_scenario_catalog(
+    *, scenarios_path: Optional[str] = None
+) -> Optional[List[Dict[str, Any]]]:
+    """Validate and atomically activate configured scenarios during config load."""
+    global _active_catalog, _active_requested_path
+
+    requested_path = str(scenarios_path or "").strip()
+    try:
+        candidate = load_scenarios(scenarios_path=requested_path)
+    except ScenarioCatalogUnavailableError:
+        with _catalog_lock:
+            _unavailable_requested_paths.add(requested_path)
+            if (
+                _active_catalog is not None
+                and _active_requested_path == requested_path
+            ):
+                return deepcopy(_active_catalog)
+            return None
+    with _catalog_lock:
+        _active_catalog = deepcopy(candidate)
+        _active_requested_path = requested_path
+        _unavailable_requested_paths.discard(requested_path)
+        return deepcopy(_active_catalog)
+
+
+def active_scenarios(*, scenarios_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Return the catalog atomically warmed by the owning Config instance."""
+    requested_path = str(scenarios_path or "").strip()
+    with _catalog_lock:
+        if _active_catalog is not None and requested_path == _active_requested_path:
+            return deepcopy(_active_catalog)
+        if requested_path in _unavailable_requested_paths:
+            raise ScenarioCatalogUnavailableError(
+                "Configured scenario catalog is unavailable"
+            )
+    activated = activate_scenario_catalog(scenarios_path=requested_path)
+    if activated is None:
+        raise ScenarioCatalogUnavailableError(
+            "Configured scenario catalog is unavailable"
+        )
+    return activated
+
+
 def get_scenario(scenario_id: str, *, scenarios_path: Optional[str] = None) -> Dict[str, Any]:
     target = _bounded_text(scenario_id, field="scenario_id", maximum=64, required=True)
     scenarios = load_scenarios(scenarios_path=scenarios_path)
     for item in scenarios:
+        if item["id"] == target:
+            return deepcopy(item)
+    raise ValueError(f"Unknown scenario_id '{target}'")
+
+
+def get_active_scenario(
+    scenario_id: str, *, scenarios_path: Optional[str] = None
+) -> Dict[str, Any]:
+    target = _bounded_text(scenario_id, field="scenario_id", maximum=64, required=True)
+    for item in active_scenarios(scenarios_path=scenarios_path):
         if item["id"] == target:
             return deepcopy(item)
     raise ValueError(f"Unknown scenario_id '{target}'")

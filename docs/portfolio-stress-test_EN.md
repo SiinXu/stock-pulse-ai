@@ -27,6 +27,8 @@ Shocks are a discriminated union:
   composed position return below `-100%` are rejected.
 - Beta and sector maps contain at most 256 entries. Beta values are finite and
   bounded to `[-5, 5]`.
+- Snapshots with more than 512 position rows are rejected with a stable client
+  error before response construction.
 
 ## Built-in scenarios
 
@@ -54,8 +56,10 @@ w_i = \frac{V_i^{response}}{\sum_j V_j^{response}},\qquad
 PnL = \sum_i V_i^{response}\frac{r_i}{100}
 \]
 
-The converted position sum is reconciled to the authoritative snapshot
-`total_market_value`; a material mismatch makes the result `partial`.
+The converted position sum plus any known excluded value is reconciled to the
+authoritative snapshot `total_market_value`; a material mismatch makes the
+result `partial`. Exclusions with unavailable prices report an explicit unknown
+value count instead of treating the placeholder zero as a real valuation.
 
 Market transmission is `r_i = beta_i × market_shock`. Missing beta uses `1.0`
 and is labeled `partial`. Sector transmission applies only to caller-classified
@@ -74,15 +78,19 @@ The response includes:
 
 - snapshot hash/version and calculation timestamp;
 - scenario source/version/hash and formula version;
-- per-position account, instrument/account/response currencies, conversion
+- per-position account, instrument/account/response currencies, separate
+  instrument-to-account valuation FX and account-to-response aggregation FX
   rate/source/as-of/staleness, and price source/provider/date/staleness;
 - beta and classification source/as-of when relevant;
 - excluded held positions whose price is unavailable or valuation is not
-  positive; and
+  positive, including known excluded value and unknown-value count; and
 - snapshot limitations, quality, FX staleness, and reconciliation delta.
 
 `top_losers` contains strictly negative PnL rows and `top_winners` strictly
 positive rows. Zero-PnL rows appear in neither list; ordering is deterministic.
+Caller-supplied scalar beta and sector maps do not contain observation dates,
+so their `*_as_of` fields remain null. Identity, zero, and 1:1 fallback FX paths
+also keep `fx_as_of` null rather than copying the request date.
 
 | Status | Meaning |
 | --- | --- |
@@ -99,9 +107,11 @@ configuration registry. The catalog is limited to 256 KiB, 64 scenarios, 16
 shocks per scenario, 32 YAML alias markers, and nesting depth 8. YAML uses safe
 loading and scenario IDs override built-ins.
 
-Reload is atomic: an invalid later file keeps the last validated catalog for
-that path. If no valid catalog has loaded, the API returns a sanitized `503`
-without exposing the configured filesystem path. An unset path uses built-ins.
+Config construction validates and atomically warms the catalog before the
+stress endpoint uses it. An invalid later file keeps the last validated catalog
+for that same path. If that path has never loaded successfully, the API returns
+a sanitized `503` without exposing the configured filesystem path. An unset
+path uses built-ins.
 
 ## Deliberate limitations
 

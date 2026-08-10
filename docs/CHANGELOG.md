@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [Added] Portfolio stress-test service and read-only `/api/v1/portfolio/stress-test` endpoints with response-base valuation, strict bounded market/sector/FX/rate shocks, reproducible price/FX/scenario provenance, honest partial/unavailable states, and an atomic bounded YAML catalog (issues #158 and #210; historical replay remaining).
+- [Fixed] Bound portfolio stress snapshots to 512 rows, preserve two-stage FX provenance without fabricated dates, reconcile known and unknown excluded values, and warm configured scenario catalogs atomically.
 - [Added] Report version comparison foundation with stable history-ID selection, paginated pickers, strict typed deltas, configuration-provenance states, graded field differences, and operation-owned recovery (#188 / T18).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).
 - [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.

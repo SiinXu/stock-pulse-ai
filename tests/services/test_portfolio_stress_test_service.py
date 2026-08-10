@@ -12,10 +12,13 @@ from typing import Any, Dict
 from unittest import TestCase
 from unittest.mock import MagicMock
 
+from src.config import Config
 from src.services.portfolio_service import PortfolioService
 from src.services.portfolio_stress_scenarios import (
     MAX_CATALOG_BYTES,
     ScenarioCatalogUnavailableError,
+    active_scenarios,
+    activate_scenario_catalog,
     get_scenario,
     load_scenarios,
 )
@@ -57,6 +60,32 @@ class ScenarioCatalogTests(TestCase):
         os.utime(path, None)
         second = load_scenarios(scenarios_path=str(path))
         self.assertEqual(first, second)
+
+    def test_atomic_activation_keeps_previous_catalog_for_invalid_reload(self) -> None:
+        valid_path = self._tmp_yaml(
+            "scenarios:\n  - id: active_custom\n    shocks:\n      - factor: market\n        value_pct: -7\n"
+        )
+        first = activate_scenario_catalog(scenarios_path=str(valid_path))
+        valid_path.write_text("scenarios: [not: valid: yaml", encoding="utf-8")
+        os.utime(valid_path, None)
+        retained = activate_scenario_catalog(scenarios_path=str(valid_path))
+        self.assertEqual(retained, first)
+        self.assertEqual(
+            active_scenarios(scenarios_path=str(valid_path)), first
+        )
+
+    def test_config_construction_warms_catalog_and_reload_is_last_known_good(self) -> None:
+        path = self._tmp_yaml(
+            "scenarios:\n  - id: config_warmed\n    shocks:\n      - factor: market\n        value_pct: -6\n"
+        )
+        Config(portfolio_stress_scenarios_path=str(path))
+        first = active_scenarios(scenarios_path=str(path))
+        self.assertIn("config_warmed", {item["id"] for item in first})
+
+        path.write_text("scenarios: [not: valid: yaml", encoding="utf-8")
+        os.utime(path, None)
+        Config(portfolio_stress_scenarios_path=str(path))
+        self.assertEqual(active_scenarios(scenarios_path=str(path)), first)
 
     def test_catalog_limits_and_public_error_do_not_expose_path(self) -> None:
         path = self._tmp_yaml("x" * (MAX_CATALOG_BYTES + 1))
@@ -135,7 +164,7 @@ class PortfolioStressTestServiceTests(TestCase):
                 "is_stale": False,
                 "method": method,
                 "source": "test_fx_feed" if rate != 1.0 else "identity",
-                "rate_date": date(2026, 5, 30) if rate != 1.0 else as_of_date,
+                "rate_date": date(2026, 5, 30) if rate != 1.0 else None,
             }
 
         portfolio.convert_amount_with_provenance.side_effect = convert
@@ -172,6 +201,7 @@ class PortfolioStressTestServiceTests(TestCase):
         self.assertEqual(result["assumptions"]["formula_version"], "portfolio_stress_linear_v2")
         self.assertEqual([row["symbol"] for row in result["top_losers"]], ["AAA", "BBB"])
         self.assertEqual(result["top_winners"], [])
+        self.assertIsNone(result["position_impacts"][0]["beta_as_of"])
 
     def test_account_values_are_converted_before_weights_and_same_symbol_is_preserved(self) -> None:
         snapshot = {
@@ -208,6 +238,42 @@ class PortfolioStressTestServiceTests(TestCase):
         self.assertEqual(usd_position["fx_rate_source"], "test_fx_feed")
         self.assertEqual(usd_position["fx_rate_method"], "direct_rate")
         self.assertEqual(usd_position["fx_as_of"], date(2026, 5, 30))
+
+    def test_instrument_to_account_fx_provenance_is_preserved_separately(self) -> None:
+        position = self._position("FOREIGN", 7000, currency="USD")
+        position.update(
+            {
+                "valuation_fx_rate_to_account_base": 7.0,
+                "valuation_fx_rate_source": "cached_daily_fx",
+                "valuation_fx_rate_method": "direct_rate",
+                "valuation_fx_as_of": date(2026, 5, 29),
+                "valuation_fx_stale": True,
+            }
+        )
+        snapshot = {
+            "currency": "CNY",
+            "total_market_value": 7000,
+            "fx_stale": True,
+            "data_quality": "partial",
+            "limitations": ["stale FX"],
+            "accounts": [
+                {
+                    "account_id": 1,
+                    "base_currency": "CNY",
+                    "positions": [position],
+                }
+            ],
+        }
+        result = self._service(snapshot).run_stress_test(
+            as_of=date(2026, 6, 1), scenario_id="fx_down_5"
+        )
+        impact = result["position_impacts"][0]
+        self.assertEqual(impact["valuation_fx_rate_to_account_base"], 7.0)
+        self.assertEqual(impact["valuation_fx_rate_source"], "cached_daily_fx")
+        self.assertEqual(impact["valuation_fx_as_of"], date(2026, 5, 29))
+        self.assertTrue(impact["valuation_fx_stale"])
+        self.assertEqual(impact["fx_rate_method"], "identity")
+        self.assertIsNone(impact["fx_as_of"])
 
     def test_fx_shock_uses_instrument_currency_not_account_base(self) -> None:
         snapshot = {
@@ -251,6 +317,13 @@ class PortfolioStressTestServiceTests(TestCase):
         )
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["portfolio_pnl"], -1800)
+        self.assertTrue(
+            all(
+                item["classification_as_of"] is None
+                for item in result["position_impacts"]
+                if item["sector"] is not None
+            )
+        )
 
     def test_unavailable_price_remains_visible_and_does_not_become_empty(self) -> None:
         snapshot = {
@@ -269,6 +342,26 @@ class PortfolioStressTestServiceTests(TestCase):
         self.assertEqual(result["status"], "unavailable")
         self.assertEqual(result["excluded_position_count"], 1)
         self.assertEqual(result["excluded_positions"][0]["reason"], "price_unavailable")
+        self.assertEqual(result["excluded_unknown_value_count"], 1)
+        self.assertEqual(result["excluded_known_market_value"], 0)
+        self.assertEqual(result["excluded_positions"][0]["value_status"], "unknown")
+
+    def test_snapshot_and_direct_map_limits_fail_before_calculation(self) -> None:
+        snapshot = self._snapshot()
+        snapshot["accounts"][0]["positions"] = [
+            self._position(f"P{index}", 1) for index in range(513)
+        ]
+        service = self._service(snapshot)
+        with self.assertRaisesRegex(ValueError, "at most 512 positions"):
+            service.run_stress_test(
+                as_of=date(2026, 6, 1), scenario_id="market_down_10"
+            )
+        with self.assertRaisesRegex(ValueError, "betas must contain at most 256"):
+            service.run_stress_test(
+                as_of=date(2026, 6, 1),
+                scenario_id="market_down_10",
+                betas={f"P{index}": 1.0 for index in range(257)},
+            )
 
     def test_stale_snapshot_propagates_partial(self) -> None:
         result = self._service(self._snapshot(stale=True)).run_stress_test(

@@ -100,10 +100,26 @@ class StressPositionImpact(_StrictModel):
     response_base_currency: str = Field(min_length=3, max_length=8)
     source_market_value: float = Field(ge=0, allow_inf_nan=False)
     market_value: float = Field(ge=0, allow_inf_nan=False)
+    valuation_fx_rate_to_account_base: Optional[float] = Field(
+        default=None, gt=0, allow_inf_nan=False
+    )
+    valuation_fx_rate_source: Optional[str] = Field(default=None, max_length=80)
+    valuation_fx_rate_method: Optional[
+        Literal[
+            "zero",
+            "identity",
+            "direct_rate",
+            "inverse_rate",
+            "fallback_1_to_1",
+            "unknown",
+        ]
+    ] = None
+    valuation_fx_as_of: Optional[date] = None
+    valuation_fx_stale: bool = False
     fx_rate_to_response_base: float = Field(gt=0, allow_inf_nan=False)
     fx_rate_source: str = Field(max_length=80)
     fx_rate_method: Literal["zero", "identity", "direct_rate", "inverse_rate", "fallback_1_to_1"]
-    fx_as_of: date
+    fx_as_of: Optional[date] = None
     fx_stale: bool
     weight_pct: float = Field(ge=0, le=100, allow_inf_nan=False)
     shock_pct: float = Field(ge=-100, allow_inf_nan=False)
@@ -128,7 +144,13 @@ class StressExcludedPosition(_StrictModel):
     account_id: int
     symbol: str = Field(min_length=1, max_length=64)
     instrument_currency: str = Field(min_length=3, max_length=8)
+    account_base_currency: str = Field(min_length=3, max_length=8)
+    response_base_currency: str = Field(min_length=3, max_length=8)
     reason: Literal["price_unavailable", "non_positive_market_value"]
+    value_status: Literal["known", "unknown"]
+    known_market_value: Optional[float] = Field(
+        default=None, ge=0, allow_inf_nan=False
+    )
     price_source: Optional[str] = Field(default=None, max_length=80)
     price_date: Optional[date] = None
     limitations: List[str] = Field(default_factory=list, max_length=32)
@@ -164,6 +186,8 @@ class PortfolioStressTestResponse(_StrictModel):
     reconciliation_delta: float = Field(default=0, allow_inf_nan=False)
     positions_used: int = Field(default=0, ge=0)
     excluded_position_count: int = Field(default=0, ge=0)
+    excluded_known_market_value: float = Field(default=0, ge=0, allow_inf_nan=False)
+    excluded_unknown_value_count: int = Field(default=0, ge=0)
     excluded_positions: List[StressExcludedPosition] = Field(
         default_factory=list, max_length=512
     )

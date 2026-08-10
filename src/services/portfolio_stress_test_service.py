@@ -18,7 +18,9 @@ from src.services.portfolio_stress_scenarios import (
     FACTOR_MARKET,
     FACTOR_RATE,
     FACTOR_SECTOR,
+    active_scenarios,
     build_custom_scenario,
+    get_active_scenario,
     get_scenario,
     load_scenarios,
 )
@@ -29,6 +31,8 @@ SIMULATION_METHOD = "deterministic_factor_shock"
 FORMULA_VERSION = "portfolio_stress_linear_v2"
 SNAPSHOT_VERSION = "portfolio_snapshot_v1"
 HISTORICAL_REPLAY_AVAILABLE = False
+MAX_STRESS_POSITIONS = 512
+MAX_INPUT_MAP_ITEMS = 256
 
 
 class PortfolioStressTestService:
@@ -42,6 +46,7 @@ class PortfolioStressTestService:
         config: Optional[Config] = None,
     ) -> None:
         self.portfolio_service = portfolio_service or PortfolioService()
+        self._uses_configured_catalog = scenarios_path is None
         resolved_config = config
         if scenarios_path is None and resolved_config is None:
             resolved_config = Config.get_instance()
@@ -53,6 +58,8 @@ class PortfolioStressTestService:
         self.scenarios_path = scenarios_path if scenarios_path is not None else configured_path
 
     def list_scenarios(self) -> List[Dict[str, Any]]:
+        if self._uses_configured_catalog:
+            return active_scenarios(scenarios_path=self.scenarios_path)
         return load_scenarios(scenarios_path=self.scenarios_path)
 
     def run_stress_test(
@@ -84,6 +91,7 @@ class PortfolioStressTestService:
         )
         target_sector_norm = self._normalize_sector(target_sector)
         sector_lookup = self._normalize_sector_map(sector_map)
+        beta_map = self._normalize_float_map(betas)
         if scenario.get("requires_target_sector") and not target_sector_norm:
             raise ValueError(f"scenario '{scenario['id']}' requires target_sector")
         if any(item["factor"] == FACTOR_SECTOR for item in scenario["shocks"]):
@@ -101,18 +109,29 @@ class PortfolioStressTestService:
         response_currency = str(snapshot.get("currency") or "CNY").strip().upper()
         if not response_currency:
             raise ValueError("portfolio snapshot currency is unavailable")
+        self._validate_snapshot_position_count(snapshot)
         positions, excluded = self._extract_positions(
             snapshot=snapshot,
             response_currency=response_currency,
             as_of_date=as_of_date,
         )
         portfolio_value = sum(item["market_value"] for item in positions)
+        excluded_known_value = sum(
+            float(item["known_market_value"])
+            for item in excluded
+            if item.get("known_market_value") is not None
+        )
+        excluded_unknown_value_count = sum(
+            1 for item in excluded if item.get("known_market_value") is None
+        )
         authoritative_value = self._finite(
             snapshot.get("total_market_value") or 0.0,
             field="snapshot total_market_value",
             minimum=0.0,
         )
-        reconciliation_delta = portfolio_value - authoritative_value
+        reconciliation_delta = (
+            portfolio_value + excluded_known_value - authoritative_value
+        )
         snapshot_hash = self._snapshot_hash(snapshot)
         calculated_at = datetime.now(timezone.utc).isoformat()
         snapshot_limitations = self._bounded_strings(snapshot.get("limitations"), maximum=128)
@@ -154,6 +173,8 @@ class PortfolioStressTestService:
             "reconciliation_delta": self._rounded(reconciliation_delta),
             "positions_used": len(positions),
             "excluded_position_count": len(excluded),
+            "excluded_known_market_value": self._rounded(excluded_known_value),
+            "excluded_unknown_value_count": excluded_unknown_value_count,
             "excluded_positions": excluded,
             "simulation_method": SIMULATION_METHOD,
             "historical_replay_available": HISTORICAL_REPLAY_AVAILABLE,
@@ -187,7 +208,6 @@ class PortfolioStressTestService:
                 "concentration": compute_concentration_metrics({}),
             }
 
-        beta_map = self._normalize_float_map(betas)
         needs_beta = any(item["factor"] == FACTOR_MARKET for item in scenario["shocks"])
         needs_sector = any(item["factor"] == FACTOR_SECTOR for item in scenario["shocks"])
         missing_data: List[str] = []
@@ -242,10 +262,10 @@ class PortfolioStressTestService:
                     "beta_source": (
                         "caller_provided" if beta is not None else ("unit_default" if needs_beta else None)
                     ),
-                    "beta_as_of": as_of_date.isoformat() if beta is not None else None,
+                    "beta_as_of": None,
                     "sector": sector,
                     "classification_source": "caller_provided" if sector else None,
-                    "classification_as_of": as_of_date.isoformat() if sector else None,
+                    "classification_as_of": None,
                 }
             )
 
@@ -274,6 +294,8 @@ class PortfolioStressTestService:
         quality_reasons: List[str] = []
         if excluded:
             quality_reasons.append("excluded_positions")
+        if excluded_unknown_value_count:
+            quality_reasons.append("excluded_position_value_unknown")
         if snapshot_fx_stale:
             quality_reasons.append("snapshot_fx_stale")
         if snapshot_quality == "partial" or snapshot_limitations:
@@ -323,6 +345,10 @@ class PortfolioStressTestService:
             raise ValueError("exactly one of scenario_id or custom_shocks is required")
         if custom_shocks is not None:
             return build_custom_scenario(shocks=custom_shocks)
+        if self._uses_configured_catalog:
+            return get_active_scenario(
+                str(scenario_id), scenarios_path=self.scenarios_path
+            )
         return get_scenario(str(scenario_id), scenarios_path=self.scenarios_path)
 
     def _extract_positions(
@@ -347,12 +373,21 @@ class PortfolioStressTestService:
                     "account_id": account_id,
                     "symbol": symbol,
                     "instrument_currency": instrument_currency,
+                    "account_base_currency": account_currency,
+                    "response_base_currency": response_currency,
                     "price_source": self._optional_text(raw.get("price_source"), 80),
                     "price_date": raw.get("price_date"),
                     "limitations": limitations,
                 }
                 if not bool(raw.get("price_available", True)):
-                    excluded.append({**excluded_base, "reason": "price_unavailable"})
+                    excluded.append(
+                        {
+                            **excluded_base,
+                            "reason": "price_unavailable",
+                            "value_status": "unknown",
+                            "known_market_value": None,
+                        }
+                    )
                     continue
                 source_market_value = self._finite(
                     raw.get("market_value_base") or 0.0,
@@ -360,7 +395,14 @@ class PortfolioStressTestService:
                     minimum=0.0,
                 )
                 if source_market_value <= _EPS:
-                    excluded.append({**excluded_base, "reason": "non_positive_market_value"})
+                    excluded.append(
+                        {
+                            **excluded_base,
+                            "reason": "non_positive_market_value",
+                            "value_status": "known",
+                            "known_market_value": 0.0,
+                        }
+                    )
                     continue
                 conversion = self.portfolio_service.convert_amount_with_provenance(
                     amount=source_market_value,
@@ -374,7 +416,14 @@ class PortfolioStressTestService:
                     minimum=0.0,
                 )
                 if market_value <= _EPS:
-                    excluded.append({**excluded_base, "reason": "non_positive_market_value"})
+                    excluded.append(
+                        {
+                            **excluded_base,
+                            "reason": "non_positive_market_value",
+                            "value_status": "known",
+                            "known_market_value": self._rounded(market_value),
+                        }
+                    )
                     continue
                 fx_rate = self._finite(
                     conversion.get("rate"),
@@ -382,6 +431,29 @@ class PortfolioStressTestService:
                     minimum=_EPS,
                 )
                 position_key = f"{account_id}:{symbol}:{instrument_currency}:{position_index}"
+                valuation_rate_raw = raw.get("valuation_fx_rate_to_account_base")
+                if valuation_rate_raw is None and instrument_currency == account_currency:
+                    valuation_rate = 1.0
+                    valuation_source = "identity"
+                    valuation_method = "identity"
+                elif valuation_rate_raw is None:
+                    valuation_rate = None
+                    valuation_source = None
+                    valuation_method = None
+                else:
+                    valuation_rate = self._finite(
+                        valuation_rate_raw,
+                        field=f"{symbol} valuation FX rate",
+                        minimum=_EPS,
+                    )
+                    valuation_source = (
+                        self._optional_text(raw.get("valuation_fx_rate_source"), 80)
+                        or "unknown"
+                    )
+                    valuation_method = (
+                        self._optional_text(raw.get("valuation_fx_rate_method"), 40)
+                        or "unknown"
+                    )
                 positions.append(
                     {
                         "position_key": position_key,
@@ -392,10 +464,19 @@ class PortfolioStressTestService:
                         "response_base_currency": response_currency,
                         "source_market_value": source_market_value,
                         "market_value": market_value,
+                        "valuation_fx_rate_to_account_base": (
+                            self._rounded(valuation_rate)
+                            if valuation_rate is not None
+                            else None
+                        ),
+                        "valuation_fx_rate_source": valuation_source,
+                        "valuation_fx_rate_method": valuation_method,
+                        "valuation_fx_as_of": raw.get("valuation_fx_as_of"),
+                        "valuation_fx_stale": bool(raw.get("valuation_fx_stale")),
                         "fx_rate_to_response_base": self._rounded(fx_rate),
                         "fx_rate_source": self._optional_text(conversion.get("source"), 80) or "unknown",
                         "fx_rate_method": self._optional_text(conversion.get("method"), 40) or "unknown",
-                        "fx_as_of": conversion.get("rate_date") or as_of_date,
+                        "fx_as_of": conversion.get("rate_date"),
                         "fx_stale": bool(conversion.get("is_stale")),
                         "price_source": self._optional_text(raw.get("price_source"), 80),
                         "price_provider": self._optional_text(raw.get("price_provider"), 80),
@@ -508,24 +589,44 @@ class PortfolioStressTestService:
 
     @staticmethod
     def _normalize_float_map(raw: Optional[Mapping[str, float]]) -> Dict[str, float]:
+        if raw is not None and len(raw) > MAX_INPUT_MAP_ITEMS:
+            raise ValueError(f"betas must contain at most {MAX_INPUT_MAP_ITEMS} items")
         output: Dict[str, float] = {}
         for key, value in (raw or {}).items():
             symbol = str(key or "").strip().upper()
-            if symbol:
-                output[symbol] = PortfolioStressTestService._finite(
-                    value, field=f"beta for {symbol}", minimum=-5.0, maximum=5.0
-                )
+            if not symbol or len(symbol) > 64:
+                raise ValueError("beta symbols must contain 1-64 characters")
+            output[symbol] = PortfolioStressTestService._finite(
+                value, field=f"beta for {symbol}", minimum=-5.0, maximum=5.0
+            )
         return output
 
     @staticmethod
     def _normalize_sector_map(raw: Optional[Mapping[str, str]]) -> Dict[str, str]:
+        if raw is not None and len(raw) > MAX_INPUT_MAP_ITEMS:
+            raise ValueError(
+                f"sector_map must contain at most {MAX_INPUT_MAP_ITEMS} items"
+            )
         output: Dict[str, str] = {}
         for key, value in (raw or {}).items():
             symbol = str(key or "").strip().upper()
             sector = PortfolioStressTestService._normalize_sector(value)
-            if symbol and sector:
-                output[symbol] = sector
+            if not symbol or len(symbol) > 64:
+                raise ValueError("sector-map symbols must contain 1-64 characters")
+            if not sector or len(sector) > 80:
+                raise ValueError("sector labels must contain 1-80 characters")
+            output[symbol] = sector
         return output
+
+    @staticmethod
+    def _validate_snapshot_position_count(snapshot: Mapping[str, Any]) -> None:
+        position_count = 0
+        for account in snapshot.get("accounts", []) or []:
+            position_count += len(account.get("positions", []) or [])
+            if position_count > MAX_STRESS_POSITIONS:
+                raise ValueError(
+                    f"portfolio snapshot must contain at most {MAX_STRESS_POSITIONS} positions"
+                )
 
     @staticmethod
     def _normalize_sector(value: Optional[str]) -> Optional[str]:

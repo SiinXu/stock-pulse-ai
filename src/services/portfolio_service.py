@@ -1554,24 +1554,29 @@ class PortfolioService:
 
             if price_info.is_available:
                 local_market_value = qty * float(last_price)
-                market_base, stale_market, _ = self._convert_amount(
+                market_conversion = self._convert_amount_with_provenance(
                     amount=local_market_value,
                     from_currency=currency,
                     to_currency=account.base_currency,
                     as_of_date=as_of_date,
                 )
-                cost_base, stale_cost, _ = self._convert_amount(
+                cost_conversion = self._convert_amount_with_provenance(
                     amount=total_cost,
                     from_currency=currency,
                     to_currency=account.base_currency,
                     as_of_date=as_of_date,
                 )
+                market_base = float(market_conversion["converted_amount"])
+                cost_base = float(cost_conversion["converted_amount"])
+                stale_market = bool(market_conversion["is_stale"])
+                stale_cost = bool(cost_conversion["is_stale"])
                 unrealized_base = market_base - cost_base
                 fx_stale = fx_stale or stale_market or stale_cost
             else:
                 market_base = 0.0
                 cost_base = 0.0
                 unrealized_base = 0.0
+                market_conversion = None
 
             unrealized_pct = None
             if abs(cost_base) > EPS:
@@ -1587,6 +1592,34 @@ class PortfolioService:
                     "total_cost": round(total_cost, 8),
                     "last_price": round(float(last_price), 8),
                     "market_value_base": round(market_base, 8),
+                    "valuation_fx_rate_to_account_base": (
+                        round(float(market_conversion["rate"]), 12)
+                        if market_conversion is not None
+                        else None
+                    ),
+                    "valuation_fx_rate_source": (
+                        str(market_conversion["source"])
+                        if market_conversion is not None
+                        else None
+                    ),
+                    "valuation_fx_rate_method": (
+                        str(market_conversion["method"])
+                        if market_conversion is not None
+                        else None
+                    ),
+                    "valuation_fx_as_of": (
+                        market_conversion["rate_date"].isoformat()
+                        if (
+                            market_conversion is not None
+                            and market_conversion.get("rate_date") is not None
+                        )
+                        else None
+                    ),
+                    "valuation_fx_stale": (
+                        bool(market_conversion["is_stale"])
+                        if market_conversion is not None
+                        else False
+                    ),
                     "unrealized_pnl_base": round(unrealized_base, 8),
                     "unrealized_pnl_pct": round(unrealized_pct, 8) if unrealized_pct is not None else None,
                     "valuation_currency": account.base_currency,
@@ -1956,7 +1989,7 @@ class PortfolioService:
                 "is_stale": False,
                 "method": "zero",
                 "source": "not_applicable",
-                "rate_date": as_of_date,
+                "rate_date": None,
             }
         if from_norm == to_norm:
             return {
@@ -1965,7 +1998,7 @@ class PortfolioService:
                 "is_stale": False,
                 "method": "identity",
                 "source": "identity",
-                "rate_date": as_of_date,
+                "rate_date": None,
             }
 
         direct = self.repo.get_latest_fx_rate(
@@ -2007,7 +2040,7 @@ class PortfolioService:
             "is_stale": True,
             "method": "fallback_1_to_1",
             "source": "fallback",
-            "rate_date": as_of_date,
+            "rate_date": None,
         }
 
     def convert_amount(

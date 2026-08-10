@@ -15497,6 +15497,12 @@
             "title": "Currency",
             "type": "string"
           },
+          "excluded_known_market_value": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Excluded Known Market Value",
+            "type": "number"
+          },
           "excluded_position_count": {
             "default": 0,
             "minimum": 0.0,
@@ -15510,6 +15516,12 @@
             "maxItems": 512,
             "title": "Excluded Positions",
             "type": "array"
+          },
+          "excluded_unknown_value_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Excluded Unknown Value Count",
+            "type": "integer"
           },
           "historical_replay_available": {
             "const": false,
@@ -20451,6 +20463,12 @@
       "StressExcludedPosition": {
         "additionalProperties": false,
         "properties": {
+          "account_base_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Account Base Currency",
+            "type": "string"
+          },
           "account_id": {
             "title": "Account Id",
             "type": "integer"
@@ -20460,6 +20478,18 @@
             "minLength": 3,
             "title": "Instrument Currency",
             "type": "string"
+          },
+          "known_market_value": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Market Value"
           },
           "limitations": {
             "items": {
@@ -20501,10 +20531,24 @@
             "title": "Reason",
             "type": "string"
           },
+          "response_base_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Response Base Currency",
+            "type": "string"
+          },
           "symbol": {
             "maxLength": 64,
             "minLength": 1,
             "title": "Symbol",
+            "type": "string"
+          },
+          "value_status": {
+            "enum": [
+              "known",
+              "unknown"
+            ],
+            "title": "Value Status",
             "type": "string"
           }
         },
@@ -20512,7 +20556,10 @@
           "account_id",
           "symbol",
           "instrument_currency",
-          "reason"
+          "account_base_currency",
+          "response_base_currency",
+          "reason",
+          "value_status"
         ],
         "title": "StressExcludedPosition",
         "type": "object"
@@ -20601,9 +20648,16 @@
             "type": "string"
           },
           "fx_as_of": {
-            "format": "date",
-            "title": "Fx As Of",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx As Of"
           },
           "fx_rate_method": {
             "enum": [
@@ -20744,6 +20798,66 @@
             "title": "Symbol",
             "type": "string"
           },
+          "valuation_fx_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx As Of"
+          },
+          "valuation_fx_rate_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "zero",
+                  "identity",
+                  "direct_rate",
+                  "inverse_rate",
+                  "fallback_1_to_1",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx Rate Method"
+          },
+          "valuation_fx_rate_source": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx Rate Source"
+          },
+          "valuation_fx_rate_to_account_base": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx Rate To Account Base"
+          },
+          "valuation_fx_stale": {
+            "default": false,
+            "title": "Valuation Fx Stale",
+            "type": "boolean"
+          },
           "weight_pct": {
             "maximum": 100.0,
             "minimum": 0.0,
@@ -20763,7 +20877,6 @@
           "fx_rate_to_response_base",
           "fx_rate_source",
           "fx_rate_method",
-          "fx_as_of",
           "fx_stale",
           "weight_pct",
           "shock_pct",

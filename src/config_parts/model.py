@@ -450,6 +450,11 @@ class Config:
             and len(self.portfolio_stress_scenarios_path) > 1024
         ):
             raise ValueError("PORTFOLIO_STRESS_SCENARIOS_PATH exceeds 1024 characters")
+        from src.services.portfolio_stress_scenarios import activate_scenario_catalog
+
+        activate_scenario_catalog(
+            scenarios_path=self.portfolio_stress_scenarios_path
+        )
         if self.agent_arch not in self._VALID_AGENT_ARCH:
             _log.warning(
                 "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",
