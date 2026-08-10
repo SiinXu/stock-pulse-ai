@@ -154,9 +154,12 @@ class _AnalysisContextStageMixin:
 
         # Add trend analysis results
         if trend_result:
-            enhanced['trend_analysis'] = {
+            technical_projection = {
                 'trend_status': trend_result.trend_status.value,
                 'ma_alignment': trend_result.ma_alignment,
+                'ma5': trend_result.ma5,
+                'ma10': trend_result.ma10,
+                'ma20': trend_result.ma20,
                 'trend_strength': trend_result.trend_strength,
                 'bias_ma5': trend_result.bias_ma5,
                 'bias_ma10': trend_result.bias_ma10,
@@ -189,14 +192,28 @@ class _AnalysisContextStageMixin:
                 'signal_reasons': trend_result.signal_reasons,
                 'risk_factors': trend_result.risk_factors,
             }
+            from data_provider.data_validation import project_technical_indicators
+
+            enhanced['trend_analysis'] = project_technical_indicators(
+                technical_projection,
+                market=get_market_for_stock(
+                    normalize_stock_code(enhanced.get('code', ''))
+                ),
+                stock_code=enhanced.get('code'),
+            )
 
         # Issue #234: Intra-day analysis uses real-time OHLC and trend MA coverage today.
-        # Protection condition: trend_result.ma5 > 0 indicates MA calculation succeeded and data volume is sufficient.
+        # A positive projected MA5 indicates validation and MA coverage both succeeded.
+        projected_ma5 = (
+            enhanced.get('trend_analysis', {}).get('ma5')
+            if isinstance(enhanced.get('trend_analysis'), dict)
+            else None
+        )
         if (
             realtime_quote
             and trend_result
-            and trend_result.ma5 is not None
-            and trend_result.ma5 > 0
+            and projected_ma5 is not None
+            and projected_ma5 > 0
         ):
             price = getattr(realtime_quote, 'price', None)
             if price is not None and price > 0:
@@ -226,17 +243,17 @@ class _AnalysisContextStageMixin:
                     'open': open_p,
                     'high': high_p,
                     'low': low_p,
-                    'ma5': trend_result.ma5,
-                    'ma10': trend_result.ma10,
-                    'ma20': trend_result.ma20,
                     'date': market_today,
                     'data_source': f"realtime:{source_name}",
                     'realtime_source': source_name,
                     'is_estimated': True,
                 }
-                estimated_fields = [
-                    'close', 'open', 'high', 'low', 'ma5', 'ma10', 'ma20',
-                ]
+                estimated_fields = ['close', 'open', 'high', 'low']
+                for ma_field in ('ma5', 'ma10', 'ma20'):
+                    ma_value = enhanced['trend_analysis'].get(ma_field)
+                    if ma_value is not None:
+                        realtime_today[ma_field] = ma_value
+                        estimated_fields.append(ma_field)
                 if vol is not None:
                     realtime_today['volume'] = vol
                     estimated_fields.append('volume')
@@ -270,7 +287,10 @@ class _AnalysisContextStageMixin:
                         realtime_today[k] = v
                 enhanced['today'] = realtime_today
                 enhanced['ma_status'] = self._compute_ma_status(
-                    price, trend_result.ma5, trend_result.ma10, trend_result.ma20
+                    price,
+                    enhanced['trend_analysis'].get('ma5') or 0,
+                    enhanced['trend_analysis'].get('ma10') or 0,
+                    enhanced['trend_analysis'].get('ma20') or 0,
                 )
                 enhanced['date'] = market_today
                 if yesterday_close is not None:

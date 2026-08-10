@@ -138,7 +138,7 @@ describe('Shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
     const palette = await screen.findByRole('dialog', { name: '快速前往' });
-    fireEvent.click(within(palette).getByRole('button', { name: '开始分析' }));
+    fireEvent.click(within(palette).getByRole('option', { name: '开始分析' }));
 
     expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent('/research/analysis');
   });
