@@ -16392,6 +16392,1162 @@
         "title": "PortfolioTradeListResponse",
         "type": "object"
       },
+      "ReasoningTraceAgent": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceAgentEvent"
+            },
+            "maxItems": 200,
+            "title": "Events",
+            "type": "array"
+          },
+          "input_summary": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Summary"
+          },
+          "output_opinion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Opinion"
+          },
+          "role": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceToolCall"
+            },
+            "maxItems": 50,
+            "title": "Tool Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ReasoningTraceAgent",
+        "type": "object"
+      },
+      "ReasoningTraceAgentEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "title": "ReasoningTraceAgentEvent",
+        "type": "object"
+      },
+      "ReasoningTraceConclusion": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "maxLength": 1200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Summary"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "final_signal": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Signal"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 800,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "sentiment_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment Score"
+          }
+        },
+        "title": "ReasoningTraceConclusion",
+        "type": "object"
+      },
+      "ReasoningTraceConsensus": {
+        "additionalProperties": false,
+        "properties": {
+          "committee_status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committee Status"
+          },
+          "consensus_level": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Level"
+          }
+        },
+        "title": "ReasoningTraceConsensus",
+        "type": "object"
+      },
+      "ReasoningTraceCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "not_recorded": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Not Recorded",
+            "type": "array"
+          },
+          "notes": {
+            "maxLength": 500,
+            "title": "Notes",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceCoverageSource"
+            },
+            "maxItems": 16,
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "notes"
+        ],
+        "title": "ReasoningTraceCoverage",
+        "type": "object"
+      },
+      "ReasoningTraceCoverageSource": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "boolean"
+          },
+          "dropped_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropped Count"
+          },
+          "export_truncated": {
+            "default": false,
+            "title": "Export Truncated",
+            "type": "boolean"
+          },
+          "original_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Count"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Reasons",
+            "type": "array"
+          },
+          "returned_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Count"
+          },
+          "source": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "source_dropped_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dropped Count"
+          },
+          "source_truncated": {
+            "default": false,
+            "title": "Source Truncated",
+            "type": "boolean"
+          },
+          "source_truncated_unknown": {
+            "default": false,
+            "title": "Source Truncated Unknown",
+            "type": "boolean"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "supported",
+          "present",
+          "absent"
+        ],
+        "title": "ReasoningTraceCoverageSource",
+        "type": "object"
+      },
+      "ReasoningTraceDataQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Missing Fields",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "ReasoningTraceDataQuality",
+        "type": "object"
+      },
+      "ReasoningTraceDataSources": {
+        "additionalProperties": false,
+        "properties": {
+          "data_quality_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningTraceDataQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "llm_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceLlmRun"
+            },
+            "maxItems": 100,
+            "title": "Llm Runs",
+            "type": "array"
+          },
+          "pipeline_stage_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTracePipelineStage"
+            },
+            "maxItems": 100,
+            "title": "Pipeline Stage Runs",
+            "type": "array"
+          },
+          "provider_trace": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceProviderRun"
+            },
+            "maxItems": 100,
+            "title": "Provider Trace",
+            "type": "array"
+          }
+        },
+        "title": "ReasoningTraceDataSources",
+        "type": "object"
+      },
+      "ReasoningTraceDisagreement": {
+        "additionalProperties": false,
+        "properties": {
+          "conflict_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "conflict_severity": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Severity"
+          },
+          "consensus_level": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Level"
+          },
+          "opposing_skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Opposing Skills",
+            "type": "array"
+          },
+          "supporting_skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Supporting Skills",
+            "type": "array"
+          }
+        },
+        "title": "ReasoningTraceDisagreement",
+        "type": "object"
+      },
+      "ReasoningTraceExportResponse": {
+        "additionalProperties": false,
+        "description": "JSON export envelope for ``reasoning-trace-v1``.",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceAgent"
+            },
+            "maxItems": 200,
+            "title": "Agents",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ReasoningTraceCoverage"
+          },
+          "data_sources": {
+            "$ref": "#/components/schemas/ReasoningTraceDataSources"
+          },
+          "markdown": {
+            "anyOf": [
+              {
+                "maxLength": 2000000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markdown"
+          },
+          "run": {
+            "$ref": "#/components/schemas/ReasoningTraceRun"
+          },
+          "schema_version": {
+            "const": "reasoning-trace-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "synthesis": {
+            "$ref": "#/components/schemas/ReasoningTraceSynthesis"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "truncation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningTraceTruncation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "schema_version",
+          "run",
+          "coverage"
+        ],
+        "title": "ReasoningTraceExportResponse",
+        "type": "object"
+      },
+      "ReasoningTraceLlmRun": {
+        "additionalProperties": false,
+        "properties": {
+          "call_type": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Type"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/ReasoningTraceTokenUsage"
+          }
+        },
+        "title": "ReasoningTraceLlmRun",
+        "type": "object"
+      },
+      "ReasoningTracePipelineStage": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "ReasoningTracePipelineStage",
+        "type": "object"
+      },
+      "ReasoningTraceProviderRun": {
+        "additionalProperties": false,
+        "properties": {
+          "data_type": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Type"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "ReasoningTraceProviderRun",
+        "type": "object"
+      },
+      "ReasoningTraceRun": {
+        "additionalProperties": false,
+        "properties": {
+          "config_fingerprint": {
+            "maxLength": 16,
+            "minLength": 16,
+            "title": "Config Fingerprint",
+            "type": "string"
+          },
+          "exported_at": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Exported At",
+            "type": "string"
+          },
+          "lookup_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Key"
+          },
+          "lookup_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "primary_key",
+                  "latest_by_query_id"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Mode"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
+          },
+          "run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "run_id",
+          "config_fingerprint",
+          "exported_at"
+        ],
+        "title": "ReasoningTraceRun",
+        "type": "object"
+      },
+      "ReasoningTraceSynthesis": {
+        "additionalProperties": false,
+        "properties": {
+          "consensus": {
+            "$ref": "#/components/schemas/ReasoningTraceConsensus"
+          },
+          "disagreement": {
+            "$ref": "#/components/schemas/ReasoningTraceDisagreement"
+          },
+          "final_conclusion": {
+            "$ref": "#/components/schemas/ReasoningTraceConclusion"
+          }
+        },
+        "title": "ReasoningTraceSynthesis",
+        "type": "object"
+      },
+      "ReasoningTraceTokenUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "title": "ReasoningTraceTokenUsage",
+        "type": "object"
+      },
+      "ReasoningTraceToolCall": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ReasoningTraceToolCall",
+        "type": "object"
+      },
+      "ReasoningTraceTruncation": {
+        "additionalProperties": false,
+        "properties": {
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceTruncationDrop"
+            },
+            "maxItems": 128,
+            "title": "Dropped",
+            "type": "array"
+          },
+          "marker": {
+            "const": "truncated",
+            "default": "truncated",
+            "title": "Marker",
+            "type": "string"
+          },
+          "max_chars": {
+            "minimum": 1.0,
+            "title": "Max Chars",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "max_chars"
+        ],
+        "title": "ReasoningTraceTruncation",
+        "type": "object"
+      },
+      "ReasoningTraceTruncationDrop": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "path": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "reason"
+        ],
+        "title": "ReasoningTraceTruncationDrop",
+        "type": "object"
+      },
       "ReportDetails": {
         "description": "报告详情区",
         "properties": {
@@ -36019,6 +37175,142 @@
         "summary": "Delete trade event",
         "tags": [
           "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/reasoning-trace/{record_id}": {
+      "get": {
+        "description": "Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Supported credential and local-path classes are redacted; operators must still treat exports as sensitive.",
+        "operationId": "exportReasoningTrace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "json returns the package envelope; markdown returns text/markdown body",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "description": "json returns the package envelope; markdown returns text/markdown body",
+              "enum": [
+                "json",
+                "markdown"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "When format=json, also embed a redacted markdown companion field",
+            "in": "query",
+            "name": "include_markdown",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "When format=json, also embed a redacted markdown companion field",
+              "title": "Include Markdown",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasoningTraceExportResponse"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Strict JSON trace package or inert Markdown export"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export multi-agent reasoning trace for an analysis history record",
+        "tags": [
+          "ReasoningTrace"
         ]
       }
     },

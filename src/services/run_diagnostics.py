@@ -550,6 +550,8 @@ class RunDiagnosticContext:
     history_runs: List[HistoryRun] = field(default_factory=list)
     pipeline_stage_runs: List[PipelineStageRun] = field(default_factory=list)
     agent_events: List[Dict[str, Any]] = field(default_factory=list)
+    agent_events_original_count: int = 0
+    agent_events_dropped_count: int = 0
     event_sink: Optional[Callable[[Dict[str, Any]], None]] = None
     flow_event_index: int = 0
     agent_event_index: int = 0
@@ -718,10 +720,13 @@ class RunDiagnosticContext:
         if not isinstance(sanitized, Mapping):
             return
         entry = dict(sanitized)
+        self.agent_events_original_count += 1
         self.agent_events.append(entry)
         max_events = 200
         if len(self.agent_events) > max_events:
-            del self.agent_events[: len(self.agent_events) - max_events]
+            dropped = len(self.agent_events) - max_events
+            self.agent_events_dropped_count += dropped
+            del self.agent_events[:dropped]
         self._emit_flow_event(_agent_flow_event(self, entry))
 
     def _emit_flow_event(self, event: Dict[str, Any]) -> None:
@@ -760,6 +765,12 @@ class RunDiagnosticContext:
             "history_runs": [run.to_dict() for run in self.history_runs],
             "pipeline_stage_runs": [run.to_dict() for run in self.pipeline_stage_runs],
             "agent_events": list(self.agent_events),
+            "agent_events_capture": {
+                "original_count": self.agent_events_original_count,
+                "returned_count": len(self.agent_events),
+                "dropped_count": self.agent_events_dropped_count,
+                "truncated": self.agent_events_dropped_count > 0,
+            },
         }
         return _redact_diagnostic_payload(payload)
 
