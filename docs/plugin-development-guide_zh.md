@@ -35,13 +35,20 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 - 无远程应用商店或自动下载；
 - 无插件依赖安装器；
-- manifest `permissions` 仅为描述元数据，**不**形成强制沙箱；
+- manifest `permissions` 是声明而非进程沙箱；`agent_tool` 在 load/enable 时做声明子集校验（非权限隔离）；
 - 无热加载（修改后需重启进程）。
 
 启用任何包前请逐行审阅。生产环境默认保持 `PLUGINS_DIR` 未设置，除非包已审阅并固定。
 运维信任边界亦见
 [安全基线](security-baseline.md#operator-security-boundaries) 与
 [ADR-007](adr/ADR-007-versioned-plugin-extension-boundary.md)。
+
+### Manifest `permissions`（声明 ≠ 沙箱）
+
+- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read`）。
+- 加载/启用时若工具要求未声明能力，将以稳定错误码 `manifest_permissions_undeclared` 拒绝该插件（失败隔离，不影响核心与其它插件）。
+- 允许声明多余权限；空列表表示工具不得要求任何能力。
+- **声明 ≠ 沙箱隔离**：插件代码仍以进程同等权限运行。
 
 ### Agent 工具限制（#539）
 
@@ -163,6 +170,65 @@ class Plugin(BasePlugin):
 | 分析策略作者指南 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) |
 | 运维安全边界 | [安全基线](security-baseline.md#operator-security-boundaries) |
 | 扩展面冻结与通知参考测试 | `tests/plugins/test_extension_surface_v1.py` |
+
+
+## 运维视角
+
+本节面向部署与值班运维，而非插件作者。
+
+### 生命周期审计
+
+生命周期变更会通过既有安全审计设施写入事件（`event_type=plugin.lifecycle`）。
+自动启动加载采用 best-effort，审计存储不可用时不会阻断其它插件。管理员发起
+enable / disable / reload 时，如果 attempt 事件无法持久化，会在状态变更前以
+fail-closed 方式返回错误；如果操作完成后 completion 写入失败，API 会返回
+`503 security_audit_unavailable` 并说明真实完成状态，不会声称已回滚。
+
+### Data Provider 自动绑定（显式开关）
+
+| 配置项 | 默认 | 效果 |
+| --- | --- | --- |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 开启后，默认 `ApplicationServices` 组合根会将 `PluginManager` 绑定到进程级 `DataFetcherManager.plugin_registry`（注入或自动创建），使已注册 provider 无需额外胶水即可路由 |
+
+保持关闭即可维持历史手动模式。开启且未注入 manager 时，`ApplicationServices`
+会构造一个 `DataFetcherManager` 并通过 `services.data_fetcher_manager` 暴露。
+股票行情与历史服务及主分析流水线会解析这个已安装 owner，因此插件 provider
+与内置 fallback 共用同一个 registry。注入 manager 时，组合根会在任何相关
+插件注册之前原子补齐 Analysis Strategy、Notification Channel、Agent Tool 与
+Event Hook 合同；无效或已冲突的 registry 会以稳定错误码阻断进程组合，绝不
+静默退化为孤立 registry。自定义组合根仍可直接调用
+`try_build_auto_bound_registry`。
+
+```python
+from data_provider import DataFetcherManager
+from src.plugins import (
+    PLUGIN_APPLICATION_VERSION,
+    PluginManager,
+    try_build_auto_bound_registry,
+)
+
+providers = DataFetcherManager()
+registry, error = try_build_auto_bound_registry(providers)
+if error:
+    raise RuntimeError(error)
+plugins = PluginManager(
+    application_version=PLUGIN_APPLICATION_VERSION,
+    registry=registry or providers.plugin_registry,  # 关闭开关时需显式绑定
+)
+```
+
+### 健康检查
+
+```python
+report = plugin_manager.health_check()
+for entry in report.plugins:
+    print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
+```
+
+`last_error_code` 表示最近一次稳定失败（例如 `plugin_onload_failed`）；禁用或
+修改意图不会清除它，真正改变状态且成功的 load / reload 才表示恢复并清除；
+幂等 enable 不会抹掉仍需运维处理的 reload 失败。单个插件失败不得影响其它
+插件与核心启动。
 
 ## 验证命令
 

@@ -18,6 +18,7 @@
 {%- set watch_conditions = phase_decision.get('watch_conditions') or [] -%}
 {%- set risk_alerts = intel.get('risk_alerts') or [] -%}
 {%- set risk_warning = result.risk_warning or '' -%}
+{%- set risk_manager = result.risk_gate_result if result.risk_gate_result else {} -%}
 {%- set time_sensitivity = core.get('time_sensitivity') or '' -%}
 {%- set stop_loss = sniper.get('stop_loss') if sniper else none -%}
 {%- set take_profit = sniper.get('take_profit') if sniper else none -%}
@@ -30,11 +31,17 @@
     message. Do not emit the 5-line wechat compact form. -#}
 {%- if compact == 'brief' -%}
 **{{ e.stock_name }}({{ result.code }})** 🃏{{ e.signal_emoji }} {{ e.signal_text }} | {{ labels.score_label }} {{ result.sentiment_score }}{% if one_sentence %} | {{ one_sentence[:60] }}{{ '…' if one_sentence|length > 60 else '' }}{% endif %}{% if confidence_level %} · {{ labels.strategy_confidence_label }}: {{ confidence_level }}{% endif %}
+{%- if risk_manager and risk_manager.get('schema_version') == 'risk-manager-result/v1' %}
+· 🛡️ {{ labels.risk_verdict_label }}: {{ risk_manager.get('verdict') }} · {{ risk_manager.get('original_action') }}→{{ risk_manager.get('final_action') }}
+{%- endif %}
 {%- if risk_alerts or risk_warning or watch_conditions %}
 · {% if risk_alerts %}{{ labels.risk_alerts_label }}: {{ (risk_alerts[0]|string)[:24] }}{{ '…' if (risk_alerts[0]|string)|length > 24 else '' }}{% elif risk_warning %}{{ labels.risk_warning_label }}: {{ (risk_warning|string)[:24] }}{{ '…' if (risk_warning|string)|length > 24 else '' }}{% endif %}{% if (risk_alerts or risk_warning) and watch_conditions %} | {% endif %}{% if watch_conditions %}{{ labels.watch_conditions_label }}: {{ (watch_conditions[0]|string)[:24] }}{{ '…' if (watch_conditions[0]|string)|length > 24 else '' }}{% endif %}
 {%- endif %}
 {%- elif compact -%}
 **🃏 {{ e.signal_emoji }} {{ e.signal_text }} | {{ labels.score_label }} {{ result.sentiment_score }}**{% if one_sentence %} · {{ one_sentence[:50] }}{{ '…' if one_sentence|length > 50 else '' }}{% endif %}{% if e.localized_trend_prediction %} · {{ labels.trend_label }}: {{ e.localized_trend_prediction }}{% endif %}{% if confidence_level %} · {{ labels.strategy_confidence_label }}: {{ confidence_level }}{% endif %}
+{%- if risk_manager and risk_manager.get('schema_version') == 'risk-manager-result/v1' %}
+· 🛡️ {{ labels.risk_verdict_label }}: {{ risk_manager.get('verdict') }} · {{ risk_manager.get('original_action') }}→{{ risk_manager.get('final_action') }}
+{%- endif %}
 {%- if risk_alerts %}
 · {{ labels.risk_alerts_label }}: {% for r in risk_alerts[:2] %}{{ (r|string)[:40] }}{{ '…' if (r|string)|length > 40 else '' }}{{ '; ' if not loop.last else '' }}{% endfor %}
 {%- elif risk_warning %}
@@ -48,6 +55,8 @@
 {%- endif %}
 {%- else -%}
 ### 🃏 {{ e.signal_emoji }} **{{ e.signal_text }}** | {{ labels.score_label }} {{ result.sentiment_score }}
+{% if risk_manager and risk_manager.get('schema_version') == 'risk-manager-result/v1' %}- **🛡️ {{ labels.risk_manager_heading }}**: {{ labels.risk_verdict_label }} `{{ risk_manager.get('verdict') }}` · {{ risk_manager.get('original_action') }} → **{{ risk_manager.get('final_action') }}** · {{ labels.risk_profile_label }} `{{ risk_manager.get('profile') }}`{% if risk_manager.get('authorized_bypass_id') %} · approval `{{ risk_manager.get('authorized_bypass_id') }}`{% endif %}
+{% endif -%}
 {% if one_sentence %}- **{{ labels.one_sentence_label }}**: {{ one_sentence }}
 {% endif -%}
 {% if e.localized_trend_prediction %}- **{{ labels.trend_label }}**: {{ e.localized_trend_prediction }}
