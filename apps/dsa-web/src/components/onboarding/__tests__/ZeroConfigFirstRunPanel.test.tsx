@@ -92,7 +92,11 @@ const configuredReadiness: FirstRunReadiness = {
   reasonCode: 'primary_model_configured',
 };
 
-function renderPanel(readiness: FirstRunReadiness, onContinue?: () => void | Promise<void>) {
+function renderPanel(
+  readiness: FirstRunReadiness,
+  onContinue?: (value: FirstRunReadiness) => void | Promise<void>,
+  onDismiss?: () => void,
+) {
   const t = (key: string) => key;
   return render(
     <UiLanguageProvider>
@@ -101,6 +105,7 @@ function renderPanel(readiness: FirstRunReadiness, onContinue?: () => void | Pro
         autoLoad={false}
         reportLanguage="en"
         onContinue={onContinue}
+        onDismiss={onDismiss}
         t={t as never}
       />
     </UiLanguageProvider>,
@@ -142,7 +147,17 @@ describe('ZeroConfigFirstRunPanel', () => {
     renderPanel(configuredReadiness, onContinue);
     fireEvent.click(screen.getByRole('button', { name: 'firstRun.ctaContinue' }));
     await waitFor(() => expect(onContinue).toHaveBeenCalledTimes(1));
+    expect(onContinue).toHaveBeenCalledWith(configuredReadiness);
     expect(getDemoAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('exposes host-owned dismissal from the real panel header', () => {
+    const onDismiss = vi.fn();
+    renderPanel(demoReadiness, undefined, onDismiss);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.close' }));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it('reports a rejected host action without an unhandled promise', async () => {
