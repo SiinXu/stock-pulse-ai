@@ -4881,6 +4881,142 @@
         "title": "CallTypeBreakdown",
         "type": "object"
       },
+      "CapabilityListResponse": {
+        "additionalProperties": false,
+        "description": "Versioned GET /api/v1/capabilities inventory snapshot.",
+        "properties": {
+          "executable_count": {
+            "minimum": 0.0,
+            "title": "Executable Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "data": "#/components/schemas/DataCapabilityItem",
+                  "extension": "#/components/schemas/ExtensionCapabilityItem",
+                  "tool": "#/components/schemas/ToolCapabilityItem"
+                },
+                "propertyName": "domain"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/DataCapabilityItem"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolCapabilityItem"
+                },
+                {
+                  "$ref": "#/components/schemas/ExtensionCapabilityItem"
+                }
+              ]
+            },
+            "maxItems": 4096,
+            "title": "Items",
+            "type": "array"
+          },
+          "non_executable_count": {
+            "minimum": 0.0,
+            "title": "Non Executable Count",
+            "type": "integer"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "capability-inventory/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilitySourceStatus"
+            },
+            "maxItems": 3,
+            "title": "Sources",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "unknown_executable_count": {
+            "minimum": 0.0,
+            "title": "Unknown Executable Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "partial",
+          "total",
+          "executable_count",
+          "non_executable_count",
+          "unknown_executable_count"
+        ],
+        "title": "CapabilityListResponse",
+        "type": "object"
+      },
+      "CapabilitySourceStatus": {
+        "additionalProperties": false,
+        "description": "Freshness and consistency state for one authoritative owner.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Generation",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "data",
+              "tool",
+              "extension"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "error",
+              "generation_drift",
+              "not_initialized"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "state",
+          "generation",
+          "as_of"
+        ],
+        "title": "CapabilitySourceStatus",
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "description": "Change password request body.",
         "properties": {
@@ -5846,6 +5982,217 @@
           "calendar_market"
         ],
         "title": "DailyScheduleRequest",
+        "type": "object"
+      },
+      "DataCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Active data-provider or supplied-method observation.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dependency_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Ready"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "const": "data",
+            "title": "Domain",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "grantable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantable"
+          },
+          "healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthy"
+          },
+          "id": {
+            "description": "Stable domain-prefixed id",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Markets",
+            "type": "array"
+          },
+          "owner": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True supplier count, which may exceed the listed providers.",
+            "title": "Provider Count"
+          },
+          "providers": {
+            "description": "Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Providers",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "source_generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Generation",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "data_provider",
+              "data_method"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "provider",
+          "version",
+          "source_generation",
+          "as_of",
+          "registered",
+          "domain",
+          "type"
+        ],
+        "title": "DataCapabilityItem",
         "type": "object"
       },
       "DecisionSignalCreateRequest": {
@@ -8636,6 +8983,217 @@
           "config_version"
         ],
         "title": "ExportSystemConfigResponse",
+        "type": "object"
+      },
+      "ExtensionCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Plugin lifecycle or active contribution observation.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dependency_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Ready"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "const": "extension",
+            "title": "Domain",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "grantable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantable"
+          },
+          "healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthy"
+          },
+          "id": {
+            "description": "Stable domain-prefixed id",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Markets",
+            "type": "array"
+          },
+          "owner": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True supplier count, which may exceed the listed providers.",
+            "title": "Provider Count"
+          },
+          "providers": {
+            "description": "Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Providers",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "source_generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Generation",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "plugin_lifecycle",
+              "extension_registration"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "provider",
+          "version",
+          "source_generation",
+          "as_of",
+          "registered",
+          "domain",
+          "type"
+        ],
+        "title": "ExtensionCapabilityItem",
         "type": "object"
       },
       "ExtractFromImageResponse": {
@@ -24959,6 +25517,214 @@
         "title": "TodaysFocusUniverseContract",
         "type": "object"
       },
+      "ToolCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Registered or owner-declared Agent tool observation.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degraded"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dependency_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Ready"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "const": "tool",
+            "title": "Domain",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "grantable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantable"
+          },
+          "healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthy"
+          },
+          "id": {
+            "description": "Stable domain-prefixed id",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Markets",
+            "type": "array"
+          },
+          "owner": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True supplier count, which may exceed the listed providers.",
+            "title": "Provider Count"
+          },
+          "providers": {
+            "description": "Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Providers",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "source_generation": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Generation",
+            "type": "string"
+          },
+          "type": {
+            "const": "agent_tool",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "provider",
+          "version",
+          "source_generation",
+          "as_of",
+          "registered",
+          "domain",
+          "type"
+        ],
+        "title": "ToolCapabilityItem",
+        "type": "object"
+      },
       "UnsupportedScheduledTaskItem": {
         "additionalProperties": false,
         "description": "Opaque projection of a definition written by a newer application.",
@@ -29629,6 +30395,86 @@
         "summary": "Solve periods required to reach a target",
         "tags": [
           "Calculators"
+        ]
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "description": "Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.",
+        "operationId": "listCapabilities",
+        "parameters": [
+          {
+            "description": "Optional domain filter. Allowed values: data, tool, extension.",
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional domain filter. Allowed values: data, tool, extension.",
+              "title": "Domain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid domain filter"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List the runtime capability inventory (read-only)",
+        "tags": [
+          "Capabilities"
         ]
       }
     },
