@@ -212,6 +212,41 @@ class HistoryComparisonStorageTestCase(unittest.TestCase):
         self.assertEqual((delta.base_record_id, delta.target_record_id), (base_id, target_id))
         self.assertEqual(self._score_change(delta).direction, DIRECTION_DOWN)
 
+    def test_batch_history_is_bounded_per_code_and_filters_window(self) -> None:
+        self._insert(
+            code="600519",
+            created_at=datetime(2026, 7, 31, 9, 0),
+            score=10,
+        )
+        first_a = self._insert(
+            code="600519",
+            created_at=datetime(2026, 8, 1, 9, 0),
+            score=20,
+        )
+        second_a = self._insert(
+            code="600519",
+            created_at=datetime(2026, 8, 2, 9, 0),
+            score=30,
+        )
+        first_us = self._insert(
+            code="AAPL",
+            created_at=datetime(2026, 8, 1, 8, 0),
+            score=40,
+        )
+
+        rows = self.db.get_analysis_history_batch(
+            codes=["600519", "AAPL"],
+            created_at_from=datetime(2026, 8, 1, 0, 0),
+            limit_per_code=2,
+        )
+        ids_by_code = {
+            code: [row.id for row in rows if row.code == code]
+            for code in ("600519", "AAPL")
+        }
+
+        self.assertEqual(ids_by_code["600519"], [second_a, first_a])
+        self.assertEqual(ids_by_code["AAPL"], [first_us])
+
     def test_latest_delta_has_no_hidden_365_day_cutoff(self) -> None:
         base_id = self._insert(
             created_at=datetime.now() - timedelta(days=800),
