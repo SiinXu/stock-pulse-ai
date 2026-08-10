@@ -84,7 +84,7 @@ describe('NotificationTestPanel', () => {
     expect(await screen.findByText('测试成功')).toBeInTheDocument();
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('https://example.com/hook?token=***')).toBeInTheDocument();
-    expect(getNotificationChannelTestRecord('custom')?.success).toBe(true);
+    expect(getNotificationChannelTestRecord('custom')?.outcome).toBe('verified');
   });
 
   it('tests a DingTalk draft while preserving masked group robot secrets', async () => {
@@ -180,7 +180,7 @@ describe('NotificationTestPanel', () => {
     ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent('draft-token');
     expect(document.body).not.toHaveTextContent('SECdraft_signing_secret');
-    expect(getNotificationChannelTestRecord('dingtalk')?.success).toBe(false);
+    expect(getNotificationChannelTestRecord('dingtalk')?.outcome).toBe('failed');
   });
 
   it('uses translated defaults when UI language changes and user has not edited fields', async () => {
@@ -310,8 +310,8 @@ describe('NotificationTestPanel', () => {
     chooseOption(screen.getByLabelText('渠道'), 'custom');
     fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
 
-    expect(await screen.findByText('测试成功')).toBeInTheDocument();
-    expect(screen.getByText(/部分成功/)).toBeInTheDocument();
+    expect(await screen.findByText('部分成功')).toBeInTheDocument();
+    expect(getNotificationChannelTestRecord('custom')?.outcome).toBe('degraded');
     expect(screen.getAllByText('HTTP 500').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('http_500')).toHaveClass('text-warning');

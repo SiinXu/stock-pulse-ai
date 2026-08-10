@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
-- [Changed] Notifications hub: channel cards show config + last-test status, read-only event routing map, and actionable test-to-bind guidance (#866).
+- [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
 - [Added] Wire range-aware local-first daily data into `DataFetcherManager` with fail-closed mode validation, bounded schema-v2 persistence, zero-provider `local_only` misses, `auto` stale-if-error, and `refresh` persistence (refs #178, #218, and #159 data scope).
 - [Fixed] Preserve local-only boundaries across batch prefetch, stock-name lookup, scheduled execution, asynchronous task errors, adjustment-aware persistence, legacy overlap ordering, provider health, and analysis OpenAPI responses.
 - [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).

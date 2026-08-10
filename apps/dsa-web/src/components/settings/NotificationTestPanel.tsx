@@ -20,30 +20,27 @@ import {
 import type { UiLanguage } from '../../i18n/uiText';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 import { mapApiErrorToActionable } from '../../utils/apiReasonMapper';
-import { setNotificationChannelTestRecord } from './notificationChannelTestStatus';
+import {
+  classifyNotificationTestOutcome,
+  computeNotificationConfigurationFingerprint,
+  setNotificationChannelTestRecord,
+} from './notificationChannelTestStatus';
+import {
+  getNotificationRoutingValue,
+  NOTIFICATION_CHANNELS,
+} from './notificationChannels';
 
 function getChannelOptions(language: UiLanguage): Array<{ value: NotificationTestChannel; label: string }> {
-  return [
-    { value: 'wechat', label: getNotificationChannelLabel('wechat', language) },
-    { value: 'dingtalk', label: getNotificationChannelLabel('dingtalk', language) },
-    { value: 'feishu', label: getNotificationChannelLabel('feishu', language) },
-    { value: 'telegram', label: 'Telegram' },
-    { value: 'email', label: getNotificationChannelLabel('email', language) },
-    { value: 'pushover', label: 'Pushover' },
-    { value: 'ntfy', label: 'ntfy' },
-    { value: 'gotify', label: 'Gotify' },
-    { value: 'pushplus', label: 'PushPlus' },
-    { value: 'serverchan3', label: 'ServerChan3' },
-    { value: 'custom', label: getNotificationChannelLabel('custom', language) },
-    { value: 'discord', label: 'Discord' },
-    { value: 'slack', label: 'Slack' },
-    { value: 'astrbot', label: 'AstrBot' },
-  ];
+  return NOTIFICATION_CHANNELS.map((definition) => ({
+    value: getNotificationRoutingValue(definition) as NotificationTestChannel,
+    label: getNotificationChannelLabel(definition.id, language),
+  }));
 }
 
 interface NotificationTestPanelProps {
   items: SystemConfigUpdateItem[];
   maskToken: string;
+  configVersion?: string;
   disabled?: boolean;
 }
 
@@ -75,6 +72,7 @@ function buildActionableFailureCopy(
 export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
   items,
   maskToken,
+  configVersion = '',
   disabled = false,
 }) => {
   const { language, t } = useUiLanguage();
@@ -108,7 +106,19 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
     setError(null);
     setResult(null);
     setIsTesting(true);
+    let configFingerprint: string | null = null;
     try {
+      const definition = NOTIFICATION_CHANNELS.find(
+        (candidate) => getNotificationRoutingValue(candidate) === channel,
+      );
+      const identityItems = definition
+        ? normalizedItems.filter((item) => definition.prefixes.some((prefix) => item.key.startsWith(prefix)))
+        : [];
+      configFingerprint = await computeNotificationConfigurationFingerprint(
+        channel,
+        configVersion,
+        identityItems,
+      );
       const payload = await systemConfigApi.testNotificationChannel({
         channel,
         items: normalizedItems,
@@ -118,23 +128,32 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         timeoutSeconds: clampTimeout(timeoutSeconds),
       });
       setResult(payload);
+      const outcome = classifyNotificationTestOutcome(payload);
       setNotificationChannelTestRecord({
         channel,
-        success: payload.success,
+        outcome,
         message: payload.message,
         errorCode: payload.errorCode,
+        attempts: payload.attempts,
+        configVersion,
+        configFingerprint,
         at: Date.now(),
       });
     } catch (requestError: unknown) {
       const parsed = getParsedApiError(requestError, language);
       setError(parsed);
-      setNotificationChannelTestRecord({
-        channel,
-        success: false,
-        message: parsed.message,
-        errorCode: parsed.code,
-        at: Date.now(),
-      });
+      if (configFingerprint) {
+        setNotificationChannelTestRecord({
+          channel,
+          outcome: 'failed',
+          message: parsed.message,
+          errorCode: parsed.code,
+          attempts: [],
+          configVersion,
+          configFingerprint,
+          at: Date.now(),
+        });
+      }
     } finally {
       setIsTesting(false);
       setTestModalOpen(false);
@@ -145,6 +164,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
   const failureCopy = result && !result.success
     ? buildActionableFailureCopy(result.errorCode, result.message, language)
     : null;
+  const resultOutcome = result ? classifyNotificationTestOutcome(result) : null;
 
   return (
     <>
@@ -184,11 +204,13 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
       {result ? (
         <div className="space-y-3" data-testid="notification-test-result">
           <InlineAlert
-            variant={result.success ? 'success' : 'danger'}
-            title={result.success ? t('settings.notificationTestSuccess') : t('settings.notificationTestFailure')}
+            variant={resultOutcome === 'verified' ? 'success' : resultOutcome === 'degraded' ? 'warning' : 'danger'}
+            title={resultOutcome === 'verified'
+              ? t('settings.notificationTestSuccess')
+              : resultOutcome === 'degraded' ? hubText.lastTestPartial : t('settings.notificationTestFailure')}
             message={(
               <span>
-                {result.success ? (
+                {resultOutcome === 'verified' ? (
                   <>
                     {result.message}
                     {typeof result.latencyMs === 'number' ? ` · ${result.latencyMs} ms` : ''}
@@ -196,6 +218,11 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
                     <span className="mt-1 block text-xs leading-5 text-secondary-text">
                       {hubText.testSuccessBindHint}
                     </span>
+                  </>
+                ) : resultOutcome === 'degraded' ? (
+                  <>
+                    {hubText.testPartialHint}
+                    {typeof result.latencyMs === 'number' ? ` · ${result.latencyMs} ms` : ''}
                   </>
                 ) : (
                   <>

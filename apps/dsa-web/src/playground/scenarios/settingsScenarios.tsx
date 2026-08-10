@@ -24,6 +24,7 @@ import { ModelMultiSelect } from '../../components/settings/ModelMultiSelect';
 import { MultiSelectDropdown } from '../../components/settings/MultiSelectDropdown';
 import { NotificationChannelsPanel } from '../../components/settings/NotificationChannelsPanel';
 import { NotificationTestPanel } from '../../components/settings/NotificationTestPanel';
+import { buildNotificationEventRoutes } from '../../components/settings/notificationEventRoutes';
 import { ProviderQuickLinks } from '../../components/settings/ProviderQuickLinks';
 import { SettingsAlert } from '../../components/settings/SettingsAlert';
 import { SettingsConfigurationSummary, SystemConfigSummary } from '../../components/settings/SettingsConfigurationSummary';
@@ -312,15 +313,11 @@ const NotificationChannelsPanelStory = () => {
       disabled={false}
       issueByKey={{}}
       onChange={(key, value) => setItems((current) => current.map((item) => item.key === key ? { ...item, value } : item))}
-      eventRoutes={scenario === 'empty' ? {
-        report: [],
-        alert: [],
-        system_error: [],
-      } : {
-        report: ['email', 'custom'],
-        alert: ['email'],
-        system_error: [],
-      }}
+      eventRoutes={buildNotificationEventRoutes(scenario === 'empty' ? {} : {
+        NOTIFICATION_REPORT_CHANNELS: 'email,custom',
+        NOTIFICATION_ALERT_CHANNELS: 'email',
+        NOTIFICATION_SYSTEM_ERROR_CHANNELS: '',
+      }, scenario === 'empty' ? [] : ['email', 'custom'])}
       maskToken={MASK_TOKEN}
     />
   );

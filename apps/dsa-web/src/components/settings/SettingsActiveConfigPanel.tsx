@@ -18,7 +18,11 @@ import {
   DataProvidersPanel,
   isNotificationChannelKey,
 } from './index';
-import { buildNotificationEventRoutes } from './notificationEventRoutes';
+import {
+  buildNotificationEventBindingUpdates,
+  buildNotificationEventRoutes,
+  NOTIFICATION_EVENT_ROUTE_KEYS,
+} from './notificationEventRoutes';
 import { AgentBehaviorPanel } from './AgentBehaviorPanel';
 import type { AgentModelSummary } from './AgentBehaviorPanel';
 import type { SettingsSaveStatus } from './autosaveMachine';
@@ -63,6 +67,7 @@ export type SettingsActiveConfigPanelProps = {
   activeCategory: string;
   /** Optional mask token so notification channel cards can run test-to-bind. */
   maskToken?: string;
+  configVersion: string;
 };
 
 /**
@@ -103,6 +108,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   readOnlyDiagnosticForItem,
   activeCategory,
   maskToken,
+  configVersion,
 }) => {
   const { t } = useUiLanguage();
 
@@ -119,8 +125,15 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   }
 
   const notificationEventRoutes = isNotificationChannelsSub
-    ? buildNotificationEventRoutes(allValuesByKey)
+    ? buildNotificationEventRoutes(persistedValuesByKey, configuredNotificationChannels)
     : null;
+  const draftNotificationEventRoutes = isNotificationChannelsSub
+    ? buildNotificationEventRoutes(allValuesByKey, configuredNotificationChannels)
+    : null;
+  const hasPendingNotificationRoutes = isNotificationChannelsSub
+    && NOTIFICATION_EVENT_ROUTE_KEYS.some(
+      (key) => String(allValuesByKey[key] ?? '') !== String(persistedValuesByKey[key] ?? ''),
+    );
 
   // Agent Behavior (execution) gets preset-first progressive disclosure.
   // Conversation still maps to category `agent` but only context keys —
@@ -141,6 +154,20 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           onChange={setDraftValue}
           issueByKey={issueByKey}
           eventRoutes={notificationEventRoutes}
+          draftEventRoutes={draftNotificationEventRoutes}
+          hasPendingRoutes={hasPendingNotificationRoutes}
+          saveStatus={activeSaveStatus}
+          persistedValuesByKey={persistedValuesByKey}
+          configVersion={configVersion}
+          onBindEvents={(routingValue, kinds) => {
+            for (const update of buildNotificationEventBindingUpdates(
+              allValuesByKey,
+              routingValue,
+              kinds,
+            )) {
+              setDraftValue(update.key, update.value);
+            }
+          }}
           maskToken={maskToken}
         />
       ) : isDataProvidersSub ? (

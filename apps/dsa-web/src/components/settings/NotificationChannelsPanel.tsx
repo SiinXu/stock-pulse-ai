@@ -3,11 +3,21 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type React from 'react';
 import { Bell, Send } from 'lucide-react';
-import type { ConfigValidationIssue, NotificationTestChannel, SystemConfigItem } from '../../types/systemConfig';
-import { Badge, Button, InlineAlert, Modal } from '../common';
+import type {
+  ConfigValidationIssue,
+  NotificationTestAttempt,
+  NotificationTestChannel,
+  SystemConfigItem,
+} from '../../types/systemConfig';
+import { Badge, Button, Checkbox, InlineAlert, Modal } from '../common';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
-import { isConfiguredChannelValue, NOTIFICATION_CHANNELS } from './notificationChannels';
+import {
+  getNotificationChannelByRoutingValue,
+  getNotificationRoutingValue,
+  isConfiguredChannelValue,
+  NOTIFICATION_CHANNELS,
+} from './notificationChannels';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import {
   getNotificationChannelLabel,
@@ -20,14 +30,20 @@ import {
   type NotificationEventRoutes,
 } from './notificationEventRoutes';
 import {
+  classifyNotificationTestOutcome,
+  clearNotificationChannelTestRecord,
+  clearNotificationChannelTestRecords,
+  computeNotificationConfigurationFingerprint,
   getNotificationChannelTestRecord,
   getNotificationChannelTestStatusVersion,
   setNotificationChannelTestRecord,
   subscribeNotificationChannelTestStatus,
+  type NotificationChannelTestOutcome,
 } from './notificationChannelTestStatus';
 import { systemConfigApi } from '../../api/systemConfig';
 import { createParsedApiError, getParsedApiError } from '../../api/error';
 import { mapApiErrorToActionable } from '../../utils/apiReasonMapper';
+import type { SettingsSaveStatus } from './autosaveMachine';
 
 interface NotificationChannelsPanelProps {
   items: SystemConfigItem[];
@@ -36,6 +52,12 @@ interface NotificationChannelsPanelProps {
   onChange: (key: string, value: string) => void;
   issueByKey: Record<string, ConfigValidationIssue[]>;
   eventRoutes?: NotificationEventRoutes | null;
+  draftEventRoutes?: NotificationEventRoutes | null;
+  hasPendingRoutes?: boolean;
+  saveStatus?: SettingsSaveStatus;
+  persistedValuesByKey?: Readonly<Record<string, string>>;
+  configVersion?: string;
+  onBindEvents?: (routingValue: string, kinds: readonly NotificationEventKind[]) => void;
   maskToken?: string;
 }
 
@@ -43,17 +65,12 @@ function isChannelConfigured(items: SystemConfigItem[]): boolean {
   return items.some((item) => isConfiguredChannelValue(item.value));
 }
 
-function channelRoutingValue(channelId: string, routingValue?: string): string {
-  return routingValue ?? channelId;
-}
-
 function toTestChannel(channelId: string, routingValue?: string): NotificationTestChannel | null {
-  const value = channelRoutingValue(channelId, routingValue);
-  const allowed: NotificationTestChannel[] = [
-    'wechat', 'dingtalk', 'feishu', 'telegram', 'email', 'pushover', 'ntfy',
-    'gotify', 'pushplus', 'serverchan3', 'custom', 'discord', 'slack', 'astrbot',
-  ];
-  return (allowed as string[]).includes(value) ? (value as NotificationTestChannel) : null;
+  const channel = NOTIFICATION_CHANNELS.find((candidate) => candidate.id === channelId);
+  const value = channel ? getNotificationRoutingValue(channel) : routingValue ?? channelId;
+  return getNotificationChannelByRoutingValue(value)
+    ? (value as NotificationTestChannel)
+    : null;
 }
 
 function eventLabel(
@@ -80,18 +97,29 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   onChange,
   issueByKey,
   eventRoutes = null,
+  draftEventRoutes = null,
+  hasPendingRoutes = false,
+  saveStatus = 'idle',
+  persistedValuesByKey = {},
+  configVersion = '',
+  onBindEvents,
   maskToken,
 }) => {
   const { language, t } = useUiLanguage();
   const text = SETTINGS_NOTIFICATION_TEXT[language];
   const testStatusVersion = useChannelTestStatusVersion();
+  const [statusNow, setStatusNow] = useState(() => Date.now());
   const [openChannelId, setOpenChannelId] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [configurationFingerprints, setConfigurationFingerprints] = useState<ReadonlyMap<string, string>>(new Map());
+  const [selectedBindEvents, setSelectedBindEvents] = useState<NotificationEventKind[]>([]);
+  const [bindFeedback, setBindFeedback] = useState<string | null>(null);
   const [modalFeedback, setModalFeedback] = useState<{
-    success: boolean;
+    outcome: NotificationChannelTestOutcome;
     title: string;
     message: string;
     technical?: string;
+    attempts?: NotificationTestAttempt[];
   } | null>(null);
 
   const configuredChannelValues = useMemo(
@@ -123,7 +151,43 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   useEffect(() => {
     setModalFeedback(null);
     setIsTesting(false);
+    setSelectedBindEvents([]);
+    setBindFeedback(null);
   }, [openChannelId]);
+
+  useEffect(() => {
+    let current = true;
+    void Promise.all(
+      NOTIFICATION_CHANNELS.map(async (channel) => {
+        const testChannel = toTestChannel(channel.id, channel.routingValue);
+        if (!testChannel) return null;
+        const channelItems = itemsByChannel.get(channel.id) ?? [];
+        const fingerprint = await computeNotificationConfigurationFingerprint(
+          testChannel,
+          configVersion,
+          channelItems.map((item) => ({ key: item.key, value: String(item.value ?? '') })),
+        );
+        return [testChannel, fingerprint] as const;
+      }),
+    ).then((entries) => {
+      if (!current) return;
+      setConfigurationFingerprints(new Map(entries.filter((entry) => entry !== null)));
+    }).catch(() => {
+      if (current) setConfigurationFingerprints(new Map());
+    });
+    return () => { current = false; };
+  }, [configVersion, itemsByChannel]);
+
+  useEffect(() => {
+    if (saveStatus === 'failed' || saveStatus === 'conflicted') {
+      clearNotificationChannelTestRecords();
+    }
+  }, [saveStatus]);
+
+  useEffect(() => {
+    const timer = globalThis.setInterval(() => setStatusNow(Date.now()), 30_000);
+    return () => globalThis.clearInterval(timer);
+  }, []);
 
   const renderFields = (fieldItems: SystemConfigItem[]) => fieldItems.map((item) => (
     <SettingsField
@@ -131,18 +195,24 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
       item={item}
       value={item.value}
       disabled={disabled}
-      onChange={onChange}
+      onChange={(key, value) => {
+        if (openChannel) {
+          const testChannel = toTestChannel(openChannel.id, openChannel.routingValue);
+          if (testChannel) clearNotificationChannelTestRecord(testChannel);
+        }
+        onChange(key, value);
+      }}
       issues={issueByKey[item.key] || []}
     />
   ));
 
-  const formatRouteTargets = (channels: readonly string[]): string => {
-    if (!channels.length) return text.eventAllConfigured;
-    return channels
+  const formatRouteTargets = (route: NotificationEventRoutes[NotificationEventKind]): string => {
+    if (route.effective === null) return text.routeAuthorityUnknown;
+    if (route.usesDefaultFanout) return text.eventAllConfigured;
+    if (!route.effective.length) return text.eventNone;
+    return route.effective
       .map((value) => {
-        const match = NOTIFICATION_CHANNELS.find(
-          (channel) => channelRoutingValue(channel.id, channel.routingValue) === value,
-        );
+        const match = getNotificationChannelByRoutingValue(value);
         return match ? getNotificationChannelLabel(match.id, language) : value;
       })
       .join(', ');
@@ -152,29 +222,41 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     if (!openChannel || !maskToken) return;
     const testChannel = toTestChannel(openChannel.id, openChannel.routingValue);
     if (!testChannel) return;
+    const testItems = openChannelItems.map((item) => ({ key: item.key, value: String(item.value ?? '') }));
     setIsTesting(true);
     setModalFeedback(null);
+    let configFingerprint: string | null = null;
     try {
+      configFingerprint = await computeNotificationConfigurationFingerprint(
+        testChannel,
+        configVersion,
+        testItems,
+      );
       const payload = await systemConfigApi.testNotificationChannel({
         channel: testChannel,
-        items: openChannelItems.map((item) => ({ key: item.key, value: String(item.value ?? '') })),
+        items: testItems,
         maskToken,
         title: t('settings.notificationTestTitleValue'),
         content: t('settings.notificationTestContent'),
         timeoutSeconds: 20,
       });
+      const outcome = classifyNotificationTestOutcome(payload);
       setNotificationChannelTestRecord({
         channel: testChannel,
-        success: payload.success,
+        outcome,
         message: payload.message,
         errorCode: payload.errorCode,
+        attempts: payload.attempts,
+        configVersion,
+        configFingerprint,
         at: Date.now(),
       });
-      if (payload.success) {
+      if (outcome === 'verified') {
         setModalFeedback({
-          success: true,
+          outcome,
           title: t('settings.notificationTestSuccess'),
           message: `${payload.message} ${text.testSuccessBindHint}`,
+          attempts: payload.attempts,
         });
       } else {
         const mapped = mapApiErrorToActionable(createParsedApiError({
@@ -183,24 +265,32 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           code: payload.errorCode ?? 'notification_channel_test_failed',
         }));
         setModalFeedback({
-          success: false,
-          title: t('settings.notificationTestFailure'),
-          message: getNotificationTestHint(mapped.technicalCode ?? payload.errorCode, language),
+          outcome,
+          title: outcome === 'degraded' ? text.lastTestPartial : t('settings.notificationTestFailure'),
+          message: outcome === 'degraded'
+            ? text.testPartialHint
+            : getNotificationTestHint(mapped.technicalCode ?? payload.errorCode, language),
           technical: [payload.errorCode, mapped.technicalReason].filter(Boolean).join(' · ') || undefined,
+          attempts: payload.attempts,
         });
       }
     } catch (requestError: unknown) {
       const parsed = getParsedApiError(requestError, language);
       const mapped = mapApiErrorToActionable(parsed);
-      setNotificationChannelTestRecord({
-        channel: testChannel,
-        success: false,
-        message: parsed.message,
-        errorCode: parsed.code ?? mapped.technicalCode,
-        at: Date.now(),
-      });
+      if (configFingerprint) {
+        setNotificationChannelTestRecord({
+          channel: testChannel,
+          outcome: 'failed',
+          message: parsed.message,
+          errorCode: parsed.code ?? mapped.technicalCode,
+          attempts: [],
+          configVersion,
+          configFingerprint,
+          at: Date.now(),
+        });
+      }
       setModalFeedback({
-        success: false,
+        outcome: 'failed',
         title: t('settings.notificationTestFailure'),
         message: getNotificationTestHint(mapped.technicalCode ?? parsed.code, language),
         technical: [parsed.code, mapped.technicalReason].filter(Boolean).join(' · ') || undefined,
@@ -210,10 +300,24 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     }
   };
 
-  const openRoutingValue = openChannel ? channelRoutingValue(openChannel.id, openChannel.routingValue) : '';
+  const openRoutingValue = openChannel ? getNotificationRoutingValue(openChannel) : '';
   const openTestChannel = openChannel ? toTestChannel(openChannel.id, openChannel.routingValue) : null;
   void testStatusVersion;
-  const openTestRecord = openTestChannel ? getNotificationChannelTestRecord(openTestChannel) : undefined;
+  const openFingerprint = openTestChannel ? configurationFingerprints.get(openTestChannel) : undefined;
+  const openTestRecord = openTestChannel && openFingerprint
+    ? getNotificationChannelTestRecord(openTestChannel, {
+      configVersion,
+      configFingerprint: openFingerprint,
+    }, statusNow)
+    : undefined;
+  const openChannelHasPendingConfig = openChannelItems.some(
+    (item) => String(item.value ?? '') !== String(persistedValuesByKey[item.key] ?? ''),
+  );
+  const openChannelIsConfigured = configuredChannelValues?.has(openRoutingValue) ?? false;
+  const openBoundEvents = eventsForRoutingChannel(eventRoutes, openRoutingValue);
+  const openDraftBoundEvents = eventsForRoutingChannel(draftEventRoutes, openRoutingValue);
+  const openUnboundEvents = (['report', 'alert', 'system_error'] as const)
+    .filter((kind) => !openBoundEvents.includes(kind));
 
   return (
     <div className="space-y-4" data-testid="notification-channels-hub">
@@ -232,17 +336,38 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               ['report', eventRoutes.report],
               ['alert', eventRoutes.alert],
               ['system_error', eventRoutes.system_error],
-            ] as const).map(([kind, channels]) => (
+            ] as const).map(([kind, route]) => (
               <div
                 key={kind}
                 className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3"
                 data-testid={`notification-event-route-${kind}`}
               >
                 <dt className="shrink-0 text-xs font-medium text-secondary-text">{eventLabel(kind, text)}</dt>
-                <dd className="min-w-0 text-xs leading-5 text-foreground sm:text-right">{formatRouteTargets(channels)}</dd>
+                <dd className="min-w-0 text-xs leading-5 text-foreground sm:text-right">
+                  <span>{formatRouteTargets(route)}</span>
+                  {route.invalid.length ? (
+                    <span className="block text-danger">
+                      {text.routeInvalid}: {route.invalid.join(', ')}
+                    </span>
+                  ) : null}
+                  {route.unconfigured.length ? (
+                    <span className="block text-warning">
+                      {text.routeUnconfigured}: {route.unconfigured.join(', ')}
+                    </span>
+                  ) : null}
+                </dd>
               </div>
             ))}
           </dl>
+          {hasPendingRoutes ? (
+            <InlineAlert
+              variant={saveStatus === 'failed' || saveStatus === 'conflicted' ? 'danger' : 'warning'}
+              title={text.routePendingDraft}
+              message={saveStatus === 'failed' || saveStatus === 'conflicted'
+                ? text.routePendingFailed
+                : text.routePendingDescription}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -250,27 +375,46 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         {NOTIFICATION_CHANNELS.map((channel) => {
           const channelItems = itemsByChannel.get(channel.id) ?? [];
           if (channelItems.length === 0) return null;
-          const routingValue = channelRoutingValue(channel.id, channel.routingValue);
+          const routingValue = getNotificationRoutingValue(channel);
           const configured = configuredChannelValues === null
             ? isChannelConfigured(channelItems)
             : configuredChannelValues.has(routingValue);
+          const hasPendingConfiguration = channelItems.some(
+            (item) => String(item.value ?? '') !== String(persistedValuesByKey[item.key] ?? ''),
+          );
           const testChannel = toTestChannel(channel.id, channel.routingValue);
-          const lastTest = testChannel ? getNotificationChannelTestRecord(testChannel) : undefined;
+          const fingerprint = testChannel ? configurationFingerprints.get(testChannel) : undefined;
+          const lastTest = testChannel && fingerprint
+            ? getNotificationChannelTestRecord(testChannel, {
+              configVersion,
+              configFingerprint: fingerprint,
+            }, statusNow)
+            : undefined;
           const boundEvents = eventsForRoutingChannel(eventRoutes, routingValue);
           const statusLabel = !configured
             ? text.bindUnconfigured
-            : lastTest?.success
+            : hasPendingConfiguration && lastTest
+              ? text.testDraftOnly
+            : lastTest?.outcome === 'verified'
               ? text.bindVerified
+              : lastTest?.outcome === 'degraded'
+                ? text.bindDegraded
               : text.bindNeedsTest;
           const statusVariant = !configured
             ? 'default'
-            : lastTest?.success
+            : hasPendingConfiguration && lastTest
+              ? 'warning'
+            : lastTest?.outcome === 'verified'
               ? 'success'
-              : lastTest && !lastTest.success
+              : lastTest?.outcome === 'failed'
                 ? 'danger'
                 : 'warning';
           const testBadge = lastTest
-            ? (lastTest.success ? text.lastTestOk : text.lastTestFailed)
+            ? (lastTest.outcome === 'verified'
+              ? text.lastTestOk
+              : lastTest.outcome === 'degraded'
+                ? text.lastTestPartial
+                : text.lastTestFailed)
             : text.lastTestNever;
           return (
             <button
@@ -296,7 +440,14 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                 <Badge variant={configured ? 'success' : 'default'} size="sm">
                   {configured ? text.configured : text.unconfigured}
                 </Badge>
-                <Badge variant={lastTest ? (lastTest.success ? 'success' : 'danger') : 'default'} size="sm">
+                <Badge
+                  variant={lastTest
+                    ? (lastTest.outcome === 'verified'
+                      ? 'success'
+                      : lastTest.outcome === 'degraded' ? 'warning' : 'danger')
+                    : 'default'}
+                  size="sm"
+                >
                   {testBadge}
                 </Badge>
               </span>
@@ -335,8 +486,17 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                   : (configuredChannelValues.has(openRoutingValue) ? text.configured : text.unconfigured)}
               </Badge>
               {openTestRecord ? (
-                <Badge variant={openTestRecord.success ? 'success' : 'danger'} size="sm">
-                  {openTestRecord.success ? text.lastTestOk : text.lastTestFailed}
+                <Badge
+                  variant={openTestRecord.outcome === 'verified'
+                    ? 'success'
+                    : openTestRecord.outcome === 'degraded' ? 'warning' : 'danger'}
+                  size="sm"
+                >
+                  {openTestRecord.outcome === 'verified'
+                    ? text.lastTestOk
+                    : openTestRecord.outcome === 'degraded'
+                      ? text.lastTestPartial
+                      : text.lastTestFailed}
                 </Badge>
               ) : (
                 <Badge variant="default" size="sm">{text.lastTestNever}</Badge>
@@ -353,6 +513,18 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                 </span>
               ) : null}
             </div>
+
+            {openTestRecord ? (
+              <p className="text-xs leading-5 text-muted-text" data-testid="notification-test-evidence-scope">
+                {text.lastTestAt}:{' '}
+                {new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : language, {
+                  dateStyle: 'short',
+                  timeStyle: 'medium',
+                }).format(new Date(openTestRecord.at))}
+                {' · '}{text.testEvidenceSession}
+                {openTestRecord.message ? ` · ${openTestRecord.message}` : ''}
+              </p>
+            ) : null}
 
             <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
               {openChannel.id === 'dingtalk' ? (
@@ -396,7 +568,9 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                 </Button>
                 {modalFeedback ? (
                   <InlineAlert
-                    variant={modalFeedback.success ? 'success' : 'danger'}
+                    variant={modalFeedback.outcome === 'verified'
+                      ? 'success'
+                      : modalFeedback.outcome === 'degraded' ? 'warning' : 'danger'}
                     title={modalFeedback.title}
                     message={(
                       <span>
@@ -410,7 +584,101 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                     )}
                   />
                 ) : null}
+                {modalFeedback?.attempts?.length ? (
+                  <div className="space-y-2" data-testid="notification-channel-test-attempts">
+                    {modalFeedback.attempts.map((attempt, index) => (
+                      <div
+                        key={`${attempt.channel}-${attempt.target ?? index}`}
+                        className="rounded-md border settings-border bg-background/35 px-3 py-2 text-xs"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={attempt.success ? 'success' : 'danger'} size="sm">
+                            {attempt.success ? t('common.success') : t('common.failure')}
+                          </Badge>
+                          <span className="break-all text-secondary-text">
+                            {attempt.target || attempt.channel}
+                          </span>
+                        </div>
+                        {!attempt.success ? (
+                          <p className="mt-1 text-muted-text">
+                            {getNotificationTestHint(attempt.errorCode, language)}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
+            ) : null}
+
+            {openTestRecord?.outcome === 'verified'
+              && openChannelIsConfigured
+              && eventRoutes
+              && onBindEvents ? (
+              <section
+                className="space-y-3 border-t border-[var(--settings-border-soft)] pt-4"
+                aria-labelledby="notification-bind-events-heading"
+              >
+                <div>
+                  <h3 id="notification-bind-events-heading" className="text-sm font-semibold text-foreground">
+                    {text.bindEventsTitle}
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-secondary-text">
+                    {text.bindEventsDescription}
+                  </p>
+                </div>
+                {openChannelHasPendingConfig ? (
+                  <InlineAlert
+                    variant="warning"
+                    title={text.testDraftOnly}
+                    message={text.testDraftOnlyDescription}
+                  />
+                ) : openUnboundEvents.length ? (
+                  <>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {openUnboundEvents.map((kind) => (
+                        <Checkbox
+                          key={kind}
+                          checked={selectedBindEvents.includes(kind)}
+                          disabled={disabled || hasPendingRoutes}
+                          label={eventLabel(kind, text)}
+                          onChange={(event) => {
+                            setSelectedBindEvents((current) => event.target.checked
+                              ? [...current, kind]
+                              : current.filter((value) => value !== kind));
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={disabled || hasPendingRoutes || selectedBindEvents.length === 0}
+                      onClick={() => {
+                        onBindEvents(openRoutingValue, selectedBindEvents);
+                        setBindFeedback(text.bindingPending);
+                        setSelectedBindEvents([]);
+                      }}
+                      data-testid="notification-channel-bind-events"
+                    >
+                      {text.bindSelectedEvents}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-xs text-success">{text.noEligibleEvents}</p>
+                )}
+                {hasPendingRoutes || bindFeedback ? (
+                  <InlineAlert
+                    variant={saveStatus === 'failed' || saveStatus === 'conflicted' ? 'danger' : 'warning'}
+                    title={text.routePendingDraft}
+                    message={saveStatus === 'failed' || saveStatus === 'conflicted'
+                      ? text.routePendingFailed
+                      : `${bindFeedback ?? text.bindingPending} ${openDraftBoundEvents.length
+                        ? openDraftBoundEvents.map((kind) => eventLabel(kind, text)).join(' · ')
+                        : ''}`}
+                  />
+                ) : null}
+              </section>
             ) : null}
           </div>
         </Modal>
