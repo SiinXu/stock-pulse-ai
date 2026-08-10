@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { onboardingApi } from '../../api/onboarding';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { ParsedApiError } from '../../api/error';
+import type { ReportLanguage } from '../../types/analysis';
 import type {
   OnboardingGoal,
   OnboardingInfrastructure,
@@ -49,6 +50,10 @@ function toggleListValue<T extends string>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
+function normalizeReportLanguage(value: string): ReportLanguage {
+  return value === 'en' || value === 'ko' ? value : 'zh';
+}
+
 export const AgentOnboardingWizard: React.FC<AgentOnboardingWizardProps> = ({
   open,
   onClose,
@@ -58,10 +63,11 @@ export const AgentOnboardingWizard: React.FC<AgentOnboardingWizardProps> = ({
   t,
 }) => {
   const navigate = useNavigate();
+  const normalizedReportLanguage = normalizeReportLanguage(reportLanguage);
   const [step, setStep] = useState<OnboardingWizardStep>('intake');
   const [profile, setProfile] = useState<UserOnboardingProfile>({
     ...DEFAULT_ONBOARDING_PROFILE,
-    reportLanguage,
+    reportLanguage: normalizedReportLanguage,
   });
   const [plan, setPlan] = useState<OnboardingPlan | null>(null);
   const [preferLlm, setPreferLlm] = useState(false);
@@ -77,16 +83,18 @@ export const AgentOnboardingWizard: React.FC<AgentOnboardingWizardProps> = ({
       setStep(draft.step === 'done' ? 'intake' : draft.step);
       setProfile({
         ...draft.profile,
-        reportLanguage: draft.profile.reportLanguage || reportLanguage,
+        reportLanguage: normalizeReportLanguage(
+          draft.profile.reportLanguage || normalizedReportLanguage,
+        ),
       });
     } else {
       setStep('intake');
-      setProfile({ ...DEFAULT_ONBOARDING_PROFILE, reportLanguage });
+      setProfile({ ...DEFAULT_ONBOARDING_PROFILE, reportLanguage: normalizedReportLanguage });
     }
     setPlan(null);
     setError(null);
     setAppliedKeys([]);
-  }, [open, reportLanguage]);
+  }, [normalizedReportLanguage, open]);
 
   useEffect(() => {
     if (!open) return;
