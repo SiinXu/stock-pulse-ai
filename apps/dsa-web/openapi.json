@@ -4945,6 +4945,20 @@
               }
             ],
             "title": "Skills"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S(?:.*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -4987,6 +5001,17 @@
           "success": {
             "title": "Success",
             "type": "boolean"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -18953,6 +18978,17 @@
           "role": {
             "title": "Role",
             "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -18978,6 +19014,11 @@
           },
           "session_state": {
             "$ref": "#/components/schemas/SessionStateResponse"
+          },
+          "turn_identity_supported": {
+            "default": true,
+            "title": "Turn Identity Supported",
+            "type": "boolean"
           }
         },
         "required": [
@@ -23992,7 +24033,7 @@
     },
     "/api/v1/agent/chat/stream": {
       "post": {
-        "description": "Chat with the AI Agent, streaming progress via SSE.\nEach SSE event is a JSON object with a 'type' field:\n  - thinking: AI is deciding next action\n  - stage_start: an agent or orchestrator stage has begun\n  - stage_done: an agent or orchestrator stage finished\n  - tool_start: a tool call has begun\n  - tool_done: a tool call finished\n  - generating: final answer being generated\n  - pipeline_timeout: analysis stopped because the stage/pipeline budget expired\n  - pipeline_budget_skipped: analysis stopped before an unstarted stage\n    because the remaining budget was too low for useful work\n  - done: analysis complete, contains 'content' and 'success'\n  - error: error occurred, contains 'message'",
+        "description": "Chat with the AI Agent, streaming progress via SSE.\nEach SSE event is a JSON object with a 'type' field:\n  - thinking: AI is deciding next action\n  - stage_start: an agent or orchestrator stage has begun\n  - stage_done: an agent or orchestrator stage finished\n  - tool_start: a tool call has begun\n  - tool_done: a tool call finished\n  - generating: final answer being generated\n  - pipeline_timeout: analysis stopped because the stage/pipeline budget expired\n  - pipeline_budget_skipped: analysis stopped before an unstarted stage\n    because the remaining budget was too low for useful work\n  - turn_persisted: the identified user turn and request context are durable\n  - done: analysis complete, contains 'content' and 'success'\n  - error: error occurred, contains 'message'",
         "operationId": "agent_chat_stream_api_v1_agent_chat_stream_post",
         "requestBody": {
           "content": {
