@@ -278,6 +278,7 @@ EXPECTED_GROUPS = (
             "save_analysis_history",
             "update_analysis_history_diagnostics",
             "get_analysis_history",
+            "get_analysis_history_batch",
             "get_latest_analysis_history_id",
             "get_analysis_history_paginated",
             "search_analysis_history",
@@ -296,7 +297,7 @@ EXPECTED_GROUPS = (
             "_extract_sniper_points",
             "_build_fallback_url_key",
         ),
-        "257f6d5e14c00d13c2e6d84f24c7e0d01caaee473ac87c170b1f21cdf15786dc",
+        "d55af92829eab68c5cfb8eebc47cff79b150e96ed7b25daac681b7a677efc738",
     ),
     (
         "_ConversationMethods",

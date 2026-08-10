@@ -43,6 +43,7 @@ from api.v1.endpoints import (
     skill_outcomes,
     stocks,
     system_config,
+    todays_focus,
     usage,
     watchlist_scores,
     watchlist_groups,
@@ -161,6 +162,12 @@ router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
+)
+
+router.include_router(
+    todays_focus.router,
+    prefix="/focus",
+    tags=["TodaysFocus"],
 )
 
 router.include_router(
