@@ -13,8 +13,8 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 207293,
-      "measuredGzipBytes": 206793
+      "maxGzipBytes": 208295,
+      "measuredGzipBytes": 206795
     },
     {
       "id": "js-entry",
@@ -25,58 +25,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 135043,
-      "measuredGzipBytes": 134543,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 136736,
+      "measuredGzipBytes": 135236,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 129103,
-      "measuredGzipBytes": 128603,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 130397,
+      "measuredGzipBytes": 128897,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 128910,
-      "measuredGzipBytes": 128410,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 130522,
+      "measuredGzipBytes": 129022,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 129013,
-      "measuredGzipBytes": 128513,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 130632,
+      "measuredGzipBytes": 129132,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 124923,
-      "measuredGzipBytes": 124423,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 126519,
+      "measuredGzipBytes": 125019,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 122630,
-      "measuredGzipBytes": 122130,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 124249,
+      "measuredGzipBytes": 122749,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 115659,
-      "measuredGzipBytes": 115159,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 117203,
+      "measuredGzipBytes": 115703,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 115731,
-      "measuredGzipBytes": 115231,
-      "note": "Rebaseline after registering agent/report Settings help and field titles (500 bytes headroom above measured gzip)."
+      "maxGzipBytes": 117265,
+      "measuredGzipBytes": 115765,
+      "note": "Rebaseline after agent/report Settings help i18n (+1500 B headroom above measured gzip)."
     },
     {
       "id": "vendor-charts",
