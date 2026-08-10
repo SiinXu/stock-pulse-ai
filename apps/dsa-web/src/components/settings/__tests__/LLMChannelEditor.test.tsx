@@ -2163,7 +2163,7 @@ describe('LLMChannelEditor', () => {
         addSignal={1}
       />,
     );
-    expect(screen.queryByRole('button', { name: /添加模型服务/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /添加模型来源/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('model-source-setup-page')).not.toBeInTheDocument();
     expect(screen.getByText('模型服务列表加载失败')).toBeInTheDocument();
   });
