@@ -245,6 +245,8 @@ class _StockAnalysisStageMixin:
             # - Return partial/failed if timeout, does not affect existing technical indicator/news link
             # - Return not_supported structure when the switch is closed.
             fundamental_context = None
+            from data_provider.data_validation import DataValidationRejected
+
             try:
                 fundamental_context = self.fetcher_manager.get_fundamental_context(
                     code,
@@ -253,6 +255,21 @@ class _StockAnalysisStageMixin:
                         'fundamental_stage_timeout_seconds',
                         FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
                     ),
+                )
+            except DataValidationRejected as rejection:
+                log_safe_exception(
+                    logger,
+                    "Fundamental data rejected by validation policy",
+                    rejection,
+                    error_code="pipeline_fundamental_validation_rejected",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                fundamental_context = (
+                    self.fetcher_manager.build_validation_rejected_fundamental_context(
+                        code,
+                        rejection,
+                    )
                 )
             except Exception as e:  # broad-exception: fallback_recorded - Fundamental failure is safely logged before a failed-context fallback is built.
                 log_safe_exception(
@@ -346,7 +363,12 @@ class _StockAnalysisStageMixin:
                     getattr(self.config, "enable_chip_distribution", False)
                     and chip_data is None
                 )
-                or fundamental_status in {"failed", "partial", "missing"}
+                or fundamental_status in {
+                    "failed",
+                    "partial",
+                    "missing",
+                    "validation_rejected",
+                }
                 or trend_result is None
                 or (
                     daily_market_context_enabled
