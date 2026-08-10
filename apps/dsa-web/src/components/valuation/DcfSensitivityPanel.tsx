@@ -9,7 +9,15 @@ import {
 } from '../../api/valuation';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { VALUATION_TEXT } from '../../locales/valuation';
-import { Button, Card, EmptyState, Field, InlineAlert } from '../common';
+import {
+  Button,
+  Card,
+  DataTable,
+  type DataTableColumn,
+  EmptyState,
+  InlineAlert,
+  Input,
+} from '../common';
 
 export type DcfSensitivityPanelProps = {
   estimate?: ValuationEstimate | null;
@@ -20,6 +28,7 @@ export type DcfSensitivityPanelProps = {
 };
 
 type SensitivityRow = { growthRate?: number; discountRate?: number; equityValue?: number };
+type SensitivityMatrixRow = { discountRate: number };
 
 const asNumber = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -128,6 +137,37 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
       max: values.length ? Math.max(...values) : 0,
     };
   }, [rows]);
+  const sensitivityRows = useMemo<SensitivityMatrixRow[]>(
+    () => matrix.discountRates.map((discountRate) => ({ discountRate })),
+    [matrix.discountRates],
+  );
+  const sensitivityColumns = useMemo<DataTableColumn<SensitivityMatrixRow>[]>(() => [
+    {
+      id: 'discount-rate',
+      header: `${text.discountAxis} / ${text.growthAxis}`,
+      cell: (row) => formatRate(row.discountRate),
+      rowHeader: true,
+    },
+    ...matrix.growthRates.map((growth) => ({
+      id: `growth-${growth}`,
+      header: formatRate(growth),
+      align: 'end' as const,
+      cell: (row: SensitivityMatrixRow) => {
+        const value = matrix.lookup.get(`${growth}|${row.discountRate}`);
+        return (
+          <div
+            className={`rounded-md px-2 py-1 text-right tabular-nums ${
+              value === undefined
+                ? 'bg-surface-muted text-content-muted'
+                : heatClass(value, matrix.min, matrix.max)
+            }`}
+          >
+            {formatMoney(value)}
+          </div>
+        );
+      },
+    })),
+  ], [matrix.growthRates, matrix.lookup, matrix.max, matrix.min, text.discountAxis, text.growthAxis]);
 
   const dcfStatus = estimate?.dcf?.status ?? estimate?.status;
   const insufficient =
@@ -180,8 +220,9 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
   }, [discountRate, fetchEstimate, growthRate, projectionYears, stockCode, terminalGrowth, text]);
 
   return (
-    <Card className={className} data-testid="dcf-sensitivity-panel">
-      <div className="flex flex-col gap-4 p-4">
+    <div className={className}>
+      <Card data-testid="dcf-sensitivity-panel">
+        <div className="flex flex-col gap-4 p-4">
         <header className="space-y-1">
           <h2 className="text-base font-semibold text-content">{text.title}</h2>
           <p className="text-sm text-content-muted">{text.description}</p>
@@ -193,59 +234,49 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
             data-testid="dcf-assumptions-form"
             aria-label={text.assumptions}
           >
-            <Field controlId={stockCodeId} label={text.stockCode}>
-              <input
-                id={stockCodeId}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                value={stockCode}
-                onChange={(event) => setStockCode(event.target.value)}
-                placeholder={text.stockCodePlaceholder}
-                data-testid="dcf-stock-code"
-              />
-            </Field>
-            <Field controlId={growthRateId} label={text.growthRate} hint={text.percentHint} hintId={`${growthRateId}-hint`}>
-              <input
-                id={growthRateId}
-                aria-describedby={`${growthRateId}-hint`}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                value={growthRate}
-                onChange={(event) => setGrowthRate(event.target.value)}
-                inputMode="decimal"
-                data-testid="dcf-growth-rate"
-              />
-            </Field>
-            <Field controlId={discountRateId} label={text.discountRate} hint={text.percentHint} hintId={`${discountRateId}-hint`}>
-              <input
-                id={discountRateId}
-                aria-describedby={`${discountRateId}-hint`}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                value={discountRate}
-                onChange={(event) => setDiscountRate(event.target.value)}
-                inputMode="decimal"
-                data-testid="dcf-discount-rate"
-              />
-            </Field>
-            <Field controlId={terminalGrowthId} label={text.terminalGrowth} hint={text.percentHint} hintId={`${terminalGrowthId}-hint`}>
-              <input
-                id={terminalGrowthId}
-                aria-describedby={`${terminalGrowthId}-hint`}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                value={terminalGrowth}
-                onChange={(event) => setTerminalGrowth(event.target.value)}
-                inputMode="decimal"
-                data-testid="dcf-terminal-growth"
-              />
-            </Field>
-            <Field controlId={projectionYearsId} label={text.projectionYears}>
-              <input
-                id={projectionYearsId}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
-                value={projectionYears}
-                onChange={(event) => setProjectionYears(event.target.value)}
-                inputMode="numeric"
-                data-testid="dcf-projection-years"
-              />
-            </Field>
+            <Input
+              id={stockCodeId}
+              label={text.stockCode}
+              value={stockCode}
+              onChange={(event) => setStockCode(event.target.value)}
+              placeholder={text.stockCodePlaceholder}
+              data-testid="dcf-stock-code"
+            />
+            <Input
+              id={growthRateId}
+              label={text.growthRate}
+              hint={text.percentHint}
+              value={growthRate}
+              onChange={(event) => setGrowthRate(event.target.value)}
+              inputMode="decimal"
+              data-testid="dcf-growth-rate"
+            />
+            <Input
+              id={discountRateId}
+              label={text.discountRate}
+              hint={text.percentHint}
+              value={discountRate}
+              onChange={(event) => setDiscountRate(event.target.value)}
+              inputMode="decimal"
+              data-testid="dcf-discount-rate"
+            />
+            <Input
+              id={terminalGrowthId}
+              label={text.terminalGrowth}
+              hint={text.percentHint}
+              value={terminalGrowth}
+              onChange={(event) => setTerminalGrowth(event.target.value)}
+              inputMode="decimal"
+              data-testid="dcf-terminal-growth"
+            />
+            <Input
+              id={projectionYearsId}
+              label={text.projectionYears}
+              value={projectionYears}
+              onChange={(event) => setProjectionYears(event.target.value)}
+              inputMode="numeric"
+              data-testid="dcf-projection-years"
+            />
             <div className="flex items-end">
               <Button variant="primary" type="button" onClick={() => void handleRecompute()} disabled={loading} data-testid="dcf-recompute">
                 {loading ? text.recomputing : text.recompute}
@@ -306,45 +337,16 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
             ) : (
               <div className="overflow-x-auto" data-testid="dcf-sensitivity-table">
                 <div className="mb-2 text-sm font-medium">{text.sensitivityTable}</div>
-                <table className="min-w-full border-collapse text-sm">
-                  <caption className="sr-only">{text.sensitivityTable}</caption>
-                  <thead>
-                    <tr>
-                      <th className="border border-border bg-surface-muted px-2 py-1 text-left">
-                        {text.discountAxis} / {text.growthAxis}
-                      </th>
-                      {matrix.growthRates.map((g) => (
-                        <th key={g} className="border border-border bg-surface-muted px-2 py-1 text-right">
-                          {formatRate(g)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matrix.discountRates.map((d) => (
-                      <tr key={d}>
-                        <th className="border border-border bg-surface-muted px-2 py-1 text-left font-medium">
-                          {formatRate(d)}
-                        </th>
-                        {matrix.growthRates.map((g) => {
-                          const value = matrix.lookup.get(`${g}|${d}`);
-                          return (
-                            <td
-                              key={`${g}-${d}`}
-                              className={`border border-border px-2 py-1 text-right tabular-nums ${
-                                value === undefined
-                                  ? 'bg-surface-muted text-content-muted'
-                                  : heatClass(value, matrix.min, matrix.max)
-                              }`}
-                            >
-                              {formatMoney(value)}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  caption={text.sensitivityTable}
+                  columns={sensitivityColumns}
+                  rows={sensitivityRows}
+                  getRowKey={(row) => row.discountRate}
+                  emptyState={{ title: text.emptyTitle, description: text.emptyDescription }}
+                  density="compact"
+                  frame="embedded"
+                  minWidth="container"
+                />
               </div>
             )}
           </section>
@@ -353,8 +355,9 @@ export const DcfSensitivityPanel: React.FC<DcfSensitivityPanelProps> = ({
         <p className="text-xs text-content-muted" data-testid="dcf-disclaimer" role="note">
           {estimate?.disclaimer || text.disclaimer}
         </p>
-      </div>
-    </Card>
+        </div>
+      </Card>
+    </div>
   );
 };
 
