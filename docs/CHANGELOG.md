@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Optional delta-first outbound notifications distinguish first analysis, no material change, and unavailable comparison without affecting report persistence or delivery fallback.
+- [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
 - [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
 - [Fixed] Aligned Web acceptance coverage with safe global error Toasts, current chat session payloads, semantic control sizing, and collapsed mobile Backtest filters.
@@ -16,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).
+- [Fixed] Preserve the last successful screening result across failed attempts, distinguish capability/status/empty/degradation states, and provide exact-parameter retry and data-source recovery actions (Refs #871).
 - [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).
 - [Changed] Adopt multi-market `marketFormat` for Stock Details quote/history and history trend drawer price/change colors (CN/HK/US precision, currency, and red_up/green_up semantics; issue #889).
 - [Added] Web report Decision Card view pins verdict/confidence/risks/watch conditions above evidence strata (default collapsed) across page, panel, and drawer report surfaces (#874).
