@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
-- [Added] Explicit principal-scoped Agent memory projection foundation with outcome-grounded evidence, bounded typed records, safe JSON data projection, and optional CJK-aware coarse ranking (refs #250 and #198; no production hook).
+- [Added] Explicit principal-scoped Agent memory projection foundation with validated UTC point-in-time `as_of` semantics, horizon-owned outcome-grounded evidence, structurally bounded typed records, safe JSON data projection, and optional CJK-aware coarse ranking (refs #250 and #198; no production hook).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
 - [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.
