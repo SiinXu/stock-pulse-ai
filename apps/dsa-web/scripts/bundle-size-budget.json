@@ -123,7 +123,8 @@
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
       "maxGzipBytes": 57000,
-      "measuredGzipBytes": 56659
+      "measuredGzipBytes": 56659,
+      "note": "Measured after moving the zero-config first-run story into its own lazy chunk; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
     },
     {
       "id": "SettingsPage",
