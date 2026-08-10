@@ -11,6 +11,8 @@ from __future__ import annotations
 import importlib.util
 import shutil
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Iterator
 
@@ -101,6 +103,21 @@ class _FallbackProvider(DataProvider):
                 "pct_chg": [0.0],
             }
         )
+
+
+class _SlowOpenBBSdk:
+    """OpenBB-shaped fixture whose historical endpoint blocks until released."""
+
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.equity = self
+        self.price = self
+
+    def historical(self, **_kwargs):
+        self.started.set()
+        self.release.wait(timeout=2.0)
+        return _sample_upstream_frame()
 
 
 @pytest.fixture(autouse=True)
@@ -233,6 +250,58 @@ def test_fixture_client_returns_normalized_daily_data() -> None:
             "timeout_seconds": 9.0,
         }
     ]
+
+
+def test_sdk_client_enforces_wall_clock_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_plugin_module()
+    sdk = _SlowOpenBBSdk()
+    monkeypatch.setattr(module, "_import_openbb", lambda: sdk)
+
+    started = time.monotonic()
+    try:
+        with pytest.raises(
+            module.OpenBBProviderTimeoutError,
+            match="OpenBB historical provider timed out",
+        ):
+            module._SdkOpenBBClient().fetch_historical(
+                symbol="AAPL",
+                start_date="2026-02-01",
+                end_date="2026-02-10",
+                timeout_seconds=0.05,
+            )
+        assert time.monotonic() - started < 0.5
+        assert sdk.started.is_set()
+    finally:
+        sdk.release.set()
+
+
+def test_sdk_timeout_enters_manager_fallback_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_plugin_module()
+    sdk = _SlowOpenBBSdk()
+    monkeypatch.setattr(module, "_import_openbb", lambda: sdk)
+    providers = DataFetcherManager(
+        fetchers=[
+            module.OpenBBDailyDataProvider(timeout_seconds=0.05),
+            _FallbackProvider(),
+        ]
+    )
+
+    started = time.monotonic()
+    try:
+        frame, source = providers.get_daily_data(
+            "600519",
+            start_date="2026-02-01",
+            end_date="2026-02-10",
+        )
+        assert time.monotonic() - started < 0.5
+        assert source == "OpenBBDemoTestFallback"
+        assert frame["close"].tolist() == [1.0]
+    finally:
+        sdk.release.set()
 
 
 def test_plugin_remains_opt_in_when_plugins_dir_unset(

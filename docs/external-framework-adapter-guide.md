@@ -159,13 +159,15 @@ remains, **raise** so the manager can fall back.
 | Situation | Required behavior |
 | --- | --- |
 | External package not installed | Raise a clear error naming the package and that StockPulse will not auto-install it |
-| Transport / SDK timeout | Raise from this attempt after configuring a finite client timeout |
+| Transport / SDK timeout | Enforce a finite client or adapter wall-clock deadline and raise from this attempt |
 | Empty or malformed upstream payload | Raise; do not return an empty “success” frame unless the capability explicitly allows empty data **and** the host contract documents that |
 | Partial multi-symbol batch failure | Fail the current attempt or return only validated rows per the host contract — never silent zeros for missing symbols |
 | Cross-provider fallback | **Forbidden inside the plugin**. One attempt; `DataFetcherManager` owns the chain |
 
 The host does **not** impose a universal deadline around every provider call.
 Finite connect/read (or SDK) timeouts are the adapter author's responsibility.
+The OpenBB example enforces its SDK deadline in the adapter and raises a typed
+provider timeout so the host fallback chain can continue.
 
 ## Dependency declaration and manual install
 
@@ -185,7 +187,7 @@ Finite connect/read (or SDK) timeouts are the adapter author's responsibility.
 
 ## Trust responsibility statement
 
-> **External adapter plugins run with full process privileges.**  
+> **External adapter plugins run with full process privileges.**
 > Setting `PLUGINS_DIR` is an explicit operator decision to load reviewed Python
 > that can read process memory, environment values, local files, and network
 > routes available to the StockPulse OS user. There is no plugin sandbox,

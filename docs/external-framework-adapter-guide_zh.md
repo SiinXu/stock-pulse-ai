@@ -152,12 +152,13 @@ Data Provider 仍需将 `PluginManager` 绑定到目标
 | 情形 | 要求行为 |
 | --- | --- |
 | 外部包未安装 | 抛出明确错误，点名包名并说明 StockPulse 不会自动安装 |
-| 传输 / SDK 超时 | 在配置有限客户端超时后，从本次 attempt 抛错 |
+| 传输 / SDK 超时 | 施加有限的客户端或适配器 wall-clock deadline，并从本次 attempt 抛错 |
 | 上游空或畸形载荷 | 抛错；除非能力显式允许空数据且宿主契约已写明，否则不要返回空“成功”帧 |
 | 批量多标的部分失败 | 按宿主契约使本次 attempt 失败或仅返回已校验行 — 禁止对缺失标的静默填零 |
 | 跨 provider 回退 | **禁止在插件内实现**。仅一次 attempt；链路由 `DataFetcherManager` 拥有 |
 
 宿主**不会**给每次 provider 调用套统一 deadline。有限的 connect/read（或 SDK）超时由适配作者负责。
+OpenBB 示例会在适配器内执行 SDK deadline，并抛出类型化 provider 超时，让宿主 fallback 链继续。
 
 ## 依赖声明与手动安装
 
@@ -174,7 +175,7 @@ Data Provider 仍需将 `PluginManager` 绑定到目标
 
 ## 信任责任声明
 
-> **外部适配插件以完整进程权限运行。**  
+> **外部适配插件以完整进程权限运行。**
 > 设置 `PLUGINS_DIR` 即表示运维方明确决定加载经审阅的 Python 代码，
 > 该代码可访问 StockPulse 进程用户可见的内存、环境变量、本地文件与网络路径。
 > surface v1 没有插件沙箱、签名库、应用商店或自动更新通道。

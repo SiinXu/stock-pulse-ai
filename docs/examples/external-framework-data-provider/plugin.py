@@ -19,6 +19,7 @@ Design rules (surface v1, uncompromising):
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import date, timedelta
 from typing import Any, Protocol
 
@@ -68,6 +69,10 @@ class OpenBBHistoricalClient(Protocol):
 
 class MissingOpenBBDependencyError(RuntimeError):
     """Raised when the optional OpenBB package is absent at call time."""
+
+
+class OpenBBProviderTimeoutError(TimeoutError):
+    """Raised when one OpenBB SDK provider attempt exceeds its deadline."""
 
 
 class OpenBBDailyDataProvider(DataProvider):
@@ -151,23 +156,40 @@ class _SdkOpenBBClient:
             kwargs["start_date"] = start_date
         if end_date:
             kwargs["end_date"] = end_date
-        # Prefer explicit provider/timeout knobs when the installed OpenBB version
-        # accepts them; fall back to the minimal signature otherwise.
+        # Prefer an explicit provider when the installed OpenBB version accepts
+        # it; fall back to the minimal signature otherwise.
+        def _request() -> Any:
+            try:
+                return obb.equity.price.historical(
+                    **kwargs,
+                    provider="yfinance",
+                )
+            except TypeError:
+                return obb.equity.price.historical(**kwargs)
+
+        # Do not use the executor as a context manager: __exit__ waits for a
+        # timed-out worker and would turn the deadline back into an unbounded
+        # caller wait. Python cannot forcibly stop an in-flight SDK thread, but
+        # this adapter owns the caller-facing wall-clock bound and immediately
+        # raises into DataFetcherManager's normal fallback chain.
+        executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="stockpulse-openbb",
+        )
         try:
-            result = obb.equity.price.historical(
-                **kwargs,
-                provider="yfinance",
-                # Some OpenBB builds accept chart/timeout style options; ignore TypeError.
-            )
-        except TypeError:
-            result = obb.equity.price.historical(**kwargs)
+            future = executor.submit(_request)
+            result = future.result(timeout=timeout_seconds)
+        except FuturesTimeoutError as exc:
+            future.cancel()
+            raise OpenBBProviderTimeoutError(
+                "OpenBB historical provider timed out after "
+                f"{timeout_seconds:g}s for symbol={symbol!r}; "
+                "failing this provider attempt so DataFetcherManager can fall back"
+            ) from exc
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
         frame = _coerce_openbb_result_to_frame(result)
-        # Document that operators should configure transport timeouts in the
-        # OpenBB / underlying provider stack; we cannot impose a host-wide
-        # deadline from StockPulse. The timeout_seconds argument is retained so
-        # injectable clients and future SDK hooks can honour it.
-        del timeout_seconds
         return frame
 
 

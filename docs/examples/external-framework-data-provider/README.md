@@ -63,8 +63,10 @@ for the composition pattern and lifecycle diagnostics.
   success.
 - **Upstream empty / failure** → raises so `DataFetcherManager` records the
   attempt and continues its eligible fallback chain.
-- **Timeouts** → owned by this adapter / the OpenBB stack. The host does not
-  wrap every provider call in a universal deadline.
+- **Timeouts** → the SDK call has an adapter-owned wall-clock deadline and
+  raises `OpenBBProviderTimeoutError`, allowing `DataFetcherManager` to continue
+  its eligible fallback chain. The host does not wrap every provider call in a
+  universal deadline.
 - **No private fallback loop** → one attempt only; shared routing stays with
   `DataFetcherManager`.
 
