@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Changed] Adopt multi-market `marketFormat` for Stock Details quote/history and history trend drawer price/change colors (CN/HK/US precision, currency, and red_up/green_up semantics; issue #889).
 - [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
+- [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
 - [Added] Default-off CoinGecko market-data path for allowlisted `crypto:` identities, with UTC daily bars, 24×7 context, safe outbound requests, and an optional crypto specialist (Refs #236 and #195).
 - [Added] Portfolio stress-test service and read-only `/api/v1/portfolio/stress-test` endpoints with response-base valuation, strict bounded market/sector/FX/rate shocks, reproducible price/FX/scenario provenance, honest partial/unavailable states, and an atomic bounded YAML catalog (issues #158 and #210; historical replay remaining).
 - [Fixed] Bound portfolio stress snapshots to 512 rows, preserve two-stage FX provenance without fabricated dates, reconcile known and unknown excluded values, and warm configured scenario catalogs atomically.
