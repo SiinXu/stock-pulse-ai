@@ -11913,6 +11913,170 @@
         "title": "LLMProviderCatalogResponse",
         "type": "object"
       },
+      "LocalMarketDataMissingDetails": {
+        "description": "Structured coverage details returned by local-only analysis.",
+        "properties": {
+          "age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Seconds"
+          },
+          "available_end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available End Date"
+          },
+          "available_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Start Date"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "end_date": {
+            "title": "End Date",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "missing_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/LocalMarketDataMissingRange"
+            },
+            "title": "Missing Ranges",
+            "type": "array"
+          },
+          "mode": {
+            "const": "local_only",
+            "default": "local_only",
+            "title": "Mode",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "start_date",
+          "end_date",
+          "days",
+          "reason"
+        ],
+        "title": "LocalMarketDataMissingDetails",
+        "type": "object"
+      },
+      "LocalMarketDataMissingErrorResponse": {
+        "description": "Stable HTTP 409 envelope for an incomplete local daily-data range.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "description": "Deprecated read-only alias of details; retained for patch/minor compatibility and removed only in a future major or versioned API",
+            "readOnly": true,
+            "title": "Detail"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalMarketDataMissingDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "const": "local_market_data_missing",
+            "default": "local_market_data_missing",
+            "title": "Error",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "LocalMarketDataMissingErrorResponse",
+        "type": "object"
+      },
+      "LocalMarketDataMissingRange": {
+        "description": "One inclusive daily-bar range absent from the local store.",
+        "properties": {
+          "end_date": {
+            "title": "End Date",
+            "type": "string"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "title": "LocalMarketDataMissingRange",
+        "type": "object"
+      },
       "LocalModelAssignmentRequest": {
         "additionalProperties": false,
         "description": "Register or explicitly assign one installed local model.",
@@ -30056,11 +30220,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DuplicateTaskErrorResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DuplicateTaskErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocalMarketDataMissingErrorResponse"
+                    }
+                  ],
+                  "title": "Response 409 Trigger Analysis Api V1 Analysis Analyze Post"
                 }
               }
             },
-            "description": "股票正在分析中，拒绝重复提交"
+            "description": "Duplicate analysis task or incomplete local market data"
           },
           "422": {
             "content": {
@@ -42512,6 +42684,16 @@
               }
             },
             "description": "历史行情数据"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Local-only market data is incomplete"
           },
           "422": {
             "content": {

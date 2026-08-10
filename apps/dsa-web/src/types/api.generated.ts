@@ -8105,6 +8105,75 @@ export interface components {
             providers: components["schemas"]["LLMProviderCatalogEntry"][];
         };
         /**
+         * LocalMarketDataMissingDetails
+         * @description Structured coverage details returned by local-only analysis.
+         */
+        LocalMarketDataMissingDetails: {
+            /** Age Seconds */
+            age_seconds?: number | null;
+            /** Available End Date */
+            available_end_date?: string | null;
+            /** Available Start Date */
+            available_start_date?: string | null;
+            /** Days */
+            days: number;
+            /** End Date */
+            end_date: string;
+            /** Fields */
+            fields?: string[];
+            /** Missing Ranges */
+            missing_ranges?: components["schemas"]["LocalMarketDataMissingRange"][];
+            /**
+             * Mode
+             * @default local_only
+             * @constant
+             */
+            mode: "local_only";
+            /** Reason */
+            reason: string;
+            /** Start Date */
+            start_date: string;
+            /** Symbol */
+            symbol: string;
+        };
+        /**
+         * LocalMarketDataMissingErrorResponse
+         * @description Stable HTTP 409 envelope for an incomplete local daily-data range.
+         */
+        LocalMarketDataMissingErrorResponse: {
+            /**
+             * Detail
+             * @deprecated
+             * @description Deprecated read-only alias of details; retained for patch/minor compatibility and removed only in a future major or versioned API
+             */
+            readonly detail?: unknown | null;
+            details?: components["schemas"]["LocalMarketDataMissingDetails"] | null;
+            /**
+             * Error
+             * @default local_market_data_missing
+             * @constant
+             */
+            error: "local_market_data_missing";
+            /** Message */
+            message: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Trace Id */
+            trace_id?: string | null;
+        };
+        /**
+         * LocalMarketDataMissingRange
+         * @description One inclusive daily-bar range absent from the local store.
+         */
+        LocalMarketDataMissingRange: {
+            /** End Date */
+            end_date: string;
+            /** Start Date */
+            start_date: string;
+        };
+        /**
          * LocalModelAssignmentRequest
          * @description Register or explicitly assign one installed local model.
          */
@@ -15931,13 +16000,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description 股票正在分析中，拒绝重复提交 */
+            /** @description Duplicate analysis task or incomplete local market data */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DuplicateTaskErrorResponse"];
+                    "application/json": components["schemas"]["DuplicateTaskErrorResponse"] | components["schemas"]["LocalMarketDataMissingErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -24107,6 +24176,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockHistoryResponse"];
+                };
+            };
+            /** @description Local-only market data is incomplete */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 不支持的周期参数 */
