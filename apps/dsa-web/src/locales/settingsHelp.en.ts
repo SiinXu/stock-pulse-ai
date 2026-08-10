@@ -1519,14 +1519,123 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.system.daily_brief': {
     title: 'Daily Brief',
     summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
-    usage: 'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown.',
+    usage:
+      'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown. DAILY_BRIEF_NOTIFY controls channel push after a successful brief. DAILY_BRIEF_PERSIST_HISTORY keeps review history. DAILY_BRIEF_SAVE_REPORT_FILE writes a report file under the report directory.',
     valueNotes: [
       'Default off keeps existing schedules unchanged.',
       'Accuracy review is informational and does not auto-trade.',
+      'Notify/persist/save-file defaults are true once the brief itself is enabled.',
     ],
-    impact: ['Affects scheduled brief generation and accuracy review panels.'],
+    impact: ['Affects scheduled brief generation, push, history, and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
   },
+  'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
+    title: 'Admin Session Max Age (Hours)',
+    summary: 'Maximum lifetime of an authenticated admin web session.',
+    usage: 'Set an integer between 1 and 720 hours. Default is 24. Existing sessions may keep the previous TTL until re-login.',
+    impact: ['Affects how long Settings and admin APIs stay authenticated without re-login.'],
+    notes: ['A process restart is recommended after changing session policy.'],
+  },
+  'settings.system.OUTBOUND_HTTP_ALLOWLIST': {
+    title: 'Outbound HTTP Allowlist',
+    summary: 'Exact host:port entries that fail-closed outbound HTTP may reach for private or loopback targets.',
+    usage: 'Comma-separated host:port list (for example 127.0.0.1:8642,searxng.internal:8080). Public internet hosts do not need entries.',
+    valueNotes: [
+      'Misconfiguration can block local Ollama, Hermes, private SearXNG, or plugin endpoints.',
+      'Loopback Ollama has a separate exemption path in some call sites; prefer an explicit allowlist when unsure.',
+    ],
+    impact: ['Affects every fail-closed outbound fetch that targets private or loopback hosts.'],
+    notes: ['Restart recommended so long-lived clients reload policy.'],
+  },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: 'Plugin Data Provider Auto-Bind',
+    summary: 'Fail-closed binding of one complete plugin data-provider registry into the process data manager.',
+    usage: 'Leave false unless you intentionally operate reviewed plugins as market-data providers for stock services and the primary analysis pipeline.',
+    impact: ['Affects which data providers stock services and the analysis pipeline can use after restart.'],
+    notes: ['Requires a process restart to rebind ApplicationServices.'],
+  },
+  'settings.system.SMARTMONEY_ENABLED': {
+    title: 'SmartMoney Money-Flow Enabled',
+    summary: 'Default-off gate for SmartMoney money-flow tracking and optional analysis-context injection.',
+    usage: 'Enable only when you accept the extra network calls and calibration metadata path.',
+    impact: ['Affects SmartMoney services and optional analysis context fields.'],
+    notes: ['Disabled runs keep the context shape stable without fabricating flow data.'],
+  },
+  'settings.system.fundamental_pipeline': {
+    title: 'Fundamental Pipeline',
+    summary: 'Master switch, timeouts, retries, and cache bounds for fundamental enrichment.',
+    usage:
+      'ENABLE_FUNDAMENTAL_PIPELINE toggles the stage. FUNDAMENTAL_STAGE_TIMEOUT_SECONDS budgets the whole stage. FUNDAMENTAL_FETCH_TIMEOUT_SECONDS limits each provider fetch. FUNDAMENTAL_RETRY_MAX, FUNDAMENTAL_CACHE_TTL_SECONDS, and FUNDAMENTAL_CACHE_MAX_ENTRIES control retry and in-process cache.',
+    valueNotes: [
+      'Default stage/fetch timeouts are 8 seconds; retry default is 1; cache default is 120s / 256 entries.',
+      'Disabling the pipeline skips fundamental enrichment without failing the rest of analysis.',
+    ],
+    impact: ['Affects fundamental blocks in analysis and related agent tools.'],
+  },
+  'settings.system.PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS': {
+    title: 'Portfolio Idempotency Replay Window (Days)',
+    summary: 'How long a portfolio mutation idempotency key remains eligible for safe replay.',
+    usage: 'Integer days from 1 to 3650. Default 7.',
+    impact: ['Affects safe retry of portfolio write APIs after client retries or reconnects.'],
+  },
+  'settings.system.portfolio_risk': {
+    title: 'Portfolio Risk Thresholds',
+    summary: 'Alert thresholds and lookback window for portfolio risk diagnostics.',
+    usage:
+      'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT, PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT, and PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT are percentages. PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO is a fraction of the stop-loss threshold (0–1). PORTFOLIO_RISK_LOOKBACK_DAYS sets the trading-day lookback (default 180).',
+    impact: ['Affects portfolio risk alerts and agent risk snapshots.'],
+  },
+  'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
+    title: 'Portfolio FX Update Enabled',
+    summary: 'Whether portfolio valuation may refresh FX rates for multi-currency holdings.',
+    usage: 'Default true. Disable only when you want valuation to reuse previously stored FX without network refresh.',
+    impact: ['Affects multi-currency portfolio valuation freshness.'],
+  },
+  'settings.system.news_intel': {
+    title: 'Local News Intelligence Pool',
+    summary: 'Retention, timeouts, and auto-fetch controls for the local intelligence pool (NEWS_INTEL_* / NewsNow).',
+    usage:
+      'NEWS_INTEL_RETENTION_DAYS (1–365), NEWS_INTEL_FETCH_TIMEOUT_SEC (1–30), NEWS_INTEL_MAX_ITEMS_PER_SOURCE (1–200), NEWS_INTEL_AUTO_FETCH_ENABLED (default false), and NEWSNOW_BASE_URL configure the pool. Private NewsNow hosts also need OUTBOUND_HTTP_ALLOWLIST.',
+    valueNotes: [
+      'Auto-fetch is opt-in and may also require workflow env-allowlist mapping in GitHub Actions.',
+      'This pool is separate from SearXNG / RSS search-pipeline sources.',
+    ],
+    impact: ['Affects intelligence pool freshness, storage, and scheduled pulls.'],
+  },
+  'settings.system.reasoning_trace_export': {
+    title: 'Reasoning Trace Export',
+    summary: 'Opt-in export of reasoning-trace artifacts for diagnostics.',
+    usage:
+      'REASONING_TRACE_EXPORT_ENABLED defaults to false. REASONING_TRACE_EXPORT_MAX_CHARS is clamped to 10000–2000000 (default 500000).',
+    valueNotes: ['Exports can be large and may contain analysis content; keep disabled in shared environments unless needed.'],
+    impact: ['Affects diagnostic artifact size and whether traces are written.'],
+  },
+  'settings.ai_model.LLM_TIMEOUT_SEC': {
+    title: 'LLM Request Timeout (Seconds)',
+    summary: 'Per-request LLM timeout reused by AlphaSift stock-selection reordering.',
+    usage: 'Default 60. After timeout AlphaSift falls back to non-LLM ranking instead of retrying blindly.',
+    impact: ['Affects AlphaSift LLM reordering latency and degradation path.'],
+  },
+  'settings.ai_model.LLM_MAX_TOKENS': {
+    title: 'LLM Max Output Tokens',
+    summary: 'Output token cap for AlphaSift LLM reordering requests.',
+    usage: 'Default 2048. Does not replace per-provider max-token keys used by main analysis channels.',
+    impact: ['Affects AlphaSift reordering output length only.'],
+  },
+  'settings.notification.FAILURE_NOTIFY_ENABLED': {
+    title: 'Failure Notify Enabled',
+    summary: 'Controls daily-run failure notifications.',
+    usage:
+      'Leave empty (auto) to notify only when NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured. Set true to force on, false to force off.',
+    impact: ['Affects whether failed daily/Actions runs attempt failure push notifications.'],
+  },
+  'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
+    title: 'Paper Portfolio Initial Cash',
+    summary: 'Starting cash for a newly created paper portfolio.',
+    usage: 'Non-negative number. Default 1000000. Fees and slippage are ignored in the MVP paper engine.',
+    impact: ['Affects only newly created paper portfolios; existing portfolios keep their cash balance.'],
+  },
+
   'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
     title: 'Portfolio Stress Scenario Catalog',
     summary: 'Optional bounded YAML catalog for deterministic portfolio stress scenarios.',

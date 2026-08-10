@@ -152,6 +152,9 @@ _UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
     "VISION_MODEL",
     "LITELLM_FALLBACK_MODELS",
     "LLM_TEMPERATURE",
+    # AlphaSift stock-selection reordering reuses these DSA LLM bounds.
+    "LLM_TIMEOUT_SEC",
+    "LLM_MAX_TOKENS",
 })
 
 _UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({

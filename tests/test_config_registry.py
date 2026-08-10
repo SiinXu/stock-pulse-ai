@@ -1183,6 +1183,8 @@ class TestUiPlacement(unittest.TestCase):
             "VISION_MODEL",
             "LITELLM_FALLBACK_MODELS",
             "LLM_TEMPERATURE",
+            "LLM_TIMEOUT_SEC",
+            "LLM_MAX_TOKENS",
         ):
             self.assertEqual(derive_ui_placement(key), "task_routing", key)
 
@@ -1282,3 +1284,37 @@ class TestUiPlacement(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLongtailBatch1FieldRegistration(unittest.TestCase):
+    """Historical long-tail keys registered in batch 1 stay categorized and typed."""
+
+    def test_batch1_keys_have_expected_controls_and_categories(self) -> None:
+        expected = {
+            "DAILY_BRIEF_NOTIFY": ("system", "boolean", "switch", "true"),
+            "OUTBOUND_HTTP_ALLOWLIST": ("system", "string", "textarea", ""),
+            "ENABLE_FUNDAMENTAL_PIPELINE": ("system", "boolean", "switch", "true"),
+            "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT": ("system", "number", "number", "35.0"),
+            "NEWS_INTEL_AUTO_FETCH_ENABLED": ("system", "boolean", "switch", "false"),
+            "LLM_TIMEOUT_SEC": ("ai_model", "integer", "number", "60"),
+            "LLM_MAX_TOKENS": ("ai_model", "integer", "number", "2048"),
+            "FAILURE_NOTIFY_ENABLED": ("notification", "string", "select", ""),
+            "PAPER_PORTFOLIO_INITIAL_CASH": ("backtest", "number", "number", "1000000"),
+            "SMARTMONEY_ENABLED": ("system", "boolean", "switch", "false"),
+            "ADMIN_SESSION_MAX_AGE_HOURS": ("system", "integer", "number", "24"),
+            "REASONING_TRACE_EXPORT_ENABLED": ("system", "boolean", "switch", "false"),
+        }
+        for key, (category, data_type, ui_control, default_value) in expected.items():
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], category, key)
+            self.assertEqual(field["data_type"], data_type, key)
+            self.assertEqual(field["ui_control"], ui_control, key)
+            self.assertEqual(field["default_value"], default_value, key)
+            self.assertTrue(field.get("is_editable"), key)
+            self.assertTrue(field.get("help_key"), key)
+            self.assertNotEqual(field["category"], "uncategorized", key)
+
+    def test_failure_notify_select_enum_includes_auto_empty(self) -> None:
+        field = get_field_definition("FAILURE_NOTIFY_ENABLED")
+        self.assertEqual(field["validation"].get("enum"), ["", "true", "false"])
+

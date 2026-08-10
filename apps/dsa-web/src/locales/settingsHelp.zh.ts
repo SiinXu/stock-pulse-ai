@@ -1548,14 +1548,123 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.system.daily_brief': {
     title: '每日简报',
     summary: '按计划生成每日简报，并回顾历史简报准确率。',
-    usage: 'DAILY_BRIEF_ENABLED 控制开关；DAILY_BRIEF_SCHEDULE_TIME 与 DAILY_BRIEF_TIMEZONE 控制计划时间；DAILY_BRIEF_MIN_SAMPLES 控制展示准确率前的最小样本数。',
+    usage:
+      'DAILY_BRIEF_ENABLED 控制开关；DAILY_BRIEF_SCHEDULE_TIME 与 DAILY_BRIEF_TIMEZONE 控制计划时间；DAILY_BRIEF_MIN_SAMPLES 控制展示准确率前的最小样本数；DAILY_BRIEF_NOTIFY 控制成功后是否推送；DAILY_BRIEF_PERSIST_HISTORY 控制是否保留回顾历史；DAILY_BRIEF_SAVE_REPORT_FILE 控制是否写入报告文件。',
     valueNotes: [
       '默认关闭，不影响既有计划任务。',
       '准确率回顾仅供参考，不会自动交易。',
+      '推送/持久化/写文件在简报启用后默认均为 true。',
     ],
-    impact: ['影响计划简报生成与准确率回顾展示。'],
+    impact: ['影响计划简报生成、推送、历史与准确率回顾展示。'],
     notes: ['定时投递需要 schedule 模式。'],
   },
+  'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
+    title: '管理员会话最长有效期（小时）',
+    summary: '已登录管理员 Web 会话的最长存活时间。',
+    usage: '填写 1–720 的整数小时，默认 24。已有会话可能保留旧 TTL，直至重新登录。',
+    impact: ['影响设置页与管理 API 在未重新登录前可保持认证的时长。'],
+    notes: ['变更会话策略后建议重启进程。'],
+  },
+  'settings.system.OUTBOUND_HTTP_ALLOWLIST': {
+    title: '出站 HTTP 允许列表',
+    summary: 'fail-closed 出站 HTTP 访问私网或回环目标时允许的精确 host:port 列表。',
+    usage: '逗号分隔的 host:port（例如 127.0.0.1:8642,searxng.internal:8080）。公网主机一般无需写入。',
+    valueNotes: [
+      '配置错误可能阻断本机 Ollama、Hermes、私有 SearXNG 或插件端点。',
+      '部分回环 Ollama 路径有单独豁免；不确定时建议显式写入 allowlist。',
+    ],
+    impact: ['影响所有面向私网/回环的 fail-closed 出站请求。'],
+    notes: ['建议重启，使长连接客户端重新加载策略。'],
+  },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: '插件数据源自动绑定',
+    summary: '将完整的插件数据提供方注册表 fail-closed 绑定到进程内 data manager。',
+    usage: '默认 false。仅在有意把已审查插件作为股票服务与主分析流水线的行情数据源时开启。',
+    impact: ['影响重启后股票服务与主分析流水线可用的数据提供方集合。'],
+    notes: ['需要重启进程以重新绑定 ApplicationServices。'],
+  },
+  'settings.system.SMARTMONEY_ENABLED': {
+    title: '启用 SmartMoney 资金流',
+    summary: 'SmartMoney 资金流跟踪与可选分析上下文注入的默认关闭总开关。',
+    usage: '仅在接受额外网络请求与校准元数据路径时开启。',
+    impact: ['影响 SmartMoney 服务与可选分析上下文字段。'],
+    notes: ['关闭时保持上下文字段形状稳定，不编造资金流数据。'],
+  },
+  'settings.system.fundamental_pipeline': {
+    title: '基本面流水线',
+    summary: '基本面增强阶段的总开关、超时、重试与缓存边界。',
+    usage:
+      'ENABLE_FUNDAMENTAL_PIPELINE 控制阶段开关；FUNDAMENTAL_STAGE_TIMEOUT_SECONDS 为整阶段预算；FUNDAMENTAL_FETCH_TIMEOUT_SECONDS 限制单次拉取；FUNDAMENTAL_RETRY_MAX、FUNDAMENTAL_CACHE_TTL_SECONDS、FUNDAMENTAL_CACHE_MAX_ENTRIES 控制重试与进程内缓存。',
+    valueNotes: [
+      '阶段/拉取默认超时 8 秒；重试默认 1；缓存默认 120 秒 / 256 条。',
+      '关闭流水线会跳过基本面增强，但不会拖垮其余分析阶段。',
+    ],
+    impact: ['影响分析中的基本面模块及相关 Agent 工具。'],
+  },
+  'settings.system.PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS': {
+    title: '组合幂等重放窗口（天）',
+    summary: '组合写操作幂等键可安全重放的保留天数。',
+    usage: '1–3650 的整数天，默认 7。',
+    impact: ['影响客户端重试或重连后组合写 API 的安全回放行为。'],
+  },
+  'settings.system.portfolio_risk': {
+    title: '组合风险阈值',
+    summary: '组合风险诊断的告警阈值与回看窗口。',
+    usage:
+      'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT、PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT、PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT 为百分比；PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO 为止损阈值的近距比例（0–1）；PORTFOLIO_RISK_LOOKBACK_DAYS 为交易日回看窗口（默认 180）。',
+    impact: ['影响组合风险告警与 Agent 风险快照。'],
+  },
+  'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
+    title: '启用组合汇率更新',
+    summary: '多币种持仓估值是否允许刷新汇率。',
+    usage: '默认 true。仅在希望估值复用已存汇率、不做网络刷新时关闭。',
+    impact: ['影响多币种组合估值的汇率新鲜度。'],
+  },
+  'settings.system.news_intel': {
+    title: '本地资讯情报池',
+    summary: '本地情报池（NEWS_INTEL_* / NewsNow）的保留天数、超时与自动拉取控制。',
+    usage:
+      'NEWS_INTEL_RETENTION_DAYS（1–365）、NEWS_INTEL_FETCH_TIMEOUT_SEC（1–30）、NEWS_INTEL_MAX_ITEMS_PER_SOURCE（1–200）、NEWS_INTEL_AUTO_FETCH_ENABLED（默认 false）与 NEWSNOW_BASE_URL 配置情报池。私有 NewsNow 主机还需写入 OUTBOUND_HTTP_ALLOWLIST。',
+    valueNotes: [
+      '自动拉取为 opt-in；GitHub Actions 工作流可能还需要 env allowlist 映射。',
+      '该池与 SearXNG / RSS 搜索链路新闻源相互独立。',
+    ],
+    impact: ['影响情报池新鲜度、存储占用与计划拉取。'],
+  },
+  'settings.system.reasoning_trace_export': {
+    title: '推理轨迹导出',
+    summary: '可选的推理轨迹诊断产物导出。',
+    usage:
+      'REASONING_TRACE_EXPORT_ENABLED 默认 false；REASONING_TRACE_EXPORT_MAX_CHARS 限制在 10000–2000000（默认 500000）。',
+    valueNotes: ['导出体积可能较大且可能包含分析内容；共享环境请保持关闭，除非确实需要。'],
+    impact: ['影响是否写入轨迹产物及其大小上限。'],
+  },
+  'settings.ai_model.LLM_TIMEOUT_SEC': {
+    title: 'LLM 请求超时（秒）',
+    summary: '单次 LLM 请求超时；AlphaSift 选股重排会复用该 DSA 配置。',
+    usage: '默认 60。超时后 AlphaSift 降级为非 LLM 排序，而不是盲目重试。',
+    impact: ['影响 AlphaSift LLM 重排时延与降级路径。'],
+  },
+  'settings.ai_model.LLM_MAX_TOKENS': {
+    title: 'LLM 最大输出 Token 数',
+    summary: 'AlphaSift LLM 重排请求的输出 token 上限。',
+    usage: '默认 2048。不替代主分析链路各供应商自己的 max-token 配置。',
+    impact: ['仅影响 AlphaSift 重排输出长度。'],
+  },
+  'settings.notification.FAILURE_NOTIFY_ENABLED': {
+    title: '失败通知开关',
+    summary: '控制每日运行失败通知。',
+    usage:
+      '留空（自动）表示仅在配置了 NOTIFICATION_SYSTEM_ERROR_CHANNELS 时发送；true 强制开启；false 强制关闭。',
+    impact: ['影响失败的每日/Actions 运行是否尝试推送失败通知。'],
+  },
+  'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
+    title: '纸面组合初始资金',
+    summary: '新建纸面组合时的起始现金。',
+    usage: '非负数，默认 1000000。MVP 纸面引擎忽略手续费与滑点。',
+    impact: ['仅影响新创建的纸面组合；既有组合保留原有现金余额。'],
+  },
+
   'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
     title: '组合压力测试情景目录',
     summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',

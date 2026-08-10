@@ -451,6 +451,58 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "LLM_TIMEOUT_SEC": {
+        "title": "LLM Request Timeout (Seconds)",
+        "description": (
+            "Per-request LLM timeout in seconds. AlphaSift stock-selection reordering reuses this "
+            "DSA setting and falls back to non-LLM ranking after timeout. Default 60."
+        ),
+        "category": "ai_model",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "60",
+        "options": [],
+        "validation": {"min": 1, "max": 3600},
+        "display_order": 7,
+        "help_key": "settings.ai_model.LLM_TIMEOUT_SEC",
+        "examples": ["LLM_TIMEOUT_SEC=60", "LLM_TIMEOUT_SEC=120"],
+        "docs": [
+            {
+                "label": "AlphaSift integration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alphasift-integration.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "LLM_MAX_TOKENS": {
+        "title": "LLM Max Output Tokens",
+        "description": (
+            "Output token cap for AlphaSift LLM reordering requests. Does not replace per-provider "
+            "max-token keys used by main analysis channels. Default 2048."
+        ),
+        "category": "ai_model",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2048",
+        "options": [],
+        "validation": {"min": 1, "max": 200000},
+        "display_order": 8,
+        "help_key": "settings.ai_model.LLM_MAX_TOKENS",
+        "examples": ["LLM_MAX_TOKENS=2048", "LLM_MAX_TOKENS=4096"],
+        "docs": [
+            {
+                "label": "AlphaSift integration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alphasift-integration.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "LLM_PROMPT_CACHE_TELEMETRY_ENABLED": {
         "title": "Prompt Cache Telemetry",
         "description": "Records provider prompt-cache usage telemetry and normalized cache diagnostics when providers return cache usage fields. This does not enable or disable provider implicit cache.",

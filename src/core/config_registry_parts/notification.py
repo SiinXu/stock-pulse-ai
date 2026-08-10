@@ -1453,4 +1453,39 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "FAILURE_NOTIFY_ENABLED": {
+        "title": "Failure Notify Enabled",
+        "description": (
+            "Controls daily-run failure notifications. Empty (default) enables notify only when "
+            "NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured; true forces on; false forces off."
+        ),
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"label": "Auto (system error channels)", "value": ""},
+            {"label": "Always on", "value": "true"},
+            {"label": "Always off", "value": "false"},
+        ],
+        "validation": {"enum": ["", "true", "false"]},
+        "display_order": 72,
+        "help_key": "settings.notification.FAILURE_NOTIFY_ENABLED",
+        "examples": [
+            "FAILURE_NOTIFY_ENABLED=",
+            "FAILURE_NOTIFY_ENABLED=true",
+            "FAILURE_NOTIFY_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "通知渠道与路由",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/notifications.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 }
+

@@ -1121,6 +1121,755 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": ["restart_required", "local_path"],
     },
 
+    "DAILY_BRIEF_NOTIFY": {
+        "title": "Daily Brief Notify",
+        "description": (
+            "When true, a completed daily brief may be pushed through the configured "
+            "notification channels. Does not enable the brief itself."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 63,
+        "help_key": "settings.system.daily_brief",
+        "examples": ["DAILY_BRIEF_NOTIFY=true", "DAILY_BRIEF_NOTIFY=false"],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_PERSIST_HISTORY": {
+        "title": "Daily Brief Persist History",
+        "description": (
+            "When true, each daily brief is stored for later accuracy review and history panels."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 64,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_PERSIST_HISTORY=true",
+            "DAILY_BRIEF_PERSIST_HISTORY=false",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_SAVE_REPORT_FILE": {
+        "title": "Daily Brief Save Report File",
+        "description": (
+            "When true, the brief also writes a report file under the configured report directory."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 65,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_SAVE_REPORT_FILE=true",
+            "DAILY_BRIEF_SAVE_REPORT_FILE=false",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "ADMIN_SESSION_MAX_AGE_HOURS": {
+        "title": "Admin Session Max Age (Hours)",
+        "description": (
+            "Maximum lifetime of an authenticated admin web session in hours. "
+            "Range 1–720; default 24."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "24",
+        "options": [],
+        "validation": {"min": 1, "max": 720},
+        "display_order": 66,
+        "help_key": "settings.system.ADMIN_SESSION_MAX_AGE_HOURS",
+        "examples": ["ADMIN_SESSION_MAX_AGE_HOURS=24", "ADMIN_SESSION_MAX_AGE_HOURS=72"],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OUTBOUND_HTTP_ALLOWLIST": {
+        "title": "Outbound HTTP Allowlist",
+        "description": (
+            "Comma-separated host:port entries that may be reached by fail-closed outbound "
+            "HTTP when the target is private or loopback. Public hosts do not need entries. "
+            "Misconfiguration can block local Ollama, SearXNG, Hermes, or private plugins."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"max_length": 4096},
+        "display_order": 67,
+        "help_key": "settings.system.OUTBOUND_HTTP_ALLOWLIST",
+        "examples": [
+            "OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642,searxng.internal:8080",
+            "OUTBOUND_HTTP_ALLOWLIST=192.168.1.100:11434",
+        ],
+        "docs": [
+            {
+                "label": "Outbound HTTP security policy",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "PLUGIN_DATA_PROVIDER_AUTO_BIND": {
+        "title": "Plugin Data Provider Auto-Bind",
+        "description": (
+            "When true, ApplicationServices fail-closed binds one complete plugin data-provider "
+            "registry into the process data manager used by stock services and the primary "
+            "analysis pipeline. Default false."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 68,
+        "help_key": "settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND",
+        "examples": [
+            "PLUGIN_DATA_PROVIDER_AUTO_BIND=false",
+            "PLUGIN_DATA_PROVIDER_AUTO_BIND=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "SMARTMONEY_ENABLED": {
+        "title": "SmartMoney Money-Flow Enabled",
+        "description": (
+            "Default-off gate for SmartMoney money-flow tracking and optional analysis-context "
+            "injection. When false, no extra SmartMoney network calls are made."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 69,
+        "help_key": "settings.system.SMARTMONEY_ENABLED",
+        "examples": ["SMARTMONEY_ENABLED=false", "SMARTMONEY_ENABLED=true"],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "ENABLE_FUNDAMENTAL_PIPELINE": {
+        "title": "Enable Fundamental Pipeline",
+        "description": (
+            "Master switch for the fundamental-data stage of analysis. When false, fundamental "
+            "fetch and enrichment are skipped without failing the rest of the pipeline."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 70,
+        "help_key": "settings.system.fundamental_pipeline",
+        "examples": [
+            "ENABLE_FUNDAMENTAL_PIPELINE=true",
+            "ENABLE_FUNDAMENTAL_PIPELINE=false",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS": {
+        "title": "Fundamental Stage Timeout (Seconds)",
+        "description": (
+            "Wall-clock budget for the fundamental pipeline stage. 0 disables the stage timeout. "
+            "Default 8.0."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8.0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 600.0},
+        "display_order": 71,
+        "help_key": "settings.system.fundamental_pipeline",
+        "examples": [
+            "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS=8.0",
+            "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS=15",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "FUNDAMENTAL_FETCH_TIMEOUT_SECONDS": {
+        "title": "Fundamental Fetch Timeout (Seconds)",
+        "description": (
+            "Per-fetch timeout for fundamental provider calls inside the stage. Default 8.0."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8.0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 600.0},
+        "display_order": 72,
+        "help_key": "settings.system.fundamental_pipeline",
+        "examples": [
+            "FUNDAMENTAL_FETCH_TIMEOUT_SECONDS=8.0",
+            "FUNDAMENTAL_FETCH_TIMEOUT_SECONDS=12",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "FUNDAMENTAL_RETRY_MAX": {
+        "title": "Fundamental Retry Max",
+        "description": "Maximum additional retries after a failed fundamental fetch. Default 1.",
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 0, "max": 10},
+        "display_order": 73,
+        "help_key": "settings.system.fundamental_pipeline",
+        "examples": ["FUNDAMENTAL_RETRY_MAX=1", "FUNDAMENTAL_RETRY_MAX=0"],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "FUNDAMENTAL_CACHE_TTL_SECONDS": {
+        "title": "Fundamental Cache TTL (Seconds)",
+        "description": "In-process fundamental cache time-to-live in seconds. Default 120.",
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "120",
+        "options": [],
+        "validation": {"min": 0, "max": 86400},
+        "display_order": 74,
+        "help_key": "settings.system.fundamental_pipeline",
+        "examples": [
+            "FUNDAMENTAL_CACHE_TTL_SECONDS=120",
+            "FUNDAMENTAL_CACHE_TTL_SECONDS=300",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "FUNDAMENTAL_CACHE_MAX_ENTRIES": {
+        "title": "Fundamental Cache Max Entries",
+        "description": "Maximum in-process fundamental cache entries. Default 256.",
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "256",
+        "options": [],
+        "validation": {"min": 1, "max": 10000},
+        "display_order": 75,
+        "help_key": "settings.system.fundamental_pipeline",
+        "examples": [
+            "FUNDAMENTAL_CACHE_MAX_ENTRIES=256",
+            "FUNDAMENTAL_CACHE_MAX_ENTRIES=512",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS": {
+        "title": "Portfolio Idempotency Replay Window (Days)",
+        "description": (
+            "How many days a portfolio mutation idempotency key remains eligible for safe replay. "
+            "Range 1–3650; default 7."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "7",
+        "options": [],
+        "validation": {"min": 1, "max": 3650},
+        "display_order": 76,
+        "help_key": "settings.system.PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS",
+        "examples": [
+            "PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS=7",
+            "PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS=30",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT": {
+        "title": "Portfolio Risk Concentration Alert (%)",
+        "description": (
+            "Single-position concentration percentage that raises a portfolio risk alert. "
+            "Default 35.0."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "35.0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 100.0},
+        "display_order": 77,
+        "help_key": "settings.system.portfolio_risk",
+        "examples": [
+            "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT=35.0",
+            "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT=25",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT": {
+        "title": "Portfolio Risk Drawdown Alert (%)",
+        "description": "Portfolio drawdown percentage that raises a risk alert. Default 15.0.",
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "15.0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 100.0},
+        "display_order": 78,
+        "help_key": "settings.system.portfolio_risk",
+        "examples": [
+            "PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT=15.0",
+            "PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT=20",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": {
+        "title": "Portfolio Risk Stop-Loss Alert (%)",
+        "description": (
+            "Per-position loss percentage that raises a stop-loss risk alert. Default 10.0."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10.0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 100.0},
+        "display_order": 79,
+        "help_key": "settings.system.portfolio_risk",
+        "examples": [
+            "PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT=10.0",
+            "PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT=8",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": {
+        "title": "Portfolio Risk Stop-Loss Near Ratio",
+        "description": (
+            "Fraction of the stop-loss threshold that counts as 'near stop-loss' for early "
+            "warnings. Range [0, 1]; default 0.8."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.8",
+        "options": [],
+        "validation": {"min": 0.0, "max": 1.0},
+        "display_order": 80,
+        "help_key": "settings.system.portfolio_risk",
+        "examples": [
+            "PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO=0.8",
+            "PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO=0.9",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_RISK_LOOKBACK_DAYS": {
+        "title": "Portfolio Risk Lookback Days",
+        "description": (
+            "Trading-day lookback window used by portfolio risk metrics such as drawdown. "
+            "Default 180."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "180",
+        "options": [],
+        "validation": {"min": 1, "max": 3650},
+        "display_order": 81,
+        "help_key": "settings.system.portfolio_risk",
+        "examples": [
+            "PORTFOLIO_RISK_LOOKBACK_DAYS=180",
+            "PORTFOLIO_RISK_LOOKBACK_DAYS=90",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_FX_UPDATE_ENABLED": {
+        "title": "Portfolio FX Update Enabled",
+        "description": (
+            "When true, portfolio valuation may refresh FX rates for multi-currency holdings. "
+            "Default true."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 82,
+        "help_key": "settings.system.PORTFOLIO_FX_UPDATE_ENABLED",
+        "examples": [
+            "PORTFOLIO_FX_UPDATE_ENABLED=true",
+            "PORTFOLIO_FX_UPDATE_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "NEWS_INTEL_RETENTION_DAYS": {
+        "title": "News Intel Retention Days",
+        "description": (
+            "How many days local intelligence-pool items are retained. Range 1–365; default 30."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 365},
+        "display_order": 83,
+        "help_key": "settings.system.news_intel",
+        "examples": ["NEWS_INTEL_RETENTION_DAYS=30", "NEWS_INTEL_RETENTION_DAYS=14"],
+        "docs": [
+            {
+                "label": "Intelligence sources",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/intelligence-sources.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "NEWS_INTEL_FETCH_TIMEOUT_SEC": {
+        "title": "News Intel Fetch Timeout (Seconds)",
+        "description": (
+            "Per-source pull timeout for the local intelligence pool. Range 1–30; default 8."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8",
+        "options": [],
+        "validation": {"min": 1.0, "max": 30.0},
+        "display_order": 84,
+        "help_key": "settings.system.news_intel",
+        "examples": ["NEWS_INTEL_FETCH_TIMEOUT_SEC=8", "NEWS_INTEL_FETCH_TIMEOUT_SEC=12"],
+        "docs": [
+            {
+                "label": "Intelligence sources",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/intelligence-sources.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "NEWS_INTEL_MAX_ITEMS_PER_SOURCE": {
+        "title": "News Intel Max Items Per Source",
+        "description": (
+            "Maximum items retained per intelligence source per fetch. Range 1–200; default 50."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "50",
+        "options": [],
+        "validation": {"min": 1, "max": 200},
+        "display_order": 85,
+        "help_key": "settings.system.news_intel",
+        "examples": [
+            "NEWS_INTEL_MAX_ITEMS_PER_SOURCE=50",
+            "NEWS_INTEL_MAX_ITEMS_PER_SOURCE=100",
+        ],
+        "docs": [
+            {
+                "label": "Intelligence sources",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/intelligence-sources.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "NEWS_INTEL_AUTO_FETCH_ENABLED": {
+        "title": "News Intel Auto Fetch Enabled",
+        "description": (
+            "When true, the local intelligence pool may auto-fetch on schedule. Default false "
+            "(opt-in). Workflow env-allowlists may still need an explicit mapping."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 86,
+        "help_key": "settings.system.news_intel",
+        "examples": [
+            "NEWS_INTEL_AUTO_FETCH_ENABLED=false",
+            "NEWS_INTEL_AUTO_FETCH_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Intelligence sources",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/intelligence-sources.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "NEWSNOW_BASE_URL": {
+        "title": "NewsNow Base URL",
+        "description": (
+            "Base URL for the NewsNow-compatible intelligence feed adapter. Default "
+            "https://newsnow.busiyi.world. Private hosts also need OUTBOUND_HTTP_ALLOWLIST."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "https://newsnow.busiyi.world",
+        "options": [],
+        "validation": {"max_length": 1024},
+        "display_order": 87,
+        "help_key": "settings.system.news_intel",
+        "examples": [
+            "NEWSNOW_BASE_URL=https://newsnow.busiyi.world",
+            "NEWSNOW_BASE_URL=http://127.0.0.1:3000",
+        ],
+        "docs": [
+            {
+                "label": "Intelligence sources",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/intelligence-sources.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "REASONING_TRACE_EXPORT_ENABLED": {
+        "title": "Reasoning Trace Export Enabled",
+        "description": (
+            "Opt-in export of reasoning-trace artifacts for diagnostics. Default false; "
+            "exports can be large and may contain analysis content."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 88,
+        "help_key": "settings.system.reasoning_trace_export",
+        "examples": [
+            "REASONING_TRACE_EXPORT_ENABLED=false",
+            "REASONING_TRACE_EXPORT_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "REASONING_TRACE_EXPORT_MAX_CHARS": {
+        "title": "Reasoning Trace Export Max Chars",
+        "description": (
+            "Maximum characters retained when reasoning-trace export is enabled. "
+            "Clamped to 10000–2000000; default 500000."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "500000",
+        "options": [],
+        "validation": {"min": 10000, "max": 2000000},
+        "display_order": 89,
+        "help_key": "settings.system.reasoning_trace_export",
+        "examples": [
+            "REASONING_TRACE_EXPORT_MAX_CHARS=500000",
+            "REASONING_TRACE_EXPORT_MAX_CHARS=100000",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：其他配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
+
 }
 
 
