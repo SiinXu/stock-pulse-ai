@@ -22,7 +22,16 @@ import time
 from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Callable, Optional, List, Tuple, Dict, Any
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 import pandas as pd
 import numpy as np
@@ -550,6 +559,7 @@ class DataFetcherManager:
         *,
         provider_run_recorder: Optional[Callable[..., None]] = None,
         provider_run_started_recorder: Optional[Callable[..., None]] = None,
+        extension_contracts: Optional[Mapping[str, Any]] = None,
     ):
         """
         初始化管理器
@@ -559,6 +569,9 @@ class DataFetcherManager:
             provider_run_recorder: Optional diagnostic recorder (defaults to
                 production run-diagnostics wiring resolved at construction).
             provider_run_started_recorder: Optional start-event recorder pair.
+            extension_contracts: Optional non-data_provider extension contracts
+                merged into the manager-owned plugin registry (composition roots
+                use this when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled).
         """
         from .manager_parts.provider_run_wiring import resolve_provider_run_recorders
 
@@ -589,7 +602,8 @@ class DataFetcherManager:
         self._fetcher_call_locks: Dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
         self._data_provider_runtime = _DataProviderPluginRuntime(
-            self._BUILTIN_DATA_PROVIDER_IDS
+            self._BUILTIN_DATA_PROVIDER_IDS,
+            additional_contracts=extension_contracts,
         )
         self._registered_fetchers: Dict[str, DataProvider] = {}
         self._provider_priorities: Dict[int, int] = {}
@@ -709,6 +723,55 @@ class DataFetcherManager:
             record_count=len(cache_read.frame),
         )
 
+    def _validated_daily_cache_result(
+        self,
+        cache_read: DailyCacheRead,
+        *,
+        stock_code: str,
+        market: str,
+        request_start: float,
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
+        """Apply the active provider-quality policy before accepting a cache hit."""
+        from data_provider.data_validation import (
+            DataValidationRejected,
+            validate_and_annotate,
+        )
+
+        try:
+            validate_and_annotate(
+                cache_read.frame,
+                data_type="daily_data",
+                market=market,
+                stock_code=stock_code,
+                provider=cache_read.source_name,
+                instrument_type=cache_read.frame.attrs.get("instrument_type"),
+            )
+        except DataValidationRejected as exc:
+            self._get_daily_data_cache().invalidate(cache_read.key.symbol)
+            record_provider_run(
+                data_type="daily_data",
+                provider=cache_read.source_name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=int((time.time() - request_start) * 1000),
+                error_type=type(exc).__name__,
+                error_message="cached candidate rejected by data validation",
+                cache_hit=True,
+                stale_seconds=int(cache_read.age_seconds),
+                record_count=len(cache_read.frame),
+            )
+            logger.warning(
+                "provider_cache event=quality_rejected data_type=daily_data "
+                "symbol=%s market=%s source=%s stale=%s",
+                sanitize_diagnostic_text(stock_code, max_length=80),
+                market,
+                sanitize_diagnostic_text(cache_read.source_name, max_length=120),
+                bool(cache_read.is_stale),
+            )
+            return None
+        self._record_daily_cache_read(cache_read, request_start)
+        return cache_read.frame, cache_read.source_name
+
     def _daily_stale_cache_result(
         self,
         cache_lookup: DailyCacheLookup,
@@ -723,7 +786,14 @@ class DataFetcherManager:
         cache_read = self._get_daily_data_cache().use_stale(cache_lookup.stale)
         if cache_read is None:
             return None
-        self._record_daily_cache_read(cache_read, request_start)
+        validated_result = self._validated_daily_cache_result(
+            cache_read,
+            stock_code=stock_code,
+            market=market,
+            request_start=request_start,
+        )
+        if validated_result is None:
+            return None
         logger.warning(
             "provider_failover event=stale_cache data_type=daily_data symbol=%s "
             "market=%s source=%s stale_seconds=%d provider_failure_count=%d",
@@ -733,7 +803,7 @@ class DataFetcherManager:
             int(cache_read.age_seconds),
             provider_failure_count,
         )
-        return cache_read.frame, cache_read.source_name
+        return validated_result
 
     def get_daily_cache_stats(self) -> Dict[str, int]:
         """Return manager-local daily cache hit, miss, and lifecycle counters."""
@@ -1208,14 +1278,24 @@ class DataFetcherManager:
 
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
+        market = _market_tag(stock_code)
+        from data_provider.data_validation import infer_instrument_type
+
+        instrument_type = infer_instrument_type(stock_code)
 
         request_start = time.time()
         cache_key = self._daily_cache_key(stock_code, start_date, end_date, days)
         daily_cache = self._get_daily_data_cache()
         cache_lookup = daily_cache.lookup(cache_key)
         if cache_lookup.fresh is not None:
-            self._record_daily_cache_read(cache_lookup.fresh, request_start)
-            return cache_lookup.fresh.frame, cache_lookup.fresh.source_name
+            fresh_result = self._validated_daily_cache_result(
+                cache_lookup.fresh,
+                stock_code=stock_code,
+                market=market,
+                request_start=request_start,
+            )
+            if fresh_result is not None:
+                return fresh_result
 
         fetchers = self._get_fetchers_snapshot()
         errors = []
@@ -1313,6 +1393,7 @@ class DataFetcherManager:
                             start_date=start_date,
                             end_date=end_date,
                             days=days,
+                            _validation_instrument_type=instrument_type,
                         )
                         if df is not None and not df.empty:
                             df = daily_cache.store(cache_key, df, fetcher.name)
@@ -1346,6 +1427,10 @@ class DataFetcherManager:
                             fallback_to=fallback_to,
                             record_count=0,
                         )
+                        # Quality failure (empty/None): do not open the exception circuit,
+                        # but still surface a per-provider line in the final DataFetchError.
+                        empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                        errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                         if df is not None and df.empty:
                             self._record_daily_source_success(fetcher, market)
                     except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
@@ -1430,7 +1515,8 @@ class DataFetcherManager:
                     stock_code=stock_code,
                     start_date=start_date,
                     end_date=end_date,
-                    days=days
+                    days=days,
+                    _validation_instrument_type=instrument_type,
                 )
                 
                 if df is not None and not df.empty:
@@ -1465,6 +1551,10 @@ class DataFetcherManager:
                     fallback_to=fallback_to,
                     record_count=0,
                 )
+                # Quality failure (empty/None): keep circuit closed for empty frames,
+                # but still surface a per-provider line in the final DataFetchError.
+                empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                 if df is not None and df.empty:
                     self._record_daily_source_success(fetcher, market)
 
@@ -3378,6 +3468,60 @@ class DataFetcherManager:
             "coverage": {block: "failed" for block in block_names},
             "source_chain": [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
             "errors": [reason],
+            **blocks,
+        }
+
+    def build_validation_rejected_fundamental_context(
+        self,
+        stock_code: str,
+        rejection: Any,
+    ) -> Dict[str, Any]:
+        """Build a typed upper-layer policy outcome without claiming provider failure."""
+        market = _market_tag(stock_code)
+        reason_codes = [
+            sanitize_diagnostic_text(code, max_length=96)
+            for code in getattr(rejection, "reason_codes", ())
+            if sanitize_diagnostic_text(code, max_length=96)
+        ][:24]
+        evidence = getattr(rejection, "evidence", None)
+        evidence_list = [dict(evidence)] if isinstance(evidence, dict) else []
+        source_chain = [
+            {
+                "provider": "data_validation",
+                "result": "rejected",
+                "duration_ms": 0,
+            }
+        ]
+        block_names = (
+            "valuation",
+            "growth",
+            "earnings",
+            "institution",
+            "capital_flow",
+            "dragon_tiger",
+            "boards",
+        )
+        blocks = {
+            block: self._build_fundamental_block(
+                "validation_rejected",
+                {},
+                source_chain,
+                reason_codes or ["data_validation_rejected"],
+            )
+            for block in block_names
+        }
+        return {
+            "market": market,
+            "status": "validation_rejected",
+            "data_quality": "rejected",
+            "coverage": {block: "validation_rejected" for block in block_names},
+            "source_chain": source_chain,
+            "errors": reason_codes or ["data_validation_rejected"],
+            "validation_rejection": {
+                "outcome": "rejected",
+                "reason_codes": reason_codes,
+            },
+            "data_quality_evidence": evidence_list,
             **blocks,
         }
 

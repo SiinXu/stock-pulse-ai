@@ -15,11 +15,13 @@ const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
 const {
+  createDesktopEnvironmentDiagnosticsProbe,
   extendMacDesktopBackendPath,
   hasOwnValue,
   normalizeBackendHost,
   readEnvFileValue,
   readEnvFileValues,
+  summarizeDesktopEnvironmentDiagnostics,
 } = require('./desktop-env');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { ModelPackError, importModelPack } = require('./model-pack');
@@ -3480,6 +3482,28 @@ function assertDesktopUpdateSender(event) {
   }
 }
 
+const probeDesktopEnvironmentDiagnostics = createDesktopEnvironmentDiagnosticsProbe();
+
+async function logDesktopEnvironmentDiagnosticsSummary({
+  probe = probeDesktopEnvironmentDiagnostics,
+  logImpl = logLine,
+} = {}) {
+  const diagnostics = await probe();
+  logImpl(`[env-diagnostics] ${summarizeDesktopEnvironmentDiagnostics(diagnostics)}`);
+  return diagnostics;
+}
+
+function scheduleDesktopEnvironmentDiagnosticsLog(options = {}) {
+  void Promise.resolve()
+    .then(() => logDesktopEnvironmentDiagnosticsSummary(options))
+    .catch((error) => {
+      const logImpl = options.logImpl || logLine;
+      logImpl(
+        `[env-diagnostics] summary failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
+}
+
 async function runLocalModelOperation(operation) {
   if (localModelOperationInFlight) {
     return { ok: false, error: 'busy', message: 'Another local model operation is in progress.' };
@@ -3685,6 +3709,7 @@ async function createWindow(brandMigrationResult) {
   const macMigrationResult = migrateMacPackagedRuntimeState();
   initLogging();
   createDesktopTray();
+  scheduleDesktopEnvironmentDiagnosticsLog();
   if (brandMigrationResult?.sourceDir) {
     if (brandMigrationResult.alreadyCompleted) {
       logLine(`[brand-migration] legacy user data migration already completed; rollback source retained at ${brandMigrationResult.sourceDir}`);
@@ -4082,6 +4107,8 @@ module.exports = {
   buildBackendUrl,
   buildBackendEnvironment,
   createDesktopModelPackAttestation,
+  logDesktopEnvironmentDiagnosticsSummary,
+  scheduleDesktopEnvironmentDiagnosticsLog,
   extendMacDesktopBackendPath,
   extractReleaseMetadata,
   fetchLatestReleaseJson,

@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-08",
-  "baselineNote": "Measured on origin/main-era production vite build; budgets are current gzip + 10%.",
+  "measuredAt": "2026-08-10",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909 and PlaygroundRenderPage after adding the lazy-loaded zero-config first-run story; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -122,8 +122,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 56433,
-      "measuredGzipBytes": 51302
+      "maxGzipBytes": 57000,
+      "measuredGzipBytes": 56659,
+      "note": "Measured after moving the zero-config first-run story into its own lazy chunk; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
     },
     {
       "id": "SettingsPage",
@@ -134,8 +135,8 @@
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 41087,
-      "measuredGzipBytes": 37351
+      "maxGzipBytes": 46602,
+      "measuredGzipBytes": 42365
     },
     {
       "id": "PortfolioPage",

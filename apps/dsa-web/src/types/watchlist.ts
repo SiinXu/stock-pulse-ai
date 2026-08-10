@@ -10,3 +10,32 @@ export interface HomeWatchlistRow {
   isTodayStatusUnknown?: boolean;
   activeTask?: TaskInfo;
 }
+
+/** Read-only, versioned projection owned by T25/T26 services. */
+export interface WatchlistMemberAttrs {
+  schemaVersion: 1;
+  aiScore?: number | null;
+  focus?: boolean | null;
+}
+
+export interface WatchlistGroupMember {
+  stockCode: string;
+  sortOrder: number;
+  attrs: WatchlistMemberAttrs;
+}
+
+export interface WatchlistGroup {
+  id: string;
+  name: string;
+  nameKey?: string | null;
+  sortOrder: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  members: WatchlistGroupMember[];
+}
+
+export interface WatchlistGroupState {
+  revision: number;
+  groups: WatchlistGroup[];
+}
