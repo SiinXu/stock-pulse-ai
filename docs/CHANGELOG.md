@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
+- [Added] Report three modes (brief/standard/research) with hard length limits, existing Decision Card integration, and explicit truncation notices for Jinja reports (#861 Phase 2).
 - [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
 - [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
 - [Added] Default-off CoinGecko market-data path for allowlisted `crypto:` identities, with UTC daily bars, 24×7 context, safe outbound requests, and an optional crypto specialist (Refs #236 and #195).
