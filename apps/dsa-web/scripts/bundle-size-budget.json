@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined for Notifications/screening/decision-replay/what-if translations, MCP Settings registry titles, and MCP settingsHelp inventory (PR #1033). Locale and IntelligenceSourcesPanel caps retain 200 bytes of headroom over measured gzip; other measuredGzipBytes may still come from earlier baselines.",
+  "baselineNote": "Merged MCP Settings registry inventory (PR #1033) onto post-#1036/#1031 main. Locale/IntelligenceSourcesPanel budgets take max(HEAD, main); remeasure after production build.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206745,
-      "measuredGzipBytes": 206545,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 237240,
+      "measuredGzipBytes": 215672,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 135442,
-      "measuredGzipBytes": 135242,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 137731,
+      "measuredGzipBytes": 137531,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 130273,
-      "measuredGzipBytes": 130073,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 132128,
+      "measuredGzipBytes": 131928,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 129247,
-      "measuredGzipBytes": 129047,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 131717,
+      "measuredGzipBytes": 131517,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 130384,
-      "measuredGzipBytes": 130184,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 132276,
+      "measuredGzipBytes": 132076,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 126507,
-      "measuredGzipBytes": 126307,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 128196,
+      "measuredGzipBytes": 127996,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 122524,
-      "measuredGzipBytes": 122324,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 124949,
+      "measuredGzipBytes": 124749,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 117249,
-      "measuredGzipBytes": 117049,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 118716,
+      "measuredGzipBytes": 118516,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 117448,
-      "measuredGzipBytes": 117248,
-      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
+      "maxGzipBytes": 118855,
+      "measuredGzipBytes": 118655,
+      "note": "Merged PR #1033 MCP inventory with main (#1031/#1036); max of both sides."
     },
     {
       "id": "vendor-charts",
@@ -131,9 +131,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57296,
-      "measuredGzipBytes": 57096,
-      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks, then adding decision-report and what-if stories; retains 200 bytes of headroom."
+      "maxGzipBytes": 57282,
+      "measuredGzipBytes": 57082,
+      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
     },
     {
       "id": "SettingsPage",
