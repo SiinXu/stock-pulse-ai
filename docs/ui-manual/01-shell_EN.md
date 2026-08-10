@@ -101,7 +101,7 @@ Legacy paths such as `/decision-signals`, `/alerts`, `/backtest`, and `/screenin
 | macOS | `Cmd + K` |
 | Windows / Linux | `Ctrl + K` |
 
-Useful queries: `analysis`, `portfolio`, `signals`, `settings`, or a ticker such as `600519`.
+Useful queries include `analysis`, `portfolio`, `signals`, `settings`, a ticker such as `600519`, or at least three characters from a saved report's stock name, code, report type, trend, summary, or advice. Results are grouped into stocks, reports, pages, and actions. Use `Up` / `Down` and `Enter` without leaving the search field; a report result opens its exact Analysis Workbench history record. If report search is temporarily unavailable, stock, page, and action search remain available.
 
 ---
 

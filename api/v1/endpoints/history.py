@@ -18,6 +18,8 @@ from fastapi.responses import Response
 from api.deps import get_database_manager
 from api.v1.schemas.history import (
     HistoryListResponse,
+    HistorySearchResponse,
+    HistorySearchItem,
     HistoryItem,
     DeleteHistoryRequest,
     DeleteHistoryResponse,
@@ -276,6 +278,60 @@ def get_history_list(
                 "message": f"查询历史列表失败: {str(e)}"
             }
         )
+
+
+@router.get(
+    "/search",
+    response_model=HistorySearchResponse,
+    responses={
+        200: {"description": "Bounded history search results"},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Search analysis history summaries",
+    description=(
+        "Search stock code, stock name, report type, trend, summary, and advice through a "
+        "maintained full-text index. Raw reports, context snapshots, news content, and "
+        "configuration values are not indexed."
+    ),
+)
+def search_history(
+    q: str = Query(..., min_length=3, max_length=100, description="Literal search query"),
+    limit: int = Query(5, ge=1, le=10, description="Maximum returned result count"),
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> HistorySearchResponse:
+    normalized_query = q.strip()
+    if len(normalized_query) < 3:
+        raise api_error(
+            422,
+            "validation_error",
+            "History search query must contain at least 3 non-whitespace characters",
+        )
+    try:
+        items = HistoryService(db_manager).search_history(normalized_query, limit)
+        return HistorySearchResponse(
+            query=normalized_query,
+            limit=limit,
+            items=[HistorySearchItem(**item) for item in items],
+        )
+    except RepositoryError as exc:
+        raise _http_repository_error(
+            exc,
+            event="History search query failed",
+            context={"query_length": len(normalized_query), "limit": limit},
+        ) from exc
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "History search query failed",
+            exc,
+            error_code="history_search_failed",
+            context={"query_length": len(normalized_query), "limit": limit},
+        )
+        raise api_error(
+            500,
+            "history_search_failed",
+            "History search is temporarily unavailable",
+        ) from exc
 
 
 @router.delete(
