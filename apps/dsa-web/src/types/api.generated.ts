@@ -1360,7 +1360,7 @@ export interface paths {
         };
         /**
          * Report export capabilities
-         * @description Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.
+         * @description Return which report export formats are available in this process. Markdown is always available. HTML is the office-friendly format and requires markdown-it-py from the optional report-export set. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. DOCX/XLSX are not implemented; office_formats_status is html_only.
          */
         get: operations["get_report_export_capabilities_api_v1_history_export_capabilities_get"];
         put?: never;
@@ -1460,7 +1460,7 @@ export interface paths {
         };
         /**
          * Export a history report
-         * @description Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.
+         * @description Export an analysis history record as Markdown (always), HTML (office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. HTML and PDF preserve visible wording but drop link destinations and complete image destinations, replace images with an omission note, and enforce explicit byte/table bounds. PDF also enforces page/time/concurrency limits and exact glyph coverage.
          */
         get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
@@ -11183,7 +11183,7 @@ export interface components {
              * Office Formats Status
              * @constant
              */
-            office_formats_status: "not_implemented";
+            office_formats_status: "html_only";
             pdf_limits: components["schemas"]["ReportExportPdfLimits"];
             /**
              * Requested Language
@@ -11191,7 +11191,7 @@ export interface components {
              */
             requested_language: "en" | "zh" | "zh-TW" | "ja" | "ko";
             /** Supported Query Formats */
-            supported_query_formats: ("md" | "pdf")[];
+            supported_query_formats: ("md" | "html" | "pdf")[];
         };
         /**
          * ReportExportFormatCapability
@@ -11223,9 +11223,10 @@ export interface components {
         };
         /**
          * ReportExportFormats
-         * @description Closed format map so generated clients expose both known keys.
+         * @description Closed format map so generated clients expose every known key.
          */
         ReportExportFormats: {
+            html: components["schemas"]["ReportExportFormatCapability"];
             md: components["schemas"]["ReportExportFormatCapability"];
             pdf: components["schemas"]["ReportExportFormatCapability"];
         };
@@ -19295,8 +19296,8 @@ export interface operations {
     export_history_report_api_v1_history__record_id__export_get: {
         parameters: {
             query?: {
-                /** @description Export format: md (default) or pdf */
-                format?: "md" | "pdf";
+                /** @description Export format: md (default), html, or pdf */
+                format?: "md" | "html" | "pdf";
             };
             header?: never;
             path: {
@@ -19313,6 +19314,7 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": string;
+                    "text/html": string;
                     "text/markdown": string;
                 };
             };
@@ -19370,7 +19372,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description PDF dependency, font, deadline, or render worker unavailable */
+            /** @description PDF/HTML dependency, font, deadline, or render worker unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Bounded Markdown and optional PDF report export.
+"""Bounded Markdown, office-friendly HTML, and optional PDF report export.
 
-Markdown is the lossless archive format and is always available. PDF is an
-optional presentation transform backed by fpdf2. The PDF path parses Markdown
-with ``markdown-it-py`` so image destinations and link destinations never leak
-into the archive, validates the exact report glyph set before rendering, wraps
-table cells without deleting content, and enforces explicit resource bounds.
+Markdown is the lossless archive format and is always available. HTML is the
+office-friendly presentation format (Word / LibreOffice open it directly) and
+reuses the same ``markdown-it-py`` AST as PDF so link destinations and image
+URLs never leak. PDF is an optional fpdf2 presentation transform: it validates
+the exact report glyph set before rendering, wraps table cells without deleting
+content, and enforces explicit resource bounds. DOCX/XLSX remain deferred in
+favor of this pure-Python HTML path (no ``python-docx`` dependency).
 """
 
 from __future__ import annotations
@@ -31,8 +33,9 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_FORMATS = ("md", "pdf")
+SUPPORTED_FORMATS = ("md", "html", "pdf")
 PDF_OPTIONAL_PACKAGE = "fpdf2"
+HTML_OPTIONAL_PACKAGE = "markdown-it-py"
 PDF_OPTIONAL_SUPPORT_PACKAGES: Tuple[Tuple[str, str], ...] = (
     ("fonttools", "fontTools"),
     ("markdown-it-py", "markdown_it"),
@@ -44,8 +47,10 @@ PDF_INSTALL_HINT = (
     "'python -m pip install --build-constraint build-constraints.txt "
     "-r requirements-report-export.txt'."
 )
+HTML_INSTALL_HINT = PDF_INSTALL_HINT
 
 MAX_PDF_INPUT_BYTES = 1_000_000
+MAX_HTML_INPUT_BYTES = MAX_PDF_INPUT_BYTES
 MAX_PDF_PAGES = 100
 MAX_TABLE_ROWS = 500
 MAX_TABLE_COLUMNS = 12
@@ -55,6 +60,7 @@ PDF_MAX_CONCURRENCY = 2
 PDF_CACHE_ENTRIES = 12
 PDF_CACHE_MAX_BYTES = 24 * 1024 * 1024
 PDF_MAX_OUTPUT_BYTES = PDF_CACHE_MAX_BYTES
+HTML_MAX_OUTPUT_BYTES = PDF_CACHE_MAX_BYTES
 PDF_WORKER_SHUTDOWN_SECONDS = 1.0
 
 _IMAGE_OMISSION_NOTE_ZH = "（图表/图片已在 PDF 导出中省略，请参阅原报告 Markdown 附件）"
@@ -259,6 +265,38 @@ def is_pdf_dependency_available() -> bool:
     return inspect_pdf_backend().available
 
 
+@dataclass(frozen=True)
+class HtmlBackendStatus:
+    """Validated markdown-it-py availability for structured HTML export."""
+
+    available: bool
+    status: str
+    version: Optional[str] = None
+    installed: Optional[bool] = None
+
+    @property
+    def dependency_installed(self) -> bool:
+        return self.installed if self.installed is not None else self.version is not None
+
+
+def inspect_html_backend() -> HtmlBackendStatus:
+    """Verify markdown-it-py so HTML can reuse the secret-safe Markdown AST."""
+    try:
+        version = importlib.metadata.version(HTML_OPTIONAL_PACKAGE)
+    except importlib.metadata.PackageNotFoundError:
+        return HtmlBackendStatus(False, "dependency_missing", installed=False)
+    try:
+        importlib.import_module("markdown_it")
+    except (ImportError, AttributeError):
+        return HtmlBackendStatus(False, "dependency_import_invalid", version, True)
+    return HtmlBackendStatus(True, "ready", version, True)
+
+
+def is_html_dependency_available() -> bool:
+    """Return whether structured HTML export can parse the Markdown AST."""
+    return inspect_html_backend().available
+
+
 def _configured_font_path() -> Optional[str]:
     """Read the font path from the shared runtime Config owner."""
     try:
@@ -438,6 +476,7 @@ def get_export_capabilities(language: str = "zh") -> Dict[str, Any]:
     """Return language-aware, sanitized export capability details."""
     normalized_language = _normalize_capability_language(language)
     backend = inspect_pdf_backend()
+    html_backend = inspect_html_backend()
     configured = _configured_font_path()
     font_path: Optional[str] = None
     font_status = "not_checked"
@@ -470,6 +509,16 @@ def get_export_capabilities(language: str = "zh") -> Dict[str, Any]:
                 "font_validated": None,
                 "missing_glyph_count": 0,
             },
+            "html": {
+                "available": html_backend.available,
+                "status": html_backend.status,
+                "media_type": "text/html; charset=utf-8",
+                "dependency": HTML_OPTIONAL_PACKAGE,
+                "dependency_installed": html_backend.dependency_installed,
+                "dependency_version": html_backend.version,
+                "font_validated": None,
+                "missing_glyph_count": 0,
+            },
             "pdf": {
                 "available": pdf_available,
                 "status": backend.status if not backend.available else font_status,
@@ -483,7 +532,9 @@ def get_export_capabilities(language: str = "zh") -> Dict[str, Any]:
         },
         "requested_language": normalized_language,
         "supported_query_formats": list(SUPPORTED_FORMATS),
-        "office_formats_status": "not_implemented",
+        # HTML is the office-friendly format delivered for Issue #163.
+        # DOCX/XLSX remain out of scope to avoid python-docx/openpyxl surface.
+        "office_formats_status": "html_only",
         "chart_handling": "markdown_images_omitted_without_destinations",
         "pdf_limits": {
             "max_input_bytes": MAX_PDF_INPUT_BYTES,
@@ -1063,6 +1114,128 @@ def export_markdown_bytes(markdown: str, *, filename_stem: str = "report") -> Ex
     )
 
 
+def _escape_html(value: str) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _render_html_document(
+    blocks: Sequence[Tuple[str, Any]],
+    *,
+    title: Optional[str],
+) -> str:
+    """Render AST blocks to a self-contained HTML document (no external URLs)."""
+    body_parts: List[str] = []
+    for kind, payload in blocks:
+        if kind == "heading":
+            level = min(max(int(payload.get("level") or 1), 1), 6)
+            text_value = _escape_html(str(payload.get("text") or ""))
+            body_parts.append(f"<h{level}>{text_value}</h{level}>")
+        elif kind == "paragraph":
+            body_parts.append(f"<p>{_escape_html(str(payload))}</p>")
+        elif kind == "quote":
+            body_parts.append(
+                f"<blockquote><p>{_escape_html(str(payload))}</p></blockquote>"
+            )
+        elif kind == "list_item":
+            depth = min(max(int(payload.get("depth") or 1), 1), 8)
+            indent_em = (depth - 1) * 1.25
+            marker = _escape_html(str(payload.get("marker") or "•"))
+            item_text = _escape_html(str(payload.get("text") or ""))
+            body_parts.append(
+                f'<p class="list-item" style="margin-left:{indent_em:.2f}em">'
+                f"{marker} {item_text}</p>"
+            )
+        elif kind == "code":
+            lang = _escape_html(str(payload.get("lang") or ""))
+            body = _escape_html(str(payload.get("body") or ""))
+            lang_attr = f' data-lang="{lang}"' if lang else ""
+            body_parts.append(f"<pre{lang_attr}><code>{body}</code></pre>")
+        elif kind == "table":
+            header = [str(value) for value in payload.get("header") or []]
+            rows = [[str(value) for value in row] for row in payload.get("rows") or []]
+            thead = ""
+            if header:
+                cells = "".join(f"<th>{_escape_html(cell)}</th>" for cell in header)
+                thead = f"<thead><tr>{cells}</tr></thead>"
+            body_rows: List[str] = []
+            for row in rows:
+                cells = "".join(f"<td>{_escape_html(cell)}</td>" for cell in row)
+                body_rows.append(f"<tr>{cells}</tr>")
+            tbody = f"<tbody>{''.join(body_rows)}</tbody>" if body_rows else ""
+            body_parts.append(f"<table>{thead}{tbody}</table>")
+        elif kind == "hr":
+            body_parts.append("<hr />")
+
+    doc_title = _escape_html(title or "StockPulse report")
+    body = "\n".join(body_parts)
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="zh">\n'
+        "<head>\n"
+        '<meta charset="utf-8" />\n'
+        f"<title>{doc_title}</title>\n"
+        "<style>\n"
+        "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"
+        "Noto Sans,PingFang SC,Microsoft YaHei,sans-serif;line-height:1.55;"
+        "margin:2rem auto;max-width:48rem;padding:0 1rem;color:#111;}\n"
+        "h1,h2,h3,h4,h5,h6{line-height:1.25;}\n"
+        "table{border-collapse:collapse;width:100%;margin:1rem 0;}\n"
+        "th,td{border:1px solid #ccc;padding:0.4rem 0.55rem;vertical-align:top;}\n"
+        "th{background:#f5f5f5;text-align:left;}\n"
+        "pre{background:#f6f8fa;padding:0.75rem;overflow:auto;}\n"
+        "blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:0.75rem;"
+        "color:#444;}\n"
+        ".list-item{margin:0.2rem 0;}\n"
+        "</style>\n"
+        "</head>\n"
+        f"<body>\n{body}\n</body>\n"
+        "</html>\n"
+    )
+
+
+def export_html_bytes(
+    markdown: str,
+    *,
+    filename_stem: str = "report",
+    title: Optional[str] = None,
+) -> ExportArtifact:
+    """Export structured, secret-safe HTML for office-friendly archive use."""
+    if markdown is None or not str(markdown).strip():
+        raise ReportExportFormatError("Report content is empty.", error_code="export_empty")
+    content = str(markdown)
+    input_bytes = len(content.encode("utf-8"))
+    if input_bytes > MAX_HTML_INPUT_BYTES:
+        raise ReportExportLimitError(
+            f"HTML input exceeds the {MAX_HTML_INPUT_BYTES}-byte limit.",
+            error_code="export_input_too_large",
+        )
+
+    backend = inspect_html_backend()
+    if not backend.available:
+        raise ReportExportDependencyError(
+            "Structured HTML export requires markdown-it-py from the optional "
+            "report-export dependency set.",
+            install_hint=HTML_INSTALL_HINT,
+        )
+
+    blocks = _parse_markdown_blocks(content)
+    _table_shape_guard(blocks)
+    document = _render_html_document(blocks, title=title or filename_stem)
+    encoded = document.encode("utf-8")
+    if len(encoded) > HTML_MAX_OUTPUT_BYTES:
+        raise ReportExportLimitError(
+            "HTML output exceeds the in-memory artifact limit.",
+            error_code="export_output_too_large",
+        )
+    stem = _safe_filename_stem(filename_stem)
+    return ExportArtifact(
+        content=encoded,
+        media_type="text/html; charset=utf-8",
+        filename=f"{stem}.html",
+        format="html",
+    )
+
+
 def _cache_key(markdown: str, font_path: str, title: Optional[str]) -> str:
     signature = _font_signature(Path(font_path))
     digest = hashlib.sha256()
@@ -1197,7 +1370,7 @@ def export_report(
     title: Optional[str] = None,
     font_path: Optional[str] = None,
 ) -> ExportArtifact:
-    """Export Markdown to the requested ``md`` or ``pdf`` format."""
+    """Export Markdown to the requested ``md``, ``html``, or ``pdf`` format."""
     normalized = (fmt or "").strip().lower()
     if normalized not in SUPPORTED_FORMATS:
         raise ReportExportFormatError(
@@ -1205,6 +1378,12 @@ def export_report(
         )
     if normalized == "md":
         return export_markdown_bytes(markdown, filename_stem=filename_stem)
+    if normalized == "html":
+        return export_html_bytes(
+            markdown,
+            filename_stem=filename_stem,
+            title=title,
+        )
     return export_pdf_bytes(
         markdown,
         filename_stem=filename_stem,

@@ -53,6 +53,16 @@ def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
                     "font_validated": None,
                     "missing_glyph_count": 0,
                 },
+                "html": {
+                    "available": True,
+                    "status": "ready",
+                    "media_type": "text/html; charset=utf-8",
+                    "dependency": "markdown-it-py",
+                    "dependency_installed": True,
+                    "dependency_version": "4.2.0",
+                    "font_validated": None,
+                    "missing_glyph_count": 0,
+                },
                 "pdf": {
                     "available": False,
                     "status": "font_coverage_missing",
@@ -65,8 +75,8 @@ def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
                 },
             },
             "requested_language": language,
-            "supported_query_formats": ["md", "pdf"],
-            "office_formats_status": "not_implemented",
+            "supported_query_formats": ["md", "html", "pdf"],
+            "office_formats_status": "html_only",
             "chart_handling": "markdown_images_omitted_without_destinations",
             "pdf_limits": {
                 "max_input_bytes": 1_000_000,
@@ -81,7 +91,9 @@ def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
     )
     response = export_endpoint.get_report_export_capabilities("zh")
     assert response.formats.md.available is True
+    assert response.formats.html.available is True
     assert response.formats.pdf.status == "font_coverage_missing"
+    assert response.office_formats_status == "html_only"
     assert "font_path" not in response.model_dump_json()
 
 
@@ -168,7 +180,7 @@ def test_generation_failure_does_not_expose_raw_service_detail(monkeypatch):
     assert "raw provider detail" not in json.dumps(exc.value.detail)
 
 
-def test_openapi_has_typed_capability_enum_and_both_binary_media():
+def test_openapi_has_typed_capability_enum_and_all_binary_media():
     from api.app import create_app
 
     schema = create_app().openapi()
@@ -178,7 +190,34 @@ def test_openapi_has_typed_capability_enum_and_both_binary_media():
     )
     export = schema["paths"]["/api/v1/history/{record_id}/export"]["get"]
     format_parameter = next(item for item in export["parameters"] if item["name"] == "format")
-    assert format_parameter["schema"]["enum"] == ["md", "pdf"]
+    assert format_parameter["schema"]["enum"] == ["md", "html", "pdf"]
     content = export["responses"]["200"]["content"]
     assert content["application/pdf"]["schema"] == {"type": "string", "format": "binary"}
     assert content["text/markdown"]["schema"] == {"type": "string", "format": "binary"}
+    assert content["text/html"]["schema"] == {"type": "string", "format": "binary"}
+
+
+def test_export_html_attachment_uses_html_suffix(monkeypatch):
+    markdown = "# 测试报告\n\n内容"
+    _patch_history(monkeypatch, _FakeHistoryService(markdown, {"id": 7}))
+    monkeypatch.setattr(
+        export_endpoint,
+        "export_report",
+        lambda *args, **kwargs: type(
+            "Artifact",
+            (),
+            {
+                "content": b"<!DOCTYPE html><html><body>ok</body></html>",
+                "media_type": "text/html; charset=utf-8",
+                "filename": "stockpulse-report-7.html",
+                "format": "html",
+            },
+        )(),
+    )
+    response = export_endpoint.export_history_report(
+        "7", format="html", db_manager=object()
+    )
+    assert response.status_code == 200
+    assert response.media_type.startswith("text/html")
+    assert ".html" in response.headers["content-disposition"]
+    assert response.headers["X-StockPulse-Export-Format"] == "html"

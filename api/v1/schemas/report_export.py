@@ -5,7 +5,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-ReportExportFormat = Literal["md", "pdf"]
+ReportExportFormat = Literal["md", "html", "pdf"]
 ReportExportCapabilityLanguage = Literal["en", "zh", "zh-TW", "ja", "ko"]
 ReportExportCapabilityStatus = Literal[
     "ready",
@@ -49,9 +49,10 @@ class ReportExportPdfLimits(BaseModel):
 
 
 class ReportExportFormats(BaseModel):
-    """Closed format map so generated clients expose both known keys."""
+    """Closed format map so generated clients expose every known key."""
 
     md: ReportExportFormatCapability
+    html: ReportExportFormatCapability
     pdf: ReportExportFormatCapability
 
 
@@ -61,6 +62,6 @@ class ReportExportCapabilitiesResponse(BaseModel):
     formats: ReportExportFormats
     requested_language: ReportExportCapabilityLanguage
     supported_query_formats: List[ReportExportFormat]
-    office_formats_status: Literal["not_implemented"]
+    office_formats_status: Literal["html_only"]
     chart_handling: Literal["markdown_images_omitted_without_destinations"]
     pdf_limits: ReportExportPdfLimits
