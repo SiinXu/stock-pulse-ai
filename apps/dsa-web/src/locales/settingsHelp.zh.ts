@@ -884,7 +884,32 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 WebUI 登录、设置页访问和管理操作保护。'],
     notes: ['启用前请确认部署环境可以持久化认证数据；手动改 .env 后需要重启进程或使用认证设置流程刷新状态。'],
   },
+  'settings.system.SECURITY_AUDIT_RETENTION_DAYS': {
+    title: '安全审计保留天数',
+    summary: '特权操作安全审计事件的时间保留窗口。',
+    usage: '设置 security-audit-v1 行的保留天数。写入与查询时会执行清理；超过窗口的旧事件会被删除。',
+    valueNotes: [
+      '默认 90 天，允许范围 1–3650。',
+      '与 SECURITY_AUDIT_MAX_EVENTS 容量上限相互独立。',
+      '不会持久化密钥；落库前会脱敏。',
+    ],
+    impact: ['影响认证、配置、工具、插件、MCP、分析接受与本地进程等特权审计轨迹的可查询时长。'],
+    notes: ['详见 docs/security-audit_zh.md。若需更长留存，请先外部归档再降低保留天数。'],
+  },
+  'settings.system.SECURITY_AUDIT_MAX_EVENTS': {
+    title: '安全审计最大事件数',
+    summary: 'security-audit-v1 存储的硬性行容量上限。',
+    usage: '限制保留的审计行数。超出后按最旧优先删除，以保留最近的特权操作决策。',
+    valueNotes: [
+      '默认 10000，允许范围 100–1000000。',
+      '与 SECURITY_AUDIT_RETENTION_DAYS 时间保留相互独立。',
+      '每次成功追加后会检查并执行容量裁剪。',
+    ],
+    impact: ['限制审计存储增长；高特权操作量时可能删除较旧事件。'],
+    notes: ['详见 docs/security-audit_zh.md。若必须保留更旧事件，请提高容量或先导出。'],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
+
     title: '信任 X-Forwarded-For',
     summary: '在可信反向代理后使用 X-Forwarded-For 识别真实客户端 IP。',
     usage: '仅单层可信反向代理场景设为 true；直连公网保持 false。',

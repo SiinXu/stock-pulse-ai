@@ -841,7 +841,32 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects WebUI login, settings access, and admin operations.'],
     notes: ['Make sure auth data is persisted in the deployment environment. Manual .env edits require a process restart or the auth settings flow to refresh state.'],
   },
+  'settings.system.SECURITY_AUDIT_RETENTION_DAYS': {
+    title: 'Security Audit Retention Days',
+    summary: 'Time window for durable privileged-operation security audit events.',
+    usage: 'Set how many days to keep security-audit-v1 rows. Retention runs on append and query; events older than the window are deleted.',
+    valueNotes: [
+      'Default is 90 days; allowed range is 1–3650.',
+      'Independent of SECURITY_AUDIT_MAX_EVENTS hard capacity.',
+      'Does not store secrets; payloads are redacted before persistence.',
+    ],
+    impact: ['Affects how long privileged auth, config, tool, plugin, MCP, analysis, and local-process audit trails remain queryable.'],
+    notes: ['See docs/security-audit.md. Archive externally before lowering retention if longer hold is required.'],
+  },
+  'settings.system.SECURITY_AUDIT_MAX_EVENTS': {
+    title: 'Security Audit Max Events',
+    summary: 'Hard row capacity for the security-audit-v1 store.',
+    usage: 'Cap the number of retained audit rows. When exceeded, oldest rows are deleted first so recent privileged decisions remain available.',
+    valueNotes: [
+      'Default is 10000; allowed range is 100–1000000.',
+      'Independent of SECURITY_AUDIT_RETENTION_DAYS time retention.',
+      'Capacity enforcement runs after each successful append.',
+    ],
+    impact: ['Bounds audit storage growth and may delete older events under high privileged-operation volume.'],
+    notes: ['See docs/security-audit.md. Raise capacity or export before long high-volume runs if older rows must be kept.'],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
+
     title: 'Trust X-Forwarded-For',
     summary: 'Uses X-Forwarded-For for client IP detection behind a trusted reverse proxy.',
     usage: 'Set true only behind one trusted reverse proxy. Keep false for direct public access.',

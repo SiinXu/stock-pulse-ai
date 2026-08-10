@@ -1092,7 +1092,7 @@ class LocalCliGenerationBackend(GenerationBackend):
             ) from exc
         except GenerationError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: cleanup - Map unexpected extractor failures to typed GenerationError boundary.
             raise self._error(
                 GenerationErrorCode.UNKNOWN_BACKEND_ERROR,
                 stage="validation",
@@ -1135,7 +1135,7 @@ class LocalCliGenerationBackend(GenerationBackend):
                 response_validator(text)
             except GenerationError:
                 raise
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: cleanup - Map unexpected response-validator failures to typed GenerationError boundary.
                 raise self._error(
                     GenerationErrorCode.INVALID_JSON,
                     stage="validation",
