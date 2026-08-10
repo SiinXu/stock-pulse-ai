@@ -89,7 +89,15 @@ Architecture: [overview](docs/architecture-overview.md).
 
 ## Quick start
 
-### Option A — GitHub Actions (no server)
+### Option A — Local and zero-cost · report in 3 steps
+
+1. Complete the local install below, then start the Web UI with `python main.py --webui`.
+2. On Home, follow the detected **local Ollama** path. No cloud API key is required.
+3. If no model is available yet, choose **View sample analysis** to open a readable offline demo report, then add a local or cloud model when ready.
+
+Cloud model keys remain an optional upgrade. See [Zero-config first success](docs/zero-config-first-run_EN.md) for the exact detection and sample-data behavior.
+
+### Option B — GitHub Actions (no server)
 
 Minimal three-step path (one model Secret, `STOCK_LIST`, optional webhook): [GitHub Actions quickstart](docs/actions-quickstart.md) · [中文](docs/actions-quickstart_CN.md).
 
@@ -103,7 +111,7 @@ Minimal three-step path (one model Secret, `STOCK_LIST`, optional webhook): [Git
 3. Enable **Actions**, run **Config Check** first (validates Secrets without a full analysis; see [job summary](docs/DEPLOY_EN.md#option-4-github-actions-deployment-serverless)), then **StockPulse Daily Analysis**.
 4. Default schedule: weekdays **18:00 Asia/Shanghai** (trading-day rules apply).
 
-### Option B — Local / Docker / desktop
+### Local / Docker / desktop install details
 
 ```bash
 git clone https://github.com/SiinXu/stock-pulse-ai.git && cd stock-pulse-ai
