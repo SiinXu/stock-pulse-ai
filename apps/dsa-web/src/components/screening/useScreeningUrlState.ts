@@ -10,8 +10,8 @@ import {
   type SetStateAction,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import type { ScreeningRunParameters } from '../components/screening/screeningRunState';
-import { readScreeningRunParameters } from '../components/screening/screeningRunState';
+import type { ScreeningRunParameters } from './screeningRunState';
+import { readScreeningRunParameters } from './screeningRunState';
 import {
   composeScreeningHref,
   readScreeningSelectionFromSearch,

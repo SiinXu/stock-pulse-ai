@@ -16,7 +16,7 @@
 import {
   getScreeningRunParametersLocation,
   type ScreeningRunParameters,
-} from '../components/screening/screeningRunState';
+} from './screeningRunState';
 import {
   booleanParam,
   defineUrlStateSchema,
@@ -26,7 +26,7 @@ import {
   type InferUrlState,
   type UrlHistoryMode,
   type UrlStatePatch,
-} from '../utils/urlState';
+} from '../../utils/urlState';
 
 export const screeningUrlSchema = defineUrlStateSchema({
   candidate: optionalStringParam({ name: 'candidate', history: 'push' }),

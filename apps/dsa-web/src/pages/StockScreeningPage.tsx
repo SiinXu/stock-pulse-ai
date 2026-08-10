@@ -62,7 +62,7 @@ import { SCREENING_TEXT } from '../locales/screening';
 import { buildDeepLink } from '../utils/deepLink';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
-import { useScreeningUrlState } from './useScreeningUrlState';
+import { useScreeningUrlState } from '../components/screening/useScreeningUrlState';
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
