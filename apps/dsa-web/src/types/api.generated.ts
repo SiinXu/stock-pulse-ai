@@ -1311,6 +1311,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/export/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report export capabilities
+         * @description Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.
+         */
+        get: operations["get_report_export_capabilities_api_v1_history_export_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history/search": {
         parameters: {
             query?: never;
@@ -1383,6 +1403,26 @@ export interface paths {
          * @description 根据分析历史记录 ID 或 query_id 获取用户可读诊断摘要和脱敏复制文本。
          */
         get: operations["get_history_diagnostics_api_v1_history__record_id__diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{record_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a history report
+         * @description Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.
+         */
+        get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10009,6 +10049,87 @@ export interface components {
             /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
         };
+        /**
+         * ReportExportCapabilitiesResponse
+         * @description Language-aware export capabilities.
+         */
+        ReportExportCapabilitiesResponse: {
+            /**
+             * Chart Handling
+             * @constant
+             */
+            chart_handling: "markdown_images_omitted_without_destinations";
+            formats: components["schemas"]["ReportExportFormats"];
+            /**
+             * Office Formats Status
+             * @constant
+             */
+            office_formats_status: "not_implemented";
+            pdf_limits: components["schemas"]["ReportExportPdfLimits"];
+            /**
+             * Requested Language
+             * @enum {string}
+             */
+            requested_language: "en" | "zh" | "zh-TW" | "ja" | "ko";
+            /** Supported Query Formats */
+            supported_query_formats: ("md" | "pdf")[];
+        };
+        /**
+         * ReportExportFormatCapability
+         * @description Readiness of one archive format without host filesystem details.
+         */
+        ReportExportFormatCapability: {
+            /** Available */
+            available: boolean;
+            /** Dependency */
+            dependency?: string | null;
+            /** Dependency Installed */
+            dependency_installed: boolean;
+            /** Dependency Version */
+            dependency_version?: string | null;
+            /** Font Validated */
+            font_validated?: boolean | null;
+            /** Media Type */
+            media_type: string;
+            /**
+             * Missing Glyph Count
+             * @default 0
+             */
+            missing_glyph_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "dependency_missing" | "dependency_import_invalid" | "dependency_version_invalid" | "legacy_namespace_conflict" | "configured_font_invalid" | "font_not_found" | "font_invalid" | "font_empty_cmap" | "font_coverage_missing" | "font_smoke_failed" | "not_checked";
+        };
+        /**
+         * ReportExportFormats
+         * @description Closed format map so generated clients expose both known keys.
+         */
+        ReportExportFormats: {
+            md: components["schemas"]["ReportExportFormatCapability"];
+            pdf: components["schemas"]["ReportExportFormatCapability"];
+        };
+        /**
+         * ReportExportPdfLimits
+         * @description Deterministic synchronous PDF resource bounds.
+         */
+        ReportExportPdfLimits: {
+            /** Max Concurrency */
+            max_concurrency: number;
+            /** Max Input Bytes */
+            max_input_bytes: number;
+            /** Max Output Bytes */
+            max_output_bytes: number;
+            /** Max Pages */
+            max_pages: number;
+            /** Max Render Seconds */
+            max_render_seconds: number;
+            /** Max Table Columns */
+            max_table_columns: number;
+            /** Max Table Rows */
+            max_table_rows: number;
+        };
         /** ReportFieldDiff */
         ReportFieldDiff: {
             /** Base Value */
@@ -17091,6 +17212,38 @@ export interface operations {
             };
         };
     };
+    get_report_export_capabilities_api_v1_history_export_capabilities_get: {
+        parameters: {
+            query?: {
+                /** @description Report language whose representative glyph set must be supported. */
+                language?: "en" | "zh" | "zh-TW" | "ja" | "ko";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available report export formats and dependency status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExportCapabilitiesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_history_api_v1_history_search_get: {
         parameters: {
             query: {
@@ -17268,6 +17421,95 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_history_report_api_v1_history__record_id__export_get: {
+        parameters: {
+            query?: {
+                /** @description Export format: md (default) or pdf */
+                format?: "md" | "pdf";
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exported report file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "text/markdown": string;
+                };
+            };
+            /** @description Invalid export format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Report not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export resource limit exceeded */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description PDF export capacity is busy */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export or report generation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PDF dependency, font, deadline, or render worker unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
