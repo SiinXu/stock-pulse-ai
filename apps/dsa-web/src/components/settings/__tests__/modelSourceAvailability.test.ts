@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canEnableModelSource,
+  collectFailedTestConnectionNames,
   isModelSourceAssignable,
   resolveModelSourceAvailability,
 } from '../modelSourceAvailability';
@@ -30,13 +31,21 @@ describe('modelSourceAvailability', () => {
     })).toBe(true);
   });
 
-  it('keeps untested enabled sources out of the available badge', () => {
+  it('keeps untested enabled sources out of the available badge and out of assignable lists', () => {
     expect(resolveModelSourceAvailability({
       enabled: true,
       hasModels: true,
       issueCount: 0,
       testState: { status: 'idle' },
     })).toBe('untested');
-    expect(isModelSourceAssignable('untested')).toBe(true);
+    expect(isModelSourceAssignable('untested')).toBe(false);
+    expect(isModelSourceAssignable('available')).toBe(true);
+  });
+
+  it('collects connection names that failed session tests', () => {
+    expect(collectFailedTestConnectionNames(
+      [{ id: 'a', name: 'openai' }, { id: 'b', name: 'deepseek' }],
+      { a: { status: 'error' }, b: { status: 'success' } },
+    )).toEqual(['openai']);
   });
 });

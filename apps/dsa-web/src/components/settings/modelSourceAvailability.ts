@@ -48,8 +48,24 @@ export function resolveModelSourceAvailability(
   return 'untested';
 }
 
+/**
+ * Sources that may appear in primary task-assignment short lists.
+ * Untested/unavailable/incomplete never qualify as healthy assignable targets.
+ * Existing configured values may still display as stale until retested.
+ */
 export function isModelSourceAssignable(availability: ModelSourceAvailability): boolean {
-  return availability === 'available' || availability === 'untested';
+  return availability === 'available';
+}
+
+/** Connection names that failed a session connectivity test. */
+export function collectFailedTestConnectionNames(
+  channels: ReadonlyArray<{ id: string; name: string }>,
+  testStates: Readonly<Record<string, { status?: string } | undefined>>,
+): string[] {
+  return channels
+    .filter((channel) => testStates[channel.id]?.status === 'error')
+    .map((channel) => channel.name)
+    .filter(Boolean);
 }
 
 export function canEnableModelSource(options: {

@@ -134,6 +134,8 @@ export function applyModelSourceSetupParams(
   next.set(MODEL_SOURCE_SETUP_QUERY_KEYS.setup, MODEL_SOURCE_SETUP_VALUES.active);
   if (options.sourceType) {
     next.set(MODEL_SOURCE_SETUP_QUERY_KEYS.sourceType, options.sourceType);
+  } else if (options.sourceType === null) {
+    next.delete(MODEL_SOURCE_SETUP_QUERY_KEYS.sourceType);
   }
   if (options.connection !== undefined) {
     if (options.connection?.trim()) {
@@ -147,3 +149,48 @@ export function applyModelSourceSetupParams(
   }
   return next;
 }
+
+export type ModelSourceSetupRestoreAction =
+  | { kind: 'none' }
+  | { kind: 'type_picker' }
+  | { kind: 'cloud_add' }
+  | { kind: 'cloud_edit'; connection: string; focusModels: boolean }
+  | { kind: 'navigate_local_server' }
+  | { kind: 'navigate_local_cli' };
+
+/**
+ * Decide how to restore the route-backed setup UI from query params.
+ * Used when the user lands on / refreshes a shareable setup URL.
+ */
+export function resolveModelSourceSetupRestore(
+  searchParams: URLSearchParams,
+  knownConnectionNames: ReadonlySet<string> | readonly string[] = [],
+): ModelSourceSetupRestoreAction {
+  const setup = readModelSourceSetup(searchParams);
+  if (!setup.active) {
+    return { kind: 'none' };
+  }
+  const names = knownConnectionNames instanceof Set
+    ? knownConnectionNames
+    : new Set(knownConnectionNames);
+
+  if (!setup.sourceType || setup.step === MODEL_SOURCE_STEPS.type) {
+    return { kind: 'type_picker' };
+  }
+  if (setup.sourceType === MODEL_SOURCE_TYPES.localServer) {
+    return { kind: 'navigate_local_server' };
+  }
+  if (setup.sourceType === MODEL_SOURCE_TYPES.localCli) {
+    return { kind: 'navigate_local_cli' };
+  }
+  // cloud
+  if (setup.connection && names.has(setup.connection)) {
+    return {
+      kind: 'cloud_edit',
+      connection: setup.connection,
+      focusModels: setup.step === MODEL_SOURCE_STEPS.models,
+    };
+  }
+  return { kind: 'cloud_add' };
+}
+
