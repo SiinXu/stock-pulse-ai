@@ -200,6 +200,27 @@ def test_production_manager_registers_exactly_one_provider_when_enabled(monkeypa
     ] == ["CryptoCoingeckoFetcher"]
 
 
+def test_partial_legacy_config_does_not_implicitly_enable_crypto(monkeypatch) -> None:
+    """Unknown config fields must preserve the default-off provider contract."""
+    import src.config as config_module
+
+    config = MagicMock(
+        finnhub_api_key=None,
+        alphavantage_api_key=None,
+        tushare_token=None,
+        longbridge_app_key=None,
+        longbridge_app_secret=None,
+        longbridge_access_token=None,
+        tickflow_api_key=None,
+    )
+    assert config.crypto_provider_enabled is not True
+    monkeypatch.setattr(config_module, "get_config", lambda: config)
+
+    manager = DataFetcherManager()
+
+    assert "CryptoCoingeckoFetcher" not in manager.available_fetchers
+
+
 def test_crypto_fundamentals_are_explicitly_not_supported(monkeypatch) -> None:
     manager = DataFetcherManager(fetchers=[_CryptoSpy()])
     monkeypatch.setattr(

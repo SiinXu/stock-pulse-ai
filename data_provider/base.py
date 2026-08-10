@@ -1236,7 +1236,10 @@ class DataFetcherManager:
         ):
             self._register_builtin_data_provider(fetcher)
 
-        if getattr(config, "crypto_provider_enabled", False):
+        # The provider is default-off and must only be activated by an explicit
+        # boolean value.  Partial config doubles (and older config objects) may
+        # synthesize truthy attributes for unknown fields.
+        if getattr(config, "crypto_provider_enabled", False) is True:
             from .crypto_coingecko_fetcher import build_crypto_provider_registration
 
             crypto_registration = build_crypto_provider_registration(config=config)
