@@ -1206,10 +1206,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       ],
     }));
     await page.route('**/api/v1/agent/chat/sessions/url-session', (route) => fulfillJson(route, {
+      session_id: 'url-session',
       messages: [{ id: 'url-message', role: 'assistant', content: 'URL session restored' }],
+      session_state: { selected_skill_ids: null },
     }));
     await page.route('**/api/v1/agent/chat/sessions/stale-local', (route) => fulfillJson(route, {
+      session_id: 'stale-local',
       messages: [{ id: 'stale-message', role: 'assistant', content: 'stale local message' }],
+      session_state: { selected_skill_ids: null },
     }));
     await login(page);
     await page.evaluate(() => localStorage.setItem('dsa_chat_session_id', 'stale-local'));
@@ -1406,7 +1410,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
   });
 
-  test('15 Alerts creation failure stays inside the modal and preserves all user input', async ({ page }) => {
+  test('15 Alerts creation failure uses the global error Toast and preserves all modal input', async ({ page }) => {
     await mockEmptyAlertCollections(page);
     await page.route('**/api/v1/alerts/rules', async (route) => {
       if (route.request().method() === 'POST') {
@@ -1428,7 +1432,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('价格阈值').fill('250');
     await dialog.getByRole('button', { name: '创建规则' }).click();
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/请求失败|创建失败/).first()).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText(/请求失败|创建失败/).first()).toBeVisible();
     await expect(dialog.getByLabel('规则名称')).toHaveValue('保留输入的失败规则');
     await expect(dialog.getByLabel('标的代码')).toHaveValue('AAPL');
     await expect(dialog.getByLabel('价格阈值')).toHaveValue('250');
@@ -1677,7 +1681,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('数量').fill('2');
     await dialog.getByLabel('成交价').fill('210');
     await dialog.getByRole('button', { name: '提交交易' }).click();
-    await expect(dialog.getByText('请求失败', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText('请求失败', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '提交交易' }).click();
     await expect(dialog).toBeHidden();
     expect(operationIds).toHaveLength(2);
@@ -2575,7 +2579,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.route('**/api/v1/agent/chat/sessions?**', (route) => fulfillJson(route, {
       sessions: [{ session_id: 'overlay-session', title: 'Overlay Session', message_count: 1, created_at: '2026-07-15T10:00:00Z', last_active: '2026-07-15T10:00:00Z' }],
     }));
-    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, { messages: [] }));
+    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, {
+      session_id: 'overlay-session',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+    }));
     await login(page);
     await page.goto('/chat?session=overlay-session');
     const historyButton = page.getByRole('button', { name: '历史对话' }).first();

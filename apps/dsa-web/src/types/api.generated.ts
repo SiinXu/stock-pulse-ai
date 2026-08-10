@@ -139,6 +139,7 @@ export interface paths {
          *       - pipeline_timeout: analysis stopped because the stage/pipeline budget expired
          *       - pipeline_budget_skipped: analysis stopped before an unstarted stage
          *         because the remaining budget was too low for useful work
+         *       - turn_persisted: the identified user turn and request context are durable
          *       - done: analysis complete, contains 'content' and 'success'
          *       - error: error occurred, contains 'message'
          */
@@ -5350,6 +5351,8 @@ export interface components {
             session_id?: string | null;
             /** Skills */
             skills?: string[] | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ChatResponse */
         ChatResponse: {
@@ -5362,6 +5365,8 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** CompoundGrowthRequest */
         CompoundGrowthRequest: {
@@ -11220,6 +11225,8 @@ export interface components {
             } | null;
             /** Role */
             role: string;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** SessionMessagesResponse */
         SessionMessagesResponse: {
@@ -11228,6 +11235,11 @@ export interface components {
             /** Session Id */
             session_id: string;
             session_state: components["schemas"]["SessionStateResponse"];
+            /**
+             * Turn Identity Supported
+             * @default true
+             */
+            turn_identity_supported: boolean;
         };
         /** SessionStateResponse */
         SessionStateResponse: {

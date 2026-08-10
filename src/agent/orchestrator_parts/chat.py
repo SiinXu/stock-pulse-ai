@@ -86,6 +86,7 @@ class _ChatMethods:
         context: Optional[Dict[str, Any]] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
         selected_skill_ids: Optional[List[str]] = None,
+        turn_id: Optional[str] = None,
     ) -> "AgentResult":
         """Run the pipeline in chat mode (free-form answer, no dashboard parse)."""
         from src.agent.executor import AgentResult
@@ -117,11 +118,19 @@ class _ChatMethods:
             session_id,
             message,
             selected_skill_ids,
+            turn_id=turn_id,
+            context=scope_resolution.effective_context,
         )
         session.update_market_context(
             scope_resolution.effective_context,
             anchor_user_message_id=user_message_id,
         )
+        if progress_callback is not None and turn_id:
+            progress_callback({
+                "type": "turn_persisted",
+                "turn_id": turn_id,
+                "message_id": str(user_message_id),
+            })
 
         try:
             stock_scope = scope_resolution.stock_scope
