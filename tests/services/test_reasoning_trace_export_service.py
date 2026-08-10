@@ -572,6 +572,15 @@ REDACTED_CREDENTIAL_SHAPES = {
     "local_path": FAKE_PATH,
     "credentialed_url": FAKE_URL,
     "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlWFla",
+    # Wrapping a credential-shaped suffix in an identifier-looking prefix must
+    # not bypass the redactor's word-boundary checks during identity restoration.
+    "prefixed_openai_key": "market_sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_deadbeef",
+    "prefixed_anthropic_key": "m_sk-ant-api03-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_deadbeef",
+    "prefixed_github_pat": "market_ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_deadbeef",
+    "prefixed_aws_key": "market_review_akiaaaaaaaaaaaaaaaaa_deadbeef",
+    "prefixed_slack_token": "market_xoxb-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_deadbeef",
+    "prefixed_google_key": "market_review_aizaaaaaaaaaaaaaaaaa_deadbeef",
+    "prefixed_stripe_key": "market_sk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 }
 
 # Identifier forms the runtime actually generates for the restored ``run`` keys.
@@ -583,6 +592,9 @@ PRODUCTION_IDENTIFIER_FORMS = {
     "history_run_id": "history:9",
     "market_review_query_id": "market_review_9f2c1ab84e7d4f0b8c3a5d6e7f801234",
     "daily_brief_query_id": "daily_brief_2026-08-10_abcdef123456",
+    "market_context_query_id": (
+        "market_context_0123456789abcdef0123456789abcdef_cn"
+    ),
 }
 
 

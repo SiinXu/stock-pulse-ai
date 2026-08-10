@@ -53,17 +53,21 @@ _JWT_RE = re.compile(
 # ``AKIA…``) that the shared redactor does recognise.
 #
 # Forms, in order: integer history primary key; ``history:<pk>``; UUID hex;
-# dashed UUID; lowercase ``<prefix>_<hex>`` generated ids such as
-# ``market_review_<uuid hex>`` and ``daily_brief_<date>_<hex>``.
+# dashed UUID; and the exact prefixed identifiers emitted by market review,
+# daily brief, and persisted daily market-context runs. Prefixes must never be
+# accepted generically because a prefix can hide a credential from a
+# word-boundary-based redaction rule.
 _STRUCTURAL_IDENTITY_FORMS = (
     re.compile(r"(?:0|[1-9][0-9]{0,30})"),
     re.compile(r"history:(?:0|[1-9][0-9]{0,30})"),
-    re.compile(r"[0-9a-fA-F]{32}"),
+    re.compile(r"[0-9a-f]{32}"),
     re.compile(
-        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
-        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+        r"[0-9a-f]{4}-[0-9a-f]{12}"
     ),
-    re.compile(r"[a-z][a-z0-9]{0,31}(?:[_-][a-z0-9]{1,31}){0,5}_[0-9a-f]{8,32}"),
+    re.compile(r"market_review_[0-9a-f]{32}"),
+    re.compile(r"daily_brief_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9a-f]{12}"),
+    re.compile(r"market_context_[0-9a-f]{32}_(?:cn|hk|us|jp|kr)"),
 )
 # Hard upper bound so restoration can never widen a bounded projection.
 _STRUCTURAL_IDENTITY_MAX_CHARS = 128

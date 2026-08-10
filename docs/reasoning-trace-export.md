@@ -48,7 +48,7 @@ OpenAPI 同时声明 `application/json` 与 `text/markdown` 的 200 响应，以
 
 结构化关联标识（`record_id`、`query_id`、`trace_id`、`run_id`、`lookup_key`）在脱敏中予以保留，使导出结果仍可与运行时日志和审计记录关联。之所以需要恢复，仅因为通用 opaque token 规则无法区分 32 位 UUID 关联标识与 bearer token；恢复受两道互相独立、必须同时成立的校验约束：
 
-1. **正向形态**：值必须匹配运行时实际生成的标识形态之一——整数历史主键、`history:<pk>`、UUID hex、带连字符的 UUID，或形如 `market_review_<uuid hex>`、`daily_brief_<date>_<hex>` 的小写 `<prefix>_<hex>` 生成标识。恢复**不**依据“缺少哪些字符”来判断：宽松字符集会放行 `sk-…`、`sk-ant-…`、`ghp_…`、`github_pat_…`、`xox…`、`AIza…`、`SG.…` 以及 `AKIA…`/`ASIA…` 等共享脱敏器确实能够识别的形态。
+1. **正向形态**：值必须匹配运行时实际生成的标识形态之一——整数历史主键、`history:<pk>`、小写 UUID hex、带连字符的小写 UUID，或精确的 `market_review_<32hex>`、`daily_brief_<YYYY-MM-DD>_<12hex>`、`market_context_<32hex>_<region>` 形态。不接受通用前缀形态。恢复**不**依据“缺少哪些字符”来判断：宽松字符集会放行 `sk-…`、`sk-ant-…`、`ghp_…`、`github_pat_…`、`xox…`、`AIza…`、`SG.…` 以及 `AKIA…`/`ASIA…` 等共享脱敏器确实能够识别的形态。
 2. **反向形态**：仅关闭通用 opaque token 规则后运行 `redact_sensitive_data`，该值必须保持不变；导出侧的 JWT 与本地路径清理同样必须保持不变。因此凡是共享脱敏器识别为凭据、API key、bearer token、带凭据 URL、JWT 或文件系统路径的值，无论形态如何都保持脱敏；探测失败按“已识别”处理，失败即关闭。
 
 证据载荷始终脱敏，且永不恢复。
