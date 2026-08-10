@@ -9,13 +9,14 @@ Chinese version: [beginner-client-setup.md](beginner-client-setup.md). After ins
 
 ## Zero-config first success (no API key)
 
-You can complete a useful first run without a cloud key:
+You can complete a useful first run without a cloud key. **Local / zero-cost paths are the primary path**; cloud keys are an optional upgrade.
 
-1. **Data-only (same artifact as `--dry-run`)**: after setting a watchlist, run `python main.py --dry-run` to fetch market data without calling an LLM.
-2. **Local Ollama auto-detect**: setup readiness probes loopback (`127.0.0.1` / `localhost` / `::1`) by default. Failures are log-only and **never block startup**. When Ollama is reachable, readiness surfaces non-secret local-zero-cost fields (for example `LLM_CHANNELS=ollama`).
-3. Turn detection off with `LOCAL_RUNTIME_AUTO_DETECT=false`. Timeout: `LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35` (default).
+1. **Local Ollama auto-detect**: setup readiness and `GET /api/v1/onboarding/first-run` probe loopback (`127.0.0.1` / `localhost` / `::1`) by default. Failures are log-only and **never block startup**. The local path appears only when Ollama is reachable and has at least one model; its CTA opens model settings and never writes configuration directly.
+2. **Offline sample analysis**: if no model and no Ollama are available, open the built-in **sample analysis** (`GET /api/v1/onboarding/demo-analysis`). It is always labeled **Sample data — not a live analysis**. Use it only to learn the report layout.
+3. **Data-only (same artifact as `--dry-run`)**: after setting a watchlist, run `python main.py --dry-run` to fetch market data without calling an LLM.
+4. Turn detection off with `LOCAL_RUNTIME_AUTO_DETECT=false`. Timeout: `LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35` (default).
 
-Full AI analysis still needs a primary model (cloud key or an applied local Ollama profile). Cloud setup continues in **Configure an AI model** below.
+**Existing configurations are never overwritten** by first-run readiness. Beginner recommendations apply only when no primary model is configured (and the install looks fresh). Full AI analysis still needs a primary model (cloud key or an applied local Ollama profile). Cloud setup continues in **Configure an AI model** below.
 
 ## Before you start
 

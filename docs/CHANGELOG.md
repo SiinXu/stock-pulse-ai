@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
+- [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
+- [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.
 - [Fixed] Report→Chat Stop and disconnect handling now uses durable turn acknowledgements, exact-session reconciliation, and idempotent turn IDs so persisted prompts are not restored or submitted twice.
 - [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
