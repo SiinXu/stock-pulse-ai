@@ -76,6 +76,12 @@ class Config:
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
     stock_index_remote_update_enabled: bool = True
+    # Unified provider-boundary validation policy.
+    data_validation_enabled: bool = True
+    data_validation_strict: bool = False
+    data_validation_strict_scopes: str = "*/*"
+    data_validation_instrument_overrides: str = ""
+    data_validation_upper_layer_mode: str = "warn"
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
