@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Optional
 
 from src.capability_registry.models import (
+    MAX_RECORD_LIST_LENGTH,
     CapabilityRecord,
     CapabilitySnapshot,
     SourceStatus,
@@ -17,6 +18,16 @@ from src.utils.sanitize import log_safe_exception
 
 Clock = Callable[[], datetime]
 logger = logging.getLogger(__name__)
+
+DATA_RUNTIME_OWNER = "data_provider.runtime"
+
+
+class OwnerNotInitialized(RuntimeError):
+    """The authoritative owner does not exist in this process yet."""
+
+    def __init__(self, error_code: str) -> None:
+        super().__init__(error_code)
+        self.error_code = error_code
 
 
 def collect_capability_records(
@@ -43,6 +54,10 @@ def collect_capability_records(
             source_generation = str(generation)
             records.extend(_data_records(active, source_generation, now))
             sources.append(SourceStatus("data", "ok", source_generation, now))
+        except OwnerNotInitialized as exc:
+            sources.append(SourceStatus(
+                "data", "not_initialized", "unknown", now, exc.error_code,
+            ))
         except Exception as exc:  # broad-exception: fallback_recorded - expose source error
             log_safe_exception(
                 logger, "Capability data source unavailable", exc,
@@ -111,12 +126,23 @@ def _domains(domains: Iterable[str] | None) -> set[str]:
 
 
 def _resolve_data_runtime() -> Any:
-    from data_provider import DataFetcherManager
-    manager = DataFetcherManager()
-    runtime = getattr(manager, "_data_provider_runtime", None)
-    if runtime is None:
-        raise RuntimeError("data provider runtime unavailable")
-    return runtime
+    """Return the runtime of the manager that actually serves this process.
+
+    Precedence follows real ownership: the composition-root manager that the
+    analysis pipeline and stock services use, then the process-shared Agent
+    tool manager. Constructing a manager here would publish an inventory of an
+    isolated owner that serves no caller, so absence is reported explicitly.
+    """
+
+    from src.application_services import get_installed_application_services
+    services = get_installed_application_services()
+    manager = None if services is None else services.data_fetcher_manager
+    if manager is None:
+        from src.agent.tools.data_tools import active_fetcher_manager
+        manager = active_fetcher_manager()
+    if manager is None:
+        raise OwnerNotInitialized("data_runtime_not_initialized")
+    return manager.data_provider_runtime
 
 
 def _resolve_tool_registry() -> Any:
@@ -134,87 +160,82 @@ def _data_records(active: Any, generation: str, now: str) -> list[CapabilityReco
     capability_providers: dict[str, list[str]] = {}
     for item in active:
         registration = item.registration
-        provider_id = registration.provider_id
+        provider_id = str(registration.provider_id)
         provider_name = str(getattr(item.provider, "name", provider_id))
         markets = tuple(sorted(registration.markets))
         capabilities = tuple(sorted(registration.capabilities))
         records.append(CapabilityRecord(
             f"data.provider:{provider_id}", "data", "data_provider",
-            "data_provider.runtime", provider_name, "1", generation, now,
+            DATA_RUNTIME_OWNER, provider_id, "1", generation, now,
             registered=True, configured=None, dependency_ready=None,
             executable=None, healthy=None, degraded=None,
-            markets=markets, display_name=provider_name,
+            markets=markets, providers=(provider_id,), provider_count=1,
+            display_name=_bounded_display_name(provider_name),
         ))
         for capability in capabilities:
-            capability_providers.setdefault(capability, []).append(provider_id)
+            capability_providers.setdefault(str(capability), []).append(provider_id)
     for capability, providers in capability_providers.items():
+        # A method supplied by several providers keeps every identity in the
+        # bounded ``providers`` list. The scalar names the owning runtime, so
+        # no valid multi-provider inventory can overflow it.
+        listed = tuple(sorted(providers))[:MAX_RECORD_LIST_LENGTH]
+        truncated = len(providers) > len(listed)
         records.append(CapabilityRecord(
             f"data.method:{capability}", "data", "data_method",
-            "data_provider.runtime", ",".join(sorted(providers)), "1", generation, now,
+            DATA_RUNTIME_OWNER, DATA_RUNTIME_OWNER, "1", generation, now,
             registered=True, configured=None, dependency_ready=None,
             executable=None, healthy=None, degraded=None,
-            display_name=capability,
+            providers=listed, provider_count=len(providers),
+            reason_code="provider_list_truncated" if truncated else None,
+            display_name=_bounded_display_name(capability),
         ))
     return records
+
+
+def _bounded_display_name(value: str) -> str:
+    """Clamp the cosmetic label without ever dropping an identity field."""
+
+    return value if len(value) <= 200 else f"{value[:197]}..."
 
 
 def _stable_tool_snapshot(
     registry: Any,
 ) -> tuple[str, tuple[Any, ...], tuple[Any, ...]]:
-    inventory_snapshot = getattr(registry, "capability_inventory_snapshot", None)
-    if callable(inventory_snapshot):
-        generation, definitions, declarations = inventory_snapshot()
-        return str(generation), tuple(definitions), tuple(declarations)
-    owner_snapshot = getattr(registry, "definition_snapshot", None)
-    if callable(owner_snapshot):
-        generation, definitions = owner_snapshot()
-        return str(generation), tuple(definitions), ()
-    for _ in range(3):
-        definitions = tuple(registry.list_tools())
-        before = {
-            definition.name: registry.definition_version(definition.name)
-            for definition in definitions
-        }
-        after = {
-            definition.name: registry.definition_version(definition.name)
-            for definition in definitions
-        }
-        if before == after and len(before) == len(definitions):
-            generation = ",".join(f"{name}:{before[name]}" for name in sorted(before)) or "empty"
-            return generation, definitions, ()
-    raise RuntimeError("tool registry generation drift")
+    """Read the tool owner exactly once through its inventory contract."""
+
+    generation, entries, declarations = registry.capability_inventory_snapshot()
+    return str(generation), tuple(entries), tuple(declarations)
 
 
 def _tool_records(
-    definitions: tuple[Any, ...],
+    entries: tuple[Any, ...],
     declarations: tuple[Any, ...],
     generation: str,
     now: str,
 ) -> list[CapabilityRecord]:
     records: list[CapabilityRecord] = []
-    registered_names = {definition.name for definition in definitions}
+    registered_names = {entry.name for entry in entries}
     declared_by_name = {
         declaration.name: declaration for declaration in declarations
     }
-    for definition in definitions:
-        policy = getattr(definition, "policy", None)
-        scopes = tuple(sorted(
-            str(value) for value in (getattr(policy, "permissions", ()) or ())
-        ))
-        declaration = declared_by_name.get(definition.name)
+    for entry in entries:
+        declaration = declared_by_name.get(entry.name)
         records.append(CapabilityRecord(
-            f"tool:{definition.name}", "tool", "agent_tool", "agent.tool_registry",
-            definition.name, "1", generation, now, registered=True,
+            f"tool:{entry.name}", "tool", "agent_tool", "agent.tool_registry",
+            entry.name, str(entry.definition_version), generation, now,
+            registered=True,
             configured=(None if declaration is None else declaration.configured),
             dependency_ready=(
                 None if declaration is None else declaration.dependency_ready
             ),
             grantable=None, executable=None, healthy=None, degraded=None,
-            scopes=scopes, display_name=definition.name,
+            scopes=tuple(entry.scopes), display_name=entry.name,
         ))
     for declaration in declarations:
         if declaration.name in registered_names:
             continue
+        # An owner-supplied reason (missing config, construction failure) is the
+        # truth. ``not_registered`` is used only when the owner gave no reason.
         records.append(CapabilityRecord(
             f"tool:{declaration.name}", "tool", "agent_tool", "agent.tool_registry",
             declaration.name, "1", generation, now, registered=False,
@@ -233,26 +254,15 @@ def _tool_records(
 def _stable_extension_snapshot(
     manager: Any,
 ) -> tuple[str, tuple[Any, ...], tuple[Any, ...]]:
-    owner_snapshot = getattr(manager, "capability_inventory_snapshot", None)
-    if callable(owner_snapshot):
-        generation, lifecycle, registrations = owner_snapshot()
-        return str(generation), tuple(lifecycle), tuple(registrations)
-    from src.plugins.registry import EXTENSION_POINTS
-    for _ in range(3):
-        before = {
-            point: manager.registration_snapshot_generation(point)
-            for point in EXTENSION_POINTS
-        }
-        registrations = tuple(manager.enabled_registrations_snapshot())
-        lifecycle = tuple(manager.list_snapshots())
-        after = {
-            point: manager.registration_snapshot_generation(point)
-            for point in EXTENSION_POINTS
-        }
-        if before == after:
-            generation = ",".join(f"{point}:{before[point]}" for point in sorted(before))
-            return generation, lifecycle, registrations
-    raise RuntimeError("extension registry generation drift")
+    """Read the plugin owner exactly once through its inventory contract.
+
+    Correlating lifecycle and registrations here would duplicate the manager's
+    locking and could not observe its lifecycle generation, so the projection
+    has no second implementation of that correlation.
+    """
+
+    generation, lifecycle, registrations = manager.capability_inventory_snapshot()
+    return str(generation), tuple(lifecycle), tuple(registrations)
 
 
 def _extension_records(

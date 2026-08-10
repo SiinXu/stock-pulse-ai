@@ -201,13 +201,38 @@ def _should_use_legacy_default_prompt(
     return getattr(bull_trend_skill, "source", None) == "builtin"
 
 
+def _declare_optional_tools(
+    registry,
+    names,
+    *,
+    configured,
+    reason_code,
+    scopes=(),
+    dependency_ready=None,
+):
+    """Publish owner truth for optional tools that may stay unregistered."""
+
+    from src.agent.tools.registry import ToolInventoryDeclaration
+
+    for name in names:
+        registry.declare_inventory_tool(
+            ToolInventoryDeclaration(
+                name=name,
+                configured=configured,
+                dependency_ready=dependency_ready,
+                scopes=tuple(scopes),
+                reason_code=reason_code,
+            )
+        )
+
+
 def get_tool_registry():
     """Return a cached ToolRegistry (built once, shared across requests)."""
     global _TOOL_REGISTRY
     if _TOOL_REGISTRY is not None:
         return _TOOL_REGISTRY
 
-    from src.agent.tools.registry import ToolInventoryDeclaration, ToolRegistry
+    from src.agent.tools.registry import ToolRegistry
     from src.agent.tools.data_tools import ALL_DATA_TOOLS
     from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
     from src.agent.tools.search_tools import ALL_SEARCH_TOOLS
@@ -234,19 +259,39 @@ def get_tool_registry():
         reason_code = None if configured else (
             "missing_config" if enabled else "feature_disabled"
         )
-        for name in (PARSE_PDF_TOOL_NAME, READ_CHART_TOOL_NAME):
-            registry.declare_inventory_tool(
-                ToolInventoryDeclaration(
-                    name=name,
-                    configured=configured,
-                    scopes=("multimodal:read",),
-                    reason_code=reason_code,
-                )
+        names = (PARSE_PDF_TOOL_NAME, READ_CHART_TOOL_NAME)
+        _declare_optional_tools(
+            registry,
+            names,
+            configured=configured,
+            reason_code=reason_code,
+            scopes=("multimodal:read",),
+        )
+        try:
+            multimodal_tools = build_multimodal_tools(config)
+        except Exception:
+            _declare_optional_tools(
+                registry,
+                names,
+                configured=configured,
+                reason_code="construction_failed",
+                scopes=("multimodal:read",),
+                dependency_ready=False,
             )
-        multimodal_tools = build_multimodal_tools(config)
-        if multimodal_tools:
-            for tool_def in multimodal_tools:
-                registry.register(tool_def)
+            raise
+        built = {tool_def.name for tool_def in (multimodal_tools or ())}
+        for tool_def in multimodal_tools or ():
+            registry.register(tool_def)
+        # A configured optional tool that the owner's factory did not produce is
+        # a construction failure, not a plain "not registered" absence.
+        _declare_optional_tools(
+            registry,
+            tuple(name for name in names if name not in built),
+            configured=configured,
+            reason_code=reason_code or "construction_produced_no_tool",
+            scopes=("multimodal:read",),
+            dependency_ready=False if configured else None,
+        )
     except Exception as exc:  # broad-exception: fallback_recorded - optional tools stay absent.
         log_safe_exception(
             logger,
@@ -266,16 +311,32 @@ def get_tool_registry():
 
         config = get_application_services().config
         configured = getattr(config, "valuation_agent_tool_enabled", False) is True
-        registry.declare_inventory_tool(
-            ToolInventoryDeclaration(
-                name=VALUATION_TOOL_NAME,
-                configured=configured,
-                reason_code=None if configured else "feature_disabled",
-            )
+        reason_code = None if configured else "feature_disabled"
+        names = (VALUATION_TOOL_NAME,)
+        _declare_optional_tools(
+            registry, names, configured=configured, reason_code=reason_code,
         )
-        valuation_tool = build_valuation_tool(config)
+        try:
+            valuation_tool = build_valuation_tool(config)
+        except Exception:
+            _declare_optional_tools(
+                registry,
+                names,
+                configured=configured,
+                reason_code="construction_failed",
+                dependency_ready=False,
+            )
+            raise
         if valuation_tool is not None:
             registry.register(valuation_tool)
+        else:
+            _declare_optional_tools(
+                registry,
+                names,
+                configured=configured,
+                reason_code=reason_code or "construction_produced_no_tool",
+                dependency_ready=False if configured else None,
+            )
     except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
         log_safe_exception(
             logger,

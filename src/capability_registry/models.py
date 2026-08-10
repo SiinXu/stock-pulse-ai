@@ -13,7 +13,9 @@ CapabilityType = Literal[
     "data_provider", "data_method", "agent_tool",
     "plugin_lifecycle", "extension_registration",
 ]
-SourceState = Literal["ok", "error", "generation_drift"]
+SourceState = Literal["ok", "error", "generation_drift", "not_initialized"]
+_SOURCE_STATES = frozenset({"ok", "error", "generation_drift", "not_initialized"})
+MAX_RECORD_LIST_LENGTH = 256
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +29,7 @@ class SourceStatus:
     def __post_init__(self) -> None:
         if self.source not in {"data", "tool", "extension"}:
             raise ValueError("source is invalid")
-        if self.state not in {"ok", "error", "generation_drift"}:
+        if self.state not in _SOURCE_STATES:
             raise ValueError("source state is invalid")
         if not self.generation or len(self.generation) > 256:
             raise ValueError("source generation must be bounded")
@@ -66,6 +68,11 @@ class CapabilityRecord:
     dependencies: Tuple[str, ...] = ()
     scopes: Tuple[str, ...] = ()
     markets: Tuple[str, ...] = ()
+    # Multi-valued owner identity. A capability supplied by several providers
+    # must never be squeezed into the ``provider`` scalar: joining identities
+    # can exceed the scalar bound and turn a healthy source into a false error.
+    providers: Tuple[str, ...] = ()
+    provider_count: Optional[int] = None
     reason_code: Optional[str] = None
     display_name: str = ""
 
@@ -98,12 +105,18 @@ class CapabilityRecord:
             raise ValueError("reason_code must be bounded")
         if self.executable is False and not self.reason_code:
             raise ValueError("known non-executable records require reason_code")
-        for values in (self.dependencies, self.scopes, self.markets):
-            if len(values) > 64 or any(
+        for values in (self.dependencies, self.scopes, self.markets, self.providers):
+            if len(values) > MAX_RECORD_LIST_LENGTH or any(
                 not isinstance(item, str) or not item or len(item) > 128
                 for item in values
             ):
                 raise ValueError("metadata lists must be bounded strings")
+        if self.provider_count is not None and (
+            type(self.provider_count) is not int or self.provider_count < 0
+        ):
+            raise ValueError("provider_count must be a non-negative integer")
+        if self.provider_count is not None and self.provider_count < len(self.providers):
+            raise ValueError("provider_count must cover the listed providers")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

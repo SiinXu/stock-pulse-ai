@@ -117,6 +117,10 @@ def test_real_app_auth_rejects_missing_invalid_and_accepts_signed_session(
     static_dir.mkdir()
     env_path.write_text("ADMIN_AUTH_ENABLED=true\n", encoding="utf-8")
     monkeypatch.setenv("ENV_FILE", str(env_path))
+    # Loading the temporary .env writes its keys into os.environ, so the whole
+    # process environment is restored below. Otherwise ADMIN_AUTH_ENABLED stays
+    # set and later suites resolve a different administrator identity.
+    original_environ = dict(os.environ)
     Config.reset_instance()
     _reset_auth()
     monkeypatch.setattr(
@@ -155,5 +159,7 @@ def test_real_app_auth_rejects_missing_invalid_and_accepts_signed_session(
         assert invalid_domain.json()["message"] == "unsupported domain"
         assert invalid_domain.json()["trace_id"]
     finally:
+        os.environ.clear()
+        os.environ.update(original_environ)
         Config.reset_instance()
         _reset_auth()

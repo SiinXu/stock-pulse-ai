@@ -9,7 +9,7 @@ from typing import Annotated, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 CapabilityDomain = Literal["data", "tool", "extension"]
-SourceState = Literal["ok", "error", "generation_drift"]
+SourceState = Literal["ok", "error", "generation_drift", "not_initialized"]
 BoundedToken = Annotated[str, Field(min_length=1, max_length=128)]
 
 
@@ -48,9 +48,22 @@ class CapabilityItemBase(BaseModel):
     executable: Optional[bool] = None
     healthy: Optional[bool] = None
     degraded: Optional[bool] = None
-    dependencies: List[BoundedToken] = Field(default_factory=list, max_length=64)
-    scopes: List[BoundedToken] = Field(default_factory=list, max_length=64)
-    markets: List[BoundedToken] = Field(default_factory=list, max_length=64)
+    dependencies: List[BoundedToken] = Field(default_factory=list, max_length=256)
+    scopes: List[BoundedToken] = Field(default_factory=list, max_length=256)
+    markets: List[BoundedToken] = Field(default_factory=list, max_length=256)
+    providers: List[BoundedToken] = Field(
+        default_factory=list,
+        max_length=256,
+        description=(
+            "Every owner identity supplying this capability. Populated for "
+            "data-domain records; the scalar provider field never joins ids."
+        ),
+    )
+    provider_count: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="True supplier count, which may exceed the listed providers.",
+    )
     reason_code: Optional[str] = Field(default=None, max_length=128)
     display_name: str = Field(default="", max_length=200)
 

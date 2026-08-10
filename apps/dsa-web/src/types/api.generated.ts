@@ -5383,7 +5383,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "ok" | "error" | "generation_drift";
+            state: "ok" | "error" | "generation_drift" | "not_initialized";
         };
         /**
          * ChangePasswordRequest
@@ -5908,6 +5908,16 @@ export interface components {
             owner: string;
             /** Provider */
             provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
             /** Reason Code */
             reason_code?: string | null;
             /** Registered */
@@ -6853,6 +6863,16 @@ export interface components {
             owner: string;
             /** Provider */
             provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
             /** Reason Code */
             reason_code?: string | null;
             /** Registered */
@@ -12972,6 +12992,16 @@ export interface components {
             owner: string;
             /** Provider */
             provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
             /** Reason Code */
             reason_code?: string | null;
             /** Registered */

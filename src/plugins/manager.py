@@ -132,6 +132,10 @@ class PluginManager:
         self._registry = registry or ExtensionRegistry()
         self._plugins: dict[str, _ManagedPlugin] = {}
         self._stable_enabled_plugin_ids: frozenset[str] = frozenset()
+        # Monotonic counter advanced by every lifecycle write (record add or
+        # removal, observed state transition, operator-intent write). Extension
+        # registration generations alone cannot represent these transitions.
+        self._lifecycle_generation = 0
         self._lock = threading.RLock()
         self._lifecycle_boundary: (
             Callable[[Callable[[], Any]], Any] | None
@@ -311,6 +315,7 @@ class PluginManager:
                 package_root=resolved_root,
                 module_name=resolved_module,
             )
+            self._lifecycle_generation += 1
         logger.info(
             "Plugin registered id=%s version=%s source=%s permissions=%s",
             manifest.id,
@@ -531,6 +536,7 @@ class PluginManager:
 
         for _ in range(3):
             with self._lock:
+                lifecycle_generation = self._lifecycle_generation
                 before = {
                     point: self._registry.registration_snapshot_generation(point)
                     for point in EXTENSION_POINTS
@@ -548,9 +554,15 @@ class PluginManager:
                     point: self._registry.registration_snapshot_generation(point)
                     for point in EXTENSION_POINTS
                 }
-            if before == after:
+                lifecycle_generation_after = self._lifecycle_generation
+            if before == after and lifecycle_generation == lifecycle_generation_after:
+                # Lifecycle transitions never touch a registration generation, so
+                # the published generation must carry the lifecycle counter too.
                 generation = ",".join(
-                    f"{point}:{before[point]}" for point in sorted(before)
+                    (
+                        f"lifecycle:{lifecycle_generation}",
+                        *(f"{point}:{before[point]}" for point in sorted(before)),
+                    )
                 )
                 return generation, lifecycle, registrations
         raise RuntimeError("extension registry generation drift")
@@ -588,6 +600,14 @@ class PluginManager:
             for plugin_id, record in self._plugins.items()
             if record.state == "enabled" and record.transition is None
         )
+        self._lifecycle_generation += 1
+
+    def _write_desired_disabled(self, plugin_id: str, disabled: bool) -> None:
+        """Persist operator intent and advance the lifecycle generation."""
+
+        self._state_store.set_disabled(plugin_id, disabled)
+        with self._lock:
+            self._lifecycle_generation += 1
 
     def _shutdown_plugin_ids(self) -> tuple[str, ...]:
         """Return plugins whose owned lifecycle state still needs shutdown."""
@@ -735,7 +755,7 @@ class PluginManager:
                 )
             if record.state == "enabled":
                 if operation == "enable":
-                    self._state_store.set_disabled(plugin_id, False)
+                    self._write_desired_disabled(plugin_id, False)
                 return PluginOperationResult(
                     plugin_id=plugin_id,
                     operation=operation,
@@ -770,7 +790,7 @@ class PluginManager:
                 )
 
             if operation == "enable":
-                self._state_store.set_disabled(plugin_id, False)
+                self._write_desired_disabled(plugin_id, False)
 
             record.transition = operation
             self._publish_stable_enabled_plugin_ids()
@@ -914,7 +934,7 @@ class PluginManager:
 
             if record.state == "disabled":
                 if persist_intent:
-                    self._state_store.set_disabled(plugin_id, True)
+                    self._write_desired_disabled(plugin_id, True)
                     logger.info(
                         "Plugin %s is already disabled; persisted lifecycle state updated",
                         plugin_id,
@@ -941,7 +961,7 @@ class PluginManager:
                 if cleanup_error is None and remaining:
                     cleanup_error = "plugin_registration_cleanup_failed"
                 if not remaining and persist_intent:
-                    self._state_store.set_disabled(plugin_id, True)
+                    self._write_desired_disabled(plugin_id, True)
                     logger.info(
                         "Plugin %s disabled after failed-state cleanup; will not be invoked",
                         plugin_id,
@@ -959,7 +979,7 @@ class PluginManager:
                 record.state = "disabled"
                 record.transition = None
                 if persist_intent:
-                    self._state_store.set_disabled(plugin_id, True)
+                    self._write_desired_disabled(plugin_id, True)
                     logger.info(
                         "Plugin %s disabled before load; skipping registration and invocation",
                         plugin_id,
@@ -1016,7 +1036,7 @@ class PluginManager:
                     ),
                 )
             if persist_intent:
-                self._state_store.set_disabled(plugin_id, True)
+                self._write_desired_disabled(plugin_id, True)
                 logger.info(
                     "Plugin %s disabled; owned registrations removed and will not be invoked",
                     plugin_id,
@@ -1258,7 +1278,7 @@ class PluginManager:
                 )
             # Preserve operator intent after unload-side disable persistence.
             if desired_enabled:
-                self._state_store.set_disabled(plugin_id, False)
+                self._write_desired_disabled(plugin_id, False)
 
         with self._lock:
             record = self._plugins.get(plugin_id)

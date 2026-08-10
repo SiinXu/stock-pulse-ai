@@ -62,6 +62,8 @@ def _to_item(record: CapabilityRecord) -> CapabilityItem:
         dependencies=list(record.dependencies),
         scopes=list(record.scopes),
         markets=list(record.markets),
+        providers=list(record.providers),
+        provider_count=record.provider_count,
         reason_code=record.reason_code,
         display_name=record.display_name,
     )

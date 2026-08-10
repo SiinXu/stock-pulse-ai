@@ -5001,7 +5001,8 @@
             "enum": [
               "ok",
               "error",
-              "generation_drift"
+              "generation_drift",
+              "not_initialized"
             ],
             "title": "State",
             "type": "string"
@@ -6021,7 +6022,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Dependencies",
             "type": "array"
           },
@@ -6093,7 +6094,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Markets",
             "type": "array"
           },
@@ -6108,6 +6109,30 @@
             "minLength": 1,
             "title": "Provider",
             "type": "string"
+          },
+          "provider_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True supplier count, which may exceed the listed providers.",
+            "title": "Provider Count"
+          },
+          "providers": {
+            "description": "Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Providers",
+            "type": "array"
           },
           "reason_code": {
             "anyOf": [
@@ -6131,7 +6156,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Scopes",
             "type": "array"
           },
@@ -8998,7 +9023,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Dependencies",
             "type": "array"
           },
@@ -9070,7 +9095,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Markets",
             "type": "array"
           },
@@ -9085,6 +9110,30 @@
             "minLength": 1,
             "title": "Provider",
             "type": "string"
+          },
+          "provider_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True supplier count, which may exceed the listed providers.",
+            "title": "Provider Count"
+          },
+          "providers": {
+            "description": "Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Providers",
+            "type": "array"
           },
           "reason_code": {
             "anyOf": [
@@ -9108,7 +9157,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Scopes",
             "type": "array"
           },
@@ -23467,7 +23516,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Dependencies",
             "type": "array"
           },
@@ -23539,7 +23588,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Markets",
             "type": "array"
           },
@@ -23554,6 +23603,30 @@
             "minLength": 1,
             "title": "Provider",
             "type": "string"
+          },
+          "provider_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True supplier count, which may exceed the listed providers.",
+            "title": "Provider Count"
+          },
+          "providers": {
+            "description": "Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Providers",
+            "type": "array"
           },
           "reason_code": {
             "anyOf": [
@@ -23577,7 +23650,7 @@
               "minLength": 1,
               "type": "string"
             },
-            "maxItems": 64,
+            "maxItems": 256,
             "title": "Scopes",
             "type": "array"
           },

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] Versioned read-only `GET /api/v1/capabilities` inventory sourced from live data-provider, tool, and plugin owners, with typed readiness fields, owner generations, and explicit partial-source errors; central registration and resolution remain tracked by #221.
+- [Fixed] The capability inventory observes the process data manager that actually serves callers instead of constructing an isolated one, publishes immutable tool entries and lifecycle-aware plugin generations, keeps multi-provider identities out of the bounded provider scalar, and preserves optional-tool construction-failure provenance.
 - [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
