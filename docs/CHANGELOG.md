@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
+- [Added] Wire shared financial charts into product pages: Stock Details KlineChart (history API candles) and Portfolio RiskHeatmap (existing risk API weight/stop-loss/drawdown scores) with loading, empty, and invalid-value guards (Refs #142).
 - [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
 - [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).

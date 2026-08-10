@@ -11,6 +11,7 @@ import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
+import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -72,6 +73,7 @@ import type {
   PendingDelete,
   PortfolioAccountMarket,
 } from '../../hooks/portfolio/types';
+import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells';
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -412,6 +414,16 @@ const PortfolioWorkspace: React.FC = () => {
 
   const concentrationPieData = sectorPieData.length > 0 ? sectorPieData : positionFallbackPieData;
   const concentrationMode = sectorPieData.length > 0 ? 'sector' : 'position';
+
+  const riskHeatmapCells = useMemo(
+    () => buildPortfolioRiskHeatmapCells(risk, {
+      portfolioRow: text.riskRowPortfolio,
+      weight: text.riskColWeight,
+      stopLoss: text.riskColStopLoss,
+      drawdown: text.riskColDrawdown,
+    }),
+    [risk, text.riskColDrawdown, text.riskColStopLoss, text.riskColWeight, text.riskRowPortfolio],
+  );
 
   const openDeleteDialog = (item: PendingDelete) => {
     if (!writableAccountId) {
@@ -1228,6 +1240,16 @@ const PortfolioWorkspace: React.FC = () => {
           </div>
         </Card>
       </section>
+
+      {hasAccounts ? (
+        <section className="grid grid-cols-1 gap-3">
+          <Card padding="md" data-testid="portfolio-risk-heatmap-card">
+            <h2 className="mb-1 text-sm font-semibold text-foreground">{text.riskHeatmapTitle}</h2>
+            <p className="mb-3 text-xs text-secondary">{text.riskHeatmapDescription}</p>
+            <RiskHeatmap cells={riskHeatmapCells} data-testid="portfolio-risk-heatmap" />
+          </Card>
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {isPaperAccountSelected ? (
