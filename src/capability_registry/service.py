@@ -30,15 +30,30 @@ class OwnerNotInitialized(RuntimeError):
         self.error_code = error_code
 
 
+class OwnerReadError(RuntimeError):
+    """An authoritative owner exists but could not be read safely."""
+
+    def __init__(self, error_code: str) -> None:
+        super().__init__(error_code)
+        self.error_code = error_code
+
+
 def collect_capability_records(
     *,
     data_provider_runtime: Any | None = None,
     tool_registry: Any | None = None,
     plugin_manager: Any | None = None,
+    skill_catalog: Any | None = None,
+    pipeline_stages: Any | None = None,
     domains: Iterable[str] | None = None,
     clock: Clock | None = None,
 ) -> CapabilitySnapshot:
-    """Capture each authoritative owner once or expose an explicit source error."""
+    """Capture each authoritative owner once or expose an explicit source error.
+
+    Availability is projected only from live owner registration and health
+    state. Never fabricates a success snapshot from a static catalog or by
+    constructing a substitute composition root.
+    """
     allowed = _domains(domains)
     now = (clock or (lambda: datetime.now(timezone.utc)))().isoformat()
     sources: list[SourceStatus] = []
@@ -97,6 +112,10 @@ def collect_capability_records(
             generation, lifecycle, registrations = _stable_extension_snapshot(manager)
             records.extend(_extension_records(lifecycle, registrations, generation, now))
             sources.append(SourceStatus("extension", "ok", generation, now))
+        except OwnerNotInitialized as exc:
+            sources.append(SourceStatus(
+                "extension", "not_initialized", "unknown", now, exc.error_code,
+            ))
         except RuntimeError:
             sources.append(SourceStatus(
                 "extension", "generation_drift", "unknown", now,
@@ -111,15 +130,75 @@ def collect_capability_records(
                 "extension", "error", "unknown", now,
                 "extension_source_unavailable",
             ))
+    if "skill" in allowed:
+        try:
+            catalog = (
+                skill_catalog if skill_catalog is not None else _resolve_skill_catalog()
+            )
+            generation, plugin_skills, declarative_skills = catalog
+            generation_s = str(generation)
+            records.extend(
+                _skill_records(plugin_skills, declarative_skills, generation_s, now)
+            )
+            sources.append(SourceStatus("skill", "ok", generation_s, now))
+        except OwnerNotInitialized as exc:
+            sources.append(SourceStatus(
+                "skill", "not_initialized", "unknown", now, exc.error_code,
+            ))
+        except OwnerReadError as exc:
+            sources.append(SourceStatus(
+                "skill", "error", "unknown", now, exc.error_code,
+            ))
+        except RuntimeError:
+            sources.append(SourceStatus(
+                "skill", "generation_drift", "unknown", now,
+                "skill_generation_drift",
+            ))
+        except Exception as exc:  # broad-exception: fallback_recorded - expose source error
+            log_safe_exception(
+                logger, "Capability skill source unavailable", exc,
+                error_code="capability_skill_source_unavailable",
+            )
+            sources.append(SourceStatus(
+                "skill", "error", "unknown", now, "skill_source_unavailable",
+            ))
+    if "pipeline" in allowed:
+        try:
+            stages = (
+                pipeline_stages
+                if pipeline_stages is not None
+                else _resolve_pipeline_stages()
+            )
+            generation, stage_names, bound_names = stages
+            generation_s = str(generation)
+            records.extend(_pipeline_records(stage_names, bound_names, generation_s, now))
+            sources.append(SourceStatus("pipeline", "ok", generation_s, now))
+        except OwnerNotInitialized as exc:
+            sources.append(SourceStatus(
+                "pipeline", "not_initialized", "unknown", now, exc.error_code,
+            ))
+        except OwnerReadError as exc:
+            sources.append(SourceStatus(
+                "pipeline", "error", "unknown", now, exc.error_code,
+            ))
+        except Exception as exc:  # broad-exception: fallback_recorded - expose source error
+            log_safe_exception(
+                logger, "Capability pipeline source unavailable", exc,
+                error_code="capability_pipeline_source_unavailable",
+            )
+            sources.append(SourceStatus(
+                "pipeline", "error", "unknown", now, "pipeline_source_unavailable",
+            ))
     records.sort(key=lambda item: (item.domain, item.capability_id))
     return CapabilitySnapshot(sources=tuple(sources), items=tuple(records))
 
 
 def _domains(domains: Iterable[str] | None) -> set[str]:
-    allowed = {"data", "tool", "extension"} if domains is None else {
+    all_domains = {"data", "tool", "extension", "skill", "pipeline"}
+    allowed = set(all_domains) if domains is None else {
         str(item).strip() for item in domains
     }
-    unknown = allowed - {"data", "tool", "extension"}
+    unknown = allowed - all_domains
     if unknown or not allowed:
         raise ValueError(f"unsupported capability domains: {sorted(unknown)}")
     return allowed
@@ -151,8 +230,14 @@ def _resolve_tool_registry() -> Any:
 
 
 def _resolve_plugin_manager() -> Any:
-    from src.application_services import get_application_services
-    return get_application_services().plugin_manager
+    """Observe only the installed plugin manager; never install a default root."""
+
+    from src.application_services import get_installed_application_services
+
+    services = get_installed_application_services()
+    if services is None:
+        raise OwnerNotInitialized("application_services_not_initialized")
+    return services.plugin_manager
 
 
 def _data_records(active: Any, generation: str, now: str) -> list[CapabilityRecord]:
@@ -275,12 +360,19 @@ def _extension_records(
     for snapshot in lifecycle:
         plugin_id = snapshot.manifest.id
         enabled = snapshot.state == "enabled" and bool(snapshot.desired_enabled)
+        failed = snapshot.state == "failed"
         records.append(CapabilityRecord(
             f"extension.plugin:{plugin_id}", "extension", "plugin_lifecycle",
             "plugin.manager", plugin_id, str(getattr(snapshot.manifest, "version", "1")),
             generation, now, registered=True, executable=False,
-            reason_code="lifecycle_not_capability" if enabled else "plugin_not_enabled",
-            healthy=None, degraded=snapshot.state == "failed", display_name=snapshot.manifest.name,
+            reason_code=(
+                "lifecycle_not_capability" if enabled else (
+                    "plugin_failed" if failed else "plugin_not_enabled"
+                )
+            ),
+            healthy=(False if failed else True if enabled else None),
+            degraded=failed,
+            display_name=snapshot.manifest.name,
         ))
     for registration in registrations:
         records.append(CapabilityRecord(
@@ -291,3 +383,148 @@ def _extension_records(
             dependencies=(registration.extension_point,), display_name=registration.registration_id,
         ))
     return records
+
+
+def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
+    """Read plugin analysis strategies and declarative skills from live owners."""
+
+    from src.application_services import get_installed_application_services
+
+    services = get_installed_application_services()
+    if services is None:
+        raise OwnerNotInitialized("application_services_not_initialized")
+    try:
+        snapshot = services.analysis_strategy_snapshot()
+    except Exception as exc:  # broad-exception: fallback_recorded - owner read failed
+        raise OwnerReadError("skill_catalog_unavailable") from exc
+    try:
+        config = services.config
+    except Exception as exc:  # broad-exception: fallback_recorded - config read failed
+        raise OwnerReadError("skill_config_unavailable") from exc
+    try:
+        from src.agent.skills.base import SkillManager
+
+        skill_manager = SkillManager()
+        custom_dir = getattr(config, "agent_skill_dir", None)
+        if custom_dir:
+            skill_manager.load_custom_skills(custom_dir)
+        declarative = tuple(skill_manager.list_skills())
+    except OwnerReadError:
+        raise
+    except Exception as exc:  # broad-exception: fallback_recorded - catalog load failed
+        raise OwnerReadError("skill_catalog_unavailable") from exc
+    plugin_skills = tuple(snapshot.registrations)
+    generation = (int(snapshot.generation) << 16) ^ len(declarative)
+    return generation, plugin_skills, declarative
+
+
+def _resolve_pipeline_stages() -> tuple[str, tuple[str, ...], frozenset[str]]:
+    """Read pipeline stages from the shared owner contract (not a copied list)."""
+
+    try:
+        from src.core.pipeline import StockAnalysisPipeline
+        from src.core.pipeline_stage_results import PipelineStageName
+        from src.services.run_diagnostics import PIPELINE_STAGE_NAMES
+    except Exception as exc:  # broad-exception: fallback_recorded - owner import failed
+        raise OwnerReadError("pipeline_source_unavailable") from exc
+    if StockAnalysisPipeline is None:  # pragma: no cover - defensive
+        raise OwnerReadError("pipeline_source_unavailable")
+    stage_names = tuple(str(name) for name in PIPELINE_STAGE_NAMES)
+    if not stage_names:
+        raise OwnerReadError("pipeline_source_unavailable")
+    enum_names = {member.value for member in PipelineStageName}
+    bound = frozenset(name for name in stage_names if name in enum_names)
+    return ",".join(stage_names), stage_names, bound
+
+
+def _bounded_dependencies(values: Any) -> tuple[str, ...]:
+    cleaned: list[str] = []
+    for item in values:
+        text_item = str(item).strip()
+        if text_item and len(text_item) <= 128:
+            cleaned.append(text_item)
+        if len(cleaned) >= MAX_RECORD_LIST_LENGTH:
+            break
+    return tuple(cleaned)
+
+
+def _skill_records(
+    plugin_skills: tuple[Any, ...],
+    declarative_skills: tuple[Any, ...],
+    generation: str,
+    now: str,
+) -> list[CapabilityRecord]:
+    records: list[CapabilityRecord] = []
+    seen: set[str] = set()
+    for item in plugin_skills:
+        definition = item.definition
+        name = str(definition.name)
+        seen.add(name)
+        enabled = bool(getattr(definition, "default_active", False)) or bool(
+            getattr(definition, "user_invocable", False)
+        )
+        records.append(CapabilityRecord(
+            f"skill:{name}", "skill", "analysis_skill",
+            "plugin.analysis_strategy_registry", str(item.plugin_id), "1",
+            generation, now,
+            registered=True,
+            configured=True,
+            executable=None if enabled else False,
+            healthy=True,
+            degraded=False,
+            reason_code=None if enabled else "skill_not_default_active",
+            display_name=_bounded_display_name(
+                str(getattr(definition, "display_name", name) or name)
+            ),
+            dependencies=_bounded_dependencies(
+                getattr(definition, "required_tools", ())
+            ),
+        ))
+    for skill in declarative_skills:
+        name = str(getattr(skill, "name", "") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        enabled = bool(getattr(skill, "enabled", True))
+        records.append(CapabilityRecord(
+            f"skill:{name}", "skill", "analysis_skill",
+            "agent.skill_manager", str(getattr(skill, "source", "custom") or "custom"),
+            "1", generation, now,
+            registered=True,
+            configured=True,
+            executable=None if enabled else False,
+            healthy=True if enabled else False,
+            degraded=not enabled,
+            reason_code=None if enabled else "skill_disabled",
+            display_name=_bounded_display_name(
+                str(getattr(skill, "display_name", name) or name)
+            ),
+            dependencies=_bounded_dependencies(
+                getattr(skill, "required_tools", None) or ()
+            ),
+        ))
+    return records
+
+
+def _pipeline_records(
+    stage_names: tuple[str, ...],
+    bound_names: frozenset[str],
+    generation: str,
+    now: str,
+) -> list[CapabilityRecord]:
+    records: list[CapabilityRecord] = []
+    for name in stage_names:
+        registered = name in bound_names
+        records.append(CapabilityRecord(
+            f"pipeline.stage:{name}", "pipeline", "pipeline_stage",
+            "core.pipeline", name, "1", generation, now,
+            registered=registered,
+            configured=True if registered else None,
+            executable=None if registered else False,
+            healthy=True if registered else False,
+            degraded=not registered,
+            reason_code=None if registered else "stage_not_bound",
+            display_name=name,
+        ))
+    return records
+
