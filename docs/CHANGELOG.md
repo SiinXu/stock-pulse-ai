@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 
-- [Added] Today's Focus recommendations: deterministic watchlist/holdings prioritization (alerts, events, analysis reversals, high-weight moves) with hard cap, honest empty state, zero extra fetch, API endpoint, and TodaysFocusPanel (#157).
+- [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
 - [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
 - [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).

@@ -299,16 +299,83 @@ const HomeReadinessCardStory = () => {
 
 
 const FIXTURE_TODAYS_FOCUS: TodaysFocusResponse = {
-  packVersion: 'todays_focus/1.0',
+  packVersion: 'todays_focus/2.0',
   generatedAt: '2026-08-09T08:00:00Z',
   status: 'ok',
   maxItems: 5,
   itemCount: 2,
   items: [
-    { code: '600519', name: 'Kweichow Moutai', reasonCode: 'alert_triggered', reasonDisplay: 'Alert triggered: price above MA', priority: 100 },
-    { code: 'AAPL', name: 'Apple', reasonCode: 'high_weight_move', reasonDisplay: 'High portfolio weight with large move: weight 22.0%, unrealized +8.5%', priority: 50, weightPct: 22 },
+    {
+      code: '600519',
+      name: 'Kweichow Moutai',
+      reasonCode: 'alert_triggered',
+      reasonDisplay: 'Alert triggered: price above MA',
+      priority: 100,
+      weightPct: null,
+      secondaryReasonCodes: [],
+      evidence: {
+        type: 'alert',
+        triggerId: 7,
+        ruleId: 9,
+        observedAt: '2026-08-09T07:30:00Z',
+        status: 'triggered',
+      },
+    },
+    {
+      code: 'AAPL',
+      name: 'Apple',
+      reasonCode: 'analysis_reversal',
+      reasonDisplay: 'Analysis conclusion changed: buy to sell',
+      priority: 70,
+      weightPct: null,
+      secondaryReasonCodes: [],
+      evidence: {
+        type: 'analysis',
+        recordId: 42,
+        queryId: 'q-42',
+        observedAt: '2026-08-09T07:00:00Z',
+        previousObservedAt: '2026-08-08T07:00:00Z',
+        previousAction: 'buy',
+        latestAction: 'sell',
+      },
+    },
   ],
-  costContract: { providerCalls: 0, analysisRunsTriggered: 0, zeroExtraFetch: true },
+  emptyReason: null,
+  emptyMessage: null,
+  sourcesUsed: ['alerts', 'analysis_history'],
+  degradedSources: [],
+  temporalPolicy: {
+    semantics: 'local_calendar_day',
+    timezone: 'Asia/Shanghai',
+    localDate: '2026-08-09',
+    windowStart: '2026-08-08T16:00:00Z',
+    windowEnd: '2026-08-09T08:00:00Z',
+    naiveTimestampPolicy: 'assume_utc',
+    missingTimestampPolicy: 'exclude',
+    nonTradingDayPolicy: 'same_local_day_only',
+  },
+  universeContract: {
+    symbolCount: 2,
+    hardCap: 1000,
+    truncated: false,
+    sources: ['watchlist_config'],
+  },
+  costContract: {
+    alertRepositoryCalls: 1,
+    portfolioRepositoryCalls: 1,
+    analysisHistoryRepositoryCalls: 1,
+    eventRepositoryCalls: 0,
+    databaseWrites: 0,
+    providerCalls: 0,
+    analysisRunsTriggered: 0,
+    zeroExtraFetch: true,
+    readOnly: true,
+  },
+  presentationBoundary: {
+    alertsOwnedBy: 'signal_center',
+    focusShows: 'prioritized_symbols_with_evidence_links',
+    duplicateAlertUi: false,
+  },
 };
 
 const TodaysFocusPanelStory = () => {
@@ -318,7 +385,7 @@ const TodaysFocusPanelStory = () => {
   const isError = scenario === 'error';
   const isEmpty = scenario === 'empty';
   const data = isEmpty
-    ? { ...FIXTURE_TODAYS_FOCUS, status: 'empty' as const, itemCount: 0, items: [], emptyReason: 'no_deterministic_signals', emptyMessage: 'No symbols need special attention today.' }
+    ? { ...FIXTURE_TODAYS_FOCUS, status: 'empty' as const, itemCount: 0, items: [], emptyReason: 'no_fresh_deterministic_signals' as const, emptyMessage: 'No symbols need special attention today.' }
     : isLoading || isError ? null : FIXTURE_TODAYS_FOCUS;
   return (
     <div className="max-w-xl">

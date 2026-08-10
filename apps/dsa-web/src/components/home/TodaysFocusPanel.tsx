@@ -4,6 +4,10 @@ import type React from 'react';
 import { Focus, RefreshCw } from 'lucide-react';
 import type { ParsedApiError } from '../../api/error';
 import type { UiTextKey } from '../../i18n/uiText';
+import {
+  buildAnalysisWorkbenchHref,
+  buildSignalCenterHref,
+} from '../../routing/routes';
 import type { TodaysFocusItem, TodaysFocusResponse } from '../../types/todaysFocus';
 import {
   ApiErrorAlert,
@@ -32,10 +36,29 @@ function reasonBadgeLabel(reasonCode: string, t: TodaysFocusPanelProps['t']): st
       return t('home.todaysFocus.reason.event');
     case 'analysis_reversal':
       return t('home.todaysFocus.reason.reversal');
-    case 'high_weight_move':
-      return t('home.todaysFocus.reason.weightMove');
     default:
       return reasonCode;
+  }
+}
+
+function evidenceHref(item: TodaysFocusItem): string | null {
+  switch (item.evidence.type) {
+    case 'alert':
+      return buildSignalCenterHref({
+        triggerId: item.evidence.triggerId,
+        stock: item.code,
+      });
+    case 'analysis':
+      return buildAnalysisWorkbenchHref({
+        recordId: item.evidence.recordId,
+        stock: item.code,
+      });
+    case 'corporate_event':
+      return item.evidence.href.startsWith('/') && !item.evidence.href.startsWith('//')
+        ? item.evidence.href
+        : null;
+    default:
+      return null;
   }
 }
 
@@ -48,6 +71,7 @@ function FocusRow({
   onSelect?: (code: string) => void;
   t: TodaysFocusPanelProps['t'];
 }) {
+  const href = evidenceHref(item);
   const content = (
     <>
       <div className="min-w-0 flex-1">
@@ -74,29 +98,37 @@ function FocusRow({
     </>
   );
 
-  if (onSelect) {
-    return (
-      <li className="border-b border-border/60 last:border-b-0">
+  return (
+    <li className="flex items-start gap-3 border-b border-border/60 last:border-b-0">
+      {onSelect ? (
         <button
           type="button"
-          className="flex w-full min-h-12 items-start gap-3 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-12 min-w-0 flex-1 items-start gap-3 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => onSelect(item.code)}
           data-testid={`todays-focus-item-${item.code}`}
           data-reason-code={item.reasonCode}
         >
           {content}
         </button>
-      </li>
-    );
-  }
-
-  return (
-    <li
-      className="flex min-h-12 items-start gap-3 border-b border-border/60 py-3 last:border-b-0"
-      data-testid={`todays-focus-item-${item.code}`}
-      data-reason-code={item.reasonCode}
-    >
-      {content}
+      ) : (
+        <div
+          className="flex min-h-12 min-w-0 flex-1 items-start gap-3 py-3"
+          data-testid={`todays-focus-item-${item.code}`}
+          data-reason-code={item.reasonCode}
+        >
+          {content}
+        </div>
+      )}
+      {href ? (
+        <a
+          href={href}
+          className="my-3 shrink-0 rounded-sm text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`${t('home.todaysFocus.viewEvidence')}: ${item.code}`}
+          data-testid={`todays-focus-evidence-${item.code}`}
+        >
+          {t('home.todaysFocus.viewEvidence')}
+        </a>
+      ) : null}
     </li>
   );
 }
@@ -150,6 +182,16 @@ export const TodaysFocusPanel: React.FC<TodaysFocusPanelProps> = ({
           <Spinner className="h-4 w-4" aria-hidden="true" />
           {t('home.todaysFocus.loading')}
         </div>
+      ) : null}
+
+      {!error && data?.status === 'degraded' ? (
+        <p
+          className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-secondary-text"
+          role="status"
+          data-testid="todays-focus-degraded"
+        >
+          {t('home.todaysFocus.degraded')}
+        </p>
       ) : null}
 
       {isEmpty ? (
