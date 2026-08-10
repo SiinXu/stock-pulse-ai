@@ -19,6 +19,8 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    calculators,
+    capabilities,
     config_profiles,
     decision_signals,
     health,
@@ -31,14 +33,23 @@ from api.v1.endpoints import (
     plugins,
     onboarding,
     portfolio,
+    portfolio_health,
     portfolio_risk_metrics,
+    portfolio_stress_test,
+    reasoning_trace,
+    report_export,
+    report_version_compare,
     scheduled_tasks,
     scorecard,
     security_audit,
     skill_outcomes,
     stocks,
     system_config,
+    todays_focus,
     usage,
+    valuation,
+    watchlist_scores,
+    watchlist_groups,
 )
 
 # Create v1 main route.
@@ -75,10 +86,43 @@ router.include_router(
     tags=["History"]
 )
 
+# Report export (Markdown / optional PDF). Same /history prefix; static
+# /export/capabilities is registered before /{record_id}/export inside the module.
+router.include_router(
+    report_export.router,
+    prefix="/history",
+    tags=["History"],
+)
+
+router.include_router(
+    report_version_compare.router,
+    prefix="/report-version-compare",
+    tags=["ReportVersionCompare"],
+)
+
 router.include_router(
     stocks.router,
     prefix="/stocks",
     tags=["Stocks"]
+)
+
+
+router.include_router(
+    watchlist_scores.router,
+    prefix="/watchlist",
+    tags=["Watchlist"],
+)
+
+router.include_router(
+    watchlist_groups.router,
+    prefix="/stocks",
+    tags=["Stocks"],
+)
+
+router.include_router(
+    valuation.router,
+    prefix="/valuation",
+    tags=["Valuation"],
 )
 
 router.include_router(
@@ -112,6 +156,24 @@ router.include_router(
 )
 
 router.include_router(
+    portfolio_health.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
+    portfolio_stress_test.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
+    calculators.router,
+    prefix="/calculators",
+    tags=["Calculators"],
+)
+
+router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
@@ -121,6 +183,12 @@ router.include_router(
     notification_inbox.router,
     prefix="/notification-inbox",
     tags=["NotificationInbox"],
+)
+
+router.include_router(
+    todays_focus.router,
+    prefix="/focus",
+    tags=["TodaysFocus"],
 )
 
 router.include_router(
@@ -172,6 +240,12 @@ router.include_router(
 )
 
 router.include_router(
+    reasoning_trace.router,
+    prefix="/reasoning-trace",
+    tags=["ReasoningTrace"],
+)
+
+router.include_router(
     scheduled_tasks.router,
     prefix="/scheduled-tasks",
     tags=["ScheduledTasks"]
@@ -194,6 +268,12 @@ router.include_router(
     plugins.router,
     prefix="/plugins",
     tags=["Plugins"],
+)
+
+router.include_router(
+    capabilities.router,
+    prefix="/capabilities",
+    tags=["Capabilities"],
 )
 
 

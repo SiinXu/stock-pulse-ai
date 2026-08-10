@@ -49,8 +49,20 @@ from src.migrations.versions.v202608050001_backtest_resolution_notes import (
 from src.migrations.versions.v202608060001_task_queue_inflight import (
     MIGRATION as TASK_QUEUE_INFLIGHT_MIGRATION,
 )
+from src.migrations.versions.v202608090001_watchlist_groups_schema import (
+    MIGRATION as WATCHLIST_GROUPS_SCHEMA_MIGRATION,
+)
+from src.migrations.versions.v202608090002_portfolio_health_snapshots import (
+    MIGRATION as PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
+)
 from src.migrations.versions.v202608090020_notification_inbox_read_state import (
     MIGRATION as NOTIFICATION_INBOX_READ_STATE_MIGRATION,
+)
+from src.migrations.versions.v202608100001_chat_turn_identity import (
+    MIGRATION as CHAT_TURN_IDENTITY_MIGRATION,
+)
+from src.migrations.versions.v202608100002_analysis_history_search_fts import (
+    MIGRATION as ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
 )
 
 
@@ -70,7 +82,11 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION,
         BACKTEST_RESOLUTION_NOTES_MIGRATION,
         TASK_QUEUE_INFLIGHT_MIGRATION,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION,
+        PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
         NOTIFICATION_INBOX_READ_STATE_MIGRATION,
+        CHAT_TURN_IDENTITY_MIGRATION,
+        ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
     )
 )
 

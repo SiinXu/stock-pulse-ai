@@ -32,7 +32,9 @@ from src.migrations.legacy_profiles import (
     match_legacy_schema_profile,
 )
 from src.migrations.registry import (
+    ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
     APPROVAL_GATE_SCHEMA_MIGRATION,
+    CHAT_TURN_IDENTITY_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
     INTELLIGENCE_ITEM_SCOPE_MIGRATION,
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
@@ -47,6 +49,8 @@ from src.migrations.registry import (
     BACKTEST_RESOLUTION_NOTES_MIGRATION,
     TASK_QUEUE_INFLIGHT_MIGRATION,
     NOTIFICATION_INBOX_READ_STATE_MIGRATION,
+    PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
+    WATCHLIST_GROUPS_SCHEMA_MIGRATION,
     TARGET_VERSION,
     get_migrations,
 )
@@ -436,7 +440,11 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
         TASK_QUEUE_INFLIGHT_MIGRATION.id,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION.id,
+        PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION.id,
         NOTIFICATION_INBOX_READ_STATE_MIGRATION.id,
+        CHAT_TURN_IDENTITY_MIGRATION.id,
+        ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)

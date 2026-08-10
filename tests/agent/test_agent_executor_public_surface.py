@@ -51,7 +51,7 @@ EXPECTED_LOOP_METHODS = (
 
 EXPECTED_AST_HASHES = {
     "_RunMethods": "e8ef83028539b5298d24ed9fa7ee2e681a21c6b70e5f85e4e985d5750f6bfa30",
-    "_ChatMethods": "24ddb7f60370172efd90ba96ce93f9123ce3b57583ad5981ae570a2de7d3ceea",
+    "_ChatMethods": "2dbfcf8f05e29ba0ba395bc428ca5e76f9c14a91c1e3a148d996cb0542844c1a",
     "_LoopMethods": "a7762e27d59da99d7cf482b3da73b78244dd3b8c61084f84c2fee7477b9d4720",
 }
 
@@ -210,6 +210,7 @@ def test_executor_runtime_annotations_match_pre_split_contract():
             "context": typing.Optional[typing.Dict[str, typing.Any]],
             "cancelled_check": typing.Optional[typing.Callable[[], bool]],
             "selected_skill_ids": typing.Optional[typing.List[str]],
+            "turn_id": typing.Optional[str],
             "return": module.AgentResult,
         },
         "_persist_provider_trace": {

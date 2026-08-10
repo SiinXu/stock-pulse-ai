@@ -154,10 +154,17 @@ _STABLE_TASK_ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 class KnownTaskFailure(Exception):
     """Command failure that already carries a stable public error code."""
 
-    def __init__(self, error_code: str, message: str) -> None:
+    def __init__(
+        self,
+        error_code: str,
+        message: str,
+        *,
+        message_params: Optional[Dict[str, Any]] = None,
+    ) -> None:
         super().__init__(message)
         self.error_code = str(error_code or "").strip() or "task_failed"
         self.message = str(message or "").strip() or self.error_code
+        self.message_params = copy.deepcopy(message_params or {})
 
 
 def public_task_error(task: Any, default_error_code: str = "task_failed") -> Optional[str]:
@@ -181,6 +188,8 @@ def public_task_message(task: Any, default_failed_message: str = "任务执行�
     message_code = getattr(task, "message_code", None)
     if message_code == "llm_not_configured":
         return "No LLM model is configured"
+    if message_code == "local_market_data_missing":
+        return "Local market data does not cover the requested analysis window"
     if message_code == "task.analysis.failed":
         return "分析失败"
     return default_failed_message
@@ -2045,6 +2054,9 @@ class AnalysisTaskQueue:
         *,
         result: Any = None,
         diagnostic_error: Optional[str] = None,
+        failure_message: Optional[str] = None,
+        failure_message_code: Optional[str] = None,
+        failure_message_params: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Apply one terminal transition; the first lock winner owns the outcome."""
         if task.status.terminal:
@@ -2097,6 +2109,10 @@ class AnalysisTaskQueue:
                     if task.kind == "stock_analysis"
                     else {}
                 )
+            elif failure_message_code:
+                task.message = failure_message or "任务执行失败"
+                task.message_code = failure_message_code
+                task.message_params = copy.deepcopy(failure_message_params or {})
             elif task.kind == "stock_analysis":
                 task.message = "分析失败"
                 task.message_code = "task.analysis.failed"
@@ -2169,6 +2185,7 @@ class AnalysisTaskQueue:
             error_message = service.last_error or "分析返回空结果"
             from src.services.analysis_service import (
                 LLM_NOT_CONFIGURED_ERROR_CODE,
+                LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
                 is_llm_not_configured_error,
             )
 
@@ -2176,6 +2193,12 @@ class AnalysisTaskQueue:
                 raise KnownTaskFailure(
                     LLM_NOT_CONFIGURED_ERROR_CODE,
                     error_message,
+                )
+            if service.last_error_code == LOCAL_MARKET_DATA_MISSING_ERROR_CODE:
+                raise KnownTaskFailure(
+                    LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
+                    error_message,
+                    message_params=getattr(service, "last_error_details", None),
                 )
             raise RuntimeError(error_message)
         return result
@@ -2267,6 +2290,15 @@ class AnalysisTaskQueue:
                         current,
                         TaskStatus.FAILED,
                         diagnostic_error=diagnostic_error,
+                        failure_message=(
+                            exc.message if isinstance(exc, KnownTaskFailure) else None
+                        ),
+                        failure_message_code=known_failure_code,
+                        failure_message_params=(
+                            exc.message_params
+                            if isinstance(exc, KnownTaskFailure)
+                            else None
+                        ),
                     )
             self._cleanup_old_tasks()
             return None

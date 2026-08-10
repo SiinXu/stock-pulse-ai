@@ -29,6 +29,7 @@ from src.config_parts.parsers import (
     normalize_news_strategy_profile,
     parse_agent_context_compression_int,
     parse_env_bool,
+    parse_env_finite_float as _parse_env_finite_float,
     parse_env_float,
     parse_env_int,
     resolve_news_window_days,
@@ -101,6 +102,29 @@ def emit_legacy_schedule_deprecation_if_needed(
     )
 
 
+def _load_indicator_period_fields() -> Dict[str, Any]:
+    """Load the same strict contract used by Settings and runtime reload."""
+    from src.utils.indicator_periods import validate_indicator_env_map
+
+    resolved = validate_indicator_env_map(
+        {
+            "INDICATOR_MA_PERIODS": os.getenv("INDICATOR_MA_PERIODS"),
+            "INDICATOR_MACD_FAST": os.getenv("INDICATOR_MACD_FAST"),
+            "INDICATOR_MACD_SLOW": os.getenv("INDICATOR_MACD_SLOW"),
+            "INDICATOR_MACD_SIGNAL": os.getenv("INDICATOR_MACD_SIGNAL"),
+            "INDICATOR_RSI_PERIODS": os.getenv("INDICATOR_RSI_PERIODS"),
+        }
+    )
+    return {
+        "indicator_ma_periods": list(resolved.ma_periods),
+        "indicator_macd_fast": resolved.macd_fast,
+        "indicator_macd_slow": resolved.macd_slow,
+        "indicator_macd_signal": resolved.macd_signal,
+        "indicator_rsi_periods": list(resolved.rsi_periods),
+        "indicator_period_source": resolved.source,
+    }
+
+
 def setup_env() -> None:
     from src import config as config_module
 
@@ -133,6 +157,8 @@ class _ConfigLoadingMethods:
         2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
         3. 代码中的默认值
         """
+        from src.config_parts.parsers import parse_risk_gate_profile
+
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
 
@@ -604,6 +630,19 @@ class _ConfigLoadingMethods:
         if report_show_llm_model_raw is not None and not report_show_llm_model_raw.strip():
             report_show_llm_model = False
 
+        coingecko_api_plan = (os.getenv('COINGECKO_API_PLAN') or 'keyless').strip().lower()
+        if coingecko_api_plan not in {'keyless', 'demo', 'pro'}:
+            logger.warning(
+                "COINGECKO_API_PLAN=%r is invalid; falling back to keyless",
+                coingecko_api_plan,
+            )
+            coingecko_api_plan = 'keyless'
+
+        # Import inside method body: _load_from_env is cloned into src.config globals.
+        from src.config_parts.loading import _load_indicator_period_fields
+
+        _indicator_period_fields = _load_indicator_period_fields()
+
         return cls(
             stock_list=stock_list,
             feishu_app_id=os.getenv('FEISHU_APP_ID'),
@@ -618,6 +657,19 @@ class _ConfigLoadingMethods:
             tencent_priority=parse_env_int(os.getenv('TENCENT_PRIORITY'), 5, field_name='TENCENT_PRIORITY', minimum=0),
             finnhub_api_key=os.getenv('FINNHUB_API_KEY') or None,
             alphavantage_api_key=os.getenv('ALPHAVANTAGE_API_KEY') or None,
+            crypto_provider_enabled=parse_env_bool(
+                os.getenv('CRYPTO_PROVIDER_ENABLED'), default=False
+            ),
+            coingecko_api_key=os.getenv('COINGECKO_API_KEY') or None,
+            coingecko_api_plan=coingecko_api_plan,
+            coingecko_api_base=(os.getenv('COINGECKO_API_BASE') or '').strip() or None,
+            crypto_coingecko_priority=parse_env_int(
+                os.getenv('CRYPTO_COINGECKO_PRIORITY'),
+                10,
+                field_name='CRYPTO_COINGECKO_PRIORITY',
+                minimum=0,
+                maximum=99,
+            ),
             longbridge_app_key=os.getenv('LONGBRIDGE_APP_KEY') or None,
             longbridge_app_secret=os.getenv('LONGBRIDGE_APP_SECRET') or None,
             longbridge_access_token=os.getenv('LONGBRIDGE_ACCESS_TOKEN') or None,
@@ -625,6 +677,33 @@ class _ConfigLoadingMethods:
             stock_index_remote_update_enabled=parse_env_bool(
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
                 default=True,
+            ),
+            data_validation_enabled=parse_env_bool(
+                os.getenv('DATA_VALIDATION_ENABLED'),
+                default=True,
+            ),
+            data_validation_strict=parse_env_bool(
+                os.getenv('DATA_VALIDATION_STRICT'),
+                default=False,
+            ),
+            data_validation_strict_scopes=(
+                os.getenv('DATA_VALIDATION_STRICT_SCOPES', '*/*').strip()
+                or '*/*'
+            ),
+            data_validation_instrument_overrides=(
+                os.getenv('DATA_VALIDATION_INSTRUMENT_OVERRIDES', '').strip()
+            ),
+            data_validation_upper_layer_mode=(
+                "reject"
+                if os.getenv('DATA_VALIDATION_UPPER_LAYER_MODE', 'warn')
+                .strip()
+                .lower()
+                == "reject"
+                else "warn"
+            ),
+            plugin_data_provider_auto_bind_enabled=parse_env_bool(
+                os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
+                default=False,
             ),
             generation_backend=generation_backend,
             generation_fallback_backend=generation_fallback_backend,
@@ -734,6 +813,7 @@ class _ConfigLoadingMethods:
             ),
             newsnow_base_url=((os.getenv('NEWSNOW_BASE_URL') or '').strip().rstrip('/') or 'https://newsnow.busiyi.world'),
             bias_threshold=parse_env_float(os.getenv('BIAS_THRESHOLD'), 5.0, field_name='BIAS_THRESHOLD', minimum=1.0),
+            **_indicator_period_fields,
             agent_generation_backend=agent_generation_backend,
             agent_litellm_model=agent_litellm_model,
             agent_mode=os.getenv('AGENT_MODE', 'false').lower() == 'true',
@@ -799,7 +879,12 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_SKILL_AGENT_TIMEOUT_S'), 0,
                 field_name='AGENT_SKILL_AGENT_TIMEOUT_S', minimum=0,
             ),
-            agent_risk_override=os.getenv('AGENT_RISK_OVERRIDE', 'true').lower() == 'true',
+            agent_risk_override=parse_env_bool(
+                os.getenv('AGENT_RISK_OVERRIDE'), default=True
+            ),
+            risk_gate_profile=parse_risk_gate_profile(
+                os.getenv('RISK_GATE_PROFILE')
+            ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
@@ -921,6 +1006,9 @@ class _ConfigLoadingMethods:
             single_stock_notify=os.getenv('SINGLE_STOCK_NOTIFY', 'false').lower() == 'true',
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
+            report_export_pdf_font_path=(
+                os.getenv('REPORT_EXPORT_PDF_FONT_PATH') or ''
+            ).strip() or None,
             report_summary_only=os.getenv('REPORT_SUMMARY_ONLY', 'false').lower() == 'true',
             report_show_llm_model=report_show_llm_model,
             report_templates_dir=os.getenv('REPORT_TEMPLATES_DIR', 'templates'),
@@ -1092,6 +1180,9 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=3650,
             ),
+            portfolio_stress_scenarios_path=(
+                os.getenv('PORTFOLIO_STRESS_SCENARIOS_PATH', '').strip() or None
+            ),
             portfolio_risk_concentration_alert_pct=parse_env_float(
                 os.getenv('PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT'),
                 35.0,
@@ -1123,6 +1214,83 @@ class _ConfigLoadingMethods:
                 minimum=1,
             ),
             portfolio_fx_update_enabled=os.getenv('PORTFOLIO_FX_UPDATE_ENABLED', 'true').lower() == 'true',
+            portfolio_health_weight_concentration=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION'),
+                0.25,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_risk_exposure=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE'),
+                0.25,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_diversification=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION'),
+                0.20,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_pnl=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_PNL'),
+                0.15,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_PNL',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_cash_ratio=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO'),
+                0.15,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_concentration_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT'),
+                35.0,
+                field_name='PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_var_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_VAR_ALERT_PCT'),
+                5.0,
+                field_name='PORTFOLIO_HEALTH_VAR_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_diversification_alert=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT'),
+                0.35,
+                field_name='PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_cash_low_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT'),
+                2.0,
+                field_name='PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_cash_high_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT'),
+                50.0,
+                field_name='PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_pnl_loss_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT'),
+                -15.0,
+                field_name='PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT',
+                minimum=-100.0,
+                maximum=0.0,
+            ),
             alphasift_enabled=parse_env_bool(os.getenv('ALPHASIFT_ENABLED'), default=False),
             alphasift_install_spec=(
                 DEFAULT_ALPHASIFT_INSTALL_SPEC
@@ -1142,6 +1310,19 @@ class _ConfigLoadingMethods:
                 os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
             ),
             multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
+            ocr_agent_tool_enabled=parse_env_bool(
+                os.getenv('OCR_AGENT_TOOL_ENABLED'), default=False
+            ),
+            ocr_file_root=os.getenv('OCR_FILE_ROOT', '').strip() or None,
+            ocr_langs=(
+                os.getenv('OCR_LANGS', 'chi_sim+eng').strip() or 'chi_sim+eng'
+            ),
+            ocr_timeout_seconds=parse_env_int(
+                os.getenv('OCR_TIMEOUT_SECONDS'),
+                30,
+                field_name='OCR_TIMEOUT_SECONDS',
+                minimum=1,
+            ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
@@ -1157,6 +1338,16 @@ class _ConfigLoadingMethods:
             ),
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
+            ),
+            reasoning_trace_export_enabled=parse_env_bool(
+                os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False
+            ),
+            reasoning_trace_export_max_chars=parse_env_int(
+                os.getenv('REASONING_TRACE_EXPORT_MAX_CHARS'),
+                500_000,
+                field_name='REASONING_TRACE_EXPORT_MAX_CHARS',
+                minimum=10_000,
+                maximum=2_000_000,
             ),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False

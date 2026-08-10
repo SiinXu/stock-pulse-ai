@@ -31,6 +31,42 @@ from tests.agent.benchmark.metrics import (  # noqa: E402
     score_observation,
 )
 from tests.agent_runtime_replay import observe_case  # noqa: E402
+from src.services.agent_trajectory_eval_service import (  # noqa: E402
+    evaluate_agent_trajectory,
+)
+from src.services.agent_eval_service import (  # noqa: E402
+    AgentEvalService,
+    load_eval_cases,
+)
+
+
+def run_output_quality_comparison(
+    candidate_cases: Optional[Sequence[Mapping[str, Any]]] = None,
+    *,
+    baseline_agent_version: str = "frozen-agent-baseline",
+    candidate_agent_version: str = "frozen-agent-candidate",
+    baseline_config_version: str = "frozen-config-baseline",
+    candidate_config_version: str = "frozen-config-candidate",
+) -> Dict[str, Any]:
+    """Run output-quality candidate-vs-baseline evaluation in the owned runner."""
+    baseline_cases = load_eval_cases()
+    candidates = list(candidate_cases) if candidate_cases is not None else baseline_cases
+    service = AgentEvalService()
+    baseline = service.evaluate_suite(baseline_cases)
+    candidate = service.evaluate_suite(candidates)
+    comparison = service.compare_reports(
+        baseline,
+        candidate,
+        baseline_agent_version=baseline_agent_version,
+        candidate_agent_version=candidate_agent_version,
+        baseline_config_version=baseline_config_version,
+        candidate_config_version=candidate_config_version,
+    )
+    return {
+        "baseline": baseline.to_dict(),
+        "candidate": candidate.to_dict(),
+        "comparison": comparison,
+    }
 
 
 def run_scenario(scenario: Mapping[str, Any]) -> Dict[str, Any]:
@@ -41,6 +77,36 @@ def run_scenario(scenario: Mapping[str, Any]) -> Dict[str, Any]:
     observed = observe_case(source_case)
     evaluation = scenario.get("evaluation") or {}
     scored = score_observation(observed, evaluation, scenario_id=scenario_id)
+    tool_rubric = evaluation.get("tool_usage_discipline") or {}
+    source_input = source_case.get("input") or {}
+    source_context = (
+        source_input.get("context")
+        if isinstance(source_input, Mapping)
+        and isinstance(source_input.get("context"), Mapping)
+        else {}
+    )
+    source_run_id = str(source_case.get("id") or source_rel)
+    trajectory = evaluate_agent_trajectory(
+        [
+            {
+                "run_id": source_run_id,
+                "execution_id": f"offline-replay:{source_run_id}",
+                "task_id": scenario_id,
+                "agent_id": "offline-single-agent",
+                "stock_code": source_context.get("stock_code"),
+                "market": scenario.get("market"),
+                "completed": observed.get("success")
+                if isinstance(observed.get("success"), bool)
+                else None,
+                "tool_calls": observed.get("tool_calls") or [],
+            }
+        ],
+        rubric={
+            "required_tools": list(tool_rubric.get("required_tools") or []),
+            "forbidden_tools": list(tool_rubric.get("forbidden_tools") or []),
+        },
+    )
+    scored["trajectory_evaluation"] = trajectory.to_dict()
     scored["source_case"] = source_rel
     scored["market"] = scenario.get("market")
     scored["profile"] = scenario.get("profile")
@@ -49,6 +115,12 @@ def run_scenario(scenario: Mapping[str, Any]) -> Dict[str, Any]:
 
 def run_benchmark(
     scenario_ids: Optional[Sequence[str]] = None,
+    *,
+    output_quality_candidate_root: Optional[Path] = None,
+    baseline_agent_version: str = "frozen-agent-baseline",
+    candidate_agent_version: str = "frozen-agent-candidate",
+    baseline_config_version: str = "frozen-config-baseline",
+    candidate_config_version: str = "frozen-config-candidate",
 ) -> Dict[str, Any]:
     """Run all (or selected) scenarios and return a stable JSON-serializable report."""
     selected = set(scenario_ids) if scenario_ids else None
@@ -67,6 +139,18 @@ def run_benchmark(
     report["scenario_details"] = sorted(
         scenario_scores,
         key=lambda item: str(item.get("scenario_id") or ""),
+    )
+    candidate_cases = (
+        load_eval_cases(output_quality_candidate_root)
+        if output_quality_candidate_root is not None
+        else None
+    )
+    report["output_quality_evaluation"] = run_output_quality_comparison(
+        candidate_cases,
+        baseline_agent_version=baseline_agent_version,
+        candidate_agent_version=candidate_agent_version,
+        baseline_config_version=baseline_config_version,
+        candidate_config_version=candidate_config_version,
     )
     return report
 

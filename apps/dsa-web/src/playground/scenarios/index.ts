@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, lazy, Suspense, type ReactNode } from 'react';
 import { PLAYGROUND_CATALOG } from '../catalog';
 import type { PlaygroundScenarioRenderer } from '../types';
 import { ALERT_HISTORY_SCENARIOS } from './alertHistoryScenarios';
@@ -10,6 +10,38 @@ import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
 
+type ChartScenarioId = 'kline-chart' | 'risk-heatmap';
+type ValuationScenarioId = 'dcf-sensitivity-panel';
+
+function createLazyScenario(loadRenderer: () => Promise<PlaygroundScenarioRenderer>): PlaygroundScenarioRenderer {
+  const LazyRenderer = lazy(async () => {
+    const renderer = await loadRenderer();
+    return { default: renderer };
+  });
+  return () => createElement(Suspense, { fallback: null }, createElement(LazyRenderer));
+}
+
+const LAZY_CHART_SCENARIOS: Record<ChartScenarioId, PlaygroundScenarioRenderer> = {
+  'kline-chart': createLazyScenario(async () => (
+    (await import('./chartScenarios')).CHART_SCENARIOS['kline-chart']
+  )),
+  'risk-heatmap': createLazyScenario(async () => (
+    (await import('./chartScenarios')).CHART_SCENARIOS['risk-heatmap']
+  )),
+};
+
+const LAZY_REPORT_VERSION_COMPARE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'report-version-compare-view': createLazyScenario(async () => (
+    (await import('./reportVersionCompareScenarios')).REPORT_VERSION_COMPARE_SCENARIOS['report-version-compare-view']
+  )),
+};
+
+const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRenderer> = {
+  'dcf-sensitivity-panel': createLazyScenario(async () => (
+    (await import('./valuationScenarios')).VALUATION_SCENARIOS['dcf-sensitivity-panel']
+  )),
+};
+
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
   ...LAYOUT_DASHBOARD_SCENARIOS,
@@ -19,6 +51,9 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
+  ...LAZY_CHART_SCENARIOS,
+  ...LAZY_VALUATION_SCENARIOS,
+  ...LAZY_REPORT_VERSION_COMPARE_SCENARIOS,
 };
 
 /**

@@ -798,6 +798,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: '报告导出 PDF 字体路径',
+    summary: '选择可选 PDF 报告导出使用的单字体 TTF/OTF。',
+    usage: '仅在服务器存在覆盖报告全部可见字符的字体时填写绝对路径；留空则探测文档列出的系统候选。',
+    valueNotes: [
+      '显式无效路径会 fail-closed，不会回退到其他系统字体。',
+      '能力检查验证目标语言代表字符；每次导出还会再次验证该报告的精确字符集。',
+    ],
+    impact: ['只影响可选 PDF 导出；无损 Markdown 导出始终可用。'],
+    notes: [
+      '支持 TTF/OTF 单字体，不猜测 TTC 字体集合下标。',
+      '公共能力与错误响应不会暴露绝对路径或字体解析器原始错误。',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
+    ],
+  },
   'settings.system.USE_PROXY': {
     title: '启用本地代理',
     summary: '大陆用户友好开关：将 PROXY_HOST 与 PROXY_PORT 映射为进程级 http_proxy/https_proxy。',
@@ -1136,16 +1153,27 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
-    usage: '开启后，full/specialist 模式中的风险 Agent 可将买入建议降级为观望或卖出。该保守覆写仍会自动生效，除非人工审批（/approvals）捕获了对应路径。',
+    usage: '控制 legacy 风险计划是否直接执行下调；不可关闭的 Risk Manager 最终动作仍会按 RISK_GATE_PROFILE 独立裁决。',
     valueNotes: [
-      '仅在 AGENT_ORCHESTRATOR_MODE 包含风险阶段时生效。',
+      '仅控制 legacy override；不能跳过最终动作裁决。',
       'HITL 风控绕过在 /approvals 默认关闭；在该页启用后，才可在限时窗口内一次性申请保留原始信号。',
     ],
     impact: ['影响最终投资建议的风险保守程度。'],
     notes: [
-      '关闭后风险 Agent 的意见仅作参考，不会否决决策。',
+      '关闭后 legacy override 不直接执行，但明确风险证据仍可能被最终动作裁决下调或拒绝。',
       '打开人工审批（/approvals）可配置默认关闭的 HITL 门禁。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: '风控经理档位',
+    summary: '选择最终建议发布前强制风控裁决的阈值档位。',
+    usage: 'balanced 为默认值；conservative 更早拒绝或下调，aggressive 仅在明确阻断证据下收紧。',
+    valueNotes: [
+      '支持 conservative、balanced、aggressive；非法值会阻止启动。',
+      '该闸门不可关闭；内部异常按 fail-closed 处理。',
+    ],
+    impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
+    notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
@@ -1254,6 +1282,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: '启用离线 OCR Agent 工具',
+    summary: '默认关闭的有界 Tesseract 文字提取。图片字节留在本机，但脱敏后的不可信文字会进入 Agent 上下文并可能发给远端模型；零远端出站需启用 LOCAL_ONLY_MODE。',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR 文件根目录',
+    summary: '单次打开普通图片的文件系统沙箱；拒绝越界路径、特殊文件、超限字节、解码像素与额外帧。',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR 语言',
+    summary: '用 + 连接的 Tesseract 语言码；默认 chi_sim+eng，需安装匹配的系统语言包。',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR 超时秒数',
+    summary: '1–120 秒的硬 wall-clock 上限；超时后终止并回收 OCR worker 及其子进程。',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1287,6 +1331,43 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['不同版本可能使用不同的评估算法或判定规则。'],
     impact: ['影响回测评估算法和结果。'],
     notes: ['除非明确要求切换版本，否则保持默认。'],
+  },
+  // ------------------------------------------------------------------
+  // 技术指标周期（Issue #172）
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: '均线周期',
+    summary: '趋势分析使用的均线周期列表（交易日，默认 5,10,20,60）。',
+    usage: '留空使用历史默认值。可追加 120/250 等长周期用于长线趋势。历史取数窗口会随最长周期自动放宽。',
+    valueNotes: [
+      '每个周期须为正整数，上限 500。',
+      '配置周期按真实 MA 标签写入 ma_by_period 与类型化指标快照。',
+      '可用 K 线不足时该均线返回空并标注数据不足，不会用更短周期静默顶替。',
+    ],
+    impact: ['影响趋势判定、乖离率、支撑判断与报告中的均线数值。'],
+    notes: ['在数据充足时，默认配置与改造前行为一致。'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD 周期',
+    summary: 'MACD 快线/慢线/信号线 EMA 周期（默认 12/26/9）。',
+    usage: 'INDICATOR_MACD_FAST 必须小于 INDICATOR_MACD_SLOW；信号线为 DEA 平滑周期。',
+    valueNotes: [
+      '标准设置为 12/26/9；更短周期更灵敏但噪声更大。',
+      '显式非法值在进程启动与 Settings 保存时都会按同一规则拒绝。',
+    ],
+    impact: ['影响 MACD DIF/DEA/柱体及综合评分中的 MACD 分量。'],
+    notes: ['除非有意更换 MACD 口径，否则保持默认。'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI 周期',
+    summary: 'RSI 周期列表（默认 6,12,24）。',
+    usage: '配置值按真实 RSI 标签输出；第二个值（仅配置一个时为第一个）用于超买超卖主判定。',
+    valueNotes: [
+      '周期须为正整数，上限 250。',
+      'RSI 使用 Wilder/SMMA 平滑，与告警路径 RSI 一致。',
+    ],
+    impact: ['影响 RSI 数值及趋势分析中的超买超卖评分。'],
+    notes: ['兼容字段 rsi_6/rsi_12/rsi_24 始终表示对应的真实历史周期，不按位置改名。'],
   },
   // ------------------------------------------------------------------
   // Report configuration
@@ -1475,6 +1556,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响计划简报生成与准确率回顾展示。'],
     notes: ['定时投递需要 schedule 模式。'],
   },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: '组合压力测试情景目录',
+    summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',
+    usage: '将 PORTFOLIO_STRESS_SCENARIOS_PATH 设为可读取的本地 YAML 文件；留空时仅使用内置情景。',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: '保存分析上下文快照',
     summary: '控制是否将分析历史的整份 context_snapshot 持久化到数据库。',
@@ -1570,6 +1656,13 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
+  },
+
+  'settings.system.portfolio_health': {
+    title: '投资组合健康度公式',
+    summary: '配置健康度的固定分母权重和预警阈值。',
+    usage: '只能使用界面范围内的有限数值；非法值会被拒绝，不会被静默修正。',
+    notes: ['修改后配置哈希会变化，需要显式刷新健康度快照。'],
   },
 
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {

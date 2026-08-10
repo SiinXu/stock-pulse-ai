@@ -97,9 +97,15 @@ News / search keys improve events and themes; technical-only runs may still work
 
 1. Pick **one** channel you actually read.  
 2. Fill Token / Webhook / Chat ID.  
-3. **Test push** (some tests use draft values—read the help text).  
-4. **Save** after a green test.  
-5. Only then add a second channel.
+3. Wait for **Autosaved**, then use **Send test** on that channel.
+4. After every target passes, select events the channel does not yet receive and choose **Bind selected events** in the same dialog.
+5. Wait for the routing draft to save and appear in the effective Event routing summary; only then add a second channel.
+
+“Verified” is session evidence bound to the current config version and a one-way fingerprint of that channel's exact tested values; it expires after 30 minutes. Channel edits, failed/conflicted saves, server refreshes, and config-version changes invalidate old evidence. For multiple custom-webhook targets, only all-success is verified. Partial delivery lists the failed targets and cannot be bound.
+
+Event routing always describes the **effective path resolved from saved configuration**, never an unsaved draft. Empty routing keeps the backend's all-configured fan-out behavior. Case and duplicates follow backend normalization, while invalid or currently unconfigured targets are reported separately.
+
+The card and test selector cover the 14 built-in static channels. Dynamically registered trusted-plugin channels remain owned by extension/diagnostic surfaces and are never mislabeled here as built-ins.
 
 **Alerts & Automation** is mostly routing and rate limits. Price/condition **rules** live in [Signal Center → Rules](06-signals_EN.md).
 
@@ -130,9 +136,17 @@ On desktop, the category navigation uses a compact sidebar so the active setting
 | Advanced · config backup | Export before reinstall; import on recovery |
 | Advanced · diagnostics | Troubleshooting |
 
+### Agent behavior presets
+
+**Agent behavior → Execution** offers Simple Q&A, Standard research, and Deep + governed as starting points. Preset status is derived from saved server values: a confirmed draft remains pending until autosave succeeds, and failed or conflicted saves never appear active. The summary also reports the effective Agent model source/readiness, Risk Agent/HITL boundary, and deep-tool state; `auto` alone is not proof that a model is configured.
+
+Selecting a preset opens confirmation without mutating the draft. Review every old/new value plus step/timeout, memory, Critic, and multi-strategy cost effects. Confirmation submits all changes as one Agent Settings batch for autosave. Cancel, Escape, focus, and hover write nothing. After failure or conflict, discard that preset draft before retrying or loading the server version.
+
+Presets enable Agent and clear “Agent acknowledged off,” but do not change credentials, skill lists, global Deep Research budgets, Risk Agent veto, or HITL approval policy. The default surface shows essentials; Advanced preserves the registry-owned runtime, skills, research, memory/context, and other semantic groups.
+
 ### Scheduling
 
-When enabled, a **long-running** Web/API/Desktop process must stay up. You may see next-run times and “run once” actions. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
+When enabled, a **long-running** Web/API/Desktop process must stay up. The status card reports this API process's mode, attachment state, and server schedule time zone without substituting the browser zone. **Run once** is available only when this process is attached, the legacy batch is enabled, and no analysis is running. An accepted run is correlated through success or failure; an older server without correlation data is shown as outcome unavailable rather than treating idle as success. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
 
 The legacy day-batch card keeps only its switch, times, and runtime status instead of repeating deprecation and process-ownership explanations. Enabled/Disabled appears on the same row as the status title; the migration warning still appears when the legacy batch is enabled.
 

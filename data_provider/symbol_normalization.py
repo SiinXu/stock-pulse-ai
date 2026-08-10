@@ -11,6 +11,41 @@ from __future__ import annotations
 
 from src.services.market_symbol_utils import is_suffix_market_symbol
 
+# Explicit crypto namespace. Bare tickers (BTC, ETH) are never auto-promoted to
+# crypto — they continue to follow equity market detection (US letter tickers).
+CRYPTO_NAMESPACE_PREFIX = "crypto:"
+
+
+def is_crypto_symbol(stock_code: str) -> bool:
+    """Return True only for explicit ``crypto:`` namespaced symbols."""
+    return (stock_code or "").strip().lower().startswith(CRYPTO_NAMESPACE_PREFIX)
+
+
+def parse_crypto_symbol(stock_code: str) -> str | None:
+    """Return the upper-case crypto ticker from ``crypto:TICKER``, else None.
+
+    Empty residual after the prefix is rejected so ``crypto:`` alone is never
+    treated as a valid asset id.
+    """
+    raw = (stock_code or "").strip()
+    if not raw.lower().startswith(CRYPTO_NAMESPACE_PREFIX):
+        return None
+    ticker = raw[len(CRYPTO_NAMESPACE_PREFIX) :].strip().upper()
+    if not ticker or any(ch.isspace() for ch in ticker):
+        return None
+    # Allow letters, digits, hyphen, underscore (e.g. crypto:BTC, crypto:1INCH).
+    if not all(ch.isalnum() or ch in "-_" for ch in ticker):
+        return None
+    return ticker
+
+
+def normalize_crypto_symbol(stock_code: str) -> str | None:
+    """Return canonical ``crypto:TICKER`` form, or None if not namespaced crypto."""
+    ticker = parse_crypto_symbol(stock_code)
+    if ticker is None:
+        return None
+    return f"{CRYPTO_NAMESPACE_PREFIX}{ticker}"
+
 
 def normalize_stock_code(stock_code: str) -> str:
     """
@@ -36,12 +71,19 @@ def normalize_stock_code(stock_code: str) -> str:
     - '2330.TW'     -> '2330.TW'  (keep Taiwan TWSE Yahoo suffix form)
     - '6505.TWO'    -> '6505.TWO' (keep Taiwan TPEx Yahoo suffix form)
     - 'AAPL'        -> 'AAPL'     (keep US stock ticker as-is)
+    - 'crypto:btc'  -> 'crypto:BTC' (explicit crypto namespace; bare BTC stays equity)
 
     This function is applied at the DataProviderManager layer so that
     all individual fetchers receive a clean 6-digit code (for A-shares/ETFs).
     """
     code = stock_code.strip()
     upper = code.upper()
+
+    # Crypto namespace must be resolved before equity prefix/suffix rules so a
+    # token like crypto:ETH is never stripped or reclassified as a US ticker.
+    crypto_normalized = normalize_crypto_symbol(code)
+    if crypto_normalized is not None:
+        return crypto_normalized
 
     # Normalize HK prefix to a canonical 5-digit form (e.g. hk1810 -> HK01810)
     if upper.startswith('HK') and not upper.startswith('HK.'):
@@ -154,7 +196,10 @@ def _is_etf_code(code: str) -> bool:
 
 
 def _market_tag(code: str) -> str:
-    """返回市场标签: cn/us/hk/jp/kr/tw."""
+    """返回市场标签: cn/us/hk/jp/kr/tw/crypto."""
+    # Explicit crypto namespace only — bare BTC/ETH remain equity candidates.
+    if is_crypto_symbol(code):
+        return "crypto"
     if _is_us_market(code):
         return "us"
     if _is_hk_market(code):
@@ -224,15 +269,23 @@ def canonical_stock_code(code: str) -> str:
         'AAPL'    -> 'AAPL'
         '600519'  -> '600519'  (digits are unchanged)
         'hk00700' -> 'HK00700'
+        'crypto:btc' -> 'crypto:BTC'
     """
+    crypto_normalized = normalize_crypto_symbol(code)
+    if crypto_normalized is not None:
+        return crypto_normalized
     return (code or "").strip().upper()
 
 
 __all__ = [
+    "CRYPTO_NAMESPACE_PREFIX",
     "ETF_PREFIXES",
     "canonical_stock_code",
     "is_bse_code",
+    "is_crypto_symbol",
     "is_kc_cy_stock",
     "is_st_stock",
+    "normalize_crypto_symbol",
     "normalize_stock_code",
+    "parse_crypto_symbol",
 ]
