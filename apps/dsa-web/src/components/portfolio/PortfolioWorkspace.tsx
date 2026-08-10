@@ -13,6 +13,7 @@ import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
+import { PortfolioRiskMetricsPanel } from '../portfolio-risk';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
@@ -1228,6 +1229,13 @@ const PortfolioWorkspace: React.FC = () => {
           </div>
         </Card>
       </section>
+
+      {hasAccounts ? (
+        <PortfolioRiskMetricsPanel
+          accountId={queryAccountId}
+          costMethod={costMethod}
+        />
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {isPaperAccountSelected ? (

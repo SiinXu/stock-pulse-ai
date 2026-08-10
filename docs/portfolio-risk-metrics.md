@@ -143,9 +143,23 @@ N_{\mathrm{eff}} = \frac{1}{\mathrm{HHI}}
 | Schema | `api/v1/schemas/portfolio_risk_metrics.py` |
 | 服务测试 | `tests/services/test_portfolio_risk_metrics_service.py` |
 | API 测试 | `tests/api/test_portfolio_risk_metrics_api.py` |
+| Web 客户端 | `apps/dsa-web/src/api/portfolioRiskMetrics.ts` |
+| Web 面板 | `apps/dsa-web/src/components/portfolio-risk/PortfolioRiskMetricsPanel.tsx` |
 
-## 后续（非 V0）
+## Web V1 界面
 
-- Web 组合页可视化（在 #239 留言跟进；受 PortfolioPage 所有权约束）。
+组合页挂载风险指标面板，仅消费本端点：
+
+- 历史 VaR 卡片（块状态非 `ok` 时为 null）
+- 相关性矩阵（缺失单元格显式展示）
+- 集中度 / 分散化卡片（HHI、有效持仓数、评分、权重）
+- 始终展示 `assumptions`
+- 顶层 `empty_portfolio` / `insufficient_history` / `partial` 诚实状态
+
+报告嵌入、参数法 VaR、压力测试集成仍不在范围内。
+
+## 后续（非 V0 / 非 Web V1）
+
 - 参数法 VaR、风险贡献、行业拆分。
 - 与压力测试（#210）、资产配置（#237）集成。
+- 风险指标的报告与通知出口。

@@ -153,9 +153,23 @@ horizon scaling, cash exclusion, and `provider_calls_on_hot_path: false`.
 | Schemas | `api/v1/schemas/portfolio_risk_metrics.py` |
 | Service tests | `tests/services/test_portfolio_risk_metrics_service.py` |
 | API tests | `tests/api/test_portfolio_risk_metrics_api.py` |
+| Web client | `apps/dsa-web/src/api/portfolioRiskMetrics.ts` |
+| Web panel | `apps/dsa-web/src/components/portfolio-risk/PortfolioRiskMetricsPanel.tsx` |
 
-## Follow-ups (not V0)
+## Web V1 surface
 
-- Web Portfolio page visualization (comment on #239; blocked by PortfolioPage ownership).
+The Portfolio page mounts a risk-metrics panel that consumes this endpoint only:
+
+- Historical VaR card (null when block status is not `ok`)
+- Correlation matrix with explicit missing cells
+- Concentration / diversification card (HHI, effective N, score, top weights)
+- Always-visible `assumptions` block
+- Honest top-level `empty_portfolio` / `insufficient_history` / `partial` banners
+
+Report embedding, parametric VaR, and stress-test integration remain out of scope.
+
+## Follow-ups (not V0 / not Web V1)
+
 - Parametric VaR, risk contribution, sector breakdown.
 - Integration with stress testing (#210) and allocation (#237).
+- Report and notification surfaces for risk metrics.
