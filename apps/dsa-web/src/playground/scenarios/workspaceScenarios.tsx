@@ -22,8 +22,11 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
+import {
+  DEFAULT_ONBOARDING_PROFILE,
+  type OnboardingPlan,
+} from '../../types/onboarding';
 import type { WatchlistGroup } from '../../types/watchlist';
-import { DEFAULT_ONBOARDING_PROFILE, type OnboardingPlan } from '../../types/onboarding';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
 import { usePlaygroundScenario } from '../scenarioContext';
@@ -35,6 +38,13 @@ const useSamples = () => {
 };
 
 const LazyTodaysFocusStory = lazy(() => import('./todaysFocusScenario'));
+
+const LazyZeroConfigFirstRunPanelStory = lazy(async () => {
+  const module = await import('./zeroConfigFirstRunScenario');
+  return { default: module.ZeroConfigFirstRunPanelStory };
+});
+
+const ZeroConfigFirstRunPanelStory = () => <LazyZeroConfigFirstRunPanelStory />;
 
 const StockAutocompleteStory = () => {
   const text = useSamples();
@@ -352,7 +362,6 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
-
 const scoredFixture: WatchlistScoreItem = {
   stockCode: '600519',
   status: 'scored',
@@ -446,5 +455,6 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
+  'zero-config-first-run-panel': ZeroConfigFirstRunPanelStory,
   'watchlist-score-column': WatchlistScoreColumnStory,
 };
