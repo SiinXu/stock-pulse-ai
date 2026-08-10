@@ -833,6 +833,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calculators/compound-growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compound growth calculator
+         * @description Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.
+         */
+        post: operations["postCompoundGrowth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-contribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve contribution required to reach a target
+         * @description Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-duration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve periods required to reach a target
+         * @description Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetDuration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-profiles/export": {
         parameters: {
             query?: never;
@@ -5013,6 +5073,17 @@ export interface components {
              */
             saved: number;
         };
+        /** BalancePoint */
+        BalancePoint: {
+            /** Balance */
+            balance: number;
+            /** Gain */
+            gain: number;
+            /** Period */
+            period: number;
+            /** Total Contributed */
+            total_contributed: number;
+        };
         /**
          * BatchDuplicateTaskItem
          * @description 批量异步任务中的重复提交项。
@@ -5256,6 +5327,64 @@ export interface components {
             success: boolean;
             /** Turn Id */
             turn_id?: string | null;
+        };
+        /** CompoundGrowthRequest */
+        CompoundGrowthRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             * @default 0
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Years */
+            years: number;
+        };
+        /** CompoundGrowthResponse */
+        CompoundGrowthResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Final Value */
+            final_value: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Series */
+            series: components["schemas"]["BalancePoint"][];
+            /** Series Returned Points */
+            series_returned_points: number;
+            /** Series Sampled */
+            series_sampled: boolean;
+            /** Series Stride */
+            series_stride: number;
+            /** Series Total Points */
+            series_total_points: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /** Total Contributed */
+            total_contributed: number;
+            /** Total Gain */
+            total_gain: number;
+            /** Years */
+            years: number;
         };
         /** ConfigComponentDiff */
         ConfigComponentDiff: {
@@ -11611,6 +11740,248 @@ export interface components {
             /** Trace Id */
             trace_id?: string | null;
         };
+        /** TargetContributionAlreadyMetResponse */
+        TargetContributionAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_growth_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionOkResponse */
+        TargetContributionOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "contribution_required";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionRequest */
+        TargetContributionRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionUnreachableResponse */
+        TargetContributionUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period?: null;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationAlreadyMetResponse */
+        TargetDurationAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Period Count
+             * @constant
+             */
+            period_count: 0;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_already_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationOkResponse */
+        TargetDurationOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "duration_solved";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationRequest */
+        TargetDurationRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+        };
+        /** TargetDurationUnreachableResponse */
+        TargetDurationUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count?: null;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "non_positive_trajectory" | "max_years_exceeded" | "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years?: null;
+        };
         /**
          * TaskAccepted
          * @description 异步任务接受响应
@@ -14688,6 +15059,159 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postCompoundGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompoundGrowthRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompoundGrowthResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetContributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetContributionOkResponse"] | components["schemas"]["TargetContributionAlreadyMetResponse"] | components["schemas"]["TargetContributionUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetDuration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetDurationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDurationOkResponse"] | components["schemas"]["TargetDurationAlreadyMetResponse"] | components["schemas"]["TargetDurationUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
