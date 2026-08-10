@@ -11,6 +11,7 @@ import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
 
 type ChartScenarioId = 'kline-chart' | 'risk-heatmap';
+type ValuationScenarioId = 'dcf-sensitivity-panel';
 
 function createLazyScenario(loadRenderer: () => Promise<PlaygroundScenarioRenderer>): PlaygroundScenarioRenderer {
   const LazyRenderer = lazy(async () => {
@@ -35,6 +36,12 @@ const LAZY_REPORT_VERSION_COMPARE_SCENARIOS: Record<string, PlaygroundScenarioRe
   )),
 };
 
+const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRenderer> = {
+  'dcf-sensitivity-panel': createLazyScenario(async () => (
+    (await import('./valuationScenarios')).VALUATION_SCENARIOS['dcf-sensitivity-panel']
+  )),
+};
+
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
   ...LAYOUT_DASHBOARD_SCENARIOS,
@@ -45,6 +52,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
   ...LAZY_CHART_SCENARIOS,
+  ...LAZY_VALUATION_SCENARIOS,
   ...LAZY_REPORT_VERSION_COMPARE_SCENARIOS,
 };
 
