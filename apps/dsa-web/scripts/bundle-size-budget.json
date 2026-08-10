@@ -123,7 +123,7 @@
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
       "maxGzipBytes": 57000,
-      "measuredGzipBytes": 56770,
+      "measuredGzipBytes": 56827,
       "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
     },
     {

@@ -281,6 +281,7 @@ EXPECTED_GROUPS = (
             "get_analysis_history_batch",
             "get_latest_analysis_history_id",
             "get_analysis_history_paginated",
+            "search_analysis_history",
             "get_analysis_history_by_id",
             "delete_analysis_history_records",
             "get_distinct_stocks_from_history",
@@ -296,7 +297,7 @@ EXPECTED_GROUPS = (
             "_extract_sniper_points",
             "_build_fallback_url_key",
         ),
-        "de8375f460631c48d0ffe80b17dda84c9f72799d451d26d863d8dc4380ce33fa",
+        "d55af92829eab68c5cfb8eebc47cff79b150e96ed7b25daac681b7a677efc738",
     ),
     (
         "_ConversationMethods",
