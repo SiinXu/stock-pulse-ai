@@ -2,7 +2,7 @@
 
 [中文](report-version-compare.md) | [English](report-version-compare_EN.md)
 
-Issue #188 / T18 基础能力：用户可分页浏览分析历史，选择同一标的的两次运行，并排查看类型化的报告与配置差异。Issue #188 仍保留现有报告/历史页面入口与可选多智能体区块等后续范围。
+Issue #188 / T18：用户可从分析历史选择同一标的的两次运行，或从个股详情进入版本对比，并排查看类型化的报告与配置差异。Issue #188 仍保留结构化 risk/catalyst 差异与可选多智能体区块缺失时的显式行为等后续范围。
 
 ## 能力范围
 
@@ -49,20 +49,12 @@ HTTP API 为兼容保留 `base_run_id` / `target_run_id` 参数名，但参数�
 - 草稿股票输入与已加载标的身份分离；编辑草稿会使旧选择与结果失效。
 - Retry 归失败操作所有：列表失败重放列表请求；对比失败按原参数重放对比，不重新加载版本或清空有效选择。
 
-## 导航接线（可选）
+## 导航与预填
 
-本任务未改 `SidebarNav` / `ResearchOverviewPage`（批次冻结或争用）。合并后可在研究总览追加入口：
-
-```tsx
-// ResearchOverviewPage RESEARCH_DESTINATIONS
-{
-  key: 'report-compare',
-  titleKey: /* new i18n key */,
-  descriptionKey: /* new i18n key */,
-  to: APP_ROUTE_PATHS.researchReportCompare,
-  icon: GitCompareArrows,
-}
-```
+- 分析工作台的 History 区在选中同一股票的两条记录后显示“开始对比”，并携带股票代码、基线历史主键和目标历史主键进入对比页。
+- 个股详情页提供“报告版本对比”入口，并携带规范化后的股票代码进入对比页。
+- 页面接受 `stock`、`baseRunId`、`targetRunId` 查询参数。`stock` 会触发版本加载；两条运行 ID 都是正安全整数且不相同时，加载成功后自动开始对比。
+- 无效或缺失的运行 ID 不会触发自动对比，用户仍可在已加载的版本选择器中手动选择。
 
 ## 相关文件
 

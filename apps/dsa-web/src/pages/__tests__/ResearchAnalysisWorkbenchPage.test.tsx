@@ -23,6 +23,7 @@ import {
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
   buildAnalysisWorkbenchHref,
+  buildReportVersionCompareHref,
   buildSettingsHref,
 } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
@@ -664,6 +665,34 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/chat?stock=AAPL&name=Apple&recordId=12',
+    );
+  });
+
+  it('opens report comparison for two selected runs of the same stock', async () => {
+    const previousHistoryItem: HistoryItem = {
+      ...historyItem,
+      id: 11,
+      queryId: 'query-11',
+      createdAt: '2026-07-22T12:00:00Z',
+    };
+    useStockPoolStore.setState({ historyItems: [historyItem, previousHistoryItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
+
+    const checkboxes = await screen.findAllByRole('checkbox', {
+      name: '选择 Apple 历史记录',
+    });
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(await screen.findByTestId('history-compare-selected'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      buildReportVersionCompareHref({
+        stock: 'AAPL',
+        baseRunId: 12,
+        targetRunId: 11,
+      }),
     );
   });
 

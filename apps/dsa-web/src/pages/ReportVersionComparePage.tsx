@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GitCompareArrows, RefreshCw } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import {
   reportVersionCompareApi,
   type ReportVersionCompareResponse,
@@ -25,7 +26,11 @@ import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import { REPORT_VERSION_COMPARE_TEXT } from '../locales/reportVersionCompare';
-import { APP_ROUTE_PATHS } from '../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS,
+  parsePositiveRouteInteger,
+} from '../routing/routes';
 
 function formatRunOption(
   text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
@@ -51,6 +56,7 @@ type FailedOperation =
     stockCode: string;
     page: number;
     append: boolean;
+    preserveSelection?: boolean;
   }
   | {
     kind: 'compare';
@@ -66,8 +72,23 @@ function normalizeStockIdentity(value: string): string {
 const ReportVersionComparePage: React.FC = () => {
   const { language } = useUiLanguage();
   const text = REPORT_VERSION_COMPARE_TEXT[language];
+  const [searchParams] = useSearchParams();
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const requestIdRef = useRef(0);
+  const appliedRoutePrefillRef = useRef<string | null>(null);
+  const autoComparedRouteRef = useRef<string | null>(null);
+
+  const routePrefill = useMemo(() => ({
+    stockCode: normalizeStockIdentity(
+      searchParams.get(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.stock) ?? '',
+    ),
+    baseRunId: parsePositiveRouteInteger(
+      searchParams.get(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.baseRunId),
+    ),
+    targetRunId: parsePositiveRouteInteger(
+      searchParams.get(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.targetRunId),
+    ),
+  }), [searchParams]);
 
   const [draftStockCode, setDraftStockCode] = useState('');
   const [loadedStockCode, setLoadedStockCode] = useState<string | null>(null);
@@ -112,6 +133,7 @@ const ReportVersionComparePage: React.FC = () => {
     stockCode,
     page,
     append,
+    preserveSelection = false,
   }: Extract<FailedOperation, { kind: 'list' }>) => {
     const code = stockCode.trim();
     if (!code) return;
@@ -137,8 +159,10 @@ const ReportVersionComparePage: React.FC = () => {
         });
       } else {
         setRuns(response.items ?? []);
-        setBaseRunId('');
-        setTargetRunId('');
+        if (!preserveSelection) {
+          setBaseRunId('');
+          setTargetRunId('');
+        }
       }
       setLoadedStockCode(normalizeStockIdentity(response.stockCode || code));
       setTotalRuns(response.total);
@@ -153,7 +177,13 @@ const ReportVersionComparePage: React.FC = () => {
         setHasLoadedRuns(true);
       }
       setError(getParsedApiError(cause));
-      setFailedOperation({ kind: 'list', stockCode: code, page, append });
+      setFailedOperation({
+        kind: 'list',
+        stockCode: code,
+        page,
+        append,
+        preserveSelection,
+      });
     } finally {
       if (requestIdRef.current === requestId) {
         if (append) setLoadingMore(false);
@@ -227,6 +257,61 @@ const ReportVersionComparePage: React.FC = () => {
       void loadRuns(failedOperation);
     }
   }, [compareRuns, failedOperation, loadRuns]);
+
+  useEffect(() => {
+    if (!routePrefill.stockCode) return;
+    const routeKey = [
+      routePrefill.stockCode,
+      routePrefill.baseRunId ?? '',
+      routePrefill.targetRunId ?? '',
+    ].join(':');
+    if (appliedRoutePrefillRef.current === routeKey) return;
+    appliedRoutePrefillRef.current = routeKey;
+    autoComparedRouteRef.current = null;
+    setDraftStockCode(routePrefill.stockCode);
+    setBaseRunId(routePrefill.baseRunId ? String(routePrefill.baseRunId) : '');
+    setTargetRunId(routePrefill.targetRunId ? String(routePrefill.targetRunId) : '');
+    setResult(null);
+    setHasLoadedRuns(false);
+    void loadRuns({
+      kind: 'list',
+      stockCode: routePrefill.stockCode,
+      page: 1,
+      append: false,
+      preserveSelection: true,
+    });
+  }, [loadRuns, routePrefill]);
+
+  useEffect(() => {
+    if (
+      !hasLoadedRuns
+      || loadingRuns
+      || !loadedStockCode
+      || loadedStockCode !== routePrefill.stockCode
+      || !routePrefill.baseRunId
+      || !routePrefill.targetRunId
+      || routePrefill.baseRunId === routePrefill.targetRunId
+    ) return;
+    const routeKey = [
+      loadedStockCode,
+      routePrefill.baseRunId,
+      routePrefill.targetRunId,
+    ].join(':');
+    if (autoComparedRouteRef.current === routeKey) return;
+    autoComparedRouteRef.current = routeKey;
+    void compareRuns({
+      kind: 'compare',
+      stockCode: loadedStockCode,
+      baseRunId: String(routePrefill.baseRunId),
+      targetRunId: String(routePrefill.targetRunId),
+    });
+  }, [
+    compareRuns,
+    hasLoadedRuns,
+    loadedStockCode,
+    loadingRuns,
+    routePrefill,
+  ]);
 
   const handleDraftStockChange = useCallback((value: string) => {
     setDraftStockCode(value);

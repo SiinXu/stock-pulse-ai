@@ -59,6 +59,7 @@ import {
   HOME_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
   type AnalysisWorkbenchSegment,
+  buildReportVersionCompareHref,
 } from '../routing/routes';
 import {
   DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
@@ -67,7 +68,12 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore, type SubmitAnalysisOptions } from '../stores/stockPoolStore';
-import type { AnalysisPhase, StockReportType, TaskInfo } from '../types/analysis';
+import type {
+  AnalysisPhase,
+  HistoryItem,
+  StockReportType,
+  TaskInfo,
+} from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';
@@ -777,6 +783,13 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       return new Set(visibleIds);
     });
   }, [analysisHistoryItems]);
+  const compareSelectedHistory = useCallback((items: readonly [HistoryItem, HistoryItem]) => {
+    navigate(buildReportVersionCompareHref({
+      stock: items[0].stockCode,
+      baseRunId: items[0].id,
+      targetRunId: items[1].id,
+    }));
+  }, [navigate]);
   const requestDeleteSelectedHistory = useCallback(() => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     setDeleteError(null);
@@ -1214,6 +1227,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 onToggleItemSelection={toggleHistorySelection}
                 onToggleSelectAll={toggleAllHistory}
                 onDeleteSelected={requestDeleteSelectedHistory}
+                onCompareSelected={compareSelectedHistory}
               />
             )}
           >

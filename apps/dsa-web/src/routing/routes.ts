@@ -22,6 +22,43 @@ export const APP_ROUTE_PATHS = {
   calculators: '/tools/calculators',
 } as const;
 
+export const REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS = {
+  stock: 'stock',
+  baseRunId: 'baseRunId',
+  targetRunId: 'targetRunId',
+} as const;
+
+export type ReportVersionCompareHrefOptions = {
+  stock?: string | null;
+  baseRunId?: number | null;
+  targetRunId?: number | null;
+};
+
+export function buildReportVersionCompareHref(
+  options: ReportVersionCompareHrefOptions = {},
+): string {
+  const searchParams = new URLSearchParams();
+  if (options.stock?.trim()) {
+    searchParams.set(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.stock, options.stock.trim());
+  }
+  if (isPositiveRouteInteger(options.baseRunId)) {
+    searchParams.set(
+      REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.baseRunId,
+      String(options.baseRunId),
+    );
+  }
+  if (isPositiveRouteInteger(options.targetRunId)) {
+    searchParams.set(
+      REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.targetRunId,
+      String(options.targetRunId),
+    );
+  }
+  const search = searchParams.toString();
+  return search
+    ? `${APP_ROUTE_PATHS.researchReportCompare}?${search}`
+    : APP_ROUTE_PATHS.researchReportCompare;
+}
+
 export const LEGACY_ROUTE_PATHS = {
   usage: '/usage',
   screening: '/screening',
@@ -379,4 +416,3 @@ export function buildInvestmentFrameworkSettingsHref(): string {
     view: 'investment_framework',
   });
 }
-
