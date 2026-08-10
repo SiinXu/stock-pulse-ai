@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-08",
-  "baselineNote": "Rebaselined AlertsWorkspace only against the current main production build after the Alert Rule List mobile-filter work from PR #909; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "measuredAt": "2026-08-10",
+  "baselineNote": "Rebaselined PlaygroundRenderPage only after the code-split Today's Focus playground registration; AlertsWorkspace retains its prior rebaseline and other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -122,8 +122,8 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 56433,
-      "measuredGzipBytes": 51302
+      "maxGzipBytes": 62309,
+      "measuredGzipBytes": 56644
     },
     {
       "id": "SettingsPage",

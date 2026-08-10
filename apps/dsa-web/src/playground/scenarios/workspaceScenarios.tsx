@@ -1,11 +1,9 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
 import { HomeReadinessCard } from '../../components/home/HomeReadinessCard';
-import { TodaysFocusPanel } from '../../components/home/TodaysFocusPanel';
-import type { TodaysFocusResponse } from '../../types/todaysFocus';
 import { AgentOnboardingWizard } from '../../components/onboarding/AgentOnboardingWizard';
 import { HomeOnboardingSection } from '../../components/onboarding/HomeOnboardingSection';
 import { OnboardingTodayPlanCard } from '../../components/onboarding/OnboardingTodayPlanCard';
@@ -35,6 +33,8 @@ const useSamples = () => {
   const { language } = useUiLanguage();
   return PLAYGROUND_TEXT[language].samples;
 };
+
+const LazyTodaysFocusStory = lazy(() => import('./todaysFocusScenario'));
 
 const StockAutocompleteStory = () => {
   const text = useSamples();
@@ -297,106 +297,11 @@ const HomeReadinessCardStory = () => {
   );
 };
 
-
-const FIXTURE_TODAYS_FOCUS: TodaysFocusResponse = {
-  packVersion: 'todays_focus/2.0',
-  generatedAt: '2026-08-09T08:00:00Z',
-  status: 'ok',
-  maxItems: 5,
-  itemCount: 2,
-  items: [
-    {
-      code: '600519',
-      name: 'Kweichow Moutai',
-      reasonCode: 'alert_triggered',
-      reasonDisplay: 'Alert triggered: price above MA',
-      priority: 100,
-      weightPct: null,
-      secondaryReasonCodes: [],
-      evidence: {
-        type: 'alert',
-        triggerId: 7,
-        ruleId: 9,
-        observedAt: '2026-08-09T07:30:00Z',
-        status: 'triggered',
-      },
-    },
-    {
-      code: 'AAPL',
-      name: 'Apple',
-      reasonCode: 'analysis_reversal',
-      reasonDisplay: 'Analysis conclusion changed: buy to sell',
-      priority: 70,
-      weightPct: null,
-      secondaryReasonCodes: [],
-      evidence: {
-        type: 'analysis',
-        recordId: 42,
-        queryId: 'q-42',
-        observedAt: '2026-08-09T07:00:00Z',
-        previousObservedAt: '2026-08-08T07:00:00Z',
-        previousAction: 'buy',
-        latestAction: 'sell',
-      },
-    },
-  ],
-  emptyReason: null,
-  emptyMessage: null,
-  sourcesUsed: ['alerts', 'analysis_history'],
-  degradedSources: [],
-  temporalPolicy: {
-    semantics: 'local_calendar_day',
-    timezone: 'Asia/Shanghai',
-    localDate: '2026-08-09',
-    windowStart: '2026-08-08T16:00:00Z',
-    windowEnd: '2026-08-09T08:00:00Z',
-    naiveTimestampPolicy: 'assume_utc',
-    missingTimestampPolicy: 'exclude',
-    nonTradingDayPolicy: 'same_local_day_only',
-  },
-  universeContract: {
-    symbolCount: 2,
-    hardCap: 1000,
-    truncated: false,
-    sources: ['watchlist_config'],
-  },
-  costContract: {
-    alertRepositoryCalls: 1,
-    portfolioRepositoryCalls: 1,
-    analysisHistoryRepositoryCalls: 1,
-    eventRepositoryCalls: 0,
-    databaseWrites: 0,
-    providerCalls: 0,
-    analysisRunsTriggered: 0,
-    zeroExtraFetch: true,
-    readOnly: true,
-  },
-  presentationBoundary: {
-    alertsOwnedBy: 'signal_center',
-    focusShows: 'prioritized_symbols_with_evidence_links',
-    duplicateAlertUi: false,
-  },
-};
-
 const TodaysFocusPanelStory = () => {
-  const { scenario } = usePlaygroundScenario();
-  const { t } = useUiLanguage();
-  const isLoading = scenario === 'loading';
-  const isError = scenario === 'error';
-  const isEmpty = scenario === 'empty';
-  const data = isEmpty
-    ? { ...FIXTURE_TODAYS_FOCUS, status: 'empty' as const, itemCount: 0, items: [], emptyReason: 'no_fresh_deterministic_signals' as const, emptyMessage: 'No symbols need special attention today.' }
-    : isLoading || isError ? null : FIXTURE_TODAYS_FOCUS;
   return (
-    <div className="max-w-xl">
-      <TodaysFocusPanel
-        data={data}
-        isLoading={isLoading}
-        error={isError ? createParsedApiError({ title: 'Fixture error', message: 'Unable to load focus.' }) : null}
-        onRefresh={() => undefined}
-        t={t}
-      />
-    </div>
+    <Suspense fallback={null}>
+      <LazyTodaysFocusStory />
+    </Suspense>
   );
 };
 

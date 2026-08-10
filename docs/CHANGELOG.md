@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).
+- [Changed] Code-split the Today's Focus Playground scenario and rebaseline only its measured render-chunk budget so the production Web bundle gate retains explicit headroom.
 - [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
