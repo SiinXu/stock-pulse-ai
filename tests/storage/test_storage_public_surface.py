@@ -98,7 +98,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "TaskQueueInflightRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "015141b6b893cd35882b8bf3a26e37de0ad1441aaa73dbff941212c25452ff0b"
+    "ef3bda9447c18cfbd202edee46c81c37fd411cb7ca40a8843fab6271bbcf9fdd"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -317,7 +317,7 @@ EXPECTED_GROUPS = (
             "get_conversation_messages",
             "delete_conversation_session",
         ),
-        "4cea1a2e30ad9cf7bc2b19ab0f7c622c5d4ca5684d63b78a7aaef666feb9ad50",
+        "b11e857f79dc5f3a3026e86bf426ecb7a3df8ebb389be3e5304fdcca787bdefb",
     ),
     (
         "_UsageMethods",

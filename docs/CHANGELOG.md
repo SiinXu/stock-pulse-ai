@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).
 - [Changed] Code-split the Today's Focus Playground scenario and rebaseline only its measured render-chunk budget so the production Web bundle gate retains explicit headroom.
+- [Fixed] Report→Chat Stop and disconnect handling now uses durable turn acknowledgements, exact-session reconciliation, and idempotent turn IDs so persisted prompts are not restored or submitted twice.
 - [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
@@ -53,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Daily provider all-empty/all-None failures now include per-provider detail lines in DataFetchError (no longer a bare failure header).
 - [Tests] Offline provider fallback contract suite with failure-mode fixtures (empty/rate-limit/missing-field/malformed) covering single-source failover, all-fail DataFetchError, STANDARD_COLUMNS normalization, and bounded retry.
 - [Added] OpenBB external-framework data_provider demonstration under `docs/examples/external-framework-data-provider/` with bilingual adapter guide and offline contract tests (proposal phase 2 / #892; surface v1 unchanged).
+- [Fixed] Bound the OpenBB example's real yfinance call, map advertised CN/HK symbols, and reject malformed daily bars before manager fallback.
 - [Added] Shared Web URL state helper (`urlState`) with typed schemas, replace/push history rules, unknown-param preservation, Decision Signals schema example, and unit tests (UI-03A / #879 A1 foundation; no page wiring yet).
 - [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).
 - [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).
