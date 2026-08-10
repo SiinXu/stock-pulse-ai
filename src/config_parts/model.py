@@ -1,6 +1,7 @@
 """Dataclass model for the public :mod:`src.config` facade."""
 
 import logging
+import os
 from dataclasses import dataclass, field
 from types import FunctionType
 from typing import Any, Dict, List, Optional, Tuple
@@ -404,6 +405,18 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+    portfolio_health_weight_concentration: float = 0.25
+    portfolio_health_weight_risk_exposure: float = 0.25
+    portfolio_health_weight_diversification: float = 0.20
+    portfolio_health_weight_pnl: float = 0.15
+    portfolio_health_weight_cash_ratio: float = 0.15
+    portfolio_health_concentration_alert_pct: float = 35.0
+    portfolio_health_var_alert_pct: float = 5.0
+    portfolio_health_diversification_alert: float = 0.35
+    portfolio_health_cash_low_alert_pct: float = 2.0
+    portfolio_health_cash_high_alert_pct: float = 50.0
+    portfolio_health_pnl_loss_alert_pct: float = -15.0
+    portfolio_stress_scenarios_path: Optional[str] = None
 
     # Discord Bot status
     discord_bot_status: str = "A股智能分析 | /help"
@@ -477,6 +490,21 @@ class Config:
 
     def __post_init__(self) -> None:
         _log = logging.getLogger(__name__)
+        if (
+            self.portfolio_stress_scenarios_path is not None
+            and len(self.portfolio_stress_scenarios_path) > 1024
+        ):
+            raise ValueError("PORTFOLIO_STRESS_SCENARIOS_PATH exceeds 1024 characters")
+        from src.services.portfolio_stress_scenarios import activate_scenario_catalog
+
+        activate_scenario_catalog(
+            scenarios_path=self.portfolio_stress_scenarios_path
+        )
+        # Market-data local-only intent must fail closed during application
+        # configuration load, before any manager can enter a provider path.
+        from data_provider.daily_cache import parse_market_data_fetch_mode
+
+        parse_market_data_fetch_mode(os.getenv("PROVIDER_MARKET_DATA_MODE"))
         if self.agent_arch not in self._VALID_AGENT_ARCH:
             _log.warning(
                 "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",
