@@ -107,6 +107,8 @@ describe('ReportMarkdownDrawer', () => {
     vi.doMock('../../../api/history', () => ({
       historyApi: {
         getMarkdown: vi.fn().mockResolvedValue('# Lazy loaded report'),
+        // Decision Card also best-effort loads structured detail; reject is fine.
+        getDetail: vi.fn().mockRejectedValue(new Error('detail unavailable')),
       },
     }));
 

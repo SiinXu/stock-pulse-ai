@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
+- [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
 - [Fixed] Aligned Web acceptance coverage with safe global error Toasts, current chat session payloads, semantic control sizing, and collapsed mobile Backtest filters.
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
@@ -15,7 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] Agent Chat what-if scenario mode with structured assumptions, hypothetical markers, turn limits, and hard isolation from AnalysisHistory / DecisionSignal / Agent memory (#130).
+- [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).
 - [Fixed] Preserve the last successful screening result across failed attempts, distinguish capability/status/empty/degradation states, and provide exact-parameter retry and data-source recovery actions (Refs #871).
+- [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).
+- [Changed] Adopt multi-market `marketFormat` for Stock Details quote/history and history trend drawer price/change colors (CN/HK/US precision, currency, and red_up/green_up semantics; issue #889).
+- [Added] Web report Decision Card view pins verdict/confidence/risks/watch conditions above evidence strata (default collapsed) across page, panel, and drawer report surfaces (#874).
+- [Added] Report three modes (brief/standard/research) with hard length limits, existing Decision Card integration, and explicit truncation notices for Jinja reports (#861 Phase 2).
 - [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
 - [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
 - [Added] Default-off CoinGecko market-data path for allowlisted `crypto:` identities, with UTC daily bars, 24×7 context, safe outbound requests, and an optional crypto specialist (Refs #236 and #195).
@@ -40,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Explicit proposal-only Agent planning foundation with a single limit authority, strict schema/tool validation, an unwidenable public step cap, projectability-guaranteed acceptance, one projected-string contract that makes the advisory boundary unforgeable and every accepted plan UTF-8 encodable, interruptible planner deadlines, truthful retry evidence, cancellation fencing, sanitized metadata, and no production runtime hook (refs #199).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
+- [Changed] Wire zero-config first success into Home, lead FirstRunWizard and bilingual Quick Start with the local path, and cover the no-key demo report in browser E2E (Refs #796).
 - [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.
 - [Fixed] Report→Chat Stop and disconnect handling now uses durable turn acknowledgements, exact-session reconciliation, and idempotent turn IDs so persisted prompts are not restored or submitted twice.
 - [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
