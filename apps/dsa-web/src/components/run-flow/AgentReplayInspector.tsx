@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, CircleCheck, ShieldAlert, ShieldX } from 'lucide-react';
-import { Badge, IconButton, InlineAlert } from '../common';
+import { Badge, IconButton } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowSnapshot } from '../../types/runFlow';
 import { buildAgentReplayModel, type AgentReplayIntegrityStatus } from './agentReplay';
@@ -14,10 +14,11 @@ interface AgentReplayInspectorProps {
 const INTEGRITY_PRESENTATION: Record<AgentReplayIntegrityStatus, {
   variant: 'success' | 'warning' | 'danger';
   icon: typeof CircleCheck;
+  label: 'common.complete' | 'common.partial' | 'common.invalid';
 }> = {
-  complete: { variant: 'success', icon: CircleCheck },
-  warning: { variant: 'warning', icon: ShieldAlert },
-  invalid: { variant: 'danger', icon: ShieldX },
+  complete: { variant: 'success', icon: CircleCheck, label: 'common.complete' },
+  warning: { variant: 'warning', icon: ShieldAlert, label: 'common.partial' },
+  invalid: { variant: 'danger', icon: ShieldX, label: 'common.invalid' },
 };
 
 const formatDetail = (value: Record<string, unknown>): string => JSON.stringify(value, null, 2);
@@ -40,13 +41,6 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
     const nodeId = model.entries[bounded]?.event.nodeId;
     if (nodeId) onSelectNode?.(nodeId);
   };
-  const integrityMessage = model.integrity.status === 'complete'
-    ? t('runFlow.replay.integrity.completeMessage')
-    : model.integrity.status === 'warning'
-      ? t('runFlow.replay.integrity.warningMessage', {
-        dropped: (model.integrity.capture?.droppedCount ?? 0) + model.integrity.gapCount,
-      })
-      : t('runFlow.replay.integrity.invalidMessage');
   const detail = current ? {
     sequence: current.sequence,
     schema_version: current.schemaVersion,
@@ -58,25 +52,40 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
     parent_span_id: current.parentSpanId,
     ...(current.attrs ? { attrs: current.attrs } : {}),
     ...(current.payload ? { payload: current.payload } : {}),
+    integrity: {
+      status: model.integrity.status,
+      gap_count: model.integrity.gapCount,
+      duplicate_count: model.integrity.duplicateCount,
+      missing_sequence_count: model.integrity.missingSequenceCount,
+      invalid_version_count: model.integrity.invalidVersionCount,
+      trace_mismatch_count: model.integrity.traceMismatchCount,
+      invalid_detail_count: model.integrity.invalidDetailCount,
+      capture_mismatch: model.integrity.captureMismatch,
+      capture: model.integrity.capture ? {
+        original_count: model.integrity.capture.originalCount,
+        returned_count: model.integrity.capture.returnedCount,
+        dropped_count: model.integrity.capture.droppedCount,
+        truncated: model.integrity.capture.truncated,
+      } : null,
+    },
   } : null;
 
   return (
     <section className="border-y border-border py-3" data-testid="agent-replay-inspector">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="label-uppercase">{t('runFlow.replay.eyebrow')}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold text-foreground">{t('runFlow.replay.title')}</h3>
             <Badge variant={presentation.variant} data-testid="agent-replay-integrity-badge">
               <IntegrityIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {t(`runFlow.replay.integrity.${model.integrity.status}`)}
+              {t(presentation.label)}
             </Badge>
           </div>
         </div>
         {model.entries.length > 0 ? (
           <div className="flex items-center gap-2">
             <IconButton
-              aria-label={t('runFlow.replay.previous')}
+              aria-label={t('common.prevPage')}
               variant="outline"
               disabled={activeCursor === 0}
               onClick={() => moveCursor(activeCursor - 1)}
@@ -91,7 +100,7 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
               {activeCursor + 1} / {model.entries.length}
             </span>
             <IconButton
-              aria-label={t('runFlow.replay.next')}
+              aria-label={t('common.nextPage')}
               variant="outline"
               disabled={activeCursor >= model.entries.length - 1}
               onClick={() => moveCursor(activeCursor + 1)}
@@ -102,17 +111,9 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
         ) : null}
       </div>
 
-      <InlineAlert
-        className="mt-3"
-        size="compact"
-        variant={presentation.variant}
-        title={t(`runFlow.replay.integrity.${model.integrity.status}`)}
-        message={integrityMessage}
-      />
-
       {!current ? (
         <div className="mt-3 border-t border-dashed border-border pt-3 text-sm text-secondary-text">
-          {t('runFlow.replay.empty')}
+          {t('runFlow.events.empty')}
         </div>
       ) : (
         <div className="mt-3 min-w-0">

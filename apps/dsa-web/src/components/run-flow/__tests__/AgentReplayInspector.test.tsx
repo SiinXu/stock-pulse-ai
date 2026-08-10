@@ -70,7 +70,7 @@ describe('AgentReplayInspector', () => {
     expect(screen.getByTestId('agent-replay-integrity-badge')).toHaveTextContent('完整');
     expect(screen.getByText(/"phase": "analysis"/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '下一个 Agent 事件' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
 
     expect(screen.getByTestId('agent-replay-position')).toHaveTextContent('2 / 2');
     expect(screen.getByText(/"event_type": "agent_tool_end"/)).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe('AgentReplayInspector', () => {
     );
 
     expect(screen.getByTestId('agent-replay-integrity-badge')).toHaveTextContent('无效');
-    expect(screen.getByText('事件的序列、版本、Trace、明细或捕获计数不一致。')).toBeInTheDocument();
+    expect(screen.getByText(/"invalid_version_count": 1/)).toBeInTheDocument();
     expect(screen.getByText(/"event_type": "agent_error"/)).toBeInTheDocument();
   });
 
@@ -116,7 +116,7 @@ describe('AgentReplayInspector', () => {
     );
 
     expect(screen.getByTestId('agent-replay-integrity-badge')).toHaveTextContent('部分');
-    expect(screen.getByText(/有 2 条事件被丢弃/)).toBeInTheDocument();
+    expect(screen.getByText(/"dropped_count": 2/)).toBeInTheDocument();
   });
 
   it('reports internal sequence gaps even when capture accounting dropped none', () => {
@@ -136,13 +136,13 @@ describe('AgentReplayInspector', () => {
     );
 
     expect(screen.getByTestId('agent-replay-integrity-badge')).toHaveTextContent('部分');
-    expect(screen.getByText(/有 1 条事件被丢弃/)).toBeInTheDocument();
+    expect(screen.getByText(/"gap_count": 1/)).toBeInTheDocument();
   });
 
   it('renders an explicit empty replay state', () => {
     render(<AgentReplayInspector snapshot={snapshot([])} />);
 
-    expect(screen.getByText('当前运行没有可回放的 Agent 事件。')).toBeInTheDocument();
+    expect(screen.getByText('当前筛选下暂无事件。')).toBeInTheDocument();
     expect(screen.queryByTestId('agent-replay-position')).not.toBeInTheDocument();
   });
 });
