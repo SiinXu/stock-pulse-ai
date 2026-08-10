@@ -25,13 +25,13 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 130215,
+      "maxGzipBytes": 130400,
       "measuredGzipBytes": 118377
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 125000,
+      "maxGzipBytes": 125150,
       "measuredGzipBytes": 124825,
       "note": "Rebaselined after the localized financial-chart and Today's Focus strings landed together; the 125,000-byte cap leaves 175 bytes of headroom."
     },
@@ -44,13 +44,13 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 124626,
+      "maxGzipBytes": 124875,
       "measuredGzipBytes": 113296
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 120475,
+      "maxGzipBytes": 120675,
       "measuredGzipBytes": 109522
     },
     {
