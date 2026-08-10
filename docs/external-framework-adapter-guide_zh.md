@@ -145,19 +145,35 @@ Data Provider 仍需将 `PluginManager` 绑定到目标
 | `amount` | 数值；上游缺失时可保守推导 |
 | `pct_chg` | 涨跌幅百分比；缺失时可由 `close` 计算 |
 
-不要用不完整行“凑成功”：丢弃不可用行；若无剩余行则**抛错**以便 Manager 回退。
+不要用不完整行“凑成功”。应明确行处理策略；OpenBB 示范在任一必需日期或
+OHLCV 值缺失、非数值、非有限、出现禁止的负值，或违反
+`low <= open/close <= high` 时让整个 attempt 失败。它先按时间戳升序排序，
+每个 UTC 日期保留最新观测，再推导 `amount` 与 `pct_chg`。
+
+示范在固定 yfinance 调用前执行 StockPulse symbol 映射：
+
+| StockPulse 形式 | yfinance 形式 |
+| --- | --- |
+| `AAPL` | `AAPL` |
+| `600519`、`600519.SH`、`SH600519` | `600519.SS` |
+| `000001`、`000001.SZ`、`SZ000001` | `000001.SZ` |
+| `HK00700`、`00700.HK`、`0700` | `0700.HK` |
+| `920748` / `920748.BJ` 等北交所形式 | 不支持；I/O 前抛错并交由 Manager 回退 |
 
 ## 失败、超时与降级
 
 | 情形 | 要求行为 |
 | --- | --- |
 | 外部包未安装 | 抛出明确错误，点名包名并说明 StockPulse 不会自动安装 |
-| 传输 / SDK 超时 | 在配置有限客户端超时后，从本次 attempt 抛错 |
+| 传输 / SDK 超时 | 对真实阻塞调用强制有限 deadline，终止并回收超时任务后抛错 |
 | 上游空或畸形载荷 | 抛错；除非能力显式允许空数据且宿主契约已写明，否则不要返回空“成功”帧 |
 | 批量多标的部分失败 | 按宿主契约使本次 attempt 失败或仅返回已校验行 — 禁止对缺失标的静默填零 |
 | 跨 provider 回退 | **禁止在插件内实现**。仅一次 attempt；链路由 `DataFetcherManager` 拥有 |
 
-宿主**不会**给每次 provider 调用套统一 deadline。有限的 connect/read（或 SDK）超时由适配作者负责。
+宿主**不会**给每次 provider 调用套统一 deadline。OpenBB 示范支持
+`openbb>=4.7,<4.8`，并在隔离进程组内只调用一次
+`equity.price.historical(..., provider="yfinance")`。deadline 到期时终止并
+回收该进程组；任意 SDK `TypeError` 会原样失败，绝不会触发第二次请求。
 
 ## 依赖声明与手动安装
 
@@ -166,7 +182,7 @@ Data Provider 仍需将 `PluginManager` 绑定到目标
 3. 运维安装到与 StockPulse **同一**运行环境：
 
    ```bash
-   pip install 'openbb>=4'   # 示例 — 请固定到你审阅过的版本
+   pip install 'openbb>=4.7,<4.8'
    export PLUGINS_DIR=/opt/stockpulse/plugins
    ```
 
@@ -235,8 +251,8 @@ PY
 
 | 层级 | 期望 |
 | --- | --- |
-| 单元 / 契约 | 注入 fixture 客户端；断言列契约、缺依赖错误文案、上游空数据抛错、注册/加载/禁用 |
-| 网络 | 可选，标记 `@pytest.mark.network`；`ci_gate` 不得依赖 |
+| 单元 / 契约 | 使用 OpenBB 4.7 形状的 OBBject/provider fake；断言单调用、symbol 映射、进程超时清理、严格 OHLCV/日期校验、重复策略、Manager 回退归因与生命周期 |
+| 网络 | 可选，标记 `@pytest.mark.network`；`ci_gate` 不得依赖。示范的离线 gate 不声称已执行真实 OpenBB 冒烟 |
 | 核心机制 | **不要**为了“让示范跑通”去改 `src/plugins` 的 loader/manager/registry — 若宿主契约不足，应另开 ADR 任务 |
 
 ## V1 表面声明
