@@ -291,6 +291,8 @@ class Config:
     # Report type: simple (concise) or full (complete)
     report_type: str = "simple"
     report_language: str = "zh"
+    # Report presentation mode for Jinja renderer (#861 Phase 2): brief / standard / research
+    report_mode: str = "standard"
     # Optional single-face TTF/OTF used by the bounded report PDF exporter.
     report_export_pdf_font_path: Optional[str] = None
 
@@ -555,6 +557,7 @@ _CONFIG_METHOD_GROUPS = (
         (
             "_parse_stock_email_groups",
             "_parse_report_type",
+            "_parse_report_mode",
             "_get_env_file_value",
             "_resolve_env_value",
             "_capture_bootstrap_runtime_env_overrides",

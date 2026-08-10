@@ -369,7 +369,6 @@
     {"path":"src/services/portfolio_service.py","scope":"<module>.PortfolioService._prefetch_realtime_position_prices","caught":["Exception"],"digest":"592a899f83c07546a0d397e57ca55e5738347794f97d928d74f0386e76d86152"},
     {"path":"src/services/portfolio_service.py","scope":"<module>.PortfolioService._prefetch_realtime_position_prices","caught":["Exception"],"digest":"e21f8ef5d1497607a950e24c3bd49d0f35910ecd70e87f848e4383bf4bca06ce"},
     {"path":"src/services/portfolio_service.py","scope":"<module>.PortfolioService._refresh_account_fx_rates","caught":["Exception"],"digest":"3593d05fa71375c7f84abd027f168465c7dc5cd0f174954bbcf10af8593c5f7c"},
-    {"path":"src/services/report_renderer.py","scope":"<module>.render","caught":["Exception"],"digest":"7f22aa5d825344768f0de2ec313f569fbb9a2338273e75ffd0a81ff5e7d7d902"},
     {"path":"src/services/run_diagnostics.py","scope":"<module>.RunDiagnosticContext._emit_flow_event","caught":["Exception"],"digest":"d26b41590352873acaa7333bd7a7e8c2b5948eb49ff765688e3349dc113d4657"},
     {"path":"src/services/run_diagnostics.py","scope":"<module>.current_diagnostic_snapshot","caught":["Exception"],"digest":"d5b165a004fb2a2575e6dbfa9033e695de7386c88f779bec98362cd9b8e36827"},
     {"path":"src/services/run_diagnostics.py","scope":"<module>.record_history_run","caught":["Exception"],"digest":"a0e14bc83430f23f4d53929fc9fe16367b589fd4aaf1b449fc742fbccc1480d2"},
