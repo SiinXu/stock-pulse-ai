@@ -1262,6 +1262,26 @@ export interface paths {
         patch: operations["updateDecisionSignalStatus"];
         trace?: never;
     };
+    "/api/v1/focus/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get today's focus recommendations
+         * @description Fresh local-calendar-day evidence from the watchlist and persisted holdings cache. Hard-capped, read-only, and explicit about source degradation; never fetches market data, runs analysis, or replays portfolio state.
+         */
+        get: operations["getTodaysFocus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -13471,6 +13491,245 @@ export interface components {
             /** Success */
             success: boolean;
         };
+        /** TodaysFocusAlertEvidence */
+        TodaysFocusAlertEvidence: {
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Rule Id */
+            rule_id?: number | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * Status
+             * @constant
+             */
+            status: "triggered";
+            /** Trigger Id */
+            trigger_id: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "alert";
+        };
+        /** TodaysFocusAnalysisEvidence */
+        TodaysFocusAnalysisEvidence: {
+            /**
+             * Latest Action
+             * @enum {string}
+             */
+            latest_action: "buy" | "sell" | "hold";
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /**
+             * Previous Action
+             * @enum {string}
+             */
+            previous_action: "buy" | "sell" | "hold";
+            /**
+             * Previous Observed At
+             * Format: date-time
+             */
+            previous_observed_at: string;
+            /** Query Id */
+            query_id?: string | null;
+            /** Record Id */
+            record_id: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "analysis";
+        };
+        /** TodaysFocusCorporateEventEvidence */
+        TodaysFocusCorporateEventEvidence: {
+            /** Event Id */
+            event_id: string;
+            /** Href */
+            href: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "corporate_event";
+        };
+        /** TodaysFocusCostContract */
+        TodaysFocusCostContract: {
+            /** Alert Repository Calls */
+            alert_repository_calls: number;
+            /** Analysis History Repository Calls */
+            analysis_history_repository_calls: number;
+            /**
+             * Analysis Runs Triggered
+             * @constant
+             */
+            analysis_runs_triggered: 0;
+            /**
+             * Database Writes
+             * @constant
+             */
+            database_writes: 0;
+            /** Event Repository Calls */
+            event_repository_calls: number;
+            /** Portfolio Repository Calls */
+            portfolio_repository_calls: number;
+            /**
+             * Provider Calls
+             * @constant
+             */
+            provider_calls: 0;
+            /**
+             * Read Only
+             * @constant
+             */
+            read_only: true;
+            /**
+             * Zero Extra Fetch
+             * @constant
+             */
+            zero_extra_fetch: true;
+        };
+        /** TodaysFocusItem */
+        TodaysFocusItem: {
+            /** Code */
+            code: string;
+            /** Evidence */
+            evidence: components["schemas"]["TodaysFocusAlertEvidence"] | components["schemas"]["TodaysFocusAnalysisEvidence"] | components["schemas"]["TodaysFocusCorporateEventEvidence"];
+            /** Name */
+            name: string;
+            /** Priority */
+            priority: number;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "alert_triggered" | "corporate_event" | "analysis_reversal";
+            /** Reason Display */
+            reason_display: string;
+            /** Secondary Reason Codes */
+            secondary_reason_codes: ("alert_triggered" | "corporate_event" | "analysis_reversal")[];
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /** TodaysFocusPresentationBoundary */
+        TodaysFocusPresentationBoundary: {
+            /**
+             * Alerts Owned By
+             * @constant
+             */
+            alerts_owned_by: "signal_center";
+            /**
+             * Duplicate Alert Ui
+             * @constant
+             */
+            duplicate_alert_ui: false;
+            /**
+             * Focus Shows
+             * @constant
+             */
+            focus_shows: "prioritized_symbols_with_evidence_links";
+        };
+        /** TodaysFocusResponse */
+        TodaysFocusResponse: {
+            cost_contract: components["schemas"]["TodaysFocusCostContract"];
+            /** Degraded Sources */
+            degraded_sources: ("alerts" | "analysis_history" | "corporate_events" | "portfolio_position_cache")[];
+            /** Empty Message */
+            empty_message?: string | null;
+            /** Empty Reason */
+            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals") | null;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Item Count */
+            item_count: number;
+            /** Items */
+            items: components["schemas"]["TodaysFocusItem"][];
+            /** Max Items */
+            max_items: number;
+            /**
+             * Pack Version
+             * @constant
+             */
+            pack_version: "todays_focus/2.0";
+            presentation_boundary: components["schemas"]["TodaysFocusPresentationBoundary"];
+            /** Sources Used */
+            sources_used: ("alert" | "analysis" | "corporate_event" | "alerts" | "analysis_history" | "corporate_events")[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty" | "degraded";
+            temporal_policy: components["schemas"]["TodaysFocusTemporalPolicy"];
+            universe_contract: components["schemas"]["TodaysFocusUniverseContract"];
+        };
+        /** TodaysFocusTemporalPolicy */
+        TodaysFocusTemporalPolicy: {
+            /**
+             * Local Date
+             * Format: date
+             */
+            local_date: string;
+            /**
+             * Missing Timestamp Policy
+             * @constant
+             */
+            missing_timestamp_policy: "exclude";
+            /**
+             * Naive Timestamp Policy
+             * @constant
+             */
+            naive_timestamp_policy: "assume_utc";
+            /**
+             * Non Trading Day Policy
+             * @constant
+             */
+            non_trading_day_policy: "same_local_day_only";
+            /**
+             * Semantics
+             * @constant
+             */
+            semantics: "local_calendar_day";
+            /** Timezone */
+            timezone: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+        };
+        /** TodaysFocusUniverseContract */
+        TodaysFocusUniverseContract: {
+            /**
+             * Hard Cap
+             * @constant
+             */
+            hard_cap: 1000;
+            /** Sources */
+            sources: ("injected_evidences" | "portfolio_position_cache" | "request" | "watchlist_config")[];
+            /** Symbol Count */
+            symbol_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
         /**
          * ToolCapabilityItem
          * @description Registered or owner-declared Agent tool observation.
@@ -17642,6 +17901,60 @@ export interface operations {
                 };
             };
             /** @description 更新失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTodaysFocus: {
+        parameters: {
+            query?: {
+                /** @description Hard cap for returned focus items (default 5, max 10) */
+                max_items?: number;
+                /** @description Optional portfolio account id for the cached holdings universe */
+                account_id?: number | null;
+                /** @description Reason display language (en/zh); defaults to report_language */
+                language?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodaysFocusResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Focus aggregation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
