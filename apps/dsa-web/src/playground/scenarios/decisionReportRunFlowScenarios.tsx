@@ -43,6 +43,8 @@ import { AnalysisContextSummary } from '../../components/report/AnalysisContextS
 import { MarketReviewReportView } from '../../components/report/MarketReviewReportView';
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
 import { ReportDecisionCard } from '../../components/report/ReportDecisionCard';
+import { ReportRiskGateBanner } from '../../components/report/ReportRiskGateBanner';
+import { buildRiskGatePresentation, parseRiskGateResult } from '../../components/report/reportRiskGateUtils';
 import { ReportDetails } from '../../components/report/ReportDetails';
 import { ReportDiagnostics } from '../../components/report/ReportDiagnostics';
 import { ReportMarkdown } from '../../components/report/ReportMarkdown';
@@ -651,6 +653,34 @@ const ReportDecisionCardStory = () => {
   );
 };
 
+
+const ReportRiskGateBannerStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'loading') {
+    return <ReportRiskGateBanner presentation={buildRiskGatePresentation({ loading: true })} language="en" />;
+  }
+  if (scenario === 'error') {
+    return <ReportRiskGateBanner presentation={buildRiskGatePresentation({ error: true })} language="en" />;
+  }
+  if (scenario === 'empty') {
+    return <ReportRiskGateBanner presentation={parseRiskGateResult(undefined)} language="en" />;
+  }
+  return (
+    <ReportRiskGateBanner
+      presentation={parseRiskGateResult({
+        schema_version: 'risk-manager-result/v1',
+        verdict: 'reject',
+        original_action: 'buy',
+        final_action: 'hold',
+        reason_codes: ['portfolio_exposure_limit'],
+        evidence_codes: ['portfolio_exposure'],
+        profile: 'balanced',
+      })}
+      language="en"
+    />
+  );
+};
+
 const ReportDetailsStory = () => {
   const { scenario } = usePlaygroundScenario();
   return <ReportDetails details={scenario === 'empty' ? undefined : fixtureReport.details} recordId={fixtureReport.meta.id} language="en" />;
@@ -867,6 +897,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,
   'report-decision-card': ReportDecisionCardStory,
+  'report-risk-gate-banner': ReportRiskGateBannerStory,
   'report-details': ReportDetailsStory,
   'report-diagnostics': ReportDiagnosticsStory,
   'report-markdown': ReportMarkdownStory,
