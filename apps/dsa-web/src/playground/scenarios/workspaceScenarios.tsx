@@ -354,18 +354,22 @@ const FIXTURE_FIRST_RUN_DEMO: FirstRunReadiness = {
   beginnerModeRecommended: true,
   primaryPath: 'demo',
   primaryCta: 'view_demo',
-  headline: 'Playground fixture: no model detected — open the offline sample analysis.',
+  reasonCode: 'local_runtime_unavailable',
+  reasonParams: {},
   localRuntime: {
-    available: false,
+    reachable: false,
+    modelsAvailable: false,
+    runnable: false,
     models: [],
     suggestedProfile: {},
-    reason: 'unreachable',
+    reasonCode: 'ollama_unreachable',
     detectEnabled: true,
   },
   suggestedProfile: {},
   demoAvailable: true,
   configMutated: false,
   existingConfigUntouched: true,
+  snapshotId: '0123456789abcdef01234567',
   generatedAt: '2026-08-09T00:00:00Z',
 };
 
@@ -376,7 +380,7 @@ const FIXTURE_FIRST_RUN_CONFIGURED: FirstRunReadiness = {
   beginnerModeRecommended: false,
   primaryPath: 'configured',
   primaryCta: 'continue',
-  headline: 'Playground fixture: model already configured; settings untouched.',
+  reasonCode: 'primary_model_configured',
 };
 
 const ZeroConfigFirstRunPanelStory = () => {

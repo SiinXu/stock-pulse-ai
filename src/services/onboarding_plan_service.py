@@ -17,12 +17,14 @@ Design notes
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from src.report_language import SUPPORTED_REPORT_LANGUAGES
 from src.services.demo_analysis_fixture import build_demo_analysis
 from src.services.local_runtime_detect import (
     LocalRuntimeDetectResult,
@@ -42,6 +44,16 @@ PLAN_SCHEMA_VERSION = 1
 FIRST_RUN_READINESS_SCHEMA_VERSION = 1
 ONBOARDING_STATE_FILENAME = "onboarding_state.json"
 
+_LEGACY_PRIMARY_MODEL_KEYS = frozenset(
+    {
+        "GEMINI_MODEL",
+        "ANTHROPIC_MODEL",
+        "OPENAI_MODEL",
+        "OLLAMA_MODEL",
+        "ANSPIRE_LLM_MODEL",
+    }
+)
+
 _FRESH_ENV_IGNORED_KEYS = frozenset(
     {
         "ADMIN_AUTH_ENABLED",
@@ -53,26 +65,6 @@ _FRESH_ENV_IGNORED_KEYS = frozenset(
         "LOG_DIR",
         "LOCAL_RUNTIME_AUTO_DETECT",
         "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS",
-    }
-)
-
-_PRIMARY_MODEL_SIGNAL_KEYS = frozenset(
-    {
-        "LITELLM_MODEL",
-        "AGENT_LITELLM_MODEL",
-        "LLM_OLLAMA_MODELS",
-        "OPENCODE_CLI_MODEL",
-        "LLM_CHANNELS",
-    }
-)
-
-_CONFIGURED_GENERATION_BACKENDS = frozenset(
-    {
-        "codex_cli",
-        "claude_code",
-        "opencode",
-        "gemini_cli",
-        "hermes_agent",
     }
 )
 
@@ -90,6 +82,7 @@ HOLDINGS = frozenset({"none", "watchlist", "bookkeeping"})
 INTERACTIONS = frozenset({"push", "web", "chat"})
 RISK_TONES = frozenset({"conservative", "balanced", "assertive"})
 INFRASTRUCTURES = frozenset({"cloud_key", "local_models", "free_only"})
+REPORT_LANGUAGES = frozenset(SUPPORTED_REPORT_LANGUAGES)
 
 FEATURE_STAGES = ("L0", "L1", "L2", "L3")
 
@@ -201,27 +194,6 @@ def is_secret_config_key(key: str) -> bool:
     return False
 
 
-def has_primary_model_configured(config_map: Mapping[str, str] | None) -> bool:
-    """Return True when the config map already signals a usable primary model path."""
-    values = {
-        str(key).strip().upper(): str(value or "").strip()
-        for key, value in dict(config_map or {}).items()
-    }
-    for key in _PRIMARY_MODEL_SIGNAL_KEYS:
-        if values.get(key):
-            return True
-    backend = values.get("GENERATION_BACKEND", "").lower()
-    if backend in _CONFIGURED_GENERATION_BACKENDS:
-        return True
-    ollama_enabled = values.get("LLM_OLLAMA_ENABLED", "").lower()
-    if ollama_enabled in {"1", "true", "yes", "on"} and values.get("LLM_OLLAMA_BASE_URL"):
-        return True
-    for key, value in values.items():
-        if value and is_secret_config_key(key):
-            return True
-    return False
-
-
 def is_fresh_environment(
     config_map: Mapping[str, str] | None,
     *,
@@ -240,8 +212,6 @@ def is_fresh_environment(
     }
     if not values:
         return True
-    if has_primary_model_configured(values):
-        return False
     for key, value in values.items():
         if not value:
             continue
@@ -269,6 +239,12 @@ def is_fresh_environment(
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _snapshot_id(payload: Mapping[str, Any]) -> str:
+    """Return a stable identifier for one bounded readiness projection."""
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:24]
 
 
 def _normalize_string_list(
@@ -379,9 +355,12 @@ def normalize_profile(raw: Mapping[str, Any] | None) -> Dict[str, Any]:
         field_name="infrastructure",
         default="cloud_key",
     )
-    report_language = str(source.get("report_language") or "zh").strip().lower() or "zh"
-    if report_language not in {"zh", "en", "ko", "ja"}:
-        report_language = "zh"
+    report_language = _normalize_enum(
+        source.get("report_language"),
+        allowed=REPORT_LANGUAGES,
+        field_name="report_language",
+        default="zh",
+    )
     return {
         "schema_version": PROFILE_SCHEMA_VERSION,
         "experience_stage": experience,
@@ -715,15 +694,6 @@ class OnboardingPlanService:
         if not (current.get("STOCK_LIST") or "").strip():
             desired["STOCK_LIST"] = _seed_stock_list(profile["markets"])
 
-        if preset_id == "local-first":
-            detect = detect_local_runtime_from_config_map(current)
-            if detect.available:
-                for key, value in dict(detect.suggested_profile or {}).items():
-                    key_u = str(key or "").strip().upper()
-                    val = str(value or "").strip()
-                    if key_u and val and not is_secret_config_key(key_u):
-                        desired[key_u] = val
-
         # Never include secrets in the plan.
         for key in list(desired.keys()):
             if is_secret_config_key(key):
@@ -898,11 +868,15 @@ class OnboardingPlanService:
             isinstance(state, dict) and str(state.get("status") or "") == "applied"
         )
         fresh = is_fresh_environment(current, onboarding_applied=onboarding_applied)
-        has_model = has_primary_model_configured(current)
+
+        # Reuse SystemConfigService's authoritative setup projection so an API
+        # key without a model/route, an empty channel scaffold, or a missing CLI
+        # executable cannot be mistaken for a runnable primary model.
+        effective = self._system_config._build_setup_effective_config_map()  # noqa: SLF001
 
         try:
             detect = detect_local_runtime_from_config_map(
-                current,
+                effective,
                 requester=detect_requester,
             )
         except Exception as exc:  # broad-exception: fallback_recorded - first-run must not fail hard
@@ -918,8 +892,22 @@ class OnboardingPlanService:
                 detect_enabled=True,
             )
 
-        preset_configs, preset_meta = _load_preset_catalog()
-        local_meta = dict(preset_meta.get("local-first") or {})
+        primary_check = self._system_config._build_setup_primary_llm_check(  # noqa: SLF001
+            effective,
+            local_detect=detect,
+        )
+        _resolved_model, model_source = self._system_config._resolve_setup_primary_model(  # noqa: SLF001
+            effective
+        )
+        legacy_model_is_explicit = any(
+            str(effective.get(key) or "").strip() for key in _LEGACY_PRIMARY_MODEL_KEYS
+        )
+        has_model = (
+            str(primary_check.get("status") or "") == "configured"
+            and (model_source != "legacy" or legacy_model_is_explicit)
+        )
+
+        preset_configs, _preset_meta = _load_preset_catalog()
         local_preset_values = {
             str(k).upper(): str(v)
             for k, v in dict(preset_configs.get("local-first") or {}).items()
@@ -928,70 +916,81 @@ class OnboardingPlanService:
 
         suggested_profile: Dict[str, str] = {}
         recommended_preset_id: Optional[str] = None
-        recommended_preset_name: Optional[str] = None
+
+        models = list(detect.models or [])
+        local_reachable = bool(detect.available)
+        local_models_available = bool(models)
+        local_runnable = local_reachable and local_models_available
 
         if has_model:
             primary_path = "configured"
             beginner_mode_recommended = False
             primary_cta = "continue"
-            headline = (
-                "A primary model is already configured. Existing settings were not changed."
-            )
-        elif detect.available:
+            reason_code = "primary_model_configured"
+            reason_params: Dict[str, str] = {}
+        elif local_runnable:
             primary_path = "local_ollama"
-            beginner_mode_recommended = True
-            primary_cta = "start_with_local"
+            beginner_mode_recommended = fresh
+            primary_cta = "open_local_setup"
+            reason_code = "local_model_ready"
+            reason_params = {"models": ", ".join(models[:3])}
             recommended_preset_id = "local-first"
-            recommended_preset_name = str(
-                local_meta.get("display_name") or "Local-first (Ollama / Model Pack)"
-            )
             suggested_profile = dict(local_preset_values)
             for key, value in dict(detect.suggested_profile or {}).items():
                 key_u = str(key or "").strip().upper()
                 val = str(value or "").strip()
                 if key_u and val and not is_secret_config_key(key_u):
                     suggested_profile[key_u] = val
-            models = list(detect.models or [])
-            model_hint = (
-                f" Detected models: {', '.join(models[:3])}."
-                if models
-                else " Start Ollama models if the list is empty."
-            )
-            headline = (
-                f"Local Ollama is reachable at {detect.base_url or 'loopback'}."
-                f"{model_hint} Primary CTA: start with a local zero-cost profile "
-                "(calls official local-first preset fields only; no secrets)."
-            )
         else:
             primary_path = "demo"
-            beginner_mode_recommended = True
+            beginner_mode_recommended = fresh
             primary_cta = "view_demo"
-            headline = (
-                "No API key and no local model detected. "
-                "You can open the built-in offline sample analysis (clearly labeled) "
-                "or start a data-only dry-run later."
-            )
+            if local_reachable:
+                reason_code = "local_runtime_no_models"
+            elif not detect.detect_enabled:
+                reason_code = "local_detect_disabled"
+            else:
+                reason_code = "local_runtime_unavailable"
+            reason_params = {}
 
-        if has_model:
-            beginner_mode_recommended = False
-        elif fresh or not has_model:
-            beginner_mode_recommended = True
-
-        return {
+        public_local_runtime = {
+            "reachable": local_reachable,
+            "models_available": local_models_available,
+            "runnable": local_runnable,
+            "backend": detect.backend,
+            "base_url": detect.base_url,
+            "models": models,
+            "suggested_profile": dict(detect.suggested_profile or {}) if local_runnable else {},
+            "reason_code": (
+                "ollama_ready"
+                if local_runnable
+                else "ollama_no_models"
+                if local_reachable
+                else "detect_disabled"
+                if not detect.detect_enabled
+                else "ollama_unreachable"
+            ),
+            "detect_enabled": bool(detect.detect_enabled),
+        }
+        snapshot_payload = {
             "schema_version": FIRST_RUN_READINESS_SCHEMA_VERSION,
             "is_fresh_environment": fresh,
             "has_primary_model": has_model,
             "beginner_mode_recommended": beginner_mode_recommended,
             "primary_path": primary_path,
             "primary_cta": primary_cta,
-            "headline": headline,
-            "local_runtime": detect.to_public_dict(),
+            "reason_code": reason_code,
+            "reason_params": reason_params,
+            "local_runtime": public_local_runtime,
             "recommended_preset_id": recommended_preset_id,
-            "recommended_preset_name": recommended_preset_name,
             "suggested_profile": suggested_profile,
             "demo_available": True,
             "config_mutated": False,
             "existing_config_untouched": True,
+        }
+        return {
+            **snapshot_payload,
+            "snapshot_id": _snapshot_id(snapshot_payload),
             "generated_at": _utc_now_iso(),
         }
 

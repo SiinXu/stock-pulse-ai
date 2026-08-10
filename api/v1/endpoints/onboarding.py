@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 from fastapi import APIRouter, Depends
 
@@ -157,7 +157,6 @@ def apply_onboarding_plan(
         raise api_error(500, "internal_error", "Failed to apply onboarding plan") from exc
 
 
-
 @router.get(
     "/first-run",
     response_model=FirstRunReadinessResponse,
@@ -166,7 +165,7 @@ def apply_onboarding_plan(
     description=(
         "Returns fresh-environment detection, beginner-mode recommendation, "
         "fast loopback Ollama detect results, and the primary CTA path "
-        "(local preset vs offline demo). Never mutates configuration."
+        "(model setup vs offline demo). Never mutates configuration."
     ),
 )
 def get_first_run_readiness(
@@ -197,7 +196,7 @@ def get_first_run_readiness(
     ),
 )
 def get_demo_analysis(
-    report_language: str = "zh",
+    report_language: Literal["zh", "en", "ko"] = "zh",
     system_config: SystemConfigService = Depends(get_system_config_service),
 ) -> DemoAnalysisResponse:
     service = _plan_service(system_config)

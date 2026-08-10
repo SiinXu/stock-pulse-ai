@@ -33,6 +33,8 @@ const demoPayload: DemoAnalysisPayload = {
       reportType: 'brief',
       reportLanguage: 'en',
       createdAt: '2026-08-09T00:00:00Z',
+      currentPrice: null,
+      changePct: null,
       modelUsed: 'demo-fixture/offline',
     },
     summary: {
@@ -44,6 +46,13 @@ const demoPayload: DemoAnalysisPayload = {
       sentimentScore: 50,
       sentimentLabel: 'Neutral',
     },
+    strategy: {
+      idealBuy: null,
+      secondaryBuy: null,
+      stopLoss: null,
+      takeProfit: null,
+    },
+    details: { news: [], technical: [] },
   },
 };
 
@@ -54,18 +63,22 @@ const demoReadiness: FirstRunReadiness = {
   beginnerModeRecommended: true,
   primaryPath: 'demo',
   primaryCta: 'view_demo',
-  headline: 'No API key and no local model detected.',
+  reasonCode: 'local_runtime_unavailable',
+  reasonParams: {},
   localRuntime: {
-    available: false,
+    reachable: false,
+    modelsAvailable: false,
+    runnable: false,
     models: [],
     suggestedProfile: {},
-    reason: 'unreachable',
+    reasonCode: 'ollama_unreachable',
     detectEnabled: true,
   },
   suggestedProfile: {},
   demoAvailable: true,
   configMutated: false,
   existingConfigUntouched: true,
+  snapshotId: '0123456789abcdef01234567',
   generatedAt: '2026-08-09T00:00:00Z',
 };
 
@@ -76,10 +89,10 @@ const configuredReadiness: FirstRunReadiness = {
   beginnerModeRecommended: false,
   primaryPath: 'configured',
   primaryCta: 'continue',
-  headline: 'A primary model is already configured.',
+  reasonCode: 'primary_model_configured',
 };
 
-function renderPanel(readiness: FirstRunReadiness) {
+function renderPanel(readiness: FirstRunReadiness, onContinue?: () => void | Promise<void>) {
   const t = (key: string) => key;
   return render(
     <UiLanguageProvider>
@@ -87,6 +100,7 @@ function renderPanel(readiness: FirstRunReadiness) {
         readiness={readiness}
         autoLoad={false}
         reportLanguage="en"
+        onContinue={onContinue}
         t={t as never}
       />
     </UiLanguageProvider>,
@@ -119,6 +133,23 @@ describe('ZeroConfigFirstRunPanel', () => {
     renderPanel(configuredReadiness);
     expect(screen.getByText('firstRun.pathConfigured')).toBeInTheDocument();
     expect(screen.queryByText('firstRun.beginnerRecommended')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'firstRun.ctaContinue' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'firstRun.ctaContinue' })).toBeDisabled();
+    expect(screen.getByText('firstRun.integrationUnavailable')).toBeInTheDocument();
+  });
+
+  it('runs the host navigation callback instead of substituting the demo', async () => {
+    const onContinue = vi.fn();
+    renderPanel(configuredReadiness, onContinue);
+    fireEvent.click(screen.getByRole('button', { name: 'firstRun.ctaContinue' }));
+    await waitFor(() => expect(onContinue).toHaveBeenCalledTimes(1));
+    expect(getDemoAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('reports a rejected host action without an unhandled promise', async () => {
+    renderPanel(configuredReadiness, vi.fn().mockRejectedValue(new Error('navigation failed')));
+    fireEvent.click(screen.getByRole('button', { name: 'firstRun.ctaContinue' }));
+    await waitFor(() => {
+      expect(screen.getByText('firstRun.actionError')).toBeInTheDocument();
+    });
   });
 });

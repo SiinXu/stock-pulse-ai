@@ -15,7 +15,6 @@ from src.services.onboarding_plan_service import (
     OnboardingPlanService,
     OnboardingProfileValidationError,
     OnboardingSecretRejectedError,
-    has_primary_model_configured,
     is_fresh_environment,
     is_secret_config_key,
     normalize_profile,
@@ -62,6 +61,8 @@ def test_normalize_profile_defaults_and_rejects_bad_market() -> None:
     assert profile["infrastructure"] == "cloud_key"
     with pytest.raises(OnboardingProfileValidationError):
         normalize_profile({"markets": ["mars"]})
+    with pytest.raises(OnboardingProfileValidationError):
+        normalize_profile({"report_language": "ja"})
 
 
 @pytest.mark.parametrize(
@@ -103,6 +104,9 @@ def _service(tmp_path: Path, current: Dict[str, str] | None = None) -> Onboardin
     manager.read_config_map.return_value = dict(current or {})
     scs = MagicMock()
     scs._manager = manager
+    scs._build_setup_effective_config_map.return_value = dict(current or {})
+    scs._build_setup_primary_llm_check.return_value = {"status": "needs_action"}
+    scs._resolve_setup_primary_model.return_value = ("", "missing")
     scs.update.return_value = {
         "success": True,
         "config_version": "v2",
@@ -226,15 +230,18 @@ def test_is_fresh_environment_conservative() -> None:
     assert is_fresh_environment({"OPENAI_API_KEY": "sk-test"}) is False
 
 
-def test_has_primary_model_configured_signals() -> None:
-    assert has_primary_model_configured({}) is False
-    assert has_primary_model_configured({"LITELLM_MODEL": "ollama/qwen"}) is True
-    assert has_primary_model_configured({"GENERATION_BACKEND": "codex_cli"}) is True
-    assert has_primary_model_configured({"OPENAI_API_KEY": "sk-x"}) is True
-
-
 def test_first_run_readiness_configured_user_not_forced(tmp_path: Path) -> None:
-    service = _service(tmp_path, current={"LITELLM_MODEL": "gpt-4o-mini", "STOCK_LIST": "AAPL"})
+    service = _service(
+        tmp_path,
+        current={"LITELLM_MODEL": "openai/gpt-4o-mini", "OPENAI_API_KEY": "sk-x", "STOCK_LIST": "AAPL"},
+    )
+    service._system_config._build_setup_primary_llm_check.return_value = {  # noqa: SLF001
+        "status": "configured"
+    }
+    service._system_config._resolve_setup_primary_model.return_value = (  # noqa: SLF001
+        "openai/gpt-4o-mini",
+        "explicit",
+    )
     offline = LocalRuntimeDetectResult(available=False, reason="unreachable", detect_enabled=True)
     import src.services.onboarding_plan_service as mod
     original = mod.detect_local_runtime_from_config_map
@@ -247,6 +254,7 @@ def test_first_run_readiness_configured_user_not_forced(tmp_path: Path) -> None:
     assert readiness["has_primary_model"] is True
     assert readiness["beginner_mode_recommended"] is False
     assert readiness["primary_path"] == "configured"
+    assert readiness["reason_code"] == "primary_model_configured"
     assert readiness["config_mutated"] is False
     assert readiness["existing_config_untouched"] is True
 
@@ -274,7 +282,8 @@ def test_first_run_readiness_local_ollama_primary_cta(tmp_path: Path) -> None:
     finally:
         mod.detect_local_runtime_from_config_map = original  # type: ignore[assignment]
     assert readiness["primary_path"] == "local_ollama"
-    assert readiness["primary_cta"] == "start_with_local"
+    assert readiness["primary_cta"] == "open_local_setup"
+    assert readiness["local_runtime"]["runnable"] is True
     assert readiness["recommended_preset_id"] == "local-first"
     assert readiness["suggested_profile"].get("LITELLM_MODEL") == "ollama/qwen3:8b"
 
@@ -294,6 +303,66 @@ def test_first_run_readiness_demo_when_detect_unavailable(tmp_path: Path) -> Non
     assert readiness["demo_available"] is True
 
 
+@pytest.mark.parametrize(
+    "current",
+    [
+        {"TUSHARE_TOKEN": "token-only"},
+        {"TELEGRAM_BOT_TOKEN": "notification-only"},
+        {"OPENAI_API_KEY": "key-without-model"},
+        {"LLM_CHANNELS": ""},
+        {"LLM_OLLAMA_MODELS": "[]"},
+        {
+            "LLM_OLLAMA_ENABLED": "true",
+            "LLM_OLLAMA_BASE_URL": "http://127.0.0.1:11434",
+        },
+    ],
+)
+def test_first_run_does_not_treat_unrunnable_scaffolds_as_configured(
+    tmp_path: Path,
+    current: Dict[str, str],
+) -> None:
+    service = _service(tmp_path, current=current)
+    offline = LocalRuntimeDetectResult(available=False, reason="unreachable", detect_enabled=True)
+    import src.services.onboarding_plan_service as mod
+    original = mod.detect_local_runtime_from_config_map
+    mod.detect_local_runtime_from_config_map = MagicMock(return_value=offline)  # type: ignore[assignment]
+    try:
+        readiness = service.get_first_run_readiness()
+    finally:
+        mod.detect_local_runtime_from_config_map = original  # type: ignore[assignment]
+    assert readiness["has_primary_model"] is False
+    assert readiness["primary_path"] == "demo"
+    assert readiness["beginner_mode_recommended"] is readiness["is_fresh_environment"]
+
+
+def test_first_run_reachable_ollama_without_models_uses_demo_with_remediation(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path, current={})
+    detected = LocalRuntimeDetectResult(
+        available=True,
+        backend="ollama",
+        base_url="http://127.0.0.1:11434",
+        models=[],
+        suggested_profile={"LLM_CHANNELS": "ollama"},
+        reason="ollama_reachable",
+        detect_enabled=True,
+    )
+    import src.services.onboarding_plan_service as mod
+    original = mod.detect_local_runtime_from_config_map
+    mod.detect_local_runtime_from_config_map = MagicMock(return_value=detected)  # type: ignore[assignment]
+    try:
+        readiness = service.get_first_run_readiness()
+    finally:
+        mod.detect_local_runtime_from_config_map = original  # type: ignore[assignment]
+    assert readiness["primary_path"] == "demo"
+    assert readiness["reason_code"] == "local_runtime_no_models"
+    assert readiness["local_runtime"]["reachable"] is True
+    assert readiness["local_runtime"]["models_available"] is False
+    assert readiness["local_runtime"]["runnable"] is False
+    assert readiness["suggested_profile"] == {}
+
+
 def test_demo_analysis_always_marked_sample(tmp_path: Path) -> None:
     service = _service(tmp_path)
     payload = service.get_demo_analysis(report_language="en")
@@ -301,3 +370,14 @@ def test_demo_analysis_always_marked_sample(tmp_path: Path) -> None:
     assert "sample" in payload["sample_banner"].lower()
     assert payload["report"]["meta"]["stock_code"] == "600519"
 
+
+def test_demo_analysis_has_complete_korean_copy_and_rejects_unsupported_language(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    payload = service.get_demo_analysis(report_language="ko")
+    assert payload["report"]["meta"]["report_language"] == "ko"
+    assert payload["report"]["summary"]["sentiment_label"] == "중립"
+    assert "예시" in payload["sample_banner"]
+    with pytest.raises(ValueError):
+        service.get_demo_analysis(report_language="ja")

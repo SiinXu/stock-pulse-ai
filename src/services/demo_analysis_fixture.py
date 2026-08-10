@@ -17,6 +17,7 @@ DEMO_QUERY_ID = "demo-sample-analysis-v1"
 DEMO_STOCK_CODE = "600519"
 DEMO_STOCK_NAME_ZH = "贵州茅台（示例）"
 DEMO_STOCK_NAME_EN = "Kweichow Moutai (sample)"
+DEMO_STOCK_NAME_KO = "구이저우 마오타이(예시)"
 
 
 def _utc_now_iso() -> str:
@@ -45,6 +46,26 @@ def _copy_for_language(report_language: str) -> Mapping[str, str]:
                 "illustrative and must not be used for trading decisions."
             ),
         }
+    if lang.startswith("ko"):
+        return {
+            "stock_name": DEMO_STOCK_NAME_KO,
+            "analysis_summary": (
+                "【예시 데이터】내장된 오프라인 데모이며 실시간 시세나 실제 AI 분석이 아닙니다. "
+                "API 키나 로컬 모델 없이 보고서 화면을 살펴볼 수 있도록 고정된 문구를 사용합니다."
+            ),
+            "operation_advice": (
+                "【예시 데이터】로컬 Ollama 또는 클라우드 키를 설정한 뒤 실제 분석을 실행하세요. "
+                "이 예시를 투자 조언으로 사용하지 마세요."
+            ),
+            "action_label": "관망(예시)",
+            "trend_prediction": "예시 추세 설명 — 실시간이 아닙니다.",
+            "sentiment_label": "중립",
+            "sample_banner": "예시 데이터 — 실시간 분석 아님",
+            "sample_disclaimer": (
+                "이 데모는 고정된 오프라인 예시입니다. 가격, 점수 및 의견은 화면 설명용이며 "
+                "거래 결정에 사용해서는 안 됩니다."
+            ),
+        }
     return {
         "stock_name": DEMO_STOCK_NAME_ZH,
         "analysis_summary": (
@@ -57,6 +78,7 @@ def _copy_for_language(report_language: str) -> Mapping[str, str]:
         ),
         "action_label": "观望（示例）",
         "trend_prediction": "示例趋势说明 — 非实时。",
+        "sentiment_label": "中性",
         "sample_banner": "示例数据 — 非实时分析",
         "sample_disclaimer": (
             "本演示分析为离线固定样例。价格、评分与操作建议仅用于界面演示，"
@@ -72,8 +94,8 @@ def build_demo_analysis(*, report_language: str = "zh") -> Dict[str, Any]:
     render an unmistakable sample marker.
     """
     lang = str(report_language or "zh").strip().lower() or "zh"
-    if lang not in {"zh", "en", "ko", "ja"}:
-        lang = "zh"
+    if lang not in {"zh", "en", "ko"}:
+        raise ValueError("report_language must be one of: zh, en, ko")
     copy = _copy_for_language(lang)
     created_at = _utc_now_iso()
     report = {
@@ -82,7 +104,7 @@ def build_demo_analysis(*, report_language: str = "zh") -> Dict[str, Any]:
             "stock_code": DEMO_STOCK_CODE,
             "stock_name": copy["stock_name"],
             "report_type": "brief",
-            "report_language": lang if lang in {"zh", "en", "ko"} else "zh",
+            "report_language": lang,
             "created_at": created_at,
             "current_price": None,
             "change_pct": None,
@@ -95,7 +117,7 @@ def build_demo_analysis(*, report_language: str = "zh") -> Dict[str, Any]:
             "action_label": copy["action_label"],
             "trend_prediction": copy["trend_prediction"],
             "sentiment_score": 50,
-            "sentiment_label": "中性" if not lang.startswith("en") else "Neutral",
+            "sentiment_label": copy.get("sentiment_label", "Neutral"),
         },
         "strategy": {
             "ideal_buy": None,

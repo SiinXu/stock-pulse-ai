@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { ReportLanguage } from './analysis';
 
 export type OnboardingExperienceStage = 'beginner' | 'report_reader' | 'has_system';
 export type OnboardingMarket = 'cn' | 'hk' | 'us';
@@ -22,7 +23,7 @@ export interface UserOnboardingProfile {
   interaction: OnboardingInteraction;
   riskTone: OnboardingRiskTone;
   infrastructure: OnboardingInfrastructure;
-  reportLanguage: string;
+  reportLanguage: ReportLanguage;
 }
 
 export interface OnboardingConfigItem {
@@ -118,68 +119,89 @@ export const ONBOARDING_PLAN_STORAGE_KEY = 'dsa-onboarding-plan-v1';
 
 /** Server first-run readiness path (zero-config #796). */
 export type FirstRunPrimaryPath = 'configured' | 'local_ollama' | 'demo';
-export type FirstRunPrimaryCta = 'continue' | 'start_with_local' | 'view_demo';
+export type FirstRunPrimaryCta = 'continue' | 'open_local_setup' | 'view_demo';
+export type FirstRunReasonCode =
+  | 'primary_model_configured'
+  | 'local_model_ready'
+  | 'local_runtime_no_models'
+  | 'local_detect_disabled'
+  | 'local_runtime_unavailable';
+export type LocalRuntimeReasonCode =
+  | 'ollama_ready'
+  | 'ollama_no_models'
+  | 'detect_disabled'
+  | 'ollama_unreachable';
 
 export interface LocalRuntimeSnapshot {
-  available: boolean;
-  backend?: string | null;
+  reachable: boolean;
+  modelsAvailable: boolean;
+  runnable: boolean;
+  backend?: 'ollama' | null;
   baseUrl?: string | null;
   models: string[];
   suggestedProfile: Record<string, string>;
-  reason: string;
+  reasonCode: LocalRuntimeReasonCode;
   detectEnabled: boolean;
 }
 
 export interface FirstRunReadiness {
-  schemaVersion: number;
+  schemaVersion: 1;
   isFreshEnvironment: boolean;
   hasPrimaryModel: boolean;
   beginnerModeRecommended: boolean;
-  primaryPath: FirstRunPrimaryPath | string;
-  primaryCta: FirstRunPrimaryCta | string;
-  headline: string;
+  primaryPath: FirstRunPrimaryPath;
+  primaryCta: FirstRunPrimaryCta;
+  reasonCode: FirstRunReasonCode;
+  reasonParams: Record<string, string>;
   localRuntime: LocalRuntimeSnapshot;
-  recommendedPresetId?: string | null;
-  recommendedPresetName?: string | null;
+  recommendedPresetId?: 'local-first' | null;
   suggestedProfile: Record<string, string>;
-  demoAvailable: boolean;
-  configMutated: boolean;
-  existingConfigUntouched: boolean;
+  demoAvailable: true;
+  configMutated: false;
+  existingConfigUntouched: true;
+  snapshotId: string;
   generatedAt: string;
 }
 
 export interface DemoAnalysisPayload {
-  schemaVersion: number;
-  isSample: boolean;
+  schemaVersion: 1;
+  isSample: true;
   sampleBanner: string;
   sampleDisclaimer: string;
-  queryId: string;
-  stockCode: string;
+  queryId: 'demo-sample-analysis-v1';
+  stockCode: '600519';
   stockName: string;
   createdAt: string;
   report: {
     meta: {
-      queryId?: string;
-      stockCode: string;
+      queryId: 'demo-sample-analysis-v1';
+      stockCode: '600519';
       stockName: string;
-      reportType: string;
-      reportLanguage?: string;
+      reportType: 'brief';
+      reportLanguage: 'zh' | 'en' | 'ko';
       createdAt: string;
-      currentPrice?: number | null;
-      changePct?: number | null;
-      modelUsed?: string | null;
+      currentPrice: null;
+      changePct: null;
+      modelUsed: 'demo-fixture/offline';
     };
     summary: {
       analysisSummary: string;
       operationAdvice: string;
-      action?: string | null;
-      actionLabel?: string | null;
+      action: 'watch';
+      actionLabel: string;
       trendPrediction: string;
       sentimentScore: number;
-      sentimentLabel?: string;
+      sentimentLabel: '中性' | 'Neutral' | '중립';
     };
-    strategy?: Record<string, unknown>;
-    details?: Record<string, unknown>;
+    strategy: {
+      idealBuy: null;
+      secondaryBuy: null;
+      stopLoss: null;
+      takeProfit: null;
+    };
+    details: {
+      news: string[];
+      technical: string[];
+    };
   };
 }
-

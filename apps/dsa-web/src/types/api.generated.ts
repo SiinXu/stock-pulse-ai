@@ -1874,7 +1874,7 @@ export interface paths {
         };
         /**
          * Zero-config first-run readiness (read-only)
-         * @description Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (local preset vs offline demo). Never mutates configuration.
+         * @description Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (model setup vs offline demo). Never mutates configuration.
          */
         get: operations["get_first_run_readiness_api_v1_onboarding_first_run_get"];
         put?: never;
@@ -6265,24 +6265,81 @@ export interface components {
              */
             deleted: number;
         };
+        /** DemoAnalysisDetails */
+        DemoAnalysisDetails: {
+            /** News */
+            news?: string[];
+            /** Technical */
+            technical?: string[];
+        };
+        /** DemoAnalysisMeta */
+        DemoAnalysisMeta: {
+            /** Change Pct */
+            change_pct?: null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Price */
+            current_price?: null;
+            /**
+             * Model Used
+             * @constant
+             */
+            model_used: "demo-fixture/offline";
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            /**
+             * Report Language
+             * @enum {string}
+             */
+            report_language: "zh" | "en" | "ko";
+            /**
+             * Report Type
+             * @constant
+             */
+            report_type: "brief";
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisReport */
+        DemoAnalysisReport: {
+            details: components["schemas"]["DemoAnalysisDetails"];
+            meta: components["schemas"]["DemoAnalysisMeta"];
+            strategy: components["schemas"]["DemoAnalysisStrategy"];
+            summary: components["schemas"]["DemoAnalysisSummary"];
+        };
         /**
          * DemoAnalysisResponse
          * @description Offline sample analysis. Always ``is_sample=True``.
          */
         DemoAnalysisResponse: {
-            /** Created At */
+            /**
+             * Created At
+             * Format: date-time
+             */
             created_at: string;
             /**
              * Is Sample
              * @default true
+             * @constant
              */
-            is_sample: boolean;
-            /** Query Id */
-            query_id: string;
-            /** Report */
-            report: {
-                [key: string]: unknown;
-            };
+            is_sample: true;
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            report: components["schemas"]["DemoAnalysisReport"];
             /** Sample Banner */
             sample_banner: string;
             /** Sample Disclaimer */
@@ -6290,12 +6347,50 @@ export interface components {
             /**
              * Schema Version
              * @default 1
+             * @constant
              */
-            schema_version: number;
-            /** Stock Code */
-            stock_code: string;
+            schema_version: 1;
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
             /** Stock Name */
             stock_name: string;
+        };
+        /** DemoAnalysisStrategy */
+        DemoAnalysisStrategy: {
+            /** Ideal Buy */
+            ideal_buy?: null;
+            /** Secondary Buy */
+            secondary_buy?: null;
+            /** Stop Loss */
+            stop_loss?: null;
+            /** Take Profit */
+            take_profit?: null;
+        };
+        /** DemoAnalysisSummary */
+        DemoAnalysisSummary: {
+            /**
+             * Action
+             * @constant
+             */
+            action: "watch";
+            /** Action Label */
+            action_label: string;
+            /** Analysis Summary */
+            analysis_summary: string;
+            /** Operation Advice */
+            operation_advice: string;
+            /**
+             * Sentiment Label
+             * @enum {string}
+             */
+            sentiment_label: "中性" | "Neutral" | "중립";
+            /** Sentiment Score */
+            sentiment_score: number;
+            /** Trend Prediction */
+            trend_prediction: string;
         };
         /**
          * DiscoverLLMChannelModelsRequest
@@ -6510,46 +6605,60 @@ export interface components {
             /**
              * Config Mutated
              * @default false
+             * @constant
              */
-            config_mutated: boolean;
+            config_mutated: false;
             /**
              * Demo Available
              * @default true
+             * @constant
              */
-            demo_available: boolean;
+            demo_available: true;
             /**
              * Existing Config Untouched
              * @default true
+             * @constant
              */
-            existing_config_untouched: boolean;
-            /** Generated At */
+            existing_config_untouched: true;
+            /**
+             * Generated At
+             * Format: date-time
+             */
             generated_at: string;
             /** Has Primary Model */
             has_primary_model: boolean;
-            /** Headline */
-            headline: string;
             /** Is Fresh Environment */
             is_fresh_environment: boolean;
             local_runtime: components["schemas"]["LocalRuntimeSnapshot"];
             /**
              * Primary Cta
-             * @description continue | start_with_local | view_demo
+             * @enum {string}
              */
-            primary_cta: string;
+            primary_cta: "continue" | "open_local_setup" | "view_demo";
             /**
              * Primary Path
-             * @description configured | local_ollama | demo
+             * @enum {string}
              */
-            primary_path: string;
+            primary_path: "configured" | "local_ollama" | "demo";
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "primary_model_configured" | "local_model_ready" | "local_runtime_no_models" | "local_detect_disabled" | "local_runtime_unavailable";
+            /** Reason Params */
+            reason_params?: {
+                [key: string]: string;
+            };
             /** Recommended Preset Id */
-            recommended_preset_id?: string | null;
-            /** Recommended Preset Name */
-            recommended_preset_name?: string | null;
+            recommended_preset_id?: "local-first" | null;
             /**
              * Schema Version
              * @default 1
+             * @constant
              */
-            schema_version: number;
+            schema_version: 1;
+            /** Snapshot Id */
+            snapshot_id: string;
             /** Suggested Profile */
             suggested_profile?: {
                 [key: string]: string;
@@ -7904,13 +8013,8 @@ export interface components {
          * @description Public, non-secret local-runtime detect projection.
          */
         LocalRuntimeSnapshot: {
-            /**
-             * Available
-             * @default false
-             */
-            available: boolean;
             /** Backend */
-            backend?: string | null;
+            backend?: "ollama" | null;
             /** Base Url */
             base_url?: string | null;
             /**
@@ -7921,10 +8025,25 @@ export interface components {
             /** Models */
             models?: string[];
             /**
-             * Reason
-             * @default not_probed
+             * Models Available
+             * @default false
              */
-            reason: string;
+            models_available: boolean;
+            /**
+             * Reachable
+             * @default false
+             */
+            reachable: boolean;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "ollama_ready" | "ollama_no_models" | "detect_disabled" | "ollama_unreachable";
+            /**
+             * Runnable
+             * @default false
+             */
+            runnable: boolean;
             /** Suggested Profile */
             suggested_profile?: {
                 [key: string]: string;
@@ -12460,10 +12579,10 @@ export interface components {
             markets?: string[];
             /**
              * Report Language
-             * @description zh | en | ko | ja
              * @default zh
+             * @enum {string}
              */
-            report_language: string;
+            report_language: "zh" | "en" | "ko";
             /**
              * Risk Tone
              * @description conservative | balanced | assertive (tone only, not advice)
@@ -17881,7 +18000,7 @@ export interface operations {
     get_demo_analysis_api_v1_onboarding_demo_analysis_get: {
         parameters: {
             query?: {
-                report_language?: string;
+                report_language?: "zh" | "en" | "ko";
             };
             header?: never;
             path?: never;

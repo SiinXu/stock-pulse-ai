@@ -139,7 +139,11 @@ def test_first_run_and_demo_analysis_endpoints(client) -> None:
     assert body["config_mutated"] is False
     assert body["existing_config_untouched"] is True
     assert body["primary_path"] in {"configured", "local_ollama", "demo"}
+    assert body["primary_cta"] in {"continue", "open_local_setup", "view_demo"}
+    assert len(body["snapshot_id"]) == 24
+    assert "headline" not in body
     assert "local_runtime" in body
+    assert set(body["local_runtime"]) >= {"reachable", "models_available", "runnable", "reason_code"}
 
     demo = test_client.get("/api/v1/onboarding/demo-analysis", params={"report_language": "en"})
     assert demo.status_code == 200, demo.text
@@ -148,3 +152,9 @@ def test_first_run_and_demo_analysis_endpoints(client) -> None:
     assert demo_body["stock_code"] == "600519"
     assert demo_body["sample_banner"]
 
+    korean = test_client.get("/api/v1/onboarding/demo-analysis", params={"report_language": "ko"})
+    assert korean.status_code == 200, korean.text
+    assert korean.json()["report"]["meta"]["report_language"] == "ko"
+
+    unsupported = test_client.get("/api/v1/onboarding/demo-analysis", params={"report_language": "ja"})
+    assert unsupported.status_code == 422

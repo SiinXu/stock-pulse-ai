@@ -4,7 +4,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -32,7 +33,7 @@ class UserOnboardingProfile(BaseModel):
         default="cloud_key",
         description="cloud_key | local_models | free_only",
     )
-    report_language: str = Field(default="zh", description="zh | en | ko | ja")
+    report_language: Literal["zh", "en", "ko"] = "zh"
 
 
 class OnboardingPlanRequest(BaseModel):
@@ -157,45 +158,99 @@ class OnboardingResetResponse(BaseModel):
 class LocalRuntimeSnapshot(BaseModel):
     """Public, non-secret local-runtime detect projection."""
 
-    available: bool = False
-    backend: Optional[str] = None
-    base_url: Optional[str] = None
-    models: List[str] = Field(default_factory=list)
-    suggested_profile: Dict[str, str] = Field(default_factory=dict)
-    reason: str = "not_probed"
+    reachable: bool = False
+    models_available: bool = False
+    runnable: bool = False
+    backend: Optional[Literal["ollama"]] = None
+    base_url: Optional[str] = Field(default=None, max_length=512)
+    models: List[str] = Field(default_factory=list, max_length=8)
+    suggested_profile: Dict[str, str] = Field(default_factory=dict, max_length=32)
+    reason_code: Literal[
+        "ollama_ready",
+        "ollama_no_models",
+        "detect_disabled",
+        "ollama_unreachable",
+    ]
     detect_enabled: bool = True
 
 
 class FirstRunReadinessResponse(BaseModel):
     """Zero-config first-run readiness snapshot (read-only; never mutates config)."""
 
-    schema_version: int = 1
+    schema_version: Literal[1] = 1
     is_fresh_environment: bool
     has_primary_model: bool
     beginner_mode_recommended: bool
-    primary_path: str = Field(description="configured | local_ollama | demo")
-    primary_cta: str = Field(description="continue | start_with_local | view_demo")
-    headline: str
+    primary_path: Literal["configured", "local_ollama", "demo"]
+    primary_cta: Literal["continue", "open_local_setup", "view_demo"]
+    reason_code: Literal[
+        "primary_model_configured",
+        "local_model_ready",
+        "local_runtime_no_models",
+        "local_detect_disabled",
+        "local_runtime_unavailable",
+    ]
+    reason_params: Dict[str, str] = Field(default_factory=dict, max_length=8)
     local_runtime: LocalRuntimeSnapshot
-    recommended_preset_id: Optional[str] = None
-    recommended_preset_name: Optional[str] = None
-    suggested_profile: Dict[str, str] = Field(default_factory=dict)
-    demo_available: bool = True
-    config_mutated: bool = False
-    existing_config_untouched: bool = True
-    generated_at: str
+    recommended_preset_id: Optional[Literal["local-first"]] = None
+    suggested_profile: Dict[str, str] = Field(default_factory=dict, max_length=32)
+    demo_available: Literal[True] = True
+    config_mutated: Literal[False] = False
+    existing_config_untouched: Literal[True] = True
+    snapshot_id: str = Field(min_length=24, max_length=24, pattern=r"^[0-9a-f]+$")
+    generated_at: datetime
+
+
+class DemoAnalysisMeta(BaseModel):
+    query_id: Literal["demo-sample-analysis-v1"]
+    stock_code: Literal["600519"]
+    stock_name: str = Field(min_length=1, max_length=120)
+    report_type: Literal["brief"]
+    report_language: Literal["zh", "en", "ko"]
+    created_at: datetime
+    current_price: None = None
+    change_pct: None = None
+    model_used: Literal["demo-fixture/offline"]
+
+
+class DemoAnalysisSummary(BaseModel):
+    analysis_summary: str = Field(min_length=1, max_length=1200)
+    operation_advice: str = Field(min_length=1, max_length=800)
+    action: Literal["watch"]
+    action_label: str = Field(min_length=1, max_length=120)
+    trend_prediction: str = Field(min_length=1, max_length=240)
+    sentiment_score: int = Field(ge=0, le=100)
+    sentiment_label: Literal["中性", "Neutral", "중립"]
+
+
+class DemoAnalysisStrategy(BaseModel):
+    ideal_buy: None = None
+    secondary_buy: None = None
+    stop_loss: None = None
+    take_profit: None = None
+
+
+class DemoAnalysisDetails(BaseModel):
+    news: List[str] = Field(default_factory=list, max_length=0)
+    technical: List[str] = Field(default_factory=list, max_length=0)
+
+
+class DemoAnalysisReport(BaseModel):
+    meta: DemoAnalysisMeta
+    summary: DemoAnalysisSummary
+    strategy: DemoAnalysisStrategy
+    details: DemoAnalysisDetails
 
 
 class DemoAnalysisResponse(BaseModel):
     """Offline sample analysis. Always ``is_sample=True``."""
 
-    schema_version: int = 1
-    is_sample: bool = True
-    sample_banner: str
-    sample_disclaimer: str
-    query_id: str
-    stock_code: str
-    stock_name: str
-    created_at: str
-    report: Dict[str, Any]
-
+    schema_version: Literal[1] = 1
+    is_sample: Literal[True] = True
+    sample_banner: str = Field(min_length=1, max_length=240)
+    sample_disclaimer: str = Field(min_length=1, max_length=800)
+    query_id: Literal["demo-sample-analysis-v1"]
+    stock_code: Literal["600519"]
+    stock_name: str = Field(min_length=1, max_length=120)
+    created_at: datetime
+    report: DemoAnalysisReport

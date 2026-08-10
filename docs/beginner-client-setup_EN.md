@@ -11,7 +11,7 @@ Chinese version: [beginner-client-setup.md](beginner-client-setup.md). After ins
 
 You can complete a useful first run without a cloud key. **Local / zero-cost paths are the primary path**; cloud keys are an optional upgrade.
 
-1. **Local Ollama auto-detect**: setup readiness and `GET /api/v1/onboarding/first-run` probe loopback (`127.0.0.1` / `localhost` / `::1`) by default. Failures are log-only and **never block startup**. When Ollama is reachable, the primary CTA is **Start with a local model** and applies the official `local-first` preset fields (no secrets invented).
+1. **Local Ollama auto-detect**: setup readiness and `GET /api/v1/onboarding/first-run` probe loopback (`127.0.0.1` / `localhost` / `::1`) by default. Failures are log-only and **never block startup**. The local path appears only when Ollama is reachable and has at least one model; its CTA opens model settings and never writes configuration directly.
 2. **Offline sample analysis**: if no model and no Ollama are available, open the built-in **sample analysis** (`GET /api/v1/onboarding/demo-analysis`). It is always labeled **Sample data — not a live analysis**. Use it only to learn the report layout.
 3. **Data-only (same artifact as `--dry-run`)**: after setting a watchlist, run `python main.py --dry-run` to fetch market data without calling an LLM.
 4. Turn detection off with `LOCAL_RUNTIME_AUTO_DETECT=false`. Timeout: `LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35` (default).

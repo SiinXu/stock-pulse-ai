@@ -9,7 +9,8 @@ Chinese: [zero-config-first-run.md](zero-config-first-run.md)
 1. Fresh install with **no** `.env` secrets and **no** primary model API key.
 2. Start the app → see first-run guidance.
 3. Reach **one** analysis-shaped result without filling required cloud fields:
-   - Prefer **local Ollama** when loopback detect succeeds (official `local-first` preset fields only).
+   - Prefer **local model setup** when loopback Ollama is reachable and has at least one model.
+   - When Ollama is reachable with an empty model list, explain the remediation and fall back to the demo path.
    - Otherwise open the **offline sample analysis** (always labeled sample data).
 4. Existing users who already have a primary model or prior setup are **not** force-switched to beginner defaults, and readiness never mutates their config.
 
@@ -18,16 +19,16 @@ Chinese: [zero-config-first-run.md](zero-config-first-run.md)
 | Method | Path | Mutates config? | Notes |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/onboarding/first-run` | No | Fresh-env signal, beginner recommendation, local detect snapshot, primary CTA |
-| `GET` | `/api/v1/onboarding/demo-analysis?report_language=zh\|en` | No | Offline fixture; always `is_sample=true` |
-| `POST` | `/api/v1/onboarding/apply` | Yes (explicit confirm) | Reuse to apply `infrastructure=local_models` → `local-first` preset |
+| `GET` | `/api/v1/onboarding/demo-analysis?report_language=zh\|en\|ko` | No | Offline fixture; always `is_sample=true` |
 
-Local detect reuses `src/services/local_runtime_detect.py`. Presets are read from `src/services/config_presets.py` (not reimplemented).
+Local detection reuses `src/services/local_runtime_detect.py`; primary-model readiness reuses the authoritative System Settings setup check. `first-run` returns stable reason codes, parameters, and a versioned `snapshot_id`. It does not ship English display copy or expose detect-then-apply semantics.
 
 ## UI
 
 - Self-contained component: `apps/dsa-web/src/components/onboarding/ZeroConfigFirstRunPanel.tsx`
 - Playground: `zero-config-first-run-panel`
-- Home / Settings wiring is an **Integration Point** (host pages frozen in this parallel batch).
+- This PR provides a self-contained foundation; a discoverable Home / Settings product entry remains an **Integration Point**.
+- For `configured` / `local_ollama`, the host must provide a settings-navigation handler. Without it, the primary button is disabled with an explanation; it never becomes a silent no-op or substitutes the demo action.
 
 ## Related
 

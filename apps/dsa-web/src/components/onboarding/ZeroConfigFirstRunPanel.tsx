@@ -1,45 +1,51 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { onboardingApi } from '../../api/onboarding';
 import type { UiTextKey } from '../../i18n/uiText';
-import type { AnalysisReport } from '../../types/analysis';
+import type { AnalysisReport, ReportLanguage } from '../../types/analysis';
 import type {
   DemoAnalysisPayload,
+  FirstRunPrimaryPath,
+  FirstRunReasonCode,
   FirstRunReadiness,
-  UserOnboardingProfile,
 } from '../../types/onboarding';
-import { DEFAULT_ONBOARDING_PROFILE } from '../../types/onboarding';
 import { Badge, Button, InlineAlert, Spinner, Surface } from '../common';
 import BeginnerReportSummary from '../report/BeginnerReportSummary';
 
 export type ZeroConfigFirstRunPanelProps = {
   /** Optional fixture for playground / tests; when omitted the panel fetches readiness. */
   readiness?: FirstRunReadiness | null;
-  reportLanguage?: string;
-  configVersion?: string;
+  reportLanguage?: ReportLanguage;
   autoLoad?: boolean;
-  onApplyLocalPreset?: (profile: UserOnboardingProfile) => void | Promise<void>;
-  onContinue?: () => void;
+  onContinue?: () => void | Promise<void>;
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
 };
 
-function pathMessageKey(path: string): UiTextKey {
+function pathMessageKey(path: FirstRunPrimaryPath): UiTextKey {
   if (path === 'local_ollama') return 'firstRun.pathLocal';
   if (path === 'configured') return 'firstRun.pathConfigured';
   return 'firstRun.pathDemo';
 }
 
+function reasonMessageKey(reasonCode: FirstRunReasonCode): UiTextKey {
+  if (reasonCode === 'primary_model_configured') return 'firstRun.reasonConfigured';
+  if (reasonCode === 'local_model_ready') return 'firstRun.detectedModels';
+  if (reasonCode === 'local_runtime_no_models') return 'firstRun.noModelsListed';
+  if (reasonCode === 'local_detect_disabled') return 'firstRun.reasonDetectDisabled';
+  return 'firstRun.reasonUnavailable';
+}
+
 function toAnalysisReport(demo: DemoAnalysisPayload): AnalysisReport {
   return {
     meta: {
-      queryId: demo.report.meta.queryId || demo.queryId,
-      stockCode: demo.report.meta.stockCode || demo.stockCode,
-      stockName: demo.report.meta.stockName || demo.stockName,
-      reportType: (demo.report.meta.reportType as AnalysisReport['meta']['reportType']) || 'brief',
-      reportLanguage: (demo.report.meta.reportLanguage as AnalysisReport['meta']['reportLanguage']) || 'zh',
-      createdAt: demo.report.meta.createdAt || demo.createdAt,
+      queryId: demo.report.meta.queryId,
+      stockCode: demo.report.meta.stockCode,
+      stockName: demo.report.meta.stockName,
+      reportType: demo.report.meta.reportType,
+      reportLanguage: demo.report.meta.reportLanguage,
+      createdAt: demo.report.meta.createdAt,
       currentPrice: demo.report.meta.currentPrice ?? undefined,
       changePct: demo.report.meta.changePct ?? undefined,
       modelUsed: demo.report.meta.modelUsed ?? undefined,
@@ -47,11 +53,11 @@ function toAnalysisReport(demo: DemoAnalysisPayload): AnalysisReport {
     summary: {
       analysisSummary: demo.report.summary.analysisSummary,
       operationAdvice: demo.report.summary.operationAdvice,
-      action: (demo.report.summary.action as AnalysisReport['summary']['action']) || 'watch',
+      action: demo.report.summary.action,
       actionLabel: demo.report.summary.actionLabel,
       trendPrediction: demo.report.summary.trendPrediction,
       sentimentScore: demo.report.summary.sentimentScore,
-      sentimentLabel: demo.report.summary.sentimentLabel as AnalysisReport['summary']['sentimentLabel'],
+      sentimentLabel: demo.report.summary.sentimentLabel,
     },
   };
 }
@@ -65,9 +71,7 @@ function toAnalysisReport(demo: DemoAnalysisPayload): AnalysisReport {
 export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = ({
   readiness: readinessProp,
   reportLanguage = 'zh',
-  configVersion,
   autoLoad = true,
-  onApplyLocalPreset,
   onContinue,
   t,
 }) => {
@@ -76,7 +80,6 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
   const [error, setError] = useState<string | null>(null);
   const [demo, setDemo] = useState<DemoAnalysisPayload | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [showProfessional, setShowProfessional] = useState(false);
 
   useEffect(() => {
@@ -107,12 +110,6 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
     };
   }, [autoLoad, readinessProp, t]);
 
-  const modelsLabel = useMemo(() => {
-    const models = readiness?.localRuntime?.models || [];
-    if (!models.length) return null;
-    return t('firstRun.detectedModels', { models: models.slice(0, 3).join(', ') });
-  }, [readiness, t]);
-
   const loadDemo = useCallback(async () => {
     setDemoLoading(true);
     setError(null);
@@ -133,44 +130,14 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
       await loadDemo();
       return;
     }
-    if (readiness.primaryCta === 'start_with_local' || readiness.primaryPath === 'local_ollama') {
-      if (onApplyLocalPreset) {
-        setApplying(true);
-        try {
-          await onApplyLocalPreset({
-            ...DEFAULT_ONBOARDING_PROFILE,
-            experienceStage: 'beginner',
-            infrastructure: 'local_models',
-            reportLanguage,
-          });
-        } finally {
-          setApplying(false);
-        }
-        return;
-      }
-      await loadDemo();
-      return;
-    }
-    onContinue?.();
-  }, [loadDemo, onApplyLocalPreset, onContinue, readiness, reportLanguage]);
-
-  const handleApplyLocal = useCallback(async () => {
-    if (!onApplyLocalPreset) {
-      await loadDemo();
-      return;
-    }
-    setApplying(true);
+    if (!onContinue) return;
+    setError(null);
     try {
-      await onApplyLocalPreset({
-        ...DEFAULT_ONBOARDING_PROFILE,
-        experienceStage: 'beginner',
-        infrastructure: 'local_models',
-        reportLanguage,
-      });
-    } finally {
-      setApplying(false);
+      await onContinue();
+    } catch {
+      setError(t('firstRun.actionError'));
     }
-  }, [loadDemo, onApplyLocalPreset, reportLanguage]);
+  }, [loadDemo, onContinue, readiness, t]);
 
   const demoReport = demo ? toAnalysisReport(demo) : null;
 
@@ -210,39 +177,36 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
           <InlineAlert
             variant={readiness.primaryPath === 'configured' ? 'info' : 'warning'}
             size="compact"
-            title={t(pathMessageKey(String(readiness.primaryPath)))}
-            message={readiness.headline}
+            title={t(pathMessageKey(readiness.primaryPath))}
+            message={t(reasonMessageKey(readiness.reasonCode), readiness.reasonParams)}
           />
 
-          {readiness.recommendedPresetName ? (
-            <p className="text-sm text-secondary-text">
-              {t('firstRun.presetLabel', { name: readiness.recommendedPresetName })}
-            </p>
-          ) : null}
-
-          {readiness.primaryPath === 'local_ollama' ? (
-            <p className="text-sm text-secondary-text">
-              {modelsLabel || t('firstRun.noModelsListed')}
-            </p>
+          {readiness.primaryPath !== 'demo' && !onContinue ? (
+            <InlineAlert
+              variant="warning"
+              size="compact"
+              title={t('onboarding.errorTitle')}
+              message={t('firstRun.integrationUnavailable')}
+            />
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
               size="default"
-              disabled={applying || demoLoading}
+              disabled={demoLoading || (readiness.primaryPath !== 'demo' && !onContinue)}
               onClick={() => {
                 void handlePrimary();
               }}
             >
-              {readiness.primaryCta === 'start_with_local'
+              {readiness.primaryCta === 'open_local_setup'
                 ? t('firstRun.ctaLocal')
                 : readiness.primaryCta === 'continue'
                   ? t('firstRun.ctaContinue')
                   : t('firstRun.ctaDemo')}
             </Button>
 
-            {readiness.primaryPath === 'local_ollama' ? (
+            {readiness.primaryPath !== 'demo' && readiness.demoAvailable ? (
               <Button
                 variant="secondary"
                 size="default"
@@ -252,19 +216,6 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
                 }}
               >
                 {t('firstRun.ctaDemo')}
-              </Button>
-            ) : null}
-
-            {readiness.primaryPath === 'local_ollama' && onApplyLocalPreset && configVersion ? (
-              <Button
-                variant="secondary"
-                size="default"
-                disabled={applying}
-                onClick={() => {
-                  void handleApplyLocal();
-                }}
-              >
-                {t('firstRun.ctaApplyLocal')}
               </Button>
             ) : null}
 
@@ -293,8 +244,8 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
           <InlineAlert
             variant="warning"
             size="compact"
-            title={demo.isSample ? (demo.sampleBanner || t('firstRun.sampleBanner')) : t('firstRun.sampleBanner')}
-            message={demo.sampleDisclaimer || t('firstRun.sampleDisclaimer')}
+            title={demo.sampleBanner}
+            message={demo.sampleDisclaimer}
           />
           {!showProfessional ? (
             <BeginnerReportSummary
