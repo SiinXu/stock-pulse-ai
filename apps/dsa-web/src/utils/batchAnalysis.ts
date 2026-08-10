@@ -9,10 +9,14 @@ const BATCH_ANALYSIS_CHUNK_SIZE = 50;
 
 export type BatchAnalysisSubmissionResult = {
   codes: string[];
+  acceptedCodes: string[];
+  duplicateCodes: string[];
+  unconfirmedCodes: string[];
   accepted: number;
   duplicates: number;
   confirmed: number;
   unconfirmed: number;
+  stoppedOnIncompleteResponse: boolean;
   submissionError: ParsedApiError | null;
   reconciliationError: ParsedApiError | null;
 };
@@ -46,14 +50,20 @@ function chunkStockCodes(codes: readonly string[]): string[][] {
   return chunks;
 }
 
-function countConfirmed(result: AnalyzeAsyncResponse): { accepted: number; duplicates: number } {
+function confirmedCodes(
+  result: AnalyzeAsyncResponse,
+  chunk: readonly string[],
+): { acceptedCodes: string[]; duplicateCodes: string[] } {
   if ('accepted' in result) {
     return {
-      accepted: result.accepted.length,
-      duplicates: result.duplicates.length,
+      acceptedCodes: result.accepted.map((item) => item.stockCode),
+      duplicateCodes: result.duplicates.map((item) => item.stockCode),
     };
   }
-  return { accepted: 1, duplicates: 0 };
+  return {
+    acceptedCodes: chunk.length === 1 ? [chunk[0]] : [],
+    duplicateCodes: [],
+  };
 }
 
 export async function submitBatchAnalysis({
@@ -64,19 +74,34 @@ export async function submitBatchAnalysis({
   incompleteResponseMessage,
 }: SubmitBatchAnalysisOptions): Promise<BatchAnalysisSubmissionResult> {
   const codes = normalizeBatchAnalysisCodes(sourceCodes);
-  let accepted = 0;
-  let duplicates = 0;
-  let confirmed = 0;
+  const sourceCodeByKey = new Map(
+    codes.map((code) => [normalizeStockCode(code).toUpperCase(), code]),
+  );
+  const acceptedCodes: string[] = [];
+  const duplicateCodes: string[] = [];
+  const confirmedKeys = new Set<string>();
   let submissionError: ParsedApiError | null = null;
+  let stoppedOnIncompleteResponse = false;
+
+  const retainConfirmed = (target: string[], returnedCodes: readonly string[]) => {
+    for (const returnedCode of returnedCodes) {
+      const key = normalizeStockCode(returnedCode).toUpperCase();
+      const sourceCode = sourceCodeByKey.get(key);
+      if (!sourceCode || confirmedKeys.has(key)) continue;
+      confirmedKeys.add(key);
+      target.push(sourceCode);
+    }
+  };
 
   for (const chunk of chunkStockCodes(codes)) {
     try {
-      const counts = countConfirmed(await submitChunk(chunk));
-      accepted += counts.accepted;
-      duplicates += counts.duplicates;
-      const confirmedInChunk = counts.accepted + counts.duplicates;
-      confirmed += Math.min(confirmedInChunk, chunk.length);
+      const result = confirmedCodes(await submitChunk(chunk), chunk);
+      const beforeConfirmed = confirmedKeys.size;
+      retainConfirmed(acceptedCodes, result.acceptedCodes);
+      retainConfirmed(duplicateCodes, result.duplicateCodes);
+      const confirmedInChunk = confirmedKeys.size - beforeConfirmed;
       if (confirmedInChunk !== chunk.length) {
+        stoppedOnIncompleteResponse = true;
         submissionError = parseError(new Error(
           incompleteResponseMessage(confirmedInChunk, chunk.length),
         ));
@@ -84,8 +109,7 @@ export async function submitBatchAnalysis({
       }
     } catch (error) {
       if (error instanceof DuplicateTaskError && chunk.length === 1) {
-        duplicates += 1;
-        confirmed += 1;
+        retainConfirmed(duplicateCodes, [chunk[0]]);
         continue;
       }
       submissionError = parseError(error);
@@ -100,12 +124,20 @@ export async function submitBatchAnalysis({
     reconciliationError = parseError(error);
   }
 
+  const unconfirmedCodes = codes.filter(
+    (code) => !confirmedKeys.has(normalizeStockCode(code).toUpperCase()),
+  );
+
   return {
     codes,
-    accepted,
-    duplicates,
-    confirmed,
-    unconfirmed: Math.max(0, codes.length - confirmed),
+    acceptedCodes,
+    duplicateCodes,
+    unconfirmedCodes,
+    accepted: acceptedCodes.length,
+    duplicates: duplicateCodes.length,
+    confirmed: confirmedKeys.size,
+    unconfirmed: unconfirmedCodes.length,
+    stoppedOnIncompleteResponse,
     submissionError,
     reconciliationError,
   };

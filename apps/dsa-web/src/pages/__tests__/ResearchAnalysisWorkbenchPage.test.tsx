@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentApi } from '../../api/agent';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
+import { createApiError, createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -19,7 +20,10 @@ import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  SETTINGS_SECTION_IDS,
+  SETTINGS_VIEW_IDS,
   buildAnalysisWorkbenchHref,
+  buildSettingsHref,
 } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { AnalysisReport, HistoryItem, StockBarItem, TaskInfo } from '../../types/analysis';
@@ -124,8 +128,27 @@ vi.mock('../../components/report/ReportSummary', () => ({
 }));
 
 vi.mock('../../components/run-flow', () => ({
-  RunFlowPanel: ({ source }: { source: { type: string } }) => (
-    <div data-testid="run-flow-panel">{source.type}</div>
+  RunFlowPanel: ({
+    source,
+    onUnavailable,
+  }: {
+    source: { type: 'task'; taskId: string } | { type: 'history'; recordId: number };
+    onUnavailable?: (error: ReturnType<typeof createParsedApiError>) => void;
+  }) => (
+    <div data-testid="run-flow-panel">
+      {source.type === 'task' ? `task:${source.taskId}` : `history:${source.recordId}`}
+      <button
+        type="button"
+        onClick={() => onUnavailable?.(createParsedApiError({
+          title: 'network',
+          message: 'network',
+          category: 'upstream_network',
+          status: 503,
+        }))}
+      >
+        Fail run flow
+      </button>
+    </div>
   ),
 }));
 
@@ -268,8 +291,8 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     }));
     const registration = routeFocusRegister.mock.calls.at(-1)?.[0];
     expect(registration?.headingRef.current).toBe(heading);
-    const stockSearch = screen.getByRole('combobox', { name: '股票搜索' });
-    const launchHeading = screen.getByRole('heading', { name: '发起与批量' });
+    const stockSearch = await screen.findByRole('combobox', { name: '股票搜索' });
+    const launchHeading = await screen.findByRole('heading', { name: '发起与批量' });
     expect(stockSearch).toBeInTheDocument();
     expect(screen.getByText('股票搜索', { selector: 'label' })).toBeInTheDocument();
     expect(launchHeading.parentElement?.parentElement).toHaveClass('max-w-5xl', 'space-y-6');
@@ -344,6 +367,24 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument());
     expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow)).toBeNull();
     expect(runFlowTrigger).toHaveFocus();
+  });
+
+  it('retries RunFlow with the exact failed source identity', async () => {
+    useStockPoolStore.setState({ activeTasks: [runningTask] });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看 Apple 运行流' }));
+    expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('task:task-7');
+    fireEvent.click(screen.getByRole('button', { name: 'Fail run flow' }));
+
+    await waitFor(() => expect(screen.queryByTestId('run-flow-panel')).not.toBeInTheDocument());
+    fireEvent.click(await screen.findByRole('button', { name: '重试' }));
+
+    expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('task:task-7');
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId))
+      .toBe('task-7');
   });
 
   it('loads a historical report from a recordId deep link and opens its RunFlow', async () => {
@@ -422,7 +463,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
       new DuplicateTaskError('AAPL', 'task-existing'),
     );
-    useStockPoolStore.setState({ historyItems: [historyItem] });
+    useStockPoolStore.setState({
+      historyItems: [historyItem],
+      activeTasks: [{ ...runningTask, taskId: 'task-existing' }],
+    });
     renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
 
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
@@ -433,6 +477,161 @@ describe('ResearchAnalysisWorkbenchPage', () => {
         .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
     expect(await screen.findByText('AAPL 已有分析任务，请等待当前任务完成。')).toBeInTheDocument();
+    expect(screen.getByTestId('actionable-api-error-inline')).toHaveAttribute(
+      'data-error-class',
+      'busy',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '运行中任务' }));
+    expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('task:task-existing');
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders llm_not_configured launch failures as actionable inline errors', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
+      createApiError(createParsedApiError({
+        title: '尚未配置 LLM 模型',
+        message: '请在设置中配置主要模型、模型连接或 API Key。',
+        code: 'llm_not_configured',
+        category: 'llm_not_configured',
+        status: 422,
+      })),
+    );
+    useStockPoolStore.setState({ query: 'AAPL', selectionSource: 'manual' });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+    }));
+
+    const analyzeButton = (await screen.findAllByRole('button', { name: '分析' })).at(-1)!;
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+
+    expect(await screen.findByTestId('actionable-api-error-inline')).toHaveAttribute(
+      'data-error-class',
+      'llm_not_configured',
+    );
+    expect(screen.getByText('尚未配置 LLM 模型')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '去配置' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
+    expect(screen.getByTestId('actionable-error-technical')).toHaveTextContent(
+      'code: llm_not_configured',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '去配置' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(buildSettingsHref({
+      section: SETTINGS_SECTION_IDS.aiModels,
+      view: SETTINGS_VIEW_IDS.aiModels.connections,
+    }));
+  });
+
+  it('retries a failed launch with the exact captured request instead of clearing it', async () => {
+    vi.mocked(agentApi.getSkills).mockResolvedValue({
+      skills: [{ id: 'retry-strategy', name: 'Retry strategy', description: 'Retry strategy' }],
+      default_skill_id: '',
+    });
+    vi.mocked(analysisApi.analyzeAsync)
+      .mockRejectedValueOnce(createApiError(createParsedApiError({
+        title: 'network',
+        message: 'network',
+        category: 'upstream_network',
+        status: 503,
+      })))
+      .mockResolvedValueOnce({ taskId: 'task-retried', status: 'pending' });
+    useStockPoolStore.setState({ query: 'AAPL', notify: true });
+    renderWorkbench();
+
+    const strategySelect = await screen.findByRole('combobox', { name: '策略' });
+    chooseSelectOption(strategySelect, 'Retry strategy');
+    chooseSelectOption(screen.getByRole('combobox', { name: '分析阶段' }), '盘中');
+    fireEvent.click((await screen.findAllByRole('button', { name: '分析' })).at(-1)!);
+
+    const retry = await screen.findByRole('button', { name: '重试' });
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[1])
+      .toEqual(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]);
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[1]?.[0]).toMatchObject({
+      stockCode: 'AAPL',
+      originalQuery: 'AAPL',
+      selectionSource: 'manual',
+      notify: true,
+      reportType: 'detailed',
+      analysisPhase: 'intraday',
+      skills: ['retry-strategy'],
+    });
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+        .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    });
+  });
+
+  it('suppresses a second retry while the captured launch is pending', async () => {
+    const pendingRetry = createDeferred<{ taskId: string; status: 'pending' }>();
+    vi.mocked(analysisApi.analyzeAsync)
+      .mockRejectedValueOnce(createApiError(createParsedApiError({
+        title: 'network',
+        message: 'network',
+        category: 'upstream_network',
+        status: 503,
+      })))
+      .mockReturnValueOnce(pendingRetry.promise);
+    useStockPoolStore.setState({ query: 'AAPL' });
+    renderWorkbench();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: '分析' })).at(-1)!);
+    const retry = await screen.findByRole('button', { name: '重试' });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      pendingRetry.resolve({ taskId: 'task-retried-once', status: 'pending' });
+      await pendingRetry.promise;
+    });
+  });
+
+  it('retries report detail through the canonical selected record operation', async () => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    vi.mocked(historyApi.getDetail).mockRejectedValueOnce(createApiError(
+      createParsedApiError({
+        title: 'network',
+        message: 'network',
+        category: 'upstream_network',
+        status: 503,
+      }),
+    ));
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    fireEvent.click(await screen.findByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(historyApi.getDetail).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(historyApi.getDetail).mock.calls).toEqual([[12], [12]]);
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('12');
+  });
+
+  it('returns validation recovery to the stock field without resubmitting', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(createApiError(
+      createParsedApiError({
+        title: 'invalid',
+        message: 'invalid',
+        code: 'validation_error',
+        status: 422,
+      }),
+    ));
+    useStockPoolStore.setState({ query: 'AAPL' });
+    renderWorkbench();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: '分析' })).at(-1)!);
+    const focusAction = await screen.findByRole('button', { name: '输入有误' });
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+    fireEvent.click(focusAction);
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: '股票搜索' })).toHaveFocus();
+    });
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
   });
 
   it('does not navigate back to tasks when a reanalysis finishes after leaving the workbench', async () => {
@@ -525,6 +724,32 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     });
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Microsoft');
     expect(vi.mocked(historyApi.getDetail).mock.calls.slice(detailCallCount)).toEqual([[11]]);
+  });
+
+  it('keeps delete recovery inside the dialog and retries the same record set', async () => {
+    vi.mocked(historyApi.deleteRecords)
+      .mockRejectedValueOnce(new Error('Delete request failed'))
+      .mockResolvedValueOnce({ deleted: 1 });
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Apple 历史记录' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    const dialog = screen.getByRole('dialog', { name: '删除历史记录' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '删除' }));
+
+    const retry = await within(dialog).findByRole('button', { name: '重试' });
+    expect(dialog).toHaveTextContent('请求未能完成，请稍后重试。');
+    expect(screen.queryAllByTestId('actionable-api-error-inline')).toHaveLength(0);
+    await waitFor(() => expect(retry).toHaveFocus());
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(historyApi.deleteRecords).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(historyApi.deleteRecords).mock.calls).toEqual([[[12]], [[12]]]);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '删除历史记录' })).not.toBeInTheDocument();
+    });
   });
 
   it('moves an accepted launch directly to the tasks segment', async () => {
@@ -634,6 +859,15 @@ describe('ResearchAnalysisWorkbenchPage', () => {
   });
 
   it('keeps a partial imported batch warning visible after switching to tasks', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValueOnce({
+      accepted: [{
+        taskId: 'task-aapl',
+        stockCode: 'AAPL',
+        status: 'pending',
+      }],
+      duplicates: [],
+      message: 'Partially accepted',
+    });
     const { container } = renderWorkbench();
     const file = new File(['symbol'], 'stocks.csv', { type: 'text/csv' });
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -658,6 +892,114 @@ describe('ResearchAnalysisWorkbenchPage', () => {
         .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
     expect(await screen.findByText(/已确认提交 1 个任务.*另有 1 只未确认/u)).toBeInTheDocument();
+  });
+
+  it('retries only unconfirmed batch identities with the captured options', async () => {
+    watchlistCodes = ['AAPL', 'MSFT', 'TSLA'];
+    vi.mocked(analysisApi.analyzeAsync)
+      .mockResolvedValueOnce({
+        accepted: [{ taskId: 'task-aapl', stockCode: 'AAPL', status: 'pending' }],
+        duplicates: [{
+          stockCode: 'MSFT',
+          existingTaskId: 'task-msft',
+          message: 'Already running',
+        }],
+        message: 'Partially accepted',
+      })
+      .mockResolvedValueOnce({
+        accepted: [{ taskId: 'task-tsla', stockCode: 'TSLA', status: 'pending' }],
+        duplicates: [],
+        message: 'Accepted',
+      });
+    renderWorkbench();
+
+    chooseSelectOption(
+      await screen.findByRole('combobox', { name: '分析阶段' }),
+      '盘前',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0]).toMatchObject({
+      stockCodes: ['AAPL', 'MSFT', 'TSLA'],
+      analysisPhase: 'premarket',
+    });
+    expect(await screen.findByText(/已确认提交 1 个任务.*1 个正在运行.*1 只未确认/u))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '发起与批量' }));
+    fireEvent.change(screen.getByRole('combobox', { name: '股票搜索' }), {
+      target: { value: 'GOOG' },
+    });
+    const analyzeButton = (await screen.findAllByRole('button', { name: '分析' })).at(-1)!;
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    chooseSelectOption(screen.getByRole('combobox', { name: '分析阶段' }), '盘后');
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[1]?.[0]).toMatchObject({
+      stockCodes: ['TSLA'],
+      analysisPhase: 'premarket',
+    });
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[1]?.[0].stockCodes)
+      .not.toEqual(expect.arrayContaining(['AAPL', 'MSFT']));
+  });
+
+  it('reconciles accepted batch evidence without offering a resubmission', async () => {
+    watchlistCodes = ['AAPL', 'MSFT'];
+    const reconcile = vi.fn().mockRejectedValue(new Error('Task refresh failed'));
+    useStockPoolStore.setState({ refreshActiveTasks: reconcile });
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValueOnce({
+      accepted: [
+        { taskId: 'task-aapl', stockCode: 'AAPL', status: 'pending' },
+        { taskId: 'task-msft', stockCode: 'MSFT', status: 'pending' },
+      ],
+      duplicates: [],
+      message: 'Accepted',
+    });
+    renderWorkbench();
+
+    fireEvent.click(await screen.findByRole('button', { name: '分析全部' }));
+
+    await waitFor(() => expect(reconcile).toHaveBeenCalledOnce());
+    expect(await screen.findByRole('button', { name: '运行中任务' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    await waitFor(() => expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument());
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('provides a guaranteed tasks-or-dismiss exit for a partial busy batch', async () => {
+    watchlistCodes = Array.from({ length: 51 }, (_, index) => `T${index}`);
+    vi.mocked(analysisApi.analyzeAsync)
+      .mockResolvedValueOnce({
+        accepted: watchlistCodes.slice(0, 50).map((stockCode, index) => ({
+          taskId: `task-${index}`,
+          stockCode,
+          status: 'pending' as const,
+        })),
+        duplicates: [],
+        message: 'Accepted',
+      })
+      .mockRejectedValueOnce(createApiError(createParsedApiError({
+        title: 'busy',
+        message: 'busy',
+        code: 'scheduler_busy',
+        status: 409,
+      })));
+    renderWorkbench();
+
+    fireEvent.click(await screen.findByRole('button', { name: '分析全部' }));
+
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).toHaveAttribute('data-error-class', 'busy');
+    expect(within(alert).getByRole('button', { name: '运行中任务' })).toBeInTheDocument();
+    expect(within(alert).getByRole('button', { name: '关闭' })).toBeInTheDocument();
+    expect(within(alert).queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+    fireEvent.click(within(alert).getByRole('button', { name: '关闭' }));
+    await waitFor(() => expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument());
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(2);
   });
 
   it('removes the previous imported batch while a replacement file is parsing', async () => {
@@ -798,8 +1140,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     await waitFor(() => {
       expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBeNull();
     });
-    expect(screen.getByRole('alert').closest('[data-overlay-root="toast"]')).not.toBeNull();
-    expect(screen.getByRole('alert')).not.toHaveTextContent('The requested report is unavailable.');
+    // Form-primary error contract (#885): inline alert, not toast dual-feedback.
+    const errorAlert = await screen.findByTestId('actionable-api-error-inline');
+    expect(errorAlert.closest('[data-overlay-root="toast"]')).toBeNull();
+    expect(errorAlert).not.toHaveTextContent('The requested report is unavailable.');
     expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
     expect(useStockPoolStore.getState().selectedRecordId).toBeNull();
   });
