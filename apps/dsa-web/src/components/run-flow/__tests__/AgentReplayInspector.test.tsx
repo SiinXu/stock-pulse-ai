@@ -66,14 +66,14 @@ describe('AgentReplayInspector', () => {
     );
 
     expect(screen.getByTestId('agent-replay-position')).toHaveTextContent('1 / 2');
-    expect(screen.getByText('agent_phase_start')).toBeInTheDocument();
+    expect(screen.getByText(/"event_type": "agent_phase_start"/)).toBeInTheDocument();
     expect(screen.getByTestId('agent-replay-integrity-badge')).toHaveTextContent('完整');
     expect(screen.getByText(/"phase": "analysis"/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '下一个 Agent 事件' }));
 
     expect(screen.getByTestId('agent-replay-position')).toHaveTextContent('2 / 2');
-    expect(screen.getByText('agent_tool_end')).toBeInTheDocument();
+    expect(screen.getByText(/"event_type": "agent_tool_end"/)).toBeInTheDocument();
     expect(onSelectNode).toHaveBeenCalledWith('tool-node');
   });
 
@@ -96,7 +96,7 @@ describe('AgentReplayInspector', () => {
 
     expect(screen.getByTestId('agent-replay-integrity-badge')).toHaveTextContent('无效');
     expect(screen.getByText('事件的序列、版本、Trace、明细或捕获计数不一致。')).toBeInTheDocument();
-    expect(screen.getByText('agent_error')).toBeInTheDocument();
+    expect(screen.getByText(/"event_type": "agent_error"/)).toBeInTheDocument();
   });
 
   it('treats a capture-truncated sequence prefix as partial but internally consistent', () => {

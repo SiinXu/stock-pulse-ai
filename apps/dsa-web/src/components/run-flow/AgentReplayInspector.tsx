@@ -5,7 +5,6 @@ import { Badge, IconButton, InlineAlert } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowSnapshot } from '../../types/runFlow';
 import { buildAgentReplayModel, type AgentReplayIntegrityStatus } from './agentReplay';
-import { formatDateTime } from './utils';
 
 interface AgentReplayInspectorProps {
   snapshot: RunFlowSnapshot;
@@ -24,7 +23,7 @@ const INTEGRITY_PRESENTATION: Record<AgentReplayIntegrityStatus, {
 const formatDetail = (value: Record<string, unknown>): string => JSON.stringify(value, null, 2);
 
 const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, onSelectNode }) => {
-  const { language, t } = useUiLanguage();
+  const { t } = useUiLanguage();
   const model = useMemo(
     () => buildAgentReplayModel(snapshot.events, snapshot.traceId),
     [snapshot.events, snapshot.traceId],
@@ -48,6 +47,18 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
         dropped: (model.integrity.capture?.droppedCount ?? 0) + model.integrity.gapCount,
       })
       : t('runFlow.replay.integrity.invalidMessage');
+  const detail = current ? {
+    sequence: current.sequence,
+    schema_version: current.schemaVersion,
+    event_type: current.event.type,
+    status: current.status ?? current.event.severity,
+    timestamp: current.event.timestamp,
+    trace_id: current.traceId,
+    span_id: current.spanId,
+    parent_span_id: current.parentSpanId,
+    ...(current.attrs ? { attrs: current.attrs } : {}),
+    ...(current.payload ? { payload: current.payload } : {}),
+  } : null;
 
   return (
     <section className="border-y border-border py-3" data-testid="agent-replay-inspector">
@@ -77,7 +88,7 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
               aria-live="polite"
               data-testid="agent-replay-position"
             >
-              {t('runFlow.replay.position', { current: activeCursor + 1, total: model.entries.length })}
+              {activeCursor + 1} / {model.entries.length}
             </span>
             <IconButton
               aria-label={t('runFlow.replay.next')}
@@ -104,44 +115,11 @@ const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, o
           {t('runFlow.replay.empty')}
         </div>
       ) : (
-        <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <dl className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
-            <dt className="text-muted-text">{t('runFlow.replay.sequence')}</dt>
-            <dd className="font-mono text-foreground">{current.sequence ?? t('runFlow.valueUnavailable')}</dd>
-            <dt className="text-muted-text">{t('runFlow.replay.schema')}</dt>
-            <dd className="font-mono text-foreground">{current.schemaVersion ?? '?'}</dd>
-            <dt className="text-muted-text">{t('runFlow.replay.event')}</dt>
-            <dd className="min-w-0 break-words font-mono text-foreground">{current.event.type}</dd>
-            <dt className="text-muted-text">{t('runFlow.replay.status')}</dt>
-            <dd className="min-w-0 break-words text-foreground">{current.status ?? current.event.severity}</dd>
-            <dt className="text-muted-text">{t('runFlow.replay.time')}</dt>
-            <dd className="min-w-0 break-words text-foreground">
-              {formatDateTime(current.event.timestamp, language, t)}
-            </dd>
-            <dt className="text-muted-text">{t('runFlow.replay.trace')}</dt>
-            <dd className="min-w-0 break-all font-mono text-foreground">{current.traceId ?? t('runFlow.valueUnavailable')}</dd>
-            <dt className="text-muted-text">{t('runFlow.replay.span')}</dt>
-            <dd className="min-w-0 break-all font-mono text-foreground">{current.spanId ?? t('runFlow.valueUnavailable')}</dd>
-            <dt className="text-muted-text">{t('runFlow.replay.parentSpan')}</dt>
-            <dd className="min-w-0 break-all font-mono text-foreground">{current.parentSpanId ?? t('runFlow.valueUnavailable')}</dd>
-          </dl>
-
-          <div className="min-w-0 space-y-3">
-            <div>
-              <p className="text-xs font-medium text-secondary-text">{t('runFlow.replay.attrs')}</p>
-              <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all border-l-2 border-border pl-3 font-mono text-xs leading-5 text-foreground">
-                {current.attrs ? formatDetail(current.attrs) : t('runFlow.valueUnavailable')}
-              </pre>
-            </div>
-            {current.payload ? (
-              <div>
-                <p className="text-xs font-medium text-secondary-text">{t('runFlow.replay.payload')}</p>
-                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all border-l-2 border-border pl-3 font-mono text-xs leading-5 text-foreground">
-                  {formatDetail(current.payload)}
-                </pre>
-              </div>
-            ) : null}
-          </div>
+        <div className="mt-3 min-w-0">
+          <p className="text-xs font-medium text-secondary-text">{t('runFlow.nodeDetails.metadata')}</p>
+          <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-all border-l-2 border-border pl-3 font-mono text-xs leading-5 text-foreground">
+            {formatDetail(detail ?? {})}
+          </pre>
         </div>
       )}
     </section>
