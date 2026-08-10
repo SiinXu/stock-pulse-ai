@@ -248,6 +248,31 @@ def build_dcf_sensitivity(
     }
 
 
+
+def compute_ev_ebitda(
+    *,
+    ebitda: Optional[float],
+    market_cap: Optional[float],
+    net_debt: Optional[float],
+) -> Optional[float]:
+    """Return EV/EBITDA only when market cap, net debt, and positive EBITDA exist.
+
+    Enterprise value is ``market_cap + net_debt``. Net debt may be zero or
+    negative (net cash). Missing any required input yields ``None`` — never an
+    invented proxy (for example total liabilities as debt).
+    """
+    if ebitda is None or not math.isfinite(ebitda) or ebitda <= 0:
+        return None
+    if market_cap is None or not math.isfinite(market_cap) or market_cap <= 0:
+        return None
+    if net_debt is None or not math.isfinite(net_debt):
+        return None
+    enterprise_value = market_cap + net_debt
+    if enterprise_value <= 0:
+        return None
+    return _round_money(enterprise_value / ebitda)
+
+
 def compute_relative_valuation(
     *,
     target_pe: Optional[float],
@@ -255,10 +280,22 @@ def compute_relative_valuation(
     current_price: Optional[float],
     peer_pe_values: Sequence[float],
     peer_pb_values: Sequence[float],
+    target_ebitda: Optional[float] = None,
+    target_market_cap: Optional[float] = None,
+    target_net_debt: Optional[float] = None,
+    peer_ev_ebitda_values: Sequence[float] = (),
 ) -> dict[str, Any]:
-    """Compare target multiples against peer medians from fundamental data."""
+    """Compare target multiples against peer medians from fundamental data.
+
+    EV/EBITDA is computed only when explicit EBITDA, market cap, and net debt
+    are supplied for the target and at least one peer multiple is available.
+    Missing EV/EBITDA inputs never fabricate numbers and do not block PE/PB.
+    """
     peer_pe_median = _median(peer_pe_values)
     peer_pb_median = _median(peer_pb_values)
+    peer_ev_ebitda_median = _median(
+        [v for v in peer_ev_ebitda_values if v is not None and v > 0]
+    )
 
     pe_usable = (
         target_pe is not None
@@ -276,8 +313,32 @@ def compute_relative_valuation(
         and current_price is not None
         and current_price > 0
     )
+    target_ev = None
+    if (
+        target_market_cap is not None
+        and math.isfinite(target_market_cap)
+        and target_market_cap > 0
+        and target_net_debt is not None
+        and math.isfinite(target_net_debt)
+    ):
+        target_ev = target_market_cap + target_net_debt
+    target_ev_ebitda = compute_ev_ebitda(
+        ebitda=target_ebitda,
+        market_cap=target_market_cap,
+        net_debt=target_net_debt,
+    )
+    ev_ebitda_usable = (
+        target_ev_ebitda is not None
+        and target_ev_ebitda > 0
+        and peer_ev_ebitda_median is not None
+        and peer_ev_ebitda_median > 0
+        and target_ebitda is not None
+        and target_ebitda > 0
+        and target_net_debt is not None
+        and math.isfinite(target_net_debt)
+    )
 
-    if not pe_usable and not pb_usable:
+    if not pe_usable and not pb_usable and not ev_ebitda_usable:
         missing: list[str] = []
         if target_pe is None or target_pe <= 0:
             missing.append("target_pe")
@@ -285,8 +346,18 @@ def compute_relative_valuation(
             missing.append("target_pb")
         if current_price is None or current_price <= 0:
             missing.append("current_price")
-        if peer_pe_median is None and peer_pb_median is None:
+        if peer_pe_median is None and peer_pb_median is None and peer_ev_ebitda_median is None:
             missing.append("peer_multiples")
+        if target_ev_ebitda is None:
+            if target_ebitda is None or target_ebitda <= 0:
+                missing.append("target_ebitda")
+            if target_market_cap is None or target_market_cap <= 0:
+                missing.append("target_market_cap")
+            if target_net_debt is None:
+                missing.append("target_net_debt")
+        elif peer_ev_ebitda_median is None:
+            missing.append("peer_ev_ebitda")
+        missing = list(dict.fromkeys(missing))
         return {
             "status": INSUFFICIENT_FUNDAMENTALS,
             "reason": INSUFFICIENT_FUNDAMENTALS,
@@ -299,15 +370,29 @@ def compute_relative_valuation(
                 "pe_ratio": target_pe,
                 "pb_ratio": target_pb,
                 "current_price": current_price,
+                "ebitda": target_ebitda,
+                "market_cap": target_market_cap,
+                "net_debt": target_net_debt,
+                "enterprise_value": (
+                    _round_money(target_ev) if target_ev is not None else None
+                ),
+                "ev_ebitda": target_ev_ebitda,
             },
             "peers": {
                 "count_pe": len([v for v in peer_pe_values if v > 0]),
                 "count_pb": len([v for v in peer_pb_values if v > 0]),
+                "count_ev_ebitda": len([v for v in peer_ev_ebitda_values if v > 0]),
                 "pe_median": peer_pe_median,
                 "pb_median": peer_pb_median,
+                "ev_ebitda_median": peer_ev_ebitda_median,
             },
             "implied_prices": {},
             "premium_discount": {},
+            "ev_ebitda": {
+                "status": INSUFFICIENT_FUNDAMENTALS,
+                "target_multiple": target_ev_ebitda,
+                "peer_median": peer_ev_ebitda_median,
+            },
         }
 
     implied: dict[str, Any] = {}
@@ -327,33 +412,120 @@ def compute_relative_valuation(
             ((target_pb / peer_pb_median) - 1.0) * 100.0
         )
 
+    if ev_ebitda_usable and peer_ev_ebitda_median is not None and target_ebitda is not None:
+        implied_ev = peer_ev_ebitda_median * target_ebitda
+        implied_equity = implied_ev - float(target_net_debt)  # type: ignore[arg-type]
+        implied["ev_ebitda_enterprise_value"] = _round_money(implied_ev)
+        implied["ev_ebitda_equity_value"] = _round_money(implied_equity)
+        premium["ev_ebitda_vs_peers_pct"] = _round_money(
+            ((float(target_ev_ebitda) / peer_ev_ebitda_median) - 1.0) * 100.0  # type: ignore[arg-type]
+        )
+        ev_ebitda_section: dict[str, Any] = {
+            "status": "ok",
+            "target_multiple": target_ev_ebitda,
+            "peer_median": _round_money(peer_ev_ebitda_median),
+            "enterprise_value": (
+                _round_money(target_ev) if target_ev is not None else None
+            ),
+            "implied_enterprise_value": _round_money(implied_ev),
+            "implied_equity_value": _round_money(implied_equity),
+        }
+    else:
+        missing_ev: list[str] = []
+        if target_ebitda is None or target_ebitda <= 0:
+            missing_ev.append("target_ebitda")
+        if target_market_cap is None or target_market_cap <= 0:
+            missing_ev.append("target_market_cap")
+        if target_net_debt is None:
+            missing_ev.append("target_net_debt")
+        if peer_ev_ebitda_median is None:
+            missing_ev.append("peer_ev_ebitda")
+        ev_ebitda_section = {
+            "status": INSUFFICIENT_FUNDAMENTALS,
+            "target_multiple": target_ev_ebitda,
+            "peer_median": (
+                _round_money(peer_ev_ebitda_median)
+                if peer_ev_ebitda_median is not None
+                else None
+            ),
+            "missing_inputs": missing_ev,
+            "message": (
+                "EV/EBITDA not computed: requires positive EBITDA, positive "
+                "market cap, explicit net debt (may be zero/negative), and at "
+                "least one peer EV/EBITDA multiple. No estimated proxies."
+            ),
+        }
+
+    method_notes = [
+        "Peer medians are computed only from positive PE/PB/EV-EBITDA values "
+        "supplied by existing fundamental/quote data for the requested peer codes.",
+        "EV/EBITDA uses enterprise value = market_cap + net_debt only when all "
+        "three of EBITDA, market_cap, and net_debt are explicitly available; "
+        "missing inputs are reported rather than estimated.",
+    ]
+
     return {
         "status": "ok",
         "target": {
             "pe_ratio": target_pe,
             "pb_ratio": target_pb,
             "current_price": current_price,
+            "ebitda": target_ebitda,
+            "market_cap": target_market_cap,
+            "net_debt": target_net_debt,
+            "enterprise_value": (
+                _round_money(target_ev) if target_ev is not None else None
+            ),
+            "ev_ebitda": target_ev_ebitda,
         },
         "peers": {
             "count_pe": len([v for v in peer_pe_values if v > 0]),
             "count_pb": len([v for v in peer_pb_values if v > 0]),
+            "count_ev_ebitda": len([v for v in peer_ev_ebitda_values if v > 0]),
             "pe_median": (
                 _round_money(peer_pe_median) if peer_pe_median is not None else None
             ),
             "pb_median": (
                 _round_money(peer_pb_median) if peer_pb_median is not None else None
             ),
+            "ev_ebitda_median": (
+                _round_money(peer_ev_ebitda_median)
+                if peer_ev_ebitda_median is not None
+                else None
+            ),
         },
         "implied_prices": implied,
         "premium_discount": premium,
-        "method_notes": [
-            "Peer medians are computed only from positive PE/PB values supplied "
-            "by existing fundamental/quote data for the requested peer codes.",
-            "EV/EBITDA is not estimated in phase 1 because the fundamental "
-            "pipeline does not expose a stable EBITDA field across markets.",
-        ],
+        "ev_ebitda": ev_ebitda_section,
+        "method_notes": method_notes,
     }
 
+
+def _extract_ebitda(earnings: Mapping[str, Any], valuation: Mapping[str, Any]) -> Optional[float]:
+    """Read an explicit EBITDA field only; never derive from operating profit."""
+    for source in (valuation, earnings):
+        for key in ("ebitda", "ebitda_ttm", "EBITDA", "EBITDA_TTM"):
+            value = _safe_float(source.get(key))
+            if value is not None and value > 0:
+                return value
+    return None
+
+
+def _extract_net_debt(
+    earnings: Mapping[str, Any],
+    valuation: Mapping[str, Any],
+    fundamentals: Mapping[str, Any],
+) -> Optional[float]:
+    """Read explicit net debt only; total liabilities are not accepted as debt."""
+    balance = _block_data(fundamentals, "balance") if isinstance(fundamentals, Mapping) else {}
+    for source in (valuation, earnings, balance, fundamentals):
+        if not isinstance(source, Mapping):
+            continue
+        for key in ("net_debt", "netDebt", "NET_DEBT"):
+            value = _safe_float(source.get(key))
+            if value is not None:
+                return value
+    return None
 
 def _extract_base_cash_flow(
     earnings: Mapping[str, Any],
@@ -642,6 +814,9 @@ class ValuationService:
                 },
             }
 
+        target_ebitda = _extract_ebitda(earnings, valuation)
+        target_net_debt = _extract_net_debt(earnings, valuation, fundamentals)
+
         peer_list = [
             str(item).strip()
             for item in (peer_codes or [])
@@ -649,26 +824,44 @@ class ValuationService:
         ]
         peer_pe_values: list[float] = []
         peer_pb_values: list[float] = []
+        peer_ev_ebitda_values: list[float] = []
         peer_details: list[dict[str, Any]] = []
         for peer in peer_list[:12]:
             peer_ctx = self._load_fundamentals(peer)
             peer_quote = self._load_quote(peer)
             peer_val = _block_data(peer_ctx, "valuation")
+            peer_earn = _block_data(peer_ctx, "earnings")
             peer_pe = _safe_float(peer_val.get("pe_ratio"))
             if peer_pe is None:
                 peer_pe = _safe_float(peer_quote.get("pe_ratio"))
             peer_pb = _safe_float(peer_val.get("pb_ratio"))
             if peer_pb is None:
                 peer_pb = _safe_float(peer_quote.get("pb_ratio"))
+            peer_mv = _safe_float(peer_val.get("total_mv"))
+            if peer_mv is None:
+                peer_mv = _safe_float(peer_quote.get("total_mv"))
+            peer_ebitda = _extract_ebitda(peer_earn, peer_val)
+            peer_net_debt = _extract_net_debt(peer_earn, peer_val, peer_ctx)
+            peer_ev_ebitda = compute_ev_ebitda(
+                ebitda=peer_ebitda,
+                market_cap=peer_mv,
+                net_debt=peer_net_debt,
+            )
             if peer_pe is not None and peer_pe > 0:
                 peer_pe_values.append(peer_pe)
             if peer_pb is not None and peer_pb > 0:
                 peer_pb_values.append(peer_pb)
+            if peer_ev_ebitda is not None and peer_ev_ebitda > 0:
+                peer_ev_ebitda_values.append(peer_ev_ebitda)
             peer_details.append(
                 {
                     "stock_code": peer,
                     "pe_ratio": peer_pe,
                     "pb_ratio": peer_pb,
+                    "ebitda": peer_ebitda,
+                    "market_cap": peer_mv,
+                    "net_debt": peer_net_debt,
+                    "ev_ebitda": peer_ev_ebitda,
                 }
             )
 
@@ -678,13 +871,23 @@ class ValuationService:
             current_price=current_price,
             peer_pe_values=peer_pe_values,
             peer_pb_values=peer_pb_values,
+            target_ebitda=target_ebitda,
+            target_market_cap=total_mv,
+            target_net_debt=target_net_debt,
+            peer_ev_ebitda_values=peer_ev_ebitda_values,
         )
         relative_section["peer_details"] = peer_details
         relative_section["assumptions"] = {
             "peer_codes": peer_list[:12],
-            "multiples": ["pe_ratio", "pb_ratio"],
+            "multiples": ["pe_ratio", "pb_ratio", "ev_ebitda"],
             "peer_aggregation": "median_of_positive_values",
-            "ev_ebitda": "not_available_in_phase_1",
+            "ev_ebitda": (
+                "computed_when_ebitda_market_cap_and_net_debt_available"
+                if relative_section.get("ev_ebitda", {}).get("status") == "ok"
+                else "insufficient_explicit_inputs"
+            ),
+            "ev_definition": "market_cap + net_debt",
+            "net_debt_policy": "explicit_net_debt_only_no_liability_proxy",
         }
 
         overall_status = "ok"
@@ -710,6 +913,8 @@ class ValuationService:
                 "pb_ratio": pb_ratio,
                 "total_mv": total_mv,
                 "current_price": current_price,
+                "ebitda": target_ebitda,
+                "net_debt": target_net_debt,
                 "operating_cash_flow": _safe_float(earnings.get("operating_cash_flow")),
                 "net_profit_parent": _safe_float(earnings.get("net_profit_parent")),
                 "revenue_yoy": _safe_float(growth.get("revenue_yoy")),
