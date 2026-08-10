@@ -1238,6 +1238,16 @@ class _ConfigLoadingMethods:
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
             ),
+            reasoning_trace_export_enabled=parse_env_bool(
+                os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False
+            ),
+            reasoning_trace_export_max_chars=parse_env_int(
+                os.getenv('REASONING_TRACE_EXPORT_MAX_CHARS'),
+                500_000,
+                field_name='REASONING_TRACE_EXPORT_MAX_CHARS',
+                minimum=10_000,
+                maximum=2_000_000,
+            ),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False
             ),
