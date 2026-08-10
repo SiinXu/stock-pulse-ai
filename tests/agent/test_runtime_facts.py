@@ -163,6 +163,77 @@ def test_runtime_facts_only_project_independent_low_sensitivity_opinions():
         assert forbidden not in serialized
 
 
+def test_runtime_facts_preserve_bounded_risk_evidence_for_later_exits():
+    ctx = AgentContext(stock_code="AAPL")
+    ctx.add_opinion(AgentOpinion(
+        agent_name="risk",
+        signal="sell",
+        confidence=0.91,
+        raw_data={
+            "risk_level": "high",
+            "veto_buy": True,
+            "signal_adjustment": "downgrade_one",
+        },
+    ))
+    ctx.add_risk_flag("exposure", "Concentration limit breached", severity="high")
+    ctx.set_data("portfolio_exposure", 0.82)
+    ctx.set_data("volatility", 0.41)
+    ctx.set_data("historical_outcomes", {"losses": 3})
+    ctx.set_data("current_holdings", {"AAPL": 120})
+    ctx.set_data("risk_evidence_as_of", "2026-08-09T00:00:00+00:00")
+
+    evidence = build_agent_runtime_facts(ctx).risk_evidence
+
+    assert evidence is not None
+    assert evidence.risk_level == "high"
+    assert evidence.veto_buy is True
+    assert evidence.signal_adjustment == "downgrade_one"
+    assert evidence.flags == (
+        ("exposure", "Concentration limit breached", "high"),
+    )
+    assert evidence.portfolio_exposure == 0.82
+    assert evidence.volatility == 0.41
+    assert evidence.historical_outcomes == '{"losses": 3}'
+    assert evidence.current_holdings == '{"AAPL": 120}'
+    assert evidence.as_of == "2026-08-09T00:00:00+00:00"
+
+
+def test_runtime_facts_keep_portfolio_evidence_without_risk_agent_or_flags():
+    ctx = AgentContext(stock_code="AAPL")
+    ctx.set_data("portfolio_exposure", 0.99)
+    ctx.set_data("volatility", 0.80)
+    ctx.set_data("historical_outcomes", {"loss_rate": 0.95})
+    ctx.set_data("current_holdings", {"AAPL": 120})
+
+    evidence = build_agent_runtime_facts(ctx).risk_evidence
+
+    assert evidence is not None
+    assert evidence.portfolio_exposure == 0.99
+    assert evidence.volatility == 0.80
+    assert evidence.historical_outcomes == '{"loss_rate": 0.95}'
+    assert evidence.current_holdings == '{"AAPL": 120}'
+    assert evidence.invalid_fields == ()
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_runtime_risk_numeric_boundaries_reject_non_finite_values(value):
+    ctx = AgentContext()
+    ctx.add_opinion(AgentOpinion(agent_name="risk", signal="hold", confidence=0.5))
+    ctx.set_data("portfolio_exposure", value)
+    ctx.set_data("volatility", value)
+
+    evidence = build_agent_runtime_facts(ctx).risk_evidence
+
+    assert evidence is not None
+    assert evidence.confidence == 0.5
+    assert evidence.portfolio_exposure is None
+    assert evidence.volatility is None
+    assert evidence.invalid_fields == ("portfolio_exposure", "volatility")
+
+    with pytest.raises(ValueError, match="finite"):
+        AgentOpinion(agent_name="risk", signal="hold", confidence=value)
+
+
 def test_public_runtime_facts_constructor_cannot_claim_soul_identity():
     metadata = get_agent_soul_metadata()
 

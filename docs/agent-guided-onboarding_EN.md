@@ -29,7 +29,7 @@ Versioned JSON (`schema_version = 1`):
 | `interaction` | `push` / `web` / `chat` |
 | `risk_tone` | `conservative` / `balanced` / `assertive` (tone only) |
 | `infrastructure` | `cloud_key` / `local_models` / `free_only` |
-| `report_language` | `zh` / `en` / `ko` / `ja` |
+| `report_language` | `zh` / `en` / `ko` |
 
 ## Plan engine honesty
 
