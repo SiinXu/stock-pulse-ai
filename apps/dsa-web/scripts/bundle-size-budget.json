@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting, Notifications hub/screening-state/decision-replay/what-if translations, and MCP Settings registry field titles (PR #1033). Locale caps retain 200 bytes of headroom over stacked measured gzip estimates; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined for Notifications/screening/decision-replay/what-if translations, MCP Settings registry titles, and MCP settingsHelp inventory (PR #1033). Locale and IntelligenceSourcesPanel caps retain 200 bytes of headroom over measured gzip; other measuredGzipBytes may still come from earlier baselines.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 206745,
+      "measuredGzipBytes": 206545,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "js-entry",
@@ -25,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 133765,
-      "measuredGzipBytes": 133565,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 135442,
+      "measuredGzipBytes": 135242,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 127601,
-      "measuredGzipBytes": 127401,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 130273,
+      "measuredGzipBytes": 130073,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 127527,
-      "measuredGzipBytes": 127327,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 129247,
+      "measuredGzipBytes": 129047,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 127842,
-      "measuredGzipBytes": 127642,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 130384,
+      "measuredGzipBytes": 130184,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 123769,
-      "measuredGzipBytes": 123569,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 126507,
+      "measuredGzipBytes": 126307,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 121322,
-      "measuredGzipBytes": 121122,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 122524,
+      "measuredGzipBytes": 122324,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 114490,
-      "measuredGzipBytes": 114290,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 117249,
+      "measuredGzipBytes": 117049,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 114659,
-      "measuredGzipBytes": 114459,
-      "note": "Stacked rebaseline for what-if/decision-replay translations plus MCP Settings titles (PR #1033); retains 200 bytes of headroom."
+      "maxGzipBytes": 117448,
+      "measuredGzipBytes": 117248,
+      "note": "Rebaseline after MCP Settings help strings (PR #1033) on top of what-if/decision-replay translations; retains 200 bytes of headroom over local production gzip measure."
     },
     {
       "id": "vendor-charts",

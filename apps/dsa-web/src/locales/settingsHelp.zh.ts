@@ -1674,6 +1674,217 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['需要 Agent multi 能力。'],
   },
 
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: '启用 MCP 服务',
+    summary: '可选 MCP 进程总开关，默认关闭；主 API/Web 进程不会自动启动 MCP。',
+    usage: '仅在你明确要执行 `python -m src.mcp_server` 时设为 true。修改后需重启 MCP 进程。',
+    valueNotes: [
+      'false 时保持对外工具面关闭。',
+      '仅开启开关不够，还需要 scopes 与对应传输的安全配置。',
+    ],
+    impact: [
+      '决定独立 MCP 进程是否允许启动。',
+    ],
+    notes: [
+      'HTTP 传输属于安全敏感对外面。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP 传输方式',
+    summary: '官方 SDK 传输：stdio（本机进程）或 streamable-http。',
+    usage: '本机操作优先 stdio。仅在具备管理员认证、scopes 与会话摘要时使用 streamable-http。',
+    valueNotes: [
+      'stdio 为默认本机边界。',
+      '运行时接受 http 作为 streamable-http 别名。',
+    ],
+    impact: [
+      '决定客户端如何连接以及适用哪些安全控制。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP 绑定主机',
+    summary: 'streamable-http 绑定主机，优先 loopback。',
+    usage: '除非有可信网络控制，否则保持 127.0.0.1/localhost。',
+    valueNotes: [
+      '绑定到非本机地址会扩大攻击面。',
+    ],
+    impact: [
+      '影响 MCP HTTP 监听接受连接的位置。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP 绑定端口',
+    summary: 'streamable-http TCP 端口（1–65535）。',
+    usage: '默认 8765；端口冲突时再修改。',
+    impact: [
+      '影响 MCP HTTP 监听地址。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio 主体',
+    summary: 'stdio 审计与限速使用的稳定主体名。',
+    usage: '使用符合支持字符规则的短稳定标识。',
+    impact: [
+      '用于标注 stdio 工具调用日志与限速桶。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio 权限范围',
+    summary: 'stdio 的逗号分隔最小权限 scopes。',
+    usage: 'transport=stdio 且启用时必填。允许：market.read、history.read、portfolio.read、analysis.trigger。',
+    valueNotes: [
+      '只授予本机操作者真正需要的范围。',
+    ],
+    impact: [
+      '限制 stdio 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '放宽 scope 会扩大可调用能力。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP 权限范围',
+    summary: 'streamable-http 的逗号分隔最小权限 scopes。',
+    usage: '启用 HTTP 传输时必填；允许范围与 stdio 相同。',
+    impact: [
+      '限制 HTTP 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '远程可达传输应保持最小权限。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP 会话令牌 SHA-256',
+    summary: '唯一接受的管理员会话令牌的 SHA-256 十六进制摘要。',
+    usage: 'streamable-http 必填。只存摘要，不存原始 Bearer。',
+    valueNotes: [
+      '须为 64 位十六进制，或在未使用时留空。',
+      '设置页会掩码此敏感字段。',
+    ],
+    impact: [
+      '为 HTTP MCP 锚定可接受的管理员会话。',
+    ],
+    notes: [
+      '若 Bearer 可能泄露，应轮换摘要。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP 资源 URL',
+    summary: 'streamable-http 的绝对 http(s) 资源/受众 URL。',
+    usage: '默认 http://127.0.0.1:8765/mcp，需与客户端使用的公开 MCP 端点一致。',
+    impact: [
+      '影响 HTTP MCP 的 resource/audience 绑定。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP 允许 Host',
+    summary: 'streamable-http 的 Host 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback。通配端口使用官方 SDK 的 :* 形式。',
+    valueNotes: [
+      '放宽列表（如 * 或公网主机）会增加 Host 头与跨站风险。',
+    ],
+    impact: [
+      '控制 HTTP MCP 接受哪些 Host 值。',
+    ],
+    notes: [
+      '应把放宽视为安全决策，而非便利开关。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP 允许 Origin',
+    summary: '浏览器客户端的 Origin 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback HTTP origin。',
+    valueNotes: [
+      '放宽 origin（尤其 * 或不可信站点）会允许浏览器跨源访问 MCP 工具。',
+    ],
+    impact: [
+      '控制 HTTP MCP 的浏览器 CORS/Origin 接受策略。',
+    ],
+    notes: [
+      '保持列表尽量小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP 最大 Body 字节',
+    summary: 'streamable-http 接受的最大 JSON Body 大小。',
+    usage: '默认 1000000。仅在有真实大负载需求时上调。',
+    impact: [
+      '限制请求体内存占用。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP 最大 Header 字节',
+    summary: 'streamable-http 未完整 Header 块上限。',
+    usage: '默认 32768。通常无需修改。',
+    impact: [
+      '限制 Header 缓冲大小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP 最大连接数',
+    summary: 'streamable-http 最大并发连接数。',
+    usage: '默认 32。小主机可下调，加压测试后再上调。',
+    impact: [
+      '限制并发 HTTP MCP 客户端。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP 监听 backlog',
+    summary: 'streamable-http 接受器的 OS listen backlog。',
+    usage: '默认 16。容量调优之外很少改动。',
+    impact: [
+      '影响待处理连接队列深度。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP 读取超时',
+    summary: 'streamable-http 每个 body chunk 读取超时（秒）。',
+    usage: '默认 10，范围 1–120。',
+    impact: [
+      '控制慢客户端可占用读取的时间。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive 超时',
+    summary: 'streamable-http 连接 keep-alive 空闲超时（秒）。',
+    usage: '默认 5，范围 1–120。',
+    impact: [
+      '控制空闲连接保留时间。',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP 最大并发工具数',
+    summary: '单个 MCP 进程最大并发工具 worker 数。',
+    usage: '默认 8，范围 1–128。',
+    impact: [
+      '限制并发工具执行成本。',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 工具速率限制',
+    summary: '按主体/工具的每分钟调用上限。',
+    usage: '默认 60，范围 1–10000。',
+    impact: [
+      '限制通用工具刷量。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 分析速率限制',
+    summary: 'analysis.trigger 每分钟调用上限。',
+    usage: '默认 2。请保持较低以控制 LLM/数据成本。',
+    impact: [
+      '保护分析成本预算。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP 单次分析最大标的数',
+    summary: '单次 analysis.trigger 允许的最大标的数。',
+    usage: '默认 5，范围 1–50。',
+    impact: [
+      '限制单次分析成本。',
+    ],
+  },
 };
 
 export default settingsHelpZhCN;

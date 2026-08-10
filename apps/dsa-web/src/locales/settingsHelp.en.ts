@@ -1632,6 +1632,217 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Changing these values changes the configuration hash and requires an explicit health refresh.'],
   },
 
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: 'Enable MCP Server',
+    summary: 'Master switch for the optional MCP process. Default off; the main API/Web process never starts MCP automatically.',
+    usage: 'Set true only when you intentionally start `python -m src.mcp_server`. Requires a process restart of the MCP process.',
+    valueNotes: [
+      'false keeps the external tool surface closed.',
+      'true alone is not enough without scopes and transport-specific security settings.',
+    ],
+    impact: [
+      'Controls whether the dedicated MCP process is allowed to start.',
+    ],
+    notes: [
+      'HTTP transport is a security-sensitive external surface.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP Transport',
+    summary: 'Official SDK transport: stdio (local process) or streamable-http.',
+    usage: 'Prefer stdio for local operators. Use streamable-http only with admin auth, scopes, and a session token digest.',
+    valueNotes: [
+      'stdio is the default local boundary.',
+      'http is accepted as a runtime alias of streamable-http.',
+    ],
+    impact: [
+      'Chooses how MCP clients connect and which security controls apply.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP Bind Host',
+    summary: 'Bind host for streamable-http. Prefer loopback.',
+    usage: 'Keep 127.0.0.1/localhost unless you have trusted network controls.',
+    valueNotes: [
+      'Binding beyond loopback expands the attack surface.',
+    ],
+    impact: [
+      'Affects where the MCP HTTP listener accepts connections.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP Bind Port',
+    summary: 'TCP port for streamable-http (1–65535).',
+    usage: 'Default 8765. Change if the port is already in use.',
+    impact: [
+      'Affects the MCP HTTP listen address.',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio Principal',
+    summary: 'Stable principal name for stdio audit and rate limits.',
+    usage: 'Use a short stable identifier matching the supported character pattern.',
+    impact: [
+      'Labels stdio tool calls in logs and limiters.',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio Scopes',
+    summary: 'Comma-separated least-privilege scopes for stdio.',
+    usage: 'Required when enabled with transport=stdio. Allowed: market.read, history.read, portfolio.read, analysis.trigger.',
+    valueNotes: [
+      'Grant only scopes the local operator needs.',
+    ],
+    impact: [
+      'Limits which MCP tools stdio clients can call.',
+    ],
+    notes: [
+      'Widening scopes increases callable capabilities.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP Scopes',
+    summary: 'Comma-separated least-privilege scopes for streamable-http.',
+    usage: 'Required when HTTP transport is enabled. Same allowed scope set as stdio.',
+    impact: [
+      'Limits which MCP tools HTTP clients can call.',
+    ],
+    notes: [
+      'Keep scopes minimal for remote-capable transports.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP Session Token SHA-256',
+    summary: 'SHA-256 hex digest of the single accepted admin session token.',
+    usage: 'Required for streamable-http. Store only the digest, never the raw bearer token.',
+    valueNotes: [
+      'Must be 64 hex characters or empty when unused.',
+      'Settings masks this sensitive field.',
+    ],
+    impact: [
+      'Audience-pins the accepted admin session for HTTP MCP.',
+    ],
+    notes: [
+      'Rotate the digest if a bearer token may have leaked.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP Resource URL',
+    summary: 'Absolute http(s) audience/resource URL for streamable-http.',
+    usage: 'Default is http://127.0.0.1:8765/mcp. Keep it aligned with the public MCP endpoint clients use.',
+    impact: [
+      'Affects resource/audience binding for HTTP MCP.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP Allowed Hosts',
+    summary: 'Comma-separated Host header allowlist for streamable-http.',
+    usage: 'Default is loopback only. Wildcard ports use the official SDK :* form.',
+    valueNotes: [
+      'Widening this list (for example * or a public hostname) increases host-header and cross-site risk.',
+    ],
+    impact: [
+      'Controls which Host values HTTP MCP accepts.',
+    ],
+    notes: [
+      'Treat expansion as a security decision, not convenience.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP Allowed Origins',
+    summary: 'Comma-separated Origin allowlist for browser clients.',
+    usage: 'Default is loopback HTTP origins only.',
+    valueNotes: [
+      'Expanding origins (especially * or untrusted sites) enables cross-origin browser access to MCP tools.',
+    ],
+    impact: [
+      'Controls browser CORS/Origin acceptance for HTTP MCP.',
+    ],
+    notes: [
+      'Keep the list minimal.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP Max Body Bytes',
+    summary: 'Maximum JSON body size accepted by streamable-http.',
+    usage: 'Default 1000000. Raise only if legitimate tool payloads need more room.',
+    impact: [
+      'Bounds request body memory use.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP Max Header Bytes',
+    summary: 'Maximum incomplete header block size for streamable-http.',
+    usage: 'Default 32768. Keep unless you have a measured need.',
+    impact: [
+      'Bounds header buffer size.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP Max Connections',
+    summary: 'Maximum concurrent streamable-http connections.',
+    usage: 'Default 32. Lower on small hosts; raise carefully under load tests.',
+    impact: [
+      'Limits concurrent HTTP MCP clients.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP Listen Backlog',
+    summary: 'OS listen backlog for the streamable-http acceptor.',
+    usage: 'Default 16. Rarely needs changes outside capacity tuning.',
+    impact: [
+      'Affects pending connection queue depth.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Read Timeout',
+    summary: 'Per-body-chunk read timeout for streamable-http (seconds).',
+    usage: 'Default 10. Range 1–120.',
+    impact: [
+      'Controls how long slow clients may hold body reads.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive Timeout',
+    summary: 'Keep-alive idle timeout for streamable-http connections (seconds).',
+    usage: 'Default 5. Range 1–120.',
+    impact: [
+      'Controls idle connection retention.',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP Max Concurrent Tools',
+    summary: 'Maximum concurrent tool workers for one MCP process.',
+    usage: 'Default 8. Range 1–128.',
+    impact: [
+      'Bounds concurrent tool execution cost.',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP Tool Rate Limit',
+    summary: 'Per-principal/tool call rate limit per minute.',
+    usage: 'Default 60. Range 1–10000.',
+    impact: [
+      'Limits general tool spam.',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP Analysis Rate Limit',
+    summary: 'Rate limit for analysis.trigger invocations per minute.',
+    usage: 'Default 2. Keep low to bound LLM/data cost.',
+    impact: [
+      'Protects analysis cost budget.',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP Analysis Max Symbols',
+    summary: 'Maximum symbols accepted in one analysis.trigger call.',
+    usage: 'Default 5. Range 1–50.',
+    impact: [
+      'Bounds per-call analysis cost.',
+    ],
+  },
 };
 
 export default settingsHelpEnUS;
