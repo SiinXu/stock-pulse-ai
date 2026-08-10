@@ -1177,9 +1177,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     let streamAttempts = 0;
     await page.route('**/api/v1/agent/chat/stream', async (route) => {
       streamAttempts += 1;
-      const body = streamAttempts === 1
+      const request = route.request().postDataJSON() as { turn_id?: string };
+      const persisted = `data: {"type":"turn_persisted","turn_id":"${request.turn_id}","message_id":"11"}\n\n`;
+      const body = persisted + (streamAttempts === 1
         ? 'data: {"type":"error","error":"upstream_timeout","message":"raw upstream detail"}\n\n'
-        : 'data: {"type":"progress","stage":"analysis","message":"streaming"}\n\ndata: {"type":"done","success":true,"content":"retry stream completed"}\n\n';
+        : 'data: {"type":"progress","stage":"analysis","message":"streaming"}\n\ndata: {"type":"done","success":true,"content":"retry stream completed"}\n\n');
       await route.fulfill({ status: 200, contentType: 'text/event-stream', body });
     });
     await login(page);
@@ -1230,11 +1232,17 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       route,
       historyDetail(1, 'AAPL', 'Apple'),
     ));
-    await page.route('**/api/v1/agent/chat/stream', (route) => route.fulfill({
-      status: 200,
-      contentType: 'text/event-stream',
-      body: 'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
-    }));
+    await page.route('**/api/v1/agent/chat/stream', (route) => {
+      const request = route.request().postDataJSON() as { turn_id?: string };
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          `data: {"type":"turn_persisted","turn_id":"${request.turn_id}","message_id":"12"}\n\n`,
+          'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
+        ].join(''),
+      });
+    });
     await login(page);
     await page.goto('/chat?stock=AAPL&name=Apple&recordId=1');
 
