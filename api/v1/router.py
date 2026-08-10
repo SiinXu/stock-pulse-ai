@@ -20,6 +20,7 @@ from api.v1.endpoints import (
     auth,
     backtest,
     calculators,
+    capabilities,
     config_profiles,
     decision_signals,
     health,
@@ -239,6 +240,12 @@ router.include_router(
     plugins.router,
     prefix="/plugins",
     tags=["Plugins"],
+)
+
+router.include_router(
+    capabilities.router,
+    prefix="/capabilities",
+    tags=["Capabilities"],
 )
 
 
