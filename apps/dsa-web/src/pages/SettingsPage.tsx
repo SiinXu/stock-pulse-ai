@@ -50,7 +50,8 @@ import { connectionItemsRespectSchema } from '../components/settings/settingsCon
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import ConfigBackupCard from '../components/settings/ConfigBackupCard';
 import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
-import { OverviewSection, SystemSecuritySection } from '../components/settings/sections';
+import OverviewSection from '../components/settings/sections/OverviewSection';
+import SystemSecuritySection from '../components/settings/sections/SystemSecuritySection';
 import {
   AiOverviewCard,
   AiTaskRoutingCard,

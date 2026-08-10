@@ -12,7 +12,7 @@ import SystemAboutCard from '../SystemAboutCard';
 type SchedulerProps = React.ComponentProps<typeof SchedulerSettingsCard>;
 type ExtensionProps = React.ComponentProps<typeof LoadedExtensionsPanel>;
 
-export type SystemSecuritySectionProps = {
+type SystemSecuritySectionProps = {
   activeCategory: string;
   activeView: string;
   passwordChangeable: boolean;
@@ -34,7 +34,7 @@ function parseMinimumSamples(value: string | undefined): number {
   return Number.isFinite(parsed) ? parsed : 10;
 }
 
-export const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
+const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
   if (props.activeCategory !== 'system') return null;
 
   if (props.activeView === 'security') {
@@ -86,3 +86,5 @@ export const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (prop
   }
   return null;
 };
+
+export default SystemSecuritySection;

@@ -14,7 +14,7 @@ import {
 
 type FirstRunSetupProps = React.ComponentProps<typeof FirstRunSetupCard>;
 
-export type OverviewSectionProps = {
+type OverviewSectionProps = {
   shouldShowFirstRunSetup: boolean;
   setupStatus: FirstRunSetupProps['status'];
   isProviderCatalogLoading: boolean;
@@ -38,7 +38,7 @@ export type OverviewSectionProps = {
   refreshAfterExternalSave: (keys: string[]) => Promise<void>;
 };
 
-export const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
+const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
   const { language, t } = useUiLanguage();
   const settingsText = SETTINGS_PAGE_TEXT[language];
   const canStartWizard = !props.isProviderCatalogLoading && props.providerCatalogLength > 0;
@@ -102,3 +102,5 @@ export const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
     </>
   );
 };
+
+export default OverviewSection;
