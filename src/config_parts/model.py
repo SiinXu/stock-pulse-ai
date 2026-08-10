@@ -293,6 +293,8 @@ class Config:
     report_language: str = "zh"
     # Report presentation mode for Jinja renderer (#861 Phase 2): brief / standard / research
     report_mode: str = "standard"
+    # Optional single-face TTF/OTF used by the bounded report PDF exporter.
+    report_export_pdf_font_path: Optional[str] = None
 
     # Only analyze the result summary: true only pushes summaries, without individual stock details (Issue #262)
     report_summary_only: bool = False

@@ -16523,6 +16523,209 @@
         "title": "ReportDetails",
         "type": "object"
       },
+      "ReportExportCapabilitiesResponse": {
+        "description": "Language-aware export capabilities.",
+        "properties": {
+          "chart_handling": {
+            "const": "markdown_images_omitted_without_destinations",
+            "title": "Chart Handling",
+            "type": "string"
+          },
+          "formats": {
+            "$ref": "#/components/schemas/ReportExportFormats"
+          },
+          "office_formats_status": {
+            "const": "not_implemented",
+            "title": "Office Formats Status",
+            "type": "string"
+          },
+          "pdf_limits": {
+            "$ref": "#/components/schemas/ReportExportPdfLimits"
+          },
+          "requested_language": {
+            "enum": [
+              "en",
+              "zh",
+              "zh-TW",
+              "ja",
+              "ko"
+            ],
+            "title": "Requested Language",
+            "type": "string"
+          },
+          "supported_query_formats": {
+            "items": {
+              "enum": [
+                "md",
+                "pdf"
+              ],
+              "type": "string"
+            },
+            "title": "Supported Query Formats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formats",
+          "requested_language",
+          "supported_query_formats",
+          "office_formats_status",
+          "chart_handling",
+          "pdf_limits"
+        ],
+        "title": "ReportExportCapabilitiesResponse",
+        "type": "object"
+      },
+      "ReportExportFormatCapability": {
+        "description": "Readiness of one archive format without host filesystem details.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "dependency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency"
+          },
+          "dependency_installed": {
+            "title": "Dependency Installed",
+            "type": "boolean"
+          },
+          "dependency_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Version"
+          },
+          "font_validated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Validated"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "missing_glyph_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Glyph Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "dependency_missing",
+              "dependency_import_invalid",
+              "dependency_version_invalid",
+              "legacy_namespace_conflict",
+              "configured_font_invalid",
+              "font_not_found",
+              "font_invalid",
+              "font_empty_cmap",
+              "font_coverage_missing",
+              "font_smoke_failed",
+              "not_checked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "status",
+          "media_type",
+          "dependency_installed"
+        ],
+        "title": "ReportExportFormatCapability",
+        "type": "object"
+      },
+      "ReportExportFormats": {
+        "description": "Closed format map so generated clients expose both known keys.",
+        "properties": {
+          "md": {
+            "$ref": "#/components/schemas/ReportExportFormatCapability"
+          },
+          "pdf": {
+            "$ref": "#/components/schemas/ReportExportFormatCapability"
+          }
+        },
+        "required": [
+          "md",
+          "pdf"
+        ],
+        "title": "ReportExportFormats",
+        "type": "object"
+      },
+      "ReportExportPdfLimits": {
+        "description": "Deterministic synchronous PDF resource bounds.",
+        "properties": {
+          "max_concurrency": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Concurrency",
+            "type": "integer"
+          },
+          "max_input_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Input Bytes",
+            "type": "integer"
+          },
+          "max_output_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Output Bytes",
+            "type": "integer"
+          },
+          "max_pages": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Pages",
+            "type": "integer"
+          },
+          "max_render_seconds": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Render Seconds",
+            "type": "number"
+          },
+          "max_table_columns": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Table Columns",
+            "type": "integer"
+          },
+          "max_table_rows": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Table Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_input_bytes",
+          "max_pages",
+          "max_table_rows",
+          "max_table_columns",
+          "max_output_bytes",
+          "max_render_seconds",
+          "max_concurrency"
+        ],
+        "title": "ReportExportPdfLimits",
+        "type": "object"
+      },
       "ReportFieldDiff": {
         "properties": {
           "base_value": {
@@ -30024,6 +30227,59 @@
         ]
       }
     },
+    "/api/v1/history/export/capabilities": {
+      "get": {
+        "description": "Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.",
+        "operationId": "get_report_export_capabilities_api_v1_history_export_capabilities_get",
+        "parameters": [
+          {
+            "description": "Report language whose representative glyph set must be supported.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "default": "zh",
+              "description": "Report language whose representative glyph set must be supported.",
+              "enum": [
+                "en",
+                "zh",
+                "zh-TW",
+                "ja",
+                "ko"
+              ],
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportCapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Available report export formats and dependency status"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report export capabilities",
+        "tags": [
+          "History"
+        ]
+      }
+    },
     "/api/v1/history/search": {
       "get": {
         "description": "Search stock code, stock name, report type, trend, summary, advice, and creation timestamp through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.",
@@ -30310,6 +30566,132 @@
           }
         },
         "summary": "获取历史报告运行诊断摘要",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/export": {
+      "get": {
+        "description": "Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.",
+        "operationId": "export_history_report_api_v1_history__record_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Export format: md (default) or pdf",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "md",
+              "description": "Export format: md (default) or pdf",
+              "enum": [
+                "md",
+                "pdf"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Exported report file"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid export format"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Report not found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Export resource limit exceeded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "PDF export capacity is busy"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Export or report generation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "PDF dependency, font, deadline, or render worker unavailable"
+          }
+        },
+        "summary": "Export a history report",
         "tags": [
           "History"
         ]
