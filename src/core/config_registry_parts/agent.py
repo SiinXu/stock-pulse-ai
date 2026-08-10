@@ -469,6 +469,43 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "RISK_GATE_PROFILE": {
+        "title": "Risk Manager Profile",
+        "description": "Select the mandatory final-action risk thresholds. The gate cannot be disabled and failures fail closed.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "balanced",
+        "options": [
+            {"label": "Conservative", "value": "conservative"},
+            {"label": "Balanced", "value": "balanced"},
+            {"label": "Aggressive", "value": "aggressive"},
+        ],
+        "validation": {
+            "enum": ["conservative", "balanced", "aggressive"],
+        },
+        "display_order": 63,
+        "help_key": "settings.agent.RISK_GATE_PROFILE",
+        "examples": [
+            "RISK_GATE_PROFILE=conservative",
+            "RISK_GATE_PROFILE=balanced",
+            "RISK_GATE_PROFILE=aggressive",
+        ],
+        "docs": [
+            {
+                "label": "Risk Manager gate",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/risk-manager-gate_EN.md",
+            },
+            {
+                "label": "风控经理闸门",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/risk-manager-gate.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MULTI_STRATEGY_DELIBERATION": {
         "title": "Multi-Strategy Deliberation",
         "description": "Enable multi-strategy deliberation, concurrent specialist scheduling, and final disagreement explanation. Default off preserves Phase-1 synthesis byte-for-byte.",

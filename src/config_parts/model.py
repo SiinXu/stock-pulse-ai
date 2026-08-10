@@ -76,6 +76,12 @@ class Config:
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
     stock_index_remote_update_enabled: bool = True
+    # Unified provider-boundary validation policy.
+    data_validation_enabled: bool = True
+    data_validation_strict: bool = False
+    data_validation_strict_scopes: str = "*/*"
+    data_validation_instrument_overrides: str = ""
+    data_validation_upper_layer_mode: str = "warn"
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
@@ -259,6 +265,7 @@ class Config:
     agent_portfolio_agent_timeout_s: float = 0
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
+    risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout

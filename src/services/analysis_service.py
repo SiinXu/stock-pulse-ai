@@ -294,6 +294,7 @@ class AnalysisService:
                 "trend_prediction": localize_trend_prediction(result.trend_prediction, report_language),
                 "sentiment_score": result.sentiment_score,
                 "sentiment_label": sentiment_label,
+                "risk_manager": getattr(result, "risk_gate_result", None),
             },
             "strategy": {
                 "ideal_buy": sniper_points.get("ideal_buy"),

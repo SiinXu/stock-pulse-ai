@@ -135,6 +135,29 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("作战计划", out)
         self.assertNotIn("盘中决策护栏", out)
 
+    def test_render_surfaces_structured_risk_decision_near_decision_card(self) -> None:
+        r = _make_result(
+            decision_type="hold",
+            operation_advice="Hold",
+            report_language="en",
+        )
+        r.risk_gate_result = {
+            "schema_version": "risk-manager-result/v1",
+            "verdict": "downgrade",
+            "original_action": "buy",
+            "final_action": "hold",
+            "profile": "balanced",
+            "authorized_bypass_id": None,
+        }
+
+        markdown = render("markdown", [r], summary_only=False)
+        wechat = render("wechat", [r], summary_only=False)
+        brief = render("brief", [r])
+
+        self.assertIn("Final Risk Decision", markdown)
+        self.assertIn("buy → **hold**", markdown)
+        self.assertIn("Verdict: downgrade · buy→hold", wechat)
+        self.assertIn("Verdict: downgrade · buy→hold", brief)
     def test_render_markdown_includes_exact_configured_indicator_evidence(self) -> None:
         r = _make_result()
         r.indicator_snapshot = {
