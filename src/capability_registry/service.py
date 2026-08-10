@@ -396,10 +396,22 @@ def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
     try:
         snapshot = services.analysis_strategy_snapshot()
     except Exception as exc:  # broad-exception: fallback_recorded - owner read failed
+        log_safe_exception(
+            logger,
+            "Capability skill catalog owner unavailable",
+            exc,
+            error_code="skill_catalog_unavailable",
+        )
         raise OwnerReadError("skill_catalog_unavailable") from exc
     try:
         config = services.config
     except Exception as exc:  # broad-exception: fallback_recorded - config read failed
+        log_safe_exception(
+            logger,
+            "Capability skill config unavailable",
+            exc,
+            error_code="skill_config_unavailable",
+        )
         raise OwnerReadError("skill_config_unavailable") from exc
     try:
         from src.agent.skills.base import SkillManager
@@ -412,6 +424,12 @@ def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
     except OwnerReadError:
         raise
     except Exception as exc:  # broad-exception: fallback_recorded - catalog load failed
+        log_safe_exception(
+            logger,
+            "Capability skill catalog load failed",
+            exc,
+            error_code="skill_catalog_unavailable",
+        )
         raise OwnerReadError("skill_catalog_unavailable") from exc
     plugin_skills = tuple(snapshot.registrations)
     generation = (int(snapshot.generation) << 16) ^ len(declarative)
@@ -426,6 +444,12 @@ def _resolve_pipeline_stages() -> tuple[str, tuple[str, ...], frozenset[str]]:
         from src.core.pipeline_stage_results import PipelineStageName
         from src.services.run_diagnostics import PIPELINE_STAGE_NAMES
     except Exception as exc:  # broad-exception: fallback_recorded - owner import failed
+        log_safe_exception(
+            logger,
+            "Capability pipeline owner unavailable",
+            exc,
+            error_code="pipeline_source_unavailable",
+        )
         raise OwnerReadError("pipeline_source_unavailable") from exc
     if StockAnalysisPipeline is None:  # pragma: no cover - defensive
         raise OwnerReadError("pipeline_source_unavailable")
