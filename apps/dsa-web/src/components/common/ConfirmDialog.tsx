@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useId, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { Button } from './Button';
@@ -15,6 +15,7 @@ interface ConfirmDialogProps {
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
   error?: string | null;
+  focusConfirmOnError?: boolean;
   isDanger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -33,12 +34,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmDisabled = false,
   cancelDisabled = false,
   error = null,
+  focusConfirmOnError = false,
   isDanger = false,
   onConfirm,
   onCancel,
 }) => {
   const { t } = useUiLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const messageId = useId();
 
@@ -48,6 +51,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     onEscape: onCancel,
     closeOnEscape: !cancelDisabled,
   });
+
+  useEffect(() => {
+    if (!isOpen || !error || !focusConfirmOnError || confirmDisabled) return;
+    confirmRef.current?.focus();
+  }, [confirmDisabled, error, focusConfirmOnError, isOpen]);
 
   if (!isOpen) return null;
 
@@ -93,6 +101,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             {cancelText ?? t('common.cancel')}
           </Button>
           <Button
+            ref={confirmRef}
             onClick={onConfirm}
             disabled={confirmDisabled}
             variant={isDanger ? 'danger' : 'primary'}
