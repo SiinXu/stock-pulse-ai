@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PortfolioRiskMetricsResponse } from '../../../types/portfolioRiskMetrics';
-import { PortfolioRiskMetricsPanel } from '../PortfolioRiskMetricsPanel';
+import PortfolioRiskMetricsPanel from '../PortfolioRiskMetricsPanel';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 
 const getRiskMetrics = vi.fn();

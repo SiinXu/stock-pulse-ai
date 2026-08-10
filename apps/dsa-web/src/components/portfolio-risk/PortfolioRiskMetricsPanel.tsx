@@ -4,7 +4,7 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
-import { Badge, Button, Card, EmptyState, InlineAlert, Loading } from '../common';
+import { Badge, Button, Card, DataTable, type DataTableColumn, EmptyState, InlineAlert, Loading } from '../common';
 import { formatParsedApiError, getParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage } from '../../i18n/uiText';
@@ -21,7 +21,7 @@ import { formatMoney, formatPct } from '../../utils/portfolioFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
 
-export type PortfolioRiskMetricsPanelProps = {
+type PortfolioRiskMetricsPanelProps = {
   accountId?: number;
   costMethod?: string;
   asOf?: string;
@@ -80,14 +80,21 @@ function formatFinitePct(value: number | null | undefined): string {
   return formatPct(value);
 }
 
-function correlationCellBackground(value: number | null): string | undefined {
-  if (value == null || !Number.isFinite(value)) return undefined;
-  // Map [-1, 1] → opacity for a cool/warm tint without inventing missing values.
-  const intensity = Math.min(1, Math.abs(value));
-  if (value >= 0) {
-    return `rgba(37, 99, 235, ${0.08 + intensity * 0.42})`;
+/** Map correlation in [-1, 1] to semantic fill classes (no hardcoded hex/rgba). */
+function correlationCellClass(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) {
+    return 'bg-subtle text-muted-text';
   }
-  return `rgba(220, 38, 38, ${0.08 + intensity * 0.42})`;
+  const intensity = Math.abs(value);
+  if (intensity < 0.25) {
+    return 'bg-subtle text-foreground';
+  }
+  if (value >= 0) {
+    if (intensity < 0.6) return 'bg-primary/15 text-foreground';
+    return 'bg-primary/30 text-foreground';
+  }
+  if (intensity < 0.6) return 'bg-danger/15 text-foreground';
+  return 'bg-danger/30 text-foreground';
 }
 
 const MetricRow: React.FC<{ label: string; value: string; testId?: string }> = ({
@@ -180,6 +187,12 @@ const VaRCard: React.FC<{
   );
 };
 
+type CorrelationRow = {
+  id: string;
+  label: string;
+  cells: Array<number | null>;
+};
+
 const CorrelationCard: React.FC<{
   block: PortfolioCorrelationBlock;
   text: (typeof PORTFOLIO_RISK_METRICS_TEXT)['en'];
@@ -187,6 +200,51 @@ const CorrelationCard: React.FC<{
   const symbols = block.symbols ?? [];
   const matrix = block.matrix ?? [];
   const hasMatrix = block.status === 'ok' && symbols.length > 0 && matrix.length > 0;
+
+  const rows: CorrelationRow[] = hasMatrix
+    ? symbols.map((symbol, rowIndex) => ({
+        id: symbol,
+        label: symbol,
+        cells: symbols.map((_, colIndex) => matrix[rowIndex]?.[colIndex] ?? null),
+      }))
+    : [];
+
+  const columns: DataTableColumn<CorrelationRow>[] = hasMatrix
+    ? [
+        {
+          id: 'symbol',
+          header: text.weightSymbol,
+          rowHeader: true,
+          nowrap: true,
+          cell: (row) => <span className="font-medium text-foreground">{row.label}</span>,
+        },
+        ...symbols.map((symbol, colIndex): DataTableColumn<CorrelationRow> => ({
+          id: `corr:${symbol}`,
+          header: symbol,
+          align: 'center',
+          cell: (row) => {
+            const raw = row.cells[colIndex] ?? null;
+            const display =
+              raw == null || !Number.isFinite(raw)
+                ? text.correlationMissingCell
+                : raw.toFixed(2);
+            return (
+              <div
+                className={cn(
+                  'flex min-h-10 items-center justify-center rounded-md border border-border/60 px-1 py-1 text-xs tabular-nums',
+                  correlationCellClass(raw),
+                )}
+                data-testid={
+                  row.id === symbol ? `portfolio-risk-corr-diag-${symbol}` : undefined
+                }
+              >
+                {display}
+              </div>
+            );
+          },
+        })),
+      ]
+    : [];
 
   return (
     <Card padding="md" data-testid="portfolio-risk-correlation-card">
@@ -203,59 +261,17 @@ const CorrelationCard: React.FC<{
         <p className="mb-2 text-xs text-secondary">{block.statusMessage}</p>
       ) : null}
       {hasMatrix ? (
-        <div className="overflow-x-auto" data-testid="portfolio-risk-correlation-matrix">
-          <table className="min-w-full border-collapse text-[11px]">
-            <caption className="sr-only">{text.correlationTitle}</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="sticky left-0 bg-surface p-1 text-left text-secondary">
-                  {' '}
-                </th>
-                {symbols.map((symbol) => (
-                  <th
-                    key={`col-${symbol}`}
-                    scope="col"
-                    className="p-1 text-center font-medium text-secondary"
-                  >
-                    {symbol}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {symbols.map((rowSymbol, rowIndex) => (
-                <tr key={`row-${rowSymbol}`}>
-                  <th
-                    scope="row"
-                    className="sticky left-0 bg-surface p-1 text-left font-medium text-secondary"
-                  >
-                    {rowSymbol}
-                  </th>
-                  {symbols.map((colSymbol, colIndex) => {
-                    const raw = matrix[rowIndex]?.[colIndex] ?? null;
-                    const display =
-                      raw == null || !Number.isFinite(raw)
-                        ? text.correlationMissingCell
-                        : raw.toFixed(2);
-                    return (
-                      <td
-                        key={`cell-${rowSymbol}-${colSymbol}`}
-                        className="p-1 text-center tabular-nums text-foreground"
-                        style={{ backgroundColor: correlationCellBackground(raw) }}
-                        data-testid={
-                          rowIndex === colIndex
-                            ? `portfolio-risk-corr-diag-${rowSymbol}`
-                            : undefined
-                        }
-                      >
-                        {display}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div data-testid="portfolio-risk-correlation-matrix">
+          <DataTable
+            caption={text.correlationTitle}
+            columns={columns}
+            rows={rows}
+            getRowKey={(row) => row.id}
+            density="compact"
+            frame="embedded"
+            minWidth="container"
+            emptyState={{ title: text.correlationEmpty }}
+          />
         </div>
       ) : (
         <EmptyState title={text.correlationEmpty} compact />
@@ -400,7 +416,7 @@ function topLevelBanner(
   return null;
 }
 
-export const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
+const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
   accountId,
   costMethod = 'fifo',
   asOf,
