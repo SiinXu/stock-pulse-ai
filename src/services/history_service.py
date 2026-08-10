@@ -1009,6 +1009,7 @@ class HistoryService:
                 analysis_summary=raw_result.get("analysis_summary", record.analysis_summary or ""),
                 key_points=raw_result.get("key_points", ""),
                 risk_warning=raw_result.get("risk_warning", ""),
+                risk_gate_result=raw_result.get("risk_gate_result"),
                 buy_reason=raw_result.get("buy_reason", ""),
                 market_snapshot=raw_result.get("market_snapshot"),
                 search_performed=raw_result.get("search_performed", False),
@@ -1023,7 +1024,7 @@ class HistoryService:
             if guardrail_reason:
                 setattr(result, "guardrail_reason", guardrail_reason)
             return result
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - keep malformed legacy history isolated
             log_safe_exception(
                 logger,
                 "Stored analysis result rebuild failed",

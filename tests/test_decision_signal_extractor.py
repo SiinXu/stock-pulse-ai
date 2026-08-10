@@ -115,6 +115,44 @@ def test_build_payload_includes_tw_market() -> None:
     assert payload["action"] == "buy"
 
 
+def test_build_payload_persists_structured_risk_manager_metadata() -> None:
+    result = _result(decision_type="hold", operation_advice="观望")
+    result.risk_gate_result = {
+        "schema_version": "risk-manager-result/v1",
+        "verdict": "downgrade",
+        "original_action": "buy",
+        "final_action": "hold",
+        "reason_codes": ["risk_veto"],
+        "reason_params": {},
+        "adjustment": "buy_to_hold",
+        "evidence_codes": ["risk_veto"],
+        "evidence_provenance": ["risk_agent_opinion"],
+        "profile": "balanced",
+        "override_enabled": False,
+        "override_would_apply": True,
+        "exit_id": "single_agent",
+        "evaluation_id": "evaluation-1",
+        "evaluated_at": "2026-08-09T00:00:00+00:00",
+        "authorized_bypass_id": None,
+        "fail_closed": False,
+    }
+
+    payload = build_decision_signal_payload_from_report(
+        result,
+        trace_id="trace-risk",
+        query_source="api",
+        report_type="full",
+        profile_source=BUILD_PROFILE_SOURCE,
+    )
+
+    assert payload is not None
+    assert payload["metadata"]["risk_manager"] == result.risk_gate_result
+    assert payload["action"] == "hold"
+    assert payload["metadata"]["final_action"] == "hold"
+    assert payload["metadata"]["raw_action"] == "buy"
+    assert payload["metadata"]["action_adjustment_reason"] == "risk_manager_final_action"
+
+
 def test_build_payload_maps_report_context_and_price_plan() -> None:
     result = _result()
     result.market_phase_summary = {"phase": "postmarket"}
