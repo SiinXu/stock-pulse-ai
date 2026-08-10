@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { History } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { Button, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
+import { Button, ConfirmDialog, Drawer, IconButton, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
 import { ChatComposer } from '../components/chat/ChatComposer';
+import { ChatSendFeedbackAlert } from '../components/chat/ChatSendFeedback';
 import { WhatIfScenarioPanel } from '../components/chat/WhatIfScenarioPanel';
 import {
   resolveActiveStockContextFromMessage,
@@ -17,13 +18,11 @@ import {
 import { getMessageSkillLabel } from '../components/chat/chatMessageMeta';
 import { useChatPageUiState } from '../components/chat/useChatPageUiState';
 import { useChatWhatIf } from '../components/chat/useChatWhatIf';
+import { useChatSendFeedback } from '../components/chat/useChatSendFeedback';
 import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
-import {
-  useAgentChatStore,
-  type Message,
-} from '../stores/agentChatStore';
+import { useAgentChatStore, type Message } from '../stores/agentChatStore';
 import { downloadSession, formatSessionAsMarkdown } from '../utils/chatExport';
 import type { ChatFollowUpContext } from '../utils/chatFollowUp';
 import {
@@ -126,10 +125,7 @@ const ChatPage: React.FC = () => {
   }, [dispatchUi]);
   const closeSidebar = useCallback(() => setSidebarPresentationOpen(false), [setSidebarPresentationOpen]);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
-  const [sendToast, setSendToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
+  const { sendToast, showSendFeedback, clearSendFeedback } = useChatSendFeedback();
   const [contextCompressionEnabled, setContextCompressionEnabled] = useState(false);
   const [contextCompressionLoaded, setContextCompressionLoaded] = useState(false);
   const [contextCompressionSaving, setContextCompressionSaving] = useState(false);
@@ -150,7 +146,6 @@ const ChatPage: React.FC = () => {
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
-  const sendToastTimerRef = useRef<number | null>(null);
   const followUpHydrationTokenRef = useRef(0);
   const sendGenerationRef = useRef(0);
   const lastHydratedFollowUpKeyRef = useRef<string | null>(null);
@@ -175,9 +170,6 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const timers = copyResetTimerRef.current;
     return () => {
-      if (sendToastTimerRef.current !== null) {
-        window.clearTimeout(sendToastTimerRef.current);
-      }
       Object.values(timers).forEach((timerId) => {
         if (timerId !== undefined) {
           window.clearTimeout(timerId);
@@ -659,16 +651,6 @@ const ChatPage: React.FC = () => {
       }
     });
   }, [searchParams, sessionId]);
-  const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {
-    if (sendToastTimerRef.current !== null) {
-      window.clearTimeout(sendToastTimerRef.current);
-    }
-    setSendToast(nextToast);
-    sendToastTimerRef.current = window.setTimeout(() => {
-      setSendToast(null);
-      sendToastTimerRef.current = null;
-    }, durationMs);
-  }, []);
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
@@ -974,7 +956,7 @@ const ChatPage: React.FC = () => {
                       onClick={async () => {
                         if (sending) return;
                         setSending(true);
-                        setSendToast(null);
+                        clearSendFeedback();
                         try {
                           const content = formatSessionAsMarkdown(messages, language);
                           await agentApi.sendChat(content);
@@ -1024,15 +1006,7 @@ const ChatPage: React.FC = () => {
               ]}
             />
           </div>
-          {sendToast ? (
-            <InlineAlert
-              variant={sendToast.type === 'success' ? 'success' : 'danger'}
-              size="compact"
-              title={sendToast.type === 'success' ? t('chat.sendSuccess') : t('chat.sendFailure')}
-              message={sendToast.message}
-              className="max-w-md"
-            />
-          ) : null}
+          <ChatSendFeedbackAlert toast={sendToast} successTitle={t('chat.sendSuccess')} failureTitle={t('chat.sendFailure')} />
         </header>
 
         {chatMode === 'research' ? (
@@ -1081,12 +1055,8 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
-          <WhatIfScenarioPanel
-            t={t}
-            draft={whatIfDraft}
-            onChange={setWhatIfDraft}
-            disabled={loading || sessionLoading || isSkillsLoading}
-          />
+          <WhatIfScenarioPanel t={t} draft={whatIfDraft} onChange={setWhatIfDraft}
+            disabled={loading || sessionLoading || isSkillsLoading} />
 
           <ChatComposer
             language={language}
@@ -1129,7 +1099,6 @@ const ChatPage: React.FC = () => {
             onStop={() => stopStream()}
             onSend={() => handleSend()}
           />
-
         </Surface>
       </div>
     </div>
