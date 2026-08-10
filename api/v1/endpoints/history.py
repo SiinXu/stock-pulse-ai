@@ -289,9 +289,9 @@ def get_history_list(
     },
     summary="Search analysis history summaries",
     description=(
-        "Search stock code, stock name, report type, trend, summary, and advice through a "
-        "maintained full-text index. Raw reports, context snapshots, news content, and "
-        "configuration values are not indexed."
+        "Search stock code, stock name, report type, trend, summary, advice, and creation "
+        "timestamp through a maintained full-text index. Raw reports, context snapshots, "
+        "news content, and configuration values are not indexed."
     ),
 )
 def search_history(

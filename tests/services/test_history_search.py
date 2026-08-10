@@ -143,6 +143,7 @@ def test_search_triggers_synchronize_insert_update_and_delete(database: Database
         ("bullish structure", "trend_prediction", "bullish structure"),
         ("Long-term quality", "analysis_summary", "Long-term quality remains constructive"),
         ("hold patiently", "operation_advice", "hold patiently"),
+        ("2026-08-10", "created_at", datetime(2026, 8, 10, 12, 30)),
     ],
 )
 def test_search_indexes_each_allowed_column(

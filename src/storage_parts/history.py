@@ -342,7 +342,8 @@ class _HistoryMethods:
         The query reads only matching row ids from the trigram index, applies a
         hard result cap, then reads only the bounded low-sensitive projection.
         Raw results, context snapshots, news content, and configuration values
-        are intentionally absent from the indexed columns.
+        are intentionally absent from the indexed columns. Creation timestamps
+        remain searchable because they are part of the low-sensitive result DTO.
         """
         normalized_query = str(query or "").strip()
         if len(normalized_query) < 3:

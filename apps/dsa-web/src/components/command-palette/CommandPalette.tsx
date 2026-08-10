@@ -250,62 +250,64 @@ export function CommandPalette({
           wrapperClassName="h-10 sm:h-10"
         />
 
-        <div
-          id="command-palette-results"
-          role="listbox"
-          aria-label={text.paletteDescription}
-          aria-busy={search.isLoading}
-          className="max-h-[55dvh] space-y-4 overflow-y-auto pr-1"
-        >
-          {groups.map((group) => {
-            const groupOffset = resultOffset;
-            resultOffset += group.items.length;
-            const labelId = `command-palette-${group.id}-label`;
-            return (
-              <section key={group.id} role="group" aria-labelledby={labelId}>
-                <h3 id={labelId} className="mb-1 px-2 text-xs font-medium uppercase text-muted-text">
-                  {group.label}
-                </h3>
-                <div className="space-y-1">
-                  {group.items.map((result, itemIndex) => {
-                    const resultIndex = groupOffset + itemIndex;
-                    const Icon = result.icon;
-                    const selected = resultIndex === safeActiveIndex;
-                    return (
-                      <button
-                        key={result.id}
-                        id={optionId(result)}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        tabIndex={-1}
-                        onClick={() => selectHref(result.href)}
-                        onMouseMove={() => setActiveIndex(resultIndex)}
-                        className={cn(
-                          'flex min-h-11 w-full items-center gap-3 rounded-md px-2 text-left text-sm text-foreground',
-                          'hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25',
-                          selected && 'bg-hover ring-2 ring-primary/20',
-                        )}
-                      >
-                        <Icon className="size-4 shrink-0 text-secondary-text" aria-hidden="true" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{result.label}</span>
-                          {result.description ? (
-                            <span className="block truncate text-xs text-secondary-text">
-                              {result.description}
-                            </span>
+        <div className="max-h-[55dvh] overflow-y-auto pr-1">
+          <div
+            id="command-palette-results"
+            role="listbox"
+            aria-label={text.paletteDescription}
+            aria-busy={search.isLoading}
+            className="space-y-4"
+          >
+            {groups.map((group) => {
+              const groupOffset = resultOffset;
+              resultOffset += group.items.length;
+              const labelId = `command-palette-${group.id}-label`;
+              return (
+                <section key={group.id} role="group" aria-labelledby={labelId}>
+                  <h3 id={labelId} className="mb-1 px-2 text-xs font-medium uppercase text-muted-text">
+                    {group.label}
+                  </h3>
+                  <div className="space-y-1">
+                    {group.items.map((result, itemIndex) => {
+                      const resultIndex = groupOffset + itemIndex;
+                      const Icon = result.icon;
+                      const selected = resultIndex === safeActiveIndex;
+                      return (
+                        <button
+                          key={result.id}
+                          id={optionId(result)}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          tabIndex={-1}
+                          onClick={() => selectHref(result.href)}
+                          onMouseMove={() => setActiveIndex(resultIndex)}
+                          className={cn(
+                            'flex min-h-11 w-full items-center gap-3 rounded-md px-2 text-left text-sm text-foreground',
+                            'hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25',
+                            selected && 'bg-hover ring-2 ring-primary/20',
+                          )}
+                        >
+                          <Icon className="size-4 shrink-0 text-secondary-text" aria-hidden="true" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium">{result.label}</span>
+                            {result.description ? (
+                              <span className="block truncate text-xs text-secondary-text">
+                                {result.description}
+                              </span>
+                            ) : null}
+                          </span>
+                          {result.meta ? (
+                            <span className="shrink-0 text-xs text-muted-text">{result.meta}</span>
                           ) : null}
-                        </span>
-                        {result.meta ? (
-                          <span className="shrink-0 text-xs text-muted-text">{result.meta}</span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
 
           {search.isLoading ? (
             <div role="status" className="flex items-center justify-center gap-2 px-2 py-4 text-sm text-secondary-text">

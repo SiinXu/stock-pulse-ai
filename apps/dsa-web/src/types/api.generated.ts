@@ -1320,7 +1320,7 @@ export interface paths {
         };
         /**
          * Search analysis history summaries
-         * @description Search stock code, stock name, report type, trend, summary, and advice through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.
+         * @description Search stock code, stock name, report type, trend, summary, advice, and creation timestamp through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.
          */
         get: operations["search_history_api_v1_history_search_get"];
         put?: never;

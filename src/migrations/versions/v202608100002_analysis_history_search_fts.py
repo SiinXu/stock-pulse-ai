@@ -15,6 +15,7 @@ _SEARCH_COLUMNS = (
     "trend_prediction",
     "analysis_summary",
     "operation_advice",
+    "created_at",
 )
 
 
@@ -43,7 +44,7 @@ def upgrade(execution: MigrationExecution) -> None:
     )
     execution.exec_driver_sql(
         "CREATE TRIGGER trg_analysis_history_search_update "
-        "AFTER UPDATE OF code, name, report_type, trend_prediction, analysis_summary, operation_advice "
+        "AFTER UPDATE OF code, name, report_type, trend_prediction, analysis_summary, operation_advice, created_at "
         "ON analysis_history BEGIN "
         f"INSERT INTO analysis_history_search(analysis_history_search, rowid, {columns}) "
         f"VALUES ('delete', old.id, {', '.join(f'old.{column}' for column in _SEARCH_COLUMNS)}); "
