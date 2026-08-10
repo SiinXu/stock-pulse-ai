@@ -24,6 +24,8 @@ from src.plugins import (
     PluginManager,
     PluginManifest,
 )
+from src.services.security_audit_service import SecurityAuditUnavailable
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 from src.plugins.event_hooks import event_hook_extension_contract
 from src.plugins.loader import ExternalPluginLoader
 
@@ -340,6 +342,7 @@ def test_plugins_api_list_and_toggle(tmp_path: Path) -> None:
     plugin = _RecordingPlugin(_manifest("api-plugin"))
     manager.register(plugin, source="external", package_root=tmp_path)
     manager.load("api-plugin")
+    manager.bind_lifecycle_auditor(SecurityAuditRecorderStub())
 
     services = ApplicationServices(plugin_manager=manager, plugins_dir="")
     set_application_services(services)
@@ -353,6 +356,16 @@ def test_plugins_api_list_and_toggle(tmp_path: Path) -> None:
         assert body["total"] == 1
         assert body["items"][0]["id"] == "api-plugin"
         assert body["items"][0]["state"] == "enabled"
+        assert body["items"][0]["last_error_code"] is None
+
+        health = client.get("/api/v1/plugins/health")
+        assert health.status_code == 200
+        health_body = health.json()
+        assert health_body["total"] == 1
+        assert health_body["plugins"][0]["plugin_id"] == "api-plugin"
+        assert health_body["plugins"][0]["state"] == "enabled"
+        assert health_body["plugins"][0]["last_error_code"] is None
+        assert "generated_at" in health_body
 
         disabled = client.post(
             "/api/v1/plugins/api-plugin/lifecycle",
@@ -377,5 +390,138 @@ def test_plugins_api_list_and_toggle(tmp_path: Path) -> None:
         )
         assert restart.status_code == 200
         assert "restart_required" in restart.json()
+    finally:
+        reset_application_services()
+
+
+def test_plugins_api_attempt_audit_failure_prevents_mutation(tmp_path: Path) -> None:
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+
+    class FailingAttemptAudit(SecurityAuditRecorderStub):
+        def record_attempt(self, **fields) -> None:
+            raise SecurityAuditUnavailable()
+
+    reset_application_services()
+    manager, _ = _manager()
+    plugin = _RecordingPlugin(_manifest("audit-attempt-plugin"))
+    manager.register(plugin, source="external", package_root=tmp_path)
+    manager.load("audit-attempt-plugin")
+    manager.bind_lifecycle_auditor(FailingAttemptAudit())
+    set_application_services(
+        ApplicationServices(plugin_manager=manager, plugins_dir="")
+    )
+    try:
+        app = FastAPI()
+        app.include_router(plugins_endpoint.router, prefix="/api/v1/plugins")
+        response = TestClient(app).post(
+            "/api/v1/plugins/audit-attempt-plugin/lifecycle",
+            json={"action": "disable"},
+        )
+        assert response.status_code == 503
+        assert response.json()["detail"] == {
+            "error": "security_audit_unavailable",
+            "message": "Security audit storage is unavailable",
+            "operation_completed": False,
+        }
+        assert manager.snapshot("audit-attempt-plugin").state == "enabled"
+        assert plugin.unload_count == 0
+    finally:
+        reset_application_services()
+
+
+def test_plugins_api_completion_audit_failure_reports_real_outcome(
+    tmp_path: Path,
+) -> None:
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+
+    class FailingCompletionAudit(SecurityAuditRecorderStub):
+        def record_completion(self, **fields) -> None:
+            raise SecurityAuditUnavailable()
+
+    reset_application_services()
+    manager, _ = _manager()
+    plugin = _RecordingPlugin(_manifest("audit-completion-plugin"))
+    manager.register(plugin, source="external", package_root=tmp_path)
+    manager.load("audit-completion-plugin")
+    audit = FailingCompletionAudit()
+    manager.bind_lifecycle_auditor(audit)
+    set_application_services(
+        ApplicationServices(plugin_manager=manager, plugins_dir="")
+    )
+    try:
+        attempts_before = len(audit.attempts)
+        app = FastAPI()
+        app.include_router(plugins_endpoint.router, prefix="/api/v1/plugins")
+        response = TestClient(app).post(
+            "/api/v1/plugins/audit-completion-plugin/lifecycle",
+            json={"action": "disable"},
+        )
+        assert response.status_code == 503
+        detail = response.json()["detail"]
+        assert detail["error"] == "security_audit_unavailable"
+        assert detail["operation_completed"] is True
+        assert detail["operation_success"] is True
+        assert detail["state"] == "disabled"
+        assert detail["error_code"] is None
+        assert detail["message"] is None
+        assert detail["restart_required"] is False
+        assert detail["reloaded"] is False
+        assert manager.snapshot("audit-completion-plugin").state == "disabled"
+        assert plugin.unload_count == 1
+        operator_attempts = audit.attempts[attempts_before:]
+        assert len(operator_attempts) == 1
+        assert operator_attempts[0]["action"] == "plugin.disable"
+        assert operator_attempts[0]["actor_type"] == "administrator"
+        assert operator_attempts[0]["actor_id"] == "local_operator"
+    finally:
+        reset_application_services()
+
+
+def test_plugins_api_completion_audit_failure_preserves_reload_result() -> None:
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+
+    class FailingCompletionAudit(SecurityAuditRecorderStub):
+        def record_completion(self, **fields) -> None:
+            raise SecurityAuditUnavailable()
+
+    reset_application_services()
+    manager, _ = _manager()
+    plugin = _RecordingPlugin(_manifest("audit-reload-plugin"))
+    manager.register(plugin, source="builtin")
+    manager.load("audit-reload-plugin")
+    manager.bind_lifecycle_auditor(FailingCompletionAudit())
+    set_application_services(
+        ApplicationServices(plugin_manager=manager, plugins_dir="")
+    )
+    try:
+        app = FastAPI()
+        app.include_router(plugins_endpoint.router, prefix="/api/v1/plugins")
+        response = TestClient(app).post(
+            "/api/v1/plugins/audit-reload-plugin/lifecycle",
+            json={"action": "reload"},
+        )
+
+        assert response.status_code == 503
+        detail = response.json()["detail"]
+        assert detail["error"] == "security_audit_unavailable"
+        assert detail["operation_completed"] is True
+        assert detail["operation_success"] is False
+        assert detail["state"] == "enabled"
+        assert detail["error_code"] == "plugin_reload_restart_required"
+        assert detail["restart_required"] is True
+        assert detail["reloaded"] is False
+        assert "process restart" in detail["message"]
     finally:
         reset_application_services()
