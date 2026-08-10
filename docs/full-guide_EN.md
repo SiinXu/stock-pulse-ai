@@ -1291,11 +1291,13 @@ System defaults to AkShare (free), also supports other data sources:
 
 ### Hong Kong Stock Support
 
-Use `hk` prefix for HK stock codes:
+HK stocks accept bare four- or five-digit numbers, an `hk` prefix, or a `.HK` suffix:
 
 ```bash
 STOCK_LIST=600519,hk00700,hk01810
 ```
+
+CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot analysis/research share the same input rule. A bare four-digit code such as `0941` is checked against the stock index and becomes `HK00941` when unresolved; indexed Japanese `7203` remains `7203.T`. Explicit forms such as `1810.HK`, `7203.T`, `2330.TW`, and `005930.KS`, as well as an explicit API market hint, always take precedence and are never reinterpreted as Hong Kong.
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
 
@@ -1682,7 +1684,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 |------|------|------|
 | A-shares | 6-digit number | `600519`, `000001`, `300750` |
 | BSE (Beijing) | 8/4/92 prefix, 6-digit; supports `BJ` prefix or `.BJ` suffix | `920748`, `BJ920493`, `920493.BJ` |
-| HK stocks | hk + 5-digit number | `hk00700`, `hk09988` |
+| HK stocks | Bare 4/5 digits, `HK` prefix, or `.HK` suffix | `0941`, `00700`, `hk00700`, `1810.HK` |
 | US stocks | 1-5 letters, optional `.X` suffix | `AAPL`, `TSLA`, `BRK.B` |
 | Japanese stocks | Yahoo `.T` suffix | `7203.T`, `6758.T` |
 | Korean stocks | Yahoo `.KS` / `.KQ` suffix | `005930.KS`, `035720.KQ` |
