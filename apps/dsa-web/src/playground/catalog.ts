@@ -124,6 +124,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('dashboard', 'dashboard-panel-header', 'DashboardPanelHeader', 'components/dashboard/DashboardPanelHeader.tsx'),
   entry('dashboard', 'dashboard-state-block', 'DashboardStateBlock', 'components/dashboard/DashboardStateBlock.tsx', ['default', 'loading', 'empty']),
   entry('dashboard', 'home-readiness-card', 'HomeReadinessCard', 'components/home/HomeReadinessCard.tsx', ['default', 'loading', 'empty', 'error']),
+  entry('dashboard', 'todays-focus-panel', 'TodaysFocusPanel', 'components/home/TodaysFocusPanel.tsx', ['default', 'empty', 'loading', 'error']),
   entry('dashboard', 'home-onboarding-section', 'HomeOnboardingSection', 'components/onboarding/HomeOnboardingSection.tsx', ['default', 'empty']),
   entry('dashboard', 'onboarding-today-plan-card', 'OnboardingTodayPlanCard', 'components/onboarding/OnboardingTodayPlanCard.tsx', ['default']),
   entry('dashboard', 'agent-onboarding-wizard', 'AgentOnboardingWizard', 'components/onboarding/AgentOnboardingWizard.tsx', ['interactive']),
