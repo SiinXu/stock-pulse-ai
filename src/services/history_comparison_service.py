@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -22,6 +23,10 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from src.report_language import normalize_report_language
 from src.schemas.decision_action import display_action_fields
 from src.schemas.decision_scale import extract_decision_guardrail_reason
+from src.services.stock_code_utils import (
+    build_daily_code_candidates,
+    canonicalize_analysis_stock_code,
+)
 from src.utils.data_processing import parse_json_field
 from src.utils.sanitize import log_safe_exception
 
@@ -228,6 +233,8 @@ def _record_to_signal(
 
     try:
         return {
+            "record_id": int(record.id) if record.id is not None else None,
+            "code": record.code,
             "created_at": record.created_at.isoformat() if record.created_at else None,
             "query_id": record.query_id,
             "sentiment_score": record.sentiment_score,
@@ -236,7 +243,7 @@ def _record_to_signal(
             "action_label": action_fields["action_label"],
             "trend_prediction": record.trend_prediction,
         }
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - invalid stored row skipped
         log_safe_exception(
             logger,
             "History comparison record skipped",
@@ -287,6 +294,7 @@ def get_signal_changes_batch(
     exclude_query_ids: Optional[Dict[str, str]] = None,
     *,
     report_language: Optional[str] = None,
+    created_at_from: Optional[datetime] = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Get recent signal changes for multiple stocks.
@@ -299,21 +307,63 @@ def get_signal_changes_batch(
     Returns:
         Dict mapping code -> list of signal dicts
     """
-    exclude_query_ids = exclude_query_ids or {}
-    db = _database_manager().get_instance()
-    result: Dict[str, List[Dict[str, Any]]] = {c: [] for c in codes}
-    for code in codes:
-        exclude = exclude_query_ids.get(code)
-        records = db.get_analysis_history(
-            code=code,
-            days=90,
-            limit=limit,
-            exclude_query_id=exclude,
+    requested_codes = list(
+        dict.fromkeys(
+            str(code or "").strip()
+            for code in codes
+            if str(code or "").strip()
         )
-        for r in records:
-            sig = _record_to_signal(r, report_language=report_language)
-            if sig:
-                result[code].append(sig)
+    )
+    safe_limit = max(1, int(limit))
+    exclude_query_ids = exclude_query_ids or {}
+    result: Dict[str, List[Dict[str, Any]]] = {code: [] for code in requested_codes}
+    if not requested_codes:
+        return result
+
+    requested_by_canonical: Dict[str, List[str]] = {}
+    stored_candidates: List[str] = []
+    for requested in requested_codes:
+        canonical = canonicalize_analysis_stock_code(requested)
+        if not canonical:
+            continue
+        requested_by_canonical.setdefault(canonical, []).append(requested)
+        stored_candidates.extend(build_daily_code_candidates(canonical))
+
+    if not stored_candidates:
+        return result
+    since = created_at_from or (datetime.now(timezone.utc) - timedelta(days=90))
+    db = _database_manager().get_instance()
+    fetch_limit = safe_limit + 1 if exclude_query_ids else safe_limit
+    records = db.get_analysis_history_batch(
+        codes=stored_candidates,
+        created_at_from=since,
+        limit_per_code=fetch_limit,
+    )
+    records_by_canonical: Dict[str, List[Any]] = {}
+    for record in records:
+        canonical = canonicalize_analysis_stock_code(str(getattr(record, "code", "") or ""))
+        if canonical in requested_by_canonical:
+            records_by_canonical.setdefault(canonical, []).append(record)
+
+    for canonical, requested_aliases in requested_by_canonical.items():
+        ordered = sorted(
+            records_by_canonical.get(canonical, []),
+            key=lambda record: (
+                getattr(record, "created_at", None) or datetime.min,
+                int(getattr(record, "id", 0) or 0),
+            ),
+            reverse=True,
+        )
+        for requested in requested_aliases:
+            excluded = exclude_query_ids.get(requested)
+            for record in ordered:
+                if excluded and getattr(record, "query_id", None) == excluded:
+                    continue
+                signal = _record_to_signal(record, report_language=report_language)
+                if signal:
+                    result[requested].append(signal)
+                if len(result[requested]) >= safe_limit:
+                    break
     return result
 
 

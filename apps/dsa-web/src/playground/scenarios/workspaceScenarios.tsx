@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { lazy, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
@@ -36,6 +36,8 @@ const useSamples = () => {
   const { language } = useUiLanguage();
   return PLAYGROUND_TEXT[language].samples;
 };
+
+const LazyTodaysFocusStory = lazy(() => import('./todaysFocusScenario'));
 
 const LazyZeroConfigFirstRunPanelStory = lazy(async () => {
   const module = await import('./zeroConfigFirstRunScenario');
@@ -305,6 +307,14 @@ const HomeReadinessCardStory = () => {
   );
 };
 
+const TodaysFocusPanelStory = () => {
+  return (
+    <Suspense fallback={null}>
+      <LazyTodaysFocusStory />
+    </Suspense>
+  );
+};
+
 const HomeOnboardingSectionStory = () => {
   const { scenario } = usePlaygroundScenario();
   const { t } = useUiLanguage();
@@ -441,6 +451,7 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-watchlist-groups-section': HomeWatchlistGroupsSectionStory,
   'watchlist-groups-panel': WatchlistGroupsPanelStory,
   'home-readiness-card': HomeReadinessCardStory,
+  'todays-focus-panel': TodaysFocusPanelStory,
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
