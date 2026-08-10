@@ -42,6 +42,7 @@ from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
 from data_provider.base import normalize_stock_code
+from data_provider.daily_cache import LocalDataMissingError
 from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
 
@@ -532,6 +533,7 @@ def get_stock_quote(stock_code: str) -> StockQuote:
     response_model=StockHistoryResponse,
     responses={
         200: {"description": "历史行情数据"},
+        409: {"description": "Local-only market data is incomplete", "model": ErrorResponse},
         422: {"description": "不支持的周期参数", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
     },
@@ -588,6 +590,15 @@ def get_stock_history(
             data=data
         )
     
+    except LocalDataMissingError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": exc.error_code,
+                "message": str(exc),
+                "details": exc.to_dict(),
+            },
+        )
     except ValueError as e:
         # period Parameter not supported error(If weekly/monthly)
         raise HTTPException(

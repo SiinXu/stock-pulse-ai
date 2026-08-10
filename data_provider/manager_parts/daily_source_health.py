@@ -10,7 +10,7 @@ existing call sites and tests keep working without behavior changes.
 
 from __future__ import annotations
 
-import json
+import json as _json
 import logging
 import os
 import time
@@ -164,6 +164,7 @@ class _DailySourceHealthMethods:
         """Serialize shared fetcher state access through manager-owned per-instance locks."""
         validation_instrument_type = kwargs.pop("_validation_instrument_type", None)
         method = getattr(fetcher, method_name)
+        result_validator = kwargs.pop("_manager_result_validator", None)
         with self._get_fetcher_call_lock(fetcher):
             if method_name == "get_realtime_quote":
                 result = method(*args, **kwargs)
@@ -184,6 +185,10 @@ class _DailySourceHealthMethods:
                     )
                 return result
             if method_name != "get_daily_data":
+                if result_validator is not None:
+                    raise ValueError(
+                        "_manager_result_validator is only supported for get_daily_data"
+                    )
                 return method(*args, **kwargs)
 
             stock_code = kwargs.get("stock_code") or (args[0] if args else "")
@@ -202,6 +207,8 @@ class _DailySourceHealthMethods:
             started_at = time.monotonic()
             try:
                 result = method(*args, **kwargs)
+                if result_validator is not None:
+                    result = result_validator(result)
                 if isinstance(result, pd.DataFrame) and not result.empty:
                     from data_provider.data_validation import validate_and_annotate
 
@@ -402,7 +409,7 @@ class _DailySourceHealthMethods:
                     sanitize_diagnostic_text(fetcher.name, max_length=120)
                     for fetcher in selected_order
                 ),
-                json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
+                _json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
             )
         return selected_order
 
@@ -612,7 +619,7 @@ class _DailySourceHealthMethods:
         logger.info(
             "provider_health event=snapshot data_type=daily_data market=%s payload=%s",
             report["market"],
-            json.dumps(report, sort_keys=True, separators=(",", ":")),
+            _json.dumps(report, sort_keys=True, separators=(",", ":")),
         )
         return report
 
