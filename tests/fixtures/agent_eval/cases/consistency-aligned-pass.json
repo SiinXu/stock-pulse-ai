@@ -1,0 +1,21 @@
+{
+  "id": "consistency-aligned-pass",
+  "title": "Bearish evidence with sell signal",
+  "tags": ["conclusion_consistency", "pass"],
+  "dimensions": ["conclusion_consistency"],
+  "context": {
+    "stock_code": "TSLA"
+  },
+  "agent_output": {
+    "signal": "sell",
+    "evidence": [
+      {"label": "trend", "polarity": "bearish", "note": "MA breakdown"},
+      {"label": "news", "sentiment": "看空", "note": "guidance cut"}
+    ]
+  },
+  "evaluation": {
+    "conclusion_consistency": {
+      "expected_signal": "sell"
+    }
+  }
+}

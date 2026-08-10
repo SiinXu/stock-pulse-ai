@@ -13,9 +13,13 @@ from __future__ import annotations
 import copy
 import json
 import os
+import shutil
 import sys
 
 import pytest
+
+from src.services.agent_eval_service import load_eval_cases
+from scripts.run_agent_benchmark import main as benchmark_main
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
 
@@ -38,6 +42,7 @@ from tests.agent.benchmark.metrics import (  # noqa: E402
 from tests.agent.benchmark.runner import (  # noqa: E402
     canonical_json,
     run_benchmark,
+    run_output_quality_comparison,
     score_only_view,
 )
 
@@ -92,6 +97,34 @@ def test_benchmark_is_deterministic() -> None:
     first = score_only_view(run_benchmark())
     second = score_only_view(run_benchmark())
     assert canonical_json(first) == canonical_json(second)
+
+
+def test_output_quality_uses_canonical_runner_and_detects_candidate_regression() -> None:
+    report = run_benchmark()
+    output_eval = report["output_quality_evaluation"]
+    assert output_eval["comparison"]["regressed"] is False
+    assert output_eval["baseline"]["suite_hash"] == output_eval["candidate"]["suite_hash"]
+
+    candidate_cases = copy.deepcopy(load_eval_cases())
+    candidate_cases[0]["agent_output"] = {}
+    comparison = run_output_quality_comparison(candidate_cases)["comparison"]
+    assert comparison["regressed"] is True
+
+
+def test_strict_cli_exits_nonzero_for_output_quality_regression(tmp_path) -> None:
+    source = os.path.join(os.path.dirname(__file__), "..", "..", "fixtures", "agent_eval")
+    candidate_root = tmp_path / "candidate"
+    shutil.copytree(source, candidate_root)
+    case_path = candidate_root / "cases" / "fact-grounded-pass.json"
+    case = json.loads(case_path.read_text(encoding="utf-8"))
+    case["agent_output"] = {}
+    case_path.write_text(json.dumps(case), encoding="utf-8")
+    assert benchmark_main([
+        "--strict-baseline", "--quiet",
+        "--output-quality-candidate-root", str(candidate_root),
+        "--candidate-agent-version", "agent-v2",
+        "--candidate-config-version", "config-v2",
+    ]) == 2
 
 
 def test_score_observation_detects_overconfident_partial_path() -> None:
