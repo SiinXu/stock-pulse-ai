@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Wire opt-in plan→act→observe into AgentExecutor.run with Config/registry knobs, BoundToolSession tool dispatch, hard budgets, and production-path regression coverage (Refs #199).
 - [Added] Report Markdown panel download actions call history export for Markdown/PDF so archive export #163 is user-reachable (Refs #163, #1008).
 - [Added] Model Access hub surfaces local model runtime and local CLI detection status (available/unavailable/not configured, last checked, honest probe failures) alongside cloud connections (Refs #865).
 - [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
