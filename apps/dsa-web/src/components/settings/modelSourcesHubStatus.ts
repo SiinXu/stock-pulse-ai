@@ -143,21 +143,12 @@ export function summarizeLocalCliStatus(
     };
   }
 
-  if (primary.healthStatus === 'passed' || primary.available) {
-    // available without a smoke test still means the CLI was detected; health "passed"
-    // is stronger. Never promote failed rows.
-    return {
-      availability: 'available',
-      tone: primary.healthStatus === 'passed' ? 'success' : 'info',
-      detailKey: primary.backendId,
-    };
-  }
-
+  // available without a smoke test still means the CLI was detected; health "passed"
+  // is stronger. Never promote failed / unavailable rows (handled above).
   return {
-    availability: 'unavailable',
-    tone: 'neutral',
+    availability: 'available',
+    tone: primary.healthStatus === 'passed' ? 'success' : 'info',
     detailKey: primary.backendId,
-    failureReason: primary.lastErrorMessage || null,
   };
 }
 

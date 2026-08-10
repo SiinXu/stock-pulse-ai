@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, and locale chunks enlarged by the Notifications hub plus screening-state translations. Locale caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined locale chunks and IntelligenceSourcesPanel after Model Access hub local-runtime/CLI status copy (PR #1031 / Refs #865). Locale caps retain 200 bytes of headroom over max(CI, local) gzip; other measuredGzipBytes still come from the 2026-08-08 initial baseline unless previously rebaselined.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 228783,
+      "measuredGzipBytes": 207984,
+      "note": "Rebaselined after Settings/Model Access hub status surface grew the shared chunk graph (Refs #865 / PR #1031); 10% headroom on max(CI, local) gzip."
     },
     {
       "id": "js-entry",
@@ -25,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 132340,
-      "measuredGzipBytes": 132140,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 132774,
+      "measuredGzipBytes": 132574,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 126652,
-      "measuredGzipBytes": 126452,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 127304,
+      "measuredGzipBytes": 127104,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 126247,
-      "measuredGzipBytes": 126047,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 126640,
+      "measuredGzipBytes": 126440,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 126528,
-      "measuredGzipBytes": 126328,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 127100,
+      "measuredGzipBytes": 126900,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 122506,
-      "measuredGzipBytes": 122306,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 123226,
+      "measuredGzipBytes": 123026,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 119940,
-      "measuredGzipBytes": 119740,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 120327,
+      "measuredGzipBytes": 120127,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113297,
-      "measuredGzipBytes": 113097,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 114013,
+      "measuredGzipBytes": 113813,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 113446,
-      "measuredGzipBytes": 113246,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 114192,
+      "measuredGzipBytes": 113992,
+      "note": "Tight rebaseline for Model Access local-runtime/CLI status translations (Refs #865); retains 200 bytes of headroom over max(CI, local) gzip."
     },
     {
       "id": "vendor-charts",
