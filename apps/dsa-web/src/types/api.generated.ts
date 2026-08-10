@@ -2284,6 +2284,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a stored daily portfolio health snapshot
+         * @description Read-only lookup. This endpoint never replays the portfolio and never writes portfolio caches or health rows. Use POST /health/refresh for explicit computation.
+         */
+        get: operations["getPortfolioHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/health/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explicitly refresh a daily portfolio health snapshot
+         * @description Replays one side-effect-free portfolio snapshot, passes that immutable input to risk metrics, and optionally performs one atomic health upsert. With persist=false the complete operation performs zero writes.
+         */
+        post: operations["refreshPortfolioHealth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/imports/csv/brokers": {
         parameters: {
             query?: never;
@@ -9940,6 +9980,274 @@ export interface components {
             stale_count: number;
             /** Updated Count */
             updated_count: number;
+        };
+        /** PortfolioHealthBand */
+        PortfolioHealthBand: {
+            /** Max Exclusive */
+            max_exclusive: number;
+            /** Min Inclusive */
+            min_inclusive: number;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "healthy" | "fair" | "caution" | "poor";
+        };
+        /** PortfolioHealthDataQuality */
+        PortfolioHealthDataQuality: {
+            /**
+             * Fx Stale
+             * @default false
+             */
+            fx_stale: boolean;
+            /** Limitations */
+            limitations?: string[];
+            /** Missing Price Symbols */
+            missing_price_symbols?: string[];
+            /** Partial Reasons */
+            partial_reasons?: string[];
+            /** Risk Metrics Status */
+            risk_metrics_status?: string | null;
+            /** Snapshot Data Quality */
+            snapshot_data_quality?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial" | "empty" | "unavailable";
+        };
+        /** PortfolioHealthDimension */
+        PortfolioHealthDimension: {
+            /** Formula */
+            formula?: string | null;
+            /** Input */
+            input?: {
+                [key: string]: number;
+            };
+            /** Reason */
+            reason?: string | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+            /** Status Message */
+            status_message?: string | null;
+        };
+        /** PortfolioHealthDimensions */
+        PortfolioHealthDimensions: {
+            cash_ratio: components["schemas"]["PortfolioHealthDimension"];
+            concentration: components["schemas"]["PortfolioHealthDimension"];
+            diversification: components["schemas"]["PortfolioHealthDimension"];
+            pnl: components["schemas"]["PortfolioHealthDimension"];
+            risk_exposure: components["schemas"]["PortfolioHealthDimension"];
+        };
+        /** PortfolioHealthEffectiveWeights */
+        PortfolioHealthEffectiveWeights: {
+            /** Cash Ratio */
+            cash_ratio?: number | null;
+            /** Concentration */
+            concentration?: number | null;
+            /** Diversification */
+            diversification?: number | null;
+            /** Pnl */
+            pnl?: number | null;
+            /** Risk Exposure */
+            risk_exposure?: number | null;
+        };
+        /** PortfolioHealthInputs */
+        PortfolioHealthInputs: {
+            /** Cash Pct */
+            cash_pct?: number | null;
+            /** Diversification Score */
+            diversification_score?: number | null;
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+            /**
+             * Total Cash
+             * @default 0
+             */
+            total_cash: number;
+            /**
+             * Total Equity
+             * @default 0
+             */
+            total_equity: number;
+            /**
+             * Total Market Value
+             * @default 0
+             */
+            total_market_value: number;
+            /** Unrealized Pnl Pct */
+            unrealized_pnl_pct?: number | null;
+            /** Var Pct */
+            var_pct?: number | null;
+        };
+        /** PortfolioHealthInsight */
+        PortfolioHealthInsight: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Metric */
+            metric?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning";
+            /**
+             * Source
+             * @default rule
+             * @enum {string}
+             */
+            source: "rule" | "rule+llm_polish";
+            /** Symbol */
+            symbol?: string | null;
+            /** Threshold */
+            threshold?: number | null;
+            /** Value */
+            value?: number | null;
+        };
+        /** PortfolioHealthProvenance */
+        PortfolioHealthProvenance: {
+            /**
+             * Calculated At
+             * Format: date-time
+             */
+            calculated_at: string;
+            /** Config Hash */
+            config_hash: string;
+            /** Fx Provenance */
+            fx_provenance?: {
+                [key: string]: unknown;
+            };
+            /** Price Provenance */
+            price_provenance?: {
+                [key: string]: unknown;
+            };
+            /** Risk Hash */
+            risk_hash: string;
+            /** Risk History */
+            risk_history?: {
+                [key: string]: unknown;
+            };
+            /** Snapshot Hash */
+            snapshot_hash: string;
+        };
+        /** PortfolioHealthResolvedConfig */
+        PortfolioHealthResolvedConfig: {
+            /** Cash High Alert Pct */
+            cash_high_alert_pct: number;
+            /** Cash Low Alert Pct */
+            cash_low_alert_pct: number;
+            /** Concentration Alert Pct */
+            concentration_alert_pct: number;
+            /** Diversification Alert */
+            diversification_alert: number;
+            /** Pnl Loss Alert Pct */
+            pnl_loss_alert_pct: number;
+            /**
+             * Source
+             * @constant
+             */
+            source: "shared_config";
+            /** Var Alert Pct */
+            var_alert_pct: number;
+            weights: components["schemas"]["PortfolioHealthWeights"];
+        };
+        /** PortfolioHealthResponse */
+        PortfolioHealthResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Band */
+            band?: ("healthy" | "fair" | "caution" | "poor") | null;
+            /** Bands */
+            bands?: components["schemas"]["PortfolioHealthBand"][];
+            /** Comparable */
+            comparable: boolean;
+            config: components["schemas"]["PortfolioHealthResolvedConfig"];
+            /**
+             * Cost Method
+             * @enum {string}
+             */
+            cost_method: "fifo" | "avg";
+            /** Coverage Ratio */
+            coverage_ratio: number;
+            /** Currency */
+            currency: string;
+            data_quality: components["schemas"]["PortfolioHealthDataQuality"];
+            dimensions: components["schemas"]["PortfolioHealthDimensions"];
+            /** Disclaimer */
+            disclaimer: string;
+            effective_weights: components["schemas"]["PortfolioHealthEffectiveWeights"];
+            /**
+             * Formula Version
+             * @default portfolio_health_v2
+             * @constant
+             */
+            formula_version: "portfolio_health_v2";
+            inputs: components["schemas"]["PortfolioHealthInputs"];
+            /** Insights */
+            insights?: components["schemas"]["PortfolioHealthInsight"][];
+            /**
+             * Llm Can Modify Score
+             * @default false
+             * @constant
+             */
+            llm_can_modify_score: false;
+            /**
+             * Partial Score
+             * @description Fixed-denominator diagnostic estimate. Missing dimensions contribute zero; never compare this value with complete daily scores.
+             */
+            partial_score?: number | null;
+            /**
+             * Persisted
+             * @default false
+             */
+            persisted: boolean;
+            provenance: components["schemas"]["PortfolioHealthProvenance"];
+            /**
+             * Score
+             * @description Comparable deterministic score; null for incomplete coverage.
+             */
+            score?: number | null;
+            /**
+             * Score Source
+             * @default rules
+             * @constant
+             */
+            score_source: "rules";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial" | "empty_portfolio" | "unavailable";
+            /** Status Message */
+            status_message?: string | null;
+            /** Unavailable Dimensions */
+            unavailable_dimensions?: ("concentration" | "risk_exposure" | "diversification" | "pnl" | "cash_ratio")[];
+            weights: components["schemas"]["PortfolioHealthWeights"];
+        };
+        /** PortfolioHealthWeights */
+        PortfolioHealthWeights: {
+            /** Cash Ratio */
+            cash_ratio: number;
+            /** Concentration */
+            concentration: number;
+            /** Diversification */
+            diversification: number;
+            /** Pnl */
+            pnl: number;
+            /** Risk Exposure */
+            risk_exposure: number;
         };
         /** PortfolioHistoricalVaRBlock */
         PortfolioHistoricalVaRBlock: {
@@ -21531,6 +21839,123 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioHealth: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description Snapshot date; default today */
+                as_of?: string | null;
+                cost_method?: "fifo" | "avg";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioHealthResponse"];
+                };
+            };
+            /** @description No stored daily health snapshot */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Health snapshot retrieval failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Portfolio health migration required */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refreshPortfolioHealth: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                cost_method?: "fifo" | "avg";
+                /** @description Persist one atomic daily health upsert */
+                persist?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioHealthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Health score computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Inputs or migration unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

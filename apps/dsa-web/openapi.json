@@ -16061,6 +16061,821 @@
         "title": "PortfolioFxRefreshResponse",
         "type": "object"
       },
+      "PortfolioHealthBand": {
+        "additionalProperties": false,
+        "properties": {
+          "max_exclusive": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Max Exclusive",
+            "type": "number"
+          },
+          "min_inclusive": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Inclusive",
+            "type": "number"
+          },
+          "name": {
+            "enum": [
+              "healthy",
+              "fair",
+              "caution",
+              "poor"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "min_inclusive",
+          "max_exclusive"
+        ],
+        "title": "PortfolioHealthBand",
+        "type": "object"
+      },
+      "PortfolioHealthDataQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "fx_stale": {
+            "default": false,
+            "title": "Fx Stale",
+            "type": "boolean"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "missing_price_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Missing Price Symbols",
+            "type": "array"
+          },
+          "partial_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Partial Reasons",
+            "type": "array"
+          },
+          "risk_metrics_status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Metrics Status"
+          },
+          "snapshot_data_quality": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Data Quality"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial",
+              "empty",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHealthDataQuality",
+        "type": "object"
+      },
+      "PortfolioHealthDimension": {
+        "additionalProperties": false,
+        "properties": {
+          "formula": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "input": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "maxProperties": 8,
+            "title": "Input",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHealthDimension",
+        "type": "object"
+      },
+      "PortfolioHealthDimensions": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_ratio": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "diversification": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "pnl": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "risk_exposure": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          }
+        },
+        "required": [
+          "concentration",
+          "risk_exposure",
+          "diversification",
+          "pnl",
+          "cash_ratio"
+        ],
+        "title": "PortfolioHealthDimensions",
+        "type": "object"
+      },
+      "PortfolioHealthEffectiveWeights": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_ratio": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Ratio"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration"
+          },
+          "diversification": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "risk_exposure": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Exposure"
+          }
+        },
+        "title": "PortfolioHealthEffectiveWeights",
+        "type": "object"
+      },
+      "PortfolioHealthInputs": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Pct"
+          },
+          "diversification_score": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "total_cash": {
+            "default": 0.0,
+            "title": "Total Cash",
+            "type": "number"
+          },
+          "total_equity": {
+            "default": 0.0,
+            "title": "Total Equity",
+            "type": "number"
+          },
+          "total_market_value": {
+            "default": 0.0,
+            "title": "Total Market Value",
+            "type": "number"
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Pct"
+          }
+        },
+        "title": "PortfolioHealthInputs",
+        "type": "object"
+      },
+      "PortfolioHealthInsight": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "default": "rule",
+            "enum": [
+              "rule",
+              "rule+llm_polish"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "PortfolioHealthInsight",
+        "type": "object"
+      },
+      "PortfolioHealthProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "calculated_at": {
+            "format": "date-time",
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "config_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "fx_provenance": {
+            "additionalProperties": true,
+            "title": "Fx Provenance",
+            "type": "object"
+          },
+          "price_provenance": {
+            "additionalProperties": true,
+            "title": "Price Provenance",
+            "type": "object"
+          },
+          "risk_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Risk Hash",
+            "type": "string"
+          },
+          "risk_history": {
+            "additionalProperties": true,
+            "title": "Risk History",
+            "type": "object"
+          },
+          "snapshot_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Snapshot Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_hash",
+          "risk_hash",
+          "config_hash",
+          "calculated_at"
+        ],
+        "title": "PortfolioHealthProvenance",
+        "type": "object"
+      },
+      "PortfolioHealthResolvedConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_high_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Cash High Alert Pct",
+            "type": "number"
+          },
+          "cash_low_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Cash Low Alert Pct",
+            "type": "number"
+          },
+          "concentration_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Concentration Alert Pct",
+            "type": "number"
+          },
+          "diversification_alert": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Diversification Alert",
+            "type": "number"
+          },
+          "pnl_loss_alert_pct": {
+            "maximum": 0.0,
+            "minimum": -100.0,
+            "title": "Pnl Loss Alert Pct",
+            "type": "number"
+          },
+          "source": {
+            "const": "shared_config",
+            "title": "Source",
+            "type": "string"
+          },
+          "var_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Var Alert Pct",
+            "type": "number"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/PortfolioHealthWeights"
+          }
+        },
+        "required": [
+          "weights",
+          "concentration_alert_pct",
+          "cash_low_alert_pct",
+          "cash_high_alert_pct",
+          "var_alert_pct",
+          "diversification_alert",
+          "pnl_loss_alert_pct",
+          "source"
+        ],
+        "title": "PortfolioHealthResolvedConfig",
+        "type": "object"
+      },
+      "PortfolioHealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "enum": [
+                  "healthy",
+                  "fair",
+                  "caution",
+                  "poor"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHealthBand"
+            },
+            "maxItems": 4,
+            "title": "Bands",
+            "type": "array"
+          },
+          "comparable": {
+            "title": "Comparable",
+            "type": "boolean"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PortfolioHealthResolvedConfig"
+          },
+          "cost_method": {
+            "enum": [
+              "fifo",
+              "avg"
+            ],
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "coverage_ratio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "currency": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Currency",
+            "type": "string"
+          },
+          "data_quality": {
+            "$ref": "#/components/schemas/PortfolioHealthDataQuality"
+          },
+          "dimensions": {
+            "$ref": "#/components/schemas/PortfolioHealthDimensions"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "effective_weights": {
+            "$ref": "#/components/schemas/PortfolioHealthEffectiveWeights"
+          },
+          "formula_version": {
+            "const": "portfolio_health_v2",
+            "default": "portfolio_health_v2",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/PortfolioHealthInputs"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHealthInsight"
+            },
+            "maxItems": 64,
+            "title": "Insights",
+            "type": "array"
+          },
+          "llm_can_modify_score": {
+            "const": false,
+            "default": false,
+            "title": "Llm Can Modify Score",
+            "type": "boolean"
+          },
+          "partial_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fixed-denominator diagnostic estimate. Missing dimensions contribute zero; never compare this value with complete daily scores.",
+            "title": "Partial Score"
+          },
+          "persisted": {
+            "default": false,
+            "title": "Persisted",
+            "type": "boolean"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/PortfolioHealthProvenance"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comparable deterministic score; null for incomplete coverage.",
+            "title": "Score"
+          },
+          "score_source": {
+            "const": "rules",
+            "default": "rules",
+            "title": "Score Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial",
+              "empty_portfolio",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unavailable_dimensions": {
+            "items": {
+              "enum": [
+                "concentration",
+                "risk_exposure",
+                "diversification",
+                "pnl",
+                "cash_ratio"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Unavailable Dimensions",
+            "type": "array"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/PortfolioHealthWeights"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "coverage_ratio",
+          "comparable",
+          "disclaimer",
+          "weights",
+          "effective_weights",
+          "dimensions",
+          "data_quality",
+          "inputs",
+          "config",
+          "provenance"
+        ],
+        "title": "PortfolioHealthResponse",
+        "type": "object"
+      },
+      "PortfolioHealthWeights": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_ratio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Cash Ratio",
+            "type": "number"
+          },
+          "concentration": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Concentration",
+            "type": "number"
+          },
+          "diversification": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Diversification",
+            "type": "number"
+          },
+          "pnl": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Pnl",
+            "type": "number"
+          },
+          "risk_exposure": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Risk Exposure",
+            "type": "number"
+          }
+        },
+        "required": [
+          "concentration",
+          "risk_exposure",
+          "diversification",
+          "pnl",
+          "cash_ratio"
+        ],
+        "title": "PortfolioHealthWeights",
+        "type": "object"
+      },
       "PortfolioHistoricalVaRBlock": {
         "properties": {
           "confidence": {
@@ -38571,6 +39386,238 @@
           }
         },
         "summary": "Refresh FX cache online with stale fallback",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/health": {
+      "get": {
+        "description": "Read-only lookup. This endpoint never replays the portfolio and never writes portfolio caches or health rows. Use POST /health/refresh for explicit computation.",
+        "operationId": "getPortfolioHealth",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "Snapshot date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No stored daily health snapshot"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health snapshot retrieval failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio health migration required"
+          }
+        },
+        "summary": "Get a stored daily portfolio health snapshot",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/health/refresh": {
+      "post": {
+        "description": "Replays one side-effect-free portfolio snapshot, passes that immutable input to risk metrics, and optionally performs one atomic health upsert. With persist=false the complete operation performs zero writes.",
+        "operationId": "refreshPortfolioHealth",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Persist one atomic daily health upsert",
+            "in": "query",
+            "name": "persist",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Persist one atomic daily health upsert",
+              "title": "Persist",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health score computation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Inputs or migration unavailable"
+          }
+        },
+        "summary": "Explicitly refresh a daily portfolio health snapshot",
         "tags": [
           "Portfolio"
         ]

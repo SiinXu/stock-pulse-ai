@@ -72,6 +72,11 @@ class Config:
     tencent_priority: int = 5
     finnhub_api_key: Optional[str] = None
     alphavantage_api_key: Optional[str] = None
+    crypto_provider_enabled: bool = False
+    coingecko_api_key: Optional[str] = None
+    coingecko_api_plan: str = "keyless"
+    coingecko_api_base: Optional[str] = None
+    crypto_coingecko_priority: int = 10
     longbridge_app_key: Optional[str] = None
     longbridge_app_secret: Optional[str] = None
     longbridge_access_token: Optional[str] = None
@@ -400,6 +405,17 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+    portfolio_health_weight_concentration: float = 0.25
+    portfolio_health_weight_risk_exposure: float = 0.25
+    portfolio_health_weight_diversification: float = 0.20
+    portfolio_health_weight_pnl: float = 0.15
+    portfolio_health_weight_cash_ratio: float = 0.15
+    portfolio_health_concentration_alert_pct: float = 35.0
+    portfolio_health_var_alert_pct: float = 5.0
+    portfolio_health_diversification_alert: float = 0.35
+    portfolio_health_cash_low_alert_pct: float = 2.0
+    portfolio_health_cash_high_alert_pct: float = 50.0
+    portfolio_health_pnl_loss_alert_pct: float = -15.0
     portfolio_stress_scenarios_path: Optional[str] = None
 
     # Discord Bot status
