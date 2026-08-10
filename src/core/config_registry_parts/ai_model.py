@@ -466,7 +466,8 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "60",
         "options": [],
         "validation": {"min": 1, "max": 3600},
-        "display_order": 7,
+        # Unique order among ai_model fields (7/8 already used by legacy/cache keys).
+        "display_order": 12,
         "help_key": "settings.ai_model.LLM_TIMEOUT_SEC",
         "examples": ["LLM_TIMEOUT_SEC=60", "LLM_TIMEOUT_SEC=120"],
         "docs": [
@@ -492,7 +493,8 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "2048",
         "options": [],
         "validation": {"min": 1, "max": 200000},
-        "display_order": 8,
+        # Unique order among ai_model fields (7/8 already used by legacy/cache keys).
+        "display_order": 13,
         "help_key": "settings.ai_model.LLM_MAX_TOKENS",
         "examples": ["LLM_MAX_TOKENS=2048", "LLM_MAX_TOKENS=4096"],
         "docs": [

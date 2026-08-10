@@ -1318,3 +1318,28 @@ class TestLongtailBatch1FieldRegistration(unittest.TestCase):
         field = get_field_definition("FAILURE_NOTIFY_ENABLED")
         self.assertEqual(field["validation"].get("enum"), ["", "true", "false"])
 
+
+    def test_llm_timeout_and_max_tokens_orders_are_unique_in_ai_model(self) -> None:
+        """Regression: do not reuse crowded low display_order slots."""
+        timeout = get_field_definition("LLM_TIMEOUT_SEC")
+        max_tokens = get_field_definition("LLM_MAX_TOKENS")
+        self.assertEqual(timeout["display_order"], 12)
+        self.assertEqual(max_tokens["display_order"], 13)
+        ai_orders = {
+            get_field_definition(key)["display_order"]: key
+            for key in get_registered_field_keys()
+            if get_field_definition(key)["category"] == "ai_model"
+            and key in {"LLM_TIMEOUT_SEC", "LLM_MAX_TOKENS"}
+        }
+        # Each of the two keys must not share order with any other ai_model field.
+        for key in ("LLM_TIMEOUT_SEC", "LLM_MAX_TOKENS"):
+            order = get_field_definition(key)["display_order"]
+            peers = [
+                other
+                for other in get_registered_field_keys()
+                if get_field_definition(other)["category"] == "ai_model"
+                and get_field_definition(other)["display_order"] == order
+            ]
+            self.assertEqual(peers, [key], f"display_order collision for {key}: {peers}")
+
+
