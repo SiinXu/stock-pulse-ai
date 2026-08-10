@@ -23,7 +23,7 @@ const INTEGRITY_PRESENTATION: Record<AgentReplayIntegrityStatus, {
 
 const formatDetail = (value: Record<string, unknown>): string => JSON.stringify(value, null, 2);
 
-export const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, onSelectNode }) => {
+const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snapshot, onSelectNode }) => {
   const { language, t } = useUiLanguage();
   const model = useMemo(
     () => buildAgentReplayModel(snapshot.events, snapshot.traceId),
@@ -147,3 +147,5 @@ export const AgentReplayInspector: React.FC<AgentReplayInspectorProps> = ({ snap
     </section>
   );
 };
+
+export default AgentReplayInspector;

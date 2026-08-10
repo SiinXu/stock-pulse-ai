@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { RunFlowEvent, RunFlowSnapshot } from '../../../types/runFlow';
-import { AgentReplayInspector } from '../AgentReplayInspector';
+import AgentReplayInspector from '../AgentReplayInspector';
 
 const replayEvent = (
   id: string,
