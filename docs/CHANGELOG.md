@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
+- [Fixed] Register crypto, data-validation, and local-first daily-cache Settings fields in the config registry with correct controls, enums, defaults, and bilingual help so they no longer land as uncategorized free-text (Refs #1023).
+- [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
 - [Fixed] Capability inventory availability is projected only from live tool/skill/pipeline/plugin/data owners; registry and config read failures return explicit partial source errors instead of fail-open success snapshots (Refs #221).
 - [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).

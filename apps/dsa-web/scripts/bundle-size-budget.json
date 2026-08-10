@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting plus the decision-report and what-if stories, and locale chunks enlarged by the Notifications hub, screening-state, decision-replay, and what-if translations. Updated caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Locale and IntelligenceSourcesPanel rebaseline for data-source config registry Settings help inventory (#1023). Locale caps retain 200 bytes of headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 210092,
+      "measuredGzipBytes": 209892,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "js-entry",
@@ -25,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 133078,
-      "measuredGzipBytes": 132878,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 136583,
+      "measuredGzipBytes": 136383,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 126973,
-      "measuredGzipBytes": 126773,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 131458,
+      "measuredGzipBytes": 131258,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 126894,
-      "measuredGzipBytes": 126694,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 130710,
+      "measuredGzipBytes": 130510,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 127197,
-      "measuredGzipBytes": 126997,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 131273,
+      "measuredGzipBytes": 131073,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 123142,
-      "measuredGzipBytes": 122942,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 127210,
+      "measuredGzipBytes": 127010,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 120605,
-      "measuredGzipBytes": 120405,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 123951,
+      "measuredGzipBytes": 123751,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113876,
-      "measuredGzipBytes": 113676,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 117764,
+      "measuredGzipBytes": 117564,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 114028,
-      "measuredGzipBytes": 113828,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 117938,
+      "measuredGzipBytes": 117738,
+      "note": "Rebaselined after registering 15 data-source Settings keys with bilingual help and 125 inventory strings for #1023 / PR data-source registry slice; retains 200 bytes of headroom."
     },
     {
       "id": "vendor-charts",
@@ -130,9 +131,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57296,
-      "measuredGzipBytes": 57096,
-      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks, then adding decision-report and what-if stories; retains 200 bytes of headroom."
+      "maxGzipBytes": 57000,
+      "measuredGzipBytes": 56827,
+      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
     },
     {
       "id": "SettingsPage",
