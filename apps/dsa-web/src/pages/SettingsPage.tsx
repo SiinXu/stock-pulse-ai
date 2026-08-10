@@ -1404,6 +1404,8 @@ const SettingsPage: React.FC = () => {
       agentModelSummary={agentModelSummary}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
+      maskToken={maskToken}
+      configVersion={configVersion}
     />
   );
   const activeSaveGroup = activeCategory;
@@ -1808,6 +1810,7 @@ const SettingsPage: React.FC = () => {
                 <NotificationTestPanel
                   items={rawActiveItems.map((item) => ({ key: item.key, value: String(item.value ?? '') }))}
                   maskToken={maskToken}
+                  configVersion={configVersion}
                   disabled={isSaving || isLoading}
                 />
               </SettingsPanelErrorBoundary>
