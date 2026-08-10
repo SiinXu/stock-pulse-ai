@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Dict
 
@@ -16,6 +16,7 @@ from src.services.history_comparison_service import (
     _extract_comparable_snapshot,
     _project_number,
     _record_to_signal,
+    get_signal_changes_batch,
 )
 
 
@@ -75,6 +76,54 @@ def _raw_payload(**overrides: Any) -> str:
     }
     payload.update(overrides)
     return json.dumps(payload, ensure_ascii=False)
+
+
+def test_signal_changes_batch_uses_one_alias_aware_bounded_query(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    class FakeDatabase:
+        def get_analysis_history_batch(self, **kwargs: Any):
+            calls.append(kwargs)
+            return [
+                _record(
+                    id=3,
+                    code="00700.HK",
+                    query_id="latest",
+                    created_at=datetime(2026, 8, 9, 7, 0),
+                ),
+                _record(
+                    id=2,
+                    code="HK00700",
+                    query_id="previous",
+                    created_at=datetime(2026, 8, 8, 7, 0),
+                ),
+                _record(
+                    id=1,
+                    code="600519.SH",
+                    query_id="a-share",
+                    created_at=datetime(2026, 8, 9, 6, 0),
+                ),
+            ]
+
+    manager = SimpleNamespace(get_instance=lambda: FakeDatabase())
+    monkeypatch.setattr(
+        "src.services.history_comparison_service._database_manager",
+        lambda: manager,
+    )
+
+    result = get_signal_changes_batch(
+        ["HK00700", "600519"],
+        limit=2,
+        created_at_from=datetime(2026, 5, 11, tzinfo=timezone.utc),
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["limit_per_code"] == 2
+    assert "00700.HK" in calls[0]["codes"]
+    assert [row["record_id"] for row in result["HK00700"]] == [3, 2]
+    assert [row["record_id"] for row in result["600519"]] == [1]
 
 
 def test_history_signal_uses_score_aligned_display_action() -> None:
