@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Locale/Playground/IntelligenceSourcesPanel rebaseline for data-source Settings registry help inventory after main #952 (Refs #1023); 200B headroom.",
+  "baselineNote": "Post-merge of Model Access local-runtime/CLI status (PR #1031 / Refs #865) onto main including #952/#1036 registry help inventory. Locales retain 200B headroom; IntelligenceSourcesPanel uses 10% headroom after remeasure.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 210090,
-      "measuredGzipBytes": 209890,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 237240,
+      "measuredGzipBytes": 215672,
+      "note": "Rebaselined after Model Access local-runtime/CLI status on post-#1036 main (PR #1031 / Refs #865); 10% headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 137277,
-      "measuredGzipBytes": 137077,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 137731,
+      "measuredGzipBytes": 137531,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 131760,
-      "measuredGzipBytes": 131560,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 132128,
+      "measuredGzipBytes": 131928,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 131324,
-      "measuredGzipBytes": 131124,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 131717,
+      "measuredGzipBytes": 131517,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 131897,
-      "measuredGzipBytes": 131697,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 132276,
+      "measuredGzipBytes": 132076,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 127816,
-      "measuredGzipBytes": 127616,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 128196,
+      "measuredGzipBytes": 127996,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 124577,
-      "measuredGzipBytes": 124377,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 124949,
+      "measuredGzipBytes": 124749,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 118339,
-      "measuredGzipBytes": 118139,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 118716,
+      "measuredGzipBytes": 118516,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 118496,
-      "measuredGzipBytes": 118296,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 118855,
+      "measuredGzipBytes": 118655,
+      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
     },
     {
       "id": "vendor-charts",
