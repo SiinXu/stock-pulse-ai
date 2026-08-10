@@ -69,6 +69,48 @@ class SecurityAuditRepository:
             session.commit()
             return int(result.rowcount or 0)
 
+    def apply_capacity(self, *, max_events: int) -> int:
+        """Delete oldest events when the table exceeds the hard capacity bound.
+
+        Capacity is a storage upper bound independent of time retention. Oldest
+        rows (by ``occurred_at``, then ``id``) are removed first so recent
+        privileged decisions remain queryable.
+        """
+        bound = int(max_events)
+        if bound < 1:
+            raise ValueError("security audit capacity must be at least one event")
+        with self.db.get_session() as session:
+            total = int(
+                session.execute(
+                    select(func.count(SecurityAuditEventRecord.id))
+                ).scalar()
+                or 0
+            )
+            excess = total - bound
+            if excess <= 0:
+                return 0
+            oldest_ids = list(
+                session.execute(
+                    select(SecurityAuditEventRecord.id)
+                    .order_by(
+                        SecurityAuditEventRecord.occurred_at.asc(),
+                        SecurityAuditEventRecord.id.asc(),
+                    )
+                    .limit(excess)
+                )
+                .scalars()
+                .all()
+            )
+            if not oldest_ids:
+                return 0
+            result = session.execute(
+                delete(SecurityAuditEventRecord).where(
+                    SecurityAuditEventRecord.id.in_(oldest_ids)
+                )
+            )
+            session.commit()
+            return int(result.rowcount or 0)
+
     def list_events(
         self,
         *,

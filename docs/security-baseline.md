@@ -98,7 +98,7 @@ Full inventory, client headers, and rollback: [MCP server integration (EN)](mcp-
 | Plugin trust and extension points | [Plugin extension contract](plugin-extension-contract.md) |
 | Outbound SSRF / egress defaults | [Outbound HTTP security policy](security-outbound-policy.md) |
 | Browser response headers (CSP) | [Browser response headers](#browser-response-headers-csp) |
-| Durable audit Phase 1 | [Security audit](security-audit.md) |
+| Durable security audit | [Security audit](security-audit.md) / [中文](security-audit_zh.md) |
 | Sensitive log/export redaction | [Sensitive-data redaction](security-sensitive-data-redaction.md) |
 | Optional MCP server adapter | [mcp-server-integration_EN.md](mcp-server-integration_EN.md), [mcp-server-integration.md](mcp-server-integration.md) |
 | Deploy bind notes | [DEPLOY.md](DEPLOY.md), [DEPLOY_EN.md](DEPLOY_EN.md) |
@@ -227,7 +227,7 @@ Current anchors include the shared fail-closed policy in [`src/security/outbound
 | `AUDIT-04` | MUST | High-risk autonomous actions must stop at a defined human approval boundary. Approval, rejection, expiration, and modification decisions must be attributable and auditable. |
 | `AUDIT-05` | SHOULD | Analysis evidence should preserve source and model provenance, timestamps, quality or degradation markers, and stable references without exporting raw secrets or unnecessary personal data. |
 
-Current anchors include the versioned durable Phase 1 contract in [`src/schemas/security_audit.py`](../src/schemas/security_audit.py), its pre-persistence redaction and storage service, the administrator-only query endpoint, redacted Agent tool audit records in [`src/agent/tools/execution.py`](../src/agent/tools/execution.py), runtime events under [`src/agent/runtime/`](../src/agent/runtime/), bounded run diagnostics in [`src/services/run_diagnostics.py`](../src/services/run_diagnostics.py), and LLM usage metadata in [`src/llm/usage.py`](../src/llm/usage.py). Phase 1 covers representative login, sensitive configuration write, ToolSession, and asynchronous analysis decisions; it is not complete coverage of every sensitive operation. See [Durable Security Audit Phase 1](security-audit.md).
+Current anchors include the versioned durable `security-audit-v1` contract in [`src/schemas/security_audit.py`](../src/schemas/security_audit.py), its pre-persistence redaction, retention, and capacity-bounded storage service, the administrator-only query endpoint, redacted Agent tool audit records in [`src/agent/tools/execution.py`](../src/agent/tools/execution.py), plugin lifecycle and local-process (OCR / local CLI) boundaries, MCP acceptance-boundary audit, runtime events under [`src/agent/runtime/`](../src/agent/runtime/), bounded run diagnostics in [`src/services/run_diagnostics.py`](../src/services/run_diagnostics.py), and LLM usage metadata in [`src/llm/usage.py`](../src/llm/usage.py). See [Durable Security Audit](security-audit.md).
 
 ### Supply chain and automation
 
@@ -276,7 +276,7 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | --- | --- | --- |
 | Multi-user identity, role and workspace authorization, consent, data ownership, export, deletion, and privacy audit are not implemented. | `AUTH-05`, `COMP-04` | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01`, `AUDIT-02` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
-| Analysis evidence-package export and any remaining non-admin privileged boundaries still need durable audit coverage beyond the connected auth/session/config-backup/HITL paths. | `AUDIT-01` through `AUDIT-04` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) |
+| Durable security-audit trail for auth, config, tools, analysis, HITL, plugins, MCP, and local process (OCR/CLI) is implemented with retention, capacity, and administrator query; evidence-package export remains product-scoped under #127. | `AUDIT-01` through `AUDIT-04` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) (implementation), [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) (evidence package) |
 | Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
 | High-risk Agent actions do not yet have configurable, attributable human approval gates. | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) |
 | Product-level investment and limitation disclosures are not yet guaranteed consistently across every report, notification, Web surface, and supported language. | `COMP-01` through `COMP-03`, `COMP-05` | [#144](https://github.com/SiinXu/stock-pulse-ai/issues/144) |

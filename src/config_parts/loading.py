@@ -1350,6 +1350,20 @@ class _ConfigLoadingMethods:
                 minimum=10_000,
                 maximum=2_000_000,
             ),
+            security_audit_retention_days=parse_env_int(
+                os.getenv('SECURITY_AUDIT_RETENTION_DAYS'),
+                90,
+                field_name='SECURITY_AUDIT_RETENTION_DAYS',
+                minimum=1,
+                maximum=3650,
+            ),
+            security_audit_max_events=parse_env_int(
+                os.getenv('SECURITY_AUDIT_MAX_EVENTS'),
+                10_000,
+                field_name='SECURITY_AUDIT_MAX_EVENTS',
+                minimum=100,
+                maximum=1_000_000,
+            ),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False
             ),

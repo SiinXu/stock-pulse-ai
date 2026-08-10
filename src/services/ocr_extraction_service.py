@@ -459,6 +459,30 @@ def _read_regular_file(path: Path) -> tuple[bytes, int]:
         os.close(descriptor)
 
 
+_OCR_POLICY_DENY_REASONS = frozenset(
+    {
+        "path_outside_root",
+        "path_not_under_root",
+        "absolute_path_rejected",
+        "path_escape_rejected",
+        "unsupported_extension",
+        "file_root_required",
+        "empty_path",
+        "invalid_path",
+        "symlink_rejected",
+        "not_a_file",
+        "file_too_large",
+        "magic_mismatch",
+        "image_too_large",
+        "too_many_frames",
+        "dependency_missing",
+        "tesseract_missing",
+        "pytesseract_missing",
+        "pillow_missing",
+    }
+)
+
+
 class OcrExtractionService:
     """Sandbox-aware, bounded OCR for files under one configured root."""
 
@@ -470,6 +494,7 @@ class OcrExtractionService:
         timeout_seconds: int = DEFAULT_OCR_TIMEOUT_SECONDS,
         engine: Optional[OcrEngine] = None,
         dependency_probe: Optional[Callable[[str], bool]] = None,
+        local_process_auditor: Any = None,
     ) -> None:
         root = str(file_root or "").strip()
         if not root:
@@ -479,9 +504,94 @@ class OcrExtractionService:
         self._timeout_seconds = clamp_ocr_timeout(timeout_seconds)
         self._engine = engine
         self._dependency_probe = dependency_probe
+        self._local_process_auditor = local_process_auditor
 
     def extract_path(self, file_path: str, *, langs: Optional[str] = None) -> dict[str, Any]:
+        """Extract text with a durable local-process security-audit trail.
+
+        Attempt is recorded before path policy evaluation. Deny and failure
+        paths complete the same correlation id. Audit storage outages raise
+        ``SecurityAuditUnavailable`` (fail closed) rather than silently
+        continuing the local worker process.
+        """
+        from src.services.local_process_audit import get_local_process_auditor
+        from src.services.security_audit_service import SecurityAuditUnavailable
+
         effective_langs = normalize_ocr_langs(langs) if langs is not None else self._langs
+        auditor = self._local_process_auditor or get_local_process_auditor()
+        execution_id = "ocr-extract"
+        target_id = "ocr"
+        correlation_id = auditor.begin(
+            kind="ocr",
+            target_id=target_id,
+            execution_id=execution_id,
+            metadata={
+                "langs": effective_langs[:64],
+                "timeout_seconds": int(self._timeout_seconds),
+            },
+        )
+        try:
+            result = self._extract_path_unchecked(
+                file_path,
+                effective_langs=effective_langs,
+            )
+            status = str(result.get("status") or "unavailable")
+            reason_raw = str(result.get("reason_code") or f"ocr_{status}")
+            if status in {"available", "degraded"}:
+                outcome = "success"
+                reason_code = (
+                    "ocr_extract_succeeded" if status == "available" else reason_raw
+                )
+            elif reason_raw in _OCR_POLICY_DENY_REASONS or status == "unavailable":
+                # Policy and pre-process rejections are rejected; engine runtime
+                # failures still use failure when reason is clearly operational.
+                if reason_raw in {"ocr_timeout", "ocr_engine_failed", "read_failed"}:
+                    outcome = "failure"
+                else:
+                    outcome = "rejected"
+                reason_code = reason_raw
+            else:
+                outcome = "failure"
+                reason_code = reason_raw
+            source = result.get("source") if isinstance(result.get("source"), dict) else {}
+            auditor.complete(
+                kind="ocr",
+                target_id=target_id,
+                execution_id=execution_id,
+                correlation_id=correlation_id,
+                outcome=outcome,
+                reason_code=reason_code,
+                metadata={
+                    "status": status,
+                    "engine": str(result.get("engine") or "none")[:64],
+                    "file_extension": str(source.get("file_extension") or "")[:16],
+                    "byte_size": source.get("byte_size"),
+                },
+            )
+            return result
+        except SecurityAuditUnavailable:
+            raise
+        except Exception as exc:
+            try:
+                auditor.complete(
+                    kind="ocr",
+                    target_id=target_id,
+                    execution_id=execution_id,
+                    correlation_id=correlation_id,
+                    outcome="failure",
+                    reason_code="ocr_extract_exception",
+                    metadata={"exception_type": type(exc).__name__[:64]},
+                )
+            except SecurityAuditUnavailable:
+                raise
+            raise
+
+    def _extract_path_unchecked(
+        self,
+        file_path: str,
+        *,
+        effective_langs: str,
+    ) -> dict[str, Any]:
         try:
             resolved = resolve_safe_file_path(file_path, file_root=self._file_root)
         except ValueError as exc:

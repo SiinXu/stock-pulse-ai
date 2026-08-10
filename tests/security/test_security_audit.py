@@ -270,3 +270,61 @@ def test_metadata_list_contract_accepts_bound_and_rejects_overflow() -> None:
             **common,
             metadata={"keys": [*bounded_keys, "CONFIG_KEY_OVERFLOW"]},
         )
+
+
+def test_capacity_bound_deletes_oldest_events(isolated_database) -> None:
+    repository = SecurityAuditRepository(isolated_database)
+    service = SecurityAuditService(repository, retention_days=90, max_events=3)
+    ids = []
+    for index in range(5):
+        event = _record_attempt(
+            service,
+            correlation_id=f"{index:032x}",
+            actor_id=f"client:{index}",
+        )
+        ids.append(event.id)
+
+    page = service.list_events(page=1, page_size=100)
+    assert page.total == 3
+    retained_ids = {event.id for event in page.items}
+    assert retained_ids == set(ids[-3:])
+    assert ids[0] not in retained_ids
+    assert ids[1] not in retained_ids
+
+
+def test_capacity_failure_surfaces_as_unavailable(isolated_database) -> None:
+    class _CapacityFailRepository(SecurityAuditRepository):
+        def apply_capacity(self, *, max_events: int) -> int:
+            del max_events
+            raise RuntimeError("capacity enforcement failed")
+
+    service = SecurityAuditService(
+        _CapacityFailRepository(isolated_database),
+        max_events=10,
+    )
+    with pytest.raises(SecurityAuditUnavailable):
+        _record_attempt(service)
+
+
+def test_get_security_audit_service_reads_config_limits(monkeypatch) -> None:
+    from src.services import security_audit_service as module
+
+    monkeypatch.setattr(
+        module,
+        "_limits_from_config",
+        lambda: (14, 500),
+    )
+    service = module.get_security_audit_service()
+    assert service._retention_days == 14
+    assert service._max_events == 500
+
+
+def test_config_env_loads_security_audit_limits(monkeypatch) -> None:
+    from src.config import Config
+
+    monkeypatch.setenv("SECURITY_AUDIT_RETENTION_DAYS", "45")
+    monkeypatch.setenv("SECURITY_AUDIT_MAX_EVENTS", "500")
+    Config._instance = None
+    config = Config._load_from_env()
+    assert config.security_audit_retention_days == 45
+    assert config.security_audit_max_events == 500

@@ -7,11 +7,34 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from src.agent.tools.ocr_tools import OCR_TOOL_NAME, build_ocr_tool, register_ocr_tools
 from src.agent.tools.registry import ToolRegistry, validate_tool_capability_contract
 from src.services.ocr_extraction_service import OCR_SCHEMA_VERSION, OcrExtractionService
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "ocr"
+
+
+class _SilentLocalProcessRecorder:
+    def record_attempt(self, **fields):
+        del fields
+        return None
+
+    def record_completion(self, **fields):
+        del fields
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _silent_local_process_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.services.local_process_audit import LocalProcessAuditor
+
+    auditor = LocalProcessAuditor(recorder=_SilentLocalProcessRecorder())
+    monkeypatch.setattr(
+        "src.services.local_process_audit.get_local_process_auditor",
+        lambda: auditor,
+    )
 
 
 def test_build_ocr_tool_default_off() -> None:

@@ -676,6 +676,104 @@ class LocalCliGenerationBackend(GenerationBackend):
         response_validator: Optional[Callable[[str], None]] = None,
         audit_context: Optional[Dict[str, Any]] = None,
     ) -> GenerationResult:
+        """Run the restricted CLI subprocess under a durable security audit trail."""
+        from src.services.local_process_audit import get_local_process_auditor
+        from src.services.security_audit_service import SecurityAuditUnavailable
+
+        auditor = get_local_process_auditor()
+        preset_id = str(self._preset.preset_id or "local_cli")
+        execution_id = f"local-cli-{preset_id}"[:128]
+        correlation_id = auditor.begin(
+            kind="local_cli",
+            target_id=preset_id,
+            execution_id=execution_id,
+            metadata={
+                "preset_id": preset_id[:64],
+                "stream_requested": bool(stream),
+            },
+        )
+        try:
+            result = self._generate_unchecked(
+                prompt,
+                generation_config,
+                system_prompt=system_prompt,
+                stream=stream,
+                stream_progress_callback=stream_progress_callback,
+                response_validator=response_validator,
+                audit_context=audit_context,
+            )
+            auditor.complete(
+                kind="local_cli",
+                target_id=preset_id,
+                execution_id=execution_id,
+                correlation_id=correlation_id,
+                outcome="success",
+                reason_code="local_cli_generate_succeeded",
+                metadata={"preset_id": preset_id[:64]},
+            )
+            return result
+        except SecurityAuditUnavailable:
+            raise
+        except GenerationError as exc:
+            details = exc.details if isinstance(getattr(exc, "details", None), dict) else {}
+            reason = str(details.get("reason") or exc.error_code.value or "local_cli_failed")
+            outcome = (
+                "rejected"
+                if exc.error_code
+                in {
+                    GenerationErrorCode.UNSAFE_CONFIG,
+                    GenerationErrorCode.COMMAND_NOT_FOUND,
+                    GenerationErrorCode.COMMAND_NOT_EXECUTABLE,
+                    GenerationErrorCode.CAPABILITY_UNSUPPORTED,
+                }
+                else "failure"
+            )
+            try:
+                auditor.complete(
+                    kind="local_cli",
+                    target_id=preset_id,
+                    execution_id=execution_id,
+                    correlation_id=correlation_id,
+                    outcome=outcome,
+                    reason_code=reason,
+                    metadata={
+                        "preset_id": preset_id[:64],
+                        "error_code": str(exc.error_code.value)[:64],
+                        "stage": str(getattr(exc, "stage", "") or "")[:64],
+                    },
+                )
+            except SecurityAuditUnavailable:
+                raise
+            raise
+        except Exception as exc:
+            try:
+                auditor.complete(
+                    kind="local_cli",
+                    target_id=preset_id,
+                    execution_id=execution_id,
+                    correlation_id=correlation_id,
+                    outcome="failure",
+                    reason_code="local_cli_exception",
+                    metadata={
+                        "preset_id": preset_id[:64],
+                        "exception_type": type(exc).__name__[:64],
+                    },
+                )
+            except SecurityAuditUnavailable:
+                raise
+            raise
+
+    def _generate_unchecked(
+        self,
+        prompt: str,
+        generation_config: Dict[str, Any],
+        *,
+        system_prompt: Optional[str] = None,
+        stream: bool = False,
+        stream_progress_callback: Optional[Callable[[int], None]] = None,
+        response_validator: Optional[Callable[[str], None]] = None,
+        audit_context: Optional[Dict[str, Any]] = None,
+    ) -> GenerationResult:
         executable, argv, executable_summary = self._resolve_command()
         timeout_seconds = min(
             _positive_int(

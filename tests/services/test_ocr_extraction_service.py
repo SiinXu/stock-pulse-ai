@@ -26,6 +26,28 @@ from src.services.ocr_extraction_service import (
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "ocr"
 
 
+class _SilentLocalProcessRecorder:
+    def record_attempt(self, **fields):
+        del fields
+        return None
+
+    def record_completion(self, **fields):
+        del fields
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _silent_local_process_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep OCR unit tests independent of durable audit storage."""
+    from src.services.local_process_audit import LocalProcessAuditor
+
+    auditor = LocalProcessAuditor(recorder=_SilentLocalProcessRecorder())
+    monkeypatch.setattr(
+        "src.services.local_process_audit.get_local_process_auditor",
+        lambda: auditor,
+    )
+
+
 def _slow_engine(*_args) -> str:
     time.sleep(3)
     return "late"

@@ -34,6 +34,28 @@ from src.llm.local_cli_backend import (  # noqa: E402
 )
 
 
+class _SilentLocalProcessRecorder:
+    def record_attempt(self, **fields):
+        del fields
+        return None
+
+    def record_completion(self, **fields):
+        del fields
+        return None
+
+
+@pytest.fixture(autouse=True)
+def _silent_local_process_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep local CLI unit tests independent of durable audit storage."""
+    from src.services.local_process_audit import LocalProcessAuditor
+
+    auditor = LocalProcessAuditor(recorder=_SilentLocalProcessRecorder())
+    monkeypatch.setattr(
+        "src.services.local_process_audit.get_local_process_auditor",
+        lambda: auditor,
+    )
+
+
 def _config(**overrides):
     defaults = {
         "generation_backend_timeout_seconds": 5,

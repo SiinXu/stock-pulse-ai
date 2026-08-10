@@ -124,6 +124,11 @@ class Config:
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
 
+    # === Durable security-audit trail (Issue #535) ===
+    # Time retention and hard row capacity for privileged-operation events.
+    security_audit_retention_days: int = 90
+    security_audit_max_events: int = 10_000
+
     # === Daily brief with historical accuracy review (Issue #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
