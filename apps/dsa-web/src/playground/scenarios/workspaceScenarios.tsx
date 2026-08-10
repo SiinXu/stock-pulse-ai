@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
@@ -7,7 +7,6 @@ import { HomeReadinessCard } from '../../components/home/HomeReadinessCard';
 import { AgentOnboardingWizard } from '../../components/onboarding/AgentOnboardingWizard';
 import { HomeOnboardingSection } from '../../components/onboarding/HomeOnboardingSection';
 import { OnboardingTodayPlanCard } from '../../components/onboarding/OnboardingTodayPlanCard';
-import { ZeroConfigFirstRunPanel } from '../../components/onboarding/ZeroConfigFirstRunPanel';
 import { TaskPanel } from '../../components/tasks/TaskPanel';
 import {
   HomeStockWorkspace,
@@ -25,7 +24,6 @@ import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
 import {
   DEFAULT_ONBOARDING_PROFILE,
-  type FirstRunReadiness,
   type OnboardingPlan,
 } from '../../types/onboarding';
 import type { WatchlistGroup } from '../../types/watchlist';
@@ -38,6 +36,11 @@ const useSamples = () => {
   const { language } = useUiLanguage();
   return PLAYGROUND_TEXT[language].samples;
 };
+
+const ZeroConfigFirstRunPanelStory = lazy(async () => {
+  const module = await import('./zeroConfigFirstRunScenario');
+  return { default: module.ZeroConfigFirstRunPanelStory };
+});
 
 const StockAutocompleteStory = () => {
   const text = useSamples();
@@ -340,58 +343,6 @@ const AgentOnboardingWizardStory = () => {
         onClose={() => setOpen(false)}
         onApplied={() => setOpen(false)}
         modelAvailable={false}
-        reportLanguage="en"
-        t={t}
-      />
-    </div>
-  );
-};
-
-const FIXTURE_FIRST_RUN_DEMO: FirstRunReadiness = {
-  schemaVersion: 1,
-  isFreshEnvironment: true,
-  hasPrimaryModel: false,
-  beginnerModeRecommended: true,
-  primaryPath: 'demo',
-  primaryCta: 'view_demo',
-  reasonCode: 'local_runtime_unavailable',
-  reasonParams: {},
-  localRuntime: {
-    reachable: false,
-    modelsAvailable: false,
-    runnable: false,
-    models: [],
-    suggestedProfile: {},
-    reasonCode: 'ollama_unreachable',
-    detectEnabled: true,
-  },
-  suggestedProfile: {},
-  demoAvailable: true,
-  configMutated: false,
-  existingConfigUntouched: true,
-  snapshotId: '0123456789abcdef01234567',
-  generatedAt: '2026-08-09T00:00:00Z',
-};
-
-const FIXTURE_FIRST_RUN_CONFIGURED: FirstRunReadiness = {
-  ...FIXTURE_FIRST_RUN_DEMO,
-  isFreshEnvironment: false,
-  hasPrimaryModel: true,
-  beginnerModeRecommended: false,
-  primaryPath: 'configured',
-  primaryCta: 'continue',
-  reasonCode: 'primary_model_configured',
-};
-
-const ZeroConfigFirstRunPanelStory = () => {
-  const { t } = useUiLanguage();
-  const { scenario } = usePlaygroundScenario();
-  const readiness = scenario === 'empty' ? FIXTURE_FIRST_RUN_CONFIGURED : FIXTURE_FIRST_RUN_DEMO;
-  return (
-    <div className="max-w-2xl">
-      <ZeroConfigFirstRunPanel
-        readiness={readiness}
-        autoLoad={false}
         reportLanguage="en"
         t={t}
       />
