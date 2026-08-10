@@ -199,12 +199,19 @@ const availableModelEntrySchema = z.object({
 const availableModelsResponseSchema = z.object({ models: z.array(availableModelEntrySchema).optional() }).passthrough();
 const schedulerStatusResponseSchema = z.object({
   enabled: z.boolean(), running: z.boolean(), scheduleTimes: z.array(z.string()),
+  track: z.literal('legacy_day_batch').optional(), attached: z.boolean().optional(),
+  processMode: z.enum(['serve', 'desktop', 'not_attached']).optional(),
+  scheduleTimezone: z.string().optional(), runNowAvailable: z.boolean().optional(),
+  runNowBlockReason: z.string().nullable().optional(),
   nextRunAt: z.string().nullable().optional(), lastRunAt: z.string().nullable().optional(),
   lastSuccessAt: z.string().nullable().optional(), lastError: z.string().nullable().optional(),
   lastSkippedAt: z.string().nullable().optional(), lastSkipReason: z.string().nullable().optional(),
+  activeRunId: z.string().nullable().optional(), lastRunId: z.string().nullable().optional(),
+  lastRunOutcome: z.enum(['succeeded', 'failed']).nullable().optional(),
 }).passthrough();
 const schedulerRunNowResponseSchema = z.object({
   accepted: z.boolean(), running: z.boolean(), reason: z.string().optional(),
+  runId: z.string().optional(), startedAt: z.string().optional(),
 }).passthrough();
 const configValidationIssueSchema = z.object({
   key: z.string(), code: z.string(), message: z.string(), severity: z.string(),

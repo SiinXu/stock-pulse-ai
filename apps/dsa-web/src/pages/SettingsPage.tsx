@@ -11,17 +11,14 @@ import {
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
 } from '../routing/routes';
-import { getUiListSeparator } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, Surface, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
-  AuthSettingsCard,
   InvestmentFrameworkSettingsCard,
-  ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
   LocalModelsWithKronos,
@@ -51,10 +48,10 @@ import {
 import { parseModelAccessFieldKey, type ModelAccessFieldFocusRequest } from '../utils/modelAccessFieldKey';
 import { connectionItemsRespectSchema } from '../components/settings/settingsConnectionUpdateContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
-import SystemAboutCard from '../components/settings/SystemAboutCard';
 import ConfigBackupCard from '../components/settings/ConfigBackupCard';
 import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
-import AlphaSiftSettingsCard from '../components/settings/AlphaSiftSettingsCard';
+import OverviewSection from '../components/settings/sections/OverviewSection';
+import SystemSecuritySection from '../components/settings/sections/SystemSecuritySection';
 import {
   AiOverviewCard,
   AiTaskRoutingCard,
@@ -98,12 +95,6 @@ import {
   shouldMarkDirtyOnConflict,
 } from '../components/settings/autosaveMachine';
 import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
-import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
-import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
-import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
-import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
-import OutboundActivityPanel from '../components/settings/OutboundActivityPanel';
-import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
 import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
@@ -231,8 +222,10 @@ const SettingsPage: React.FC = () => {
     load,
     retry,
     save,
+    serverItems,
     resetDraftKeys,
     setDraftValue,
+    applyPartialUpdate,
     getChangedItems,
     refreshAfterExternalSave,
     configVersion,
@@ -670,6 +663,11 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  const persistedValuesByKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    serverItems.forEach((item) => { map[item.key.toUpperCase()] = String(item.value ?? ''); });
+    return map;
+  }, [serverItems]);
   const rawValueKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const categoryItems of Object.values(itemsByCategory)) {
@@ -1335,6 +1333,21 @@ const SettingsPage: React.FC = () => {
   const activeConfigPanelTitle = sectionScopedCopy?.title
     ?? (hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle);
   const activeConfigPanelDescription = sectionScopedCopy?.description ?? activeCategoryDescription;
+  const persistedAgentModel = (persistedValuesByKey.AGENT_LITELLM_MODEL ?? '').trim();
+  const persistedReportModel = (persistedValuesByKey.LITELLM_MODEL ?? '').trim();
+  const effectivePersistedAgentModel = persistedAgentModel || persistedReportModel;
+  const resolvedPersistedAgentModel = effectivePersistedAgentModel ? resolveConfiguredModelRef(effectivePersistedAgentModel) : '';
+  const agentModelSummary = {
+    value: effectivePersistedAgentModel ? formatConfiguredModel(effectivePersistedAgentModel) : '',
+    source: persistedAgentModel ? 'explicit' as const : 'inherited' as const,
+    readiness: availableModelsLoading
+      ? 'checking' as const
+      : availableModelsError
+        ? 'unknown' as const
+        : !effectivePersistedAgentModel
+          ? 'unconfigured' as const
+          : availableModelRefSet.has(resolvedPersistedAgentModel) ? 'ready' as const : 'unavailable' as const,
+  };
   // For single-tab categories that a section split can narrow (agent →
   // Conversation / Agent Behavior), gate on the section-filtered content so an
   // empty section never renders a bare card.
@@ -1347,7 +1360,7 @@ const SettingsPage: React.FC = () => {
     && !isInvestmentFrameworkView
     && !isTopLevelAdvanced
     && !(isAlertsSection && activeView === 'events')
-    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
+    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about' || activeView === 'extensions'));
   const showActiveConfigEmptyState = !(
     activeSection === 'overview'
     || activeSection === 'ai_models'
@@ -1382,8 +1395,13 @@ const SettingsPage: React.FC = () => {
       isSaving={isSaving}
       issueByKey={issueByKey}
       allValuesByKey={allValuesByKey}
+      persistedValuesByKey={persistedValuesByKey}
       alphasiftEnabled={alphasiftEnabled}
       setDraftValue={setDraftValue}
+      applyPartialUpdate={applyPartialUpdate}
+      resetDraftKeys={resetDraftKeys}
+      activeSaveStatus={groupSaveStates[activeCategory]?.status ?? 'idle'}
+      agentModelSummary={agentModelSummary}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
     />
@@ -1530,118 +1548,44 @@ const SettingsPage: React.FC = () => {
                 message={t('settings.restartRequiredNotice')}
               />
             ) : null}
-            {shouldShowFirstRunSetup && !setupStatus?.isComplete ? (
-              <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    {settingsText.quickSetup}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-text">
-                    {settingsText.quickSetupDescription}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="default"
-                  className="shrink-0"
-                  disabled={isProviderCatalogLoading || providerCatalog.length === 0}
-                  onClick={() => setIsWizardOpen(true)}
-                >
-                  {settingsText.startWizard}
-                </Button>
-              </Surface>
-            ) : null}
-            {shouldShowFirstRunSetup ? (
-              <FirstRunSetupCard
-                status={setupStatus}
-                isLoading={isRefreshingSetupStatus}
-                error={setupStatusError}
-                firstStockCode={firstSetupStockCode}
-                isSaving={isSaving}
-                isRunningSmoke={isRunningSetupSmoke}
-                smokeError={setupSmokeError}
-                smokeSuccess={setupSmokeSuccess}
-                onRefresh={refreshSetupStatus}
-                onSelectCategory={(category) => {
-                  const target = legacyToSectionView(category, null);
-                  selectSectionView(target.section, target.view);
-                }}
-                onRunSmoke={handleRunSetupSmoke}
-                showStartWizard={Boolean(setupStatus?.isComplete)}
-                canStartWizard={!isProviderCatalogLoading && providerCatalog.length > 0}
-                startWizardLabel={settingsText.startWizard}
-                onStartWizard={() => setIsWizardOpen(true)}
-                listSeparator={getUiListSeparator(uiLanguage)}
-                t={t}
-              />
-            ) : null}
-            {shouldShowAlphaSiftSettings ? (
-              <AlphaSiftSettingsCard
-                enabled={alphasiftEnabled}
-                configVersion={configVersion}
-                maskToken={maskToken}
-                disabled={isSaving || isLoading}
-                onViewConfigItems={() => selectSectionView('data_sources', 'providers')}
-                onAfterChange={async () => {
-                  await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-                }}
-              />
-            ) : null}
-            {activeCategory === 'system' && activeView === 'security' ? (
-              <>
-                <AuthSettingsCard />
-                <OutboundActivityPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-                <SecurityAuditPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-              </>
-            ) : null}
+            <OverviewSection
+              shouldShowFirstRunSetup={shouldShowFirstRunSetup}
+              setupStatus={setupStatus}
+              isProviderCatalogLoading={isProviderCatalogLoading}
+              providerCatalogLength={providerCatalog.length}
+              setIsWizardOpen={setIsWizardOpen}
+              isRefreshingSetupStatus={isRefreshingSetupStatus}
+              setupStatusError={setupStatusError}
+              firstSetupStockCode={firstSetupStockCode}
+              isSaving={isSaving}
+              isLoading={isLoading}
+              isRunningSetupSmoke={isRunningSetupSmoke}
+              setupSmokeError={setupSmokeError}
+              setupSmokeSuccess={setupSmokeSuccess}
+              refreshSetupStatus={refreshSetupStatus}
+              selectSectionView={selectSectionView}
+              handleRunSetupSmoke={handleRunSetupSmoke}
+              shouldShowAlphaSiftSettings={shouldShowAlphaSiftSettings}
+              alphasiftEnabled={alphasiftEnabled}
+              configVersion={configVersion}
+              maskToken={maskToken}
+              refreshAfterExternalSave={refreshAfterExternalSave}
+            />
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
-            {activeCategory === 'system' && activeView === 'runtime' ? (
-              <>
-                <SchedulerSettingsCard
-                  items={rawActiveItems}
-                  disabled={isSaving || isLoading}
-                  issueByKey={issueByKey}
-                  statusRefreshToken={schedulerStatusRefreshToken}
-                  onSchedulerStateChange={handleSchedulerRuntimeStateChange}
-                  onChange={setDraftValue}
-                  t={t}
-                  language={uiLanguage}
-                />
-                <ScheduledTasksPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-              </>
-            ) : null}
-            {activeCategory === 'system' && activeView === 'general' ? (
-              <SignalScorecardPanel
-                publicEnabled={['1', 'true', 'yes', 'on'].includes(
-                  String(allValuesByKey.SIGNAL_SCORECARD_PUBLIC_ENABLED ?? '').trim().toLowerCase(),
-                )}
-                minSamples={(() => {
-                  const raw = String(allValuesByKey.SIGNAL_SCORECARD_MIN_SAMPLES ?? '').trim();
-                  if (!raw) return 10;
-                  const parsed = Number.parseInt(raw, 10);
-                  return Number.isFinite(parsed) ? parsed : 10;
-                })()}
-                disabled={isSaving || isLoading}
-                t={t}
-                language={uiLanguage}
-              />
-            ) : null}
-            {activeCategory === 'system' && activeView === 'about' ? (
-              <SystemAboutCard />
-            ) : null}
+            <SystemSecuritySection
+              activeCategory={activeCategory}
+              activeView={activeView}
+              passwordChangeable={passwordChangeable}
+              items={rawActiveItems}
+              disabled={isSaving || isLoading}
+              issueByKey={issueByKey}
+              schedulerStatusRefreshToken={schedulerStatusRefreshToken}
+              onSchedulerStateChange={handleSchedulerRuntimeStateChange}
+              onChange={setDraftValue}
+              allValuesByKey={allValuesByKey}
+              t={t}
+              language={uiLanguage}
+            />
             {isTopLevelAdvanced && activeView === 'backup' ? (
               <>
                 <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
@@ -1854,9 +1798,6 @@ const SettingsPage: React.FC = () => {
                   onReplaceModelReferences={replaceModelReferences}
                 />
               </section>
-            ) : null}
-            {activeCategory === 'system' && activeView === 'security' && passwordChangeable ? (
-              <ChangePasswordCard />
             ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
               <SettingsPanelErrorBoundary

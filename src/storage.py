@@ -199,6 +199,7 @@ _LifecycleMethods = _storage_lifecycle._LifecycleMethods
 _MarketDataMethods = _storage_market_data._MarketDataMethods
 _HistoryMethods = _storage_history._HistoryMethods
 _ConversationMethods = _storage_conversation._ConversationMethods
+_load_conversation_context = _storage_conversation._load_conversation_context
 _UsageMethods = _storage_usage._UsageMethods
 
 _LIFECYCLE_METHOD_NAMES = _bind_storage_facade_methods(

@@ -83,6 +83,58 @@ npm run typecheck
 从 Electron 31 / electron-builder 24 升级时需注意：自动更新与 NSIS/DMG 打包语义、沙箱与 contextIsolation 默认值，以及 builder 26 的 archive API（options object）。Windows 协议注册仍依赖 `installer.nsh`，不依赖 builder 的 protocols 字段。
 
 
+## Desktop vs Web 能力矩阵（#884）
+
+桌面端与纯 Web 共用同一套私有本地 origin 上的 React 路由与 API，但**进程环境、协议唤起与安装升级**不同。下表用于避免把“Web 有、桌面缺”的误报当成功能缺口。
+
+| 能力 | Web（浏览器） | Desktop（Electron） | 说明 |
+| --- | --- | --- | --- |
+| 报告 / 分析 / 设置 UI | 是 | 是（同构建产物） | 桌面由本机 FastAPI 托管 `static/` |
+| 登录与会话 Cookie | 是 | 是 | 同 Web origin；品牌迁移会复制会话状态 |
+| `stockpulse://` 深链 | 否 | 是 | 见下文「桌面深链协议」；路径白名单对齐 Web 稳定入口 |
+| 浏览器地址栏 / 分享 URL | 是 | 仅私有 origin | 桌面窗口导航守卫禁止离开本地 origin；外链转系统浏览器 |
+| 自动更新与版本检查 | 否 | 是 | `window.dsaDesktop` 更新 API；设置「关于」卡片消费 |
+| 更新时保留 `.env` / DB / cache | N/A | 是 | 见「发版前可复现验证」中的升级留存核对与 `.dsa-desktop-update-backup` |
+| 本地 Ollama 启停 / 内嵌 runtime | 探测远端服务 | 是 | 系统/内嵌/外部服务探测；Local Models 面板 |
+| 生成后端 CLI（codex/claude/opencode） | 依赖宿主 PATH | 依赖 Desktop 子进程 PATH | macOS GUI 会补 Homebrew 常见路径；见 PATH/CLI 诊断 |
+| 调度进程模式文案 | Web 部署语义 | 桌面本机语义 | 以 Settings 调度区块与 #869 为准，不在桌面壳重复实现 |
+| 环境变量 / `.env` 位置 | 服务端部署目录 | Windows：exe 旁；macOS：userData | 见「配置文件说明」 |
+| `WEBUI_PORT` 决定连接地址 | 是 | 否 | 桌面自选 8000–8100 可用端口并同步给后端 |
+
+### #884 缺口实测处置（origin/main + 本任务）
+
+| 问题 | 实测结论 | 处置 |
+| --- | --- | --- |
+| Dock/Finder 启动时找不到 Homebrew CLI | 仍成立：GUI `process.env.PATH` 常缺 `/opt/homebrew/bin` 等 | **已有** `extendMacDesktopBackendPath` 注入后端与 Ollama 子进程 PATH；本任务补充有界异步启动摘要日志 |
+| PATH/CLI 对操作者不可见 | 部分成立：此前无统一诊断摘要 | **本任务** 在 `logs/desktop.log` 写入安全摘要，不向 renderer 暴露原始 PATH 或 CLI 绝对路径；#884 Phase 1 的可见设置 UI 仍待后续 Web 任务完成 |
+| 深链 / 二实例 URL 转发 | **已随既有实现解决** | 协议解析、冷启动排队、`open-url` / second-instance 与测试/文档已在仓库 |
+| 更新“像清空数据” | **已有备份/恢复路径** | Windows NSIS 更新备份 `.env`、DB、provider cache、AlphaSift、内嵌模型目录；macOS 使用 userData，不随 `.app` 替换丢失 |
+| 环境变量 denylist 与 shell 不一致 | 部分成立 | 本地 CLI 生成后端仅继承安全 env 白名单（防密钥泄漏）；**不**为“与 shell 完全一致”放宽 denylist（#884 non-goal） |
+| Desktop vs Web 矩阵文档 | 此前分散 | **本任务** 收敛为本节 |
+
+Web 侧 Model Sources / Settings 面板直接渲染 CLI 表格属于 Web 域，不在 `apps/dsa-desktop/**` 边界内。本任务不新增 preload/IPC 契约；可见设置 UI、用户触发刷新及可操作引导仍属于 #884 后续阶段。
+
+### PATH / CLI 诊断
+
+桌面主进程在创建窗口时安排一次异步诊断，解析**有效 PATH**（macOS 在进程 PATH 后追加 Homebrew 与系统 bin 目录；Windows/Linux 继承进程 PATH，不额外改写），并对 allowlist 命令做无 shell 的路径探测：
+
+- `ollama`
+- `codex`
+- `claude`
+- `opencode`
+
+诊断有 250 ms 总时限、最多 64 个 PATH 条目和 4 个并发探测，并以单次请求合并和 5 分钟缓存限制重复 I/O。窗口创建和后端启动不等待诊断完成；慢文件系统、权限错误或缺失 PATH 会得到 `unknown`，不会误报为 `missing`。
+
+**日志：** 一行摘要形如
+`[env-diagnostics] platform=darwin pathPolicy=macos-gui-homebrew-extend pathEntries=N pathAugmented=yes ollama=available codex=missing claude=unknown ...`
+日志只记录 `available` / `missing` / `unknown` 状态与条目数量，不记录原始 PATH、PATH 条目、CLI 绝对路径、应用目录或 `.env` 路径。诊断结果不通过 IPC/preload 暴露给 renderer。
+
+操作建议：
+
+1. 若 `codex`/`claude`/`opencode` 为 `missing`：在终端确认 `which <cli>`，并安装到 `/opt/homebrew/bin` 或 `/usr/local/bin`（macOS），或保证安装目录已在用户登录 PATH 且重启桌面端；`unknown` 表示探测超时、PATH 不可用或探测错误，不能据此断定 CLI 缺失。
+2. 若 `ollama=missing` 但 Local Models 仍可用：可能使用了**内嵌** runtime（不依赖 PATH 上的 `ollama`）；以 Local Models 面板状态为准。
+3. 生成失败时不要只看空白 “backend error”：对照上述 CLI 可见性与 Settings 中的 generation backend 配置。
+
 ## 桌面深链协议
 
 桌面安装包注册 `stockpulse` 自定义协议。规范形式是

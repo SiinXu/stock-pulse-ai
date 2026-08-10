@@ -81,6 +81,7 @@ class Config:
     data_validation_strict: bool = False
     data_validation_strict_scopes: str = "*/*"
     data_validation_upper_layer_mode: str = "warn"
+    plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
     alphasift_enabled: bool = False
@@ -94,6 +95,11 @@ class Config:
     # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
     multimodal_agent_tools_enabled: bool = False
     multimodal_file_root: Optional[str] = None
+    # === Optional offline OCR Agent Tool (issue #196) ===
+    ocr_agent_tool_enabled: bool = False
+    ocr_file_root: Optional[str] = None
+    ocr_langs: str = "chi_sim+eng"
+    ocr_timeout_seconds: int = 30
     # === Optional DCF / relative valuation Agent Tool (issue #238) ===
     valuation_agent_tool_enabled: bool = False
 
@@ -224,6 +230,15 @@ class Config:
     news_intel_auto_fetch_enabled: bool = False  # Automatically initialize and pull local news sources before analysis
     newsnow_base_url: str = "https://newsnow.busiyi.world"  # NewsNow HTTP API base URL (Source side data, Does Not Affect LLM/provider base URL)
     bias_threshold: float = 5.0  # Standard deviation threshold (%), prompts not to chase highs if exceeded.
+
+    # === Technical indicator periods (Issue #172) ===
+    # Defaults match historical hard-coded StockTrendAnalyzer periods.
+    indicator_ma_periods: List[int] = field(default_factory=lambda: [5, 10, 20, 60])
+    indicator_macd_fast: int = 12
+    indicator_macd_slow: int = 26
+    indicator_macd_signal: int = 9
+    indicator_rsi_periods: List[int] = field(default_factory=lambda: [6, 12, 24])
+    indicator_period_source: str = "defaults"
 
     # == Agent Mode Configuration ===
     agent_generation_backend: str = AUTO_AGENT_BACKEND_ID
