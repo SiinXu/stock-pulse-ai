@@ -143,6 +143,70 @@ def test_manager_supplement_does_not_mark_fallback_from(mock_get_config):
 
 
 @patch("src.config.get_config")
+def test_final_realtime_evidence_matches_supplemented_quote(
+    mock_get_config,
+    monkeypatch,
+):
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    mock_get_config.return_value = SimpleNamespace(
+        enable_realtime_quote=True,
+        realtime_source_priority="efinance,akshare_em",
+    )
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "false")
+    reset_application_services()
+    Config.reset_instance()
+    primary = _make_quote(source=RealtimeSource.EFINANCE)
+    supplement = _make_quote(source=RealtimeSource.AKSHARE_EM, pe_ratio="bad")
+    manager = DataFetcherManager(
+        fetchers=[
+            _DummyFetcher("EfinanceFetcher", 0, result=primary),
+            _DummyFetcher("AkshareFetcher", 1, result=supplement),
+        ]
+    )
+
+    quote = manager.get_realtime_quote("600519")
+
+    assert quote is primary
+    assert quote.pe_ratio == "bad"
+    assert quote.data_quality_evidence["provider"] == "efinance"
+    assert {
+        issue["code"] for issue in quote.data_quality_evidence["issues"]
+    } == {"dv_fund_pe_invalid_type"}
+    assert quote.data_quality_evidence["provenance"]["fetched_at"] == quote.fetched_at
+
+
+@patch("src.config.get_config")
+def test_final_realtime_evidence_carries_fallback_provenance(
+    mock_get_config,
+    monkeypatch,
+):
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    mock_get_config.return_value = SimpleNamespace(
+        enable_realtime_quote=True,
+        realtime_source_priority="efinance,akshare_em",
+    )
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    reset_application_services()
+    Config.reset_instance()
+    manager = DataFetcherManager(
+        fetchers=[
+            _DummyFetcher("EfinanceFetcher", 0, error=RuntimeError("timeout")),
+            _DummyFetcher("AkshareFetcher", 1, result=_make_quote()),
+        ]
+    )
+
+    quote = manager.get_realtime_quote("600519")
+
+    assert quote is not None
+    assert quote.data_quality_evidence["provenance"]["fallback_from"] == "efinance"
+
+
+@patch("src.config.get_config")
 def test_manager_fallback_from_records_highest_priority_failed_source(mock_get_config):
     mock_get_config.return_value = SimpleNamespace(
         enable_realtime_quote=True,
@@ -208,6 +272,58 @@ def test_pipeline_warns_once_when_all_realtime_sources_fail(caplog):
         "贵州茅台(600519) all realtime quote sources failed; "
         "using historical close price"
     ]
+
+
+def test_pipeline_preserves_typed_fundamental_validation_rejection():
+    from data_provider.data_validation import (
+        DataValidationRejected,
+        validate_fundamental_context,
+    )
+
+    pipeline = _make_pipeline(enable_realtime_quote=False)
+    pipeline.analysis_skills = []
+    validation = validate_fundamental_context(
+        {"valuation": {"data": {"pe_ratio": "bad"}}},
+        market="cn",
+        stock_code="600519",
+    )
+    rejection = DataValidationRejected(
+        validation,
+        data_type="fundamental_context",
+        evidence=validation.to_evidence(
+            data_type="fundamental_context",
+            stock_code="600519",
+            provider="fundamental_pipeline",
+            market="cn",
+            instrument_type="equity",
+            rejected=True,
+        ),
+    )
+    typed_context = {
+        "market": "cn",
+        "status": "validation_rejected",
+        "data_quality": "rejected",
+        "coverage": {},
+        "source_chain": [
+            {"provider": "data_validation", "result": "rejected", "duration_ms": 0}
+        ],
+        "errors": list(rejection.reason_codes),
+    }
+    pipeline.fetcher_manager.get_fundamental_context.side_effect = rejection
+    pipeline.fetcher_manager.build_validation_rejected_fundamental_context.return_value = (
+        typed_context
+    )
+
+    pipeline.analyze_stock("600519", ReportType.SIMPLE, "q-validation-rejected")
+
+    pipeline.fetcher_manager.build_validation_rejected_fundamental_context.assert_called_once_with(
+        "600519",
+        rejection,
+    )
+    pipeline.fetcher_manager.build_failed_fundamental_context.assert_not_called()
+    persisted = pipeline.db.save_fundamental_snapshot.call_args.kwargs["payload"]
+    assert persisted["status"] == "validation_rejected"
+    assert persisted["source_chain"][0]["provider"] == "data_validation"
 
 
 @patch("src.config.get_config")
