@@ -1124,16 +1124,27 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
-    usage: 'When enabled, the risk agent in full/specialist mode can downgrade buy recommendations to hold or sell. That conservative override still applies automatically unless Human approvals captures the path.',
+    usage: 'Controls whether the legacy risk plan directly applies a downgrade. The mandatory Risk Manager still decides the final action under RISK_GATE_PROFILE.',
     valueNotes: [
-      'Only effective when AGENT_ORCHESTRATOR_MODE includes the risk stage.',
+      'Controls only the legacy override and cannot skip final-action evaluation.',
       'HITL risk-control bypass is off by default on /approvals; enable it there for a one-shot, time-limited chance to preserve the original signal.',
     ],
     impact: ['Affects the risk conservatism of final investment recommendations.'],
     notes: [
-      'When disabled, the risk agent opinion is advisory only and cannot override decisions.',
+      'When disabled, the legacy override does not apply directly, but explicit risk evidence can still cause the final action to be downgraded or rejected.',
       'Open Human approvals (/approvals) to configure the default-off HITL gate. This is not broker or trade-order approval and does not expand Agent tool authority.',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: 'Risk Manager Profile',
+    summary: 'Selects the mandatory final-action thresholds before a recommendation is published.',
+    usage: 'Balanced is the default; conservative intervenes sooner, while aggressive requires explicit blocking evidence.',
+    valueNotes: [
+      'Supported values are conservative, balanced, and aggressive; invalid values stop startup.',
+      'The gate cannot be disabled, and internal failures fail closed.',
+    ],
+    impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
+    notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
