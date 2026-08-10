@@ -18,6 +18,8 @@ import {
   hasReportDecisionCardContent,
   type ReportDecisionCardModel,
 } from './reportDecisionCardUtils';
+import { ReportRiskGateBanner } from './ReportRiskGateBanner';
+import { buildRiskGatePresentation } from './reportRiskGateUtils';
 
 export interface ReportDecisionCardProps {
   meta: ReportMeta;
@@ -26,6 +28,10 @@ export interface ReportDecisionCardProps {
   details?: ReportDetailsType;
   language?: ReportLanguage;
   compact?: boolean;
+  /** When true, show the risk-gate loading state instead of missing-as-pass. */
+  riskGateLoading?: boolean;
+  /** When true, show the risk-gate load-error state. */
+  riskGateError?: boolean;
 }
 
 const DetailLine: React.FC<{ label: string; value?: React.ReactNode }> = ({
@@ -88,6 +94,8 @@ export const ReportDecisionCard: React.FC<ReportDecisionCardProps> = ({
   details,
   language,
   compact = false,
+  riskGateLoading = false,
+  riskGateError = false,
 }) => {
   const { t } = useUiLanguage();
   const reportLanguage = normalizeReportLanguage(language ?? meta.reportLanguage);
@@ -101,10 +109,15 @@ export const ReportDecisionCard: React.FC<ReportDecisionCardProps> = ({
     details,
     signalLabel,
   });
-
-  if (!hasReportDecisionCardContent(model)) {
-    return null;
-  }
+  const riskGate = buildRiskGatePresentation({
+    summary,
+    details,
+    loading: riskGateLoading,
+    error: riskGateError,
+  });
+  // Always show the decision surface so the Risk Manager conclusion (including
+  // not-evaluated) cannot be omitted when other decision fields are empty.
+  const hasDecisionContent = hasReportDecisionCardContent(model);
 
   const positionParts: string[] = [];
   if (model.positionNoPosition) {
@@ -149,38 +162,49 @@ export const ReportDecisionCard: React.FC<ReportDecisionCardProps> = ({
         )}
       />
 
-      <dl className="space-y-2.5">
-        <DetailLine label={text.oneSentence} value={model.oneSentence} />
-        <DetailLine label={text.trendPrediction} value={model.trendPrediction} />
-        <DetailLine label={text.confidence} value={model.confidenceLevel} />
-        <DetailLine label={text.confidenceReason} value={model.confidenceReason} />
-        <DetailLine label={text.immediateAction} value={model.immediateAction} />
-        <DetailLine label={text.timeSensitivity} value={model.timeSensitivity} />
-        <DetailLine
-          label={text.positionAdvice}
-          value={positionParts.length > 0 ? positionParts.join(' · ') : undefined}
-        />
-        <DetailLine
-          label={text.actionLevels}
-          value={levelParts.length > 0 ? levelParts.join(' · ') : undefined}
-        />
-      </dl>
+      <ReportRiskGateBanner
+        presentation={riskGate}
+        language={reportLanguage}
+        compact={compact}
+        className="mb-4"
+      />
 
-      <div className="mt-4 space-y-3">
-        <BulletList
-          label={text.keyRisks}
-          items={model.keyRisks}
-          testId="report-decision-card-risks"
-        />
-        {!model.keyRisks.length && model.riskWarning ? (
-          <DetailLine label={text.riskWarning} value={model.riskWarning} />
-        ) : null}
-        <BulletList
-          label={text.watchConditions}
-          items={model.watchConditions}
-          testId="report-decision-card-watch"
-        />
-      </div>
+      {hasDecisionContent ? (
+        <>
+          <dl className="space-y-2.5">
+            <DetailLine label={text.oneSentence} value={model.oneSentence} />
+            <DetailLine label={text.trendPrediction} value={model.trendPrediction} />
+            <DetailLine label={text.confidence} value={model.confidenceLevel} />
+            <DetailLine label={text.confidenceReason} value={model.confidenceReason} />
+            <DetailLine label={text.immediateAction} value={model.immediateAction} />
+            <DetailLine label={text.timeSensitivity} value={model.timeSensitivity} />
+            <DetailLine
+              label={text.positionAdvice}
+              value={positionParts.length > 0 ? positionParts.join(' · ') : undefined}
+            />
+            <DetailLine
+              label={text.actionLevels}
+              value={levelParts.length > 0 ? levelParts.join(' · ') : undefined}
+            />
+          </dl>
+
+          <div className="mt-4 space-y-3">
+            <BulletList
+              label={text.keyRisks}
+              items={model.keyRisks}
+              testId="report-decision-card-risks"
+            />
+            {!model.keyRisks.length && model.riskWarning ? (
+              <DetailLine label={text.riskWarning} value={model.riskWarning} />
+            ) : null}
+            <BulletList
+              label={text.watchConditions}
+              items={model.watchConditions}
+              testId="report-decision-card-watch"
+            />
+          </div>
+        </>
+      ) : null}
     </Card>
   );
 };
