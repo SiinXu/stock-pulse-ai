@@ -45,6 +45,10 @@ from src.schemas.decision_action import (
     localize_action_label,
 )
 from src.schemas.report_strata import resolve_report_strata
+from src.services.valuation_projection import (
+    extract_valuation_payload,
+    project_valuation_for_report,
+)
 from src.utils.data_processing import (
     normalize_model_used,
     signal_attribution_has_content,
@@ -303,6 +307,17 @@ def render(
         _, se, _ = get_signal_level(signal_action or display_advice, r.sentiment_score, report_language)
         rn = get_localized_stock_name(r.name, r.code, report_language)
         strata_model = resolve_report_strata(r, language=report_language)
+        valuation_payload = extract_valuation_payload(r)
+        valuation_by_code = (extra_context or {}).get("valuation_by_code")
+        if valuation_payload is None and isinstance(valuation_by_code, dict):
+            code_key = str(getattr(r, "code", "") or "")
+            candidate = valuation_by_code.get(code_key)
+            if isinstance(candidate, dict):
+                valuation_payload = candidate
+        valuation_projection = project_valuation_for_report(
+            valuation_payload,
+            language=report_language,
+        )
         sorted_enriched.append({
             "result": r,
             "signal_text": display_advice,
@@ -312,6 +327,8 @@ def render(
             "localized_trend_prediction": localize_trend_prediction(r.trend_prediction, report_language),
             # Issue #616: optional strata dict for templates; None keeps historical path quiet.
             "report_strata": strata_model.to_public_dict() if strata_model else None,
+            # Issue #238: optional valuation projection; None omits the section entirely.
+            "valuation_projection": valuation_projection,
         })
 
     display_buckets = [
