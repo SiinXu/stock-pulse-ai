@@ -37,10 +37,12 @@ const useSamples = () => {
   return PLAYGROUND_TEXT[language].samples;
 };
 
-const ZeroConfigFirstRunPanelStory = lazy(async () => {
+const LazyZeroConfigFirstRunPanelStory = lazy(async () => {
   const module = await import('./zeroConfigFirstRunScenario');
   return { default: module.ZeroConfigFirstRunPanelStory };
 });
+
+const ZeroConfigFirstRunPanelStory = () => <LazyZeroConfigFirstRunPanelStory />;
 
 const StockAutocompleteStory = () => {
   const text = useSamples();
