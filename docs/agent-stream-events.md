@@ -46,9 +46,14 @@ New clients may additionally read:
 - `retry_status`
 - `validation_status`
 - `confidence_delta`
+- `turn_id`
+- `message_id`
 
 Unknown event types should be ignored or displayed with a generic fallback.
 `done` and `error` keep their existing completion semantics.
+In particular, `done` is not a persistence acknowledgement. Clients that need
+to decide whether a stopped or disconnected turn is resendable must use the
+identified `turn_persisted` event or reconcile the exact session and turn ID.
 
 The Critic event types below are produced only for an explicitly enabled,
 non-Chat Native Multi run. `response_mode=chat` never enters the Critic stage,
@@ -66,6 +71,7 @@ so these additions do not expand the public Ask Stock Chat SSE payload.
 | `generating` | single-agent loop | The final response is being generated. | `step`, `message` |
 | `pipeline_timeout` | multi-agent orchestrator | The orchestrator stopped because the stage or pipeline budget expired. | `stage`, `elapsed`, `timeout` |
 | `pipeline_budget_skipped` | multi-agent orchestrator | The orchestrator stopped before starting the next stage because the remaining budget was too low for useful work. | `stage`, `elapsed`, `timeout`, `remaining`, `minimum`, `reason`, `message` |
+| `turn_persisted` | single-agent loop, multi-agent orchestrator | The client-supplied user turn ID, message, selected Skills, and request context have committed before generation starts. | `turn_id`, `message_id` |
 | `critic_verdict` | enabled non-Chat multi-agent orchestrator | The bounded Critic produced a validated verdict, failed closed, or could not complete. | `stage`, `verdict`, `requested_verdict`, `reasons`, `missing_evidence`, `retry_targets_requested`, `retry_targets_executed`, `retry_budget_consumed`, `retry_budget_remaining`, `retry_status`, `validation_status`, `confidence_delta` |
 | `critic_retry_start` | enabled non-Chat multi-agent orchestrator | The one-shot whitelist retry has consumed its run budget and started. | `stage`, `retry_target`, Critic verdict and budget fields |
 | `critic_retry_done` | enabled non-Chat multi-agent orchestrator | The whitelist retry completed or failed without opening another retry. | `stage`, `status`, `duration`, `retry_target`, Critic verdict and budget fields |
@@ -77,6 +83,14 @@ so these additions do not expand the public Ask Stock Chat SSE payload.
 The Web chat UI now recognizes `stage_start`, `stage_done`,
 `pipeline_timeout`, and `pipeline_budget_skipped` in addition to the existing
 thinking/tool/generating events.
+For new sends, the Web client supplies a stable `turn_id`. If the stream ends
+before its acknowledgement arrives, it queries the exact session history and
+checks that ID before restoring a resendable draft. Reusing the same ID is
+idempotent within a session. Older messages keep a null ID, and a server that
+does not advertise `turn_identity_supported` produces an `unknown` result;
+the client does not guess that such a turn is safe to resend. Report follow-up
+URLs record that ambiguity as `context=unknown`, preventing refresh from
+recreating a duplicate draft without falsely claiming `context=active`.
 Critic events are not emitted on Chat runs. A non-Chat progress consumer can
 render their bounded fields directly or treat them as an additive unknown type.
 If a future backend event is not recognized, the UI keeps the event in the
@@ -127,6 +141,7 @@ The focused tests should confirm that:
 - Critic cancellation and timeout exits finalize metadata before termination
 - SSE cleanup behavior remains unchanged
 - Web chat state and Chat page rendering still pass
+- acknowledgement follows durable persistence and ambiguous retry keeps one user row
 
 ## Rollback
 
@@ -139,6 +154,9 @@ To roll back this event-contract change, revert the commit that introduced:
 
 Because the change is additive and keeps `done` / `error` semantics unchanged,
 existing clients can also ignore the new stage events without a migration step.
+Rolling back the turn-identity behavior requires reverting the API/Web change
+and its migration. The nullable database columns can safely remain; duplicate
+rows already created before rollback are not removed automatically.
 For the bounded Critic additions specifically, disabling
 `AGENT_CRITIC_ENABLED` restores the previous event set immediately; reverting
 the Critic change removes the event types without data or schema migration.

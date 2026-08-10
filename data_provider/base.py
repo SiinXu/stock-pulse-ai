@@ -22,7 +22,16 @@ import time
 from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Callable, Optional, List, Tuple, Dict, Any
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 import pandas as pd
 import numpy as np
@@ -30,6 +39,7 @@ from src.data.stock_index_loader import get_index_stock_name
 from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 from .daily_cache import (
+    CachedCandidateRejected,
     DailyCacheKey,
     DailyDataCache,
     MarketDataResolveResult,
@@ -559,6 +569,7 @@ class DataFetcherManager:
         *,
         provider_run_recorder: Optional[Callable[..., None]] = None,
         provider_run_started_recorder: Optional[Callable[..., None]] = None,
+        extension_contracts: Optional[Mapping[str, Any]] = None,
     ):
         """
         初始化管理器
@@ -568,6 +579,9 @@ class DataFetcherManager:
             provider_run_recorder: Optional diagnostic recorder (defaults to
                 production run-diagnostics wiring resolved at construction).
             provider_run_started_recorder: Optional start-event recorder pair.
+            extension_contracts: Optional non-data_provider extension contracts
+                merged into the manager-owned plugin registry (composition roots
+                use this when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled).
         """
         from .manager_parts.provider_run_wiring import resolve_provider_run_recorders
 
@@ -598,7 +612,8 @@ class DataFetcherManager:
         self._fetcher_call_locks: Dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
         self._data_provider_runtime = _DataProviderPluginRuntime(
-            self._BUILTIN_DATA_PROVIDER_IDS
+            self._BUILTIN_DATA_PROVIDER_IDS,
+            additional_contracts=extension_contracts,
         )
         self._registered_fetchers: Dict[str, DataProvider] = {}
         self._provider_priorities: Dict[int, int] = {}
@@ -736,6 +751,38 @@ class DataFetcherManager:
             stale_seconds=int(cache_result.age_seconds),
             record_count=len(cache_result.frame),
         )
+
+    @staticmethod
+    def _validate_daily_candidate(
+        frame: pd.DataFrame,
+        *,
+        stock_code: str,
+        source_name: str,
+    ) -> pd.DataFrame:
+        """Apply the active quality policy to provider and cached candidates."""
+        from data_provider.data_validation import (
+            DataValidationRejected,
+            infer_instrument_type,
+            validate_and_annotate,
+        )
+
+        try:
+            validate_and_annotate(
+                frame,
+                data_type="daily_data",
+                market=_market_tag(normalize_stock_code(stock_code)),
+                stock_code=stock_code,
+                provider=source_name,
+                instrument_type=(
+                    frame.attrs.get("instrument_type")
+                    or infer_instrument_type(stock_code)
+                ),
+            )
+        except DataValidationRejected as exc:
+            raise CachedCandidateRejected(
+                "cached daily-data candidate rejected by active quality policy"
+            ) from exc
+        return frame
 
     def get_daily_cache_stats(self) -> Dict[str, int]:
         """Return manager-local daily cache hit, miss, and lifecycle counters."""
@@ -1185,6 +1232,7 @@ class DataFetcherManager:
         start_date: Optional[str],
         end_date: Optional[str],
         days: int,
+        validation_instrument_type: Optional[str] = None,
     ) -> Optional[pd.DataFrame]:
         """Call one provider and reject unusable normalized daily schemas."""
 
@@ -1213,6 +1261,7 @@ class DataFetcherManager:
             end_date=end_date,
             days=days,
             _manager_result_validator=_validate_result,
+            _validation_instrument_type=validation_instrument_type,
         )
 
     def get_daily_data(
@@ -1254,6 +1303,11 @@ class DataFetcherManager:
             cache_key,
             network_fetch=network_fetch,
             required_fields=REQUIRED_DAILY_COLUMNS,
+            cached_candidate_validator=lambda frame, source_name: self._validate_daily_candidate(
+                frame,
+                stock_code=normalized_code,
+                source_name=source_name,
+            ),
         )
 
         if result.from_cache:
@@ -1328,6 +1382,10 @@ class DataFetcherManager:
 
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
+        market = _market_tag(stock_code)
+        from data_provider.data_validation import infer_instrument_type
+
+        instrument_type = infer_instrument_type(stock_code)
 
         request_start = time.time()
         fetchers = self._get_fetchers_snapshot()
@@ -1416,6 +1474,7 @@ class DataFetcherManager:
                             start_date=start_date,
                             end_date=end_date,
                             days=days,
+                            validation_instrument_type=instrument_type,
                         )
                         if df is not None and not df.empty:
                             duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1529,7 +1588,8 @@ class DataFetcherManager:
                     stock_code=stock_code,
                     start_date=start_date,
                     end_date=end_date,
-                    days=days
+                    days=days,
+                    validation_instrument_type=instrument_type,
                 )
                 
                 if df is not None and not df.empty:
@@ -3493,6 +3553,60 @@ class DataFetcherManager:
             "coverage": {block: "failed" for block in block_names},
             "source_chain": [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
             "errors": [reason],
+            **blocks,
+        }
+
+    def build_validation_rejected_fundamental_context(
+        self,
+        stock_code: str,
+        rejection: Any,
+    ) -> Dict[str, Any]:
+        """Build a typed upper-layer policy outcome without claiming provider failure."""
+        market = _market_tag(stock_code)
+        reason_codes = [
+            sanitize_diagnostic_text(code, max_length=96)
+            for code in getattr(rejection, "reason_codes", ())
+            if sanitize_diagnostic_text(code, max_length=96)
+        ][:24]
+        evidence = getattr(rejection, "evidence", None)
+        evidence_list = [dict(evidence)] if isinstance(evidence, dict) else []
+        source_chain = [
+            {
+                "provider": "data_validation",
+                "result": "rejected",
+                "duration_ms": 0,
+            }
+        ]
+        block_names = (
+            "valuation",
+            "growth",
+            "earnings",
+            "institution",
+            "capital_flow",
+            "dragon_tiger",
+            "boards",
+        )
+        blocks = {
+            block: self._build_fundamental_block(
+                "validation_rejected",
+                {},
+                source_chain,
+                reason_codes or ["data_validation_rejected"],
+            )
+            for block in block_names
+        }
+        return {
+            "market": market,
+            "status": "validation_rejected",
+            "data_quality": "rejected",
+            "coverage": {block: "validation_rejected" for block in block_names},
+            "source_chain": source_chain,
+            "errors": reason_codes or ["data_validation_rejected"],
+            "validation_rejection": {
+                "outcome": "rejected",
+                "reason_codes": reason_codes,
+            },
+            "data_quality_evidence": evidence_list,
             **blocks,
         }
 

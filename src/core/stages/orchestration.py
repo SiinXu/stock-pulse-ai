@@ -7,7 +7,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import ContextVar
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from data_provider.base import normalize_stock_code
@@ -166,20 +166,50 @@ class _OrchestrationStageMixin:
             target_date = self._resolve_resume_target_date(
                 code, current_time=current_time
             )
+            from src.utils.indicator_periods import IndicatorPeriodConfig, periods_from_config
 
-            # Checkpoint resumption check: If the latest reusable data for a trading day already exists, skip it.
+            pipeline_config = getattr(self, "config", None)
+            indicator_periods = (
+                periods_from_config(pipeline_config)
+                if pipeline_config is not None
+                else IndicatorPeriodConfig()
+            )
+            required_bars = indicator_periods.max_required_trading_days
+            lookback_days = indicator_periods.required_history_calendar_days()
             if not force_refresh and self.db.has_today_data(code, target_date):
+                coverage_start = target_date - timedelta(days=lookback_days)
+                existing_bars = self.db.get_data_range(code, coverage_start, target_date)
+                existing_bar_count = 0 if existing_bars is None else len(existing_bars)
+
+                # Latest-date resumability is insufficient for long indicators:
+                # only skip when configured warmup coverage also exists.
+                if existing_bar_count >= required_bars:
+                    logger.info(
+                        "%s(%s) already has data for %s with %s/%s required bars; "
+                        "skipping fetch for resumability",
+                        stock_name,
+                        code,
+                        target_date,
+                        existing_bar_count,
+                        required_bars,
+                    )
+                    return True, None
                 logger.info(
-                    "%s(%s) already has data for %s; skipping fetch for resumability",
+                    "%s(%s) has target-date data but only %s/%s required bars; "
+                    "backfilling %s calendar days",
                     stock_name,
                     code,
-                    target_date,
+                    existing_bar_count,
+                    required_bars,
+                    lookback_days,
                 )
-                return True, None
 
             # Get data from data source.
             logger.info("%s(%s) fetching market data", stock_name, code)
-            df, source_name = self.fetcher_manager.get_daily_data(code, days=30)
+            df, source_name = self.fetcher_manager.get_daily_data(
+                code,
+                days=lookback_days,
+            )
 
             if df is None or df.empty:
                 return False, "获取数据为空"
@@ -606,7 +636,15 @@ class _OrchestrationStageMixin:
         # === Batch Pre-fetch Real-Time Quotes (Optimization: Avoid triggering full pull for each stock) ===
         # Pre-fetch only when the number of stocks is >= 5; query small amounts of stocks individually for efficiency.
         if len(stock_codes) >= 5 and not local_only_market_data:
-            daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(stock_codes, days=30)
+            from src.utils.indicator_periods import periods_from_config
+
+            daily_prefetch_days = periods_from_config(
+                self.config
+            ).required_history_calendar_days()
+            daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(
+                stock_codes,
+                days=daily_prefetch_days,
+            )
             if daily_prefetch_count > 0:
                 logger.info(
                     "[prefetch] component=daily_kline_prefetch action=complete "

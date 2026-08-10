@@ -92,6 +92,10 @@ class _IncompatibleCacheIdentity(ValueError):
     """A valid cache file owned by another adjustment/schema identity."""
 
 
+class CachedCandidateRejected(ValueError):
+    """The active quality policy rejected a cached daily-data candidate."""
+
+
 def parse_market_data_fetch_mode(raw_value: Optional[str]) -> MarketDataFetchMode:
     """Parse the configured mode and fail closed on an ambiguous value."""
 
@@ -1194,6 +1198,9 @@ class DailyDataCache:
         network_fetch: Optional[Callable[[], Tuple[pd.DataFrame, str]]] = None,
         required_fields: Sequence[str] = _DEFAULT_REQUIRED_FIELDS,
         mode: Optional[MarketDataFetchMode] = None,
+        cached_candidate_validator: Optional[
+            Callable[[pd.DataFrame, str], pd.DataFrame]
+        ] = None,
     ) -> MarketDataResolveResult:
         """Resolve the complete daily-data contract for all three manager modes."""
 
@@ -1210,12 +1217,31 @@ class DailyDataCache:
                         self._stats["local_only_misses"] += 1
                         self._record_event("local_only_miss", missing.reason)
                     raise LocalDataMissingError(missing)
+                if cached_candidate_validator is not None:
+                    try:
+                        local_frame = cached_candidate_validator(
+                            local.frame,
+                            local.source_name,
+                        )
+                    except CachedCandidateRejected as exc:
+                        self.invalidate(key.symbol)
+                        missing = self.build_local_missing(
+                            key,
+                            fields=required_fields,
+                            reason="quality_rejected",
+                        )
+                        with self._lock:
+                            self._stats["local_only_misses"] += 1
+                            self._record_event("local_only_miss", missing.reason)
+                        raise LocalDataMissingError(missing) from exc
+                else:
+                    local_frame = local.frame
                 with self._lock:
                     self._stats["local_only_hits"] += 1
                     self._stats["hits"] += 1
                     self._record_event("local_only_hit", local.layer)
                 return MarketDataResolveResult(
-                    frame=local.frame,
+                    frame=local_frame,
                     source_name=local.source_name,
                     mode=mode_value,
                     from_cache=True,
@@ -1234,15 +1260,37 @@ class DailyDataCache:
                 lookup = self.lookup(key, required_fields=required_fields)
                 if lookup.fresh is not None:
                     fresh = lookup.fresh
-                    return MarketDataResolveResult(
-                        frame=fresh.frame,
-                        source_name=fresh.source_name,
-                        mode=mode_value,
-                        from_cache=True,
-                        is_stale=False,
-                        layer=fresh.layer,
-                        age_seconds=fresh.age_seconds,
-                    )
+                    if cached_candidate_validator is not None:
+                        try:
+                            fresh_frame = cached_candidate_validator(
+                                fresh.frame,
+                                fresh.source_name,
+                            )
+                        except CachedCandidateRejected:
+                            self.invalidate(key.symbol)
+                            lookup = DailyCacheLookup(fresh=None, stale=None)
+                            with self._lock:
+                                self._record_event("quality_rejected", fresh.layer)
+                        else:
+                            return MarketDataResolveResult(
+                                frame=fresh_frame,
+                                source_name=fresh.source_name,
+                                mode=mode_value,
+                                from_cache=True,
+                                is_stale=False,
+                                layer=fresh.layer,
+                                age_seconds=fresh.age_seconds,
+                            )
+                    else:
+                        return MarketDataResolveResult(
+                            frame=fresh.frame,
+                            source_name=fresh.source_name,
+                            mode=mode_value,
+                            from_cache=True,
+                            is_stale=False,
+                            layer=fresh.layer,
+                            age_seconds=fresh.age_seconds,
+                        )
 
             try:
                 frame, source_name = network_fetch()
@@ -1271,8 +1319,24 @@ class DailyDataCache:
                 if active_mode is MarketDataFetchMode.AUTO and lookup.stale is not None:
                     stale = self.use_stale(lookup.stale)
                     if stale is not None:
+                        if cached_candidate_validator is not None:
+                            try:
+                                stale_frame = cached_candidate_validator(
+                                    stale.frame,
+                                    stale.source_name,
+                                )
+                            except CachedCandidateRejected:
+                                self.invalidate(key.symbol)
+                                with self._lock:
+                                    self._record_event(
+                                        "quality_rejected",
+                                        stale.layer,
+                                    )
+                                raise exc
+                        else:
+                            stale_frame = stale.frame
                         return MarketDataResolveResult(
-                            frame=stale.frame,
+                            frame=stale_frame,
                             source_name=stale.source_name,
                             mode=mode_value,
                             from_cache=True,

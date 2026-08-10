@@ -54,6 +54,7 @@ const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
 const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
 const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
+const FinancialCalculatorsPage = lazy(() => import('./pages/FinancialCalculatorsPage'));
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -185,6 +186,7 @@ const routes = [
           },
           { path: APP_ROUTE_PATHS.researchBacktest, element: <BacktestPage /> },
           { path: APP_ROUTE_PATHS.researchSkillOutcomes, element: <SkillOutcomesPage /> },
+          { path: APP_ROUTE_PATHS.calculators, element: <FinancialCalculatorsPage /> },
           {
             path: APP_ROUTE_PATHS.researchReportCompare,
             element: <ReportVersionComparePage />,

@@ -19,6 +19,7 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    calculators,
     config_profiles,
     decision_signals,
     health,
@@ -39,6 +40,8 @@ from api.v1.endpoints import (
     stocks,
     system_config,
     usage,
+    watchlist_scores,
+    watchlist_groups,
 )
 
 # Create v1 main route.
@@ -87,6 +90,19 @@ router.include_router(
     tags=["Stocks"]
 )
 
+
+router.include_router(
+    watchlist_scores.router,
+    prefix="/watchlist",
+    tags=["Watchlist"],
+)
+
+router.include_router(
+    watchlist_groups.router,
+    prefix="/stocks",
+    tags=["Stocks"],
+)
+
 router.include_router(
     backtest.router,
     prefix="/backtest",
@@ -115,6 +131,12 @@ router.include_router(
     portfolio_risk_metrics.router,
     prefix="/portfolio",
     tags=["Portfolio"]
+)
+
+router.include_router(
+    calculators.router,
+    prefix="/calculators",
+    tags=["Calculators"],
 )
 
 router.include_router(

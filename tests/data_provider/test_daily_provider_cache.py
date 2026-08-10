@@ -101,9 +101,16 @@ def _manager(provider: _Provider, cache: DailyDataCache) -> DataFetcherManager:
 
 @pytest.fixture(autouse=True)
 def _reset_daily_health() -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    reset_application_services()
+    Config.reset_instance()
     DataFetcherManager.reset_daily_source_health()
     yield
     DataFetcherManager.reset_daily_source_health()
+    reset_application_services()
+    Config.reset_instance()
 
 
 def test_environment_defaults_enable_bounded_layered_cache(monkeypatch) -> None:
@@ -183,6 +190,35 @@ def test_expired_memory_falls_through_to_fresh_persistent_layer(tmp_path: Path) 
     assert provider.calls == 1
     assert persisted.attrs["provider_cache"]["layer"] == "persistent"
     assert persisted.attrs["provider_cache"]["is_stale"] is False
+
+
+def test_fresh_cache_is_revalidated_when_policy_becomes_strict(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    clock = _Clock()
+    provider = _Provider([_frame("bad"), _frame(10.3)])
+    manager = _manager(provider, _cache(tmp_path, clock))
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "false")
+    reset_application_services()
+    Config.reset_instance()
+    first, _ = manager.get_daily_data("600519")
+    assert first.loc[0, "close"] == "bad"
+
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "cn/equity")
+    reset_application_services()
+    Config.reset_instance()
+    refreshed, source = manager.get_daily_data("600519")
+
+    assert source == "CacheTestProvider"
+    assert provider.calls == 2
+    assert refreshed.loc[0, "close"] == pytest.approx(10.3)
+    assert refreshed.attrs["provider_cache"]["cache_hit"] is False
 
 
 def test_expired_layers_fetch_and_replace_data(tmp_path: Path) -> None:
@@ -282,6 +318,43 @@ def test_stale_data_is_used_only_after_provider_failure(
     assert manager.get_daily_cache_stats()["stale_hits"] == 1
     assert "provider_cache event=stale_hit" in caplog.text
     assert "provider_failover event=stale_cache" in caplog.text
+
+
+def test_stale_cache_rejection_does_not_escape_strict_policy(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    clock = _Clock()
+    provider = _Provider([_frame("bad"), TimeoutError("upstream unavailable")])
+    manager = _manager(
+        provider,
+        _cache(
+            tmp_path,
+            clock,
+            memory_ttl=5.0,
+            persistent_ttl=10.0,
+            stale_if_error=60.0,
+        ),
+    )
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "false")
+    reset_application_services()
+    Config.reset_instance()
+    manager.get_daily_data("600519")
+    clock.advance(11.0)
+
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "cn/equity")
+    reset_application_services()
+    Config.reset_instance()
+    with pytest.raises(DataFetchError):
+        manager.get_daily_data("600519")
+
+    assert provider.calls == 2
+    assert manager.get_daily_cache_stats()["invalidations"] >= 1
 
 
 def test_stale_candidate_expiring_during_provider_failure_is_rejected(

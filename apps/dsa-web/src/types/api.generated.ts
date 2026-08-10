@@ -139,6 +139,7 @@ export interface paths {
          *       - pipeline_timeout: analysis stopped because the stage/pipeline budget expired
          *       - pipeline_budget_skipped: analysis stopped before an unstarted stage
          *         because the remaining budget was too low for useful work
+         *       - turn_persisted: the identified user turn and request context are durable
          *       - done: analysis complete, contains 'content' and 'success'
          *       - error: error occurred, contains 'message'
          */
@@ -826,6 +827,66 @@ export interface paths {
          * @description 对历史分析记录进行回测评估，并写入 backtest_results/backtest_summaries
          */
         post: operations["run_backtest_api_v1_backtest_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/compound-growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compound growth calculator
+         * @description Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.
+         */
+        post: operations["postCompoundGrowth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-contribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve contribution required to reach a target
+         * @description Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-duration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve periods required to reach a target
+         * @description Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetDuration"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1845,6 +1906,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onboarding/demo-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offline sample analysis for zero-config first success
+         * @description Returns a fixed offline sample analysis. Always is_sample=true with a visible sample banner. No network, LLM, or paid data is used.
+         */
+        get: operations["get_demo_analysis_api_v1_onboarding_demo_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/first-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Zero-config first-run readiness (read-only)
+         * @description Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (model setup vs offline demo). Never mutates configuration.
+         */
+        get: operations["get_first_run_readiness_api_v1_onboarding_first_run_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/plan": {
         parameters: {
             query?: never;
@@ -1892,9 +1993,29 @@ export interface paths {
         };
         /**
          * List registered plugins and lifecycle state
-         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
+         * @description Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.
          */
         get: operations["listPlugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read-only plugin health snapshot
+         * @description Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.
+         */
+        get: operations["getPluginHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2655,6 +2776,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/watchlist/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List watchlist groups
+         * @description Reconcile groups from authoritative STOCK_LIST before returning revisioned state.
+         */
+        get: operations["list_watchlist_groups_api_v1_stocks_watchlist_groups_get"];
+        put?: never;
+        /** Create a watchlist group */
+        post: operations["create_watchlist_group_api_v1_stocks_watchlist_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/move-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move or copy a symbol between groups */
+        post: operations["move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Atomically reorder every watchlist group */
+        put: operations["reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a watchlist group */
+        delete: operations["delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename a watchlist group */
+        patch: operations["rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add an authoritative symbol to a group */
+        post: operations["add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Atomically reorder every member in one group */
+        put: operations["reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocks/watchlist/groups/{group_id}/members/{stock_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a symbol from one group */
+        delete: operations["remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/watchlist/remove": {
         parameters: {
             query?: never;
@@ -3193,6 +3438,26 @@ export interface paths {
         get: operations["get_usage_summary_api_v1_usage_summary_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/watchlist/scores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score watchlist symbols from existing analysis
+         * @description Batch-aggregate AI-oriented watchlist scores from the latest analysis history and same-report, unexpired decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Requests are limited to 200 unique market identities. Default sort=manual preserves the caller's order. No new LLM calls.
+         */
+        post: operations["scoreWatchlistSymbols"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4848,6 +5113,17 @@ export interface components {
              */
             saved: number;
         };
+        /** BalancePoint */
+        BalancePoint: {
+            /** Balance */
+            balance: number;
+            /** Gain */
+            gain: number;
+            /** Period */
+            period: number;
+            /** Total Contributed */
+            total_contributed: number;
+        };
         /**
          * BatchDuplicateTaskItem
          * @description 批量异步任务中的重复提交项。
@@ -5075,6 +5351,8 @@ export interface components {
             session_id?: string | null;
             /** Skills */
             skills?: string[] | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ChatResponse */
         ChatResponse: {
@@ -5087,6 +5365,66 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+            /** Turn Id */
+            turn_id?: string | null;
+        };
+        /** CompoundGrowthRequest */
+        CompoundGrowthRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             * @default 0
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Years */
+            years: number;
+        };
+        /** CompoundGrowthResponse */
+        CompoundGrowthResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Final Value */
+            final_value: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Series */
+            series: components["schemas"]["BalancePoint"][];
+            /** Series Returned Points */
+            series_returned_points: number;
+            /** Series Sampled */
+            series_sampled: boolean;
+            /** Series Stride */
+            series_stride: number;
+            /** Series Total Points */
+            series_total_points: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /** Total Contributed */
+            total_contributed: number;
+            /** Total Gain */
+            total_gain: number;
+            /** Years */
+            years: number;
         };
         /** ConfigComponentDiff */
         ConfigComponentDiff: {
@@ -6061,6 +6399,133 @@ export interface components {
              */
             deleted: number;
         };
+        /** DemoAnalysisDetails */
+        DemoAnalysisDetails: {
+            /** News */
+            news?: string[];
+            /** Technical */
+            technical?: string[];
+        };
+        /** DemoAnalysisMeta */
+        DemoAnalysisMeta: {
+            /** Change Pct */
+            change_pct?: null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Price */
+            current_price?: null;
+            /**
+             * Model Used
+             * @constant
+             */
+            model_used: "demo-fixture/offline";
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            /**
+             * Report Language
+             * @enum {string}
+             */
+            report_language: "zh" | "en" | "ko";
+            /**
+             * Report Type
+             * @constant
+             */
+            report_type: "brief";
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisReport */
+        DemoAnalysisReport: {
+            details: components["schemas"]["DemoAnalysisDetails"];
+            meta: components["schemas"]["DemoAnalysisMeta"];
+            strategy: components["schemas"]["DemoAnalysisStrategy"];
+            summary: components["schemas"]["DemoAnalysisSummary"];
+        };
+        /**
+         * DemoAnalysisResponse
+         * @description Offline sample analysis. Always ``is_sample=True``.
+         */
+        DemoAnalysisResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Is Sample
+             * @default true
+             * @constant
+             */
+            is_sample: true;
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            report: components["schemas"]["DemoAnalysisReport"];
+            /** Sample Banner */
+            sample_banner: string;
+            /** Sample Disclaimer */
+            sample_disclaimer: string;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisStrategy */
+        DemoAnalysisStrategy: {
+            /** Ideal Buy */
+            ideal_buy?: null;
+            /** Secondary Buy */
+            secondary_buy?: null;
+            /** Stop Loss */
+            stop_loss?: null;
+            /** Take Profit */
+            take_profit?: null;
+        };
+        /** DemoAnalysisSummary */
+        DemoAnalysisSummary: {
+            /**
+             * Action
+             * @constant
+             */
+            action: "watch";
+            /** Action Label */
+            action_label: string;
+            /** Analysis Summary */
+            analysis_summary: string;
+            /** Operation Advice */
+            operation_advice: string;
+            /**
+             * Sentiment Label
+             * @enum {string}
+             */
+            sentiment_label: "中性" | "Neutral" | "중립";
+            /** Sentiment Score */
+            sentiment_score: number;
+            /** Trend Prediction */
+            trend_prediction: string;
+        };
         /**
          * DiscoverLLMChannelModelsRequest
          * @description Request payload for discovering models from one LLM channel.
@@ -6263,6 +6728,75 @@ export interface components {
              * @description 股票名称（如有）
              */
             name?: string | null;
+        };
+        /**
+         * FirstRunReadinessResponse
+         * @description Zero-config first-run readiness snapshot (read-only; never mutates config).
+         */
+        FirstRunReadinessResponse: {
+            /** Beginner Mode Recommended */
+            beginner_mode_recommended: boolean;
+            /**
+             * Config Mutated
+             * @default false
+             * @constant
+             */
+            config_mutated: false;
+            /**
+             * Demo Available
+             * @default true
+             * @constant
+             */
+            demo_available: true;
+            /**
+             * Existing Config Untouched
+             * @default true
+             * @constant
+             */
+            existing_config_untouched: true;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Has Primary Model */
+            has_primary_model: boolean;
+            /** Is Fresh Environment */
+            is_fresh_environment: boolean;
+            local_runtime: components["schemas"]["LocalRuntimeSnapshot"];
+            /**
+             * Primary Cta
+             * @enum {string}
+             */
+            primary_cta: "continue" | "open_local_setup" | "view_demo";
+            /**
+             * Primary Path
+             * @enum {string}
+             */
+            primary_path: "configured" | "local_ollama" | "demo";
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "primary_model_configured" | "local_model_ready" | "local_runtime_no_models" | "local_detect_disabled" | "local_runtime_unavailable";
+            /** Reason Params */
+            reason_params?: {
+                [key: string]: string;
+            };
+            /** Recommended Preset Id */
+            recommended_preset_id?: "local-first" | null;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
         };
         /**
          * GenerationBackendStatus
@@ -7678,6 +8212,47 @@ export interface components {
             policy: string;
         };
         /**
+         * LocalRuntimeSnapshot
+         * @description Public, non-secret local-runtime detect projection.
+         */
+        LocalRuntimeSnapshot: {
+            /** Backend */
+            backend?: "ollama" | null;
+            /** Base Url */
+            base_url?: string | null;
+            /**
+             * Detect Enabled
+             * @default true
+             */
+            detect_enabled: boolean;
+            /** Models */
+            models?: string[];
+            /**
+             * Models Available
+             * @default false
+             */
+            models_available: boolean;
+            /**
+             * Reachable
+             * @default false
+             */
+            reachable: boolean;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "ollama_ready" | "ollama_no_models" | "detect_disabled" | "ollama_unreachable";
+            /**
+             * Runnable
+             * @default false
+             */
+            runnable: boolean;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
+        };
+        /**
          * LoginRequest
          * @description Login request body. For first-time setup use password + password_confirm.
          */
@@ -8375,6 +8950,56 @@ export interface components {
             win_rate_pct?: number | null;
         };
         /**
+         * PluginHealthEntryResponse
+         * @description One plugin health row for operator diagnostics consumers.
+         */
+        PluginHealthEntryResponse: {
+            /** Desired Enabled */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /** Last Error Code */
+            last_error_code?: string | null;
+            /** Name */
+            name: string;
+            /** Package Root */
+            package_root?: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloadable
+             * @default false
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginHealthResponse
+         * @description GET /api/v1/plugins/health — read-only plugin health snapshot.
+         */
+        PluginHealthResponse: {
+            /**
+             * Generated At
+             * @description UTC ISO-8601 timestamp when the snapshot was built
+             */
+            generated_at: string;
+            /** Plugins */
+            plugins?: components["schemas"]["PluginHealthEntryResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
          * PluginInfo
          * @description One registered plugin and its lifecycle state.
          */
@@ -8401,6 +9026,11 @@ export interface components {
              * @description Stable plugin id from the manifest
              */
             id: string;
+            /**
+             * Last Error Code
+             * @description Stable last lifecycle failure code when the plugin is degraded
+             */
+            last_error_code?: string | null;
             /** Name */
             name: string;
             /**
@@ -10429,6 +11059,70 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * SchedulerRunNowResponse
+         * @description Acceptance and correlation data for one immediate scheduler run.
+         */
+        SchedulerRunNowResponse: {
+            /** Accepted */
+            accepted: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at?: string | null;
+        };
+        /**
+         * SchedulerStatusResponse
+         * @description Authoritative status for this process's legacy day-batch scheduler.
+         */
+        SchedulerStatusResponse: {
+            /** Active Run Id */
+            active_run_id?: string | null;
+            /** Attached */
+            attached: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /** Last Run Id */
+            last_run_id?: string | null;
+            /** Last Run Outcome */
+            last_run_outcome?: ("succeeded" | "failed") | null;
+            /** Last Skip Reason */
+            last_skip_reason?: string | null;
+            /** Last Skipped At */
+            last_skipped_at?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /**
+             * Process Mode
+             * @enum {string}
+             */
+            process_mode: "serve" | "desktop" | "not_attached";
+            /** Run Now Available */
+            run_now_available: boolean;
+            /** Run Now Block Reason */
+            run_now_block_reason?: string | null;
+            /** Running */
+            running: boolean;
+            /** Schedule Times */
+            schedule_times?: string[];
+            /** Schedule Timezone */
+            schedule_timezone: string;
+            /**
+             * Track
+             * @constant
+             */
+            track: "legacy_day_batch";
+        };
         /** ScorecardBucket */
         ScorecardBucket: {
             /** Avg Return Pct */
@@ -10600,6 +11294,8 @@ export interface components {
             } | null;
             /** Role */
             role: string;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** SessionMessagesResponse */
         SessionMessagesResponse: {
@@ -10608,6 +11304,11 @@ export interface components {
             /** Session Id */
             session_id: string;
             session_state: components["schemas"]["SessionStateResponse"];
+            /**
+             * Turn Identity Supported
+             * @default true
+             */
+            turn_identity_supported: boolean;
         };
         /** SessionStateResponse */
         SessionStateResponse: {
@@ -11204,7 +11905,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**
@@ -11384,6 +12085,248 @@ export interface components {
             };
             /** Trace Id */
             trace_id?: string | null;
+        };
+        /** TargetContributionAlreadyMetResponse */
+        TargetContributionAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_growth_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionOkResponse */
+        TargetContributionOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "contribution_required";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionRequest */
+        TargetContributionRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionUnreachableResponse */
+        TargetContributionUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period?: null;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationAlreadyMetResponse */
+        TargetDurationAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Period Count
+             * @constant
+             */
+            period_count: 0;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_already_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationOkResponse */
+        TargetDurationOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "duration_solved";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationRequest */
+        TargetDurationRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+        };
+        /** TargetDurationUnreachableResponse */
+        TargetDurationUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count?: null;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "non_positive_trajectory" | "max_years_exceeded" | "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years?: null;
         };
         /**
          * TaskAccepted
@@ -12088,10 +13031,10 @@ export interface components {
             markets?: string[];
             /**
              * Report Language
-             * @description zh | en | ko | ja
              * @default zh
+             * @enum {string}
              */
-            report_language: string;
+            report_language: "zh" | "en" | "ko";
             /**
              * Risk Tone
              * @description conservative | balanced | assertive (tone only, not advice)
@@ -12143,6 +13086,117 @@ export interface components {
             target?: string | null;
         };
         /**
+         * WatchlistComputedAttrsSchema
+         * @description Read-only computed projection owned by T25/T26 services.
+         */
+        WatchlistComputedAttrsSchema: {
+            /** Ai Score */
+            ai_score?: number | null;
+            /** Focus */
+            focus?: boolean | null;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+        };
+        /** WatchlistGroupCreateRequest */
+        WatchlistGroupCreateRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
+            name: string;
+        };
+        /** WatchlistGroupMemberAddRequest */
+        WatchlistGroupMemberAddRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistGroupMemberMoveRequest */
+        WatchlistGroupMemberMoveRequest: {
+            /**
+             * Copy Membership
+             * @default false
+             */
+            copy_membership: boolean;
+            /** Expected Revision */
+            expected_revision: number;
+            /** Source Group Id */
+            source_group_id: string;
+            /** Stock Code */
+            stock_code: string;
+            /** Target Group Id */
+            target_group_id: string;
+            /** Target Index */
+            target_index?: number | null;
+        };
+        /** WatchlistGroupMemberReorderRequest */
+        WatchlistGroupMemberReorderRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Ordered Codes */
+            ordered_codes: string[];
+        };
+        /** WatchlistGroupMemberSchema */
+        WatchlistGroupMemberSchema: {
+            attrs?: components["schemas"]["WatchlistComputedAttrsSchema"];
+            /** Sort Order */
+            sort_order: number;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistGroupRenameRequest */
+        WatchlistGroupRenameRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Name */
+            name: string;
+        };
+        /** WatchlistGroupReorderRequest */
+        WatchlistGroupReorderRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Ordered Ids */
+            ordered_ids: string[];
+        };
+        /** WatchlistGroupSchema */
+        WatchlistGroupSchema: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Members */
+            members?: components["schemas"]["WatchlistGroupMemberSchema"][];
+            /** Name */
+            name: string;
+            /** Name Key */
+            name_key?: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** WatchlistGroupsResponse */
+        WatchlistGroupsResponse: {
+            /** Groups */
+            groups?: components["schemas"]["WatchlistGroupSchema"][];
+            /** Message */
+            message: string;
+            /** Revision */
+            revision: number;
+        };
+        /**
          * WatchlistRequest
          * @description 自选队列操作请求
          */
@@ -12168,6 +13222,128 @@ export interface components {
              * @description 当前自选队列股票代码列表
              */
             stock_codes?: string[];
+        };
+        /** WatchlistScoreFactor */
+        WatchlistScoreFactor: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "analysis_sentiment" | "decision_signal";
+            /** Params */
+            params?: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Reason */
+            reason?: ("invalid_sentiment" | "inactive_signal" | "expired_signal" | "incoherent_signal_source" | "unknown_signal_action" | "invalid_signal_confidence") | null;
+            source: components["schemas"]["WatchlistScoreFactorSource"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "ignored";
+            /** Value */
+            value?: string | number | null;
+        };
+        /** WatchlistScoreFactorSource */
+        WatchlistScoreFactorSource: {
+            /** As Of */
+            as_of?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "watchlist_score_v1";
+            /** Id */
+            id?: number | null;
+            /** Profile */
+            profile?: string | null;
+            /** Source Report Id */
+            source_report_id?: number | null;
+        };
+        /** WatchlistScoreItem */
+        WatchlistScoreItem: {
+            /** Age Days */
+            age_days?: number | null;
+            /** Analysis Id */
+            analysis_id?: number | null;
+            /** As Of */
+            as_of?: string | null;
+            /** Degraded Reasons */
+            degraded_reasons?: ("invalid_sentiment" | "inactive_signal" | "expired_signal" | "incoherent_signal_source" | "unknown_signal_action" | "invalid_signal_confidence")[];
+            /** Factors */
+            factors?: components["schemas"]["WatchlistScoreFactor"][];
+            /**
+             * Freshness
+             * @default none
+             * @enum {string}
+             */
+            freshness: "none" | "unknown" | "today" | "recent" | "stale_week" | "stale";
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scored" | "unanalyzed";
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistScoreQueryCount */
+        WatchlistScoreQueryCount: {
+            /** Analysis */
+            analysis: number;
+            /** Signals */
+            signals: number;
+        };
+        /** WatchlistScoreRequest */
+        WatchlistScoreRequest: {
+            /**
+             * Sort
+             * @default manual
+             * @enum {string}
+             */
+            sort: "manual" | "score_desc" | "score_asc";
+            /** Stock Codes */
+            stock_codes?: string[];
+        };
+        /** WatchlistScoreResponse */
+        WatchlistScoreResponse: {
+            /**
+             * Disclaimer Key
+             * @constant
+             */
+            disclaimer_key: "watchlist_score.disclaimer";
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "watchlist_score_v1";
+            /** Items */
+            items: components["schemas"]["WatchlistScoreItem"][];
+            query_count: components["schemas"]["WatchlistScoreQueryCount"];
+            /**
+             * Scoring Mode
+             * @constant
+             */
+            scoring_mode: "aggregate_existing";
+            /**
+             * Sort
+             * @enum {string}
+             */
+            sort: "manual" | "score_desc" | "score_asc";
+            source_rows: components["schemas"]["WatchlistScoreSourceRows"];
+        };
+        /** WatchlistScoreSourceRows */
+        WatchlistScoreSourceRows: {
+            /** Analysis */
+            analysis: number;
+            /** Signals */
+            signals: number;
         };
     };
     responses: never;
@@ -14229,6 +15405,159 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postCompoundGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompoundGrowthRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompoundGrowthResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetContributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetContributionOkResponse"] | components["schemas"]["TargetContributionAlreadyMetResponse"] | components["schemas"]["TargetContributionUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetDuration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetDurationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDurationOkResponse"] | components["schemas"]["TargetDurationAlreadyMetResponse"] | components["schemas"]["TargetDurationUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -17273,6 +18602,75 @@ export interface operations {
             };
         };
     };
+    get_demo_analysis_api_v1_onboarding_demo_analysis_get: {
+        parameters: {
+            query?: {
+                report_language?: "zh" | "en" | "ko";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoAnalysisResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_first_run_readiness_api_v1_onboarding_first_run_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirstRunReadinessResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     generate_onboarding_plan_api_v1_onboarding_plan_post: {
         parameters: {
             query?: never;
@@ -17420,6 +18818,35 @@ export interface operations {
             };
         };
     };
+    getPluginHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginHealthResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     updatePluginLifecycle: {
         parameters: {
             query?: never;
@@ -17482,6 +18909,15 @@ export interface operations {
             };
             /** @description Lifecycle operation failed unexpectedly */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19973,6 +21409,603 @@ export interface operations {
             };
         };
     };
+    list_watchlist_groups_api_v1_stocks_watchlist_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_watchlist_group_api_v1_stocks_watchlist_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorder_watchlist_groups_api_v1_stocks_watchlist_groups_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete: {
+        parameters: {
+            query: {
+                expected_revision: number;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_watchlist_group_api_v1_stocks_watchlist_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorder_watchlist_group_members_api_v1_stocks_watchlist_groups__group_id__members_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupMemberReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete: {
+        parameters: {
+            query: {
+                expected_revision: number;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     remove_from_watchlist_api_v1_stocks_watchlist_remove_post: {
         parameters: {
             query?: never;
@@ -21054,9 +23087,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerRunNowResponse"];
                 };
             };
         };
@@ -21076,9 +23107,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerStatusResponse"];
                 };
             };
         };
@@ -21145,6 +23174,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scoreWatchlistSymbols: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistScoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistScoreResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Score aggregation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

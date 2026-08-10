@@ -131,9 +131,16 @@ def _manager(provider: _Provider, cache: DailyDataCache) -> DataFetcherManager:
 
 @pytest.fixture(autouse=True)
 def _reset_health() -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    reset_application_services()
+    Config.reset_instance()
     DataFetcherManager.reset_daily_source_health()
     yield
     DataFetcherManager.reset_daily_source_health()
+    reset_application_services()
+    Config.reset_instance()
 
 
 def test_manager_auto_warms_then_serves_overlap_and_restart(tmp_path: Path) -> None:
@@ -168,6 +175,46 @@ def test_manager_auto_warms_then_serves_overlap_and_restart(tmp_path: Path) -> N
     assert restarted_provider.calls == 0
     assert len(persisted) == 2
     assert persisted.attrs["provider_cache"]["layer"] == "persistent"
+
+
+def test_manager_local_only_rejects_cached_data_that_fails_current_policy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    clock = _Clock()
+    invalid = _bars()
+    invalid["close"] = invalid["close"].astype(object)
+    invalid.loc[0, "close"] = "bad"
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "false")
+    reset_application_services()
+    Config.reset_instance()
+    warm_provider = _Provider([invalid])
+    warm_manager = _manager(
+        warm_provider,
+        _cache(tmp_path, clock, mode=MarketDataFetchMode.AUTO),
+    )
+    warm_manager.get_daily_data("600519")
+
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "cn/equity")
+    reset_application_services()
+    Config.reset_instance()
+    offline_provider = _Provider([])
+    offline_manager = _manager(
+        offline_provider,
+        _cache(tmp_path, clock, mode=MarketDataFetchMode.LOCAL_ONLY),
+    )
+
+    with pytest.raises(LocalDataMissingError) as exc_info:
+        offline_manager.get_daily_data("600519")
+
+    assert exc_info.value.missing.reason == "quality_rejected"
+    assert offline_provider.calls == 0
+    assert offline_manager.get_daily_cache_stats()["invalidations"] >= 1
 
 
 def test_manager_default_end_date_rollover_uses_covered_bars_without_provider(

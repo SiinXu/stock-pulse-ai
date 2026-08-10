@@ -27,9 +27,24 @@ class StockService:
     封装股票数据获取的业务逻辑
     """
     
-    def __init__(self):
+    def __init__(self, data_fetcher_manager: Any | None = None):
         """初始化股票数据服务"""
         self.repo = StockRepository()
+        self._data_fetcher_manager = data_fetcher_manager
+
+    def _resolve_data_fetcher_manager(self):
+        """Use the installed composition owner, with standalone fallback."""
+
+        if self._data_fetcher_manager is not None:
+            return self._data_fetcher_manager
+        from src.application_services import get_installed_application_services
+
+        services = get_installed_application_services()
+        if services is not None and services.data_fetcher_manager is not None:
+            return services.data_fetcher_manager
+        from data_provider.base import DataFetcherManager
+
+        return DataFetcherManager()
     
     def get_realtime_quote(self, stock_code: str) -> Optional[Dict[str, Any]]:
         """
@@ -43,9 +58,7 @@ class StockService:
         """
         try:
             # Call the data retriever to get real-time quotes
-            from data_provider.base import DataFetcherManager
-            
-            manager = DataFetcherManager()
+            manager = self._resolve_data_fetcher_manager()
             quote = manager.get_realtime_quote(stock_code)
             
             if quote is None:
@@ -83,7 +96,7 @@ class StockService:
         except ImportError:
             logger.warning("DataFetcherManager 未找到，使用占位数据")
             return self._get_placeholder_quote(stock_code)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - quote failures are sanitized before the API returns its established unavailable result.
             log_safe_exception(
                 logger,
                 "Realtime quote lookup failed",
@@ -122,9 +135,7 @@ class StockService:
         
         try:
             # Call the data retriever to get historical data
-            from data_provider.base import DataFetcherManager
-            
-            manager = DataFetcherManager()
+            manager = self._resolve_data_fetcher_manager()
             df, source = manager.get_daily_data(stock_code, days=days)
             
             if df is None or df.empty:
@@ -166,7 +177,7 @@ class StockService:
         except ImportError:
             logger.warning("DataFetcherManager 未找到，返回空数据")
             return {"stock_code": stock_code, "period": period, "data": []}
-        except Exception as exc:  # broad-exception: fallback_recorded - history failure is logged before the established empty response
+        except Exception as exc:  # broad-exception: fallback_recorded - history failures are sanitized before the API returns its established empty-data result.
             log_safe_exception(
                 logger,
                 "Historical stock data lookup failed",
