@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting plus the notification inbox scenario, and only locale chunks enlarged by genuine Notifications hub and inbox translations; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after lazy scenario splitting plus the notification inbox scenario, and locale chunks enlarged by genuine Notifications hub, screening-state, and inbox provenance translations. Updated caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -25,58 +25,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 131982,
-      "measuredGzipBytes": 131782,
-      "note": "Tight Linux-CI rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 132717,
+      "measuredGzipBytes": 132517,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 127046,
-      "measuredGzipBytes": 126846,
-      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 127041,
+      "measuredGzipBytes": 126841,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 125924,
-      "measuredGzipBytes": 125724,
-      "note": "Tight Linux-CI rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 126620,
+      "measuredGzipBytes": 126420,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 126510,
-      "measuredGzipBytes": 126310,
-      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 126933,
+      "measuredGzipBytes": 126733,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 122510,
-      "measuredGzipBytes": 122310,
-      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 122895,
+      "measuredGzipBytes": 122695,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 119673,
-      "measuredGzipBytes": 119473,
-      "note": "Tight Linux-CI rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 120327,
+      "measuredGzipBytes": 120127,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113346,
-      "measuredGzipBytes": 113146,
-      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 113643,
+      "measuredGzipBytes": 113443,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 113552,
-      "measuredGzipBytes": 113352,
-      "note": "Tight rebaseline for the Notifications hub and inbox translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 113795,
+      "measuredGzipBytes": 113595,
+      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
     },
     {
       "id": "vendor-charts",
@@ -130,9 +130,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57371,
-      "measuredGzipBytes": 57171,
-      "note": "Linux CI measurement after lazy scenario splitting and the notification inbox registration; retains 200 bytes of headroom."
+      "maxGzipBytes": 57378,
+      "measuredGzipBytes": 57178,
+      "note": "Linux measurement after lazy scenario splitting plus the screening-state and notification inbox registrations; retains 200 bytes of headroom."
     },
     {
       "id": "SettingsPage",
