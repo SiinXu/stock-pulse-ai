@@ -6,6 +6,8 @@ export type SystemConfigCategory =
   | 'system'
   | 'agent'
   | 'backtest'
+  | 'indicators'
+  | 'mcp'
   | 'uncategorized';
 
 export type SystemConfigDataType =

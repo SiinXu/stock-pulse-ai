@@ -11,6 +11,8 @@ const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>>
   system: '系统设置',
   agent: 'Agent 设置',
   backtest: '回测配置',
+  indicators: '技术指标',
+  mcp: 'MCP 服务',
   uncategorized: '其他',
   },
   en: {
@@ -21,6 +23,8 @@ const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>>
     system: 'System',
     agent: 'Agent',
     backtest: 'Backtest',
+    indicators: 'Technical indicators',
+    mcp: 'MCP server',
     uncategorized: 'Other',
   },
 });
@@ -34,6 +38,8 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
   system: '管理调度、日志、端口等系统级参数。',
   agent: '管理 Agent 模式、策略与多 Agent 编排配置。',
   backtest: '管理回测开关、评估窗口和引擎参数。',
+  indicators: '管理移动平均、MACD、RSI 等技术指标周期。',
+  mcp: '管理可选 MCP 对外服务进程（默认关闭；HTTP 传输为安全敏感面）。',
   uncategorized: '其他未归类的配置项。',
   },
   en: {
@@ -44,6 +50,8 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
     system: 'Manage scheduling, logging, ports, and system parameters.',
     agent: 'Manage Agent mode, strategies, and multi-agent orchestration.',
     backtest: 'Manage backtest switches, evaluation windows, and engine parameters.',
+    indicators: 'Manage moving-average, MACD, and RSI periods for trend analysis.',
+    mcp: 'Manage the optional MCP process (default off; HTTP is a security-sensitive surface).',
     uncategorized: 'Other uncategorized settings.',
   },
 });
@@ -292,6 +300,27 @@ const fieldTitleMapZh = {
   PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT: '投资组合健康度亏损预警阈值（%）',
   PORTFOLIO_STRESS_SCENARIOS_PATH: '组合压力测试情景目录',
   LOCAL_ONLY_MODE: '仅本地模式',
+  MCP_SERVER_ENABLED: '启用 MCP 服务',
+  MCP_SERVER_TRANSPORT: 'MCP 传输方式',
+  MCP_SERVER_HOST: 'MCP 绑定主机',
+  MCP_SERVER_PORT: 'MCP 绑定端口',
+  MCP_STDIO_PRINCIPAL: 'MCP stdio 主体',
+  MCP_STDIO_SCOPES: 'MCP stdio 权限范围',
+  MCP_HTTP_SCOPES: 'MCP HTTP 权限范围',
+  MCP_HTTP_SESSION_TOKEN_SHA256: 'MCP HTTP 会话令牌 SHA-256',
+  MCP_HTTP_RESOURCE: 'MCP HTTP 资源 URL',
+  MCP_HTTP_ALLOWED_HOSTS: 'MCP HTTP 允许 Host',
+  MCP_HTTP_ALLOWED_ORIGINS: 'MCP HTTP 允许 Origin',
+  MCP_HTTP_MAX_BODY_BYTES: 'MCP HTTP 最大 Body 字节',
+  MCP_HTTP_MAX_HEADER_BYTES: 'MCP HTTP 最大 Header 字节',
+  MCP_HTTP_MAX_CONNECTIONS: 'MCP HTTP 最大连接数',
+  MCP_HTTP_BACKLOG: 'MCP HTTP 监听 backlog',
+  MCP_HTTP_READ_TIMEOUT_SECONDS: 'MCP HTTP 读取超时（秒）',
+  MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS: 'MCP HTTP Keep-Alive 超时（秒）',
+  MCP_MAX_CONCURRENT_TOOLS: 'MCP 最大并发工具数',
+  MCP_RATE_LIMIT_PER_MINUTE: 'MCP 工具速率限制（次/分钟）',
+  MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE: 'MCP 分析速率限制（次/分钟）',
+  MCP_ANALYSIS_MAX_STOCKS: 'MCP 单次分析最大标的数',
 
 } as const;
 
@@ -544,6 +573,27 @@ const fieldTitleMapEn = {
   PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT: 'Portfolio Health PnL Loss Alert (%)',
   PORTFOLIO_STRESS_SCENARIOS_PATH: 'Portfolio Stress Scenario Catalog',
   LOCAL_ONLY_MODE: 'Local Only Mode',
+  MCP_SERVER_ENABLED: 'Enable MCP Server',
+  MCP_SERVER_TRANSPORT: 'MCP Transport',
+  MCP_SERVER_HOST: 'MCP Bind Host',
+  MCP_SERVER_PORT: 'MCP Bind Port',
+  MCP_STDIO_PRINCIPAL: 'MCP stdio Principal',
+  MCP_STDIO_SCOPES: 'MCP stdio Scopes',
+  MCP_HTTP_SCOPES: 'MCP HTTP Scopes',
+  MCP_HTTP_SESSION_TOKEN_SHA256: 'MCP HTTP Session Token SHA-256',
+  MCP_HTTP_RESOURCE: 'MCP HTTP Resource URL',
+  MCP_HTTP_ALLOWED_HOSTS: 'MCP HTTP Allowed Hosts',
+  MCP_HTTP_ALLOWED_ORIGINS: 'MCP HTTP Allowed Origins',
+  MCP_HTTP_MAX_BODY_BYTES: 'MCP HTTP Max Body Bytes',
+  MCP_HTTP_MAX_HEADER_BYTES: 'MCP HTTP Max Header Bytes',
+  MCP_HTTP_MAX_CONNECTIONS: 'MCP HTTP Max Connections',
+  MCP_HTTP_BACKLOG: 'MCP HTTP Listen Backlog',
+  MCP_HTTP_READ_TIMEOUT_SECONDS: 'MCP HTTP Read Timeout',
+  MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS: 'MCP HTTP Keep-Alive Timeout',
+  MCP_MAX_CONCURRENT_TOOLS: 'MCP Max Concurrent Tools',
+  MCP_RATE_LIMIT_PER_MINUTE: 'MCP Tool Rate Limit',
+  MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE: 'MCP Analysis Rate Limit',
+  MCP_ANALYSIS_MAX_STOCKS: 'MCP Analysis Max Stocks',
 
 } satisfies Record<SystemConfigFieldTitleKey, string>;
 
@@ -749,6 +799,27 @@ const fieldDescriptionMap: Record<string, string> = {
   INDICATOR_MACD_SLOW: 'MACD 慢线 EMA 周期（默认 26）。',
   INDICATOR_MACD_SIGNAL: 'MACD 信号线 EMA 周期（默认 9）。',
   INDICATOR_RSI_PERIODS: 'RSI 周期列表（默认 6,12,24）。',
+  MCP_SERVER_ENABLED: '可选 MCP 进程总开关，默认关闭；主 API/Web 进程不会自动启动 MCP，需显式启动独立进程。',
+  MCP_SERVER_TRANSPORT: 'MCP 传输方式：stdio 为本机进程边界；streamable-http 为 HTTP 对外面，必须配合管理员认证、显式 scopes 与会话摘要。',
+  MCP_SERVER_HOST: 'streamable-http 绑定主机；优先 loopback。绑定到非本机地址会扩大攻击面。',
+  MCP_SERVER_PORT: 'streamable-http 绑定端口（1–65535）。',
+  MCP_STDIO_PRINCIPAL: 'stdio 工具调用的稳定主体名，用于审计与限速。',
+  MCP_STDIO_SCOPES: 'stdio 最小权限 scopes（逗号分隔）；启用 stdio 时必填。放宽 scope 会扩大可调用能力。',
+  MCP_HTTP_SCOPES: 'streamable-http 最小权限 scopes（逗号分隔）；启用 HTTP 传输时必填。',
+  MCP_HTTP_SESSION_TOKEN_SHA256: 'streamable-http 接受的管理员会话令牌 SHA-256 摘要（64 位十六进制）。只存摘要，不存原始 Bearer。',
+  MCP_HTTP_RESOURCE: 'streamable-http 绝对 http(s) 资源/受众 URL。',
+  MCP_HTTP_ALLOWED_HOSTS: 'Host 允许列表（逗号分隔）。默认仅 loopback；放宽（如 * 或公网主机）会增加 Host 头与跨站风险。',
+  MCP_HTTP_ALLOWED_ORIGINS: 'Origin 允许列表（逗号分隔）。默认仅 loopback HTTP；放宽会允许浏览器跨源访问 MCP 工具，属于安全决策。',
+  MCP_HTTP_MAX_BODY_BYTES: 'streamable-http 最大 JSON Body 字节数。',
+  MCP_HTTP_MAX_HEADER_BYTES: 'streamable-http 未完整 Header 块上限（字节）。',
+  MCP_HTTP_MAX_CONNECTIONS: 'streamable-http 最大并发连接数。',
+  MCP_HTTP_BACKLOG: 'streamable-http 监听 backlog。',
+  MCP_HTTP_READ_TIMEOUT_SECONDS: 'streamable-http 每个 body chunk 读取超时（秒）。',
+  MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS: 'streamable-http keep-alive 空闲超时（秒）。',
+  MCP_MAX_CONCURRENT_TOOLS: '单个 MCP 进程最大并发工具 worker 数。',
+  MCP_RATE_LIMIT_PER_MINUTE: '按主体/工具的每分钟调用上限。',
+  MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE: 'analysis.trigger 每分钟调用上限；请保持较低以控制成本。',
+  MCP_ANALYSIS_MAX_STOCKS: '单次 MCP analysis.trigger 允许的最大标的数。',
 };
 
 const fieldOptionLabelMap: Record<string, Record<string, string>> = {
@@ -849,6 +920,11 @@ const fieldOptionLabelMap: Record<string, Record<string, string>> = {
     'auto (regime-based)': '自动（按市场状态）',
     'manual (use agent_skills)': '手动（使用 AGENT_SKILLS）',
   },
+  MCP_SERVER_TRANSPORT: {
+    stdio: 'stdio（本机进程）',
+    'streamable-http': 'streamable-http',
+    'stdio (local process)': 'stdio（本机进程）',
+  },
 };
 
 const fieldOptionLabelMapEn: Record<string, Record<string, string>> = {
@@ -948,6 +1024,11 @@ const fieldOptionLabelMapEn: Record<string, Record<string, string>> = {
     manual: 'Manual (use AGENT_SKILLS)',
     'auto (regime-based)': 'Auto (regime-based)',
     'manual (use agent_skills)': 'Manual (use AGENT_SKILLS)',
+  },
+  MCP_SERVER_TRANSPORT: {
+    stdio: 'stdio (local process)',
+    'streamable-http': 'streamable-http',
+    'stdio (local process)': 'stdio (local process)',
   },
 };
 

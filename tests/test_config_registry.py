@@ -1282,3 +1282,109 @@ class TestUiPlacement(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestMcpFieldsRegistered(unittest.TestCase):
+    """Optional MCP process settings must be explicitly registered for Settings UI."""
+
+    _MCP_KEYS = (
+        "MCP_SERVER_ENABLED",
+        "MCP_SERVER_TRANSPORT",
+        "MCP_SERVER_HOST",
+        "MCP_SERVER_PORT",
+        "MCP_STDIO_PRINCIPAL",
+        "MCP_STDIO_SCOPES",
+        "MCP_HTTP_SCOPES",
+        "MCP_HTTP_SESSION_TOKEN_SHA256",
+        "MCP_HTTP_RESOURCE",
+        "MCP_HTTP_ALLOWED_HOSTS",
+        "MCP_HTTP_ALLOWED_ORIGINS",
+        "MCP_HTTP_MAX_BODY_BYTES",
+        "MCP_HTTP_MAX_HEADER_BYTES",
+        "MCP_HTTP_MAX_CONNECTIONS",
+        "MCP_HTTP_BACKLOG",
+        "MCP_HTTP_READ_TIMEOUT_SECONDS",
+        "MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS",
+        "MCP_MAX_CONCURRENT_TOOLS",
+        "MCP_RATE_LIMIT_PER_MINUTE",
+        "MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE",
+        "MCP_ANALYSIS_MAX_STOCKS",
+    )
+
+    def test_all_mcp_keys_registered_in_mcp_category(self):
+        for key in self._MCP_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "mcp", key)
+            self.assertNotEqual(field["display_order"], 9000, key)
+            self.assertTrue(field.get("help_key"), key)
+            self.assertTrue(field.get("title"), key)
+            self.assertTrue(field.get("description"), key)
+            self.assertNotIn("Auto-inferred", field.get("description", ""), key)
+            self.assertNotIn(key, WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_enabled_is_boolean_switch_default_off(self):
+        field = get_field_definition("MCP_SERVER_ENABLED")
+        self.assertEqual(field["data_type"], "boolean")
+        self.assertEqual(field["ui_control"], "switch")
+        self.assertEqual(field["default_value"], "false")
+        self.assertFalse(field["is_sensitive"])
+
+    def test_transport_is_select_with_enum(self):
+        field = get_field_definition("MCP_SERVER_TRANSPORT")
+        self.assertEqual(field["ui_control"], "select")
+        self.assertEqual(field["default_value"], "stdio")
+        self.assertEqual(field["validation"]["enum"], ["stdio", "streamable-http"])
+
+    def test_port_and_timeout_ranges_match_runtime(self):
+        expected = {
+            "MCP_SERVER_PORT": {"min": 1, "max": 65535},
+            "MCP_HTTP_MAX_BODY_BYTES": {"min": 1024, "max": 10_000_000},
+            "MCP_HTTP_MAX_HEADER_BYTES": {"min": 4096, "max": 262_144},
+            "MCP_HTTP_MAX_CONNECTIONS": {"min": 1, "max": 1024},
+            "MCP_HTTP_BACKLOG": {"min": 1, "max": 1024},
+            "MCP_HTTP_READ_TIMEOUT_SECONDS": {"min": 1, "max": 120},
+            "MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS": {"min": 1, "max": 120},
+            "MCP_MAX_CONCURRENT_TOOLS": {"min": 1, "max": 128},
+            "MCP_RATE_LIMIT_PER_MINUTE": {"min": 1, "max": 10_000},
+            "MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE": {"min": 1, "max": 60},
+            "MCP_ANALYSIS_MAX_STOCKS": {"min": 1, "max": 50},
+        }
+        for key, validation in expected.items():
+            field = get_field_definition(key)
+            self.assertEqual(field["data_type"], "integer", key)
+            self.assertEqual(field["ui_control"], "number", key)
+            self.assertEqual(field["validation"]["min"], validation["min"], key)
+            self.assertEqual(field["validation"]["max"], validation["max"], key)
+
+    def test_session_token_is_sensitive_password_with_hex_pattern(self):
+        field = get_field_definition("MCP_HTTP_SESSION_TOKEN_SHA256")
+        self.assertTrue(field["is_sensitive"])
+        self.assertEqual(field["ui_control"], "password")
+        self.assertIn("secret_value", field.get("warning_codes", []))
+        pattern = re.compile(field["validation"]["pattern"])
+        self.assertIsNotNone(pattern.fullmatch(""))
+        self.assertIsNotNone(pattern.fullmatch("a" * 64))
+        self.assertIsNotNone(pattern.fullmatch("A" * 64))
+        self.assertIsNone(pattern.fullmatch("not-a-hash"))
+        self.assertIsNone(pattern.fullmatch("a" * 63))
+
+    def test_allowlists_document_widening_risk(self):
+        for key in ("MCP_HTTP_ALLOWED_HOSTS", "MCP_HTTP_ALLOWED_ORIGINS"):
+            field = get_field_definition(key)
+            description = field["description"].lower()
+            self.assertTrue(
+                "risk" in description or "cross-origin" in description or "widening" in description,
+                key,
+            )
+            self.assertIn("security_surface", field.get("warning_codes", []))
+
+    def test_schema_response_includes_mcp_category_and_fields(self):
+        schema = build_schema_response()
+        mcp_cat = next((c for c in schema["categories"] if c["category"] == "mcp"), None)
+        self.assertIsNotNone(mcp_cat, "mcp category missing from schema")
+        field_keys = {f["key"] for f in mcp_cat["fields"]}
+        for key in self._MCP_KEYS:
+            self.assertIn(key, field_keys, key)
+        # category must sort before uncategorized
+        orders = {c["category"]: c["display_order"] for c in schema["categories"]}
+        self.assertLess(orders["mcp"], orders["uncategorized"])
+

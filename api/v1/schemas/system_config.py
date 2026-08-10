@@ -245,6 +245,7 @@ class SystemConfigFieldSchema(BaseModel):
         "agent",
         "backtest",
         "indicators",
+        "mcp",
         "uncategorized",
     ]
     data_type: Literal["string", "integer", "number", "boolean", "array", "json", "time"]
