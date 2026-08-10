@@ -35,6 +35,7 @@ from src.agent.runner_parts import tools as _runner_tools
 parse_dashboard_json = _runner_parsing.parse_dashboard_json
 parse_dashboard_json_result = _runner_parsing.parse_dashboard_json_result
 run_agent_loop = _runner_loop.run_agent_loop
+_NATIVE_TOOL_RESULT_MAX_BYTES = _runner_loop._NATIVE_TOOL_RESULT_MAX_BYTES
 
 from src.agent.dashboard_payload import (
     has_reserved_explanation_field,
@@ -365,6 +366,7 @@ _RUNNER_COMPAT_EXPORTS = (
     _is_stock_scoped_tool,
     _normalize_guard_stock_code,
     _normalize_tool_stock_code,
+    _NATIVE_TOOL_RESULT_MAX_BYTES,
     _try_parse_json,
     _try_repair_json,
     as_completed,
