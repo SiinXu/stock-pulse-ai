@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Settings scheduler card shows next run with timezone, honest process-mode/deployment copy, run-now busy tracking, and last-skipped status (#869).
 - [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
 
+- [Added] Portfolio health stored GET and explicit refresh API with deterministic five-dimension scoring, coverage-gated comparable bands, strict finite configuration, migration-owned atomic persistence, provenance, and rule-based insights (refs #151).
 - [Added] Revisioned watchlist groups with pre-mutation CAS write leases, version-fenced STOCK_LIST reconciliation, failure-aware accessible controls, mobile non-drag controls, and typed score/focus projections (#189).
 - [Added] Report version comparison foundation with stable history-ID selection, paginated pickers, strict typed deltas, configuration-provenance states, graded field differences, and operation-owned recovery (#188 / T18).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).

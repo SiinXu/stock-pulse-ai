@@ -32,6 +32,7 @@ from api.v1.endpoints import (
     plugins,
     onboarding,
     portfolio,
+    portfolio_health,
     portfolio_risk_metrics,
     portfolio_stress_test,
     reasoning_trace,
@@ -142,6 +143,12 @@ router.include_router(
 
 router.include_router(
     portfolio_risk_metrics.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
+    portfolio_health.router,
     prefix="/portfolio",
     tags=["Portfolio"]
 )

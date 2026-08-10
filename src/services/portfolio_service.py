@@ -693,7 +693,6 @@ class PortfolioService:
         include_realtime: bool = True,
     ) -> Dict[str, Any]:
         """Build and materialize the canonical portfolio snapshot."""
-
         return self._build_portfolio_snapshot(
             account_id=account_id,
             as_of=as_of,
@@ -710,8 +709,7 @@ class PortfolioService:
         cost_method: str = "fifo",
         include_realtime: bool = False,
     ) -> Dict[str, Any]:
-        """Replay a canonical snapshot without writing derived cache rows."""
-
+        """Replay the canonical snapshot without writing derived cache rows."""
         return self._build_portfolio_snapshot(
             account_id=account_id,
             as_of=as_of,
