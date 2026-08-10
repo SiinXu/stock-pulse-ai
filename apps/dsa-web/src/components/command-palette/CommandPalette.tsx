@@ -7,32 +7,44 @@ import {
   BriefcaseBusiness,
   Calculator,
   ClipboardCheck,
+  FileText,
   FlaskConical,
   Gauge,
   Home,
+  LineChart,
   MessageSquareQuote,
   Search,
   Settings2,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StockAutocomplete } from '../StockAutocomplete';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
 import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
   RESEARCH_MARKET_ACTION_VALUES,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  buildAnalysisWorkbenchHref,
   buildResearchMarketHref,
   buildSignalCenterHref,
 } from '../../routing/routes';
 import { cn } from '../../utils/cn';
+import { formatDateTime, formatReportType } from '../../utils/format';
 import { Modal } from '../common/Modal';
 import { SearchInput } from '../common/SearchInput';
+import { Spinner } from '../common/Spinner';
+import { useCommandPaletteSearch } from './useCommandPaletteSearch';
 import type { LucideIcon } from 'lucide-react';
 
 type CommandItem = {
@@ -44,12 +56,31 @@ type CommandItem = {
   | { label: string; labelKey?: never }
 );
 
+type PaletteResult = {
+  id: string;
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  description?: string;
+  meta?: string;
+};
+
+type PaletteGroup = {
+  id: string;
+  label: string;
+  items: PaletteResult[];
+};
+
 export type CommandPaletteProps = {
   isOpen: boolean;
   onClose: () => void;
   analysisHref?: string;
   onNavigate?: (href: string) => void;
 };
+
+function optionId(result: PaletteResult): string {
+  return `command-palette-option-${result.id.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+}
 
 export function CommandPalette({
   isOpen,
@@ -61,11 +92,10 @@ export function CommandPalette({
   const text = NOTIFICATIONS_TEXT[language];
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
-  const commandRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [query, setQuery] = useState('');
-  const [stockQuery, setStockQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const search = useCommandPaletteSearch(query, isOpen);
 
-  // Page order follows the product IA domains, then global/admin surfaces that stay off the sidebar.
   const pages = useMemo<CommandItem[]>(() => [
     { id: 'home', labelKey: 'layout.nav.home', href: APP_ROUTE_PATHS.home, icon: Home },
     { id: 'signals', labelKey: 'layout.nav.decisionSignals', href: APP_ROUTE_PATHS.signals, icon: BellRing },
@@ -95,22 +125,65 @@ export function CommandPalette({
     if (!isOpen) return undefined;
     const frame = window.requestAnimationFrame(() => {
       setQuery('');
-      setStockQuery('');
+      setActiveIndex(-1);
       searchRef.current?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
   }, [isOpen]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const getItemLabel = (item: CommandItem) => (
-    item.label ?? t(item.labelKey)
-  );
-  const matchesQuery = (item: CommandItem) => (
-    normalizedQuery.length === 0 || getItemLabel(item).toLocaleLowerCase().includes(normalizedQuery)
-  );
-  const visiblePages = pages.filter(matchesQuery);
-  const visibleActions = actions.filter(matchesQuery);
-  const visibleCommands = [...visiblePages, ...visibleActions];
+  const commandResult = (item: CommandItem, resultType: 'page' | 'action'): PaletteResult => ({
+    id: `${resultType}-${item.id}`,
+    href: item.href,
+    icon: item.icon,
+    label: item.label ?? t(item.labelKey),
+  });
+  const matchesQuery = (item: CommandItem) => {
+    const label = item.label ?? t(item.labelKey);
+    return normalizedQuery.length === 0 || label.toLocaleLowerCase().includes(normalizedQuery);
+  };
+  const stockResults = search.stocks.map<PaletteResult>((stock) => ({
+    id: `stock-${stock.canonicalCode}`,
+    href: APP_ROUTE_PATHS.stockDetails.replace(
+      ':stockCode',
+      encodeURIComponent(stock.canonicalCode),
+    ),
+    icon: LineChart,
+    label: stock.nameZh || stock.displayCode,
+    description: stock.displayCode,
+    meta: stock.market,
+  }));
+  const reportResults = search.reports.map<PaletteResult>((report) => ({
+    id: `report-${report.id}`,
+    href: buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      recordId: report.id,
+      stock: report.stockCode,
+    }),
+    icon: FileText,
+    label: report.stockName
+      ? `${report.stockName} (${report.stockCode})`
+      : report.stockCode,
+    description: report.summary ?? formatReportType(report.reportType, language),
+    meta: `${formatReportType(report.reportType, language)} · ${formatDateTime(report.createdAt, language)}`,
+  }));
+  const groups: PaletteGroup[] = [
+    { id: 'stocks', label: text.stocksGroup, items: stockResults },
+    { id: 'reports', label: text.reportsGroup, items: reportResults },
+    {
+      id: 'pages',
+      label: text.pagesGroup,
+      items: pages.filter(matchesQuery).map((item) => commandResult(item, 'page')),
+    },
+    {
+      id: 'actions',
+      label: text.actionsGroup,
+      items: actions.filter(matchesQuery).map((item) => commandResult(item, 'action')),
+    },
+  ].filter((group) => group.items.length > 0);
+  const visibleResults = groups.flatMap((group) => group.items);
+  const safeActiveIndex = activeIndex < visibleResults.length ? activeIndex : -1;
+  const activeResult = safeActiveIndex >= 0 ? visibleResults[safeActiveIndex] : undefined;
 
   const selectHref = (href: string) => {
     onClose();
@@ -118,74 +191,36 @@ export function CommandPalette({
     else navigate(href);
   };
 
-  const selectStock = (stockCode: string) => {
-    const normalizedCode = stockCode.trim();
-    if (!normalizedCode) return;
-    selectHref(
-      APP_ROUTE_PATHS.stockDetails.replace(':stockCode', encodeURIComponent(normalizedCode)),
-    );
-  };
-
-  const focusCommand = (index: number) => {
-    if (visibleCommands.length === 0) return;
-    const normalizedIndex = (index + visibleCommands.length) % visibleCommands.length;
-    commandRefs.current[normalizedIndex]?.focus();
+  const moveActive = (direction: 1 | -1) => {
+    if (visibleResults.length === 0) return;
+    setActiveIndex((current) => {
+      if (current < 0 || current >= visibleResults.length) {
+        return direction === 1 ? 0 : visibleResults.length - 1;
+      }
+      return (current + direction + visibleResults.length) % visibleResults.length;
+    });
   };
 
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      focusCommand(0);
+      moveActive(1);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      focusCommand(visibleCommands.length - 1);
+      moveActive(-1);
+    } else if (event.key === 'Home' && visibleResults.length > 0) {
+      event.preventDefault();
+      setActiveIndex(0);
+    } else if (event.key === 'End' && visibleResults.length > 0) {
+      event.preventDefault();
+      setActiveIndex(visibleResults.length - 1);
+    } else if (event.key === 'Enter' && activeResult) {
+      event.preventDefault();
+      selectHref(activeResult.href);
     }
   };
 
-  const renderGroup = (label: string, items: CommandItem[], offset: number) => {
-    if (items.length === 0) return null;
-    return (
-      <section>
-        <h3 className="mb-1 px-2 text-xs font-medium uppercase text-muted-text">{label}</h3>
-        <div className="space-y-1">
-          {items.map((item, itemIndex) => {
-            const commandIndex = offset + itemIndex;
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                ref={(node) => { commandRefs.current[commandIndex] = node; }}
-                type="button"
-                onClick={() => selectHref(item.href)}
-                onKeyDown={(event) => {
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    focusCommand(commandIndex + 1);
-                  } else if (event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    focusCommand(commandIndex - 1);
-                  } else if (event.key === 'Home') {
-                    event.preventDefault();
-                    focusCommand(0);
-                  } else if (event.key === 'End') {
-                    event.preventDefault();
-                    focusCommand(visibleCommands.length - 1);
-                  }
-                }}
-                className={cn(
-                  'flex min-h-10 w-full items-center gap-3 rounded-md px-2 text-left text-sm text-foreground',
-                  'hover:bg-hover focus-visible:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25',
-                )}
-              >
-                <Icon className="size-4 shrink-0 text-secondary-text" aria-hidden="true" />
-                <span className="truncate">{getItemLabel(item)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    );
-  };
+  let resultOffset = 0;
 
   return (
     <Modal
@@ -195,35 +230,105 @@ export function CommandPalette({
       description={text.paletteDescription}
       size="wide"
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
         <SearchInput
           ref={searchRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(-1);
+          }}
           onKeyDown={handleSearchKeyDown}
           placeholder={text.searchPlaceholder}
           aria-label={text.searchPlaceholder}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="command-palette-results"
+          aria-expanded={visibleResults.length > 0}
+          aria-activedescendant={activeResult ? optionId(activeResult) : undefined}
+          autoComplete="off"
           wrapperClassName="h-10 sm:h-10"
         />
 
-        <div className="max-h-[40dvh] space-y-4 overflow-y-auto pr-1">
-          {renderGroup(text.pagesGroup, visiblePages, 0)}
-          {renderGroup(text.actionsGroup, visibleActions, visiblePages.length)}
-          {visibleCommands.length === 0 ? (
-            <p className="px-2 py-4 text-center text-sm text-secondary-text">{text.noResults}</p>
-          ) : null}
-        </div>
+        <div className="max-h-[55dvh] overflow-y-auto pr-1">
+          <div
+            id="command-palette-results"
+            role="listbox"
+            aria-label={text.paletteDescription}
+            aria-busy={search.isLoading}
+            className="space-y-4"
+          >
+            {groups.map((group) => {
+              const groupOffset = resultOffset;
+              resultOffset += group.items.length;
+              const labelId = `command-palette-${group.id}-label`;
+              return (
+                <section key={group.id} role="group" aria-labelledby={labelId}>
+                  <h3 id={labelId} className="mb-1 px-2 text-xs font-medium uppercase text-muted-text">
+                    {group.label}
+                  </h3>
+                  <div className="space-y-1">
+                    {group.items.map((result, itemIndex) => {
+                      const resultIndex = groupOffset + itemIndex;
+                      const Icon = result.icon;
+                      const selected = resultIndex === safeActiveIndex;
+                      return (
+                        <button
+                          key={result.id}
+                          id={optionId(result)}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          tabIndex={-1}
+                          onClick={() => selectHref(result.href)}
+                          onMouseMove={() => setActiveIndex(resultIndex)}
+                          className={cn(
+                            'flex min-h-11 w-full items-center gap-3 rounded-md px-2 text-left text-sm text-foreground',
+                            'hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25',
+                            selected && 'bg-hover ring-2 ring-primary/20',
+                          )}
+                        >
+                          <Icon className="size-4 shrink-0 text-secondary-text" aria-hidden="true" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium">{result.label}</span>
+                            {result.description ? (
+                              <span className="block truncate text-xs text-secondary-text">
+                                {result.description}
+                              </span>
+                            ) : null}
+                          </span>
+                          {result.meta ? (
+                            <span className="shrink-0 text-xs text-muted-text">{result.meta}</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
 
-        <section className="border-t border-border pt-4">
-          <h3 className="mb-2 text-xs font-medium uppercase text-muted-text">{text.stocksGroup}</h3>
-          <StockAutocomplete
-            value={stockQuery}
-            onChange={setStockQuery}
-            onSubmit={selectStock}
-            placeholder={t('common.searchPlaceholder')}
-            ariaLabel={text.stocksGroup}
-          />
-        </section>
+          {search.isLoading ? (
+            <div role="status" className="flex items-center justify-center gap-2 px-2 py-4 text-sm text-secondary-text">
+              <Spinner size="sm" />
+              <span>{t('common.loading')}</span>
+            </div>
+          ) : null}
+          {search.hasError ? (
+            <p role="alert" className="px-2 py-3 text-center text-sm text-danger">
+              {text.searchUnavailable}
+            </p>
+          ) : null}
+          {normalizedQuery.length > 0
+            && !search.isLoading
+            && !search.hasError
+            && visibleResults.length === 0 ? (
+              <p role="status" className="px-2 py-4 text-center text-sm text-secondary-text">
+                {text.noResults}
+              </p>
+            ) : null}
+        </div>
       </div>
     </Modal>
   );

@@ -45,6 +45,7 @@ from sqlalchemy import (
     event,
     func,
     inspect,
+    text as _sql_text,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import (
@@ -108,6 +109,7 @@ _STORAGE_FACADE_COMPAT_GLOBALS = (
     event,
     func,
     inspect,
+    _sql_text,
     sqlite_insert,
     sessionmaker,
     Session,
