@@ -8094,6 +8094,260 @@
         "title": "DeleteHistoryResponse",
         "type": "object"
       },
+      "DemoAnalysisDetails": {
+        "properties": {
+          "news": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0,
+            "title": "News",
+            "type": "array"
+          },
+          "technical": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0,
+            "title": "Technical",
+            "type": "array"
+          }
+        },
+        "title": "DemoAnalysisDetails",
+        "type": "object"
+      },
+      "DemoAnalysisMeta": {
+        "properties": {
+          "change_pct": {
+            "title": "Change Pct",
+            "type": "null"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_price": {
+            "title": "Current Price",
+            "type": "null"
+          },
+          "model_used": {
+            "const": "demo-fixture/offline",
+            "title": "Model Used",
+            "type": "string"
+          },
+          "query_id": {
+            "const": "demo-sample-analysis-v1",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "report_language": {
+            "enum": [
+              "zh",
+              "en",
+              "ko"
+            ],
+            "title": "Report Language",
+            "type": "string"
+          },
+          "report_type": {
+            "const": "brief",
+            "title": "Report Type",
+            "type": "string"
+          },
+          "stock_code": {
+            "const": "600519",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Stock Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id",
+          "stock_code",
+          "stock_name",
+          "report_type",
+          "report_language",
+          "created_at",
+          "model_used"
+        ],
+        "title": "DemoAnalysisMeta",
+        "type": "object"
+      },
+      "DemoAnalysisReport": {
+        "properties": {
+          "details": {
+            "$ref": "#/components/schemas/DemoAnalysisDetails"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DemoAnalysisMeta"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/DemoAnalysisStrategy"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DemoAnalysisSummary"
+          }
+        },
+        "required": [
+          "meta",
+          "summary",
+          "strategy",
+          "details"
+        ],
+        "title": "DemoAnalysisReport",
+        "type": "object"
+      },
+      "DemoAnalysisResponse": {
+        "description": "Offline sample analysis. Always ``is_sample=True``.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "is_sample": {
+            "const": true,
+            "default": true,
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "query_id": {
+            "const": "demo-sample-analysis-v1",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/DemoAnalysisReport"
+          },
+          "sample_banner": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Sample Banner",
+            "type": "string"
+          },
+          "sample_disclaimer": {
+            "maxLength": 800,
+            "minLength": 1,
+            "title": "Sample Disclaimer",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "stock_code": {
+            "const": "600519",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Stock Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sample_banner",
+          "sample_disclaimer",
+          "query_id",
+          "stock_code",
+          "stock_name",
+          "created_at",
+          "report"
+        ],
+        "title": "DemoAnalysisResponse",
+        "type": "object"
+      },
+      "DemoAnalysisStrategy": {
+        "properties": {
+          "ideal_buy": {
+            "title": "Ideal Buy",
+            "type": "null"
+          },
+          "secondary_buy": {
+            "title": "Secondary Buy",
+            "type": "null"
+          },
+          "stop_loss": {
+            "title": "Stop Loss",
+            "type": "null"
+          },
+          "take_profit": {
+            "title": "Take Profit",
+            "type": "null"
+          }
+        },
+        "title": "DemoAnalysisStrategy",
+        "type": "object"
+      },
+      "DemoAnalysisSummary": {
+        "properties": {
+          "action": {
+            "const": "watch",
+            "title": "Action",
+            "type": "string"
+          },
+          "action_label": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Action Label",
+            "type": "string"
+          },
+          "analysis_summary": {
+            "maxLength": 1200,
+            "minLength": 1,
+            "title": "Analysis Summary",
+            "type": "string"
+          },
+          "operation_advice": {
+            "maxLength": 800,
+            "minLength": 1,
+            "title": "Operation Advice",
+            "type": "string"
+          },
+          "sentiment_label": {
+            "enum": [
+              "中性",
+              "Neutral",
+              "중립"
+            ],
+            "title": "Sentiment Label",
+            "type": "string"
+          },
+          "sentiment_score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Sentiment Score",
+            "type": "integer"
+          },
+          "trend_prediction": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Trend Prediction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "analysis_summary",
+          "operation_advice",
+          "action",
+          "action_label",
+          "trend_prediction",
+          "sentiment_score",
+          "sentiment_label"
+        ],
+        "title": "DemoAnalysisSummary",
+        "type": "object"
+      },
       "DiscoverLLMChannelModelsRequest": {
         "description": "Request payload for discovering models from one LLM channel.",
         "properties": {
@@ -8457,6 +8711,132 @@
           }
         },
         "title": "ExtractItem",
+        "type": "object"
+      },
+      "FirstRunReadinessResponse": {
+        "description": "Zero-config first-run readiness snapshot (read-only; never mutates config).",
+        "properties": {
+          "beginner_mode_recommended": {
+            "title": "Beginner Mode Recommended",
+            "type": "boolean"
+          },
+          "config_mutated": {
+            "const": false,
+            "default": false,
+            "title": "Config Mutated",
+            "type": "boolean"
+          },
+          "demo_available": {
+            "const": true,
+            "default": true,
+            "title": "Demo Available",
+            "type": "boolean"
+          },
+          "existing_config_untouched": {
+            "const": true,
+            "default": true,
+            "title": "Existing Config Untouched",
+            "type": "boolean"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "has_primary_model": {
+            "title": "Has Primary Model",
+            "type": "boolean"
+          },
+          "is_fresh_environment": {
+            "title": "Is Fresh Environment",
+            "type": "boolean"
+          },
+          "local_runtime": {
+            "$ref": "#/components/schemas/LocalRuntimeSnapshot"
+          },
+          "primary_cta": {
+            "enum": [
+              "continue",
+              "open_local_setup",
+              "view_demo"
+            ],
+            "title": "Primary Cta",
+            "type": "string"
+          },
+          "primary_path": {
+            "enum": [
+              "configured",
+              "local_ollama",
+              "demo"
+            ],
+            "title": "Primary Path",
+            "type": "string"
+          },
+          "reason_code": {
+            "enum": [
+              "primary_model_configured",
+              "local_model_ready",
+              "local_runtime_no_models",
+              "local_detect_disabled",
+              "local_runtime_unavailable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reason_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 8,
+            "title": "Reason Params",
+            "type": "object"
+          },
+          "recommended_preset_id": {
+            "anyOf": [
+              {
+                "const": "local-first",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Preset Id"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "snapshot_id": {
+            "maxLength": 24,
+            "minLength": 24,
+            "pattern": "^[0-9a-f]+$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "suggested_profile": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 32,
+            "title": "Suggested Profile",
+            "type": "object"
+          }
+        },
+        "required": [
+          "is_fresh_environment",
+          "has_primary_model",
+          "beginner_mode_recommended",
+          "primary_path",
+          "primary_cta",
+          "reason_code",
+          "local_runtime",
+          "snapshot_id",
+          "generated_at"
+        ],
+        "title": "FirstRunReadinessResponse",
         "type": "object"
       },
       "GenerationBackendStatus": {
@@ -11859,6 +12239,86 @@
           "enabled"
         ],
         "title": "LocalOnlyModeStatus",
+        "type": "object"
+      },
+      "LocalRuntimeSnapshot": {
+        "description": "Public, non-secret local-runtime detect projection.",
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "const": "ollama",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "detect_enabled": {
+            "default": true,
+            "title": "Detect Enabled",
+            "type": "boolean"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Models",
+            "type": "array"
+          },
+          "models_available": {
+            "default": false,
+            "title": "Models Available",
+            "type": "boolean"
+          },
+          "reachable": {
+            "default": false,
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "enum": [
+              "ollama_ready",
+              "ollama_no_models",
+              "detect_disabled",
+              "ollama_unreachable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "runnable": {
+            "default": false,
+            "title": "Runnable",
+            "type": "boolean"
+          },
+          "suggested_profile": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 32,
+            "title": "Suggested Profile",
+            "type": "object"
+          }
+        },
+        "required": [
+          "reason_code"
+        ],
+        "title": "LocalRuntimeSnapshot",
         "type": "object"
       },
       "LoginRequest": {
@@ -22946,7 +23406,11 @@
           },
           "report_language": {
             "default": "zh",
-            "description": "zh | en | ko | ja",
+            "enum": [
+              "zh",
+              "en",
+              "ko"
+            ],
             "title": "Report Language",
             "type": "string"
           },
@@ -31836,6 +32300,97 @@
           }
         },
         "summary": "Apply non-secret onboarding config recommendations",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/api/v1/onboarding/demo-analysis": {
+      "get": {
+        "description": "Returns a fixed offline sample analysis. Always is_sample=true with a visible sample banner. No network, LLM, or paid data is used.",
+        "operationId": "get_demo_analysis_api_v1_onboarding_demo_analysis_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "report_language",
+            "required": false,
+            "schema": {
+              "default": "zh",
+              "enum": [
+                "zh",
+                "en",
+                "ko"
+              ],
+              "title": "Report Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Offline sample analysis for zero-config first success",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/api/v1/onboarding/first-run": {
+      "get": {
+        "description": "Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (model setup vs offline demo). Never mutates configuration.",
+        "operationId": "get_first_run_readiness_api_v1_onboarding_first_run_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirstRunReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Zero-config first-run readiness (read-only)",
         "tags": [
           "Onboarding"
         ]

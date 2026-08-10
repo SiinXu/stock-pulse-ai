@@ -1926,6 +1926,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onboarding/demo-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offline sample analysis for zero-config first success
+         * @description Returns a fixed offline sample analysis. Always is_sample=true with a visible sample banner. No network, LLM, or paid data is used.
+         */
+        get: operations["get_demo_analysis_api_v1_onboarding_demo_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/first-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Zero-config first-run readiness (read-only)
+         * @description Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (model setup vs offline demo). Never mutates configuration.
+         */
+        get: operations["get_first_run_readiness_api_v1_onboarding_first_run_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/plan": {
         parameters: {
             query?: never;
@@ -6379,6 +6419,133 @@ export interface components {
              */
             deleted: number;
         };
+        /** DemoAnalysisDetails */
+        DemoAnalysisDetails: {
+            /** News */
+            news?: string[];
+            /** Technical */
+            technical?: string[];
+        };
+        /** DemoAnalysisMeta */
+        DemoAnalysisMeta: {
+            /** Change Pct */
+            change_pct?: null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Price */
+            current_price?: null;
+            /**
+             * Model Used
+             * @constant
+             */
+            model_used: "demo-fixture/offline";
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            /**
+             * Report Language
+             * @enum {string}
+             */
+            report_language: "zh" | "en" | "ko";
+            /**
+             * Report Type
+             * @constant
+             */
+            report_type: "brief";
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisReport */
+        DemoAnalysisReport: {
+            details: components["schemas"]["DemoAnalysisDetails"];
+            meta: components["schemas"]["DemoAnalysisMeta"];
+            strategy: components["schemas"]["DemoAnalysisStrategy"];
+            summary: components["schemas"]["DemoAnalysisSummary"];
+        };
+        /**
+         * DemoAnalysisResponse
+         * @description Offline sample analysis. Always ``is_sample=True``.
+         */
+        DemoAnalysisResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Is Sample
+             * @default true
+             * @constant
+             */
+            is_sample: true;
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            report: components["schemas"]["DemoAnalysisReport"];
+            /** Sample Banner */
+            sample_banner: string;
+            /** Sample Disclaimer */
+            sample_disclaimer: string;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisStrategy */
+        DemoAnalysisStrategy: {
+            /** Ideal Buy */
+            ideal_buy?: null;
+            /** Secondary Buy */
+            secondary_buy?: null;
+            /** Stop Loss */
+            stop_loss?: null;
+            /** Take Profit */
+            take_profit?: null;
+        };
+        /** DemoAnalysisSummary */
+        DemoAnalysisSummary: {
+            /**
+             * Action
+             * @constant
+             */
+            action: "watch";
+            /** Action Label */
+            action_label: string;
+            /** Analysis Summary */
+            analysis_summary: string;
+            /** Operation Advice */
+            operation_advice: string;
+            /**
+             * Sentiment Label
+             * @enum {string}
+             */
+            sentiment_label: "中性" | "Neutral" | "중립";
+            /** Sentiment Score */
+            sentiment_score: number;
+            /** Trend Prediction */
+            trend_prediction: string;
+        };
         /**
          * DiscoverLLMChannelModelsRequest
          * @description Request payload for discovering models from one LLM channel.
@@ -6581,6 +6748,75 @@ export interface components {
              * @description 股票名称（如有）
              */
             name?: string | null;
+        };
+        /**
+         * FirstRunReadinessResponse
+         * @description Zero-config first-run readiness snapshot (read-only; never mutates config).
+         */
+        FirstRunReadinessResponse: {
+            /** Beginner Mode Recommended */
+            beginner_mode_recommended: boolean;
+            /**
+             * Config Mutated
+             * @default false
+             * @constant
+             */
+            config_mutated: false;
+            /**
+             * Demo Available
+             * @default true
+             * @constant
+             */
+            demo_available: true;
+            /**
+             * Existing Config Untouched
+             * @default true
+             * @constant
+             */
+            existing_config_untouched: true;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Has Primary Model */
+            has_primary_model: boolean;
+            /** Is Fresh Environment */
+            is_fresh_environment: boolean;
+            local_runtime: components["schemas"]["LocalRuntimeSnapshot"];
+            /**
+             * Primary Cta
+             * @enum {string}
+             */
+            primary_cta: "continue" | "open_local_setup" | "view_demo";
+            /**
+             * Primary Path
+             * @enum {string}
+             */
+            primary_path: "configured" | "local_ollama" | "demo";
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "primary_model_configured" | "local_model_ready" | "local_runtime_no_models" | "local_detect_disabled" | "local_runtime_unavailable";
+            /** Reason Params */
+            reason_params?: {
+                [key: string]: string;
+            };
+            /** Recommended Preset Id */
+            recommended_preset_id?: "local-first" | null;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
         };
         /**
          * GenerationBackendStatus
@@ -7982,6 +8218,47 @@ export interface components {
              * @default non_loopback_denied
              */
             policy: string;
+        };
+        /**
+         * LocalRuntimeSnapshot
+         * @description Public, non-secret local-runtime detect projection.
+         */
+        LocalRuntimeSnapshot: {
+            /** Backend */
+            backend?: "ollama" | null;
+            /** Base Url */
+            base_url?: string | null;
+            /**
+             * Detect Enabled
+             * @default true
+             */
+            detect_enabled: boolean;
+            /** Models */
+            models?: string[];
+            /**
+             * Models Available
+             * @default false
+             */
+            models_available: boolean;
+            /**
+             * Reachable
+             * @default false
+             */
+            reachable: boolean;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "ollama_ready" | "ollama_no_models" | "detect_disabled" | "ollama_unreachable";
+            /**
+             * Runnable
+             * @default false
+             */
+            runnable: boolean;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
         };
         /**
          * LoginRequest
@@ -12762,10 +13039,10 @@ export interface components {
             markets?: string[];
             /**
              * Report Language
-             * @description zh | en | ko | ja
              * @default zh
+             * @enum {string}
              */
-            report_language: string;
+            report_language: "zh" | "en" | "ko";
             /**
              * Risk Tone
              * @description conservative | balanced | assertive (tone only, not advice)
@@ -18363,6 +18640,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_demo_analysis_api_v1_onboarding_demo_analysis_get: {
+        parameters: {
+            query?: {
+                report_language?: "zh" | "en" | "ko";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoAnalysisResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_first_run_readiness_api_v1_onboarding_first_run_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirstRunReadinessResponse"];
                 };
             };
             /** @description Internal Server Error */
