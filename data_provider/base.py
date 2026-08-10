@@ -14,7 +14,7 @@
 3. 指数退避重试机制
 """
 
-import json
+import json as _json
 import logging
 import os
 import random
@@ -22,14 +22,30 @@ import time
 from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Callable, Optional, List, Tuple, Dict, Any
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 import pandas as pd
 import numpy as np
 from src.data.stock_index_loader import get_index_stock_name
 from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
-from .daily_cache import DailyCacheKey, DailyCacheLookup, DailyCacheRead, DailyDataCache
+from .daily_cache import (
+    CachedCandidateRejected,
+    DailyCacheKey,
+    DailyDataCache,
+    MarketDataResolveResult,
+    MarketDataFetchMode,
+    REQUIRED_DAILY_COLUMNS,
+)
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
@@ -178,7 +194,10 @@ def _is_meaningful_chip_distribution(chip: Any) -> bool:
 
 class DataFetchError(Exception):
     """数据获取异常基类"""
-    pass
+
+    def __init__(self, message: str, *, provider_failure_count: int = 0) -> None:
+        self.provider_failure_count = provider_failure_count
+        super().__init__(message)
 
 
 class RateLimitError(DataFetchError):
@@ -550,6 +569,7 @@ class DataFetcherManager:
         *,
         provider_run_recorder: Optional[Callable[..., None]] = None,
         provider_run_started_recorder: Optional[Callable[..., None]] = None,
+        extension_contracts: Optional[Mapping[str, Any]] = None,
     ):
         """
         初始化管理器
@@ -559,6 +579,9 @@ class DataFetcherManager:
             provider_run_recorder: Optional diagnostic recorder (defaults to
                 production run-diagnostics wiring resolved at construction).
             provider_run_started_recorder: Optional start-event recorder pair.
+            extension_contracts: Optional non-data_provider extension contracts
+                merged into the manager-owned plugin registry (composition roots
+                use this when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled).
         """
         from .manager_parts.provider_run_wiring import resolve_provider_run_recorders
 
@@ -589,7 +612,8 @@ class DataFetcherManager:
         self._fetcher_call_locks: Dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
         self._data_provider_runtime = _DataProviderPluginRuntime(
-            self._BUILTIN_DATA_PROVIDER_IDS
+            self._BUILTIN_DATA_PROVIDER_IDS,
+            additional_contracts=extension_contracts,
         )
         self._registered_fetchers: Dict[str, DataProvider] = {}
         self._provider_priorities: Dict[int, int] = {}
@@ -628,6 +652,7 @@ class DataFetcherManager:
     _ensure_concurrency_guards = None
 
     plugin_registry = None
+    data_provider_runtime = None
     _assign_fetcher_static_order_locked = None
     _provider_priority = None
     _sort_fetchers_locked = None
@@ -674,12 +699,29 @@ class DataFetcherManager:
                 self._daily_data_cache = DailyDataCache.from_env()
             return self._daily_data_cache
 
+    def is_market_data_local_only(self) -> bool:
+        """Return whether manager-owned market-data helpers must avoid providers."""
+
+        return self._get_daily_data_cache().fetch_mode is MarketDataFetchMode.LOCAL_ONLY
+
+    def _daily_adjustment_identity(self) -> str:
+        """Return the active adjustment policy that partitions persistent bars."""
+
+        for fetcher in self._get_fetchers_snapshot():
+            if fetcher.name != "TickFlowFetcher":
+                continue
+            adjustment = str(getattr(fetcher, "kline_adjust", "none") or "none")
+            return f"tickflow:{adjustment.strip().lower()}"
+        return "provider_default"
+
     @staticmethod
     def _daily_cache_key(
         stock_code: str,
         start_date: Optional[str],
         end_date: Optional[str],
         days: int,
+        *,
+        adjustment: str = "provider_default",
     ) -> DailyCacheKey:
         effective_end = end_date or datetime.now().strftime("%Y-%m-%d")
         effective_start = start_date
@@ -691,49 +733,57 @@ class DataFetcherManager:
             start_date=effective_start,
             end_date=effective_end,
             days=days,
+            adjustment=adjustment,
+            allow_end_rollover=end_date is None,
         )
 
     @staticmethod
-    def _record_daily_cache_read(
-        cache_read: DailyCacheRead,
+    def _record_daily_cache_result(
+        cache_result: MarketDataResolveResult,
         request_start: float,
     ) -> None:
         record_provider_run(
             data_type="daily_data",
-            provider=cache_read.source_name,
+            provider=cache_result.source_name,
             operation="get_daily_data",
             success=True,
             latency_ms=int((time.time() - request_start) * 1000),
             cache_hit=True,
-            stale_seconds=int(cache_read.age_seconds),
-            record_count=len(cache_read.frame),
+            stale_seconds=int(cache_result.age_seconds),
+            record_count=len(cache_result.frame),
         )
 
-    def _daily_stale_cache_result(
-        self,
-        cache_lookup: DailyCacheLookup,
+    @staticmethod
+    def _validate_daily_candidate(
+        frame: pd.DataFrame,
         *,
         stock_code: str,
-        market: str,
-        request_start: float,
-        provider_failure_count: int,
-    ) -> Optional[Tuple[pd.DataFrame, str]]:
-        if cache_lookup.stale is None:
-            return None
-        cache_read = self._get_daily_data_cache().use_stale(cache_lookup.stale)
-        if cache_read is None:
-            return None
-        self._record_daily_cache_read(cache_read, request_start)
-        logger.warning(
-            "provider_failover event=stale_cache data_type=daily_data symbol=%s "
-            "market=%s source=%s stale_seconds=%d provider_failure_count=%d",
-            sanitize_diagnostic_text(stock_code, max_length=80),
-            market,
-            sanitize_diagnostic_text(cache_read.source_name, max_length=120),
-            int(cache_read.age_seconds),
-            provider_failure_count,
+        source_name: str,
+    ) -> pd.DataFrame:
+        """Apply the active quality policy to provider and cached candidates."""
+        from data_provider.data_validation import (
+            DataValidationRejected,
+            infer_instrument_type,
+            validate_and_annotate,
         )
-        return cache_read.frame, cache_read.source_name
+
+        try:
+            validate_and_annotate(
+                frame,
+                data_type="daily_data",
+                market=_market_tag(normalize_stock_code(stock_code)),
+                stock_code=stock_code,
+                provider=source_name,
+                instrument_type=(
+                    frame.attrs.get("instrument_type")
+                    or infer_instrument_type(stock_code)
+                ),
+            )
+        except DataValidationRejected as exc:
+            raise CachedCandidateRejected(
+                "cached daily-data candidate rejected by active quality policy"
+            ) from exc
+        return frame
 
     def get_daily_cache_stats(self) -> Dict[str, int]:
         """Return manager-local daily cache hit, miss, and lifecycle counters."""
@@ -1174,8 +1224,133 @@ class DataFetcherManager:
         logger.info(f"已初始化 {len(self._fetchers)} 个数据源（按优先级）: {priority_info}")
     
     add_fetcher = None
-    
+
+    def _call_daily_data_provider(
+        self,
+        fetcher: DataProvider,
+        *,
+        stock_code: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        days: int,
+        validation_instrument_type: Optional[str] = None,
+    ) -> Optional[pd.DataFrame]:
+        """Call one provider and reject unusable normalized daily schemas."""
+
+        def _validate_result(frame: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+            if frame is None or frame.empty:
+                return frame
+            missing_columns = [
+                column for column in REQUIRED_DAILY_COLUMNS if column not in frame.columns
+            ]
+            if missing_columns:
+                raise DataFetchError(
+                    f"[{fetcher.name}] daily data is missing required columns: "
+                    f"{','.join(missing_columns)}"
+                )
+            if not pd.to_datetime(frame["date"], errors="coerce").notna().any():
+                raise DataFetchError(
+                    f"[{fetcher.name}] daily data has no valid date values"
+                )
+            return frame
+
+        return self._call_fetcher_method(
+            fetcher,
+            "get_daily_data",
+            stock_code=stock_code,
+            start_date=start_date,
+            end_date=end_date,
+            days=days,
+            _manager_result_validator=_validate_result,
+            _validation_instrument_type=validation_instrument_type,
+        )
+
     def get_daily_data(
+        self,
+        stock_code: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: int = 30,
+    ) -> Tuple[pd.DataFrame, str]:
+        """Resolve daily bars through the configured local-first contract.
+
+        This is the single orchestration owner. The provider-chain method below
+        retains market eligibility, plugin routing, adaptive/circuit state,
+        diagnostics, and per-provider fallback, but it performs no cache reads,
+        writes, or stale fallback of its own.
+        """
+        from .us_index_mapping import is_us_index_code, is_us_stock_code
+
+        normalized_code = normalize_stock_code(stock_code)
+        request_start = time.time()
+        cache_key = self._daily_cache_key(
+            normalized_code,
+            start_date,
+            end_date,
+            days,
+            adjustment=self._daily_adjustment_identity(),
+        )
+        daily_cache = self._get_daily_data_cache()
+        network_fetch = None
+        if daily_cache.fetch_mode is not MarketDataFetchMode.LOCAL_ONLY:
+            network_fetch = lambda: self._get_daily_data_from_providers(
+                normalized_code,
+                start_date=start_date,
+                end_date=end_date,
+                days=days,
+            )
+
+        result = daily_cache.resolve(
+            cache_key,
+            network_fetch=network_fetch,
+            required_fields=REQUIRED_DAILY_COLUMNS,
+            cached_candidate_validator=lambda frame, source_name: self._validate_daily_candidate(
+                frame,
+                stock_code=normalized_code,
+                source_name=source_name,
+            ),
+        )
+
+        if result.from_cache:
+            self._record_daily_cache_result(result, request_start)
+        if result.is_stale:
+            is_us_index = is_us_index_code(normalized_code)
+            is_us = is_us_index or is_us_stock_code(normalized_code)
+            is_hk = (not is_us) and _is_hk_market(normalized_code)
+            is_jp = (not is_us) and (not is_hk) and _is_jp_market(normalized_code)
+            is_kr = (not is_us) and (not is_hk) and _is_kr_market(normalized_code)
+            is_tw = (
+                (not is_us)
+                and (not is_hk)
+                and (not is_jp)
+                and (not is_kr)
+                and _is_tw_market(normalized_code)
+            )
+            market = (
+                "us"
+                if is_us
+                else "hk"
+                if is_hk
+                else "jp"
+                if is_jp
+                else "kr"
+                if is_kr
+                else "tw"
+                if is_tw
+                else "cn"
+            )
+            logger.warning(
+                "provider_failover event=stale_cache data_type=daily_data symbol=%s "
+                "market=%s source=%s stale_seconds=%d provider_failure_count=%d",
+                sanitize_diagnostic_text(normalized_code, max_length=80),
+                market,
+                sanitize_diagnostic_text(result.source_name, max_length=120),
+                int(result.age_seconds),
+                result.provider_failure_count,
+            )
+        return result.frame, result.source_name
+
+    def _get_daily_data_from_providers(
         self, 
         stock_code: str,
         start_date: Optional[str] = None,
@@ -1183,7 +1358,7 @@ class DataFetcherManager:
         days: int = 30
     ) -> Tuple[pd.DataFrame, str]:
         """
-        获取日线数据（自动切换数据源）
+        Fetch daily data from the existing provider fallback chain exactly once.
         
         故障切换策略：
         1. 美股指数/美股股票直接路由到 YfinanceFetcher
@@ -1208,15 +1383,12 @@ class DataFetcherManager:
 
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
+        market = _market_tag(stock_code)
+        from data_provider.data_validation import infer_instrument_type
+
+        instrument_type = infer_instrument_type(stock_code)
 
         request_start = time.time()
-        cache_key = self._daily_cache_key(stock_code, start_date, end_date, days)
-        daily_cache = self._get_daily_data_cache()
-        cache_lookup = daily_cache.lookup(cache_key)
-        if cache_lookup.fresh is not None:
-            self._record_daily_cache_read(cache_lookup.fresh, request_start)
-            return cache_lookup.fresh.frame, cache_lookup.fresh.source_name
-
         fetchers = self._get_fetchers_snapshot()
         errors = []
         provider_failure_count = 0
@@ -1239,19 +1411,10 @@ class DataFetcherManager:
         total_fetchers = len(fetchers)
 
         if total_fetchers == 0:
-            stale_result = self._daily_stale_cache_result(
-                cache_lookup,
-                stock_code=stock_code,
-                market=market,
-                request_start=request_start,
-                provider_failure_count=0,
-            )
-            if stale_result is not None:
-                return stale_result
             market_label = "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "台股" if is_tw else "A股"
             error_summary = f"{market_label} {stock_code} 获取失败:\n暂无可用数据源"
             logger.error(f"[数据源终止] {stock_code} 获取失败: {error_summary}")
-            raise DataFetchError(error_summary)
+            raise DataFetchError(error_summary, provider_failure_count=0)
 
         # US stocks (including US stock indices) use dedicated routing; Hong Kong stocks use the standard data source loop
         # Failover chain: Finnhub(P2) -> AlphaVantage(P3) -> Yfinance(P4) -> Longbridge(P5)
@@ -1306,16 +1469,15 @@ class DataFetcherManager:
                             provider=fetcher.name,
                             operation="get_daily_data",
                         )
-                        df = self._call_fetcher_method(
+                        df = self._call_daily_data_provider(
                             fetcher,
-                            "get_daily_data",
                             stock_code=stock_code,
                             start_date=start_date,
                             end_date=end_date,
                             days=days,
+                            validation_instrument_type=instrument_type,
                         )
                         if df is not None and not df.empty:
-                            df = daily_cache.store(cache_key, df, fetcher.name)
                             duration_ms = int((time.time() - attempt_start) * 1000)
                             record_provider_run(
                                 data_type="daily_data",
@@ -1346,6 +1508,10 @@ class DataFetcherManager:
                             fallback_to=fallback_to,
                             record_count=0,
                         )
+                        # Quality failure (empty/None): do not open the exception circuit,
+                        # but still surface a per-provider line in the final DataFetchError.
+                        empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                        errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                         if df is not None and df.empty:
                             self._record_daily_source_success(fetcher, market)
                     except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
@@ -1384,22 +1550,16 @@ class DataFetcherManager:
                         errors.append(error_msg)
                     break
 
-            stale_result = self._daily_stale_cache_result(
-                cache_lookup,
-                stock_code=stock_code,
-                market=market,
-                request_start=request_start,
-                provider_failure_count=provider_failure_count,
-            )
-            if stale_result is not None:
-                return stale_result
             error_summary = f"{market_label} {stock_code} 获取失败:\n" + "\n".join(errors)
             logger.error(
                 "All eligible data providers failed daily data request symbol=%s market=%s",
                 stock_code,
                 market,
             )
-            raise DataFetchError(error_summary)
+            raise DataFetchError(
+                error_summary,
+                provider_failure_count=provider_failure_count,
+            )
 
         for attempt, fetcher in enumerate(fetchers, start=1):
             fallback_to = self._next_daily_fallback_name(
@@ -1424,17 +1584,16 @@ class DataFetcherManager:
                     provider=fetcher.name,
                     operation="get_daily_data",
                 )
-                df = self._call_fetcher_method(
+                df = self._call_daily_data_provider(
                     fetcher,
-                    "get_daily_data",
                     stock_code=stock_code,
                     start_date=start_date,
                     end_date=end_date,
-                    days=days
+                    days=days,
+                    validation_instrument_type=instrument_type,
                 )
                 
                 if df is not None and not df.empty:
-                    df = daily_cache.store(cache_key, df, fetcher.name)
                     duration_ms = int((time.time() - attempt_start) * 1000)
                     record_provider_run(
                         data_type="daily_data",
@@ -1465,6 +1624,10 @@ class DataFetcherManager:
                     fallback_to=fallback_to,
                     record_count=0,
                 )
+                # Quality failure (empty/None): keep circuit closed for empty frames,
+                # but still surface a per-provider line in the final DataFetchError.
+                empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                 if df is not None and df.empty:
                     self._record_daily_source_success(fetcher, market)
 
@@ -1512,16 +1675,6 @@ class DataFetcherManager:
                 # Try the next data source
                 continue
         
-        stale_result = self._daily_stale_cache_result(
-            cache_lookup,
-            stock_code=stock_code,
-            market=market,
-            request_start=request_start,
-            provider_failure_count=provider_failure_count,
-        )
-        if stale_result is not None:
-            return stale_result
-
         # All data sources failed
         error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
         logger.error(
@@ -1529,7 +1682,10 @@ class DataFetcherManager:
             stock_code,
             market,
         )
-        raise DataFetchError(error_summary)
+        raise DataFetchError(
+            error_summary,
+            provider_failure_count=provider_failure_count,
+        )
     
     available_fetchers = None
     
@@ -1553,6 +1709,12 @@ class DataFetcherManager:
         Returns:
             预取的股票数量（0 表示跳过预取）
         """
+        if self.is_market_data_local_only():
+            logger.debug(
+                "[prefetch] component=realtime_prefetch action=skip reason=local_only"
+            )
+            return 0
+
         # Normalize all codes
         stock_codes = [normalize_stock_code(c) for c in stock_codes]
 
@@ -1629,7 +1791,7 @@ class DataFetcherManager:
                     )
                     or 0
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics preserve per-symbol fallback after optional TickFlow prefetch fails.
                 log_safe_exception(
                     logger,
                     "TickFlow realtime quote prefetch failed",
@@ -1661,7 +1823,7 @@ class DataFetcherManager:
                 )
                 return 0
                 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve per-symbol fallback after optional realtime prefetch fails.
             log_safe_exception(
                 logger,
                 "Realtime quote prefetch failed",
@@ -1674,6 +1836,11 @@ class DataFetcherManager:
 
     def prefetch_daily_klines(self, stock_codes: List[str], days: int = 30) -> int:
         """Batch-prefetch TickFlow daily K-lines without changing per-stock callers."""
+        if self.is_market_data_local_only():
+            logger.debug(
+                "[prefetch] component=daily_kline_prefetch action=skip reason=local_only"
+            )
+            return 0
         fetcher = self._get_fetcher_by_name("TickFlowFetcher", capability="daily_data")
         if fetcher is None or not hasattr(fetcher, "prefetch_daily_klines"):
             return 0
@@ -1688,7 +1855,7 @@ class DataFetcherManager:
                 )
                 or 0
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Safe diagnostics preserve per-symbol fallback after optional daily prefetch fails.
             log_safe_exception(
                 logger,
                 "TickFlow daily K-line prefetch failed",
@@ -2458,6 +2625,12 @@ class DataFetcherManager:
         if is_meaningful_stock_name(index_name, stock_code):
             return self._cache_stock_name(stock_code, index_name) or index_name
 
+        # Stock-name fallbacks are provider-backed. In market-data local-only
+        # mode, retain local maps/caches above but never enter a provider or
+        # realtime callback merely to decorate an otherwise local analysis.
+        if self.is_market_data_local_only():
+            return ""
+
         # 2. Attempt to fetch from real-time quotes (fastest, can be disabled on demand)
         if allow_realtime:
             quote = self.get_realtime_quote(raw_stock_code or stock_code, log_final_failure=False)
@@ -2591,7 +2764,7 @@ class DataFetcherManager:
             stock_codes: Stock codes to prefetch.
             use_bulk: If True, may use get_stock_list (full fetch). Default False.
         """
-        if not stock_codes:
+        if not stock_codes or self.is_market_data_local_only():
             return
         stock_codes = [normalize_stock_code(c) for c in stock_codes]
         if use_bulk:
@@ -2628,6 +2801,9 @@ class DataFetcherManager:
                     missing_codes.discard(code)
         
         if not missing_codes:
+            return result
+
+        if self.is_market_data_local_only():
             return result
         
         # 2. Attempt to fetch stock lists in capability-filtered priority order.
@@ -3381,6 +3557,60 @@ class DataFetcherManager:
             **blocks,
         }
 
+    def build_validation_rejected_fundamental_context(
+        self,
+        stock_code: str,
+        rejection: Any,
+    ) -> Dict[str, Any]:
+        """Build a typed upper-layer policy outcome without claiming provider failure."""
+        market = _market_tag(stock_code)
+        reason_codes = [
+            sanitize_diagnostic_text(code, max_length=96)
+            for code in getattr(rejection, "reason_codes", ())
+            if sanitize_diagnostic_text(code, max_length=96)
+        ][:24]
+        evidence = getattr(rejection, "evidence", None)
+        evidence_list = [dict(evidence)] if isinstance(evidence, dict) else []
+        source_chain = [
+            {
+                "provider": "data_validation",
+                "result": "rejected",
+                "duration_ms": 0,
+            }
+        ]
+        block_names = (
+            "valuation",
+            "growth",
+            "earnings",
+            "institution",
+            "capital_flow",
+            "dragon_tiger",
+            "boards",
+        )
+        blocks = {
+            block: self._build_fundamental_block(
+                "validation_rejected",
+                {},
+                source_chain,
+                reason_codes or ["data_validation_rejected"],
+            )
+            for block in block_names
+        }
+        return {
+            "market": market,
+            "status": "validation_rejected",
+            "data_quality": "rejected",
+            "coverage": {block: "validation_rejected" for block in block_names},
+            "source_chain": source_chain,
+            "errors": reason_codes or ["data_validation_rejected"],
+            "validation_rejection": {
+                "outcome": "rejected",
+                "reason_codes": reason_codes,
+            },
+            "data_quality_evidence": evidence_list,
+            **blocks,
+        }
+
     def get_fundamental_context(
         self,
         stock_code: str,
@@ -4069,6 +4299,7 @@ from .manager_parts import daily_source_health as _daily_source_health_module  #
 
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
     "plugin_registry",
+    "data_provider_runtime",
     "_assign_fetcher_static_order_locked",
     "_provider_priority",
     "_sort_fetchers_locked",

@@ -7,10 +7,11 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import ContextVar
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from data_provider.base import normalize_stock_code
+from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.analyzer import AnalysisResult
 from src.core.pipeline_stage_results import (
     PipelineStageName,
@@ -165,20 +166,50 @@ class _OrchestrationStageMixin:
             target_date = self._resolve_resume_target_date(
                 code, current_time=current_time
             )
+            from src.utils.indicator_periods import IndicatorPeriodConfig, periods_from_config
 
-            # Checkpoint resumption check: If the latest reusable data for a trading day already exists, skip it.
+            pipeline_config = getattr(self, "config", None)
+            indicator_periods = (
+                periods_from_config(pipeline_config)
+                if pipeline_config is not None
+                else IndicatorPeriodConfig()
+            )
+            required_bars = indicator_periods.max_required_trading_days
+            lookback_days = indicator_periods.required_history_calendar_days()
             if not force_refresh and self.db.has_today_data(code, target_date):
+                coverage_start = target_date - timedelta(days=lookback_days)
+                existing_bars = self.db.get_data_range(code, coverage_start, target_date)
+                existing_bar_count = 0 if existing_bars is None else len(existing_bars)
+
+                # Latest-date resumability is insufficient for long indicators:
+                # only skip when configured warmup coverage also exists.
+                if existing_bar_count >= required_bars:
+                    logger.info(
+                        "%s(%s) already has data for %s with %s/%s required bars; "
+                        "skipping fetch for resumability",
+                        stock_name,
+                        code,
+                        target_date,
+                        existing_bar_count,
+                        required_bars,
+                    )
+                    return True, None
                 logger.info(
-                    "%s(%s) already has data for %s; skipping fetch for resumability",
+                    "%s(%s) has target-date data but only %s/%s required bars; "
+                    "backfilling %s calendar days",
                     stock_name,
                     code,
-                    target_date,
+                    existing_bar_count,
+                    required_bars,
+                    lookback_days,
                 )
-                return True, None
 
             # Get data from data source.
             logger.info("%s(%s) fetching market data", stock_name, code)
-            df, source_name = self.fetcher_manager.get_daily_data(code, days=30)
+            df, source_name = self.fetcher_manager.get_daily_data(
+                code,
+                days=lookback_days,
+            )
 
             if df is None or df.empty:
                 return False, "获取数据为空"
@@ -195,6 +226,11 @@ class _OrchestrationStageMixin:
 
             return True, None
 
+        except __LocalDataMissingError__:
+            # Preserve the typed offline miss so API, CLI, and scheduler
+            # boundaries can surface actionable ranges without implying that a
+            # provider was attempted.
+            raise
         except Exception as e:  # broad-exception: fallback_recorded - Market-data failures are logged and returned as stage failure details.
             error_msg = f"获取/保存数据失败: {str(e)}"
             log_safe_exception(
@@ -482,6 +518,22 @@ class _OrchestrationStageMixin:
                     )
             return result
 
+        except __LocalDataMissingError__:
+            record_missing_pipeline_stages_as_skipped(
+                PIPELINE_STAGE_NAMES,
+                input_summary={"stock_code": code},
+                reason=__LocalDataMissingError__.error_code,
+            )
+            if analysis_event_started:
+                dispatch_analysis_event(
+                    "analysis.failed",
+                    task_id=effective_query_id,
+                    trace_id=effective_trace_id,
+                    stock_code=code,
+                    trigger_source=getattr(self, "query_source", None) or "system",
+                    error_code=__LocalDataMissingError__.error_code,
+                )
+            raise
         except Exception as e:  # broad-exception: fallback_recorded - Per-stock failures are safely logged so the batch can continue.
             # Capture all exceptions to ensure individual stock failure does not affect the overall result
             record_missing_pipeline_stages_as_skipped(
@@ -572,10 +624,27 @@ class _OrchestrationStageMixin:
         # Freeze the unified reference time for this round of running to avoid using the same stocks across market closing boundaries with different target trading days.
         resume_reference_time = current_time or datetime.now(timezone.utc)
 
+        local_only_checker = getattr(
+            self.fetcher_manager,
+            "is_market_data_local_only",
+            None,
+        )
+        local_only_market_data = bool(
+            callable(local_only_checker) and local_only_checker() is True
+        )
+
         # === Batch Pre-fetch Real-Time Quotes (Optimization: Avoid triggering full pull for each stock) ===
         # Pre-fetch only when the number of stocks is >= 5; query small amounts of stocks individually for efficiency.
-        if len(stock_codes) >= 5:
-            daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(stock_codes, days=30)
+        if len(stock_codes) >= 5 and not local_only_market_data:
+            from src.utils.indicator_periods import periods_from_config
+
+            daily_prefetch_days = periods_from_config(
+                self.config
+            ).required_history_calendar_days()
+            daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(
+                stock_codes,
+                days=daily_prefetch_days,
+            )
             if daily_prefetch_count > 0:
                 logger.info(
                     "[prefetch] component=daily_kline_prefetch action=complete "
@@ -594,7 +663,7 @@ class _OrchestrationStageMixin:
 
         # Issue #455: Pre-fetch stock names to avoid displaying "stockxxxxx" during concurrent analysis.
         # dry_run Just perform data retrieval, Do not fetch names, Avoid additional network overhead
-        if not dry_run:
+        if not dry_run and not local_only_market_data:
             self.fetcher_manager.prefetch_stock_names(stock_codes, use_bulk=False)
 
         # Single stock push mode (#55): Reads configuration
@@ -618,6 +687,7 @@ class _OrchestrationStageMixin:
             )
 
         results: List[AnalysisResult] = []
+        local_missing_errors: List[__LocalDataMissingError__] = []
 
         # Use thread pool for concurrent processing
         # Note: Set `max_workers` to a lower value (default 3) to avoid triggering anti-crawling.
@@ -673,6 +743,16 @@ class _OrchestrationStageMixin:
                         )
                         time.sleep(analysis_delay)
 
+                except __LocalDataMissingError__ as exc:
+                    local_missing_errors.append(exc)
+                    log_safe_exception(
+                        logger,
+                        "Local-only market data is incomplete",
+                        exc,
+                        error_code=exc.error_code,
+                        level=logging.WARNING,
+                        context={"stock_code": code},
+                    )
                 except Exception as e:  # broad-exception: fallback_recorded - Worker failures are safely logged and the remaining stock tasks continue.
                     log_safe_exception(
                         logger,
@@ -681,6 +761,12 @@ class _OrchestrationStageMixin:
                         error_code="pipeline_stock_task_failed",
                         context={"stock_code": code},
                     )
+
+        # Any local-only miss is a typed run failure. Raise before notification
+        # assembly so scheduled and CLI callers receive actionable coverage
+        # details instead of silently reporting a partial batch as complete.
+        if local_missing_errors:
+            raise local_missing_errors[0]
 
         # Statistics
         elapsed_time = time.time() - start_time

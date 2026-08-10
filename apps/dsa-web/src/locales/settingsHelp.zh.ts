@@ -358,6 +358,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 AlphaSift 适配层来源校验和显式修复安装。'],
     notes: ['请确认来源可信；AlphaSift 是实验性质选股能力，启用前应理解相关风险。'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom 新闻源',
+    summary: '可选的免费 RSS 或 Atom 订阅地址，作为按需新闻检索的补充来源。',
+    usage: '填写逗号分隔的 http(s) 订阅地址；留空则保持该能力不生效。拉取过程遵循 fail-closed 出站策略。',
+    valueNotes: [
+      '这是对 SearXNG 或付费搜索的补充，不能完全替代它们。',
+      '私有或回环主机需要在 OUTBOUND_HTTP_ALLOWLIST 中写精确条目。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制单源超时（1–30 秒，默认 8）。',
+    ],
+    impact: ['配置后会影响按需新闻检索的覆盖范围。'],
+    notes: ['单个订阅源失败不应阻断其余新闻链路。'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: '实时行情源优先级',
     summary: '配置多个实时行情源的尝试顺序。',
@@ -786,6 +798,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: '报告导出 PDF 字体路径',
+    summary: '选择可选 PDF 报告导出使用的单字体 TTF/OTF。',
+    usage: '仅在服务器存在覆盖报告全部可见字符的字体时填写绝对路径；留空则探测文档列出的系统候选。',
+    valueNotes: [
+      '显式无效路径会 fail-closed，不会回退到其他系统字体。',
+      '能力检查验证目标语言代表字符；每次导出还会再次验证该报告的精确字符集。',
+    ],
+    impact: ['只影响可选 PDF 导出；无损 Markdown 导出始终可用。'],
+    notes: [
+      '支持 TTF/OTF 单字体，不猜测 TTC 字体集合下标。',
+      '公共能力与错误响应不会暴露绝对路径或字体解析器原始错误。',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
+    ],
+  },
   'settings.system.USE_PROXY': {
     title: '启用本地代理',
     summary: '大陆用户友好开关：将 PROXY_HOST 与 PROXY_PORT 映射为进程级 http_proxy/https_proxy。',
@@ -1070,6 +1099,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: '多策略合议',
+    summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',
+    usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持 Phase-1 合成路径不变。',
+    valueNotes: [
+      '关闭时按字节级兼容保留既有合成行为。',
+      '开启后启用多策略合议与最终分歧说明。',
+    ],
+    impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
+    notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
+  },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
     summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
@@ -1113,16 +1153,27 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
-    usage: '开启后，full/specialist 模式中的风险 Agent 可将买入建议降级为观望或卖出。该保守覆写仍会自动生效，除非人工审批（/approvals）捕获了对应路径。',
+    usage: '控制 legacy 风险计划是否直接执行下调；不可关闭的 Risk Manager 最终动作仍会按 RISK_GATE_PROFILE 独立裁决。',
     valueNotes: [
-      '仅在 AGENT_ORCHESTRATOR_MODE 包含风险阶段时生效。',
+      '仅控制 legacy override；不能跳过最终动作裁决。',
       'HITL 风控绕过在 /approvals 默认关闭；在该页启用后，才可在限时窗口内一次性申请保留原始信号。',
     ],
     impact: ['影响最终投资建议的风险保守程度。'],
     notes: [
-      '关闭后风险 Agent 的意见仅作参考，不会否决决策。',
+      '关闭后 legacy override 不直接执行，但明确风险证据仍可能被最终动作裁决下调或拒绝。',
       '打开人工审批（/approvals）可配置默认关闭的 HITL 门禁。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: '风控经理档位',
+    summary: '选择最终建议发布前强制风控裁决的阈值档位。',
+    usage: 'balanced 为默认值；conservative 更早拒绝或下调，aggressive 仅在明确阻断证据下收紧。',
+    valueNotes: [
+      '支持 conservative、balanced、aggressive；非法值会阻止启动。',
+      '该闸门不可关闭；内部异常按 fail-closed 处理。',
+    ],
+    impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
+    notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
@@ -1231,6 +1282,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: '启用离线 OCR Agent 工具',
+    summary: '默认关闭的有界 Tesseract 文字提取。图片字节留在本机，但脱敏后的不可信文字会进入 Agent 上下文并可能发给远端模型；零远端出站需启用 LOCAL_ONLY_MODE。',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR 文件根目录',
+    summary: '单次打开普通图片的文件系统沙箱；拒绝越界路径、特殊文件、超限字节、解码像素与额外帧。',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR 语言',
+    summary: '用 + 连接的 Tesseract 语言码；默认 chi_sim+eng，需安装匹配的系统语言包。',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR 超时秒数',
+    summary: '1–120 秒的硬 wall-clock 上限；超时后终止并回收 OCR worker 及其子进程。',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1264,6 +1331,43 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['不同版本可能使用不同的评估算法或判定规则。'],
     impact: ['影响回测评估算法和结果。'],
     notes: ['除非明确要求切换版本，否则保持默认。'],
+  },
+  // ------------------------------------------------------------------
+  // 技术指标周期（Issue #172）
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: '均线周期',
+    summary: '趋势分析使用的均线周期列表（交易日，默认 5,10,20,60）。',
+    usage: '留空使用历史默认值。可追加 120/250 等长周期用于长线趋势。历史取数窗口会随最长周期自动放宽。',
+    valueNotes: [
+      '每个周期须为正整数，上限 500。',
+      '配置周期按真实 MA 标签写入 ma_by_period 与类型化指标快照。',
+      '可用 K 线不足时该均线返回空并标注数据不足，不会用更短周期静默顶替。',
+    ],
+    impact: ['影响趋势判定、乖离率、支撑判断与报告中的均线数值。'],
+    notes: ['在数据充足时，默认配置与改造前行为一致。'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD 周期',
+    summary: 'MACD 快线/慢线/信号线 EMA 周期（默认 12/26/9）。',
+    usage: 'INDICATOR_MACD_FAST 必须小于 INDICATOR_MACD_SLOW；信号线为 DEA 平滑周期。',
+    valueNotes: [
+      '标准设置为 12/26/9；更短周期更灵敏但噪声更大。',
+      '显式非法值在进程启动与 Settings 保存时都会按同一规则拒绝。',
+    ],
+    impact: ['影响 MACD DIF/DEA/柱体及综合评分中的 MACD 分量。'],
+    notes: ['除非有意更换 MACD 口径，否则保持默认。'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI 周期',
+    summary: 'RSI 周期列表（默认 6,12,24）。',
+    usage: '配置值按真实 RSI 标签输出；第二个值（仅配置一个时为第一个）用于超买超卖主判定。',
+    valueNotes: [
+      '周期须为正整数，上限 250。',
+      'RSI 使用 Wilder/SMMA 平滑，与告警路径 RSI 一致。',
+    ],
+    impact: ['影响 RSI 数值及趋势分析中的超买超卖评分。'],
+    notes: ['兼容字段 rsi_6/rsi_12/rsi_24 始终表示对应的真实历史周期，不按位置改名。'],
   },
   // ------------------------------------------------------------------
   // Report configuration

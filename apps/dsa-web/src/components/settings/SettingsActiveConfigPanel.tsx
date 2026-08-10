@@ -19,6 +19,9 @@ import {
   isNotificationChannelKey,
 } from './index';
 import { buildNotificationEventRoutes } from './notificationEventRoutes';
+import { AgentBehaviorPanel } from './AgentBehaviorPanel';
+import type { AgentModelSummary } from './AgentBehaviorPanel';
+import type { SettingsSaveStatus } from './autosaveMachine';
 
 export type FieldGroupDescriptor = {
   id: string;
@@ -49,8 +52,13 @@ export type SettingsActiveConfigPanelProps = {
   isSaving: boolean;
   issueByKey: Record<string, ConfigValidationIssue[]>;
   allValuesByKey: Record<string, string>;
+  persistedValuesByKey: Record<string, string>;
   alphasiftEnabled: boolean;
   setDraftValue: (key: string, value: string) => void;
+  applyPartialUpdate: (items: Array<{ key: string; value: string }>) => void;
+  resetDraftKeys: (keys: string[]) => void;
+  activeSaveStatus: SettingsSaveStatus;
+  agentModelSummary: AgentModelSummary;
   readOnlyDiagnosticForItem: (item: SystemConfigItem, categoryHint?: string) => string | undefined;
   activeCategory: string;
   /** Optional mask token so notification channel cards can run test-to-bind. */
@@ -85,8 +93,13 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   isSaving,
   issueByKey,
   allValuesByKey,
+  persistedValuesByKey,
   alphasiftEnabled,
   setDraftValue,
+  applyPartialUpdate,
+  resetDraftKeys,
+  activeSaveStatus,
+  agentModelSummary,
   readOnlyDiagnosticForItem,
   activeCategory,
   maskToken,
@@ -109,6 +122,15 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
     ? buildNotificationEventRoutes(allValuesByKey)
     : null;
 
+  // Agent Behavior (execution) gets preset-first progressive disclosure.
+  // Conversation still maps to category `agent` but only context keys —
+  // keep the generic grouped renderer there so compression fields stay flat.
+  const isAgentBehaviorPanel = activeCategory === 'agent'
+    && subFilteredItems.some((item) => {
+      const upper = item.key.toUpperCase();
+      return !upper.startsWith('AGENT_CONTEXT_') && !upper.startsWith('AGENT_EVENT_');
+    });
+
   const content = (
     <>
       {isNotificationChannelsSub ? (
@@ -128,6 +150,23 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           onChange={setDraftValue}
           issueByKey={issueByKey}
           configuredOverrides={{ alphasift: alphasiftEnabled }}
+        />
+      ) : isAgentBehaviorPanel ? (
+        <AgentBehaviorPanel
+          items={subFilteredItems}
+          disabled={isSaving}
+          onChange={setDraftValue}
+          onBatchChange={applyPartialUpdate}
+          onResetKeys={resetDraftKeys}
+          issueByKey={issueByKey}
+          draftValuesByKey={allValuesByKey}
+          persistedValuesByKey={persistedValuesByKey}
+          saveStatus={activeSaveStatus}
+          modelSummary={agentModelSummary}
+          fieldGroups={activeFieldGroupOrder ?? []}
+          fieldGroupIdOf={fieldGroupIdOf}
+          fieldGroupOrderOf={fieldGroupOrderOf}
+          readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
         />
       ) : activeFieldGroupOrder ? (
         <div className="space-y-4">

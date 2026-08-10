@@ -13,6 +13,8 @@ from api.v1.schemas.common import ErrorDetailsCompatibilityModel
 LLMCapabilityCheck = Literal["json", "tools", "vision", "stream"]
 GenerationBackendSmokeMode = Literal["text", "json"]
 GenerationBackendHealthStatus = Literal["not_tested", "passed", "failed", "skipped"]
+SchedulerProcessMode = Literal["serve", "desktop", "not_attached"]
+SchedulerRunOutcome = Literal["succeeded", "failed"]
 NotificationTestChannel = Literal[
     "wechat",
     "dingtalk",
@@ -36,6 +38,39 @@ class SystemConfigOption(BaseModel):
 
     label: str
     value: str
+
+
+class SchedulerStatusResponse(BaseModel):
+    """Authoritative status for this process's legacy day-batch scheduler."""
+
+    track: Literal["legacy_day_batch"]
+    enabled: bool
+    running: bool
+    attached: bool
+    process_mode: SchedulerProcessMode
+    schedule_timezone: str
+    run_now_available: bool
+    run_now_block_reason: Optional[str] = None
+    schedule_times: List[str] = Field(default_factory=list)
+    next_run_at: Optional[str] = None
+    last_run_at: Optional[str] = None
+    last_success_at: Optional[str] = None
+    last_error: Optional[str] = None
+    last_skipped_at: Optional[str] = None
+    last_skip_reason: Optional[str] = None
+    active_run_id: Optional[str] = None
+    last_run_id: Optional[str] = None
+    last_run_outcome: Optional[SchedulerRunOutcome] = None
+
+
+class SchedulerRunNowResponse(BaseModel):
+    """Acceptance and correlation data for one immediate scheduler run."""
+
+    accepted: bool
+    running: bool
+    reason: Optional[str] = None
+    run_id: Optional[str] = None
+    started_at: Optional[str] = None
 
 
 class SystemConfigDocLink(BaseModel):
@@ -201,7 +236,17 @@ class SystemConfigFieldSchema(BaseModel):
     key: str = Field(..., description="Configuration key name")
     title: Optional[str] = Field(None, description="Display title")
     description: Optional[str] = Field(None, description="Field description")
-    category: Literal["base", "data_source", "ai_model", "notification", "system", "agent", "backtest", "uncategorized"]
+    category: Literal[
+        "base",
+        "data_source",
+        "ai_model",
+        "notification",
+        "system",
+        "agent",
+        "backtest",
+        "indicators",
+        "uncategorized",
+    ]
     data_type: Literal["string", "integer", "number", "boolean", "array", "json", "time"]
     ui_control: Literal["text", "password", "number", "select", "textarea", "switch", "time"]
     is_sensitive: bool

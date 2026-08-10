@@ -22,6 +22,60 @@ const NON_TRANSLATABLE_PROPERTIES = new Set([
   'path',
 ]);
 
+/** Keep aligned with createUiLanguageRecord.ts SETTINGS_HELP_MAPS_NAMESPACE. */
+const SETTINGS_HELP_MAPS_NAMESPACE = 'locales.settingsHelp.SETTINGS_HELP_MAPS';
+
+/**
+ * Skip the settings-help `examples` container before array recursion.
+ * Array children do not retain the parent property name. Scope is SETTINGS_HELP_MAPS only.
+ * Keep predicate structure aligned with createUiLanguageRecord.shouldSkipSettingsHelpExamplesContainer.
+ */
+function shouldSkipSettingsHelpExamplesContainer(namespace, propertyName) {
+  return namespace === SETTINGS_HELP_MAPS_NAMESPACE && propertyName === 'examples';
+}
+
+function assertExampleLiteralArraysEqual(english, chinese, path) {
+  if (!Array.isArray(english) || !Array.isArray(chinese)) {
+    throw new Error(`Settings-help examples parity failed at ${path}: both sides must be arrays`);
+  }
+  if (english.length !== chinese.length) {
+    throw new Error(
+      `Settings-help examples parity failed at ${path}: length ${english.length} !== ${chinese.length}`,
+    );
+  }
+  english.forEach((item, index) => {
+    if (item !== chinese[index]) {
+      throw new Error(
+        `Settings-help examples parity failed at ${path}.${index}: English and Chinese literals must match byte-for-byte`,
+      );
+    }
+  });
+}
+
+/** Walk settings-help maps and enforce parity only on `examples` arrays. */
+function assertSettingsHelpExamplesParity(english, chinese, path = []) {
+  if (!english || typeof english !== 'object' || Array.isArray(english)) {
+    return;
+  }
+  if (!chinese || typeof chinese !== 'object' || Array.isArray(chinese)) {
+    return;
+  }
+
+  for (const [key, child] of Object.entries(english)) {
+    const nextPath = [...path, key];
+    if (key === 'examples') {
+      assertExampleLiteralArraysEqual(child, chinese[key], nextPath.join('.'));
+      continue;
+    }
+    assertSettingsHelpExamplesParity(child, chinese[key], nextPath);
+  }
+  if (Object.prototype.hasOwnProperty.call(chinese, 'examples')
+    && !Object.prototype.hasOwnProperty.call(english, 'examples')) {
+    throw new Error(
+      `Settings-help examples parity failed at ${[...path, 'examples'].join('.')}: present in Chinese only`,
+    );
+  }
+}
 const argumentsSet = new Set(process.argv.slice(2));
 const supportedArguments = new Set(['--write']);
 const unknownArguments = [...argumentsSet].filter((argument) => !supportedArguments.has(argument));
@@ -111,11 +165,18 @@ function flattenSourceRecords(records) {
       }
       if (value && typeof value === 'object') {
         for (const [key, child] of Object.entries(value)) {
+          if (shouldSkipSettingsHelpExamplesContainer(record.namespace, key)) {
+            // Parity is enforced below for SETTINGS_HELP_MAPS; do not inventory literals.
+            continue;
+          }
           visit(child, [...parts, key], key);
         }
       }
     }
 
+    if (record.namespace === SETTINGS_HELP_MAPS_NAMESPACE) {
+      assertSettingsHelpExamplesParity(record.en, record.zh);
+    }
     visit(record.en);
   }
 

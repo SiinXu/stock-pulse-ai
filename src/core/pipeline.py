@@ -29,6 +29,7 @@ from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT, get_config, Co
 from src.storage import get_db
 from data_provider import DataFetcherManager
 from data_provider.base import is_bse_code, normalize_stock_code
+from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from data_provider.realtime_types import ChipDistribution
 from src.analyzer import (
     GeminiAnalyzer,
@@ -236,6 +237,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         daily_market_context_allow_generate: bool = True,
         *,
         strict_skill_selection: bool = False,
+        data_fetcher_manager: Optional[DataFetcherManager] = None,
     ):
         """Initialize the analysis pipeline and its request-scoped services.
 
@@ -267,9 +269,22 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         
         # Initialize modules
         self.db = get_db()
-        self.fetcher_manager = DataFetcherManager()
+        if data_fetcher_manager is None:
+            from src.application_services import get_installed_application_services
+
+            application_services = get_installed_application_services()
+            if application_services is not None:
+                data_fetcher_manager = application_services.data_fetcher_manager
+        self.fetcher_manager = (
+            data_fetcher_manager
+            if data_fetcher_manager is not None
+            else DataFetcherManager()
+        )
         # No longer create akshare_fetcher separately, use fetcher_manager to get enhanced data
-        self.trend_analyzer = StockTrendAnalyzer()  # Technical analyzer
+        from src.utils.indicator_periods import periods_from_config
+
+        # Issue #172: inject configured MA/MACD/RSI periods (defaults preserve history).
+        self.trend_analyzer = StockTrendAnalyzer(periods=periods_from_config(self.config))
         self.analyzer = GeminiAnalyzer(
             config=self.config,
             skills=self.analysis_skills,
