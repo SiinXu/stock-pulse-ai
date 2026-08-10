@@ -243,8 +243,11 @@ beforeEach(() => {
   mockStartNewChat.mockReturnValue('session-new');
   mockSwitchSession.mockResolvedValue(true);
   mockStartStream.mockReset();
-  // Default stream outcome is backend acceptance so success-path context=active tests stay green.
-  mockStartStream.mockResolvedValue('completed');
+  mockStartStream.mockResolvedValue({
+    terminal: 'completed',
+    persistence: 'persisted',
+    turnId: 'turn-default',
+  });
 });
 
 describe('ChatPage', () => {
@@ -1421,7 +1424,11 @@ describe('ChatPage', () => {
         rawMessage: 'upstream disconnected',
         category: 'upstream_network',
       });
-      return 'failed';
+      return {
+        terminal: 'failed',
+        persistence: 'not_persisted',
+        turnId: 'turn-failed',
+      };
     });
 
     const router = createMemoryRouter(
@@ -1472,7 +1479,11 @@ describe('ChatPage', () => {
     });
 
     // User-abort shape: startStream resolves without lastFailedRequest (retry stays inert).
-    mockStartStream.mockImplementationOnce(async () => 'aborted');
+    mockStartStream.mockImplementationOnce(async () => ({
+      terminal: 'aborted',
+      persistence: 'not_persisted',
+      turnId: 'turn-aborted',
+    }));
 
     const router = createMemoryRouter(
       [{ path: '/chat', element: <ChatPage /> }],
@@ -1496,6 +1507,57 @@ describe('ChatPage', () => {
       });
       expect(params.context).toBeUndefined();
     });
+  });
+
+  it('marks unknown persistence without recreating a resendable draft on refresh', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 3,
+        queryId: 'q-3',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T10:00:00Z',
+      },
+      summary: {
+        analysisSummary: 'Stable',
+        operationAdvice: 'Hold',
+        trendPrediction: 'Range',
+        sentimentScore: 70,
+      },
+      strategy: {},
+    });
+    mockStartStream.mockResolvedValueOnce({
+      terminal: 'failed',
+      persistence: 'unknown',
+      turnId: 'turn-unknown',
+    });
+
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
+    );
+    const firstRender = render(<RouterProvider router={router} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    fireEvent.click(await getReadySendButton());
+    await waitFor(() => {
+      expect(new URLSearchParams(router.state.location.search).get('context'))
+        .toBe('unknown');
+      expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
+    });
+
+    const refreshEntry = `${router.state.location.pathname}${router.state.location.search}`;
+    firstRender.unmount();
+    const refreshedRouter = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: [refreshEntry] },
+    );
+    render(<RouterProvider router={refreshedRouter} />);
+
+    await screen.findByRole('heading', { name: '问股' });
+    expect(screen.queryByDisplayValue('请深入分析 Apple(AAPL)')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
   });
 
   it('finishes report context hydration after StrictMode replays mount effects', async () => {

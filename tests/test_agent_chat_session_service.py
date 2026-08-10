@@ -103,13 +103,14 @@ def test_all_invalid_nonempty_selection_uses_implicit_default_without_state() ->
 def test_session_detail_preserves_missing_persisted_state() -> None:
     db = DatabaseManager(db_url="sqlite:///:memory:")
     service = AgentChatSessionService(db)
-    db.save_conversation_message("legacy-session", "user", "legacy question")
+    session_id = "legacy-service-session"
+    db.save_conversation_message(session_id, "user", "legacy question")
 
     detail = service.get_session_detail(
-        "legacy-session",
+        session_id,
         limit=100,
     )
 
     assert [message["content"] for message in detail.messages] == ["legacy question"]
     assert detail.selected_skill_ids is None
-    assert db.get_conversation_session_selected_skill_ids("legacy-session") is None
+    assert db.get_conversation_session_selected_skill_ids(session_id) is None
