@@ -226,6 +226,16 @@ def _declare_optional_tools(
         )
 
 
+def get_installed_tool_registry():
+    """Return the process ToolRegistry only when it already exists.
+
+    Read-only observers must not construct a registry (or a composition root
+    used by optional tool factories) as a side effect of inventory capture.
+    """
+
+    return _TOOL_REGISTRY
+
+
 def get_tool_registry():
     """Return a cached ToolRegistry (built once, shared across requests)."""
     global _TOOL_REGISTRY
