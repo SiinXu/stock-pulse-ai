@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Wire range-aware local-first daily data into `DataFetcherManager` with fail-closed mode validation, bounded schema-v2 persistence, zero-provider `local_only` misses, `auto` stale-if-error, and `refresh` persistence (refs #178, #218, and #159 data scope).
 - [Fixed] Preserve local-only boundaries across batch prefetch, stock-name lookup, scheduled execution, asynchronous task errors, adjustment-aware persistence, legacy overlap ordering, provider health, and analysis OpenAPI responses.
+- [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, deterministic portfolio exposure/volatility/historical-loss thresholds, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
 - [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).

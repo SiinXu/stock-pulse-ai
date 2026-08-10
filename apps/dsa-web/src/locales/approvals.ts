@@ -52,9 +52,9 @@ export const APPROVALS_TEXT = createUiLanguageRecord('approvals.APPROVALS_TEXT',
     ruleDisabledTitle: '人工审批规则默认关闭',
     ruleDisabledMessage:
       '规则关闭时不会创建待审批事项，风控仍按既有路径自动应用保守覆写。启用本页开关并保存后，仅选中的 risk_veto / risk_downgrade 才会进入限时审批。',
-    riskOverrideTitle: '与 AGENT_RISK_OVERRIDE 的关系',
+    riskOverrideTitle: '与最终风控裁决的关系',
     riskOverrideMessage:
-      '当 AGENT_RISK_OVERRIDE 开启且既有风险计划 will_apply 时，系统仍会先走保守风控覆写；只有本页规则命中并成功完成一次性批准与消费后，才会保留原始、更激进的建议。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
+      '系统始终先执行不可关闭的 Risk Manager 最终动作裁决；只有本页规则命中并成功完成一次性批准与消费后，才会在记录审批 ID 的前提下保留原始、更激进的建议。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
     riskOverrideAction: '打开 Agent 行为设置',
     unavailableRule: '无法加载审批规则',
   },
@@ -109,9 +109,9 @@ export const APPROVALS_TEXT = createUiLanguageRecord('approvals.APPROVALS_TEXT',
     ruleDisabledTitle: 'Human approval rule is off by default',
     ruleDisabledMessage:
       'While the rule is disabled, no pending approvals are created and existing risk control still applies the conservative override automatically. Enable the switch on this page and save so only selected risk_veto / risk_downgrade categories enter the time-limited gate.',
-    riskOverrideTitle: 'How this relates to AGENT_RISK_OVERRIDE',
+    riskOverrideTitle: 'How this relates to the final risk decision',
     riskOverrideMessage:
-      'When AGENT_RISK_OVERRIDE is on and an existing risk plan will_apply, the system still applies the conservative risk override first. Only a matched rule on this page plus successful one-shot approval and consumption preserves the original, more aggressive recommendation. This is not broker or trade-order approval and does not expand Agent tool authority.',
+      'The mandatory Risk Manager final-action decision always runs first. Only a matched rule on this page plus successful one-shot approval and consumption preserves the original, more aggressive recommendation with an audited approval ID. This is not broker or trade-order approval and does not expand Agent tool authority.',
     riskOverrideAction: 'Open Agent Behavior settings',
     unavailableRule: 'Approval rule is unavailable',
   },
