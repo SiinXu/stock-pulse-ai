@@ -1093,5 +1093,32 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PORTFOLIO_STRESS_SCENARIOS_PATH": {
+        "title": "Portfolio Stress Scenario Catalog",
+        "description": (
+            "Optional local YAML file that adds or overrides bounded deterministic "
+            "portfolio stress scenarios. The last validated catalog remains active "
+            "when a later reload is invalid."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {"max_length": 1024},
+        "display_order": 62,
+        "help_key": "settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH",
+        "examples": ["PORTFOLIO_STRESS_SCENARIOS_PATH=./config/stress-scenarios.yaml"],
+        "docs": [
+            {
+                "label": "Portfolio stress testing",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/portfolio-stress-test_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required", "local_path"],
+    },
 
 }

@@ -400,6 +400,7 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+    portfolio_stress_scenarios_path: Optional[str] = None
 
     # Discord Bot status
     discord_bot_status: str = "A股智能分析 | /help"
@@ -473,6 +474,16 @@ class Config:
 
     def __post_init__(self) -> None:
         _log = logging.getLogger(__name__)
+        if (
+            self.portfolio_stress_scenarios_path is not None
+            and len(self.portfolio_stress_scenarios_path) > 1024
+        ):
+            raise ValueError("PORTFOLIO_STRESS_SCENARIOS_PATH exceeds 1024 characters")
+        from src.services.portfolio_stress_scenarios import activate_scenario_catalog
+
+        activate_scenario_catalog(
+            scenarios_path=self.portfolio_stress_scenarios_path
+        )
         # Market-data local-only intent must fail closed during application
         # configuration load, before any manager can enter a provider path.
         from data_provider.daily_cache import parse_market_data_fetch_mode
