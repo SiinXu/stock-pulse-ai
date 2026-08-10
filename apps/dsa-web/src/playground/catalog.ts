@@ -182,7 +182,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'market-review-region-selector', 'MarketReviewRegionSelector', 'components/market-review/MarketReviewRegionSelector.tsx', ['interactive', 'states']),
   entry('reports', 'deep-research-panel', 'DeepResearchPanel', 'components/chat/DeepResearchPanel.tsx', ['interactive', 'empty', 'error']),
   entry('reports', 'chat-composer', 'ChatComposer', 'components/chat/ChatComposer.tsx', ['default', 'loading', 'error']),
-  entry('reports', 'chat-send-feedback-alert', 'ChatSendFeedbackAlert', 'components/chat/ChatSendFeedback.tsx', ['success', 'error', 'empty']),
+  entry('reports', 'chat-send-feedback-alert', 'ChatSendFeedbackAlert', 'components/chat/ChatSendFeedback.tsx', ['states', 'error', 'empty']),
   entry('reports', 'chat-message-list', 'ChatMessageList', 'components/chat/ChatMessageList.tsx', ['default', 'loading', 'empty']),
   entry('reports', 'what-if-scenario-panel', 'WhatIfScenarioPanel', 'components/chat/WhatIfScenarioPanel.tsx', ['default', 'states', 'empty']),
   entry('reports', 'chat-session-sidebar', 'ChatSessionSidebar', 'components/chat/ChatSessionSidebar.tsx', ['default', 'loading', 'empty', 'error']),
