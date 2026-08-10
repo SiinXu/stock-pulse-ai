@@ -115,6 +115,10 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Reasoning-trace export (Issue #135) — default off ===
+    reasoning_trace_export_enabled: bool = False
+    reasoning_trace_export_max_chars: int = 500_000
+
     # === Daily brief with historical accuracy review (Issue #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
