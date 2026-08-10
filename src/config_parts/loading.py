@@ -29,6 +29,7 @@ from src.config_parts.parsers import (
     normalize_news_strategy_profile,
     parse_agent_context_compression_int,
     parse_env_bool,
+    parse_env_finite_float as _parse_env_finite_float,
     parse_env_float,
     parse_env_int,
     resolve_news_window_days,
@@ -629,6 +630,14 @@ class _ConfigLoadingMethods:
         if report_show_llm_model_raw is not None and not report_show_llm_model_raw.strip():
             report_show_llm_model = False
 
+        coingecko_api_plan = (os.getenv('COINGECKO_API_PLAN') or 'keyless').strip().lower()
+        if coingecko_api_plan not in {'keyless', 'demo', 'pro'}:
+            logger.warning(
+                "COINGECKO_API_PLAN=%r is invalid; falling back to keyless",
+                coingecko_api_plan,
+            )
+            coingecko_api_plan = 'keyless'
+
         # Import inside method body: _load_from_env is cloned into src.config globals.
         from src.config_parts.loading import _load_indicator_period_fields
 
@@ -648,6 +657,19 @@ class _ConfigLoadingMethods:
             tencent_priority=parse_env_int(os.getenv('TENCENT_PRIORITY'), 5, field_name='TENCENT_PRIORITY', minimum=0),
             finnhub_api_key=os.getenv('FINNHUB_API_KEY') or None,
             alphavantage_api_key=os.getenv('ALPHAVANTAGE_API_KEY') or None,
+            crypto_provider_enabled=parse_env_bool(
+                os.getenv('CRYPTO_PROVIDER_ENABLED'), default=False
+            ),
+            coingecko_api_key=os.getenv('COINGECKO_API_KEY') or None,
+            coingecko_api_plan=coingecko_api_plan,
+            coingecko_api_base=(os.getenv('COINGECKO_API_BASE') or '').strip() or None,
+            crypto_coingecko_priority=parse_env_int(
+                os.getenv('CRYPTO_COINGECKO_PRIORITY'),
+                10,
+                field_name='CRYPTO_COINGECKO_PRIORITY',
+                minimum=0,
+                maximum=99,
+            ),
             longbridge_app_key=os.getenv('LONGBRIDGE_APP_KEY') or None,
             longbridge_app_secret=os.getenv('LONGBRIDGE_APP_SECRET') or None,
             longbridge_access_token=os.getenv('LONGBRIDGE_ACCESS_TOKEN') or None,
@@ -1115,6 +1137,8 @@ class _ConfigLoadingMethods:
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
+            # SmartMoney money-flow (default off: zero extra network unless opted in)
+            smartmoney_enabled=os.getenv('SMARTMONEY_ENABLED', 'false').lower() == 'true',
             # Eastmoney API patch switch
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # Real-time quote data source priority:
@@ -1158,6 +1182,9 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=3650,
             ),
+            portfolio_stress_scenarios_path=(
+                os.getenv('PORTFOLIO_STRESS_SCENARIOS_PATH', '').strip() or None
+            ),
             portfolio_risk_concentration_alert_pct=parse_env_float(
                 os.getenv('PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT'),
                 35.0,
@@ -1189,6 +1216,83 @@ class _ConfigLoadingMethods:
                 minimum=1,
             ),
             portfolio_fx_update_enabled=os.getenv('PORTFOLIO_FX_UPDATE_ENABLED', 'true').lower() == 'true',
+            portfolio_health_weight_concentration=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION'),
+                0.25,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_risk_exposure=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE'),
+                0.25,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_diversification=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION'),
+                0.20,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_pnl=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_PNL'),
+                0.15,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_PNL',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_weight_cash_ratio=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO'),
+                0.15,
+                field_name='PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_concentration_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT'),
+                35.0,
+                field_name='PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_var_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_VAR_ALERT_PCT'),
+                5.0,
+                field_name='PORTFOLIO_HEALTH_VAR_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_diversification_alert=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT'),
+                0.35,
+                field_name='PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            portfolio_health_cash_low_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT'),
+                2.0,
+                field_name='PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_cash_high_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT'),
+                50.0,
+                field_name='PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT',
+                minimum=0.0,
+                maximum=100.0,
+            ),
+            portfolio_health_pnl_loss_alert_pct=_parse_env_finite_float(
+                os.getenv('PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT'),
+                -15.0,
+                field_name='PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT',
+                minimum=-100.0,
+                maximum=0.0,
+            ),
             alphasift_enabled=parse_env_bool(os.getenv('ALPHASIFT_ENABLED'), default=False),
             alphasift_install_spec=(
                 DEFAULT_ALPHASIFT_INSTALL_SPEC

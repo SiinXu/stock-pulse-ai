@@ -22,11 +22,12 @@ from .base import DataProvider
 
 _PROVIDER_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _CAPABILITY_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
-DATA_PROVIDER_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
+DATA_PROVIDER_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw", "crypto"})
 DATA_PROVIDER_CAPABILITY_METHODS = {
     "daily_data": "get_daily_data",
     "realtime_quote": "get_realtime_quote",
     "chip_distribution": "get_chip_distribution",
+    "money_flow": "get_money_flow",
     "stock_name": "get_stock_name",
     "stock_list": "get_stock_list",
     "belong_boards": "get_belong_board",

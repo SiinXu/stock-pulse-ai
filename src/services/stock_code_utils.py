@@ -117,6 +117,9 @@ def is_code_like(value: str) -> bool:
     text = value.strip().upper()
     if not text:
         return False
+    from data_provider.symbol_normalization import normalize_crypto_symbol
+    if normalize_crypto_symbol(value) is not None:
+        return True
     if text.isdigit() and len(text) in (4, 5, 6):
         return True
     if _strip_exchange_suffix(text) is not None:
@@ -138,6 +141,11 @@ def normalize_code(raw: str) -> Optional[str]:
     - Prefix format: SH600519, SH.600519, SZ000001, BJ920493, HK00700 (case-insensitive)
     - US ticker symbols: AAPL, TSLA
     """
+    from data_provider.symbol_normalization import normalize_crypto_symbol
+
+    crypto_symbol = normalize_crypto_symbol(raw)
+    if crypto_symbol is not None:
+        return crypto_symbol
     text = raw.strip().upper()
     if not text:
         return None
@@ -397,6 +405,12 @@ def canonicalize_analysis_stock_code(raw: str) -> Optional[str]:
     text = (raw or "").strip()
     if not text:
         return None
+
+    from data_provider.symbol_normalization import normalize_crypto_symbol
+
+    crypto_symbol = normalize_crypto_symbol(text)
+    if crypto_symbol is not None:
+        return crypto_symbol
 
     # A four-digit base is ambiguous with index-backed Japanese listings.
     # Resolve the index first; only an unresolved value takes the documented

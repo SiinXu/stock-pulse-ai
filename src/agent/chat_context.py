@@ -145,6 +145,12 @@ _CHAT_MARKET_FACTS: Dict[str, _MarketPromptFacts] = {
         "新台币汇率、三大法人、融资融券、当冲与 TWSE/TPEx 公告",
         "TWD FX, institutional flows, margin/day trading, and TWSE/TPEx filings",
     ),
+    "crypto": _MarketPromptFacts(
+        "USD",
+        "UTC (24x7)",
+        "UTC 日界线、滚动 24 小时成交额、流动性、托管与监管风险",
+        "UTC day boundaries, rolling-24h trading value, liquidity, custody, and regulatory risk",
+    ),
 }
 
 
