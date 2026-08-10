@@ -51,6 +51,10 @@ class TestSensitiveConfigKeyClassifier(unittest.TestCase):
         "ALPHAVANTAGE_API_KEY",
         "LLM_DEEPSEEK_API_KEY",
         "LLM_OPENROUTER_API_KEY",
+        # High-confidence markers must beat structural KEY_* exclusions
+        "SECRET_KEY_ID",
+        "PASSWORD_KEY_NAME",
+        "CREDENTIAL_KEY_VERSION",
     )
 
     _MUST_NOT_BE_SENSITIVE = (
@@ -77,6 +81,10 @@ class TestSensitiveConfigKeyClassifier(unittest.TestCase):
         "CRYPTO_PROVIDER_ENABLED",
         "PROVIDER_MARKET_DATA_MODE",
         "REPORT_MODE",
+        # Structural KEY labels without high-confidence secret markers
+        "API_KEY_VERSION",
+        "CACHE_KEY_ID",
+        "MAP_KEY_NAME",
     )
 
     def test_real_credential_keys_are_sensitive(self) -> None:
@@ -98,6 +106,25 @@ class TestSensitiveConfigKeyClassifier(unittest.TestCase):
                 )
                 self.assertFalse(_is_sensitive_key(key.upper()))
                 self.assertFalse(is_secret_config_key(key))
+
+    def test_high_confidence_markers_beat_structural_key_suffixes(self) -> None:
+        """SECRET/PASSWORD/CREDENTIAL must not be neutralized by _KEY_ID/_KEY_VERSION."""
+        for key in (
+            "SECRET_KEY_ID",
+            "PASSWORD_KEY_NAME",
+            "CREDENTIAL_KEY_VERSION",
+            "APP_SECRET_KEY_ID",
+        ):
+            with self.subTest(key=key):
+                self.assertTrue(is_sensitive_config_key_name(key), key)
+                self.assertTrue(is_secret_config_key(key), key)
+        for key in (
+            "API_KEY_VERSION",
+            "CACHE_KEY_ID",
+            "LLM_USAGE_HMAC_KEY_VERSION",
+        ):
+            with self.subTest(key=key):
+                self.assertFalse(is_sensitive_config_key_name(key), key)
 
     def test_empty_name_semantics(self) -> None:
         self.assertFalse(is_sensitive_config_key_name(""))

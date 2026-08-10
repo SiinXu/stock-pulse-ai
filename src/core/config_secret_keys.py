@@ -8,10 +8,14 @@ onboarding so secret-bearing names stay consistent without per-callsite drift.
 Rules (applied in order):
 1. Empty names are not classified here (callers decide fail-open vs fail-closed).
 2. Exact secret allowlist (known secret containers without KEY/TOKEN markers).
-3. Exact non-secret denylist and structural suffixes (token *counts*, public keys,
-   keywords, key version labels).
-4. Explicit secret suffixes (extra headers, install specs).
-5. Substring markers: KEY / TOKEN / SECRET / PASSWORD / PASSWD / CREDENTIAL.
+3. Exact non-secret denylist (registered structural fields).
+4. High-confidence secret markers (SECRET / PASSWORD / PASSWD / CREDENTIAL) win
+   over structural KEY/TOKEN quantity exclusions so names like SECRET_KEY_ID stay
+   secret-bearing.
+5. Structural non-secret suffixes/contains (token *counts*, public keys, keywords,
+   key version / name / id labels).
+6. Explicit secret suffixes (extra headers, install specs).
+7. Remaining substring markers: KEY / TOKEN.
 
 Registered field definitions may still override ``is_sensitive`` explicitly.
 """
@@ -73,12 +77,16 @@ _SECRET_SUFFIXES: Final[tuple[str, ...]] = (
     "_INSTALL_SPEC",
 )
 
-# Substring markers for credential-bearing env names.
-_SECRET_MARKERS: Final[tuple[str, ...]] = (
+# Always-sensitive markers: must beat structural KEY_* / token-count exclusions.
+_HIGH_CONFIDENCE_SECRET_MARKERS: Final[tuple[str, ...]] = (
     "SECRET",
     "PASSWORD",
     "PASSWD",
     "CREDENTIAL",
+)
+
+# Broader substring markers (after structural non-secret exclusions).
+_SECRET_MARKERS: Final[tuple[str, ...]] = (
     "TOKEN",
     "KEY",
 )
@@ -104,6 +112,9 @@ def is_sensitive_config_key_name(key: str | None) -> bool:
         return True
     if normalized in _NON_SECRET_EXACT:
         return False
+    # Credential containers always win over KEY_VERSION / KEY_ID style exclusions.
+    if any(marker in normalized for marker in _HIGH_CONFIDENCE_SECRET_MARKERS):
+        return True
     if _NON_SECRET_SUFFIX_RE.search(normalized):
         return False
     if any(fragment in normalized for fragment in _NON_SECRET_CONTAINS):
