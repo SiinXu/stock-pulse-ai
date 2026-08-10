@@ -4556,6 +4556,36 @@
         "title": "BacktestRunResponse",
         "type": "object"
       },
+      "BalancePoint": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "number"
+          },
+          "gain": {
+            "title": "Gain",
+            "type": "number"
+          },
+          "period": {
+            "minimum": 0.0,
+            "title": "Period",
+            "type": "integer"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          }
+        },
+        "required": [
+          "period",
+          "balance",
+          "total_contributed",
+          "gain"
+        ],
+        "title": "BalancePoint",
+        "type": "object"
+      },
       "BatchDuplicateTaskItem": {
         "description": "批量异步任务中的重复提交项。",
         "example": {
@@ -4915,6 +4945,20 @@
               }
             ],
             "title": "Skills"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S(?:.*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -4957,6 +5001,17 @@
           "success": {
             "title": "Success",
             "type": "boolean"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -4965,6 +5020,148 @@
           "session_id"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "CompoundGrowthRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "default": 0.0,
+            "description": "End-of-period contribution; negative values are withdrawals",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "CompoundGrowthRequest",
+        "type": "object"
+      },
+      "CompoundGrowthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "final_value": {
+            "title": "Final Value",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/BalancePoint"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "series_returned_points": {
+            "maximum": 241.0,
+            "minimum": 2.0,
+            "title": "Series Returned Points",
+            "type": "integer"
+          },
+          "series_sampled": {
+            "title": "Series Sampled",
+            "type": "boolean"
+          },
+          "series_stride": {
+            "minimum": 1.0,
+            "title": "Series Stride",
+            "type": "integer"
+          },
+          "series_total_points": {
+            "minimum": 2.0,
+            "title": "Series Total Points",
+            "type": "integer"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          },
+          "total_gain": {
+            "title": "Total Gain",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "principal",
+          "annual_rate",
+          "years",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "final_value",
+          "total_contributed",
+          "total_gain",
+          "series_total_points",
+          "series_returned_points",
+          "series_sampled",
+          "series_stride",
+          "series"
+        ],
+        "title": "CompoundGrowthResponse",
         "type": "object"
       },
       "ConfigComponentDiff": {
@@ -7897,6 +8094,260 @@
         "title": "DeleteHistoryResponse",
         "type": "object"
       },
+      "DemoAnalysisDetails": {
+        "properties": {
+          "news": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0,
+            "title": "News",
+            "type": "array"
+          },
+          "technical": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0,
+            "title": "Technical",
+            "type": "array"
+          }
+        },
+        "title": "DemoAnalysisDetails",
+        "type": "object"
+      },
+      "DemoAnalysisMeta": {
+        "properties": {
+          "change_pct": {
+            "title": "Change Pct",
+            "type": "null"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_price": {
+            "title": "Current Price",
+            "type": "null"
+          },
+          "model_used": {
+            "const": "demo-fixture/offline",
+            "title": "Model Used",
+            "type": "string"
+          },
+          "query_id": {
+            "const": "demo-sample-analysis-v1",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "report_language": {
+            "enum": [
+              "zh",
+              "en",
+              "ko"
+            ],
+            "title": "Report Language",
+            "type": "string"
+          },
+          "report_type": {
+            "const": "brief",
+            "title": "Report Type",
+            "type": "string"
+          },
+          "stock_code": {
+            "const": "600519",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Stock Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id",
+          "stock_code",
+          "stock_name",
+          "report_type",
+          "report_language",
+          "created_at",
+          "model_used"
+        ],
+        "title": "DemoAnalysisMeta",
+        "type": "object"
+      },
+      "DemoAnalysisReport": {
+        "properties": {
+          "details": {
+            "$ref": "#/components/schemas/DemoAnalysisDetails"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/DemoAnalysisMeta"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/DemoAnalysisStrategy"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DemoAnalysisSummary"
+          }
+        },
+        "required": [
+          "meta",
+          "summary",
+          "strategy",
+          "details"
+        ],
+        "title": "DemoAnalysisReport",
+        "type": "object"
+      },
+      "DemoAnalysisResponse": {
+        "description": "Offline sample analysis. Always ``is_sample=True``.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "is_sample": {
+            "const": true,
+            "default": true,
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "query_id": {
+            "const": "demo-sample-analysis-v1",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/DemoAnalysisReport"
+          },
+          "sample_banner": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Sample Banner",
+            "type": "string"
+          },
+          "sample_disclaimer": {
+            "maxLength": 800,
+            "minLength": 1,
+            "title": "Sample Disclaimer",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "stock_code": {
+            "const": "600519",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Stock Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sample_banner",
+          "sample_disclaimer",
+          "query_id",
+          "stock_code",
+          "stock_name",
+          "created_at",
+          "report"
+        ],
+        "title": "DemoAnalysisResponse",
+        "type": "object"
+      },
+      "DemoAnalysisStrategy": {
+        "properties": {
+          "ideal_buy": {
+            "title": "Ideal Buy",
+            "type": "null"
+          },
+          "secondary_buy": {
+            "title": "Secondary Buy",
+            "type": "null"
+          },
+          "stop_loss": {
+            "title": "Stop Loss",
+            "type": "null"
+          },
+          "take_profit": {
+            "title": "Take Profit",
+            "type": "null"
+          }
+        },
+        "title": "DemoAnalysisStrategy",
+        "type": "object"
+      },
+      "DemoAnalysisSummary": {
+        "properties": {
+          "action": {
+            "const": "watch",
+            "title": "Action",
+            "type": "string"
+          },
+          "action_label": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Action Label",
+            "type": "string"
+          },
+          "analysis_summary": {
+            "maxLength": 1200,
+            "minLength": 1,
+            "title": "Analysis Summary",
+            "type": "string"
+          },
+          "operation_advice": {
+            "maxLength": 800,
+            "minLength": 1,
+            "title": "Operation Advice",
+            "type": "string"
+          },
+          "sentiment_label": {
+            "enum": [
+              "中性",
+              "Neutral",
+              "중립"
+            ],
+            "title": "Sentiment Label",
+            "type": "string"
+          },
+          "sentiment_score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Sentiment Score",
+            "type": "integer"
+          },
+          "trend_prediction": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Trend Prediction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "analysis_summary",
+          "operation_advice",
+          "action",
+          "action_label",
+          "trend_prediction",
+          "sentiment_score",
+          "sentiment_label"
+        ],
+        "title": "DemoAnalysisSummary",
+        "type": "object"
+      },
       "DiscoverLLMChannelModelsRequest": {
         "description": "Request payload for discovering models from one LLM channel.",
         "properties": {
@@ -8260,6 +8711,132 @@
           }
         },
         "title": "ExtractItem",
+        "type": "object"
+      },
+      "FirstRunReadinessResponse": {
+        "description": "Zero-config first-run readiness snapshot (read-only; never mutates config).",
+        "properties": {
+          "beginner_mode_recommended": {
+            "title": "Beginner Mode Recommended",
+            "type": "boolean"
+          },
+          "config_mutated": {
+            "const": false,
+            "default": false,
+            "title": "Config Mutated",
+            "type": "boolean"
+          },
+          "demo_available": {
+            "const": true,
+            "default": true,
+            "title": "Demo Available",
+            "type": "boolean"
+          },
+          "existing_config_untouched": {
+            "const": true,
+            "default": true,
+            "title": "Existing Config Untouched",
+            "type": "boolean"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "has_primary_model": {
+            "title": "Has Primary Model",
+            "type": "boolean"
+          },
+          "is_fresh_environment": {
+            "title": "Is Fresh Environment",
+            "type": "boolean"
+          },
+          "local_runtime": {
+            "$ref": "#/components/schemas/LocalRuntimeSnapshot"
+          },
+          "primary_cta": {
+            "enum": [
+              "continue",
+              "open_local_setup",
+              "view_demo"
+            ],
+            "title": "Primary Cta",
+            "type": "string"
+          },
+          "primary_path": {
+            "enum": [
+              "configured",
+              "local_ollama",
+              "demo"
+            ],
+            "title": "Primary Path",
+            "type": "string"
+          },
+          "reason_code": {
+            "enum": [
+              "primary_model_configured",
+              "local_model_ready",
+              "local_runtime_no_models",
+              "local_detect_disabled",
+              "local_runtime_unavailable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reason_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 8,
+            "title": "Reason Params",
+            "type": "object"
+          },
+          "recommended_preset_id": {
+            "anyOf": [
+              {
+                "const": "local-first",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Preset Id"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "snapshot_id": {
+            "maxLength": 24,
+            "minLength": 24,
+            "pattern": "^[0-9a-f]+$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "suggested_profile": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 32,
+            "title": "Suggested Profile",
+            "type": "object"
+          }
+        },
+        "required": [
+          "is_fresh_environment",
+          "has_primary_model",
+          "beginner_mode_recommended",
+          "primary_path",
+          "primary_cta",
+          "reason_code",
+          "local_runtime",
+          "snapshot_id",
+          "generated_at"
+        ],
+        "title": "FirstRunReadinessResponse",
         "type": "object"
       },
       "GenerationBackendStatus": {
@@ -8767,6 +9344,107 @@
           "limit"
         ],
         "title": "HistoryListResponse",
+        "type": "object"
+      },
+      "HistorySearchItem": {
+        "description": "Low-sensitive report projection returned by command-palette search.",
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Report creation timestamp",
+            "title": "Created At"
+          },
+          "id": {
+            "description": "Analysis history record primary key",
+            "title": "Id",
+            "type": "integer"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persisted report type",
+            "title": "Report Type"
+          },
+          "stock_code": {
+            "description": "Persisted stock code",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persisted stock name",
+            "title": "Stock Name"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Truncated conclusion excerpt",
+            "title": "Summary"
+          }
+        },
+        "required": [
+          "id",
+          "stock_code"
+        ],
+        "title": "HistorySearchItem",
+        "type": "object"
+      },
+      "HistorySearchResponse": {
+        "description": "Bounded full-text search results for analysis history summaries.",
+        "properties": {
+          "items": {
+            "description": "Ranked matching history summaries",
+            "items": {
+              "$ref": "#/components/schemas/HistorySearchItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "description": "Maximum returned result count",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "description": "Normalized literal search query",
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "limit"
+        ],
+        "title": "HistorySearchResponse",
         "type": "object"
       },
       "ImportSystemConfigRequest": {
@@ -11563,6 +12241,86 @@
         "title": "LocalOnlyModeStatus",
         "type": "object"
       },
+      "LocalRuntimeSnapshot": {
+        "description": "Public, non-secret local-runtime detect projection.",
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "const": "ollama",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "detect_enabled": {
+            "default": true,
+            "title": "Detect Enabled",
+            "type": "boolean"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Models",
+            "type": "array"
+          },
+          "models_available": {
+            "default": false,
+            "title": "Models Available",
+            "type": "boolean"
+          },
+          "reachable": {
+            "default": false,
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "enum": [
+              "ollama_ready",
+              "ollama_no_models",
+              "detect_disabled",
+              "ollama_unreachable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "runnable": {
+            "default": false,
+            "title": "Runnable",
+            "type": "boolean"
+          },
+          "suggested_profile": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 32,
+            "title": "Suggested Profile",
+            "type": "object"
+          }
+        },
+        "required": [
+          "reason_code"
+        ],
+        "title": "LocalRuntimeSnapshot",
+        "type": "object"
+      },
       "LoginRequest": {
         "description": "Login request body. For first-time setup use password + password_confirm.",
         "properties": {
@@ -13117,6 +13875,119 @@
         "title": "PerformanceMetrics",
         "type": "object"
       },
+      "PluginHealthEntryResponse": {
+        "additionalProperties": false,
+        "description": "One plugin health row for operator diagnostics consumers.",
+        "properties": {
+          "desired_enabled": {
+            "title": "Desired Enabled",
+            "type": "boolean"
+          },
+          "extension_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Extension Points",
+            "type": "array"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "package_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Root"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "reloadable": {
+            "default": false,
+            "title": "Reloadable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "builtin",
+              "external"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "name",
+          "version",
+          "source",
+          "state",
+          "desired_enabled"
+        ],
+        "title": "PluginHealthEntryResponse",
+        "type": "object"
+      },
+      "PluginHealthResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/plugins/health — read-only plugin health snapshot.",
+        "properties": {
+          "generated_at": {
+            "description": "UTC ISO-8601 timestamp when the snapshot was built",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHealthEntryResponse"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generated_at",
+          "total"
+        ],
+        "title": "PluginHealthResponse",
+        "type": "object"
+      },
       "PluginInfo": {
         "additionalProperties": false,
         "description": "One registered plugin and its lifecycle state.",
@@ -13147,6 +14018,18 @@
             "description": "Stable plugin id from the manifest",
             "title": "Id",
             "type": "string"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable last lifecycle failure code when the plugin is degraded",
+            "title": "Last Error Code"
           },
           "name": {
             "title": "Name",
@@ -16324,6 +17207,1162 @@
         "title": "PortfolioTradeListResponse",
         "type": "object"
       },
+      "ReasoningTraceAgent": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceAgentEvent"
+            },
+            "maxItems": 200,
+            "title": "Events",
+            "type": "array"
+          },
+          "input_summary": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Summary"
+          },
+          "output_opinion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Opinion"
+          },
+          "role": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceToolCall"
+            },
+            "maxItems": 50,
+            "title": "Tool Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ReasoningTraceAgent",
+        "type": "object"
+      },
+      "ReasoningTraceAgentEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "title": "ReasoningTraceAgentEvent",
+        "type": "object"
+      },
+      "ReasoningTraceConclusion": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "maxLength": 1200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Summary"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "final_signal": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Signal"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 800,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "sentiment_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment Score"
+          }
+        },
+        "title": "ReasoningTraceConclusion",
+        "type": "object"
+      },
+      "ReasoningTraceConsensus": {
+        "additionalProperties": false,
+        "properties": {
+          "committee_status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committee Status"
+          },
+          "consensus_level": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Level"
+          }
+        },
+        "title": "ReasoningTraceConsensus",
+        "type": "object"
+      },
+      "ReasoningTraceCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "not_recorded": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Not Recorded",
+            "type": "array"
+          },
+          "notes": {
+            "maxLength": 500,
+            "title": "Notes",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceCoverageSource"
+            },
+            "maxItems": 16,
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "notes"
+        ],
+        "title": "ReasoningTraceCoverage",
+        "type": "object"
+      },
+      "ReasoningTraceCoverageSource": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "boolean"
+          },
+          "dropped_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropped Count"
+          },
+          "export_truncated": {
+            "default": false,
+            "title": "Export Truncated",
+            "type": "boolean"
+          },
+          "original_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Count"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Reasons",
+            "type": "array"
+          },
+          "returned_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Count"
+          },
+          "source": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "source_dropped_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dropped Count"
+          },
+          "source_truncated": {
+            "default": false,
+            "title": "Source Truncated",
+            "type": "boolean"
+          },
+          "source_truncated_unknown": {
+            "default": false,
+            "title": "Source Truncated Unknown",
+            "type": "boolean"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "supported",
+          "present",
+          "absent"
+        ],
+        "title": "ReasoningTraceCoverageSource",
+        "type": "object"
+      },
+      "ReasoningTraceDataQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Missing Fields",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "ReasoningTraceDataQuality",
+        "type": "object"
+      },
+      "ReasoningTraceDataSources": {
+        "additionalProperties": false,
+        "properties": {
+          "data_quality_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningTraceDataQuality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "llm_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceLlmRun"
+            },
+            "maxItems": 100,
+            "title": "Llm Runs",
+            "type": "array"
+          },
+          "pipeline_stage_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTracePipelineStage"
+            },
+            "maxItems": 100,
+            "title": "Pipeline Stage Runs",
+            "type": "array"
+          },
+          "provider_trace": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceProviderRun"
+            },
+            "maxItems": 100,
+            "title": "Provider Trace",
+            "type": "array"
+          }
+        },
+        "title": "ReasoningTraceDataSources",
+        "type": "object"
+      },
+      "ReasoningTraceDisagreement": {
+        "additionalProperties": false,
+        "properties": {
+          "conflict_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "conflict_severity": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Severity"
+          },
+          "consensus_level": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Level"
+          },
+          "opposing_skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Opposing Skills",
+            "type": "array"
+          },
+          "supporting_skills": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Supporting Skills",
+            "type": "array"
+          }
+        },
+        "title": "ReasoningTraceDisagreement",
+        "type": "object"
+      },
+      "ReasoningTraceExportResponse": {
+        "additionalProperties": false,
+        "description": "JSON export envelope for ``reasoning-trace-v1``.",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceAgent"
+            },
+            "maxItems": 200,
+            "title": "Agents",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ReasoningTraceCoverage"
+          },
+          "data_sources": {
+            "$ref": "#/components/schemas/ReasoningTraceDataSources"
+          },
+          "markdown": {
+            "anyOf": [
+              {
+                "maxLength": 2000000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markdown"
+          },
+          "run": {
+            "$ref": "#/components/schemas/ReasoningTraceRun"
+          },
+          "schema_version": {
+            "const": "reasoning-trace-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "synthesis": {
+            "$ref": "#/components/schemas/ReasoningTraceSynthesis"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "truncation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningTraceTruncation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "schema_version",
+          "run",
+          "coverage"
+        ],
+        "title": "ReasoningTraceExportResponse",
+        "type": "object"
+      },
+      "ReasoningTraceLlmRun": {
+        "additionalProperties": false,
+        "properties": {
+          "call_type": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Type"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/ReasoningTraceTokenUsage"
+          }
+        },
+        "title": "ReasoningTraceLlmRun",
+        "type": "object"
+      },
+      "ReasoningTracePipelineStage": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "ReasoningTracePipelineStage",
+        "type": "object"
+      },
+      "ReasoningTraceProviderRun": {
+        "additionalProperties": false,
+        "properties": {
+          "data_type": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Type"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "ReasoningTraceProviderRun",
+        "type": "object"
+      },
+      "ReasoningTraceRun": {
+        "additionalProperties": false,
+        "properties": {
+          "config_fingerprint": {
+            "maxLength": 16,
+            "minLength": 16,
+            "title": "Config Fingerprint",
+            "type": "string"
+          },
+          "exported_at": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Exported At",
+            "type": "string"
+          },
+          "lookup_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Key"
+          },
+          "lookup_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "primary_key",
+                  "latest_by_query_id"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Mode"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
+          },
+          "run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "run_id",
+          "config_fingerprint",
+          "exported_at"
+        ],
+        "title": "ReasoningTraceRun",
+        "type": "object"
+      },
+      "ReasoningTraceSynthesis": {
+        "additionalProperties": false,
+        "properties": {
+          "consensus": {
+            "$ref": "#/components/schemas/ReasoningTraceConsensus"
+          },
+          "disagreement": {
+            "$ref": "#/components/schemas/ReasoningTraceDisagreement"
+          },
+          "final_conclusion": {
+            "$ref": "#/components/schemas/ReasoningTraceConclusion"
+          }
+        },
+        "title": "ReasoningTraceSynthesis",
+        "type": "object"
+      },
+      "ReasoningTraceTokenUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "title": "ReasoningTraceTokenUsage",
+        "type": "object"
+      },
+      "ReasoningTraceToolCall": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ReasoningTraceToolCall",
+        "type": "object"
+      },
+      "ReasoningTraceTruncation": {
+        "additionalProperties": false,
+        "properties": {
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningTraceTruncationDrop"
+            },
+            "maxItems": 128,
+            "title": "Dropped",
+            "type": "array"
+          },
+          "marker": {
+            "const": "truncated",
+            "default": "truncated",
+            "title": "Marker",
+            "type": "string"
+          },
+          "max_chars": {
+            "minimum": 1.0,
+            "title": "Max Chars",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "max_chars"
+        ],
+        "title": "ReasoningTraceTruncation",
+        "type": "object"
+      },
+      "ReasoningTraceTruncationDrop": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "path": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "reason"
+        ],
+        "title": "ReasoningTraceTruncationDrop",
+        "type": "object"
+      },
       "ReportDetails": {
         "description": "报告详情区",
         "properties": {
@@ -16453,6 +18492,209 @@
           }
         },
         "title": "ReportDetails",
+        "type": "object"
+      },
+      "ReportExportCapabilitiesResponse": {
+        "description": "Language-aware export capabilities.",
+        "properties": {
+          "chart_handling": {
+            "const": "markdown_images_omitted_without_destinations",
+            "title": "Chart Handling",
+            "type": "string"
+          },
+          "formats": {
+            "$ref": "#/components/schemas/ReportExportFormats"
+          },
+          "office_formats_status": {
+            "const": "not_implemented",
+            "title": "Office Formats Status",
+            "type": "string"
+          },
+          "pdf_limits": {
+            "$ref": "#/components/schemas/ReportExportPdfLimits"
+          },
+          "requested_language": {
+            "enum": [
+              "en",
+              "zh",
+              "zh-TW",
+              "ja",
+              "ko"
+            ],
+            "title": "Requested Language",
+            "type": "string"
+          },
+          "supported_query_formats": {
+            "items": {
+              "enum": [
+                "md",
+                "pdf"
+              ],
+              "type": "string"
+            },
+            "title": "Supported Query Formats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formats",
+          "requested_language",
+          "supported_query_formats",
+          "office_formats_status",
+          "chart_handling",
+          "pdf_limits"
+        ],
+        "title": "ReportExportCapabilitiesResponse",
+        "type": "object"
+      },
+      "ReportExportFormatCapability": {
+        "description": "Readiness of one archive format without host filesystem details.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "dependency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency"
+          },
+          "dependency_installed": {
+            "title": "Dependency Installed",
+            "type": "boolean"
+          },
+          "dependency_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Version"
+          },
+          "font_validated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Validated"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "missing_glyph_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Glyph Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "dependency_missing",
+              "dependency_import_invalid",
+              "dependency_version_invalid",
+              "legacy_namespace_conflict",
+              "configured_font_invalid",
+              "font_not_found",
+              "font_invalid",
+              "font_empty_cmap",
+              "font_coverage_missing",
+              "font_smoke_failed",
+              "not_checked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "status",
+          "media_type",
+          "dependency_installed"
+        ],
+        "title": "ReportExportFormatCapability",
+        "type": "object"
+      },
+      "ReportExportFormats": {
+        "description": "Closed format map so generated clients expose both known keys.",
+        "properties": {
+          "md": {
+            "$ref": "#/components/schemas/ReportExportFormatCapability"
+          },
+          "pdf": {
+            "$ref": "#/components/schemas/ReportExportFormatCapability"
+          }
+        },
+        "required": [
+          "md",
+          "pdf"
+        ],
+        "title": "ReportExportFormats",
+        "type": "object"
+      },
+      "ReportExportPdfLimits": {
+        "description": "Deterministic synchronous PDF resource bounds.",
+        "properties": {
+          "max_concurrency": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Concurrency",
+            "type": "integer"
+          },
+          "max_input_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Input Bytes",
+            "type": "integer"
+          },
+          "max_output_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Output Bytes",
+            "type": "integer"
+          },
+          "max_pages": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Pages",
+            "type": "integer"
+          },
+          "max_render_seconds": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Render Seconds",
+            "type": "number"
+          },
+          "max_table_columns": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Table Columns",
+            "type": "integer"
+          },
+          "max_table_rows": {
+            "exclusiveMinimum": 0.0,
+            "title": "Max Table Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_input_bytes",
+          "max_pages",
+          "max_table_rows",
+          "max_table_columns",
+          "max_output_bytes",
+          "max_render_seconds",
+          "max_concurrency"
+        ],
+        "title": "ReportExportPdfLimits",
         "type": "object"
       },
       "ReportFieldDiff": {
@@ -18785,6 +21027,229 @@
         "title": "ScheduledTaskTodayResponse",
         "type": "object"
       },
+      "SchedulerRunNowResponse": {
+        "description": "Acceptance and correlation data for one immediate scheduler run.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "accepted",
+          "running"
+        ],
+        "title": "SchedulerRunNowResponse",
+        "type": "object"
+      },
+      "SchedulerStatusResponse": {
+        "description": "Authoritative status for this process's legacy day-batch scheduler.",
+        "properties": {
+          "active_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Run Id"
+          },
+          "attached": {
+            "title": "Attached",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Id"
+          },
+          "last_run_outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Outcome"
+          },
+          "last_skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skip Reason"
+          },
+          "last_skipped_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skipped At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "process_mode": {
+            "enum": [
+              "serve",
+              "desktop",
+              "not_attached"
+            ],
+            "title": "Process Mode",
+            "type": "string"
+          },
+          "run_now_available": {
+            "title": "Run Now Available",
+            "type": "boolean"
+          },
+          "run_now_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Now Block Reason"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "schedule_times": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schedule Times",
+            "type": "array"
+          },
+          "schedule_timezone": {
+            "title": "Schedule Timezone",
+            "type": "string"
+          },
+          "track": {
+            "const": "legacy_day_batch",
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "track",
+          "enabled",
+          "running",
+          "attached",
+          "process_mode",
+          "schedule_timezone",
+          "run_now_available"
+        ],
+        "title": "SchedulerStatusResponse",
+        "type": "object"
+      },
       "ScorecardBucket": {
         "properties": {
           "avg_return_pct": {
@@ -19248,6 +21713,17 @@
           "role": {
             "title": "Role",
             "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -19273,6 +21749,11 @@
           },
           "session_state": {
             "$ref": "#/components/schemas/SessionStateResponse"
+          },
+          "turn_identity_supported": {
+            "default": true,
+            "title": "Turn Identity Supported",
+            "type": "boolean"
           }
         },
         "required": [
@@ -20846,6 +23327,7 @@
               "system",
               "agent",
               "backtest",
+              "indicators",
               "uncategorized"
             ],
             "title": "Category",
@@ -21269,6 +23751,504 @@
           "message"
         ],
         "title": "SystemConfigValidationErrorResponse",
+        "type": "object"
+      },
+      "TargetContributionAlreadyMetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "principal_growth_meets_target",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "already_met",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code",
+          "contribution_per_period"
+        ],
+        "title": "TargetContributionAlreadyMetResponse",
+        "type": "object"
+      },
+      "TargetContributionOkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "contribution_required",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code",
+          "contribution_per_period"
+        ],
+        "title": "TargetContributionOkResponse",
+        "type": "object"
+      },
+      "TargetContributionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "TargetContributionRequest",
+        "type": "object"
+      },
+      "TargetContributionUnreachableResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "null"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "target_unreachable",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unreachable",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code"
+        ],
+        "title": "TargetContributionUnreachableResponse",
+        "type": "object"
+      },
+      "TargetDurationAlreadyMetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "const": 0,
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "principal_already_meets_target",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "already_met",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "maximum": 0.0,
+            "minimum": 0.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code",
+          "period_count",
+          "years"
+        ],
+        "title": "TargetDurationAlreadyMetResponse",
+        "type": "object"
+      },
+      "TargetDurationOkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "minimum": 1.0,
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "duration_solved",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code",
+          "period_count",
+          "years"
+        ],
+        "title": "TargetDurationOkResponse",
+        "type": "object"
+      },
+      "TargetDurationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "description": "End-of-period contribution; negative values are withdrawals",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period"
+        ],
+        "title": "TargetDurationRequest",
+        "type": "object"
+      },
+      "TargetDurationUnreachableResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "null"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "enum": [
+              "non_positive_trajectory",
+              "max_years_exceeded",
+              "target_unreachable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unreachable",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "null"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code"
+        ],
+        "title": "TargetDurationUnreachableResponse",
         "type": "object"
       },
       "TaskAccepted": {
@@ -22600,7 +25580,11 @@
           },
           "report_language": {
             "default": "zh",
-            "description": "zh | en | ko | ja",
+            "enum": [
+              "zh",
+              "en",
+              "ko"
+            ],
             "title": "Report Language",
             "type": "string"
           },
@@ -23094,6 +26078,425 @@
         ],
         "title": "WatchlistResponse",
         "type": "object"
+      },
+      "WatchlistScoreFactor": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "analysis_sentiment",
+              "decision_signal"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 8,
+            "title": "Params",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "invalid_sentiment",
+                  "inactive_signal",
+                  "expired_signal",
+                  "incoherent_signal_source",
+                  "unknown_signal_action",
+                  "invalid_signal_confidence"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source": {
+            "$ref": "#/components/schemas/WatchlistScoreFactorSource"
+          },
+          "status": {
+            "enum": [
+              "applied",
+              "ignored"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "source"
+        ],
+        "title": "WatchlistScoreFactor",
+        "type": "object"
+      },
+      "WatchlistScoreFactorSource": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "formula_version": {
+            "const": "watchlist_score_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "maxLength": 24,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "source_report_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Report Id"
+          }
+        },
+        "required": [
+          "formula_version"
+        ],
+        "title": "WatchlistScoreFactorSource",
+        "type": "object"
+      },
+      "WatchlistScoreItem": {
+        "additionalProperties": false,
+        "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "maximum": 365000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days"
+          },
+          "analysis_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "degraded_reasons": {
+            "items": {
+              "enum": [
+                "invalid_sentiment",
+                "inactive_signal",
+                "expired_signal",
+                "incoherent_signal_source",
+                "unknown_signal_action",
+                "invalid_signal_confidence"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Degraded Reasons",
+            "type": "array"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreFactor"
+            },
+            "maxItems": 2,
+            "title": "Factors",
+            "type": "array"
+          },
+          "freshness": {
+            "default": "none",
+            "enum": [
+              "none",
+              "unknown",
+              "today",
+              "recent",
+              "stale_week",
+              "stale"
+            ],
+            "title": "Freshness",
+            "type": "string"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "enum": [
+              "scored",
+              "unanalyzed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "status"
+        ],
+        "title": "WatchlistScoreItem",
+        "type": "object"
+      },
+      "WatchlistScoreQueryCount": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreQueryCount",
+        "type": "object"
+      },
+      "WatchlistScoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "sort": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "score_desc",
+              "score_asc"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "stock_codes": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Stock Codes",
+            "type": "array"
+          }
+        },
+        "title": "WatchlistScoreRequest",
+        "type": "object"
+      },
+      "WatchlistScoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "disclaimer_key": {
+            "const": "watchlist_score.disclaimer",
+            "title": "Disclaimer Key",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "watchlist_score_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistScoreItem"
+            },
+            "maxItems": 200,
+            "title": "Items",
+            "type": "array"
+          },
+          "query_count": {
+            "$ref": "#/components/schemas/WatchlistScoreQueryCount"
+          },
+          "scoring_mode": {
+            "const": "aggregate_existing",
+            "title": "Scoring Mode",
+            "type": "string"
+          },
+          "sort": {
+            "enum": [
+              "manual",
+              "score_desc",
+              "score_asc"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "source_rows": {
+            "$ref": "#/components/schemas/WatchlistScoreSourceRows"
+          }
+        },
+        "required": [
+          "formula_version",
+          "scoring_mode",
+          "sort",
+          "items",
+          "query_count",
+          "source_rows",
+          "disclaimer_key"
+        ],
+        "title": "WatchlistScoreResponse",
+        "type": "object"
+      },
+      "WatchlistScoreSourceRows": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Analysis",
+            "type": "integer"
+          },
+          "signals": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "analysis",
+          "signals"
+        ],
+        "title": "WatchlistScoreSourceRows",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -23369,7 +26772,7 @@
     },
     "/api/v1/agent/chat/stream": {
       "post": {
-        "description": "Chat with the AI Agent, streaming progress via SSE.\nEach SSE event is a JSON object with a 'type' field:\n  - thinking: AI is deciding next action\n  - stage_start: an agent or orchestrator stage has begun\n  - stage_done: an agent or orchestrator stage finished\n  - tool_start: a tool call has begun\n  - tool_done: a tool call finished\n  - generating: final answer being generated\n  - pipeline_timeout: analysis stopped because the stage/pipeline budget expired\n  - pipeline_budget_skipped: analysis stopped before an unstarted stage\n    because the remaining budget was too low for useful work\n  - done: analysis complete, contains 'content' and 'success'\n  - error: error occurred, contains 'message'",
+        "description": "Chat with the AI Agent, streaming progress via SSE.\nEach SSE event is a JSON object with a 'type' field:\n  - thinking: AI is deciding next action\n  - stage_start: an agent or orchestrator stage has begun\n  - stage_done: an agent or orchestrator stage finished\n  - tool_start: a tool call has begun\n  - tool_done: a tool call finished\n  - generating: final answer being generated\n  - pipeline_timeout: analysis stopped because the stage/pipeline budget expired\n  - pipeline_budget_skipped: analysis stopped before an unstarted stage\n    because the remaining budget was too low for useful work\n  - turn_persisted: the identified user turn and request context are durable\n  - done: analysis complete, contains 'content' and 'success'\n  - error: error occurred, contains 'message'",
         "operationId": "agent_chat_stream_api_v1_agent_chat_stream_post",
         "requestBody": {
           "content": {
@@ -26241,6 +29644,230 @@
         ]
       }
     },
+    "/api/v1/calculators/compound-growth": {
+      "post": {
+        "description": "Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.",
+        "operationId": "postCompoundGrowth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompoundGrowthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompoundGrowthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Compound growth calculator",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-contribution": {
+      "post": {
+        "description": "Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetContribution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetContributionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "already_met": "#/components/schemas/TargetContributionAlreadyMetResponse",
+                      "ok": "#/components/schemas/TargetContributionOkResponse",
+                      "unreachable": "#/components/schemas/TargetContributionUnreachableResponse"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TargetContributionOkResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetContributionAlreadyMetResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetContributionUnreachableResponse"
+                    }
+                  ],
+                  "title": "Response Posttargetcontribution"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve contribution required to reach a target",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-duration": {
+      "post": {
+        "description": "Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetDuration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetDurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "already_met": "#/components/schemas/TargetDurationAlreadyMetResponse",
+                      "ok": "#/components/schemas/TargetDurationOkResponse",
+                      "unreachable": "#/components/schemas/TargetDurationUnreachableResponse"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TargetDurationOkResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetDurationAlreadyMetResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetDurationUnreachableResponse"
+                    }
+                  ],
+                  "title": "Response Posttargetduration"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve periods required to reach a target",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
     "/api/v1/config-profiles/export": {
       "get": {
         "description": "Export non-secret configuration as stockpulse-profile v1 YAML. Secret keys (API keys, tokens, passwords, extra headers) are never included.",
@@ -28571,6 +32198,130 @@
         ]
       }
     },
+    "/api/v1/history/export/capabilities": {
+      "get": {
+        "description": "Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.",
+        "operationId": "get_report_export_capabilities_api_v1_history_export_capabilities_get",
+        "parameters": [
+          {
+            "description": "Report language whose representative glyph set must be supported.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "default": "zh",
+              "description": "Report language whose representative glyph set must be supported.",
+              "enum": [
+                "en",
+                "zh",
+                "zh-TW",
+                "ja",
+                "ko"
+              ],
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExportCapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Available report export formats and dependency status"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report export capabilities",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/search": {
+      "get": {
+        "description": "Search stock code, stock name, report type, trend, summary, advice, and creation timestamp through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.",
+        "operationId": "search_history_api_v1_history_search_get",
+        "parameters": [
+          {
+            "description": "Literal search query",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Literal search query",
+              "maxLength": 100,
+              "minLength": 3,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum returned result count",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "Maximum returned result count",
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorySearchResponse"
+                }
+              }
+            },
+            "description": "Bounded history search results"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Search analysis history summaries",
+        "tags": [
+          "History"
+        ]
+      }
+    },
     "/api/v1/history/stocks": {
       "get": {
         "description": "返回历史记录中每只股票的最新一条分析摘要，不包含大盘复盘（code=MARKET）。",
@@ -28786,6 +32537,132 @@
           }
         },
         "summary": "获取历史报告运行诊断摘要",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/export": {
+      "get": {
+        "description": "Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.",
+        "operationId": "export_history_report_api_v1_history__record_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Export format: md (default) or pdf",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "md",
+              "description": "Export format: md (default) or pdf",
+              "enum": [
+                "md",
+                "pdf"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Exported report file"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid export format"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Report not found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Export resource limit exceeded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "PDF export capacity is busy"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Export or report generation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "PDF dependency, font, deadline, or render worker unavailable"
+          }
+        },
+        "summary": "Export a history report",
         "tags": [
           "History"
         ]
@@ -30781,6 +34658,97 @@
         ]
       }
     },
+    "/api/v1/onboarding/demo-analysis": {
+      "get": {
+        "description": "Returns a fixed offline sample analysis. Always is_sample=true with a visible sample banner. No network, LLM, or paid data is used.",
+        "operationId": "get_demo_analysis_api_v1_onboarding_demo_analysis_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "report_language",
+            "required": false,
+            "schema": {
+              "default": "zh",
+              "enum": [
+                "zh",
+                "en",
+                "ko"
+              ],
+              "title": "Report Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Offline sample analysis for zero-config first success",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
+    "/api/v1/onboarding/first-run": {
+      "get": {
+        "description": "Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (model setup vs offline demo). Never mutates configuration.",
+        "operationId": "get_first_run_readiness_api_v1_onboarding_first_run_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirstRunReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Zero-config first-run readiness (read-only)",
+        "tags": [
+          "Onboarding"
+        ]
+      }
+    },
     "/api/v1/onboarding/plan": {
       "post": {
         "description": "Rule-based plan generation is the default. When prefer_llm is true but no model is available, the response stays engine=rules with an honest llm_note (no fake AI).",
@@ -30915,7 +34883,7 @@
     },
     "/api/v1/plugins": {
       "get": {
-        "description": "Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.",
+        "description": "Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.",
         "operationId": "listPlugins",
         "responses": {
           "200": {
@@ -30945,6 +34913,43 @@
           }
         ],
         "summary": "List registered plugins and lifecycle state",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/health": {
+      "get": {
+        "description": "Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.",
+        "operationId": "getPluginHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Read-only plugin health snapshot",
         "tags": [
           "Plugins"
         ]
@@ -31035,6 +35040,16 @@
               }
             },
             "description": "Lifecycle operation failed unexpectedly"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable"
           }
         },
         "security": [
@@ -33522,6 +37537,142 @@
         "summary": "Delete trade event",
         "tags": [
           "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/reasoning-trace/{record_id}": {
+      "get": {
+        "description": "Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Supported credential and local-path classes are redacted; operators must still treat exports as sensitive.",
+        "operationId": "exportReasoningTrace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "json returns the package envelope; markdown returns text/markdown body",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "description": "json returns the package envelope; markdown returns text/markdown body",
+              "enum": [
+                "json",
+                "markdown"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "When format=json, also embed a redacted markdown companion field",
+            "in": "query",
+            "name": "include_markdown",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "When format=json, also embed a redacted markdown companion field",
+              "title": "Include Markdown",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasoningTraceExportResponse"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Strict JSON trace package or inert Markdown export"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export multi-agent reasoning trace for an analysis history record",
+        "tags": [
+          "ReasoningTrace"
         ]
       }
     },
@@ -37407,9 +41558,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Run Scheduler Now Api V1 System Scheduler Run Now Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerRunNowResponse"
                 }
               }
             },
@@ -37431,9 +41580,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Scheduler Status Api V1 System Scheduler Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerStatusResponse"
                 }
               }
             },
@@ -37549,6 +41696,68 @@
         "summary": "LLM token usage summary",
         "tags": [
           "Usage"
+        ]
+      }
+    },
+    "/api/v1/watchlist/scores": {
+      "post": {
+        "description": "Batch-aggregate AI-oriented watchlist scores from the latest analysis history and same-report, unexpired decision signals. Symbols without analysis history return status=unanalyzed with score=null (never a fabricated 0). Requests are limited to 200 unique market identities. Default sort=manual preserves the caller's order. No new LLM calls.",
+        "operationId": "scoreWatchlistSymbols",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Score aggregation failed"
+          }
+        },
+        "summary": "Score watchlist symbols from existing analysis",
+        "tags": [
+          "Watchlist"
         ]
       }
     },

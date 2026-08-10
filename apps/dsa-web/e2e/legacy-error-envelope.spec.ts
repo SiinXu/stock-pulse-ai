@@ -7,7 +7,7 @@ import { loginAsE2eAdmin } from './auth-fixture';
 const uiLanguageStorageKey = 'dsa.uiLanguage';
 
 test.describe('legacy error envelope compatibility', () => {
-  test('adapts a legacy-only top-level detail through the alert rules UI', async ({ page }) => {
+  test('localizes a legacy-only detail without exposing operator diagnostics', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await page.evaluate((key) => localStorage.setItem(key, 'en'), uiLanguageStorageKey);
 
@@ -39,13 +39,11 @@ test.describe('legacy error envelope compatibility', () => {
     await expect(alert.getByText('Operation conflict', { exact: true })).toBeVisible();
     await expect(alert.getByText('The data changed. Refresh and try again.', { exact: true })).toBeVisible();
 
-    const diagnostic = alert.locator('pre');
-    await expect(diagnostic).toBeHidden();
-    await alert.getByText('View details', { exact: true }).click();
-    await expect(diagnostic).toBeVisible();
-    await expect(diagnostic).toContainText('Legacy alert-rules diagnostic for operators only');
-    await expect(diagnostic).toContainText('legacy-alert-rules');
-    await expect(diagnostic).toContainText('legacy-detail-browser-acceptance');
-    await expect(diagnostic).toContainText('trace_id: trace-legacy-detail-e2e');
+    await expect(alert.getByText('View details', { exact: true })).toHaveCount(0);
+    await expect(alert.locator('pre')).toHaveCount(0);
+    await expect(alert).not.toContainText('Legacy alert-rules diagnostic for operators only');
+    await expect(alert).not.toContainText('legacy-alert-rules');
+    await expect(alert).not.toContainText('legacy-detail-browser-acceptance');
+    await expect(alert).not.toContainText('trace-legacy-detail-e2e');
   });
 });

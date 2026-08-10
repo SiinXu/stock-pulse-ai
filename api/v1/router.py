@@ -19,6 +19,7 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    calculators,
     config_profiles,
     decision_signals,
     health,
@@ -32,6 +33,8 @@ from api.v1.endpoints import (
     portfolio,
     portfolio_health,
     portfolio_risk_metrics,
+    reasoning_trace,
+    report_export,
     report_version_compare,
     scheduled_tasks,
     scorecard,
@@ -40,6 +43,7 @@ from api.v1.endpoints import (
     stocks,
     system_config,
     usage,
+    watchlist_scores,
     watchlist_groups,
 )
 
@@ -77,6 +81,14 @@ router.include_router(
     tags=["History"]
 )
 
+# Report export (Markdown / optional PDF). Same /history prefix; static
+# /export/capabilities is registered before /{record_id}/export inside the module.
+router.include_router(
+    report_export.router,
+    prefix="/history",
+    tags=["History"],
+)
+
 router.include_router(
     report_version_compare.router,
     prefix="/report-version-compare",
@@ -87,6 +99,13 @@ router.include_router(
     stocks.router,
     prefix="/stocks",
     tags=["Stocks"]
+)
+
+
+router.include_router(
+    watchlist_scores.router,
+    prefix="/watchlist",
+    tags=["Watchlist"],
 )
 
 router.include_router(
@@ -129,6 +148,12 @@ router.include_router(
     portfolio_health.router,
     prefix="/portfolio",
     tags=["Portfolio"]
+)
+
+router.include_router(
+    calculators.router,
+    prefix="/calculators",
+    tags=["Calculators"],
 )
 
 router.include_router(
@@ -183,6 +208,12 @@ router.include_router(
     security_audit.router,
     prefix="/security",
     tags=["SecurityAudit"],
+)
+
+router.include_router(
+    reasoning_trace.router,
+    prefix="/reasoning-trace",
+    tags=["ReasoningTrace"],
 )
 
 router.include_router(

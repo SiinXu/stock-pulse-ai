@@ -34,6 +34,16 @@ def parse_env_bool(value: Optional[str], default: bool = False) -> bool:
     return normalized not in _FALSEY_ENV_VALUES
 
 
+def parse_risk_gate_profile(value: Optional[str]) -> str:
+    """Parse the mandatory risk profile and reject unsafe configuration drift."""
+    normalized = str(value or "balanced").strip().lower()
+    if normalized not in {"conservative", "balanced", "aggressive"}:
+        raise ValueError(
+            "RISK_GATE_PROFILE must be one of: conservative, balanced, aggressive"
+        )
+    return normalized
+
+
 def parse_env_int(
     value: Optional[str],
     default: int,

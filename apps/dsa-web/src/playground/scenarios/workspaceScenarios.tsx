@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
@@ -13,6 +13,8 @@ import {
   type HomeWatchlistRow,
   type HomeWorkspaceTab,
 } from '../../components/watchlist/HomeStockWorkspace';
+import { WatchlistScoreColumn } from '../../components/watchlist/WatchlistScoreColumn';
+import type { WatchlistScoreItem } from '../../types/watchlistScore';
 import { HomeWatchlistGroupsSection } from '../../components/watchlist/HomeWatchlistGroupsSection';
 import { WatchlistGroupsPanel } from '../../components/watchlist/WatchlistGroupsPanel';
 import { createParsedApiError } from '../../api/error';
@@ -20,8 +22,11 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
+import {
+  DEFAULT_ONBOARDING_PROFILE,
+  type OnboardingPlan,
+} from '../../types/onboarding';
 import type { WatchlistGroup } from '../../types/watchlist';
-import { DEFAULT_ONBOARDING_PROFILE, type OnboardingPlan } from '../../types/onboarding';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
 import { usePlaygroundScenario } from '../scenarioContext';
@@ -31,6 +36,13 @@ const useSamples = () => {
   const { language } = useUiLanguage();
   return PLAYGROUND_TEXT[language].samples;
 };
+
+const LazyZeroConfigFirstRunPanelStory = lazy(async () => {
+  const module = await import('./zeroConfigFirstRunScenario');
+  return { default: module.ZeroConfigFirstRunPanelStory };
+});
+
+const ZeroConfigFirstRunPanelStory = () => <LazyZeroConfigFirstRunPanelStory />;
 
 const StockAutocompleteStory = () => {
   const text = useSamples();
@@ -340,6 +352,87 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
+const scoredFixture: WatchlistScoreItem = {
+  stockCode: '600519',
+  status: 'scored',
+  score: 72,
+  asOf: '2026-08-08T09:00:00+00:00',
+  ageDays: 1,
+  analysisId: 5,
+  operationAdvice: 'Buy',
+  freshness: 'recent',
+  degradedReasons: [],
+  factors: [
+    {
+      key: 'analysis_sentiment',
+      status: 'applied',
+      value: 72,
+      params: { operationAdvice: 'Buy', reportType: 'detailed' },
+      reason: null,
+      source: {
+        id: 5,
+        sourceReportId: 5,
+        profile: null,
+        asOf: '2026-08-08T09:00:00+00:00',
+        expiresAt: null,
+        formulaVersion: 'watchlist_score_v1',
+      },
+    },
+    {
+      key: 'decision_signal',
+      status: 'applied',
+      value: 'buy',
+      params: { confidence: 0.8, profile: 'balanced' },
+      reason: null,
+      source: {
+        id: 8,
+        sourceReportId: 5,
+        profile: 'balanced',
+        asOf: '2026-08-08T10:00:00+00:00',
+        expiresAt: '2026-08-10T10:00:00+00:00',
+        formulaVersion: 'watchlist_score_v1',
+      },
+    },
+  ],
+};
+
+const unanalyzedFixture: WatchlistScoreItem = {
+  stockCode: 'AAPL',
+  status: 'unanalyzed',
+  score: null,
+  asOf: null,
+  ageDays: null,
+  analysisId: null,
+  operationAdvice: null,
+  factors: [],
+  freshness: 'none',
+  degradedReasons: [],
+};
+
+const WatchlistScoreColumnStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return (
+      <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreColumn item={unanalyzedFixture} />
+      </div>
+    );
+  }
+  if (scenario === 'interactive') {
+    return (
+      <div className="max-w-sm space-y-3 rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreColumn item={scoredFixture} expanded />
+        <WatchlistScoreColumn item={unanalyzedFixture} />
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+      <WatchlistScoreColumn item={scoredFixture} />
+    </div>
+  );
+};
+
 export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'stock-autocomplete': StockAutocompleteStory,
   'suggestions-list': SuggestionsListStory,
@@ -351,4 +444,6 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
+  'zero-config-first-run-panel': ZeroConfigFirstRunPanelStory,
+  'watchlist-score-column': WatchlistScoreColumnStory,
 };

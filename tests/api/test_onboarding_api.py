@@ -127,3 +127,34 @@ def test_invalid_profile_returns_400(client) -> None:
     body = resp.json()
     detail = body.get("detail") or body
     assert "onboarding_profile_invalid" in str(detail) or detail.get("error") == "onboarding_profile_invalid"
+
+
+def test_first_run_and_demo_analysis_endpoints(client) -> None:
+    test_client, _env_path = client
+    readiness = test_client.get("/api/v1/onboarding/first-run")
+    assert readiness.status_code == 200, readiness.text
+    body = readiness.json()
+    assert body["schema_version"] == 1
+    assert body["demo_available"] is True
+    assert body["config_mutated"] is False
+    assert body["existing_config_untouched"] is True
+    assert body["primary_path"] in {"configured", "local_ollama", "demo"}
+    assert body["primary_cta"] in {"continue", "open_local_setup", "view_demo"}
+    assert len(body["snapshot_id"]) == 24
+    assert "headline" not in body
+    assert "local_runtime" in body
+    assert set(body["local_runtime"]) >= {"reachable", "models_available", "runnable", "reason_code"}
+
+    demo = test_client.get("/api/v1/onboarding/demo-analysis", params={"report_language": "en"})
+    assert demo.status_code == 200, demo.text
+    demo_body = demo.json()
+    assert demo_body["is_sample"] is True
+    assert demo_body["stock_code"] == "600519"
+    assert demo_body["sample_banner"]
+
+    korean = test_client.get("/api/v1/onboarding/demo-analysis", params={"report_language": "ko"})
+    assert korean.status_code == 200, korean.text
+    assert korean.json()["report"]["meta"]["report_language"] == "ko"
+
+    unsupported = test_client.get("/api/v1/onboarding/demo-analysis", params={"report_language": "ja"})
+    assert unsupported.status_code == 422

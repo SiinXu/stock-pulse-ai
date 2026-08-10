@@ -77,7 +77,8 @@ def test_real_client_validates_revisioned_response_contract(tmp_path: Path) -> N
     assert listed.status_code == 200
     payload = listed.json()
     assert payload["revision"] >= 1
-    assert datetime.fromisoformat(payload["groups"][0]["created_at"]).tzinfo is not None
+    created_at = payload["groups"][0]["created_at"].replace("Z", "+00:00")
+    assert datetime.fromisoformat(created_at).tzinfo is not None
 
     created = client.post(
         "/api/v1/stocks/watchlist/groups",
