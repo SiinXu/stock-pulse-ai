@@ -1230,6 +1230,33 @@ def test_persisted_explicit_comparison_clears_stale_process_stock_cache() -> Non
     assert session.context == {}
 
 
+def test_conversation_recovers_report_context_from_identified_user_turn() -> None:
+    db = MagicMock()
+    db.get_visible_conversation_messages.return_value = [
+        {
+            "id": 1,
+            "role": "user",
+            "content": "continue with valuation",
+            "turn_id": "turn-report",
+            "context": {
+                "stock_code": "AAPL",
+                "stock_name": "Apple",
+                "report_language": "en",
+            },
+        },
+    ]
+    session = ConversationSession("report-context-session")
+
+    with patch("src.agent.conversation.get_db", return_value=db):
+        restored = session.get_market_context()
+
+    assert restored == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+        "report_language": "en",
+    }
+
+
 def test_conversation_replays_only_turns_newer_than_cached_context_anchor() -> None:
     db = MagicMock()
     db.get_visible_conversation_messages.return_value = [
@@ -2074,6 +2101,8 @@ def test_multi_agent_chat_synthesis_exception_preserves_verified_soul_failure(
             "multi-synthesis-failure",
             "compare AAPL and HK00700",
             None,
+            turn_id=None,
+            context={},
         ),
     ]
     assert add_message.call_args_list == [

@@ -36,7 +36,7 @@ test.describe('Shell global actions', () => {
     let palette = page.getByRole('dialog', { name: '快速前往' });
     await expect(palette).toBeVisible();
     await expect(palette.getByText('⌘K')).toHaveCount(0);
-    await palette.getByRole('button', { name: '开始分析' }).click();
+    await palette.getByRole('option', { name: '开始分析' }).click();
     await expect(page).toHaveURL(new RegExp(`${APP_ROUTE_PATHS.researchAnalysis}$`));
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -50,10 +50,12 @@ test.describe('Shell global actions', () => {
     await expect(drawer).toBeHidden();
     palette = page.getByRole('dialog', { name: '快速前往' });
     await expect(palette).toBeVisible();
-    await expect(palette.getByRole('searchbox', { name: '搜索页面或操作' })).toBeFocused();
+    await expect(
+      palette.getByRole('combobox', { name: '搜索股票、报告、页面或操作' }),
+    ).toBeFocused();
     await expect(page.locator('button[aria-label^="通知"]')).toHaveCount(1);
 
-    await palette.getByRole('button', { name: '运行大盘复盘' }).click();
+    await palette.getByRole('option', { name: '运行大盘复盘' }).click();
     await expect.poll(() => marketReviewRequests).toBe(1);
     await expect(page).toHaveURL(new RegExp(`${APP_ROUTE_PATHS.researchMarket}$`));
   });
