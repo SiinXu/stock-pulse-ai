@@ -24938,6 +24938,585 @@
         "title": "TestNotificationChannelResponse",
         "type": "object"
       },
+      "TodaysFocusAlertEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "const": "triggered",
+            "title": "Status",
+            "type": "string"
+          },
+          "trigger_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Trigger Id",
+            "type": "integer"
+          },
+          "type": {
+            "const": "alert",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "trigger_id",
+          "observed_at",
+          "status"
+        ],
+        "title": "TodaysFocusAlertEvidence",
+        "type": "object"
+      },
+      "TodaysFocusAnalysisEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "latest_action": {
+            "enum": [
+              "buy",
+              "sell",
+              "hold"
+            ],
+            "title": "Latest Action",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "previous_action": {
+            "enum": [
+              "buy",
+              "sell",
+              "hold"
+            ],
+            "title": "Previous Action",
+            "type": "string"
+          },
+          "previous_observed_at": {
+            "format": "date-time",
+            "title": "Previous Observed At",
+            "type": "string"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "type": {
+            "const": "analysis",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "record_id",
+          "observed_at",
+          "previous_observed_at",
+          "previous_action",
+          "latest_action"
+        ],
+        "title": "TodaysFocusAnalysisEvidence",
+        "type": "object"
+      },
+      "TodaysFocusCorporateEventEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Event Id",
+            "type": "string"
+          },
+          "href": {
+            "maxLength": 512,
+            "pattern": "^/[^/].*",
+            "title": "Href",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "type": {
+            "const": "corporate_event",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "event_id",
+          "observed_at",
+          "href"
+        ],
+        "title": "TodaysFocusCorporateEventEvidence",
+        "type": "object"
+      },
+      "TodaysFocusCostContract": {
+        "additionalProperties": false,
+        "properties": {
+          "alert_repository_calls": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Alert Repository Calls",
+            "type": "integer"
+          },
+          "analysis_history_repository_calls": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Analysis History Repository Calls",
+            "type": "integer"
+          },
+          "analysis_runs_triggered": {
+            "const": 0,
+            "title": "Analysis Runs Triggered",
+            "type": "integer"
+          },
+          "database_writes": {
+            "const": 0,
+            "title": "Database Writes",
+            "type": "integer"
+          },
+          "event_repository_calls": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Event Repository Calls",
+            "type": "integer"
+          },
+          "portfolio_repository_calls": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Portfolio Repository Calls",
+            "type": "integer"
+          },
+          "provider_calls": {
+            "const": 0,
+            "title": "Provider Calls",
+            "type": "integer"
+          },
+          "read_only": {
+            "const": true,
+            "title": "Read Only",
+            "type": "boolean"
+          },
+          "zero_extra_fetch": {
+            "const": true,
+            "title": "Zero Extra Fetch",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "alert_repository_calls",
+          "portfolio_repository_calls",
+          "analysis_history_repository_calls",
+          "event_repository_calls",
+          "database_writes",
+          "provider_calls",
+          "analysis_runs_triggered",
+          "zero_extra_fetch",
+          "read_only"
+        ],
+        "title": "TodaysFocusCostContract",
+        "type": "object"
+      },
+      "TodaysFocusItem": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "evidence": {
+            "discriminator": {
+              "mapping": {
+                "alert": "#/components/schemas/TodaysFocusAlertEvidence",
+                "analysis": "#/components/schemas/TodaysFocusAnalysisEvidence",
+                "corporate_event": "#/components/schemas/TodaysFocusCorporateEventEvidence"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TodaysFocusAlertEvidence"
+              },
+              {
+                "$ref": "#/components/schemas/TodaysFocusAnalysisEvidence"
+              },
+              {
+                "$ref": "#/components/schemas/TodaysFocusCorporateEventEvidence"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "priority": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "reason_code": {
+            "enum": [
+              "alert_triggered",
+              "corporate_event",
+              "analysis_reversal"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reason_display": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Reason Display",
+            "type": "string"
+          },
+          "secondary_reason_codes": {
+            "items": {
+              "enum": [
+                "alert_triggered",
+                "corporate_event",
+                "analysis_reversal"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Secondary Reason Codes",
+            "type": "array"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "reason_code",
+          "reason_display",
+          "priority",
+          "secondary_reason_codes",
+          "evidence"
+        ],
+        "title": "TodaysFocusItem",
+        "type": "object"
+      },
+      "TodaysFocusPresentationBoundary": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts_owned_by": {
+            "const": "signal_center",
+            "title": "Alerts Owned By",
+            "type": "string"
+          },
+          "duplicate_alert_ui": {
+            "const": false,
+            "title": "Duplicate Alert Ui",
+            "type": "boolean"
+          },
+          "focus_shows": {
+            "const": "prioritized_symbols_with_evidence_links",
+            "title": "Focus Shows",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alerts_owned_by",
+          "focus_shows",
+          "duplicate_alert_ui"
+        ],
+        "title": "TodaysFocusPresentationBoundary",
+        "type": "object"
+      },
+      "TodaysFocusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "cost_contract": {
+            "$ref": "#/components/schemas/TodaysFocusCostContract"
+          },
+          "degraded_sources": {
+            "items": {
+              "enum": [
+                "alerts",
+                "analysis_history",
+                "corporate_events",
+                "portfolio_position_cache"
+              ],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Degraded Sources",
+            "type": "array"
+          },
+          "empty_message": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Message"
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "source_unavailable",
+                  "no_fresh_deterministic_signals"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "item_count": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TodaysFocusItem"
+            },
+            "maxItems": 10,
+            "title": "Items",
+            "type": "array"
+          },
+          "max_items": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "pack_version": {
+            "const": "todays_focus/2.0",
+            "title": "Pack Version",
+            "type": "string"
+          },
+          "presentation_boundary": {
+            "$ref": "#/components/schemas/TodaysFocusPresentationBoundary"
+          },
+          "sources_used": {
+            "items": {
+              "enum": [
+                "alert",
+                "analysis",
+                "corporate_event",
+                "alerts",
+                "analysis_history",
+                "corporate_events"
+              ],
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Sources Used",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "temporal_policy": {
+            "$ref": "#/components/schemas/TodaysFocusTemporalPolicy"
+          },
+          "universe_contract": {
+            "$ref": "#/components/schemas/TodaysFocusUniverseContract"
+          }
+        },
+        "required": [
+          "pack_version",
+          "generated_at",
+          "status",
+          "max_items",
+          "item_count",
+          "items",
+          "sources_used",
+          "degraded_sources",
+          "temporal_policy",
+          "universe_contract",
+          "cost_contract",
+          "presentation_boundary"
+        ],
+        "title": "TodaysFocusResponse",
+        "type": "object"
+      },
+      "TodaysFocusTemporalPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "local_date": {
+            "format": "date",
+            "title": "Local Date",
+            "type": "string"
+          },
+          "missing_timestamp_policy": {
+            "const": "exclude",
+            "title": "Missing Timestamp Policy",
+            "type": "string"
+          },
+          "naive_timestamp_policy": {
+            "const": "assume_utc",
+            "title": "Naive Timestamp Policy",
+            "type": "string"
+          },
+          "non_trading_day_policy": {
+            "const": "same_local_day_only",
+            "title": "Non Trading Day Policy",
+            "type": "string"
+          },
+          "semantics": {
+            "const": "local_calendar_day",
+            "title": "Semantics",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date-time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "semantics",
+          "timezone",
+          "local_date",
+          "window_start",
+          "window_end",
+          "naive_timestamp_policy",
+          "missing_timestamp_policy",
+          "non_trading_day_policy"
+        ],
+        "title": "TodaysFocusTemporalPolicy",
+        "type": "object"
+      },
+      "TodaysFocusUniverseContract": {
+        "additionalProperties": false,
+        "properties": {
+          "hard_cap": {
+            "const": 1000,
+            "title": "Hard Cap",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "enum": [
+                "injected_evidences",
+                "portfolio_position_cache",
+                "request",
+                "watchlist_config"
+              ],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Sources",
+            "type": "array"
+          },
+          "symbol_count": {
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Symbol Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol_count",
+          "hard_cap",
+          "truncated",
+          "sources"
+        ],
+        "title": "TodaysFocusUniverseContract",
+        "type": "object"
+      },
       "ToolCapabilityItem": {
         "additionalProperties": false,
         "description": "Registered or owner-declared Agent tool observation.",
@@ -32087,6 +32666,112 @@
         "summary": "更新决策信号状态",
         "tags": [
           "DecisionSignals"
+        ]
+      }
+    },
+    "/api/v1/focus/today": {
+      "get": {
+        "description": "Fresh local-calendar-day evidence from the watchlist and persisted holdings cache. Hard-capped, read-only, and explicit about source degradation; never fetches market data, runs analysis, or replays portfolio state.",
+        "operationId": "getTodaysFocus",
+        "parameters": [
+          {
+            "description": "Hard cap for returned focus items (default 5, max 10)",
+            "in": "query",
+            "name": "max_items",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "Hard cap for returned focus items (default 5, max 10)",
+              "maximum": 10,
+              "minimum": 0,
+              "title": "Max Items",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional portfolio account id for the cached holdings universe",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional portfolio account id for the cached holdings universe",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "Reason display language (en/zh); defaults to report_language",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(en|zh)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reason display language (en/zh); defaults to report_language",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaysFocusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Focus aggregation failed"
+          }
+        },
+        "summary": "Get today's focus recommendations",
+        "tags": [
+          "TodaysFocus"
         ]
       }
     },
