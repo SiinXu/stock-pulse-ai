@@ -16630,9 +16630,26 @@
             "title": "Source",
             "type": "string"
           },
+          "source_dropped_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dropped Count"
+          },
           "source_truncated": {
             "default": false,
             "title": "Source Truncated",
+            "type": "boolean"
+          },
+          "source_truncated_unknown": {
+            "default": false,
+            "title": "Source Truncated Unknown",
             "type": "boolean"
           },
           "supported": {

@@ -140,9 +140,15 @@ class ReasoningTraceCoverageSource(_StrictTraceModel):
     present: bool
     absent: bool
     source_truncated: bool = False
+    # True when capture loss cannot be proven either way (legacy records written
+    # before the runtime recorded an agent_events capture marker).
+    source_truncated_unknown: bool = False
     export_truncated: bool = False
     original_count: Optional[int] = Field(default=None, ge=0)
     returned_count: Optional[int] = Field(default=None, ge=0)
+    # Capture-stage (upstream retention) loss, distinct from the total gap
+    # between original_count and what the response actually carries.
+    source_dropped_count: Optional[int] = Field(default=None, ge=0)
     dropped_count: Optional[int] = Field(default=None, ge=0)
     reasons: list[str] = Field(default_factory=list, max_length=16)
 

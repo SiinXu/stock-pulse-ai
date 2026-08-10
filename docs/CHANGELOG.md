@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
-- [Added] Opt-in reasoning-trace export (`REASONING_TRACE_EXPORT_ENABLED`, default off) with a strict finite `reasoning-trace-v1` contract, bounded redacted JSON/Markdown responses, completeness metadata, durable access audit, and `GET /api/v1/reasoning-trace/{record_id}` (Issue #135).
+- [Added] Opt-in reasoning-trace export (`REASONING_TRACE_EXPORT_ENABLED`, default off) with a strict finite `reasoning-trace-v1` contract, bounded redacted JSON/Markdown responses, preserved structural correlation identities, payload-reconciled coverage and loss accounting, resolved-identity lookup attribution, durable access audit, and `GET /api/v1/reasoning-trace/{record_id}` (Issue #135, Refs #212).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
 - [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.

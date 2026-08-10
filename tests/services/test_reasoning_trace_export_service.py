@@ -415,7 +415,14 @@ def test_source_retention_marker_is_preserved() -> None:
     )
     assert entry["source_truncated"] is True
     assert entry["original_count"] == 250
-    assert entry["dropped_count"] == 50
+    # Capture-stage retention loss is preserved verbatim from the marker.
+    assert entry["source_dropped_count"] == 50
+    # ...and total loss is accounted against what the response actually carries:
+    # only one event survived into the payload, so 249 of 250 are missing.
+    assert entry["returned_count"] == 1
+    assert entry["dropped_count"] == 249
+    assert entry["original_count"] - entry["returned_count"] == entry["dropped_count"]
+    assert entry["present"] is True
 
 
 def test_record_query_and_trace_identities_are_distinct() -> None:
@@ -509,3 +516,256 @@ def test_many_agent_budget_drops_keep_truncation_ledger_typed() -> None:
     assert len(result.to_json_text()) <= 10_000
     ReasoningTraceExportResponse.model_validate(result.package)
     assert len(result.package["truncation"]["dropped"]) <= 128
+
+
+# --- Merge-gate counterexample regressions (PR #975 four returned contracts) ---
+
+PROD_QUERY_ID = "9f2c1ab84e7d4f0b8c3a5d6e7f801234"
+PROD_TRACE_ID = "0123456789abcdef0123456789abcdef"
+
+
+def _coverage(package: Dict[str, Any], source: str) -> Dict[str, Any]:
+    return next(
+        item for item in package["coverage"]["sources"] if item["source"] == source
+    )
+
+
+def test_production_uuid_identities_survive_opaque_token_redaction() -> None:
+    """Blocker 1: 32-char UUID hex correlation ids must not become [REDACTED]."""
+    result = build_reasoning_trace_package(
+        run_id=PROD_TRACE_ID,
+        record_id="77",
+        query_id=PROD_QUERY_ID,
+        lookup_key=PROD_QUERY_ID,
+        lookup_mode="latest_by_query_id",
+        diagnostics={"trace_id": PROD_TRACE_ID, "query_id": PROD_QUERY_ID},
+        include_markdown=False,
+    )
+    run = result.package["run"]
+    assert run["query_id"] == PROD_QUERY_ID
+    assert run["trace_id"] == PROD_TRACE_ID
+    assert run["run_id"] == PROD_TRACE_ID
+    assert run["record_id"] == "77"
+    assert run["lookup_key"] == PROD_QUERY_ID
+    assert "[REDACTED]" not in json.dumps(run)
+    ReasoningTraceExportResponse.model_validate(result.package)
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [FAKE_PATH, FAKE_URL, "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlWFla"],
+)
+def test_identity_restoration_never_resurrects_credential_shapes(secret: str) -> None:
+    """Blocker 1 guard: identity preservation must not become a redaction bypass."""
+    result = build_reasoning_trace_package(
+        run_id=secret,
+        record_id="1",
+        query_id=secret,
+        lookup_key=secret,
+        diagnostics={"trace_id": secret},
+        include_markdown=False,
+    )
+    assert secret not in result.to_json_text()
+
+
+def test_budget_drop_updates_coverage_atomically() -> None:
+    """Blocker 2: a size-budget drop must not leave present/returned/dropped stale."""
+    events = [
+        {
+            "event_type": "agent.step",
+            "name": "n" * 300,
+            "status": "ok",
+            "attrs": {"agent": f"role{index % 3}"},
+        }
+        for index in range(150)
+    ]
+    provider_runs = [
+        {"provider": "p" * 60, "data_type": "d" * 60, "operation": "o" * 60, "status": "ok"}
+        for _ in range(100)
+    ]
+    result = build_reasoning_trace_package(
+        run_id="budget-run",
+        diagnostics={"agent_events": events, "provider_runs": provider_runs},
+        max_chars=10_000,
+        include_markdown=False,
+    )
+    package = result.package
+    assert len(result.to_json_text()) <= 10_000
+    assert package["data_sources"]["provider_trace"] == []
+    entry = _coverage(package, "diagnostics.provider_runs")
+    assert entry["present"] is False
+    assert entry["absent"] is True
+    assert entry["returned_count"] == 0
+    assert entry["dropped_count"] == 100
+    assert entry["export_truncated"] is True
+    events_entry = _coverage(package, "diagnostics.agent_events")
+    assert events_entry["present"] is False
+    assert events_entry["returned_count"] == 0
+
+
+def test_every_coverage_entry_matches_the_returned_payload() -> None:
+    """Blocker 2: count and presence invariants hold for every source."""
+    package = build_reasoning_trace_package(
+        run_id="invariant-run",
+        diagnostics=_source_payload()["diagnostics"],
+        raw_result=_source_payload().get("raw_result") or {"dashboard": {}},
+        include_markdown=False,
+    ).package
+    actual = {
+        "diagnostics.provider_runs": len(package["data_sources"]["provider_trace"]),
+        "diagnostics.llm_runs": len(package["data_sources"]["llm_runs"]),
+        "diagnostics.pipeline_stage_runs": len(package["data_sources"]["pipeline_stage_runs"]),
+        "diagnostics.agent_events": sum(
+            len(agent["events"]) for agent in package["agents"]
+        ),
+    }
+    for entry in package["coverage"]["sources"]:
+        assert entry["absent"] is not entry["present"]
+        if entry["source"] in actual:
+            assert entry["returned_count"] == actual[entry["source"]]
+            assert entry["present"] is bool(actual[entry["source"]])
+
+
+def test_value_clipping_is_recorded_in_the_loss_ledger() -> None:
+    """Blocker 2: _clip_text must never shrink content silently."""
+    result = build_reasoning_trace_package(
+        run_id="clip-run",
+        raw_result={"dashboard": {"core_conclusion": {"analysis_summary": "z" * 50_000}}},
+        include_markdown=False,
+    )
+    package = result.package
+    assert package["truncated"] is True
+    assert any(
+        drop["path"] == "dashboard.synthesis" and drop["reason"] == "value_clipped"
+        for drop in package["truncation"]["dropped"]
+    )
+
+
+def test_empty_source_does_not_claim_synthesis_coverage() -> None:
+    """Blocker 3: an empty raw_result must report absent, not a null container."""
+    package = build_reasoning_trace_package(
+        run_id="empty-run", raw_result={}, diagnostics={}, include_markdown=False
+    ).package
+    entry = _coverage(package, "dashboard.synthesis")
+    assert entry["present"] is False
+    assert entry["absent"] is True
+    assert package["synthesis"] == {
+        "disagreement": {},
+        "consensus": {},
+        "final_conclusion": {},
+    }
+
+
+def test_malformed_only_events_report_absent_with_loss() -> None:
+    """Blocker 3: malformed-only sources must not claim presence."""
+    package = build_reasoning_trace_package(
+        run_id="malformed-run",
+        diagnostics={"agent_events": ["not-a-mapping", 42, None]},
+        include_markdown=False,
+    ).package
+    entry = _coverage(package, "diagnostics.agent_events")
+    assert entry["present"] is False
+    assert entry["returned_count"] == 0
+    assert entry["export_truncated"] is True
+    assert "malformed_source_entries" in entry["reasons"]
+
+
+def test_legacy_record_at_capture_cap_reports_unknown_loss() -> None:
+    """Blocker 3: a marker-less record at the historic cap cannot prove no loss."""
+    events = [{"event_type": "agent.phase", "attrs": {"agent": "a"}} for _ in range(200)]
+    package = build_reasoning_trace_package(
+        run_id="legacy-run", diagnostics={"agent_events": events}, include_markdown=False
+    ).package
+    entry = _coverage(package, "diagnostics.agent_events")
+    assert entry["source_truncated_unknown"] is True
+    assert entry["original_count"] is None
+    assert entry["dropped_count"] is None
+    assert "legacy_capture_loss_unknown" in entry["reasons"]
+    ReasoningTraceExportResponse.model_validate(package)
+
+
+def test_current_marker_reports_exact_capture_loss() -> None:
+    """Blocker 3: the current runtime marker keeps exact, provable accounting."""
+    events = [{"event_type": "agent.phase", "attrs": {"agent": "a"}} for _ in range(200)]
+    package = build_reasoning_trace_package(
+        run_id="current-run",
+        diagnostics={
+            "agent_events": events,
+            "agent_events_capture": {
+                "original_count": 201,
+                "returned_count": 200,
+                "dropped_count": 1,
+                "truncated": True,
+            },
+        },
+        include_markdown=False,
+    ).package
+    entry = _coverage(package, "diagnostics.agent_events")
+    assert entry["source_truncated_unknown"] is False
+    assert entry["source_truncated"] is True
+    assert entry["original_count"] == 201
+    assert entry["source_dropped_count"] == 1
+
+
+def _export_with_resolver(requested: str, record: SimpleNamespace):
+    history = SimpleNamespace(
+        _resolve_record=lambda value: record,
+        _parse_diagnostic_json_field=lambda value, field: value,
+    )
+    return ReasoningTraceExportService(
+        history_service=history,
+        config=SimpleNamespace(reasoning_trace_export_enabled=True),
+    ).export_for_record(requested, include_markdown=False)
+
+
+def test_numeric_query_fallback_reports_actual_resolution_mode() -> None:
+    """Blocker 4: numeric key resolved via query fallback is not a primary_key hit."""
+    record = SimpleNamespace(
+        id=77,
+        query_id="123",
+        code="600519",
+        name="N",
+        model_used="m",
+        created_at=None,
+        context_snapshot={"diagnostics": {}},
+        raw_result={},
+    )
+    run = _export_with_resolver("123", record).package["run"]
+    assert run["lookup_key"] == "123"
+    assert run["record_id"] == "77"
+    assert run["lookup_mode"] == "latest_by_query_id"
+
+
+def test_numeric_primary_key_hit_still_reports_primary_key() -> None:
+    """Blocker 4: numeric PK/query collision must attribute to the primary key."""
+    record = SimpleNamespace(
+        id=123,
+        query_id="123",
+        code="600519",
+        name="N",
+        model_used="m",
+        created_at=None,
+        context_snapshot={"diagnostics": {}},
+        raw_result={},
+    )
+    run = _export_with_resolver("123", record).package["run"]
+    assert run["record_id"] == "123"
+    assert run["lookup_mode"] == "primary_key"
+
+
+def test_non_numeric_lookup_reports_query_mode() -> None:
+    """Blocker 4: string query ids keep the latest-by-query attribution."""
+    record = SimpleNamespace(
+        id=9,
+        query_id=PROD_QUERY_ID,
+        code="600519",
+        name="N",
+        model_used="m",
+        created_at=None,
+        context_snapshot={"diagnostics": {}},
+        raw_result={},
+    )
+    run = _export_with_resolver(PROD_QUERY_ID, record).package["run"]
+    assert run["record_id"] == "9"
+    assert run["query_id"] == PROD_QUERY_ID
+    assert run["lookup_mode"] == "latest_by_query_id"

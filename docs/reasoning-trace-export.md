@@ -37,12 +37,22 @@ OpenAPI 同时声明 `application/json` 与 `text/markdown` 的 200 响应，以
 
 - `run`：`record_id`、`query_id`、`trace_id`、`run_id`、标的、市场、模型、时间和非敏感配置指纹。
 - `agents`：有界的角色、输入摘要、工具调用、意见和事件摘要。
-- `synthesis`：分歧、共识和最终结论的有界投影；不复制任意嵌套的原始模型对象。
+- `synthesis`：分歧、共识和最终结论的有界投影；不复制任意嵌套的原始模型对象。容器只保留真实存在的值，空来源返回空容器，而不是一组 null。
 - `data_sources`：provider、LLM、pipeline stage 和数据质量的有界投影。
-- `coverage.sources`：逐来源的 `supported`、`present`、`absent`、`source_truncated`、`export_truncated`、原始/返回/丢弃数量与原因。
-- `truncation`：来源保留、投影上限、畸形输入或体积预算导致的每一项损失。
+- `coverage.sources`：逐来源的 `supported`、`present`、`absent`、`source_truncated`、`source_truncated_unknown`、`export_truncated`、`original_count`、`returned_count`、`source_dropped_count`、`dropped_count` 与原因。
+- `truncation`：来源保留、投影上限、值截断、畸形输入或体积预算导致的每一项损失。
 
-运行时诊断保留最近 200 个 Agent 事件，并持久化原始数、返回数和丢弃数。导出器对 Agent 事件、每 Agent 工具调用、provider/LLM/stage 列表分别应用有界投影；任何上限都必须显式反映在 coverage 与 truncation 中。
+### 身份语义
+
+`run.record_id` 是实际导出的不可变分析历史主键；`run.lookup_key` 是调用方请求的值；`run.lookup_mode` 报告的是**实际解析方式**，而不是字符串的解析结果：历史查找先尝试整数主键，再回退到按 `query_id` 取最新记录，因此一个并非主键的数字查找键会经回退解析，并被报告为 `latest_by_query_id`。安全审计的 attempt 记录针对请求的查找键，completion 记录针对解析出的不可变记录。
+
+结构化关联标识（`record_id`、`query_id`、`trace_id`、`run_id`、`lookup_key`）按严格的标识字符集校验后在脱敏中予以保留，使导出结果仍可与运行时日志和审计记录关联。该字符集不包含 `.` 与 `/`，因此 JWT 形态值、带凭据的 URL 和文件系统路径永远无法通过校验，仍会被脱敏。证据载荷始终脱敏。
+
+### 损失核算
+
+coverage 在每个返回路径（含体积预算的每一步）都与实际返回的载荷对账，并在响应发出前断言数量与存在性不变量。因预算被丢弃的来源会报告 `present=false`、`returned_count=0` 和完整的 `dropped_count`，不会遗留过时的 `present=true` 或原始 `returned_count`。值级截断、不支持项与畸形项都会记入 `truncation.dropped`，不会静默生效。`present` 由真实投影内容推导，空来源或仅含 null 的来源报告为 absent。
+
+运行时诊断保留最近 200 个 Agent 事件，并在 `agent_events_capture` 标记中持久化原始数、返回数和丢弃数。该标记出现之前写入的记录无法证明是否发生过捕获丢失：没有标记且事件数恰好等于历史上限 200 的记录，会报告 `source_truncated_unknown=true`、`original_count` 与 `dropped_count` 为 null，并附 `legacy_capture_loss_unknown` 原因，而不是宣称零丢失。`source_dropped_count` 表示捕获阶段的保留丢失，`dropped_count` 表示 `original_count` 与实际返回内容之间的总差额。导出器对 Agent 事件、每 Agent 工具调用、provider/LLM/stage 列表分别应用有界投影；任何上限都必须显式反映在 coverage 与 truncation 中。
 
 体积预算在投影、脱敏、严格序列化和可选 Markdown 嵌入之后执行。每个返回路径都会再次检查完整响应；若可选证据无法容纳，则返回确定性的最小有类型包，不会仅设置标记后超出预算。
 

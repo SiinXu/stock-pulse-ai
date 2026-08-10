@@ -206,3 +206,90 @@ def test_real_service_path_accepts_signed_admin_session() -> None:
     assert body["run"]["trace_id"] == "trace-real"
     assert body["run"]["lookup_mode"] == "primary_key"
     assert audit.completions[0]["reason_code"] == "export_completed"
+
+
+PROD_QUERY_ID = "9f2c1ab84e7d4f0b8c3a5d6e7f801234"
+
+
+def _signed_export(requested: str, record: SimpleNamespace, audit: SecurityAuditRecorderStub):
+    from src import auth
+
+    history = SimpleNamespace(
+        _resolve_record=lambda value: record,
+        _parse_diagnostic_json_field=lambda value, field: json.loads(value),
+    )
+    with _patch_services_config(enabled=True), patch.object(
+        endpoint, "is_auth_enabled", return_value=True
+    ), patch.object(endpoint, "HistoryService", return_value=history), patch.object(
+        auth, "_session_secret", b"reasoning-trace-test-secret"
+    ), patch.object(
+        auth, "is_auth_enabled", return_value=True
+    ):
+        session = auth.create_session()
+        return _client(audit).get(
+            f"/api/v1/reasoning-trace/{requested}",
+            cookies={"dsa_session": session},
+        )
+
+
+def _record(record_pk: int, query_id: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=record_pk,
+        query_id=query_id,
+        code="AAPL",
+        name="Apple",
+        model_used="gpt-test",
+        created_at=None,
+        context_snapshot=json.dumps(
+            {"diagnostics": {"trace_id": "0123456789abcdef0123456789abcdef"}}
+        ),
+        raw_result=json.dumps({"decision_type": "hold"}),
+    )
+
+
+def test_numeric_query_fallback_audits_the_resolved_record() -> None:
+    """Blocker 4 (API): completion audit must target the exported record, not '123'."""
+    audit = SecurityAuditRecorderStub()
+    response = _signed_export("123", _record(77, "123"), audit)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run"]["record_id"] == "77"
+    assert body["run"]["lookup_key"] == "123"
+    assert body["run"]["lookup_mode"] == "latest_by_query_id"
+
+    # Attempt is audited against the requested key (nothing is resolved yet).
+    assert audit.attempts[0]["target_id"] == "123"
+    # Completion is audited against the immutable exported record.
+    completion = audit.completions[0]
+    assert completion["target_id"] == "77"
+    assert completion["reason_code"] == "export_completed"
+    assert completion["metadata"]["lookup_key"] == "123"
+    assert completion["metadata"]["resolved_record_id"] == "77"
+    assert completion["metadata"]["lookup_mode"] == "latest_by_query_id"
+
+
+def test_primary_key_hit_audits_the_same_identity() -> None:
+    """Blocker 4 (API): a true PK hit keeps attempt and completion identities equal."""
+    audit = SecurityAuditRecorderStub()
+    response = _signed_export("123", _record(123, "123"), audit)
+
+    assert response.status_code == 200
+    assert response.json()["run"]["lookup_mode"] == "primary_key"
+    assert audit.attempts[0]["target_id"] == "123"
+    assert audit.completions[0]["target_id"] == "123"
+    assert audit.completions[0]["metadata"]["lookup_mode"] == "primary_key"
+
+
+def test_real_api_preserves_production_uuid_identities() -> None:
+    """Blocker 1 (API): production-shaped ids survive the real export path."""
+    audit = SecurityAuditRecorderStub()
+    response = _signed_export(PROD_QUERY_ID, _record(9, PROD_QUERY_ID), audit)
+
+    assert response.status_code == 200
+    run = response.json()["run"]
+    assert run["query_id"] == PROD_QUERY_ID
+    assert run["trace_id"] == "0123456789abcdef0123456789abcdef"
+    assert run["lookup_key"] == PROD_QUERY_ID
+    assert "[REDACTED]" not in json.dumps(run)
+    assert audit.completions[0]["target_id"] == "9"

@@ -58,7 +58,27 @@ def _record_export_audit(
     include_markdown: bool,
     outcome: Literal["success", "denied", "failure"] = "success",
     reason_code: str = "export_completed",
+    resolved_record_id: str | None = None,
+    lookup_mode: str | None = None,
 ) -> None:
+    """Record an export audit row.
+
+    ``record_id`` is the attempted lookup key from the route. When the export
+    resolved a record, ``resolved_record_id`` carries the immutable primary key:
+    the completion row is audited against the record that was actually exported,
+    not against the requested string, because a numeric lookup key can resolve
+    through the query_id fallback to a different record.
+    """
+    audited_id = resolved_record_id or record_id
+    metadata: dict[str, object] = {
+        "format": format,
+        "include_markdown": include_markdown,
+        "lookup_key": _audit_target_id(record_id),
+    }
+    if resolved_record_id is not None:
+        metadata["resolved_record_id"] = _audit_target_id(resolved_record_id)
+    if lookup_mode is not None:
+        metadata["lookup_mode"] = lookup_mode
     common = {
         "event_type": "reasoning_trace.export",
         "actor_type": "administrator",
@@ -66,12 +86,9 @@ def _record_export_audit(
         "execution_id": correlation_id,
         "action": "reasoning_trace.export",
         "target_type": "analysis_history",
-        "target_id": _audit_target_id(record_id),
+        "target_id": _audit_target_id(audited_id),
         "correlation_id": correlation_id,
-        "metadata": {
-            "format": format,
-            "include_markdown": include_markdown,
-        },
+        "metadata": metadata,
     }
     try:
         if phase == "attempt":
@@ -252,6 +269,17 @@ def export_reasoning_trace(
         )
         raise api_error(500, "internal_error", "Reasoning trace export failed")
 
+    exported_run = result.package.get("run") if isinstance(result.package, dict) else None
+    exported_run = exported_run if isinstance(exported_run, dict) else {}
+    resolved_record_id = exported_run.get("record_id")
+    resolved_record_id = (
+        str(resolved_record_id) if isinstance(resolved_record_id, str) and resolved_record_id else None
+    )
+    resolved_lookup_mode = exported_run.get("lookup_mode")
+    resolved_lookup_mode = (
+        str(resolved_lookup_mode) if isinstance(resolved_lookup_mode, str) else None
+    )
+
     try:
         ReasoningTraceExportResponse.model_validate(result.package)
     except ValueError as exc:
@@ -264,6 +292,8 @@ def export_reasoning_trace(
             include_markdown=include_markdown,
             outcome="failure",
             reason_code="response_contract_invalid",
+            resolved_record_id=resolved_record_id,
+            lookup_mode=resolved_lookup_mode,
         )
         log_safe_exception(
             logger,
@@ -283,6 +313,8 @@ def export_reasoning_trace(
         include_markdown=include_markdown,
         outcome="success",
         reason_code="export_completed",
+        resolved_record_id=resolved_record_id,
+        lookup_mode=resolved_lookup_mode,
     )
 
     if format == "markdown":

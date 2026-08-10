@@ -9948,11 +9948,18 @@ export interface components {
             returned_count?: number | null;
             /** Source */
             source: string;
+            /** Source Dropped Count */
+            source_dropped_count?: number | null;
             /**
              * Source Truncated
              * @default false
              */
             source_truncated: boolean;
+            /**
+             * Source Truncated Unknown
+             * @default false
+             */
+            source_truncated_unknown: boolean;
             /** Supported */
             supported: boolean;
         };
