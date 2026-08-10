@@ -38,6 +38,9 @@ cp .env.example .env
 # Edit .env and fill in the required API keys
 ```
 
+
+When adding a new configuration key, update `.env.example`, the configuration registry (`src/core/config_registry_parts/`), and the bilingual inventory in `docs/environment-variables.md` / `docs/environment-variables_EN.md` together. Run `python scripts/check_config_doc_consistency.py` (see the inventory docs for the full process and the Task 1 registry guard).
+
 ### Contribution Workflow
 
 1. Fork this repository.

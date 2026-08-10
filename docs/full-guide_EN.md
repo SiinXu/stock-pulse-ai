@@ -28,6 +28,7 @@ stock-pulse-ai/
 - [Project Structure](#project-structure)
 - [GitHub Actions Configuration](#github-actions-configuration)
 - [Complete Environment Variables List](#complete-environment-variables-list)
+- [Full environment variable inventory and config addition process](environment-variables_EN.md)
 - [Docker Deployment](#docker-deployment)
 - [Local Deployment](#local-deployment)
 - [Scheduled Task Configuration](#scheduled-task-configuration)
@@ -92,7 +93,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `EMAIL_SENDER` | Sender email (e.g., `xxx@qq.com`) | Optional |
 | `EMAIL_PASSWORD` | Email authorization code (not login password) | Optional |
 | `EMAIL_RECEIVERS` | Receiver emails (comma-separated, leave empty to send to self) | Optional |
-| `EMAIL_SENDER_NAME` | Sender display name | Optional |
+| `EMAIL_SENDER_NAME` | Sender display name (supported in code; not yet listed in `.env.example`; full inventory is [environment-variables_EN.md](environment-variables_EN.md) / the template) | Optional |
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | Email routing groups (Issue #268): `STOCK_GROUP_N` should be a subset of `STOCK_LIST`; affects email recipients only, not analysis scope or other channels | Optional |
 | `PUSHPLUS_TOKEN` | PushPlus Token ([Get here](https://www.pushplus.plus), Chinese push service) | Optional |
 | `SERVERCHAN3_SENDKEY` | ServerChan v3 Sendkey ([Get here](https://sc3.ft07.com/), mobile app push service) | Optional |
@@ -211,6 +212,9 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 
 ## Complete Environment Variables List
 
+> **Full key inventory and the config addition process** live in [Environment variable inventory](environment-variables_EN.md).  
+> This section is a curated high-frequency guide. `.env.example`, the configuration registry, and docs must be updated together. Consistency check: `python scripts/check_config_doc_consistency.py`. Registry gaps are owned by registry tasks and the Task 1 guard—do not fix them in docs-only PRs.
+
 ### AI Model Configuration
 
 > Full details: [LLM Config Guide](LLM_CONFIG_GUIDE_EN.md) (three-tier config, channels, Vision, Agent, troubleshooting).
@@ -278,7 +282,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `EMAIL_SENDER` | Sender email | Optional |
 | `EMAIL_PASSWORD` | Email authorization code (not login password) | Optional |
 | `EMAIL_RECEIVERS` | Receiver emails (comma-separated, leave empty to send to self) | Optional |
-| `EMAIL_SENDER_NAME` | Sender display name | Optional |
+| `EMAIL_SENDER_NAME` | Sender display name (supported in code; not yet listed in `.env.example`; full inventory is [environment-variables_EN.md](environment-variables_EN.md) / the template) | Optional |
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | Email routing groups (Issue #268): `STOCK_GROUP_N` should stay within `STOCK_LIST` and only changes email recipients | Optional |
 | `CUSTOM_WEBHOOK_URLS` | Custom Webhook (comma-separated) | Optional |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | Custom Webhook Bearer Token | Optional |
@@ -311,7 +315,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 |--------|------|:----:|
 | `FEISHU_APP_ID` | Feishu App ID | Optional |
 | `FEISHU_APP_SECRET` | Feishu App Secret | Optional |
-| `FEISHU_FOLDER_TOKEN` | Feishu Cloud Drive Folder Token | Optional |
+| `FEISHU_FOLDER_TOKEN` | Feishu Cloud Drive Folder Token (supported in code; not yet listed in `.env.example`; full inventory is [environment-variables_EN.md](environment-variables_EN.md) / the template) | Optional |
 | `FEISHU_SEND_AS_FILE` | Send reports as files via Feishu App Bot (default `false`) | Optional |
 
 > Feishu Cloud Document setup steps:

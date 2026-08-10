@@ -28,6 +28,7 @@ stock-pulse-ai/
 - [项目结构](#项目结构)
 - [GitHub Actions 详细配置](#github-actions-详细配置)
 - [环境变量完整列表](#环境变量完整列表)
+- [环境变量完整清单与配置新增流程](environment-variables.md)
 - [Docker 部署](#docker-部署)
 - [本地运行详细配置](#本地运行详细配置)
 - [定时任务配置](#定时任务配置)
@@ -228,6 +229,9 @@ stock-pulse-ai/
 
 ## 环境变量完整列表
 
+> **完整键清单与配置项新增流程**见 [环境变量清单与配置事实源](environment-variables.md)。  
+> 本节为高频精选说明；`.env.example`、配置注册表与文档三方必须同步更新。一致性检查：`python scripts/check_config_doc_consistency.py`。注册表缺口由注册表任务与 Task 1 守卫处理，不要只改文档。
+
 ### AI 模型配置
 
 > 完整说明见 [LLM 配置指南](LLM_CONFIG_GUIDE.md)（三层配置、渠道模式、Vision、Agent、排错）；常用服务商预设、Actions 变量对照和错误排障见 [LLM 服务商配置指南](llm-providers.md)。
@@ -309,7 +313,7 @@ stock-pulse-ai/
 | `EMAIL_SENDER` | 发件人邮箱 | 可选 |
 | `EMAIL_PASSWORD` | 邮箱授权码（非登录密码） | 可选 |
 | `EMAIL_RECEIVERS` | 收件人邮箱（逗号分隔，留空发给自己） | 可选 |
-| `EMAIL_SENDER_NAME` | 发件人显示名称 | 可选 |
+| `EMAIL_SENDER_NAME` | 发件人显示名称（代码支持；当前未写入 `.env.example`，完整清单以 [environment-variables.md](environment-variables.md) / 模板为准） | 可选 |
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | 邮件分组路由（Issue #268）：`STOCK_GROUP_N` 应为 `STOCK_LIST` 子集，仅影响邮件收件人，不改变分析范围或其他通知渠道 | 可选 |
 | `CUSTOM_WEBHOOK_URLS` | 自定义 Webhook（逗号分隔） | 可选 |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | 自定义 Webhook Bearer Token | 可选 |
@@ -342,7 +346,7 @@ stock-pulse-ai/
 |--------|------|:----:|
 | `FEISHU_APP_ID` | 飞书应用 ID | 可选 |
 | `FEISHU_APP_SECRET` | 飞书应用 Secret | 可选 |
-| `FEISHU_FOLDER_TOKEN` | 飞书云盘文件夹 Token | 可选 |
+| `FEISHU_FOLDER_TOKEN` | 飞书云盘文件夹 Token（代码支持；当前未写入 `.env.example`，完整清单以 [environment-variables.md](environment-variables.md) / 模板为准） | 可选 |
 | `FEISHU_SEND_AS_FILE` | 飞书 App Bot 以文件形式发送报告（默认 `false`） | 可选 |
 
 > 飞书云文档配置步骤：
