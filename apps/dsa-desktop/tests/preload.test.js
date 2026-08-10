@@ -167,7 +167,6 @@ test('createDesktopBridge delegates update actions to ipcRenderer', async (t) =>
     channel: preloadModule.DESKTOP_OPEN_RELEASE_PAGE_CHANNEL,
     payload: 'https://github.com/SiinXu/stock-pulse-ai/releases/tag/v3.13.0',
   });
-
   const receivedPayloads = [];
   const unsubscribe = desktopBridge.onUpdateStateChange((payload) => {
     receivedPayloads.push(payload);

@@ -1,34 +1,36 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-/* eslint-disable @typescript-eslint/no-explicit-any -- mechanical section props accept page model shapes */
 import type React from 'react';
-import type { ParsedApiError } from '../../../api/error';
-import type { SetupStatusResponse } from '../../../types/systemConfig';
+import { useUiLanguage } from '../../../contexts/UiLanguageContext';
+import { SETTINGS_PAGE_TEXT } from '../../../locales/settingsPage';
+import { getUiListSeparator } from '../../../utils/uiLocale';
 import { Button, Surface } from '../../common';
-import FirstRunSetupCard from '../FirstRunSetupCard';
 import AlphaSiftSettingsCard from '../AlphaSiftSettingsCard';
-import { legacyToSectionView } from '../settingsInformationArchitecture';
+import FirstRunSetupCard from '../FirstRunSetupCard';
+import {
+  legacyToSectionView,
+  type SettingsSectionId,
+} from '../settingsInformationArchitecture';
+
+type FirstRunSetupProps = React.ComponentProps<typeof FirstRunSetupCard>;
 
 export type OverviewSectionProps = {
   shouldShowFirstRunSetup: boolean;
-  setupStatus: SetupStatusResponse | null;
+  setupStatus: FirstRunSetupProps['status'];
   isProviderCatalogLoading: boolean;
   providerCatalogLength: number;
-  settingsText: any;
   setIsWizardOpen: (open: boolean) => void;
   isRefreshingSetupStatus: boolean;
-  setupStatusError: ParsedApiError | null;
+  setupStatusError: FirstRunSetupProps['error'];
   firstSetupStockCode: string;
   isSaving: boolean;
   isLoading: boolean;
   isRunningSetupSmoke: boolean;
-  setupSmokeError: ParsedApiError | null;
+  setupSmokeError: FirstRunSetupProps['smokeError'];
   setupSmokeSuccess: string;
   refreshSetupStatus: () => void;
-  selectSectionView: (...args: any[]) => void;
+  selectSectionView: (section: SettingsSectionId, view: string) => void;
   handleRunSetupSmoke: () => void;
-  listSeparator: string;
-  t: (...args: any[]) => string;
   shouldShowAlphaSiftSettings: boolean;
   alphasiftEnabled: boolean;
   configVersion: string;
@@ -36,61 +38,67 @@ export type OverviewSectionProps = {
   refreshAfterExternalSave: (keys: string[]) => Promise<void>;
 };
 
-export const OverviewSection: React.FC<OverviewSectionProps> = (p) => (
-  <>
-    {p.shouldShowFirstRunSetup && !p.setupStatus?.isComplete ? (
-      <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">{p.settingsText.quickSetup}</p>
-          <p className="mt-0.5 text-xs text-muted-text">{p.settingsText.quickSetupDescription}</p>
-        </div>
-        <Button
-          type="button"
-          variant="primary"
-          size="default"
-          className="shrink-0"
-          disabled={p.isProviderCatalogLoading || p.providerCatalogLength === 0}
-          onClick={() => p.setIsWizardOpen(true)}
-        >
-          {p.settingsText.startWizard}
-        </Button>
-      </Surface>
-    ) : null}
-    {p.shouldShowFirstRunSetup ? (
-      <FirstRunSetupCard
-        status={p.setupStatus}
-        isLoading={p.isRefreshingSetupStatus}
-        error={p.setupStatusError}
-        firstStockCode={p.firstSetupStockCode}
-        isSaving={p.isSaving}
-        isRunningSmoke={p.isRunningSetupSmoke}
-        smokeError={p.setupSmokeError}
-        smokeSuccess={p.setupSmokeSuccess}
-        onRefresh={p.refreshSetupStatus}
-        onSelectCategory={(category) => {
-          const target = legacyToSectionView(category, null);
-          p.selectSectionView(target.section, target.view);
-        }}
-        onRunSmoke={p.handleRunSetupSmoke}
-        showStartWizard={Boolean(p.setupStatus?.isComplete)}
-        canStartWizard={!p.isProviderCatalogLoading && p.providerCatalogLength > 0}
-        startWizardLabel={p.settingsText.startWizard}
-        onStartWizard={() => p.setIsWizardOpen(true)}
-        listSeparator={p.listSeparator}
-        t={p.t}
-      />
-    ) : null}
-    {p.shouldShowAlphaSiftSettings ? (
-      <AlphaSiftSettingsCard
-        enabled={p.alphasiftEnabled}
-        configVersion={p.configVersion}
-        maskToken={p.maskToken}
-        disabled={p.isSaving || p.isLoading}
-        onViewConfigItems={() => p.selectSectionView('data_sources', 'providers')}
-        onAfterChange={async () => {
-          await p.refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-        }}
-      />
-    ) : null}
-  </>
-);
+export const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
+  const { language, t } = useUiLanguage();
+  const settingsText = SETTINGS_PAGE_TEXT[language];
+  const canStartWizard = !props.isProviderCatalogLoading && props.providerCatalogLength > 0;
+
+  return (
+    <>
+      {props.shouldShowFirstRunSetup && !props.setupStatus?.isComplete ? (
+        <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">{settingsText.quickSetup}</p>
+            <p className="mt-0.5 text-xs text-muted-text">{settingsText.quickSetupDescription}</p>
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            size="default"
+            className="shrink-0"
+            disabled={!canStartWizard}
+            onClick={() => props.setIsWizardOpen(true)}
+          >
+            {settingsText.startWizard}
+          </Button>
+        </Surface>
+      ) : null}
+      {props.shouldShowFirstRunSetup ? (
+        <FirstRunSetupCard
+          status={props.setupStatus}
+          isLoading={props.isRefreshingSetupStatus}
+          error={props.setupStatusError}
+          firstStockCode={props.firstSetupStockCode}
+          isSaving={props.isSaving}
+          isRunningSmoke={props.isRunningSetupSmoke}
+          smokeError={props.setupSmokeError}
+          smokeSuccess={props.setupSmokeSuccess}
+          onRefresh={props.refreshSetupStatus}
+          onSelectCategory={(category) => {
+            const target = legacyToSectionView(category, null);
+            props.selectSectionView(target.section, target.view);
+          }}
+          onRunSmoke={props.handleRunSetupSmoke}
+          showStartWizard={Boolean(props.setupStatus?.isComplete)}
+          canStartWizard={canStartWizard}
+          startWizardLabel={settingsText.startWizard}
+          onStartWizard={() => props.setIsWizardOpen(true)}
+          listSeparator={getUiListSeparator(language)}
+          t={t}
+        />
+      ) : null}
+      {props.shouldShowAlphaSiftSettings ? (
+        <AlphaSiftSettingsCard
+          enabled={props.alphasiftEnabled}
+          configVersion={props.configVersion}
+          maskToken={props.maskToken}
+          disabled={props.isSaving || props.isLoading}
+          onViewConfigItems={() => props.selectSectionView('data_sources', 'providers')}
+          onAfterChange={async () => {
+            await props.refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
+          }}
+        />
+      ) : null}
+    </>
+  );
+};

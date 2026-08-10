@@ -1,93 +1,88 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-/* eslint-disable @typescript-eslint/no-explicit-any -- mechanical section props accept page model shapes */
 import type React from 'react';
-import type { UiLanguage } from '../../../i18n/uiLanguages';
-import type { SystemConfigItem } from '../../../types/systemConfig';
-import { AuthSettingsCard, ChangePasswordCard } from '..';
-import SystemAboutCard from '../SystemAboutCard';
+import { AuthSettingsCard, ChangePasswordCard, LoadedExtensionsPanel } from '..';
+import OutboundActivityPanel from '../OutboundActivityPanel';
 import SchedulerSettingsCard from '../SchedulerSettingsCard';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
 import SecurityAuditPanel from '../SecurityAuditPanel';
-import OutboundActivityPanel from '../OutboundActivityPanel';
 import SignalScorecardPanel from '../SignalScorecardPanel';
+import SystemAboutCard from '../SystemAboutCard';
+
+type SchedulerProps = React.ComponentProps<typeof SchedulerSettingsCard>;
+type ExtensionProps = React.ComponentProps<typeof LoadedExtensionsPanel>;
 
 export type SystemSecuritySectionProps = {
   activeCategory: string;
   activeView: string;
   passwordChangeable: boolean;
-  rawActiveItems: SystemConfigItem[];
-  isSaving: boolean;
-  isLoading: boolean;
-  issueByKey: Record<string, any>;
+  items: SchedulerProps['items'];
+  disabled: boolean;
+  issueByKey: SchedulerProps['issueByKey'];
   schedulerStatusRefreshToken: number;
-  handleSchedulerRuntimeStateChange: (...args: any[]) => void;
-  setDraftValue: (key: string, value: string) => void;
-  allValuesByKey: Record<string, string>;
-  t: (...args: any[]) => string;
-  language: UiLanguage;
+  onSchedulerStateChange: SchedulerProps['onSchedulerStateChange'];
+  onChange: SchedulerProps['onChange'];
+  allValuesByKey: Readonly<Record<string, string>>;
+  t: ExtensionProps['t'];
+  language: ExtensionProps['language'];
 };
 
-/** System & Security section specialized panels (not the generic field panel). */
-export const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = ({
-  activeCategory,
-  activeView,
-  passwordChangeable,
-  rawActiveItems,
-  isSaving,
-  isLoading,
-  issueByKey,
-  schedulerStatusRefreshToken,
-  handleSchedulerRuntimeStateChange,
-  setDraftValue,
-  allValuesByKey,
-  t,
-  language,
-}) => (
-  <>
-    {activeCategory === 'system' && activeView === 'security' ? (
+function parseMinimumSamples(value: string | undefined): number {
+  const raw = String(value ?? '').trim();
+  if (!raw) return 10;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : 10;
+}
+
+export const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
+  if (props.activeCategory !== 'system') return null;
+
+  if (props.activeView === 'security') {
+    return (
       <>
         <AuthSettingsCard />
-        <OutboundActivityPanel disabled={isSaving || isLoading} t={t} language={language} />
-        <SecurityAuditPanel disabled={isSaving || isLoading} t={t} language={language} />
+        <OutboundActivityPanel disabled={props.disabled} t={props.t} language={props.language} />
+        <SecurityAuditPanel disabled={props.disabled} t={props.t} language={props.language} />
+        {props.passwordChangeable ? <ChangePasswordCard /> : null}
       </>
-    ) : null}
-    {activeCategory === 'system' && activeView === 'runtime' ? (
+    );
+  }
+
+  if (props.activeView === 'runtime') {
+    return (
       <>
         <SchedulerSettingsCard
-          items={rawActiveItems}
-          disabled={isSaving || isLoading}
-          issueByKey={issueByKey}
-          statusRefreshToken={schedulerStatusRefreshToken}
-          onSchedulerStateChange={handleSchedulerRuntimeStateChange}
-          onChange={setDraftValue}
-          t={t}
-          language={language}
+          items={props.items}
+          disabled={props.disabled}
+          issueByKey={props.issueByKey}
+          statusRefreshToken={props.schedulerStatusRefreshToken}
+          onSchedulerStateChange={props.onSchedulerStateChange}
+          onChange={props.onChange}
+          t={props.t}
+          language={props.language}
         />
-        <ScheduledTasksPanel disabled={isSaving || isLoading} t={t} language={language} />
+        <ScheduledTasksPanel disabled={props.disabled} t={props.t} language={props.language} />
       </>
-    ) : null}
-    {activeCategory === 'system' && activeView === 'general' ? (
+    );
+  }
+
+  if (props.activeView === 'general') {
+    return (
       <SignalScorecardPanel
         publicEnabled={['1', 'true', 'yes', 'on'].includes(
-          String(allValuesByKey.SIGNAL_SCORECARD_PUBLIC_ENABLED ?? '').trim().toLowerCase(),
+          String(props.allValuesByKey.SIGNAL_SCORECARD_PUBLIC_ENABLED ?? '').trim().toLowerCase(),
         )}
-        minSamples={(() => {
-          const raw = String(allValuesByKey.SIGNAL_SCORECARD_MIN_SAMPLES ?? '').trim();
-          if (!raw) return 10;
-          const parsed = Number.parseInt(raw, 10);
-          return Number.isFinite(parsed) ? parsed : 10;
-        })()}
-        disabled={isSaving || isLoading}
-        t={t}
-        language={language}
+        minSamples={parseMinimumSamples(props.allValuesByKey.SIGNAL_SCORECARD_MIN_SAMPLES)}
+        disabled={props.disabled}
+        t={props.t}
+        language={props.language}
       />
-    ) : null}
-    {activeCategory === 'system' && activeView === 'about' ? (
-      <SystemAboutCard />
-    ) : null}
-    {activeCategory === 'system' && activeView === 'security' && passwordChangeable ? (
-      <ChangePasswordCard />
-    ) : null}
-  </>
-);
+    );
+  }
+
+  if (props.activeView === 'about') return <SystemAboutCard />;
+  if (props.activeView === 'extensions') {
+    return <LoadedExtensionsPanel disabled={props.disabled} t={props.t} language={props.language} />;
+  }
+  return null;
+};

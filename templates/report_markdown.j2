@@ -1,4 +1,4 @@
-{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line with context %}
+{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line, decision_card with context %}
 # 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ labels.analyzed_prefix }} **{{ results|length }}** {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -24,6 +24,7 @@
 
 ## {{ e.signal_emoji }} {{ e.stock_name }} ({{ result.code }})
 
+{{ decision_card(e, compact=false) }}
 {% if intel %}
 ### 📰 {{ labels.info_heading }}
 
@@ -71,6 +72,33 @@
 {% endif %}
 
 {{ market_snapshot(result) }}
+
+{% set indicator_snapshot = result.indicator_snapshot if result.indicator_snapshot else {} %}
+{% set configured_mas = indicator_snapshot.get('ma_readings') or {} %}
+{% set configured_rsis = indicator_snapshot.get('rsi_readings') or {} %}
+{% set configured_macd = indicator_snapshot.get('macd_reading') or {} %}
+{% if configured_mas or configured_rsis or configured_macd %}
+{% set indicator_copy = {
+  'en': {'heading': 'Configured indicators', 'source': 'source', 'bars': 'bars', 'as_of': 'as-of', 'indicator': 'Indicator', 'value': 'Value', 'availability': 'Availability', 'available': 'available', 'unavailable': 'unavailable'},
+  'ko': {'heading': '설정된 지표', 'source': '출처', 'bars': '봉', 'as_of': '기준일', 'indicator': '지표', 'value': '값', 'availability': '사용 가능 여부', 'available': '사용 가능', 'unavailable': '사용 불가'},
+  'zh': {'heading': '配置指标', 'source': '来源', 'bars': 'K线', 'as_of': '截止', 'indicator': '指标', 'value': '数值', 'availability': '可用性', 'available': '可用', 'unavailable': '不可用'}
+}.get(report_language, {'heading': '配置指标', 'source': '来源', 'bars': 'K线', 'as_of': '截止', 'indicator': '指标', 'value': '数值', 'availability': '可用性', 'available': '可用', 'unavailable': '不可用'}) %}
+### 📈 {{ indicator_copy.heading }}
+
+> {{ indicator_copy.source }}={{ indicator_snapshot.get('indicator_period_source', 'unknown') }} · {{ indicator_copy.bars }}={{ indicator_snapshot.get('indicator_bar_count', 0) }} · {{ indicator_copy.as_of }}={{ indicator_snapshot.get('indicator_as_of', 'N/A') }}
+
+| {{ indicator_copy.indicator }} | {{ indicator_copy.value }} | {{ indicator_copy.availability }} |
+|---|---:|---|
+{% for reading in configured_mas.values() %}
+| {{ reading.get('label', 'MA') }} | {{ reading.get('value') if reading.get('value') is not none else 'N/A' }} | {{ indicator_copy.available if reading.get('available') else reading.get('reason', indicator_copy.unavailable) }} |
+{% endfor %}
+{% for reading in configured_rsis.values() %}
+| {{ reading.get('label', 'RSI') }} | {{ reading.get('value') if reading.get('value') is not none else 'N/A' }} | {{ indicator_copy.available if reading.get('available') else reading.get('reason', indicator_copy.unavailable) }} |
+{% endfor %}
+{% if configured_macd %}
+| {{ configured_macd.get('label', 'MACD') }} | {% if configured_macd.get('available') %}DIF={{ configured_macd.get('dif') }}, DEA={{ configured_macd.get('dea') }}, BAR={{ configured_macd.get('bar') }}{% else %}N/A{% endif %} | {{ indicator_copy.available if configured_macd.get('available') else configured_macd.get('reason', indicator_copy.unavailable) }} |
+{% endif %}
+{% endif %}
 
 {% if data_persp %}
 ### 📊 {{ labels.data_perspective_heading }}
