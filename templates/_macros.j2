@@ -5,7 +5,7 @@
    sections remain below in full templates for backward compatibility. #}
 {% macro decision_card(e, compact=false) -%}
 {%- set result = e.result -%}
-{%- set dashboard = result.dashboard if result.dashboard else {} -%}
+{%- set dashboard = e.dashboard_view if e.dashboard_view is defined and e.dashboard_view else (result.dashboard if result.dashboard else {}) -%}
 {%- set core = dashboard.get('core_conclusion') or {} -%}
 {%- set intel = dashboard.get('intelligence') or {} -%}
 {%- set battle = dashboard.get('battle_plan') or {} -%}
