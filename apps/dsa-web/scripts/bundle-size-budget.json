@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-08",
-  "baselineNote": "Rebaselined AlertsWorkspace only against the current main production build after the Alert Rule List mobile-filter work from PR #909; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "measuredAt": "2026-08-10",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909 and PlaygroundRenderPage after the intentional zero-config first-run Playground scenario; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -122,8 +122,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 56433,
-      "measuredGzipBytes": 51302
+      "maxGzipBytes": 65109,
+      "measuredGzipBytes": 59190,
+      "note": "Measured on PR #959 exact-head CI after adding the zero-config first-run Playground scenario; cap is ceil(measured * 1.10)."
     },
     {
       "id": "SettingsPage",
