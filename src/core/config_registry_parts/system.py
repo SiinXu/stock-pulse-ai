@@ -3,6 +3,34 @@
 from typing import Any, Dict
 
 SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+    "REPORT_EXPORT_PDF_FONT_PATH": {
+        "title": "Report Export PDF Font Path",
+        "description": (
+            "Optional absolute path to one parseable TTF/OTF face used by PDF report export. "
+            "An explicitly configured invalid path fails closed; it never falls back to another system font."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"maxLength": 1024},
+        "display_order": 9,
+        "help_key": "settings.system.REPORT_EXPORT_PDF_FONT_PATH",
+        "examples": [
+            "REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf",
+        ],
+        "docs": [
+            {
+                "label": "Report export configuration and font readiness",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/report-export.md",
+            },
+        ],
+        "warning_codes": ["restart_required", "path_must_exist"],
+    },
     "SCHEDULE_TIME": {
         "title": "Schedule Time",
         "description": (
