@@ -8,7 +8,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
-from sqlalchemy import and_, delete, desc, func, or_, select, text
+from sqlalchemy import and_, delete, desc, func, or_, select, text as _sql_text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
@@ -353,7 +353,7 @@ class _HistoryMethods:
 
         with self.get_session() as session:
             rows = session.execute(
-                text(
+                _sql_text(
                     "SELECT history.id "
                     "FROM analysis_history_search "
                     "JOIN analysis_history AS history "
