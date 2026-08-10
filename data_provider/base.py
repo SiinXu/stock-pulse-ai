@@ -14,7 +14,7 @@
 3. 指数退避重试机制
 """
 
-import json
+import json as _json
 import inspect
 import logging
 import os
