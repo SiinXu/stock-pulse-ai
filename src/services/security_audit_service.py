@@ -272,13 +272,13 @@ class SecurityAuditService:
 
 
 def _limits_from_config() -> tuple[int, int]:
-    """Resolve retention and capacity from shared Config with safe defaults."""
+    """Resolve retention and capacity from shared Config with safe defaults.\n\n    Prefer composition-root config access over bare ``get_config()`` so this\n    module stays outside the config-access growth baseline (see\n    docs/config-access-ratchet.md).\n    """
     retention = SECURITY_AUDIT_RETENTION_DAYS
     max_events = SECURITY_AUDIT_MAX_EVENTS
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        config = get_config()
+        config = get_application_services().config
         configured_retention = getattr(config, "security_audit_retention_days", None)
         configured_max = getattr(config, "security_audit_max_events", None)
         if configured_retention is not None:
