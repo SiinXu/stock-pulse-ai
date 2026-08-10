@@ -460,7 +460,7 @@ const HomePage: React.FC = () => {
       {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
           avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
       <div data-testid="home-core-blocks" className="grid min-w-0 gap-4 xl:grid-cols-3">
-                <TodaysFocusPanel
+        <TodaysFocusPanel
           data={todaysFocusData}
           isLoading={todaysFocusLoading}
           error={todaysFocusError}
