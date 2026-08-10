@@ -158,6 +158,8 @@ N_{\mathrm{eff}} = \frac{1}{\mathrm{HHI}}
 
 报告嵌入、参数法 VaR、压力测试集成仍不在范围内。
 
+面板通过现有 Portfolio 工作区 QueryProvider 树内的 TanStack Query 加载。
+
 ## 后续（非 V0 / 非 Web V1）
 
 - 参数法 VaR、风险贡献、行业拆分。

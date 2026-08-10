@@ -168,6 +168,8 @@ The Portfolio page mounts a risk-metrics panel that consumes this endpoint only:
 
 Report embedding, parametric VaR, and stress-test integration remain out of scope.
 
+The panel is loaded via TanStack Query inside the existing Portfolio workspace QueryProvider tree.
+
 ## Follow-ups (not V0 / not Web V1)
 
 - Parametric VaR, risk contribution, sector breakdown.
