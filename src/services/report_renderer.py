@@ -51,6 +51,10 @@ from src.services.report_mode import (
     resolve_report_mode,
     truncation_notice,
 )
+from src.services.valuation_projection import (
+    extract_valuation_payload,
+    project_valuation_for_report,
+)
 from src.utils.data_processing import (
     normalize_model_used,
     signal_attribution_has_content,
@@ -349,6 +353,17 @@ def render(
             )
             if detail_present:
                 total_omitted += 1
+        valuation_payload = extract_valuation_payload(r)
+        valuation_by_code = (extra_context or {}).get("valuation_by_code")
+        if valuation_payload is None and isinstance(valuation_by_code, dict):
+            code_key = str(getattr(r, "code", "") or "")
+            candidate = valuation_by_code.get(code_key)
+            if isinstance(candidate, dict):
+                valuation_payload = candidate
+        valuation_projection = project_valuation_for_report(
+            valuation_payload,
+            language=report_language,
+        )
         sorted_enriched.append({
             "result": r,
             "signal_text": display_advice,
@@ -360,6 +375,8 @@ def render(
             "dashboard_view": limited_dashboard,
             "omitted_count": total_omitted,
             "truncation_notice": truncation_notice(total_omitted, report_language),
+            # Issue #238: optional valuation projection; None omits the section entirely.
+            "valuation_projection": valuation_projection,
         })
 
     display_buckets = [

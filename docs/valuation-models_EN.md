@@ -1,11 +1,9 @@
 # Valuation Models (DCF & Relative) — Phase 1
 
 StockPulse can estimate intrinsic value with a transparent DCF model and peer
-relative valuation (P/E, P/B). This document describes **phase 1** of issue
-#238: a backend valuation service plus an optional, default-off Agent Tool.
-
-Report template projection, prompt injection into the default analysis path,
-and EV/EBITDA relative valuation remain later phases.
+relative valuation (P/E, P/B). This document covers issue #238: backend valuation service, optional default-off
+Agent Tool, report/prompt projection, EV/EBITDA when explicit inputs exist, and
+the interactive Web DCF sensitivity UI.
 
 ## Honesty Contract
 
@@ -73,7 +71,9 @@ scenario discount rate.
 - Implied prices: `EPS × peer PE median`, `book/share × peer PB median`
 - Empty peers or missing multiples → `insufficient_fundamentals` for the
   relative section (no invented peer set)
-- EV/EBITDA is **not** estimated in phase 1 (no stable EBITDA field across markets)
+- EV/EBITDA is estimated **only** when explicit `ebitda`, positive `market_cap`/`total_mv`,
+  and explicit `net_debt` (may be zero/negative net cash) are available. Missing inputs
+  yield `insufficient_fundamentals` for EV/EBITDA; total liabilities are never a debt proxy.
 
 ## Tool Input / Output
 
@@ -111,12 +111,22 @@ python -m py_compile src/services/valuation_service.py src/agent/tools/valuation
 python -m pytest tests -k "valuation or dcf" -m "not network and not benchmark"
 ```
 
-## Follow-ups (not in phase 1)
+## Report / prompt projection
 
-- Report / prompt projection of valuation blocks
-- EV/EBITDA when a cross-market EBITDA field is available
-- Interactive Web sensitivity UI
-- Market-specific model packs beyond shared DCF / PE-PB
+- Optional `dashboard.valuation` or `extra_context.valuation_by_code[code]` renders a valuation section.
+- Missing valuation omits the section (no empty placeholders).
+- `format_valuation_prompt_block(estimate)` for analysis-context / LLM injection.
+
+## Web sensitivity UI
+
+- `DcfSensitivityPanel` + `GET|POST /api/v1/valuation/estimate`
+- Consumes server-side sensitivity rows; assumptions visible/adjustable; non-advice disclaimer.
+- Playground: `dcf-sensitivity-panel`. StockDetailsPage integration deferred (frozen page).
+
+## Remaining follow-ups
+
+- Market-specific model packs beyond shared DCF / PE-PB / EV-EBITDA
+- Auto-attach valuation into default analysis dashboard during pipeline runs
 
 ## Rollback
 

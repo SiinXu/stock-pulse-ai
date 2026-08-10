@@ -1,4 +1,4 @@
-{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line, decision_card with context %}
+{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line, decision_card, valuation_section with context %}
 # 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ labels.analyzed_prefix }} **{{ results|length }}** {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -304,6 +304,8 @@
 | {{ h.created_at[:16] if h.created_at else 'N/A' }} | {{ h.sentiment_score or 'N/A' }} | {{ h.action_label or localize_action_label(h.action, report_language) or localize_operation_advice(h.operation_advice or 'N/A', report_language) }} | {{ localize_trend_prediction(h.trend_prediction or 'N/A', report_language) }} |
 {% endfor %}
 {% endif %}
+
+{{ valuation_section(e.valuation_projection, compact=false) }}
 
 {% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
 {% if mode_limits.strata_style != 'none' %}

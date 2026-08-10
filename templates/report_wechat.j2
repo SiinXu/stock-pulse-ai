@@ -1,4 +1,4 @@
-{% from '_macros.j2' import report_strata_section, report_disclaimer_line, decision_card with context %}
+{% from '_macros.j2' import report_strata_section, report_disclaimer_line, decision_card, valuation_section with context %}
 ## 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ results|length }} {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -99,6 +99,8 @@
    {{ check[:40] }}
 {% endfor %}
 {% endif %}
+
+{{ valuation_section(e.valuation_projection, compact=true) }}
 
 {% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
 {% if mode_limits.strata_style != 'none' and strata %}

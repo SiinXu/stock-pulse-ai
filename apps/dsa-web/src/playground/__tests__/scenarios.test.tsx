@@ -10,6 +10,7 @@ import { COMMON_SCENARIOS } from '../scenarios/commonScenarios';
 import { DECISION_REPORT_RUN_FLOW_SCENARIOS } from '../scenarios/decisionReportRunFlowScenarios';
 import { SETTINGS_SCENARIOS } from '../scenarios/settingsScenarios';
 import { ALERT_HISTORY_SCENARIOS } from '../scenarios/alertHistoryScenarios';
+import { getPlaygroundRenderer } from '../scenarios';
 
 let sandbox: ReturnType<typeof installPlaygroundApiMock> | null = null;
 
@@ -45,6 +46,16 @@ afterEach(() => {
 });
 
 describe('representative playground scenarios', () => {
+  it('lazy-loads the financial chart story with 36 strictly increasing demo dates', async () => {
+    const Story = getPlaygroundRenderer('kline-chart');
+    expect(Story).toBeDefined();
+    renderStory(Story as React.ComponentType);
+
+    const summary = await screen.findByTestId('kline-chart-summary');
+    expect(summary).toHaveTextContent('2026-01-01 to 2026-02-05');
+    expect(screen.getAllByTestId(/^kline-chart-candle-/)).toHaveLength(36);
+  });
+
   it('renders shared variants and keeps modal focus/Escape behavior real', async () => {
     renderStory(COMMON_SCENARIOS.modal, 'interactive');
 

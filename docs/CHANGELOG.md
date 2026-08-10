@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Web report Decision Card view pins verdict/confidence/risks/watch conditions above evidence strata (default collapsed) across page, panel, and drawer report surfaces (#874).
 - [Added] Report three modes (brief/standard/research) with hard length limits, existing Decision Card integration, and explicit truncation notices for Jinja reports (#861 Phase 2).
+- [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
+- [Added] Reusable Web financial chart components: KlineChart (volume + MA overlays + zoom, dirty OHLC guards) and RiskHeatmap (score + level labels; color not sole carrier), with playground previews and unit tests; no page wiring (#142).
+- [Added] Earnings-call transcript parsing (`earnings-transcript-v2`) with exact source coordinates, typed metrics, page-aware PDF provenance, compact chunk retrieval, untrusted-document privacy boundaries, and bounded valid-JSON Agent results; default-off tool `parse_earnings_transcript` behind existing multimodal gates (#253 remaining).
+
 - [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
 - [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, deterministic portfolio exposure/volatility/historical-loss thresholds, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
 - [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
