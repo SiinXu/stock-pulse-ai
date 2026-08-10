@@ -142,11 +142,15 @@ describe('SelectionChip production guard', () => {
   });
 
   it('keeps one shared owner and no copied production marker', () => {
+    // Cheap string prefilter before AST parse: any real declaration/marker must
+    // contain these tokens, so full-tree TypeScript parsing is unnecessary.
     const sources = Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename));
-    const declarationViolations = sources
+    const declarationCandidates = sources.filter(([, source]) => source.includes('SelectionChip'));
+    const markerCandidates = sources.filter(([, source]) => source.includes('selection-chip'));
+    const declarationViolations = declarationCandidates
       .flatMap(([filename, source]) => findSelectionChipDeclarations(filename, source));
-    const markers = sources
+    const markers = markerCandidates
       .flatMap(([filename, source]) => findSelectionChipControlMarkers(filename, source));
 
     expect(declarationViolations).toEqual([]);
