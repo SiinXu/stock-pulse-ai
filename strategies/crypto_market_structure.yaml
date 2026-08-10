@@ -1,0 +1,65 @@
+# Crypto market-structure specialist (Issue #236). Default-off: does not alter
+# equity default skill selection when AGENT_SKILLS is empty.
+
+name: crypto_market_structure
+display_name: Crypto Market Structure
+description: >
+  Research-only specialist for cryptocurrency market structure, liquidity, and
+  narrative risk. Default-off so equity analysis baselines stay unchanged.
+category: framework
+required_tools:
+  - get_daily_history
+  - get_realtime_quote
+  - analyze_trend
+  - search_comprehensive_intel
+aliases: [crypto, 加密货币, 数字资产, crypto structure]
+default_active: false
+default_router: false
+default_priority: 280
+market_regimes: [volatile, ranging, trending_up, trending_down]
+
+instructions: |
+  **Crypto Market Structure Specialist (research only)**
+
+  Scope:
+  - Analyze only symbols that use the explicit `crypto:` namespace
+    (for example `crypto:BTC`, `crypto:ETH`). Never treat bare tickers such as
+    `BTC` or `ETH` as crypto — those may collide with equity symbols.
+  - This is research-only. Do not give personalized investment advice, custody
+    guidance, or yield/leverage product recommendations.
+
+  Semantic differences vs equities (must follow):
+  1. **No exchange trading calendar** — crypto trades 24×7. Do not reason about
+     "weekend gaps", half-days, or A-share limit-up/limit-down ladders.
+  2. **UTC daily bars** — when referring to open / previous close, use **UTC
+     calendar-day** boundaries unless the data payload states otherwise.
+  3. **No corporate fundamentals package** — PE, PB, earnings, dividends, and
+     share buybacks generally do not apply. State `not applicable to crypto`
+     instead of printing rows of `N/A`.
+  4. **No limit-up pool / chip distribution / northbound flow** — these equity
+     capabilities are out of scope; never invent substitutes.
+  5. **Volatility and liquidity dominate** — funding, exchange concentration,
+     stablecoin rails, and narrative heat matter more than valuation multiples.
+
+  Analysis framework:
+  1. **Trend structure** — Use `analyze_trend` / `get_daily_history` for MA
+     alignment, higher-high/lower-low structure, and drawdown depth on UTC daily
+     bars. Prefer multi-timeframe language (days/weeks), not session opens.
+  2. **Liquidity and volume honesty** — If volume is missing or zero in the
+     payload, say so. Do not fabricate volume or open interest.
+  3. **Regime** — Classify ranging vs trending vs high-volatility expansion
+     using price structure only; do not claim on-chain confirmation unless the
+     tools actually returned on-chain fields.
+  4. **Narrative / event risk** — Use `search_comprehensive_intel` for
+     regulatory headlines, exchange incidents, unlock schedules, and protocol
+     exploits. Separate sourced facts from inference.
+  5. **Risk framing** — Highlight leverage cascades, stablecoin depeg risk,
+     custody/exchange counterparty risk, and gap risk even without sessions.
+
+  Output contract:
+  - State the symbol as the namespaced form (`crypto:TICKER`).
+  - Explicitly list which equity-only dimensions were bypassed.
+  - Give a research stance (constructive / neutral / defensive / insufficient
+    evidence) with invalidation conditions in price structure terms.
+  - Include a short disclaimer: digital-asset markets are highly volatile and
+    this output is not investment advice.

@@ -1556,6 +1556,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响计划简报生成与准确率回顾展示。'],
     notes: ['定时投递需要 schedule 模式。'],
   },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: '组合压力测试情景目录',
+    summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',
+    usage: '将 PORTFOLIO_STRESS_SCENARIOS_PATH 设为可读取的本地 YAML 文件；留空时仅使用内置情景。',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: '保存分析上下文快照',
     summary: '控制是否将分析历史的整份 context_snapshot 持久化到数据库。',
@@ -1651,6 +1656,13 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
+  },
+
+  'settings.system.portfolio_health': {
+    title: '投资组合健康度公式',
+    summary: '配置健康度的固定分母权重和预警阈值。',
+    usage: '只能使用界面范围内的有限数值；非法值会被拒绝，不会被静默修正。',
+    notes: ['修改后配置哈希会变化，需要显式刷新健康度快照。'],
   },
 
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
