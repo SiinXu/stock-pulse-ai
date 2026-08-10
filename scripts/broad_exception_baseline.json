@@ -340,7 +340,6 @@
     {"path":"src/services/history_loader.py","scope":"<module>.load_history_df","caught":["Exception"],"digest":"f9a8f82b219d588ab576fb17e838283cedb60ae92e084c0c2ab205cb4e123546"},
     {"path":"src/services/history_service.py","scope":"<module>.HistoryService._history_code_filter_candidates","caught":["Exception"],"digest":"2dffbdfae6c43923f4b4a9f0f28c09a600bdc2249bc830a47bbd32e4e07b610b"},
     {"path":"src/services/history_service.py","scope":"<module>.HistoryService._history_code_filter_candidates","caught":["Exception"],"digest":"d4ced6bcfcf957a4c58f0a2c6b5014a82c1d39d60760ad3025e75442836d4671"},
-    {"path":"src/services/history_service.py","scope":"<module>.HistoryService._rebuild_analysis_result","caught":["Exception"],"digest":"9a3db26570628e5220d6440fc8162aeb074c0651120986b94414e215f3ca1814"},
     {"path":"src/services/history_service.py","scope":"<module>.HistoryService.get_history_detail_by_id","caught":["Exception"],"digest":"95a80c76566167f56ad9f3524875c6acf3677595672970c9e165432d31925378"},
     {"path":"src/services/history_service.py","scope":"<module>.HistoryService.get_news_intel","caught":["Exception"],"digest":"26fc5f9d4860900c72e8c6b72357d1a18578622e0a41509368464e1c0d33026e"},
     {"path":"src/services/history_service.py","scope":"<module>.HistoryService.get_news_intel_by_record_id","caught":["Exception"],"digest":"167e16ffe3ab5427eb5285d6023201eab54aab6c477dfbcbac2de13fe246796d"},
