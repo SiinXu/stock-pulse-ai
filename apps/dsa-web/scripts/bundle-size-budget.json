@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909 and PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909 and PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories. Locale budgets record the deterministic combined output of the DCF, screening-state, and what-if translations with 50-72 bytes of headroom; unchanged assets retain the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -25,39 +25,38 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 130400,
-      "measuredGzipBytes": 118377
+      "maxGzipBytes": 131100,
+      "measuredGzipBytes": 131041
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 125150,
-      "measuredGzipBytes": 124825,
-      "note": "Rebaselined after the localized financial-chart and Today's Focus strings landed together; the 125,000-byte cap leaves 175 bytes of headroom."
+      "maxGzipBytes": 125450,
+      "measuredGzipBytes": 125398
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 124794,
-      "measuredGzipBytes": 113449
+      "maxGzipBytes": 125075,
+      "measuredGzipBytes": 125020
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 124875,
-      "measuredGzipBytes": 113296
+      "maxGzipBytes": 125525,
+      "measuredGzipBytes": 125453
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 120675,
-      "measuredGzipBytes": 109522
+      "maxGzipBytes": 121275,
+      "measuredGzipBytes": 121225
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 118181,
-      "measuredGzipBytes": 107437
+      "maxGzipBytes": 118850,
+      "measuredGzipBytes": 118787
     },
     {
       "id": "locale-ms",
