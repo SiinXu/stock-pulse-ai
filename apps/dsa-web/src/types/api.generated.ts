@@ -139,6 +139,7 @@ export interface paths {
          *       - pipeline_timeout: analysis stopped because the stage/pipeline budget expired
          *       - pipeline_budget_skipped: analysis stopped before an unstarted stage
          *         because the remaining budget was too low for useful work
+         *       - turn_persisted: the identified user turn and request context are durable
          *       - done: analysis complete, contains 'content' and 'success'
          *       - error: error occurred, contains 'message'
          */
@@ -832,6 +833,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calculators/compound-growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compound growth calculator
+         * @description Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.
+         */
+        post: operations["postCompoundGrowth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-contribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve contribution required to reach a target
+         * @description Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-duration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve periods required to reach a target
+         * @description Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetDuration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the runtime capability inventory (read-only)
+         * @description Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.
+         */
+        get: operations["listCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-profiles/export": {
         parameters: {
             query?: never;
@@ -1250,6 +1331,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/export/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report export capabilities
+         * @description Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.
+         */
+        get: operations["get_report_export_capabilities_api_v1_history_export_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search analysis history summaries
+         * @description Search stock code, stock name, report type, trend, summary, advice, and creation timestamp through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.
+         */
+        get: operations["search_history_api_v1_history_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history/stocks": {
         parameters: {
             query?: never;
@@ -1302,6 +1423,26 @@ export interface paths {
          * @description 根据分析历史记录 ID 或 query_id 获取用户可读诊断摘要和脱敏复制文本。
          */
         get: operations["get_history_diagnostics_api_v1_history__record_id__diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{record_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a history report
+         * @description Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.
+         */
+        get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1845,6 +1986,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onboarding/demo-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offline sample analysis for zero-config first success
+         * @description Returns a fixed offline sample analysis. Always is_sample=true with a visible sample banner. No network, LLM, or paid data is used.
+         */
+        get: operations["get_demo_analysis_api_v1_onboarding_demo_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/first-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Zero-config first-run readiness (read-only)
+         * @description Returns fresh-environment detection, beginner-mode recommendation, fast loopback Ollama detect results, and the primary CTA path (model setup vs offline demo). Never mutates configuration.
+         */
+        get: operations["get_first_run_readiness_api_v1_onboarding_first_run_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/plan": {
         parameters: {
             query?: never;
@@ -1892,9 +2073,29 @@ export interface paths {
         };
         /**
          * List registered plugins and lifecycle state
-         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
+         * @description Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.
          */
         get: operations["listPlugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read-only plugin health snapshot
+         * @description Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.
+         */
+        get: operations["getPluginHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2255,6 +2456,26 @@ export interface paths {
         post?: never;
         /** Delete trade event */
         delete: operations["delete_trade_api_v1_portfolio_trades__trade_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reasoning-trace/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export multi-agent reasoning trace for an analysis history record
+         * @description Builds a redacted reasoning-trace-v1 package from already-recorded diagnostics and dashboard synthesis fields. Disabled by default (REASONING_TRACE_EXPORT_ENABLED=false). Supported credential and local-path classes are redacted; operators must still treat exports as sensitive.
+         */
+        get: operations["exportReasoningTrace"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4992,6 +5213,17 @@ export interface components {
              */
             saved: number;
         };
+        /** BalancePoint */
+        BalancePoint: {
+            /** Balance */
+            balance: number;
+            /** Gain */
+            gain: number;
+            /** Period */
+            period: number;
+            /** Total Contributed */
+            total_contributed: number;
+        };
         /**
          * BatchDuplicateTaskItem
          * @description 批量异步任务中的重复提交项。
@@ -5187,6 +5419,53 @@ export interface components {
             total_tokens: number;
         };
         /**
+         * CapabilityListResponse
+         * @description Versioned GET /api/v1/capabilities inventory snapshot.
+         */
+        CapabilityListResponse: {
+            /** Executable Count */
+            executable_count: number;
+            /** Items */
+            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"])[];
+            /** Non Executable Count */
+            non_executable_count: number;
+            /** Partial */
+            partial: boolean;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "capability-inventory/v1";
+            /** Sources */
+            sources?: components["schemas"]["CapabilitySourceStatus"][];
+            /** Total */
+            total: number;
+            /** Unknown Executable Count */
+            unknown_executable_count: number;
+        };
+        /**
+         * CapabilitySourceStatus
+         * @description Freshness and consistency state for one authoritative owner.
+         */
+        CapabilitySourceStatus: {
+            /** As Of */
+            as_of: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Generation */
+            generation: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "data" | "tool" | "extension";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "error" | "generation_drift" | "not_initialized";
+        };
+        /**
          * ChangePasswordRequest
          * @description Change password request body.
          */
@@ -5219,6 +5498,8 @@ export interface components {
             session_id?: string | null;
             /** Skills */
             skills?: string[] | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ChatResponse */
         ChatResponse: {
@@ -5231,6 +5512,66 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+            /** Turn Id */
+            turn_id?: string | null;
+        };
+        /** CompoundGrowthRequest */
+        CompoundGrowthRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             * @default 0
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Years */
+            years: number;
+        };
+        /** CompoundGrowthResponse */
+        CompoundGrowthResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Final Value */
+            final_value: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Series */
+            series: components["schemas"]["BalancePoint"][];
+            /** Series Returned Points */
+            series_returned_points: number;
+            /** Series Sampled */
+            series_sampled: boolean;
+            /** Series Stride */
+            series_stride: number;
+            /** Series Total Points */
+            series_total_points: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /** Total Contributed */
+            total_contributed: number;
+            /** Total Gain */
+            total_gain: number;
+            /** Years */
+            years: number;
         };
         /** ConfigComponentDiff */
         ConfigComponentDiff: {
@@ -5604,6 +5945,74 @@ export interface components {
             time: string;
             /** Timezone */
             timezone: string;
+        };
+        /**
+         * DataCapabilityItem
+         * @description Active data-provider or supplied-method observation.
+         */
+        DataCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "data";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "data_provider" | "data_method";
+            /** Version */
+            version: string;
         };
         /** DecisionSignalCreateRequest */
         DecisionSignalCreateRequest: {
@@ -6205,6 +6614,133 @@ export interface components {
              */
             deleted: number;
         };
+        /** DemoAnalysisDetails */
+        DemoAnalysisDetails: {
+            /** News */
+            news?: string[];
+            /** Technical */
+            technical?: string[];
+        };
+        /** DemoAnalysisMeta */
+        DemoAnalysisMeta: {
+            /** Change Pct */
+            change_pct?: null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Price */
+            current_price?: null;
+            /**
+             * Model Used
+             * @constant
+             */
+            model_used: "demo-fixture/offline";
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            /**
+             * Report Language
+             * @enum {string}
+             */
+            report_language: "zh" | "en" | "ko";
+            /**
+             * Report Type
+             * @constant
+             */
+            report_type: "brief";
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisReport */
+        DemoAnalysisReport: {
+            details: components["schemas"]["DemoAnalysisDetails"];
+            meta: components["schemas"]["DemoAnalysisMeta"];
+            strategy: components["schemas"]["DemoAnalysisStrategy"];
+            summary: components["schemas"]["DemoAnalysisSummary"];
+        };
+        /**
+         * DemoAnalysisResponse
+         * @description Offline sample analysis. Always ``is_sample=True``.
+         */
+        DemoAnalysisResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Is Sample
+             * @default true
+             * @constant
+             */
+            is_sample: true;
+            /**
+             * Query Id
+             * @constant
+             */
+            query_id: "demo-sample-analysis-v1";
+            report: components["schemas"]["DemoAnalysisReport"];
+            /** Sample Banner */
+            sample_banner: string;
+            /** Sample Disclaimer */
+            sample_disclaimer: string;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Stock Code
+             * @constant
+             */
+            stock_code: "600519";
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** DemoAnalysisStrategy */
+        DemoAnalysisStrategy: {
+            /** Ideal Buy */
+            ideal_buy?: null;
+            /** Secondary Buy */
+            secondary_buy?: null;
+            /** Stop Loss */
+            stop_loss?: null;
+            /** Take Profit */
+            take_profit?: null;
+        };
+        /** DemoAnalysisSummary */
+        DemoAnalysisSummary: {
+            /**
+             * Action
+             * @constant
+             */
+            action: "watch";
+            /** Action Label */
+            action_label: string;
+            /** Analysis Summary */
+            analysis_summary: string;
+            /** Operation Advice */
+            operation_advice: string;
+            /**
+             * Sentiment Label
+             * @enum {string}
+             */
+            sentiment_label: "中性" | "Neutral" | "중립";
+            /** Sentiment Score */
+            sentiment_score: number;
+            /** Trend Prediction */
+            trend_prediction: string;
+        };
         /**
          * DiscoverLLMChannelModelsRequest
          * @description Request payload for discovering models from one LLM channel.
@@ -6366,6 +6902,74 @@ export interface components {
             updated_at?: string | null;
         };
         /**
+         * ExtensionCapabilityItem
+         * @description Plugin lifecycle or active contribution observation.
+         */
+        ExtensionCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "extension";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "plugin_lifecycle" | "extension_registration";
+            /** Version */
+            version: string;
+        };
+        /**
          * ExtractFromImageResponse
          * @description 图片股票代码提取响应
          */
@@ -6407,6 +7011,75 @@ export interface components {
              * @description 股票名称（如有）
              */
             name?: string | null;
+        };
+        /**
+         * FirstRunReadinessResponse
+         * @description Zero-config first-run readiness snapshot (read-only; never mutates config).
+         */
+        FirstRunReadinessResponse: {
+            /** Beginner Mode Recommended */
+            beginner_mode_recommended: boolean;
+            /**
+             * Config Mutated
+             * @default false
+             * @constant
+             */
+            config_mutated: false;
+            /**
+             * Demo Available
+             * @default true
+             * @constant
+             */
+            demo_available: true;
+            /**
+             * Existing Config Untouched
+             * @default true
+             * @constant
+             */
+            existing_config_untouched: true;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Has Primary Model */
+            has_primary_model: boolean;
+            /** Is Fresh Environment */
+            is_fresh_environment: boolean;
+            local_runtime: components["schemas"]["LocalRuntimeSnapshot"];
+            /**
+             * Primary Cta
+             * @enum {string}
+             */
+            primary_cta: "continue" | "open_local_setup" | "view_demo";
+            /**
+             * Primary Path
+             * @enum {string}
+             */
+            primary_path: "configured" | "local_ollama" | "demo";
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "primary_model_configured" | "local_model_ready" | "local_runtime_no_models" | "local_detect_disabled" | "local_runtime_unavailable";
+            /** Reason Params */
+            reason_params?: {
+                [key: string]: string;
+            };
+            /** Recommended Preset Id */
+            recommended_preset_id?: "local-first" | null;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
         };
         /**
          * GenerationBackendStatus
@@ -6646,6 +7319,63 @@ export interface components {
              * @description 总记录数
              */
             total: number;
+        };
+        /**
+         * HistorySearchItem
+         * @description Low-sensitive report projection returned by command-palette search.
+         */
+        HistorySearchItem: {
+            /**
+             * Created At
+             * @description Report creation timestamp
+             */
+            created_at?: string | null;
+            /**
+             * Id
+             * @description Analysis history record primary key
+             */
+            id: number;
+            /**
+             * Report Type
+             * @description Persisted report type
+             */
+            report_type?: string | null;
+            /**
+             * Stock Code
+             * @description Persisted stock code
+             */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @description Persisted stock name
+             */
+            stock_name?: string | null;
+            /**
+             * Summary
+             * @description Truncated conclusion excerpt
+             */
+            summary?: string | null;
+        };
+        /**
+         * HistorySearchResponse
+         * @description Bounded full-text search results for analysis history summaries.
+         */
+        HistorySearchResponse: {
+            /**
+             * Items
+             * @description Ranked matching history summaries
+             */
+            items?: components["schemas"]["HistorySearchItem"][];
+            /**
+             * Limit
+             * @description Maximum returned result count
+             */
+            limit: number;
+            /**
+             * Query
+             * @description Normalized literal search query
+             */
+            query: string;
         };
         /**
          * ImportSystemConfigRequest
@@ -7753,6 +8483,47 @@ export interface components {
             policy: string;
         };
         /**
+         * LocalRuntimeSnapshot
+         * @description Public, non-secret local-runtime detect projection.
+         */
+        LocalRuntimeSnapshot: {
+            /** Backend */
+            backend?: "ollama" | null;
+            /** Base Url */
+            base_url?: string | null;
+            /**
+             * Detect Enabled
+             * @default true
+             */
+            detect_enabled: boolean;
+            /** Models */
+            models?: string[];
+            /**
+             * Models Available
+             * @default false
+             */
+            models_available: boolean;
+            /**
+             * Reachable
+             * @default false
+             */
+            reachable: boolean;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "ollama_ready" | "ollama_no_models" | "detect_disabled" | "ollama_unreachable";
+            /**
+             * Runnable
+             * @default false
+             */
+            runnable: boolean;
+            /** Suggested Profile */
+            suggested_profile?: {
+                [key: string]: string;
+            };
+        };
+        /**
          * LoginRequest
          * @description Login request body. For first-time setup use password + password_confirm.
          */
@@ -8450,6 +9221,56 @@ export interface components {
             win_rate_pct?: number | null;
         };
         /**
+         * PluginHealthEntryResponse
+         * @description One plugin health row for operator diagnostics consumers.
+         */
+        PluginHealthEntryResponse: {
+            /** Desired Enabled */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /** Last Error Code */
+            last_error_code?: string | null;
+            /** Name */
+            name: string;
+            /** Package Root */
+            package_root?: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloadable
+             * @default false
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginHealthResponse
+         * @description GET /api/v1/plugins/health — read-only plugin health snapshot.
+         */
+        PluginHealthResponse: {
+            /**
+             * Generated At
+             * @description UTC ISO-8601 timestamp when the snapshot was built
+             */
+            generated_at: string;
+            /** Plugins */
+            plugins?: components["schemas"]["PluginHealthEntryResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
          * PluginInfo
          * @description One registered plugin and its lifecycle state.
          */
@@ -8476,6 +9297,11 @@ export interface components {
              * @description Stable plugin id from the manifest
              */
             id: string;
+            /**
+             * Last Error Code
+             * @description Stable last lifecycle failure code when the plugin is degraded
+             */
+            last_error_code?: string | null;
             /** Name */
             name: string;
             /**
@@ -9362,6 +10188,285 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ReasoningTraceAgent */
+        ReasoningTraceAgent: {
+            /** Events */
+            events?: components["schemas"]["ReasoningTraceAgentEvent"][];
+            /** Input Summary */
+            input_summary?: string | null;
+            /** Output Opinion */
+            output_opinion?: string | null;
+            /** Role */
+            role: string;
+            /** Tool Calls */
+            tool_calls?: components["schemas"]["ReasoningTraceToolCall"][];
+        };
+        /** ReasoningTraceAgentEvent */
+        ReasoningTraceAgentEvent: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Event Type */
+            event_type?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Phase */
+            phase?: string | null;
+            /** Sequence */
+            sequence?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Timestamp */
+            timestamp?: string | null;
+        };
+        /** ReasoningTraceConclusion */
+        ReasoningTraceConclusion: {
+            /** Analysis Summary */
+            analysis_summary?: string | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Final Signal */
+            final_signal?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Sentiment Score */
+            sentiment_score?: number | null;
+        };
+        /** ReasoningTraceConsensus */
+        ReasoningTraceConsensus: {
+            /** Committee Status */
+            committee_status?: string | null;
+            /** Consensus Level */
+            consensus_level?: string | null;
+        };
+        /** ReasoningTraceCoverage */
+        ReasoningTraceCoverage: {
+            /** Not Recorded */
+            not_recorded?: string[];
+            /** Notes */
+            notes: string;
+            /** Sources */
+            sources?: components["schemas"]["ReasoningTraceCoverageSource"][];
+        };
+        /** ReasoningTraceCoverageSource */
+        ReasoningTraceCoverageSource: {
+            /** Absent */
+            absent: boolean;
+            /** Dropped Count */
+            dropped_count?: number | null;
+            /**
+             * Export Truncated
+             * @default false
+             */
+            export_truncated: boolean;
+            /** Original Count */
+            original_count?: number | null;
+            /** Present */
+            present: boolean;
+            /** Reasons */
+            reasons?: string[];
+            /** Returned Count */
+            returned_count?: number | null;
+            /** Source */
+            source: string;
+            /** Source Dropped Count */
+            source_dropped_count?: number | null;
+            /**
+             * Source Truncated
+             * @default false
+             */
+            source_truncated: boolean;
+            /**
+             * Source Truncated Unknown
+             * @default false
+             */
+            source_truncated_unknown: boolean;
+            /** Supported */
+            supported: boolean;
+        };
+        /** ReasoningTraceDataQuality */
+        ReasoningTraceDataQuality: {
+            /** Missing Fields */
+            missing_fields?: string[];
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** ReasoningTraceDataSources */
+        ReasoningTraceDataSources: {
+            data_quality_status?: components["schemas"]["ReasoningTraceDataQuality"] | null;
+            /** Llm Runs */
+            llm_runs?: components["schemas"]["ReasoningTraceLlmRun"][];
+            /** Pipeline Stage Runs */
+            pipeline_stage_runs?: components["schemas"]["ReasoningTracePipelineStage"][];
+            /** Provider Trace */
+            provider_trace?: components["schemas"]["ReasoningTraceProviderRun"][];
+        };
+        /** ReasoningTraceDisagreement */
+        ReasoningTraceDisagreement: {
+            /** Conflict Count */
+            conflict_count?: number | null;
+            /** Conflict Severity */
+            conflict_severity?: string | null;
+            /** Consensus Level */
+            consensus_level?: string | null;
+            /** Opposing Skills */
+            opposing_skills?: string[];
+            /** Supporting Skills */
+            supporting_skills?: string[];
+        };
+        /**
+         * ReasoningTraceExportResponse
+         * @description JSON export envelope for ``reasoning-trace-v1``.
+         */
+        ReasoningTraceExportResponse: {
+            /** Agents */
+            agents?: components["schemas"]["ReasoningTraceAgent"][];
+            coverage: components["schemas"]["ReasoningTraceCoverage"];
+            data_sources?: components["schemas"]["ReasoningTraceDataSources"];
+            /** Markdown */
+            markdown?: string | null;
+            run: components["schemas"]["ReasoningTraceRun"];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "reasoning-trace-v1";
+            synthesis?: components["schemas"]["ReasoningTraceSynthesis"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            truncation?: components["schemas"]["ReasoningTraceTruncation"] | null;
+        };
+        /** ReasoningTraceLlmRun */
+        ReasoningTraceLlmRun: {
+            /** Call Type */
+            call_type?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Status */
+            status?: string | null;
+            usage?: components["schemas"]["ReasoningTraceTokenUsage"];
+        };
+        /** ReasoningTracePipelineStage */
+        ReasoningTracePipelineStage: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Stage */
+            stage?: string | null;
+            /** Status */
+            status?: string | null;
+        };
+        /** ReasoningTraceProviderRun */
+        ReasoningTraceProviderRun: {
+            /** Data Type */
+            data_type?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Operation */
+            operation?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Status */
+            status?: string | null;
+        };
+        /** ReasoningTraceRun */
+        ReasoningTraceRun: {
+            /** Config Fingerprint */
+            config_fingerprint: string;
+            /** Exported At */
+            exported_at: string;
+            /** Lookup Key */
+            lookup_key?: string | null;
+            /** Lookup Mode */
+            lookup_mode?: ("primary_key" | "latest_by_query_id") | null;
+            /** Market */
+            market?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Query Id */
+            query_id?: string | null;
+            /** Record Id */
+            record_id?: string | null;
+            /** Run Id */
+            run_id: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Stock Name */
+            stock_name?: string | null;
+            /** Trace Id */
+            trace_id?: string | null;
+        };
+        /** ReasoningTraceSynthesis */
+        ReasoningTraceSynthesis: {
+            consensus?: components["schemas"]["ReasoningTraceConsensus"];
+            disagreement?: components["schemas"]["ReasoningTraceDisagreement"];
+            final_conclusion?: components["schemas"]["ReasoningTraceConclusion"];
+        };
+        /** ReasoningTraceTokenUsage */
+        ReasoningTraceTokenUsage: {
+            /** Completion Tokens */
+            completion_tokens?: number | null;
+            /** Prompt Tokens */
+            prompt_tokens?: number | null;
+            /** Total Tokens */
+            total_tokens?: number | null;
+        };
+        /** ReasoningTraceToolCall */
+        ReasoningTraceToolCall: {
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Name */
+            name: string;
+            /** Sequence */
+            sequence?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Step */
+            step?: string | null;
+            /** Timestamp */
+            timestamp?: string | null;
+            /** Tool Call Id */
+            tool_call_id?: string | null;
+        };
+        /** ReasoningTraceTruncation */
+        ReasoningTraceTruncation: {
+            /** Dropped */
+            dropped?: components["schemas"]["ReasoningTraceTruncationDrop"][];
+            /**
+             * Marker
+             * @default truncated
+             * @constant
+             */
+            marker: "truncated";
+            /** Max Chars */
+            max_chars: number;
+            /** Reason */
+            reason: string;
+        };
+        /** ReasoningTraceTruncationDrop */
+        ReasoningTraceTruncationDrop: {
+            /** Count */
+            count?: number | null;
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
+        };
         /**
          * ReportDetails
          * @description 报告详情区
@@ -9421,6 +10526,87 @@ export interface components {
             sector_rankings?: unknown | null;
             /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
+        };
+        /**
+         * ReportExportCapabilitiesResponse
+         * @description Language-aware export capabilities.
+         */
+        ReportExportCapabilitiesResponse: {
+            /**
+             * Chart Handling
+             * @constant
+             */
+            chart_handling: "markdown_images_omitted_without_destinations";
+            formats: components["schemas"]["ReportExportFormats"];
+            /**
+             * Office Formats Status
+             * @constant
+             */
+            office_formats_status: "not_implemented";
+            pdf_limits: components["schemas"]["ReportExportPdfLimits"];
+            /**
+             * Requested Language
+             * @enum {string}
+             */
+            requested_language: "en" | "zh" | "zh-TW" | "ja" | "ko";
+            /** Supported Query Formats */
+            supported_query_formats: ("md" | "pdf")[];
+        };
+        /**
+         * ReportExportFormatCapability
+         * @description Readiness of one archive format without host filesystem details.
+         */
+        ReportExportFormatCapability: {
+            /** Available */
+            available: boolean;
+            /** Dependency */
+            dependency?: string | null;
+            /** Dependency Installed */
+            dependency_installed: boolean;
+            /** Dependency Version */
+            dependency_version?: string | null;
+            /** Font Validated */
+            font_validated?: boolean | null;
+            /** Media Type */
+            media_type: string;
+            /**
+             * Missing Glyph Count
+             * @default 0
+             */
+            missing_glyph_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "dependency_missing" | "dependency_import_invalid" | "dependency_version_invalid" | "legacy_namespace_conflict" | "configured_font_invalid" | "font_not_found" | "font_invalid" | "font_empty_cmap" | "font_coverage_missing" | "font_smoke_failed" | "not_checked";
+        };
+        /**
+         * ReportExportFormats
+         * @description Closed format map so generated clients expose both known keys.
+         */
+        ReportExportFormats: {
+            md: components["schemas"]["ReportExportFormatCapability"];
+            pdf: components["schemas"]["ReportExportFormatCapability"];
+        };
+        /**
+         * ReportExportPdfLimits
+         * @description Deterministic synchronous PDF resource bounds.
+         */
+        ReportExportPdfLimits: {
+            /** Max Concurrency */
+            max_concurrency: number;
+            /** Max Input Bytes */
+            max_input_bytes: number;
+            /** Max Output Bytes */
+            max_output_bytes: number;
+            /** Max Pages */
+            max_pages: number;
+            /** Max Render Seconds */
+            max_render_seconds: number;
+            /** Max Table Columns */
+            max_table_columns: number;
+            /** Max Table Rows */
+            max_table_rows: number;
         };
         /** ReportFieldDiff */
         ReportFieldDiff: {
@@ -10739,6 +11925,8 @@ export interface components {
             } | null;
             /** Role */
             role: string;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** SessionMessagesResponse */
         SessionMessagesResponse: {
@@ -10747,6 +11935,11 @@ export interface components {
             /** Session Id */
             session_id: string;
             session_state: components["schemas"]["SessionStateResponse"];
+            /**
+             * Turn Identity Supported
+             * @default true
+             */
+            turn_identity_supported: boolean;
         };
         /** SessionStateResponse */
         SessionStateResponse: {
@@ -11343,7 +12536,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**
@@ -11523,6 +12716,248 @@ export interface components {
             };
             /** Trace Id */
             trace_id?: string | null;
+        };
+        /** TargetContributionAlreadyMetResponse */
+        TargetContributionAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_growth_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionOkResponse */
+        TargetContributionOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "contribution_required";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionRequest */
+        TargetContributionRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionUnreachableResponse */
+        TargetContributionUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period?: null;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationAlreadyMetResponse */
+        TargetDurationAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Period Count
+             * @constant
+             */
+            period_count: 0;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_already_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationOkResponse */
+        TargetDurationOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "duration_solved";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationRequest */
+        TargetDurationRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+        };
+        /** TargetDurationUnreachableResponse */
+        TargetDurationUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count?: null;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "non_positive_trajectory" | "max_years_exceeded" | "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years?: null;
         };
         /**
          * TaskAccepted
@@ -12013,6 +13448,74 @@ export interface components {
             success: boolean;
         };
         /**
+         * ToolCapabilityItem
+         * @description Registered or owner-declared Agent tool observation.
+         */
+        ToolCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "tool";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "agent_tool";
+            /** Version */
+            version: string;
+        };
+        /**
          * UnsupportedScheduledTaskItem
          * @description Opaque projection of a definition written by a newer application.
          */
@@ -12227,10 +13730,10 @@ export interface components {
             markets?: string[];
             /**
              * Report Language
-             * @description zh | en | ko | ja
              * @default zh
+             * @enum {string}
              */
-            report_language: string;
+            report_language: "zh" | "en" | "ko";
             /**
              * Risk Tone
              * @description conservative | balanced | assertive (tone only, not advice)
@@ -14611,6 +16114,209 @@ export interface operations {
             };
         };
     };
+    postCompoundGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompoundGrowthRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompoundGrowthResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetContributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetContributionOkResponse"] | components["schemas"]["TargetContributionAlreadyMetResponse"] | components["schemas"]["TargetContributionUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetDuration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetDurationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDurationOkResponse"] | components["schemas"]["TargetDurationAlreadyMetResponse"] | components["schemas"]["TargetDurationUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listCapabilities: {
+        parameters: {
+            query?: {
+                /** @description Optional domain filter. Allowed values: data, tool, extension. */
+                domain?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityListResponse"];
+                };
+            };
+            /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_config_profile_api_v1_config_profiles_export_get: {
         parameters: {
             query?: never;
@@ -16040,6 +17746,81 @@ export interface operations {
             };
         };
     };
+    get_report_export_capabilities_api_v1_history_export_capabilities_get: {
+        parameters: {
+            query?: {
+                /** @description Report language whose representative glyph set must be supported. */
+                language?: "en" | "zh" | "zh-TW" | "ja" | "ko";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available report export formats and dependency status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExportCapabilitiesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_history_api_v1_history_search_get: {
+        parameters: {
+            query: {
+                /** @description Literal search query */
+                q: string;
+                /** @description Maximum returned result count */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded history search results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorySearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_stock_bar_api_v1_history_stocks_get: {
         parameters: {
             query?: {
@@ -16174,6 +17955,95 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_history_report_api_v1_history__record_id__export_get: {
+        parameters: {
+            query?: {
+                /** @description Export format: md (default) or pdf */
+                format?: "md" | "pdf";
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exported report file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "text/markdown": string;
+                };
+            };
+            /** @description Invalid export format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Report not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export resource limit exceeded */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description PDF export capacity is busy */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export or report generation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description PDF dependency, font, deadline, or render worker unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17645,6 +19515,75 @@ export interface operations {
             };
         };
     };
+    get_demo_analysis_api_v1_onboarding_demo_analysis_get: {
+        parameters: {
+            query?: {
+                report_language?: "zh" | "en" | "ko";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoAnalysisResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_first_run_readiness_api_v1_onboarding_first_run_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirstRunReadinessResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     generate_onboarding_plan_api_v1_onboarding_plan_post: {
         parameters: {
             query?: never;
@@ -17792,6 +19731,35 @@ export interface operations {
             };
         };
     };
+    getPluginHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginHealthResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     updatePluginLifecycle: {
         parameters: {
             query?: never;
@@ -17854,6 +19822,15 @@ export interface operations {
             };
             /** @description Lifecycle operation failed unexpectedly */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19232,6 +21209,97 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exportReasoningTrace: {
+        parameters: {
+            query?: {
+                /** @description json returns the package envelope; markdown returns text/markdown body */
+                format?: "json" | "markdown";
+                /** @description When format=json, also embed a redacted markdown companion field */
+                include_markdown?: boolean;
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Strict JSON trace package or inert Markdown export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReasoningTraceExportResponse"];
+                    "text/markdown": string;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

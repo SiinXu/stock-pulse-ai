@@ -733,6 +733,22 @@ class _PersistenceStageMixin:
         query_id: str,
     ) -> Tuple[str, Optional[Dict[str, Any]]]:
         try:
+            diagnostic_snapshot = current_diagnostic_snapshot()
+            evidence = (
+                diagnostic_snapshot.get("data_quality_evidence")
+                if isinstance(diagnostic_snapshot, dict)
+                else None
+            )
+            if isinstance(evidence, list):
+                from dataclasses import replace as replace_artifacts
+
+                metadata = dict(artifacts.metadata or {})
+                metadata["data_quality_evidence"] = [
+                    dict(item)
+                    for item in evidence[-24:]
+                    if isinstance(item, dict)
+                ]
+                artifacts = replace_artifacts(artifacts, metadata=metadata)
             pack = AnalysisContextBuilder.build(artifacts)
             summary = format_analysis_context_pack_prompt_section(
                 pack,

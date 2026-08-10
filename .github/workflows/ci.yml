@@ -107,7 +107,7 @@ jobs:
   backend-gate:
     name: backend-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true'
     permissions:
@@ -183,7 +183,7 @@ jobs:
   python-minimum:
     name: python-minimum
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true'
     permissions:

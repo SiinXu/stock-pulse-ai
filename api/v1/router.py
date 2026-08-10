@@ -19,6 +19,8 @@ from api.v1.endpoints import (
     approvals,
     auth,
     backtest,
+    calculators,
+    capabilities,
     config_profiles,
     decision_signals,
     health,
@@ -31,6 +33,8 @@ from api.v1.endpoints import (
     onboarding,
     portfolio,
     portfolio_risk_metrics,
+    reasoning_trace,
+    report_export,
     report_version_compare,
     scheduled_tasks,
     scorecard,
@@ -75,6 +79,14 @@ router.include_router(
     history.router,
     prefix="/history",
     tags=["History"]
+)
+
+# Report export (Markdown / optional PDF). Same /history prefix; static
+# /export/capabilities is registered before /{record_id}/export inside the module.
+router.include_router(
+    report_export.router,
+    prefix="/history",
+    tags=["History"],
 )
 
 router.include_router(
@@ -133,6 +145,12 @@ router.include_router(
 )
 
 router.include_router(
+    calculators.router,
+    prefix="/calculators",
+    tags=["Calculators"],
+)
+
+router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
@@ -187,6 +205,12 @@ router.include_router(
 )
 
 router.include_router(
+    reasoning_trace.router,
+    prefix="/reasoning-trace",
+    tags=["ReasoningTrace"],
+)
+
+router.include_router(
     scheduled_tasks.router,
     prefix="/scheduled-tasks",
     tags=["ScheduledTasks"]
@@ -209,6 +233,12 @@ router.include_router(
     plugins.router,
     prefix="/plugins",
     tags=["Plugins"],
+)
+
+router.include_router(
+    capabilities.router,
+    prefix="/capabilities",
+    tags=["Capabilities"],
 )
 
 
