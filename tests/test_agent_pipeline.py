@@ -607,6 +607,8 @@ class TestAgentResultConversion(unittest.TestCase):
             mock_cfg.enable_chip_distribution = True
             mock_cfg.realtime_source_priority = []
             mock_cfg.save_context_snapshot = False
+            mock_cfg.report_language = "zh"
+            mock_cfg.risk_gate_profile = "balanced"
             mock_config.return_value = mock_cfg
 
             from src.core.pipeline import StockAnalysisPipeline
@@ -1692,6 +1694,10 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             mock_cfg.enable_chip_distribution = True
             mock_cfg.realtime_source_priority = []
             mock_cfg.save_context_snapshot = False
+            mock_cfg.report_language = "zh"
+            mock_cfg.risk_gate_profile = "balanced"
+            mock_cfg.agent_risk_override = False
+            mock_cfg.agent_multi_strategy_deliberation = True
             mock_config.return_value = mock_cfg
 
             from src.core.pipeline import StockAnalysisPipeline
@@ -1706,8 +1712,20 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
                     "stock_name": "科创芯片ETF",
                     "sentiment_score": 78,
                     "trend_prediction": "震荡偏多",
-                    "operation_advice": "持有",
-                    "decision_type": "hold",
+                    "operation_advice": "买入",
+                    "decision_type": "buy",
+                    "analysis_summary": "原始买入建议",
+                    "risk_assessment": {
+                        "risk_level": "high",
+                        "veto_buy": True,
+                        "risk_flags": [
+                            {
+                                "category": "exposure",
+                                "description": "集中度超限",
+                                "severity": "high",
+                            }
+                        ],
+                    },
                 },
                 provider="gemini",
             )
@@ -1734,6 +1752,17 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
 
             self.assertIsNotNone(result)
             self.assertEqual(result.name, "科创芯片ETF")
+            self.assertEqual(result.decision_type, "hold")
+            self.assertEqual(result.action, "hold")
+            self.assertEqual(
+                result.risk_gate_result["exit_id"],
+                "deliberation_projection",
+            )
+            self.assertEqual(result.risk_gate_result["final_action"], "hold")
+            self.assertEqual(
+                agent_result.runtime_facts.risk_evidence.risk_level,
+                "high",
+            )
             pipeline.search_service.search_stock_news.assert_called_once_with(
                 stock_code="588200",
                 stock_name="科创芯片ETF",

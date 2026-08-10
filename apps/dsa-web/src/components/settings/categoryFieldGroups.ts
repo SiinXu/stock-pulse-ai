@@ -186,6 +186,7 @@ const AGENT_GROUPS: CategoryFieldGroup[] = [
       'DECISION_PROFILE_CALIBRATION_ENABLED',
       'AGENT_CRITIC_ENABLED',
       'AGENT_RISK_OVERRIDE',
+      'RISK_GATE_PROFILE',
     ],
   },
   {

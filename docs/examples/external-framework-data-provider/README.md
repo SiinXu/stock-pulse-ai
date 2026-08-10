@@ -27,8 +27,8 @@ metadata only.
 Before enabling:
 
 1. Review every file in this directory.
-2. Install and pin OpenBB yourself in the application environment
-   (`pip install openbb` or your org's approved mirror). StockPulse will not
+2. Install and pin the supported OpenBB minor in the application environment
+   (`pip install 'openbb>=4.7,<4.8'` or your org's approved mirror). StockPulse will not
    install it.
 3. Point `PLUGINS_DIR` at a reviewed parent directory that contains this package
    as a **direct child**. Prefer an absolute, operator-owned path in production.
@@ -37,7 +37,7 @@ Before enabling:
 
 ```bash
 # 1) Install the external dependency manually (outside StockPulse)
-pip install 'openbb>=4'
+pip install 'openbb>=4.7,<4.8'
 
 # 2) Copy this package under an operator-owned plugin root
 mkdir -p /opt/stockpulse/plugins
@@ -57,16 +57,27 @@ for the composition pattern and lifecycle diagnostics.
 ## Behavior contract
 
 - **Field normalization** → `date`, `open`, `high`, `low`, `close`, `volume`,
-  `amount`, `pct_chg` (same contract as other daily providers).
+  `amount`, `pct_chg`. Required OHLCV/date values must be numeric, finite, and
+  structurally valid; volume is required and cannot be synthesized.
+- **Ordering and duplicates** → parse and sort timestamps ascending, retain the
+  latest observation for each UTC date, then derive `amount` (when absent) and
+  `pct_chg`.
+- **Symbols** → US passes through; Shanghai/Shenzhen and HK forms are mapped to
+  yfinance (`600519.SS`, `000001.SZ`, `0700.HK`). BSE is explicitly unsupported
+  by this example and raises before I/O so the manager can fall back.
 - **Missing OpenBB dependency** → raises `MissingOpenBBDependencyError` with an
   explicit install message. Never returns `None` or an empty frame to fake
   success.
 - **Upstream empty / failure** → raises so `DataFetcherManager` records the
   attempt and continues its eligible fallback chain.
-- **Timeouts** → owned by this adapter / the OpenBB stack. The host does not
-  wrap every provider call in a universal deadline.
-- **No private fallback loop** → one attempt only; shared routing stays with
-  `DataFetcherManager`.
+- **Timeouts** → the single OpenBB/yfinance request runs in an isolated process
+  group. At the configured positive deadline, the adapter terminates and reaps
+  that process tree before raising `TimeoutError`; no timed-out worker thread is
+  left behind.
+- **One supported call** → OpenBB `>=4.7,<4.8`,
+  `obb.equity.price.historical(..., provider="yfinance")`, exactly once. SDK
+  `TypeError` is propagated and never used as signature negotiation.
+- **No private fallback loop** → shared routing stays with `DataFetcherManager`.
 
 ## Offline verification
 
@@ -75,8 +86,10 @@ python -m py_compile docs/examples/external-framework-data-provider/plugin.py
 python -m pytest -q tests/plugins/test_external_framework_openbb_provider.py
 ```
 
-Tests inject a fixture client and never require a live OpenBB install or
-network access (`pytest -m "not network"` safe).
+Tests use deterministic OpenBB 4.7-shaped OBBject/provider fakes and a real
+short-lived subprocess timeout probe; they never require a live OpenBB install
+or network access (`pytest -m "not network"` safe). A live OpenBB/network smoke
+is intentionally not part of the offline gate.
 
 ## V1 surface declaration
 
