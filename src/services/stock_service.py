@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any, List
 
 from src.repositories.stock_repo import StockRepository
 from src.utils.sanitize import log_safe_exception
+from data_provider.daily_cache import LocalDataMissingError
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,8 @@ class StockService:
                 "data": data,
             }
             
+        except LocalDataMissingError:
+            raise
         except ImportError:
             logger.warning("DataFetcherManager 未找到，返回空数据")
             return {"stock_code": stock_code, "period": period, "data": []}

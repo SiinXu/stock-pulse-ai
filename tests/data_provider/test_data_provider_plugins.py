@@ -38,6 +38,7 @@ _BUILTIN_IDENTITIES = {
     "LongbridgeFetcher": "longbridge",
     "FinnhubFetcher": "finnhub",
     "AlphaVantageFetcher": "alphavantage",
+    "CryptoCoingeckoFetcher": "crypto_coingecko",
 }
 
 
