@@ -280,6 +280,12 @@ class Config:
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
+    # Layered memory lifecycle (principal-scoped; minimize-by-default).
+    layered_memory_collection_enabled: bool = False
+    layered_memory_retention_days: int = 90
+    layered_memory_vector_enabled: bool = False
+    layered_memory_max_records_per_principal: int = 200
+    layered_memory_audit_enabled: bool = True
     agent_skill_autoweight: bool = True  # Auto-weight skills by backtest performance
     agent_skill_routing: str = "auto"  # Skill routing: 'auto' (regime-based) or 'manual'
     agent_context_compression_enabled: bool = False  # Compress visible chat history before Agent calls
