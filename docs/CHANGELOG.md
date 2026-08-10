@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
+- [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
