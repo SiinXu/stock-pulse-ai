@@ -1,8 +1,13 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReportStrata } from '../ReportStrata';
 import { resolveReportStrataFromDetails } from '../reportStrataUtils';
 import type { ReportDetails } from '../../../types/analysis';
+
+const expandStrata = () => {
+  const toggle = screen.getByTestId('report-strata-toggle');
+  fireEvent.click(toggle);
+};
 
 const strataPayload = {
   schemaVersion: 'report-strata-v1',
@@ -30,11 +35,24 @@ const strataPayload = {
 };
 
 describe('ReportStrata', () => {
-  it('renders six strata sections in product order and keeps inference out of facts', () => {
+  it('keeps full strata collapsed by default while disclaimer stays visible', () => {
     const details: ReportDetails = { reportStrata: strataPayload };
     render(<ReportStrata details={details} language="en" />);
 
     const root = screen.getByTestId('report-strata');
+    expect(root).toHaveAttribute('data-collapsed', 'true');
+    expect(screen.getByTestId('report-strata-body')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-disclaimer')).toBeVisible();
+    expect(screen.getByTestId('report-strata-toggle')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('renders six strata sections in product order and keeps inference out of facts', () => {
+    const details: ReportDetails = { reportStrata: strataPayload };
+    render(<ReportStrata details={details} language="en" />);
+    expandStrata();
+
+    const root = screen.getByTestId('report-strata');
+    expect(root).toHaveAttribute('data-collapsed', 'false');
     const facts = screen.getByTestId('report-strata-facts');
     const gaps = screen.getByTestId('report-strata-gaps');
     const inference = screen.getByTestId('report-strata-inference');
@@ -51,22 +69,18 @@ describe('ReportStrata', () => {
     expect(within(framework).getByText(/framework not configured/i)).toBeInTheDocument();
     expect(within(disclaimer).getByText(/Not investment advice/)).toBeInTheDocument();
 
-    const order = [facts, gaps, inference, risks, framework, disclaimer].map(
-      (node) => node.compareDocumentPosition.bind(node),
-    );
-    // facts before gaps before inference ...
     expect(facts.compareDocumentPosition(gaps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(gaps.compareDocumentPosition(inference) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inference.compareDocumentPosition(risks) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(risks.compareDocumentPosition(framework) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(framework.compareDocumentPosition(disclaimer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    void order;
   });
 
   it('shows disclaimer for historical reports without strata', () => {
     render(<ReportStrata details={{}} language="zh" alwaysShowDisclaimer />);
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('不构成投资建议');
     expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-strata-toggle')).not.toBeInTheDocument();
   });
 
   it('resolves strata from rawResult.dashboard when projection is absent', () => {
@@ -80,6 +94,7 @@ describe('ReportStrata', () => {
     const resolved = resolveReportStrataFromDetails(details);
     expect(resolved).toBeTruthy();
     render(<ReportStrata details={details} language="en" />);
+    expandStrata();
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
   });
 
@@ -115,9 +130,9 @@ describe('ReportStrata', () => {
       },
     };
     render(<ReportStrata details={details} language="en" />);
+    expandStrata();
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
     expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('Momentum may improve');
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('Not investment advice');
   });
 });
-

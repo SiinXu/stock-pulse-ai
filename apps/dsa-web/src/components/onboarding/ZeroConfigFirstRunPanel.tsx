@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { onboardingApi } from '../../api/onboarding';
 import type { UiTextKey } from '../../i18n/uiText';
 import type { AnalysisReport, ReportLanguage } from '../../types/analysis';
@@ -11,7 +12,7 @@ import type {
   FirstRunReasonCode,
   FirstRunReadiness,
 } from '../../types/onboarding';
-import { Badge, Button, InlineAlert, Spinner, Surface } from '../common';
+import { Badge, Button, IconButton, InlineAlert, Spinner, Surface } from '../common';
 import BeginnerReportSummary from '../report/BeginnerReportSummary';
 
 export type ZeroConfigFirstRunPanelProps = {
@@ -19,7 +20,8 @@ export type ZeroConfigFirstRunPanelProps = {
   readiness?: FirstRunReadiness | null;
   reportLanguage?: ReportLanguage;
   autoLoad?: boolean;
-  onContinue?: () => void | Promise<void>;
+  onContinue?: (readiness: FirstRunReadiness) => void | Promise<void>;
+  onDismiss?: () => void;
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
 };
 
@@ -64,15 +66,15 @@ function toAnalysisReport(demo: DemoAnalysisPayload): AnalysisReport {
 
 /**
  * Self-contained zero-config first-run panel (#796).
- *
- * Does not mutate host pages. Integration Point: mount under Home onboarding
- * when setup is incomplete, or open from FirstRun success step.
+ * Readiness is observational; host-owned navigation is explicit and demo data
+ * stays local to the panel.
  */
 export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = ({
   readiness: readinessProp,
   reportLanguage = 'zh',
   autoLoad = true,
   onContinue,
+  onDismiss,
   t,
 }) => {
   const [readiness, setReadiness] = useState<FirstRunReadiness | null>(readinessProp ?? null);
@@ -133,7 +135,7 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
     if (!onContinue) return;
     setError(null);
     try {
-      await onContinue();
+      await onContinue(readiness);
     } catch {
       setError(t('firstRun.actionError'));
     }
@@ -149,16 +151,29 @@ export const ZeroConfigFirstRunPanel: React.FC<ZeroConfigFirstRunPanelProps> = (
       className="space-y-4"
       data-testid="zero-config-first-run-panel"
     >
-      <header className="space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold text-foreground">
-            {t('firstRun.zeroConfigTitle')}
-          </h2>
-          {readiness?.beginnerModeRecommended ? (
-            <Badge variant="default">{t('firstRun.beginnerRecommended')}</Badge>
-          ) : null}
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-foreground">
+              {t('firstRun.zeroConfigTitle')}
+            </h2>
+            {readiness?.beginnerModeRecommended ? (
+              <Badge variant="default">{t('firstRun.beginnerRecommended')}</Badge>
+            ) : null}
+          </div>
+          <p className="text-sm text-secondary-text">{t('firstRun.zeroConfigSubtitle')}</p>
         </div>
-        <p className="text-sm text-secondary-text">{t('firstRun.zeroConfigSubtitle')}</p>
+        {onDismiss ? (
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="default"
+            aria-label={t('common.close')}
+            onClick={onDismiss}
+          >
+            <X aria-hidden="true" />
+          </IconButton>
+        ) : null}
       </header>
 
       {loading ? (

@@ -39,6 +39,7 @@ import {
 import { AnalysisContextSummary } from '../../components/report/AnalysisContextSummary';
 import { MarketReviewReportView } from '../../components/report/MarketReviewReportView';
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
+import { ReportDecisionCard } from '../../components/report/ReportDecisionCard';
 import { ReportDetails } from '../../components/report/ReportDetails';
 import { ReportDiagnostics } from '../../components/report/ReportDiagnostics';
 import { ReportMarkdown } from '../../components/report/ReportMarkdown';
@@ -592,6 +593,26 @@ const MarketStructureCardStory = () => {
   return <MarketStructureCard context={scenario === 'empty' ? null : fixtureMarketStructure} language="en" />;
 };
 
+const ReportDecisionCardStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ReportDecisionCard
+      meta={fixtureReport.meta}
+      summary={scenario === 'empty'
+        ? {
+            analysisSummary: '',
+            operationAdvice: '',
+            trendPrediction: '',
+            sentimentScore: Number.NaN,
+          }
+        : fixtureReport.summary}
+      strategy={scenario === 'empty' ? undefined : fixtureReport.strategy}
+      details={scenario === 'empty' ? undefined : fixtureReport.details}
+      language="en"
+    />
+  );
+};
+
 const ReportDetailsStory = () => {
   const { scenario } = usePlaygroundScenario();
   return <ReportDetails details={scenario === 'empty' ? undefined : fixtureReport.details} recordId={fixtureReport.meta.id} language="en" />;
@@ -807,6 +828,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,
+  'report-decision-card': ReportDecisionCardStory,
   'report-details': ReportDetailsStory,
   'report-diagnostics': ReportDiagnosticsStory,
   'report-markdown': ReportMarkdownStory,
