@@ -109,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Removed the redundant Backtest Filter action, aligned its Stock field, and clarified the relationship between window days and next-day validation.
 - [Added] Offline financial agent evaluation benchmark (V0): structural metrics over frozen agent_runtime replays, deterministic runner, committed baseline, and bilingual docs (#252).
 - [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
+- [Changed] Stale workflow no longer auto-closes issues (planning backlog stays open); issue stale nudge is 90 days, and common backlog labels are exempt. PRs still stale after 21 days and close after 14 more.
 - [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
 - [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
 - [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
