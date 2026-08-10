@@ -3504,6 +3504,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/valuation/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estimate stock valuation (DCF + relative)
+         * @description Transparent DCF and relative valuation (P/E, P/B, EV/EBITDA when explicit inputs exist). Returns assumptions and a growth×discount sensitivity table. Research support only; not investment advice.
+         */
+        get: operations["estimateStockValuation"];
+        put?: never;
+        /**
+         * Estimate stock valuation with body overrides
+         * @description Same as GET /estimate with JSON body for interactive Web sensitivity UI.
+         */
+        post: operations["estimateStockValuationPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/watchlist/scores": {
         parameters: {
             query?: never;
@@ -13206,6 +13230,68 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValuationEstimateRequest */
+        ValuationEstimateRequest: {
+            /**
+             * Discount Rate
+             * @description Optional discount rate / WACC as a decimal
+             */
+            discount_rate?: number | null;
+            /**
+             * Growth Rate
+             * @description Optional high-growth rate as a decimal
+             */
+            growth_rate?: number | null;
+            /**
+             * Peer Codes
+             * @description Optional peer codes for relative valuation medians
+             */
+            peer_codes?: string[] | null;
+            /**
+             * Projection Years
+             * @description Optional projection horizon in years
+             */
+            projection_years?: number | null;
+            /**
+             * Stock Code
+             * @description Stock code such as 600519, hk00700, or AAPL
+             */
+            stock_code: string;
+            /**
+             * Terminal Growth Rate
+             * @description Optional perpetual growth rate as a decimal
+             */
+            terminal_growth_rate?: number | null;
+        };
+        /** ValuationEstimateResponse */
+        ValuationEstimateResponse: {
+            /** Dcf */
+            dcf?: {
+                [key: string]: unknown;
+            };
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Fundamentals Snapshot */
+            fundamentals_snapshot?: {
+                [key: string]: unknown;
+            } | null;
+            /** Message */
+            message?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Relative */
+            relative?: {
+                [key: string]: unknown;
+            };
+            /** Schema Version */
+            schema_version: string;
+            /** Status */
+            status: string;
+            /** Stock Code */
+            stock_code: string;
+        } & {
+            [key: string]: unknown;
         };
         /** ValueUnavailabilityPayload */
         ValueUnavailabilityPayload: {
@@ -23458,6 +23544,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimateStockValuation: {
+        parameters: {
+            query: {
+                /** @description Stock code */
+                stock_code: string;
+                /** @description Optional growth rate (decimal) */
+                growth_rate?: number | null;
+                /** @description Optional discount rate (decimal) */
+                discount_rate?: number | null;
+                /** @description Optional terminal growth rate (decimal) */
+                terminal_growth_rate?: number | null;
+                projection_years?: number | null;
+                /** @description Optional peer codes (repeat query param) */
+                peer_codes?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValuationEstimateResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Valuation estimate failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    estimateStockValuationPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValuationEstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValuationEstimateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Valuation estimate failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

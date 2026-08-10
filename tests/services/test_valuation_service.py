@@ -248,3 +248,89 @@ def test_service_uses_net_profit_proxy_when_ocf_missing() -> None:
     assert result["dcf"]["status"] == "ok"
     assert result["dcf"]["assumptions"]["cash_flow_source"] == "net_profit_parent_proxy"
     assert result["dcf"]["equity_value"] == pytest.approx(1446.2118899836075, rel=1e-9)
+
+
+def test_compute_ev_ebitda_requires_explicit_inputs() -> None:
+    from src.services.valuation_service import compute_ev_ebitda
+
+    assert compute_ev_ebitda(ebitda=100.0, market_cap=1000.0, net_debt=200.0) == pytest.approx(12.0)
+    assert compute_ev_ebitda(ebitda=100.0, market_cap=1000.0, net_debt=None) is None
+    assert compute_ev_ebitda(ebitda=0.0, market_cap=1000.0, net_debt=0.0) is None
+    assert compute_ev_ebitda(ebitda=100.0, market_cap=1000.0, net_debt=-100.0) == pytest.approx(9.0)
+
+
+def test_relative_valuation_ev_ebitda_hand_computed() -> None:
+    result = compute_relative_valuation(
+        target_pe=None,
+        target_pb=None,
+        current_price=None,
+        peer_pe_values=[],
+        peer_pb_values=[],
+        target_ebitda=50.0,
+        target_market_cap=800.0,
+        target_net_debt=200.0,
+        peer_ev_ebitda_values=[8.0, 10.0, 12.0],
+    )
+    assert result["status"] == "ok"
+    assert result["target"]["ev_ebitda"] == pytest.approx(20.0)
+    assert result["ev_ebitda"]["status"] == "ok"
+    assert result["ev_ebitda"]["peer_median"] == pytest.approx(10.0)
+    assert result["implied_prices"]["ev_ebitda_enterprise_value"] == pytest.approx(500.0)
+    assert result["implied_prices"]["ev_ebitda_equity_value"] == pytest.approx(300.0)
+    assert result["premium_discount"]["ev_ebitda_vs_peers_pct"] == pytest.approx(100.0)
+
+
+def test_relative_valuation_missing_ev_ebitda_does_not_block_pe() -> None:
+    result = compute_relative_valuation(
+        target_pe=20.0,
+        target_pb=None,
+        current_price=100.0,
+        peer_pe_values=[10.0, 15.0, 20.0],
+        peer_pb_values=[],
+        target_ebitda=None,
+        target_market_cap=1000.0,
+        target_net_debt=None,
+        peer_ev_ebitda_values=[],
+    )
+    assert result["status"] == "ok"
+    assert result["implied_prices"]["pe_based"] == pytest.approx(75.0)
+    assert result["ev_ebitda"]["status"] == INSUFFICIENT_FUNDAMENTALS
+    assert "target_net_debt" in result["ev_ebitda"]["missing_inputs"]
+
+
+def test_service_ev_ebitda_when_peers_have_explicit_inputs() -> None:
+    def provider(code: str):
+        table = {
+            "AAPL": {
+                "status": "ok",
+                "valuation": {"data": {"pe_ratio": 20.0, "pb_ratio": 4.0, "total_mv": 1000.0, "ebitda": 100.0, "net_debt": 200.0}},
+                "growth": {"data": {}},
+                "earnings": {"data": {"operating_cash_flow": 50.0, "ebitda": 100.0}},
+            },
+            "MSFT": {
+                "status": "ok",
+                "valuation": {"data": {"pe_ratio": 15.0, "pb_ratio": 3.0, "total_mv": 900.0, "ebitda": 90.0, "net_debt": 100.0}},
+                "growth": {"data": {}},
+                "earnings": {"data": {"operating_cash_flow": 40.0, "ebitda": 90.0}},
+            },
+            "GOOG": {
+                "status": "ok",
+                "valuation": {"data": {"pe_ratio": 10.0, "pb_ratio": 2.0, "total_mv": 800.0, "ebitda": 80.0, "net_debt": 0.0}},
+                "growth": {"data": {}},
+                "earnings": {"data": {"operating_cash_flow": 30.0, "ebitda": 80.0}},
+            },
+        }
+        return table[code]
+
+    def quote_provider(code: str):
+        prices = {"AAPL": 100.0, "MSFT": 200.0, "GOOG": 150.0}
+        mvs = {"AAPL": 1000.0, "MSFT": 900.0, "GOOG": 800.0}
+        return {"price": prices[code], "total_mv": mvs[code]}
+
+    service = ValuationService(fundamental_provider=provider, quote_provider=quote_provider)
+    result = service.estimate("AAPL", peer_codes=["MSFT", "GOOG"])
+    assert result["relative"]["status"] == "ok"
+    assert result["relative"]["ev_ebitda"]["status"] == "ok"
+    assert result["relative"]["target"]["ev_ebitda"] == pytest.approx(12.0)
+    assert result["fundamentals_snapshot"]["ebitda"] == pytest.approx(100.0)
+    assert result["fundamentals_snapshot"]["net_debt"] == pytest.approx(200.0)
