@@ -1035,6 +1035,25 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         # Unknown mode fails safe to auto (historical precedence preserved).
         self.assertEqual(config.llm_config_mode, "auto")
 
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    @patch.object(Config, "_parse_stock_email_groups", return_value=[])
+    def test_reasoning_trace_export_budget_is_clamped(
+        self, _mock_groups, _mock_litellm, _mock_setup_env
+    ):
+        with patch.dict(
+            os.environ,
+            {
+                "REASONING_TRACE_EXPORT_ENABLED": "true",
+                "REASONING_TRACE_EXPORT_MAX_CHARS": str(10**12),
+            },
+            clear=True,
+        ):
+            config = Config._load_from_env()
+
+        self.assertTrue(config.reasoning_trace_export_enabled)
+        self.assertEqual(config.reasoning_trace_export_max_chars, 2_000_000)
+
 
 if __name__ == "__main__":
     unittest.main()

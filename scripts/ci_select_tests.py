@@ -66,7 +66,7 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
-def _git_diff_names(base: str) -> list[str]:
+def _git_diff_names(base: str) -> list[str] | None:
     merge_base = subprocess.run(
         ["git", "merge-base", "HEAD", base],
         cwd=REPO_ROOT,
@@ -75,9 +75,8 @@ def _git_diff_names(base: str) -> list[str]:
         check=False,
     )
     if merge_base.returncode != 0 or not merge_base.stdout.strip():
-        ref = base
-    else:
-        ref = merge_base.stdout.strip()
+        return None
+    ref = merge_base.stdout.strip()
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{ref}...HEAD"],
         cwd=REPO_ROOT,
@@ -86,7 +85,7 @@ def _git_diff_names(base: str) -> list[str]:
         check=False,
     )
     if result.returncode != 0:
-        raise SystemExit(f"git diff failed: {result.stderr.strip()}")
+        return None
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
@@ -162,6 +161,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         ]
     else:
         paths = _git_diff_names(args.base)
+        if paths is None:
+            # A shallow or otherwise incomplete PR graph cannot safely prove
+            # which tests cover the change. Fail closed to the full suite.
+            print("FULL")
+            return 0
     result = select_targets(paths)
     if result == "FULL":
         print("FULL")
