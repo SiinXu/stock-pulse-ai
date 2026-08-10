@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).
 - [Changed] Code-split the Today's Focus Playground scenario and rebaseline only its measured render-chunk budget so the production Web bundle gate retains explicit headroom.
+- [Added] Earnings-call transcript parsing (`earnings-transcript-v2`) with exact source coordinates, typed metrics, page-aware PDF provenance, compact chunk retrieval, untrusted-document privacy boundaries, and bounded valid-JSON Agent results; default-off tool `parse_earnings_transcript` behind existing multimodal gates (#253 remaining).
+
 - [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
 - [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, deterministic portfolio exposure/volatility/historical-loss thresholds, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
 - [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
