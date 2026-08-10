@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { systemConfigApi } from '../../api/systemConfig';
 import { ConfirmDialog, InlineAlert, SearchInput, StatusDot } from '../common';
 import { getParsedApiError } from '../../api/error';
-import { systemConfigApi } from '../../api/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { UI_LANGUAGE_METADATA } from '../../i18n/uiLanguages';
@@ -14,6 +15,11 @@ import {
 import { SETTINGS_LOCAL_MODELS_TEXT } from '../../locales/settingsLocalModels';
 import type { GenerationBackendStatusResponse } from '../../types/systemConfig';
 import type { LocalModelRuntimeState } from '../../types/localModels';
+import {
+  SETTINGS_SECTION_IDS,
+  SETTINGS_VIEW_IDS,
+  buildSettingsHref,
+} from '../../routing/routes';
 import {
   getProviderDisplayLabel,
   inspectConnectionSchemaDefinition,
@@ -62,6 +68,16 @@ import {
   type LLMChannelEditorProps,
   type ModelReferenceReplacement,
 } from './llmChannelEditorModel';
+import { canEnableModelSource } from './modelSourceAvailability';
+import {
+  MODEL_SOURCE_STEPS,
+  MODEL_SOURCE_TYPES,
+  applyModelSourceSetupParams,
+  clearModelSourceSetupParams,
+  readModelSourceSetup,
+  resolveModelSourceSetupRestore,
+  type ModelSourceType,
+} from './modelSourcesRoute';
 
 export type {
   ModelReferenceReplacement,
@@ -96,6 +112,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const editorText = MODEL_ACCESS_EDITOR_TEXT[language];
+  const accessText = MODEL_ACCESS_TEXT[language];
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialItemSourceByKey = useMemo(() => buildItemSourceByKey(items), [items]);
   const initialChannels = useMemo(
     () => parseChannelsFromItems(items, initialItemSourceByKey, providers, connectionFields),
@@ -136,6 +154,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onValidityChangeRef = useRef(onValidityChange);
   const [connectionFilter, setConnectionFilter] = useState('');
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const localTransport = useMemo(() => createLocalModelTransport(), []);
   const [localRuntime, setLocalRuntime] = useState<LocalModelRuntimeState | null>(null);
   const [localRuntimeProbe, setLocalRuntimeProbe] = useState<HubProbeState>('loading');
@@ -147,6 +166,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const [cliCheckedAt, setCliCheckedAt] = useState<number | null>(null);
   const localProbeRequestIdRef = useRef(0);
   const cliProbeRequestIdRef = useRef(0);
+  /** Connection display labels auto-disabled after a failed connectivity test. */
+  const [autoDisabledNotices, setAutoDisabledNotices] = useState<string[]>([]);
+  const setupRestoredKeyRef = useRef<string | null>(null);
 
   const refreshLocalRuntime = useCallback(async (options?: { markLoading?: boolean }) => {
     const requestId = localProbeRequestIdRef.current + 1;
@@ -202,61 +224,72 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     }
   }, [language]);
 
-  useEffect(() => {
-    // Initial probe: state already starts as loading; avoid sync setState-in-effect.
-    // User-triggered recheck uses markLoading (default true) outside effects.
-    let cancelled = false;
-    const requestLocal = localProbeRequestIdRef.current + 1;
-    localProbeRequestIdRef.current = requestLocal;
-    const requestCli = cliProbeRequestIdRef.current + 1;
-    cliProbeRequestIdRef.current = requestCli;
+  const closeSetup = () => {
+    // Suppress restore for the current setup key until query params are cleared.
+    // Otherwise React can re-render with wizard closed while setup=1 is still in
+    // the URL for one frame and re-open the full-page flow.
+    const setup = readModelSourceSetup(searchParams);
+    if (setup.active) {
+      setupRestoredKeyRef.current = [
+        setup.sourceType ?? '',
+        setup.connection ?? '',
+        setup.step ?? '',
+      ].join('|');
+    }
+    setModal(null);
+    setTypePickerOpen(false);
+    // Explicit close clears shareable setup params so the hub is the durable URL.
+    setSearchParams(clearModelSourceSetupParams(searchParams), { replace: true });
+  };
 
-    void localTransport.getRuntime()
-      .then((runtime) => {
-        if (cancelled || localProbeRequestIdRef.current !== requestLocal) {
-          return;
-        }
-        setLocalRuntime(runtime);
-        setLocalRuntimeProbe('idle');
-        setLocalRuntimeCheckedAt(Date.now());
-      })
-      .catch((error: unknown) => {
-        if (cancelled || localProbeRequestIdRef.current !== requestLocal) {
-          return;
-        }
-        const parsed = getParsedApiError(error, language);
-        setLocalRuntime(null);
-        setLocalRuntimeProbe('error');
-        setLocalRuntimeError(parsed.message || parsed.rawMessage || null);
-        setLocalRuntimeCheckedAt(Date.now());
-      });
+  const navigateToLocalModels = () => {
+    setSearchParams(new URLSearchParams(
+      buildSettingsHref({
+        section: SETTINGS_SECTION_IDS.aiModels,
+        view: SETTINGS_VIEW_IDS.aiModels.localModels,
+      }).split('?')[1] ?? '',
+    ), { replace: false });
+  };
 
-    void systemConfigApi.getGenerationBackendStatus()
-      .then((status) => {
-        if (cancelled || cliProbeRequestIdRef.current !== requestCli) {
-          return;
-        }
-        setCliStatus(status);
-        setCliProbe('idle');
-        setCliCheckedAt(Date.now());
-      })
-      .catch((error: unknown) => {
-        if (cancelled || cliProbeRequestIdRef.current !== requestCli) {
-          return;
-        }
-        const parsed = getParsedApiError(error, language);
-        setCliStatus(null);
-        setCliProbe('error');
-        setCliError(parsed.message || parsed.rawMessage || null);
-        setCliCheckedAt(Date.now());
-      });
+  const navigateToCliBackend = () => {
+    if (onViewDiagnostics) {
+      onViewDiagnostics();
+      return;
+    }
+    setSearchParams(new URLSearchParams(
+      buildSettingsHref({
+        section: 'advanced',
+        view: 'raw_config',
+      }).split('?')[1] ?? '',
+    ), { replace: false });
+  };
 
-    return () => {
-      cancelled = true;
-      localProbeRequestIdRef.current += 1;
-      cliProbeRequestIdRef.current += 1;
-    };
-  }, [language, localTransport]);
+  const navigateToTaskRouting = () => {
+    if (onManageModels) {
+      onManageModels();
+      return;
+    }
+    setSearchParams(new URLSearchParams(
+      buildSettingsHref({
+        section: SETTINGS_SECTION_IDS.aiModels,
+        view: SETTINGS_VIEW_IDS.aiModels.taskRouting,
+      }).split('?')[1] ?? '',
+    ), { replace: false });
+  };
+
+  const chooseSourceType = (sourceType: ModelSourceType) => {
+    setTypePickerOpen(false);
+    if (sourceType === MODEL_SOURCE_TYPES.cloud) {
+      setModal({ mode: 'add' });
+      return;
+    }
+    setModal(null);
+    if (sourceType === MODEL_SOURCE_TYPES.localServer) {
+      navigateToLocalModels();
+      return;
+    }
+    navigateToCliBackend();
+  };
 
   const connectionSchemaDefinition = useMemo(
     () => inspectConnectionSchemaDefinition(connectionFields),
@@ -296,18 +329,28 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     setChannels(hydratedChannels);
     setTestStates({});
     setModal(null);
+    setTypePickerOpen(false);
     setPendingRemove(null);
   }
 
-  // The page-level "Add model service" button lives in the parent header; it bumps
-  // addSignal to open the add dialog here (same adjust-during-render pattern).
+  // The page-level "Add model source" button opens the type picker first.
   const [prevAddSignal, setPrevAddSignal] = useState(addSignal);
   if (prevAddSignal !== addSignal) {
     setPrevAddSignal(addSignal);
     if (!mutationBusy) {
-      setModal({ mode: 'add' });
+      setTypePickerOpen(true);
+      setModal(null);
     }
   }
+
+  // Clear restore tracking when the parent requests a new Add-source session.
+  // Must not write refs during render (react-hooks/refs).
+  useEffect(() => {
+    if (addSignal === 0) {
+      return;
+    }
+    setupRestoredKeyRef.current = null;
+  }, [addSignal]);
 
   const [handledFocusRequestId, setHandledFocusRequestId] = useState<number | null>(null);
   if (focusFieldRequest && handledFocusRequestId !== focusFieldRequest.requestId && !busy) {
@@ -330,6 +373,103 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       setModal({ mode: 'edit', index, focusField: parsed.suffix });
     }
   }
+
+  useEffect(() => {
+    // Initial probe: state already starts as loading; avoid sync setState-in-effect.
+    void refreshLocalRuntime({ markLoading: false });
+    void refreshCliStatus({ markLoading: false });
+    return () => {
+      localProbeRequestIdRef.current += 1;
+      cliProbeRequestIdRef.current += 1;
+    };
+  }, [refreshLocalRuntime, refreshCliStatus]);
+
+  // Restore route-backed setup from shareable query params (refresh / deep link).
+  useEffect(() => {
+    const setup = readModelSourceSetup(searchParams);
+    if (!setup.active) {
+      setupRestoredKeyRef.current = null;
+      return;
+    }
+    const restoreKey = [
+      setup.sourceType ?? '',
+      setup.connection ?? '',
+      setup.step ?? '',
+    ].join('|');
+    // Already handling this setup key (opened by UI or previously restored).
+    if (setupRestoredKeyRef.current === restoreKey) {
+      return;
+    }
+    if (typePickerOpen || modal) {
+      setupRestoredKeyRef.current = restoreKey;
+      return;
+    }
+    if (mutationBusy) {
+      return;
+    }
+    const knownNames = channels.map((channel) => channel.name);
+    const action = resolveModelSourceSetupRestore(searchParams, knownNames);
+    setupRestoredKeyRef.current = restoreKey;
+    if (action.kind === 'type_picker') {
+      setTypePickerOpen(true);
+      return;
+    }
+    if (action.kind === 'cloud_add') {
+      setTypePickerOpen(false);
+      setModal({ mode: 'add' });
+      return;
+    }
+    if (action.kind === 'cloud_edit') {
+      const index = channels.findIndex((channel) => channel.name === action.connection);
+      if (index >= 0) {
+        setTypePickerOpen(false);
+        setModal({ mode: 'edit', index, focusModels: action.focusModels });
+      } else {
+        setTypePickerOpen(true);
+      }
+      return;
+    }
+    if (action.kind === 'navigate_local_server') {
+      navigateToLocalModels();
+      return;
+    }
+    if (action.kind === 'navigate_local_cli') {
+      navigateToCliBackend();
+    }
+    // navigate actions leave the hub; setup params are replaced by the target view URL.
+  }, [channels, modal, mutationBusy, searchParams, typePickerOpen]);
+
+  // Keep setup query params aligned while the wizard session is open.
+  useEffect(() => {
+    if (!typePickerOpen && !modal) {
+      return;
+    }
+    let next: URLSearchParams | null = null;
+    if (typePickerOpen) {
+      next = applyModelSourceSetupParams(searchParams, {
+        step: MODEL_SOURCE_STEPS.type,
+        sourceType: null,
+        connection: null,
+      });
+    } else if (modal?.mode === 'add') {
+      next = applyModelSourceSetupParams(searchParams, {
+        sourceType: MODEL_SOURCE_TYPES.cloud,
+        step: MODEL_SOURCE_STEPS.provider,
+        connection: null,
+      });
+    } else if (modal?.mode === 'edit') {
+      const channel = channels[modal.index];
+      next = applyModelSourceSetupParams(searchParams, {
+        sourceType: MODEL_SOURCE_TYPES.cloud,
+        step: modal.focusModels ? MODEL_SOURCE_STEPS.models : MODEL_SOURCE_STEPS.connect,
+        connection: channel?.name ?? null,
+      });
+    }
+    if (!next) return;
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [typePickerOpen, modal, channels, searchParams, setSearchParams]);
 
   const hasChanges = useMemo(() => {
     if (channels.length !== initialChannels.length) {
@@ -459,11 +599,28 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     ) {
       return;
     }
-    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hermesSecretPersisted)) {
+    const markUnavailableAfterFailedTest = (target: ChannelConfig, errorText: string) => {
       setTestStates((previous) => ({
         ...previous,
-        [channel.id]: { status: 'error', text: MODEL_ACCESS_TEXT[language].runtimeSecret },
+        [target.id]: { status: 'error', text: errorText },
       }));
+      if (!target.enabled) {
+        return;
+      }
+      // Failed sources must not remain available for task routing.
+      setChannels((previous) => previous.map((item) => (
+        item.id === target.id
+          ? { ...item, enabled: false, enabledValuePresent: true }
+          : item
+      )));
+      const label = target.displayName.trim() || target.name;
+      setAutoDisabledNotices((previous) => (
+        previous.includes(label) ? previous : [...previous, label]
+      ));
+    };
+
+    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hermesSecretPersisted)) {
+      markUnavailableAfterFailedTest(channel, MODEL_ACCESS_TEXT[language].runtimeSecret);
       return;
     }
     const requestId = testRequestIdRef.current + 1;
@@ -479,6 +636,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       language,
     );
     if (testNonceRef.current[channel.id] !== requestId) {
+      return;
+    }
+    if (result.status === 'error') {
+      markUnavailableAfterFailedTest(channel, result.text || accessText.testFailed);
       return;
     }
     setTestStates((previous) => ({ ...previous, [channel.id]: result }));
@@ -578,6 +739,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         ),
       ];
       if (issues.length > 0) {
+        setTypePickerOpen(false);
+        setModal({ mode: 'edit', index });
+        return;
+      }
+      if (!canEnableModelSource({
+        testState: testStates[channel.id],
+        requireSuccessfulTest: true,
+      })) {
+        setTypePickerOpen(false);
         setModal({ mode: 'edit', index });
         return;
       }
@@ -639,18 +809,18 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     if (replacements.length > 0) {
       onReplaceModelReferences?.(replacements);
     }
-    setModal(null);
+    closeSetup();
   };
 
+  const normalizedFilter = connectionFilter.trim().toLowerCase();
   const visibleChannels = useMemo(() => {
-    const query = connectionFilter.trim().toLowerCase();
     return channels
       .map((channel, index) => ({ channel, index }))
       .filter(({ channel }) => {
-        if (!query) {
+        if (!normalizedFilter) {
           return true;
         }
-        const provider = providers.find((entry) => entry.id === channel.providerId);
+        const provider = findCatalogProvider(providers, channel.providerId);
         const providerLabel = provider
           ? getProviderDisplayLabel(provider, language)
           : channel.providerId;
@@ -661,10 +831,14 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           providerLabel,
           channel.models,
           channel.baseUrl,
-        ].join(' ').toLowerCase().includes(query);
+          editorText.hubCloudGroup,
+        ].join(' ').toLowerCase().includes(normalizedFilter);
       });
-  }, [channels, connectionFilter, language, providers]);
+  }, [channels, connectionFilter, editorText.hubCloudGroup, language, normalizedFilter, providers]);
 
+  const primaryModel = initialRuntimeConfig.primaryModel.trim();
+  const agentModel = initialRuntimeConfig.agentPrimaryModel.trim();
+  const visionModel = initialRuntimeConfig.visionModel.trim();
   const localModelsText = SETTINGS_LOCAL_MODELS_TEXT[language];
   const localSummary = useMemo(
     () => summarizeLocalRuntimeStatus(localRuntimeProbe, localRuntime, localRuntimeError),
@@ -702,11 +876,120 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         return editorText.hubStatusLoading;
     }
   };
+  const localRuntimeLabel = localRuntime?.status || 'unknown';
+  const localMatches = !normalizedFilter
+    || editorText.hubLocalGroup.toLowerCase().includes(normalizedFilter)
+    || 'ollama'.includes(normalizedFilter)
+    || localPrimary.toLowerCase().includes(normalizedFilter)
+    || localRuntimeLabel.toLowerCase().includes(normalizedFilter)
+    || availabilityLabel(localSummary.availability).toLowerCase().includes(normalizedFilter);
   const cliPrimary = cliStatus?.primary;
   const cliIsLocal = cliPrimary?.backendType === 'local_cli';
+  const cliMatches = !normalizedFilter
+    || editorText.hubCliGroup.toLowerCase().includes(normalizedFilter)
+    || 'cli'.includes(normalizedFilter)
+    || (cliPrimary?.backendId || '').toLowerCase().includes(normalizedFilter)
+    || (cliPrimary?.backendType || '').toLowerCase().includes(normalizedFilter)
+    || availabilityLabel(cliSummary.availability).toLowerCase().includes(normalizedFilter);
+  const hasAnyMatch = visibleChannels.length > 0 || localMatches || cliMatches || channels.length === 0;
+  const setupOpen = Boolean(modal) || typePickerOpen;
 
   return (
-    <div className="space-y-4" data-testid="model-sources-hub">
+    <div className="space-y-4" data-testid={setupOpen ? 'model-sources-hub-wizard' : 'model-sources-hub'}>
+      {setupOpen ? (
+        <div className="space-y-4">
+          {typePickerOpen ? (
+            <section
+              className="space-y-4 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 sm:p-5"
+              data-testid="model-source-type-picker"
+              aria-labelledby="model-source-type-heading"
+            >
+              <div className="space-y-1">
+                <h2 id="model-source-type-heading" className="text-base font-semibold text-foreground">
+                  {editorText.hubTypePickerTitle}
+                </h2>
+                <p className="text-sm text-secondary-text">{editorText.hubTypePickerDescription}</p>
+                <p className="text-xs text-muted-text">{accessText.setupLifecycleHint}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {([
+                  {
+                    type: MODEL_SOURCE_TYPES.cloud,
+                    title: editorText.hubTypeCloud,
+                    description: editorText.hubTypeCloudDescription,
+                    testId: 'source-type-cloud',
+                  },
+                  {
+                    type: MODEL_SOURCE_TYPES.localServer,
+                    title: editorText.hubTypeLocal,
+                    description: editorText.hubTypeLocalDescription,
+                    testId: 'source-type-local',
+                  },
+                  {
+                    type: MODEL_SOURCE_TYPES.localCli,
+                    title: editorText.hubTypeCli,
+                    description: editorText.hubTypeCliDescription,
+                    testId: 'source-type-cli',
+                  },
+                ] as const).map((option) => (
+                  <button
+                    key={option.type}
+                    type="button"
+                    data-testid={option.testId}
+                    disabled={busy}
+                    onClick={() => chooseSourceType(option.type)}
+                    className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-4 py-4 text-left transition hover:border-[var(--settings-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <p className="text-sm font-semibold text-foreground">{option.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-secondary-text">{option.description}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                  onClick={closeSetup}
+                >
+                  {accessText.closeSetup}
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {modal ? (
+            <ConnectionModal
+              presentation="page"
+              mode={modal.mode}
+              initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
+              focusModels={modal.mode === 'edit' ? modal.focusModels : false}
+              focusField={modal.mode === 'edit' ? modal.focusField : undefined}
+              channels={channels}
+              availableModelRoutes={availableModelRoutes}
+              availableModels={availableModels}
+              providers={providers}
+              connectionFields={connectionFields}
+              emptyApiKeyHosts={emptyApiKeyHosts}
+              maskToken={maskToken}
+              hermesSecretPersisted={hermesSecretPersisted}
+              catalogUnavailable={catalogUnavailable}
+              disabled={busy}
+              taskModelRefs={resolvedTaskModelRefs}
+              onReloadCatalog={onReloadCatalog}
+              onManageModels={navigateToTaskRouting}
+              canReplaceModelReferences={Boolean(onReplaceModelReferences)}
+              onSubmit={handleModalSubmit}
+              onClose={closeSetup}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      <div
+        className={setupOpen ? 'hidden' : 'space-y-4'}
+        aria-hidden={setupOpen ? true : undefined}
+        data-testid="model-sources-hub-body"
+      >
       {overriddenByMode ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-2.5 text-xs text-secondary-text">
           <span>{editorText.readonly}</span>
@@ -720,6 +1003,54 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             </button>
           ) : null}
         </div>
+      ) : null}
+
+      <section
+        className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+        data-testid="model-sources-active-header"
+        aria-labelledby="model-sources-active-heading"
+      >
+        <h3 id="model-sources-active-heading" className="text-sm font-semibold text-foreground">
+          {editorText.hubActiveHeader}
+        </h3>
+        <p className="text-xs text-secondary-text">
+          {primaryModel
+            ? formatUiText(editorText.hubPrimaryModel, { model: primaryModel })
+            : editorText.hubNoPrimary}
+        </p>
+        {agentModel ? (
+          <p className="text-xs text-secondary-text">
+            {formatUiText(editorText.hubAgentModel, { model: agentModel })}
+          </p>
+        ) : null}
+        {visionModel ? (
+          <p className="text-xs text-secondary-text">
+            {formatUiText(editorText.hubVisionModel, { model: visionModel })}
+          </p>
+        ) : null}
+        <p className="text-xs text-muted-text">{accessText.setupLifecycleHint}</p>
+      </section>
+
+      {autoDisabledNotices.length > 0 ? (
+        <InlineAlert
+          variant="warning"
+          size="compact"
+          title={editorText.hubAutoDisabledTitle}
+          message={(
+            <div className="space-y-1" data-testid="model-sources-auto-disabled-notice">
+              <p>{formatUiText(editorText.hubAutoDisabledMessage, {
+                sources: autoDisabledNotices.join(getUiListSeparator(language)),
+              })}</p>
+              <button
+                type="button"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                onClick={() => setAutoDisabledNotices([])}
+              >
+                {editorText.hubAutoDisabledDismiss}
+              </button>
+            </div>
+          )}
+        />
       ) : null}
 
       {catalogUnavailable ? (
@@ -742,31 +1073,34 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         />
       ) : null}
 
-      <section
-        className="space-y-2"
-        data-testid="model-sources-cloud-group"
-        aria-labelledby="cloud-connections-heading"
-      >
+      <SearchInput
+        value={connectionFilter}
+        onChange={(event) => setConnectionFilter(event.target.value)}
+        placeholder={editorText.hubSearchPlaceholder}
+        aria-label={editorText.hubSearchLabel}
+        wrapperClassName="w-full sm:max-w-sm"
+        data-testid="model-sources-filter"
+      />
+
+      {!hasAnyMatch ? (
+        <p className="px-1 text-sm text-muted-text" role="status" data-testid="model-sources-no-matches">
+          {editorText.hubNoSearchMatches}
+        </p>
+      ) : null}
+
+      <section className="space-y-2" aria-labelledby="cloud-connections-heading" data-testid="model-sources-cloud-group">
         <h3 id="cloud-connections-heading" className="text-sm font-semibold text-foreground">
           {editorText.hubCloudGroup}
         </h3>
-        <SearchInput
-          value={connectionFilter}
-          onChange={(event) => setConnectionFilter(event.target.value)}
-          placeholder={editorText.hubSearchPlaceholder}
-          aria-label={editorText.hubSearchLabel}
-          wrapperClassName="w-full sm:max-w-sm"
-        />
-
         {channels.length === 0 ? (
           <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
             <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
             <p className="mt-1 text-xs text-muted-text">{editorText.emptyDescription}</p>
           </div>
         ) : visibleChannels.length === 0 ? (
-          <p className="px-1 text-sm text-muted-text" role="status">
-            {editorText.hubNoSearchMatches}
-          </p>
+          normalizedFilter ? null : (
+            <p className="text-xs text-muted-text">{editorText.hubNoSearchMatches}</p>
+          )
         ) : (
           <div className="space-y-2">
             {visibleChannels.map(({ channel, index }) => (
@@ -837,148 +1171,170 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         )}
       </section>
 
-      <section
-        className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
-        data-testid="model-sources-local-group"
-        aria-labelledby="model-sources-local-heading"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusDot
-              tone={localSummary.tone}
-              pulse={localSummary.pulse}
-              aria-label={availabilityLabel(localSummary.availability)}
-            />
-            <h3 id="model-sources-local-heading" className="text-sm font-semibold text-foreground">
-              {editorText.hubLocalGroup}
-            </h3>
-            <span
-              className="text-xs text-secondary-text"
-              data-testid="model-sources-local-availability"
-            >
-              {availabilityLabel(localSummary.availability)}
-            </span>
+      {localMatches ? (
+        <section
+          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+          data-testid="model-sources-local-group"
+          aria-labelledby="model-sources-local-heading"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusDot
+                tone={localSummary.tone}
+                pulse={localSummary.pulse}
+                aria-label={availabilityLabel(localSummary.availability)}
+              />
+              <h3 id="model-sources-local-heading" className="text-sm font-semibold text-foreground">
+                {editorText.hubLocalGroup}
+              </h3>
+              <span
+                className="text-xs text-secondary-text"
+                data-testid="model-sources-local-availability"
+              >
+                {availabilityLabel(localSummary.availability)}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                onClick={() => void refreshLocalRuntime()}
+                disabled={localRuntimeProbe === 'loading'}
+              >
+                {editorText.hubLocalRecheck}
+              </button>
+              <button
+                type="button"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                onClick={navigateToLocalModels}
+              >
+                {editorText.hubLocalManage}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-            onClick={() => void refreshLocalRuntime()}
-            disabled={localRuntimeProbe === 'loading'}
-          >
-            {editorText.hubLocalRecheck}
-          </button>
-        </div>
-        {localSummary.availability === 'loading' ? (
-          <p className="text-xs text-muted-text" data-testid="model-sources-local-loading">
-            {editorText.hubLocalLoading}
-          </p>
-        ) : localSummary.availability === 'failed' ? (
-          <div className="space-y-1 text-xs text-danger" data-testid="model-sources-local-error">
-            <p>{editorText.hubLocalFailed}</p>
-            {localSummary.failureReason ? (
-              <p>
-                {formatUiText(editorText.hubLocalFailedReason, {
-                  reason: localSummary.failureReason,
-                })}
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <div className="space-y-1 text-xs text-secondary-text" data-testid="model-sources-local-details">
-            {localStatusLabel ? (
-              <p>{formatUiText(editorText.hubLocalStatus, { status: localStatusLabel })}</p>
-            ) : null}
-            {registeredCount > 0 ? (
-              <p>{editorText.hubLocalConfigured} · {registeredCount}</p>
-            ) : (
-              <p>{editorText.hubLocalNone}</p>
-            )}
-            {localPrimary ? (
-              <p>{formatUiText(editorText.hubLocalPrimary, { model: localPrimary })}</p>
-            ) : null}
-            {localAgent ? (
-              <p>{formatUiText(editorText.hubLocalAgent, { model: localAgent })}</p>
-            ) : null}
-          </div>
-        )}
-        {localCheckedLabel ? (
-          <p className="text-xs text-muted-text" data-testid="model-sources-local-checked-at">
-            {formatUiText(editorText.hubLocalCheckedAt, { time: localCheckedLabel })}
-          </p>
-        ) : null}
-      </section>
+          {localSummary.availability === 'loading' ? (
+            <p className="text-xs text-muted-text" data-testid="model-sources-local-loading">
+              {editorText.hubLocalLoading}
+            </p>
+          ) : localSummary.availability === 'failed' ? (
+            <div className="space-y-1 text-xs text-danger" data-testid="model-sources-local-error">
+              <p>{editorText.hubLocalFailed}</p>
+              {localSummary.failureReason ? (
+                <p>
+                  {formatUiText(editorText.hubLocalFailedReason, {
+                    reason: localSummary.failureReason,
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="space-y-1 text-xs text-secondary-text" data-testid="model-sources-local-details">
+              {localStatusLabel ? (
+                <p>{formatUiText(editorText.hubLocalStatus, { status: localStatusLabel })}</p>
+              ) : null}
+              {registeredCount > 0 ? (
+                <p>{editorText.hubLocalConfigured} · {registeredCount}</p>
+              ) : (
+                <p>{editorText.hubLocalNone}</p>
+              )}
+              {localPrimary ? (
+                <p>{formatUiText(editorText.hubLocalPrimary, { model: localPrimary })}</p>
+              ) : null}
+              {localAgent ? (
+                <p>{formatUiText(editorText.hubLocalAgent, { model: localAgent })}</p>
+              ) : null}
+            </div>
+          )}
+          {localCheckedLabel ? (
+            <p className="text-xs text-muted-text" data-testid="model-sources-local-checked-at">
+              {formatUiText(editorText.hubLocalCheckedAt, { time: localCheckedLabel })}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
-      <section
-        className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
-        data-testid="model-sources-cli-group"
-        aria-labelledby="model-sources-cli-heading"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusDot
-              tone={cliSummary.tone}
-              pulse={cliSummary.pulse}
-              aria-label={availabilityLabel(cliSummary.availability)}
-            />
-            <h3 id="model-sources-cli-heading" className="text-sm font-semibold text-foreground">
-              {editorText.hubCliGroup}
-            </h3>
-            <span
-              className="text-xs text-secondary-text"
-              data-testid="model-sources-cli-availability"
-            >
-              {availabilityLabel(cliSummary.availability)}
-            </span>
+      {cliMatches ? (
+        <section
+          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+          data-testid="model-sources-cli-group"
+          aria-labelledby="model-sources-cli-heading"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusDot
+                tone={cliSummary.tone}
+                pulse={cliSummary.pulse}
+                aria-label={availabilityLabel(cliSummary.availability)}
+              />
+              <h3 id="model-sources-cli-heading" className="text-sm font-semibold text-foreground">
+                {editorText.hubCliGroup}
+              </h3>
+              <span
+                className="text-xs text-secondary-text"
+                data-testid="model-sources-cli-availability"
+              >
+                {availabilityLabel(cliSummary.availability)}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                onClick={() => void refreshCliStatus()}
+                disabled={cliProbe === 'loading'}
+              >
+                {editorText.hubCliRecheck}
+              </button>
+              <button
+                type="button"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                onClick={navigateToCliBackend}
+              >
+                {editorText.hubCliManage}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-            onClick={() => void refreshCliStatus()}
-            disabled={cliProbe === 'loading'}
-          >
-            {editorText.hubCliRecheck}
-          </button>
-        </div>
-        {cliSummary.availability === 'loading' ? (
-          <p className="text-xs text-muted-text" data-testid="model-sources-cli-loading">
-            {editorText.hubCliLoading}
-          </p>
-        ) : cliSummary.availability === 'failed' ? (
-          <div className="space-y-1 text-xs text-danger" data-testid="model-sources-cli-error">
-            <p>{editorText.hubCliFailed}</p>
-            {cliSummary.failureReason ? (
-              <p>
-                {formatUiText(editorText.hubCliFailedReason, {
-                  reason: cliSummary.failureReason,
-                })}
-              </p>
-            ) : null}
-          </div>
-        ) : cliIsLocal && cliPrimary ? (
-          <div className="space-y-1 text-xs text-secondary-text" data-testid="model-sources-cli-details">
-            <p>{formatUiText(editorText.hubCliActive, { backend: cliPrimary.backendId })}</p>
-            {cliStatus?.fallback?.backendId ? (
-              <p>{formatUiText(editorText.hubCliFallback, { backend: cliStatus.fallback.backendId })}</p>
-            ) : null}
-            {cliSummary.failureReason ? (
-              <p className="text-warning">
-                {formatUiText(editorText.hubCliFailedReason, {
-                  reason: cliSummary.failureReason,
-                })}
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-xs text-secondary-text" data-testid="model-sources-cli-none">
-            {editorText.hubCliNone}
-          </p>
-        )}
-        {cliCheckedLabel ? (
-          <p className="text-xs text-muted-text" data-testid="model-sources-cli-checked-at">
-            {formatUiText(editorText.hubCliCheckedAt, { time: cliCheckedLabel })}
-          </p>
-        ) : null}
-      </section>
+          {cliSummary.availability === 'loading' ? (
+            <p className="text-xs text-muted-text" data-testid="model-sources-cli-loading">
+              {editorText.hubCliLoading}
+            </p>
+          ) : cliSummary.availability === 'failed' ? (
+            <div className="space-y-1 text-xs text-danger" data-testid="model-sources-cli-error">
+              <p>{editorText.hubCliFailed}</p>
+              {cliSummary.failureReason ? (
+                <p>
+                  {formatUiText(editorText.hubCliFailedReason, {
+                    reason: cliSummary.failureReason,
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : cliIsLocal && cliPrimary ? (
+            <div className="space-y-1 text-xs text-secondary-text" data-testid="model-sources-cli-details">
+              <p>{formatUiText(editorText.hubCliActive, { backend: cliPrimary.backendId })}</p>
+              {cliStatus?.fallback?.backendId ? (
+                <p>{formatUiText(editorText.hubCliFallback, { backend: cliStatus.fallback.backendId })}</p>
+              ) : null}
+              {cliSummary.failureReason ? (
+                <p className="text-warning">
+                  {formatUiText(editorText.hubCliFailedReason, {
+                    reason: cliSummary.failureReason,
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-xs text-secondary-text" data-testid="model-sources-cli-none">
+              {editorText.hubCliNone}
+            </p>
+          )}
+          {cliCheckedLabel ? (
+            <p className="text-xs text-muted-text" data-testid="model-sources-cli-checked-at">
+              {formatUiText(editorText.hubCliCheckedAt, { time: cliCheckedLabel })}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {!draftValid ? (
         <InlineAlert
@@ -1003,17 +1359,18 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         />
       ) : null}
 
-      {onManageModels && channels.some((channel) => channel.enabled) ? (
+      {channels.some((channel) => channel.enabled) ? (
         <div className="flex items-center justify-end px-1">
           <button
             type="button"
             className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-            onClick={onManageModels}
+            onClick={navigateToTaskRouting}
           >
             {editorText.assignModels}
           </button>
         </div>
       ) : null}
+      </div>
 
       <ConfirmDialog
         isOpen={pendingRemove !== null}
@@ -1028,7 +1385,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         onConfirm={() => {
           if (pendingRemove) {
             if (pendingRemove.referencedBy.length > 0) {
-              onManageModels?.();
+              navigateToTaskRouting();
             } else {
               removeChannel(pendingRemove.index);
             }
@@ -1037,31 +1394,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         }}
         onCancel={() => setPendingRemove(null)}
       />
-
-      {modal ? (
-        <ConnectionModal
-          mode={modal.mode}
-          initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
-          focusModels={modal.mode === 'edit' ? modal.focusModels : false}
-          focusField={modal.mode === 'edit' ? modal.focusField : undefined}
-          channels={channels}
-          availableModelRoutes={availableModelRoutes}
-          availableModels={availableModels}
-          providers={providers}
-          connectionFields={connectionFields}
-          emptyApiKeyHosts={emptyApiKeyHosts}
-          maskToken={maskToken}
-          hermesSecretPersisted={hermesSecretPersisted}
-          catalogUnavailable={catalogUnavailable}
-          disabled={busy}
-          taskModelRefs={resolvedTaskModelRefs}
-          onReloadCatalog={onReloadCatalog}
-          onManageModels={onManageModels}
-          canReplaceModelReferences={Boolean(onReplaceModelReferences)}
-          onSubmit={handleModalSubmit}
-          onClose={() => setModal(null)}
-        />
-      ) : null}
     </div>
   );
 };

@@ -1,8 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactElement, ReactNode } from 'react';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../../types/systemConfig';
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { LLMChannelEditor } from '../LLMChannelEditor';
+
+function renderWithRouter(ui: ReactElement, options?: { initialEntries?: string[] }) {
+  const entries = options?.initialEntries ?? ['/settings?section=ai_models&view=connections'];
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <MemoryRouter initialEntries={entries}>{children}</MemoryRouter>;
+  }
+  return render(ui, { wrapper: Wrapper });
+}
 
 function provider(
   overrides: Partial<LlmProviderCatalogEntry> & Pick<LlmProviderCatalogEntry, 'id' | 'label' | 'protocol'>,
@@ -294,8 +304,7 @@ function lastDraft(onDraftItemsChange: ReturnType<typeof vi.fn>): Array<{ key: s
 async function expectUnavailableConnectionSchema(connectionFields: LlmConnectionFieldSchema[]) {
   const onDraftItemsChange = vi.fn();
   const onValidityChange = vi.fn();
-  render(
-    <LLMChannelEditor
+  renderWithRouter(<LLMChannelEditor
       items={OPENAI_ITEMS}
       providers={PROVIDERS}
       connectionFields={connectionFields}
@@ -370,7 +379,7 @@ describe('LLMChannelEditor', () => {
 
   it('updates cards and an open Connection modal immediately when UI language changes', () => {
     localStorage.setItem('dsa.uiLanguage', 'en');
-    render(
+    renderWithRouter(
       <UiLanguageProvider>
         <RuntimeLanguageSwitch />
         <LLMChannelEditor items={OPENAI_ITEMS} providers={BILINGUAL_PROVIDERS} maskToken="******" />
@@ -390,8 +399,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('renders saved connections as compact cards without flat credential fields', () => {
-    const { container } = render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    const { container } = renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
 
     expect(connectionCard()).toHaveTextContent('OpenAI 官方');
@@ -402,8 +410,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('filters cloud connections by provider and model without changing ownership', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={[
           ...OPENAI_ITEMS.map((item) => (
             item.key === 'LLM_CHANNELS' ? { ...item, value: 'openai,deepseek' } : item
@@ -439,8 +446,7 @@ describe('LLMChannelEditor', () => {
     'LLM_OPENAI_ENABLED',
   ])('does not synthesize %s when a Connection Schema is present', async (missingKey) => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={COMPLETE_SAVED_CONNECTION_ITEMS.filter((item) => item.key !== missingKey)}
         providers={PROVIDERS}
         connectionFields={withIdentity(REQUIRED_SAVED_CONNECTION_FIELDS)}
@@ -459,8 +465,7 @@ describe('LLMChannelEditor', () => {
     'LLM_OPENAI_ENABLED',
   ])('does not treat the effective %s fallback as persisted when rawValueExists is false', async (missingKey) => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={COMPLETE_SAVED_CONNECTION_ITEMS.map((item) => (
           item.key === missingKey ? { ...item, rawValueExists: false } : item
         ))}
@@ -476,8 +481,7 @@ describe('LLMChannelEditor', () => {
 
   it('treats an explicit false enabled value as present under a Connection Schema', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={COMPLETE_SAVED_CONNECTION_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity(REQUIRED_SAVED_CONNECTION_FIELDS)}
@@ -491,8 +495,7 @@ describe('LLMChannelEditor', () => {
 
   it('keeps legacy fallback for the same sparse payload only when the Schema is omitted', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS.filter((item) => (
           !['LLM_OPENAI_PROVIDER', 'LLM_OPENAI_PROTOCOL', 'LLM_OPENAI_ENABLED'].includes(item.key)
         ))}
@@ -559,8 +562,7 @@ describe('LLMChannelEditor', () => {
   it('keeps an unknown-condition field inspectable but read-only', async () => {
     const onDraftItemsChange = vi.fn();
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -603,7 +605,7 @@ describe('LLMChannelEditor', () => {
 
   it('localizes the unavailable-schema diagnostic in English', () => {
     localStorage.setItem('dsa.uiLanguage', 'en');
-    render(
+    renderWithRouter(
       <UiLanguageProvider>
         <LLMChannelEditor
           items={OPENAI_ITEMS}
@@ -621,8 +623,7 @@ describe('LLMChannelEditor', () => {
     const onDraftItemsChange = vi.fn();
     const onValidityChange = vi.fn();
     const completeFields = withIdentity([MODELS_SCHEMA_FIELD]);
-    const { rerender } = render(
-      <LLMChannelEditor
+    const { rerender } = renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={completeFields}
@@ -633,7 +634,7 @@ describe('LLMChannelEditor', () => {
     );
     const dialog = editConnection();
 
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
@@ -661,8 +662,7 @@ describe('LLMChannelEditor', () => {
 
   it('uses the backend Connection field contract instead of a local models requirement', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_MODELS')}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -682,8 +682,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('uses the schema API-key label when Catalog says the key is required', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -708,8 +707,7 @@ describe('LLMChannelEditor', () => {
       requiresApiKey: { configurable: true, get: legacyRequirementRead },
       requiresBaseUrl: { configurable: true, get: legacyRequirementRead },
     });
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={[openai]}
         connectionFields={[]}
@@ -725,8 +723,7 @@ describe('LLMChannelEditor', () => {
   it('uses schema visibility and enabled state for protocol and Base URL fields', () => {
     const readOnlyForThisProvider = [{ key: 'provider_id', operator: 'equals' as const, value: 'other' }];
     const visibleForThisProvider = [{ key: 'provider_id', operator: 'equals' as const, value: 'openai' }];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([
@@ -763,8 +760,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('does not expose legacy Base URL actions when the schema hides the field', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -788,8 +784,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('exposes the Base URL reveal only when the schema authorizes that UI context', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -818,8 +813,7 @@ describe('LLMChannelEditor', () => {
         ? { ...item, value: 'https://proxy.example.com/v1' }
         : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={customUrlItems}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -846,8 +840,7 @@ describe('LLMChannelEditor', () => {
 
   it('does not mutate models through secondary controls when the schema is read-only', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -885,8 +878,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('disables model discovery when a schema-required connection-test field is missing', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_API_KEY')}
         providers={PROVIDERS}
         connectionFields={withIdentity([
@@ -916,8 +908,7 @@ describe('LLMChannelEditor', () => {
   it('uses schema visibility and enabled state for the remaining editable fields', () => {
     const disabledHere = [{ key: 'provider_id', operator: 'equals' as const, value: 'other' }];
     const hiddenHere = [{ key: 'provider_id', operator: 'equals' as const, value: 'other' }];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([
@@ -941,8 +932,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('blocks saving a disabled draft when its schema contains an unknown operator', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS.map((item) => (
           item.key === 'LLM_OPENAI_ENABLED' ? { ...item, value: 'false' } : item
         ))}
@@ -970,8 +960,7 @@ describe('LLMChannelEditor', () => {
 
   it('does not let the card shortcut toggle enabled when an empty schema authorizes no writes', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={[]}
@@ -989,8 +978,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('does not expose the add-flow Provider writer under an empty schema', () => {
-    const { rerender } = render(
-      <LLMChannelEditor
+    const { rerender } = renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={[]}
@@ -998,7 +986,7 @@ describe('LLMChannelEditor', () => {
         addSignal={0}
       />,
     );
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
@@ -1020,10 +1008,9 @@ describe('LLMChannelEditor', () => {
         isRequired: true,
         contract: { requirement: 'required' },
     }];
-    const { rerender } = render(
-      <LLMChannelEditor items={[]} providers={PROVIDERS} connectionFields={connectionFields} maskToken="******" addSignal={0} />,
+    const { rerender } = renderWithRouter(<LLMChannelEditor items={[]} providers={PROVIDERS} connectionFields={connectionFields} maskToken="******" addSignal={0} />,
     );
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor items={[]} providers={PROVIDERS} connectionFields={connectionFields} maskToken="******" addSignal={1} />,
     );
 
@@ -1033,8 +1020,7 @@ describe('LLMChannelEditor', () => {
 
   it('does not let a Provider change rewrite schema-read-only transport fields', () => {
     const readOnly = [{ key: 'provider_id', operator: 'equals' as const, value: 'never' }];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([
@@ -1059,8 +1045,7 @@ describe('LLMChannelEditor', () => {
 
   it('writes a single credential only to the schema-visible API_KEYS sibling', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_API_KEY')}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -1090,8 +1075,7 @@ describe('LLMChannelEditor', () => {
   it('does not serialize or mutate a draft under a present models-only schema', async () => {
     const onDraftItemsChange = vi.fn();
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={[{
@@ -1119,8 +1103,7 @@ describe('LLMChannelEditor', () => {
 
   it('serializes a model edit when the final schema has writable identity authority', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={withIdentity([{
@@ -1146,8 +1129,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('blocks card Test/Delete and modal Test when the schema authorizes no operations', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         connectionFields={[]}
@@ -1174,8 +1156,7 @@ describe('LLMChannelEditor', () => {
     ['Catalog failure', { catalogUnavailable: true }],
   ])('keeps the draft invalid and actions read-only during %s', async (_label, state) => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1196,8 +1177,7 @@ describe('LLMChannelEditor', () => {
       configurable: true,
       get: legacyRequirementRead,
     });
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={officialItemsWithoutBaseUrl('anthropic')}
         providers={[anthropic]}
         connectionFields={withIdentity([{
@@ -1217,8 +1197,7 @@ describe('LLMChannelEditor', () => {
 
   it('fails closed without evaluating legacy completeness while the Catalog schema is still loading', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_MODELS')}
         providers={PROVIDERS}
         maskToken="******"
@@ -1233,8 +1212,7 @@ describe('LLMChannelEditor', () => {
 
   it('uses the backend Connection field contract instead of a local display-name requirement', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={[
           ...OPENAI_ITEMS,
           { key: 'LLM_OPENAI_DISPLAY_NAME', value: '' },
@@ -1258,8 +1236,7 @@ describe('LLMChannelEditor', () => {
 
   it('preserves legacy model-based local runtime inference only when the Schema is omitted', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={[
           { key: 'LLM_CHANNELS', value: 'lab' },
           { key: 'LLM_LAB_MODELS', value: 'ollama/llama3' },
@@ -1275,7 +1252,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('shows provider identity plus independent enabled and untested states', () => {
-    render(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
     const card = connectionCard();
     expect(within(card).getByTestId('provider-avatar-openai')).toHaveTextContent('O');
     expect(within(card).getByText('已启用')).toBeInTheDocument();
@@ -1283,7 +1260,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('keeps native connection actions on 44px targets with a compact switch visual', () => {
-    render(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
 
     const card = connectionCard();
     expect(within(card).getByRole('button', { name: '管理模型 openai' })).toHaveClass('min-h-11', 'min-w-11');
@@ -1307,8 +1284,7 @@ describe('LLMChannelEditor', () => {
       key: item.key.replace('LLM_OPENAI_', 'LLM_PRODUCTION_'),
       value: item.key === 'LLM_CHANNELS' ? 'production' : item.value,
     }));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={renamedItems}
         providers={PROVIDERS}
         maskToken="******"
@@ -1333,8 +1309,7 @@ describe('LLMChannelEditor', () => {
 
   it('preserves an explicitly empty display name for contract validation', async () => {
     const onValidityChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={[
           ...OPENAI_ITEMS,
           { key: 'LLM_OPENAI_DISPLAY_NAME', value: '' },
@@ -1355,8 +1330,7 @@ describe('LLMChannelEditor', () => {
 
   it('reports one stable empty draft while the saved connection is unchanged', async () => {
     const onDraftItemsChange = vi.fn();
-    const { rerender } = render(
-      <LLMChannelEditor
+    const { rerender } = renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1364,7 +1338,7 @@ describe('LLMChannelEditor', () => {
       />,
     );
     await waitFor(() => expect(onDraftItemsChange).toHaveBeenCalledWith([]));
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
@@ -1377,8 +1351,7 @@ describe('LLMChannelEditor', () => {
 
   it('confirms before deleting an unreferenced connection', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1397,8 +1370,7 @@ describe('LLMChannelEditor', () => {
 
   it('blocks deletion when a task still references the connection', () => {
     const onManageModels = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1418,8 +1390,7 @@ describe('LLMChannelEditor', () => {
 
   it('blocks deleting one model in the modal and lists every task reference', () => {
     const onManageModels = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1442,8 +1413,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('normalizes a historical bare Agent model before protecting its route', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1472,8 +1442,7 @@ describe('LLMChannelEditor', () => {
       { key: 'LLM_BACKUP_MODELS', value: 'gpt-4o-mini' },
       { key: 'LITELLM_MODEL', value: 'openai/gpt-4o-mini' },
     ];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         maskToken="******"
@@ -1527,8 +1496,7 @@ describe('LLMChannelEditor', () => {
         available: true,
       },
     ];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         availableModels={availableModels}
@@ -1553,8 +1521,7 @@ describe('LLMChannelEditor', () => {
     const items = OPENAI_ITEMS.map((item) => (
       item.key === 'LLM_OPENAI_MODELS' ? { ...item, value: 'gpt-4o-mini,gpt-5.5' } : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         maskToken="******"
@@ -1588,8 +1555,7 @@ describe('LLMChannelEditor', () => {
     const items = OPENAI_ITEMS.map((item) => (
       item.key === 'LLM_OPENAI_MODELS' ? { ...item, value: 'gpt-4o-mini,gpt-5.5' } : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         maskToken="******"
@@ -1621,8 +1587,7 @@ describe('LLMChannelEditor', () => {
         ? { ...item, value: 'gpt-4o-mini,gpt-4.1-mini,gpt-5.5' }
         : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         maskToken="******"
@@ -1649,8 +1614,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('opens and focuses the requested dynamic connection field through the editor signal', async () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1667,8 +1631,7 @@ describe('LLMChannelEditor', () => {
     const items = OPENAI_ITEMS.map((item) => (
       item.key === 'LLM_OPENAI_PROVIDER' ? { ...item, value: 'missing-provider' } : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         maskToken="******"
@@ -1692,8 +1655,7 @@ describe('LLMChannelEditor', () => {
     const items = OPENAI_ITEMS.map((item) => (
       item.key === 'LLM_OPENAI_PROTOCOL' ? { ...item, value: 'deepseek' } : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS}
         maskToken="******"
@@ -1716,8 +1678,7 @@ describe('LLMChannelEditor', () => {
 
   it('reveals and focuses Extra Headers so a backend field error can be corrected', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={[...OPENAI_ITEMS, { key: 'LLM_OPENAI_EXTRA_HEADERS', value: '{invalid' }]}
         providers={PROVIDERS}
         maskToken="******"
@@ -1739,8 +1700,7 @@ describe('LLMChannelEditor', () => {
 
   it('edits credentials and models only inside the modal and emits the unified draft', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1769,8 +1729,7 @@ describe('LLMChannelEditor', () => {
         ? { ...item, value: '******', rawValueExists: true }
         : item
     ));
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={maskedItems}
         providers={PROVIDERS}
         maskToken="******"
@@ -1791,8 +1750,7 @@ describe('LLMChannelEditor', () => {
 
   it('returns to an empty draft when an edit is restored to the saved value', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1813,8 +1771,7 @@ describe('LLMChannelEditor', () => {
 
   it('does not emit invalid env keys while the connection name is empty', () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -1836,7 +1793,7 @@ describe('LLMChannelEditor', () => {
   });
 
   function editConnectionAfterRender(): HTMLElement {
-    render(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
     return editConnection();
   }
 
@@ -1873,8 +1830,7 @@ describe('LLMChannelEditor', () => {
   });
 
   function openAddAfterRender(props: Partial<React.ComponentProps<typeof LLMChannelEditor>> = {}): HTMLElement {
-    const { rerender } = render(
-      <LLMChannelEditor
+    const { rerender } = renderWithRouter(<LLMChannelEditor
         items={[]}
         providers={PROVIDERS}
         maskToken="******"
@@ -1882,7 +1838,7 @@ describe('LLMChannelEditor', () => {
         addSignal={0}
       />,
     );
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor
         items={[]}
         providers={PROVIDERS}
@@ -1951,10 +1907,9 @@ describe('LLMChannelEditor', () => {
   });
 
   it('uses a stable unique id separately from the editable display name', () => {
-    const { rerender } = render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" addSignal={0} />,
+    const { rerender } = renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" addSignal={0} />,
     );
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" addSignal={1} />,
     );
     selectProvider('openai');
@@ -1980,8 +1935,7 @@ describe('LLMChannelEditor', () => {
       { key: 'LLM_LOCAL_CUSTOM_API_KEY', value: '' },
       { key: 'LLM_LOCAL_CUSTOM_MODELS', value: 'qwen3:8b' },
     ];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={items}
         providers={PROVIDERS.filter((entry) => ['custom', 'anthropic'].includes(entry.id))}
         emptyApiKeyHosts={['localhost']}
@@ -2088,8 +2042,7 @@ describe('LLMChannelEditor', () => {
 
   it('keeps existing connections visible when the provider catalog fails', () => {
     const onReloadCatalog = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={[]}
         maskToken="******"
@@ -2107,8 +2060,7 @@ describe('LLMChannelEditor', () => {
     'preserves an explicit %s Provider and blank official Base URL during an initial catalog outage',
     async (providerId) => {
       const onValidityChange = vi.fn();
-      render(
-        <LLMChannelEditor
+      renderWithRouter(<LLMChannelEditor
           items={officialItemsWithoutBaseUrl(providerId)}
           providers={[]}
           maskToken="******"
@@ -2127,8 +2079,7 @@ describe('LLMChannelEditor', () => {
   );
 
   it('keeps a failed-catalog empty state passive and ignores the page add signal', () => {
-    const { rerender } = render(
-      <LLMChannelEditor
+    const { rerender } = renderWithRouter(<LLMChannelEditor
         items={[]}
         providers={[]}
         maskToken="******"
@@ -2136,7 +2087,7 @@ describe('LLMChannelEditor', () => {
         addSignal={0}
       />,
     );
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor
         items={[]}
         providers={[]}
@@ -2152,8 +2103,7 @@ describe('LLMChannelEditor', () => {
 
   it('renders a concise read-only notice for externally managed model config', () => {
     const onViewDiagnostics = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -2290,8 +2240,7 @@ describe('LLMChannelEditor', () => {
       { key: 'LLM_HERMES_API_KEY', value: '******', rawValueExists: false },
       { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
     ];
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={hermesItems}
         providers={PROVIDERS}
         emptyApiKeyHosts={['localhost']}
@@ -2304,15 +2253,14 @@ describe('LLMChannelEditor', () => {
   });
 
   it('resets local modal changes when the parent reset signal changes', () => {
-    const { rerender } = render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" resetSignal={0} />,
+    const { rerender } = renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" resetSignal={0} />,
     );
     const dialog = editConnection();
     replaceModels(['gpt-5.5']);
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
     expect(connectionCard()).toHaveTextContent('gpt-5.5');
 
-    rerender(
+    rerenderWithRouter(
       <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" resetSignal={1} />,
     );
     expect(connectionCard()).toHaveTextContent('gpt-4o-mini');
@@ -2320,8 +2268,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('rehydrates a parent-held channel draft after remount', () => {
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -2334,8 +2281,7 @@ describe('LLMChannelEditor', () => {
 
   it('never emits runtime routing keys from model-access edits', async () => {
     const onDraftItemsChange = vi.fn();
-    render(
-      <LLMChannelEditor
+    renderWithRouter(<LLMChannelEditor
         items={OPENAI_ITEMS}
         providers={PROVIDERS}
         maskToken="******"
@@ -2361,14 +2307,13 @@ describe('LLMChannelEditor', () => {
       { key: 'LLM_OPENAI_API_KEY', value: 'saved-single', rawValueExists: true },
       { key: 'LLM_OPENAI_API_KEYS', value: 'runtime-list', rawValueExists: false },
     ];
-    render(<LLMChannelEditor items={items} providers={PROVIDERS} maskToken="******" />);
+    renderWithRouter(<LLMChannelEditor items={items} providers={PROVIDERS} maskToken="******" />);
     const dialog = editConnection();
     expect(within(dialog).getByLabelText('API 密钥')).toHaveValue('runtime-list');
   });
 
   it('does not surface legacy channel terminology or internal config keys in normal UI', () => {
-    const { container } = render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    const { container } = renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
     const dialog = editConnection();
     expect(container.textContent).not.toMatch(/渠道|LLM_|LITELLM_|GENERATION_BACKEND|主后端|备用后端/);
@@ -2376,8 +2321,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('renders local model runtime and CLI status groups with honest availability', async () => {
-    render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
 
     expect(await screen.findByTestId('model-sources-hub')).toBeInTheDocument();
@@ -2397,8 +2341,7 @@ describe('LLMChannelEditor', () => {
 
   it('shows local runtime probe failure with reason instead of available', async () => {
     getRuntime.mockRejectedValueOnce(new Error('ollama unreachable'));
-    render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
     expect(await screen.findByTestId('model-sources-local-error')).toHaveTextContent('本地模型运行时检测失败');
     expect(screen.getByTestId('model-sources-local-availability')).toHaveTextContent('检测失败');
@@ -2439,8 +2382,7 @@ describe('LLMChannelEditor', () => {
       },
       backends: [],
     }));
-    render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
     expect(await screen.findByTestId('model-sources-cli-availability')).toHaveTextContent('可用');
     expect(screen.getByTestId('model-sources-cli-details')).toHaveTextContent('codex_cli');
@@ -2470,11 +2412,64 @@ describe('LLMChannelEditor', () => {
       fallback: null,
       backends: [],
     }));
-    render(
-      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    renderWithRouter(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
     );
     expect(await screen.findByTestId('model-sources-cli-availability')).toHaveTextContent('不可用');
     expect(screen.getByTestId('model-sources-cli-details').textContent).toMatch(/cli_not_found|binary missing/);
+  });
+
+
+  it('opens a type picker and route-backed cloud setup for add, and marks failed tests unavailable', async () => {
+    testLLMChannel.mockResolvedValue({
+      success: false,
+      message: 'auth failed',
+      errorCode: 'auth',
+      stage: 'chat_completion',
+    });
+    const { rerender } = renderWithRouter(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" addSignal={0} />,
+    );
+    rerenderWithRouter(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" addSignal={1} />,
+    );
+    expect(screen.getByTestId('model-source-type-picker')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-hub-wizard')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('source-type-cloud'));
+    expect(screen.getByTestId('model-source-setup-page')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /返回模型来源|取消/ }));
+    expect(screen.getByTestId('model-sources-hub')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-active-header')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-local-group')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-cli-group')).toBeInTheDocument();
+
+    fireEvent.click(within(connectionCard()).getByRole('button', { name: '测试' }));
+    await waitFor(() => expect(testLLMChannel).toHaveBeenCalled());
+    await waitFor(() => expect(connectionCard().getAttribute('data-source-availability')).toBe('disabled'));
+    expect(screen.getByTestId('model-sources-auto-disabled-notice')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-auto-disabled-notice')).toHaveTextContent('openai');
+  });
+
+  it('restores the route-backed cloud setup wizard from shareable setup query params', async () => {
+    renderWithRouter(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+      {
+        initialEntries: [
+          '/settings?section=ai_models&view=connections&setup=1&sourceType=cloud&connection=openai&step=connect',
+        ],
+      },
+    );
+    expect(await screen.findByTestId('model-source-setup-page')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-hub-wizard')).toBeInTheDocument();
+  });
+
+  it('restores the type picker from a setup=1 deep link without source type', async () => {
+    renderWithRouter(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+      {
+        initialEntries: ['/settings?section=ai_models&view=connections&setup=1&step=type'],
+      },
+    );
+    expect(await screen.findByTestId('model-source-type-picker')).toBeInTheDocument();
   });
 
 });
