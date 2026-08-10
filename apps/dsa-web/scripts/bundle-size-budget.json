@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, Notifications hub/screening-state translations, and MCP Settings registry field titles (PR #1033). Locale caps retain 200 bytes of headroom over CI-measured gzip after MCP registration; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, and locale chunks enlarged by the Notifications hub plus screening-state translations. Locale caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -25,58 +25,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 133027,
-      "measuredGzipBytes": 132827,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 132340,
+      "measuredGzipBytes": 132140,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 127280,
-      "measuredGzipBytes": 127080,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 126652,
+      "measuredGzipBytes": 126452,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 126880,
-      "measuredGzipBytes": 126680,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 126247,
+      "measuredGzipBytes": 126047,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 127173,
-      "measuredGzipBytes": 126973,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 126528,
+      "measuredGzipBytes": 126328,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 123133,
-      "measuredGzipBytes": 122933,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 122506,
+      "measuredGzipBytes": 122306,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 120657,
-      "measuredGzipBytes": 120457,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 119940,
+      "measuredGzipBytes": 119740,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113911,
-      "measuredGzipBytes": 113711,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 113297,
+      "measuredGzipBytes": 113097,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 114077,
-      "measuredGzipBytes": 113877,
-      "note": "Rebaseline for MCP Settings registry titles (PR #1033); retains 200 bytes of headroom over CI-measured gzip."
+      "maxGzipBytes": 113446,
+      "measuredGzipBytes": 113246,
+      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
     },
     {
       "id": "vendor-charts",
