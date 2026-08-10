@@ -51,6 +51,7 @@ import {
   channelSchemaAllowsKnownOperations,
   channelsAreEqual,
   collectChannelRouteSet,
+  findCatalogProvider,
   getChannelCompletenessIssues,
   getChannelDisplayNameIssues,
   getChannelNameIssues,
@@ -376,13 +377,59 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
   useEffect(() => {
     // Initial probe: state already starts as loading; avoid sync setState-in-effect.
-    void refreshLocalRuntime({ markLoading: false });
-    void refreshCliStatus({ markLoading: false });
+    // User-triggered recheck uses markLoading (default true) outside effects.
+    let cancelled = false;
+    const requestLocal = localProbeRequestIdRef.current + 1;
+    localProbeRequestIdRef.current = requestLocal;
+    const requestCli = cliProbeRequestIdRef.current + 1;
+    cliProbeRequestIdRef.current = requestCli;
+
+    void localTransport.getRuntime()
+      .then((runtime) => {
+        if (cancelled || localProbeRequestIdRef.current !== requestLocal) {
+          return;
+        }
+        setLocalRuntime(runtime);
+        setLocalRuntimeProbe('idle');
+        setLocalRuntimeCheckedAt(Date.now());
+      })
+      .catch((error: unknown) => {
+        if (cancelled || localProbeRequestIdRef.current !== requestLocal) {
+          return;
+        }
+        const parsed = getParsedApiError(error, language);
+        setLocalRuntime(null);
+        setLocalRuntimeProbe('error');
+        setLocalRuntimeError(parsed.message || parsed.rawMessage || null);
+        setLocalRuntimeCheckedAt(Date.now());
+      });
+
+    void systemConfigApi.getGenerationBackendStatus()
+      .then((status) => {
+        if (cancelled || cliProbeRequestIdRef.current !== requestCli) {
+          return;
+        }
+        setCliStatus(status);
+        setCliProbe('idle');
+        setCliCheckedAt(Date.now());
+      })
+      .catch((error: unknown) => {
+        if (cancelled || cliProbeRequestIdRef.current !== requestCli) {
+          return;
+        }
+        const parsed = getParsedApiError(error, language);
+        setCliStatus(null);
+        setCliProbe('error');
+        setCliError(parsed.message || parsed.rawMessage || null);
+        setCliCheckedAt(Date.now());
+      });
+
     return () => {
+      cancelled = true;
       localProbeRequestIdRef.current += 1;
       cliProbeRequestIdRef.current += 1;
     };
-  }, [refreshLocalRuntime, refreshCliStatus]);
+  }, [language, localTransport]);
 
   // Restore route-backed setup from shareable query params (refresh / deep link).
   useEffect(() => {
@@ -410,32 +457,35 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const knownNames = channels.map((channel) => channel.name);
     const action = resolveModelSourceSetupRestore(searchParams, knownNames);
     setupRestoredKeyRef.current = restoreKey;
-    if (action.kind === 'type_picker') {
-      setTypePickerOpen(true);
-      return;
-    }
-    if (action.kind === 'cloud_add') {
-      setTypePickerOpen(false);
-      setModal({ mode: 'add' });
-      return;
-    }
-    if (action.kind === 'cloud_edit') {
-      const index = channels.findIndex((channel) => channel.name === action.connection);
-      if (index >= 0) {
-        setTypePickerOpen(false);
-        setModal({ mode: 'edit', index, focusModels: action.focusModels });
-      } else {
+    // Defer React state updates out of the effect body (react-hooks/set-state-in-effect).
+    queueMicrotask(() => {
+      if (action.kind === 'type_picker') {
         setTypePickerOpen(true);
+        return;
       }
-      return;
-    }
-    if (action.kind === 'navigate_local_server') {
-      navigateToLocalModels();
-      return;
-    }
-    if (action.kind === 'navigate_local_cli') {
-      navigateToCliBackend();
-    }
+      if (action.kind === 'cloud_add') {
+        setTypePickerOpen(false);
+        setModal({ mode: 'add' });
+        return;
+      }
+      if (action.kind === 'cloud_edit') {
+        const index = channels.findIndex((channel) => channel.name === action.connection);
+        if (index >= 0) {
+          setTypePickerOpen(false);
+          setModal({ mode: 'edit', index, focusModels: action.focusModels });
+        } else {
+          setTypePickerOpen(true);
+        }
+        return;
+      }
+      if (action.kind === 'navigate_local_server') {
+        navigateToLocalModels();
+        return;
+      }
+      if (action.kind === 'navigate_local_cli') {
+        navigateToCliBackend();
+      }
+    });
     // navigate actions leave the hub; setup params are replaced by the target view URL.
   }, [channels, modal, mutationBusy, searchParams, typePickerOpen]);
 
