@@ -8,7 +8,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
-from sqlalchemy import and_, delete, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
@@ -331,6 +331,73 @@ class _HistoryMethods:
             results = session.execute(data_query).scalars().all()
             
             return list(results), total
+
+    def search_analysis_history(
+        self,
+        query: str,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Search low-sensitive history summaries through the maintained FTS index.
+
+        The query reads only matching row ids from the trigram index, applies a
+        hard result cap, then reads only the bounded low-sensitive projection.
+        Raw results, context snapshots, news content, and configuration values
+        are intentionally absent from the indexed columns.
+        """
+        normalized_query = str(query or "").strip()
+        if len(normalized_query) < 3:
+            return []
+        bounded_limit = max(1, min(int(limit), 10))
+        literal_match = f'"{normalized_query.replace(chr(34), chr(34) * 2)}"'
+
+        with self.get_session() as session:
+            rows = session.execute(
+                text(
+                    "SELECT history.id "
+                    "FROM analysis_history_search "
+                    "JOIN analysis_history AS history "
+                    "ON history.id = analysis_history_search.rowid "
+                    "WHERE analysis_history_search MATCH :match_query "
+                    "ORDER BY "
+                    "CASE WHEN lower(history.code) = lower(:literal_query) "
+                    "OR lower(coalesce(history.name, '')) = lower(:literal_query) "
+                    "THEN 0 ELSE 1 END, "
+                    "bm25(analysis_history_search), "
+                    "history.created_at DESC, history.id DESC "
+                    "LIMIT :limit"
+                ),
+                {
+                    "match_query": literal_match,
+                    "literal_query": normalized_query,
+                    "limit": bounded_limit,
+                },
+            ).fetchall()
+            record_ids = [int(row[0]) for row in rows]
+            if not record_ids:
+                return []
+
+            records = session.execute(
+                select(
+                    AnalysisHistory.id.label("id"),
+                    AnalysisHistory.code.label("stock_code"),
+                    AnalysisHistory.name.label("stock_name"),
+                    AnalysisHistory.report_type.label("report_type"),
+                    AnalysisHistory.analysis_summary.label("analysis_summary"),
+                    AnalysisHistory.operation_advice.label("operation_advice"),
+                    AnalysisHistory.trend_prediction.label("trend_prediction"),
+                    AnalysisHistory.created_at.label("created_at"),
+                ).where(AnalysisHistory.id.in_(record_ids))
+            ).mappings().all()
+            records_by_id = {
+                int(record["id"]): dict(record)
+                for record in records
+                if record["id"] is not None
+            }
+            return [
+                records_by_id[record_id]
+                for record_id in record_ids
+                if record_id in records_by_id
+            ]
     
     def get_analysis_history_by_id(self, record_id: int) -> Optional[AnalysisHistory]:
         """
