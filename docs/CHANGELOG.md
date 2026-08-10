@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
 - [Fixed] Aligned Web acceptance coverage with safe global error Toasts, current chat session payloads, semantic control sizing, and collapsed mobile Backtest filters.
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.

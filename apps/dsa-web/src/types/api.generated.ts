@@ -1311,6 +1311,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search analysis history summaries
+         * @description Search stock code, stock name, report type, trend, summary, advice, and creation timestamp through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.
+         */
+        get: operations["search_history_api_v1_history_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history/stocks": {
         parameters: {
             query?: never;
@@ -7036,6 +7056,63 @@ export interface components {
              * @description 总记录数
              */
             total: number;
+        };
+        /**
+         * HistorySearchItem
+         * @description Low-sensitive report projection returned by command-palette search.
+         */
+        HistorySearchItem: {
+            /**
+             * Created At
+             * @description Report creation timestamp
+             */
+            created_at?: string | null;
+            /**
+             * Id
+             * @description Analysis history record primary key
+             */
+            id: number;
+            /**
+             * Report Type
+             * @description Persisted report type
+             */
+            report_type?: string | null;
+            /**
+             * Stock Code
+             * @description Persisted stock code
+             */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @description Persisted stock name
+             */
+            stock_name?: string | null;
+            /**
+             * Summary
+             * @description Truncated conclusion excerpt
+             */
+            summary?: string | null;
+        };
+        /**
+         * HistorySearchResponse
+         * @description Bounded full-text search results for analysis history summaries.
+         */
+        HistorySearchResponse: {
+            /**
+             * Items
+             * @description Ranked matching history summaries
+             */
+            items?: components["schemas"]["HistorySearchItem"][];
+            /**
+             * Limit
+             * @description Maximum returned result count
+             */
+            limit: number;
+            /**
+             * Query
+             * @description Normalized literal search query
+             */
+            query: string;
         };
         /**
          * ImportSystemConfigRequest
@@ -16918,6 +16995,49 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    search_history_api_v1_history_search_get: {
+        parameters: {
+            query: {
+                /** @description Literal search query */
+                q: string;
+                /** @description Maximum returned result count */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded history search results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorySearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;
