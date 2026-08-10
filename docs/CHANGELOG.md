@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Added] Web report Decision Card view pins verdict/confidence/risks/watch conditions above evidence strata (default collapsed) across page, panel, and drawer report surfaces (#874).
 - [Added] Report three modes (brief/standard/research) with hard length limits, existing Decision Card integration, and explicit truncation notices for Jinja reports (#861 Phase 2).
 - [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
 - [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
