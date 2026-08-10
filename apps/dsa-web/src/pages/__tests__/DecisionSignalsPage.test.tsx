@@ -809,6 +809,7 @@ describe('DecisionSignalsPage', () => {
     ).search));
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
     expect(screen.getByRole('tab', { name: '规则' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
   });
 
   it('prefills a stock-scoped rule from a Signal Center deep link', async () => {
@@ -842,11 +843,12 @@ describe('DecisionSignalsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('button', { name: '创建告警规则' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: '信号范围' })).toBeInTheDocument();
     await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
       targetScope: 'portfolio_holdings',
     })));
+    expect(await screen.findByText('暂无告警规则')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('tab', { name: '推送历史' }));
 

@@ -1,0 +1,14 @@
+{
+  "id": "stockpulse.openbb-data-provider",
+  "name": "OpenBB External Framework Adapter",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Thin, default-off OpenBB data_provider adapter demonstrating external-framework absorption without new extension points.",
+  "author": "StockPulse Contributors",
+  "permissions": [
+    "network.outbound",
+    "dependency.openbb"
+  ],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}

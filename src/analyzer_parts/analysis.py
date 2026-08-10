@@ -328,6 +328,23 @@ class GeminiAnalyzer:
                 result.raw_response = response_text
                 result.search_performed = bool(news_context)
                 result.market_snapshot = self._build_market_snapshot(context)
+                trend_snapshot = context.get("trend_analysis")
+                if isinstance(trend_snapshot, dict):
+                    result.indicator_snapshot = {
+                        key: trend_snapshot.get(key)
+                        for key in (
+                            "ma_readings",
+                            "rsi_readings",
+                            "macd_reading",
+                            "bias_by_period",
+                            "support_by_period",
+                            "primary_ma_periods",
+                            "primary_bias_period",
+                            "indicator_period_source",
+                            "indicator_bar_count",
+                            "indicator_as_of",
+                        )
+                    }
                 result.model_used = model_used
                 result.report_language = report_language
                 normalize_chip_structure_availability(result, context.get("chip"))
@@ -716,21 +733,104 @@ class GeminiAnalyzer:
                 context['trend_analysis'],
                 volume_change_ratio=context.get('volume_change_ratio'),
             )
+            primary_periods = []
+            for raw_period in (trend.get('primary_ma_periods') or []):
+                if isinstance(raw_period, bool):
+                    continue
+                try:
+                    parsed_period = int(raw_period)
+                    exact_period = float(raw_period) == parsed_period
+                except (TypeError, ValueError):
+                    continue
+                if parsed_period > 0 and exact_period:
+                    primary_periods.append(parsed_period)
+            try:
+                primary_bias_period = int(trend.get('primary_bias_period') or 5)
+            except (TypeError, ValueError):
+                primary_bias_period = primary_periods[0] if primary_periods else 5
+            if primary_bias_period <= 0:
+                primary_bias_period = primary_periods[0] if primary_periods else 5
+            bias_by_period = trend.get('bias_by_period') or {}
+            if not isinstance(bias_by_period, dict):
+                bias_by_period = {}
+            primary_bias = bias_by_period.get(primary_bias_period)
+            if primary_bias is None:
+                primary_bias = bias_by_period.get(str(primary_bias_period))
+            ma_readings = trend.get('ma_readings') or {}
+            if not isinstance(ma_readings, dict):
+                ma_readings = {}
+            ma_rows = []
+            for raw_period, reading in ma_readings.items():
+                if not isinstance(reading, dict):
+                    continue
+                label = reading.get('label') or f"MA{raw_period}"
+                value = reading.get('value')
+                numeric_value = _safe_float(value, default=math.nan)
+                rendered = 'N/A' if not math.isfinite(numeric_value) else f"{numeric_value:.2f}"
+                reason = reading.get('reason') or ''
+                ma_rows.append(f"| {label} | {rendered} | {reason} |")
+            ma_rows_text = chr(10).join(ma_rows) or "| MA | N/A | insufficient data |"
+            rsi_readings = trend.get('rsi_readings') or {}
+            if not isinstance(rsi_readings, dict):
+                rsi_readings = {}
+            rsi_rows = []
+            for raw_period, reading in rsi_readings.items():
+                if not isinstance(reading, dict):
+                    continue
+                label = reading.get('label') or f"RSI({raw_period})"
+                numeric_value = _safe_float(reading.get('value'), default=math.nan)
+                rendered = 'N/A' if not math.isfinite(numeric_value) else f"{numeric_value:.2f}"
+                rsi_rows.append(f"| {label} | {rendered} | {reading.get('reason') or ''} |")
+            rsi_rows_text = chr(10).join(rsi_rows) or "| RSI | N/A | insufficient data |"
+            macd_reading = trend.get('macd_reading') or {}
+            macd_label = macd_reading.get('label', 'MACD') if isinstance(macd_reading, dict) else 'MACD'
+            macd_available = bool(
+                isinstance(macd_reading, dict) and macd_reading.get('available')
+            )
+            macd_values = (
+                f"DIF={_safe_float(macd_reading.get('dif'), default=0.0):.4f}, "
+                f"DEA={_safe_float(macd_reading.get('dea'), default=0.0):.4f}, "
+                f"BAR={_safe_float(macd_reading.get('bar'), default=0.0):.4f}"
+                if macd_available
+                else 'N/A'
+            )
+            macd_reason = (
+                macd_reading.get('reason') or ''
+                if isinstance(macd_reading, dict)
+                else 'insufficient data'
+            )
+            alignment_rule = ">".join(f"MA{period}" for period in primary_periods[:3])
+            numeric_bias = _safe_float(primary_bias, default=math.nan)
+            bias_rendered = "N/A" if not math.isfinite(numeric_bias) else f"{numeric_bias:+.2f}%"
             consistency_notes = trend.get('prompt_consistency_notes', [])
             if use_legacy_default_prompt:
-                bias_warning = "🚨 超过5%，严禁追高！" if trend.get('bias_ma5', 0) > 5 else "✅ 安全范围"
+                bias_warning = (
+                    "数据不足，不参与判断"
+                    if not math.isfinite(numeric_bias)
+                    else ("🚨 超过5%，严禁追高！" if numeric_bias > 5 else "✅ 安全范围")
+                )
                 prompt += f"""
 ### 趋势分析预判（基于交易理念）
 | 指标 | 数值 | 判定 |
 |------|------|------|
 | 趋势状态 | {trend.get('trend_status', unknown_text)} | |
-| 均线排列 | {trend.get('ma_alignment', unknown_text)} | MA5>MA10>MA20为多头 |
+| 均线排列 | {trend.get('ma_alignment', unknown_text)} | {alignment_rule or 'N/A'}为多头 |
 | 趋势强度 | {trend.get('trend_strength', 0)}/100 | |
-| **乖离率(MA5)** | **{trend.get('bias_ma5', 0):+.2f}%** | {bias_warning} |
-| 乖离率(MA10) | {trend.get('bias_ma10', 0):+.2f}% | |
+| **乖离率(MA{primary_bias_period})** | **{bias_rendered}** | {bias_warning} |
 | 量能状态 | {trend.get('volume_status', unknown_text)} | {trend.get('volume_trend', '')} |
 | 系统信号 | {trend.get('buy_signal', unknown_text)} | |
 | 系统评分 | {trend.get('signal_score', 0)}/100 | |
+
+#### 配置均线（source={trend.get('indicator_period_source', 'unknown')}, bars={trend.get('indicator_bar_count', 0)}, as-of={trend.get('indicator_as_of', 'N/A')})
+| 均线 | 数值 | 可用性 |
+|------|------|--------|
+{ma_rows_text}
+
+#### 配置 RSI / MACD
+| 指标 | 数值 | 可用性 |
+|------|------|--------|
+{rsi_rows_text}
+| {macd_label} | {macd_values} | {macd_reason} |
 
 #### 系统分析理由
 **买入理由**：
@@ -748,8 +848,8 @@ class GeminiAnalyzer:
             else:
                 bias_warning = (
                     "🚨 偏离较大，需谨慎评估追高风险"
-                    if trend.get('bias_ma5', 0) > 5
-                    else "✅ 位置相对可控"
+                    if math.isfinite(numeric_bias) and numeric_bias > 5
+                    else ("✅ 位置相对可控" if math.isfinite(numeric_bias) else "数据不足，不参与判断")
                 )
                 prompt += f"""
 ### 技术与结构分析（供激活技能判断参考）
@@ -758,11 +858,21 @@ class GeminiAnalyzer:
 | 趋势状态 | {trend.get('trend_status', unknown_text)} | |
 | 均线排列 | {trend.get('ma_alignment', unknown_text)} | 结合激活技能判断结构强弱 |
 | 趋势强度 | {trend.get('trend_strength', 0)}/100 | |
-| **价格位置(MA5)** | **{trend.get('bias_ma5', 0):+.2f}%** | {bias_warning} |
-| 价格位置(MA10) | {trend.get('bias_ma10', 0):+.2f}% | |
+| **价格位置(MA{primary_bias_period})** | **{bias_rendered}** | {bias_warning} |
 | 量能状态 | {trend.get('volume_status', unknown_text)} | {trend.get('volume_trend', '')} |
 | 系统信号 | {trend.get('buy_signal', unknown_text)} | |
 | 系统评分 | {trend.get('signal_score', 0)}/100 | |
+
+#### 配置均线（source={trend.get('indicator_period_source', 'unknown')}, bars={trend.get('indicator_bar_count', 0)}, as-of={trend.get('indicator_as_of', 'N/A')})
+| 均线 | 数值 | 可用性 |
+|------|------|--------|
+{ma_rows_text}
+
+#### 配置 RSI / MACD
+| 指标 | 数值 | 可用性 |
+|------|------|--------|
+{rsi_rows_text}
+| {macd_label} | {macd_values} | {macd_reason} |
 
 #### 系统分析理由
 **支持因素**：
