@@ -48,11 +48,15 @@ EXPECTED_PRIVATE_EXPORTS = {
     "_UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES",
     "_UI_PLACEMENT_LOCAL_MODELS_KEYS",
     "_UI_PLACEMENT_TASK_ROUTING_KEYS",
+    "_BOOLEAN_KEY_PREFIXES",
+    "_BOOLEAN_KEY_SUFFIXES",
     "_extract_option_values",
     "_infer_category",
     "_infer_data_type",
     "_infer_ui_control",
+    "_is_boolean_named_key",
     "_is_sensitive_key",
+    "_normalize_value_hint_token",
 }
 EXPECTED_MODULE_ANNOTATIONS = {
     "_CATEGORY_DEFINITIONS": "List[Dict[str, Any]]",
