@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Added] Reusable Web financial chart components: KlineChart (volume + MA overlays + zoom, dirty OHLC guards) and RiskHeatmap (score + level labels; color not sole carrier), with playground previews and unit tests; no page wiring (#142).
 - [Added] Earnings-call transcript parsing (`earnings-transcript-v2`) with exact source coordinates, typed metrics, page-aware PDF provenance, compact chunk retrieval, untrusted-document privacy boundaries, and bounded valid-JSON Agent results; default-off tool `parse_earnings_transcript` behind existing multimodal gates (#253 remaining).
 
 - [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
