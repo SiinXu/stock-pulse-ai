@@ -234,7 +234,7 @@ def run_with_planning(
         if session is not None:
             try:
                 session.close()
-            except Exception as close_exc:  # broad-exception: fallback_recorded
+            except Exception as close_exc:  # broad-exception: fallback_recorded - session close best-effort
                 log_safe_exception(
                     logger,
                     "Plan tool session close failed",
