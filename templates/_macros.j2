@@ -148,6 +148,81 @@
 *{{ labels.not_investment_advice }}*
 {%- endmacro %}
 
+{# Issue #238: optional valuation block. Renders only when projection is present. #}
+{% macro valuation_section(projection, compact=false) -%}
+{% if projection and projection.present %}
+{% if not compact %}
+### 💹 {{ labels.valuation_heading }}
+
+**{{ labels.valuation_status_label }}**: {{ projection.status_label or projection.status or '—' }}
+{% set dcf = projection.dcf or {} %}
+{% set relative = projection.relative or {} %}
+{% set assumptions = dcf.assumptions or {} %}
+{% set sensitivity = dcf.sensitivity or {} %}
+
+#### {{ labels.valuation_dcf_heading }}
+- {{ labels.valuation_status_label }}: {{ dcf.status_label or dcf.status or '—' }}
+{% if dcf.equity_value is not none %}- {{ labels.valuation_equity_value_label }}: {{ dcf.equity_value }}
+{% endif -%}
+{% if dcf.intrinsic_value_per_share is not none %}- {{ labels.valuation_intrinsic_per_share_label }}: {{ dcf.intrinsic_value_per_share }}
+{% endif -%}
+{% if dcf.upside_vs_price_pct is not none %}- {{ labels.valuation_upside_label }}: {{ dcf.upside_vs_price_pct }}%
+{% endif -%}
+{% if dcf.current_price is not none %}- {{ labels.current_price_label }}: {{ dcf.current_price }}
+{% endif -%}
+{% if dcf.message %}- {{ dcf.message }}
+{% endif %}
+
+**{{ labels.valuation_assumptions_heading }}**
+{% if assumptions.growth_rate is not none %}- {{ labels.valuation_growth_rate_label }}: {{ assumptions.growth_rate }}{% if assumptions.growth_source %} ({{ assumptions.growth_source }}){% endif %}
+{% endif -%}
+{% if assumptions.discount_rate is not none %}- {{ labels.valuation_discount_rate_label }}: {{ assumptions.discount_rate }}
+{% endif -%}
+{% if assumptions.terminal_growth_rate is not none %}- {{ labels.valuation_terminal_growth_label }}: {{ assumptions.terminal_growth_rate }}
+{% endif -%}
+{% if assumptions.projection_years is not none %}- {{ labels.valuation_projection_years_label }}: {{ assumptions.projection_years }}
+{% endif -%}
+{% if assumptions.cash_flow_source %}- {{ labels.valuation_cash_flow_source_label }}: {{ assumptions.cash_flow_source }}{% if assumptions.base_fcf is not none %} ({{ assumptions.base_fcf }}){% endif %}
+{% endif -%}
+{% if assumptions.net_debt_assumption %}- {{ labels.valuation_net_debt_assumption_label }}: {{ assumptions.net_debt_assumption }}
+{% endif %}
+
+**{{ labels.valuation_sensitivity_heading }}**
+{% if sensitivity.equity_value_low is not none or sensitivity.equity_value_high is not none %}
+| {{ labels.valuation_sensitivity_low_label }} | {{ labels.valuation_sensitivity_mid_label }} | {{ labels.valuation_sensitivity_high_label }} |
+| --- | --- | --- |
+| {{ sensitivity.equity_value_low if sensitivity.equity_value_low is not none else '—' }} | {{ sensitivity.equity_value_mid if sensitivity.equity_value_mid is not none else '—' }} | {{ sensitivity.equity_value_high if sensitivity.equity_value_high is not none else '—' }} |
+{% else %}
+- —
+{% endif %}
+
+#### {{ labels.valuation_relative_heading }}
+- {{ labels.valuation_status_label }}: {{ relative.status_label or relative.status or '—' }}
+{% if relative.pe_ratio is not none %}- P/E: {{ relative.pe_ratio }}{% if relative.premium_discount and relative.premium_discount.pe_vs_peers_pct is not none %} ({{ labels.valuation_vs_peers_label }}: {{ relative.premium_discount.pe_vs_peers_pct }}%){% endif %}
+{% endif -%}
+{% if relative.pb_ratio is not none %}- P/B: {{ relative.pb_ratio }}{% if relative.premium_discount and relative.premium_discount.pb_vs_peers_pct is not none %} ({{ labels.valuation_vs_peers_label }}: {{ relative.premium_discount.pb_vs_peers_pct }}%){% endif %}
+{% endif -%}
+{% if relative.ev_ebitda is not none %}- EV/EBITDA: {{ relative.ev_ebitda }}{% if relative.ev_ebitda_peer_median is not none %} ({{ labels.valuation_peer_median_label }}: {{ relative.ev_ebitda_peer_median }}){% endif %}
+{% elif relative.ev_ebitda_status %}- EV/EBITDA: {{ relative.ev_ebitda_status }}
+{% endif -%}
+{% if relative.implied_prices and relative.implied_prices.pe_based is not none %}- {{ labels.valuation_implied_pe_label }}: {{ relative.implied_prices.pe_based }}
+{% endif -%}
+{% if relative.implied_prices and relative.implied_prices.pb_based is not none %}- {{ labels.valuation_implied_pb_label }}: {{ relative.implied_prices.pb_based }}
+{% endif -%}
+{% if relative.implied_prices and relative.implied_prices.ev_ebitda_equity_value is not none %}- {{ labels.valuation_implied_ev_ebitda_label }}: {{ relative.implied_prices.ev_ebitda_equity_value }}
+{% endif -%}
+{% if relative.message %}- {{ relative.message }}
+{% endif %}
+
+*{{ labels.valuation_model_disclaimer or projection.disclaimer or labels.not_investment_advice }}*
+
+{% else %}
+**💹 {{ labels.valuation_heading }}**: {{ projection.status_label or projection.status or '—' }}{% set dcf = projection.dcf or {} %}{% if dcf.intrinsic_value_per_share is not none %} · {{ labels.valuation_intrinsic_per_share_label }}: {{ dcf.intrinsic_value_per_share }}{% elif dcf.equity_value is not none %} · {{ labels.valuation_equity_value_label }}: {{ dcf.equity_value }}{% endif %}
+{% endif %}
+{% endif %}
+{%- endmacro %}
+
+
 {% macro market_snapshot(result) %}
 {% set snapshot = result.market_snapshot if result.market_snapshot else {} %}
 {% if snapshot %}
