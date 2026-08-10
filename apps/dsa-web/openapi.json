@@ -23713,6 +23713,165 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValuationEstimateRequest": {
+        "properties": {
+          "discount_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional discount rate / WACC as a decimal",
+            "title": "Discount Rate"
+          },
+          "growth_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional high-growth rate as a decimal",
+            "title": "Growth Rate"
+          },
+          "peer_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional peer codes for relative valuation medians",
+            "title": "Peer Codes"
+          },
+          "projection_years": {
+            "anyOf": [
+              {
+                "maximum": 15.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional projection horizon in years",
+            "title": "Projection Years"
+          },
+          "stock_code": {
+            "description": "Stock code such as 600519, hk00700, or AAPL",
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "terminal_growth_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional perpetual growth rate as a decimal",
+            "title": "Terminal Growth Rate"
+          }
+        },
+        "required": [
+          "stock_code"
+        ],
+        "title": "ValuationEstimateRequest",
+        "type": "object"
+      },
+      "ValuationEstimateResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "dcf": {
+            "additionalProperties": true,
+            "title": "Dcf",
+            "type": "object"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "fundamentals_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fundamentals Snapshot"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "relative": {
+            "additionalProperties": true,
+            "title": "Relative",
+            "type": "object"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "stock_code"
+        ],
+        "title": "ValuationEstimateResponse",
+        "type": "object"
+      },
       "ValueUnavailabilityPayload": {
         "properties": {
           "base": {
@@ -39357,6 +39516,225 @@
         "summary": "LLM token usage summary",
         "tags": [
           "Usage"
+        ]
+      }
+    },
+    "/api/v1/valuation/estimate": {
+      "get": {
+        "description": "Transparent DCF and relative valuation (P/E, P/B, EV/EBITDA when explicit inputs exist). Returns assumptions and a growth×discount sensitivity table. Research support only; not investment advice.",
+        "operationId": "estimateStockValuation",
+        "parameters": [
+          {
+            "description": "Stock code",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code",
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional growth rate (decimal)",
+            "in": "query",
+            "name": "growth_rate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional growth rate (decimal)",
+              "title": "Growth Rate"
+            }
+          },
+          {
+            "description": "Optional discount rate (decimal)",
+            "in": "query",
+            "name": "discount_rate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional discount rate (decimal)",
+              "title": "Discount Rate"
+            }
+          },
+          {
+            "description": "Optional terminal growth rate (decimal)",
+            "in": "query",
+            "name": "terminal_growth_rate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional terminal growth rate (decimal)",
+              "title": "Terminal Growth Rate"
+            }
+          },
+          {
+            "in": "query",
+            "name": "projection_years",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 15,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Projection Years"
+            }
+          },
+          {
+            "description": "Optional peer codes (repeat query param)",
+            "in": "query",
+            "name": "peer_codes",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional peer codes (repeat query param)",
+              "title": "Peer Codes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValuationEstimateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Valuation estimate failed"
+          }
+        },
+        "summary": "Estimate stock valuation (DCF + relative)",
+        "tags": [
+          "Valuation"
+        ]
+      },
+      "post": {
+        "description": "Same as GET /estimate with JSON body for interactive Web sensitivity UI.",
+        "operationId": "estimateStockValuationPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValuationEstimateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValuationEstimateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Valuation estimate failed"
+          }
+        },
+        "summary": "Estimate stock valuation with body overrides",
+        "tags": [
+          "Valuation"
         ]
       }
     },

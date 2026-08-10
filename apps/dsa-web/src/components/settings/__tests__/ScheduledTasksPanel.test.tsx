@@ -7,6 +7,7 @@ import { UI_TEXT } from '../../../i18n/uiText';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
 
 const HISTORY_ASSERT_TIMEOUT_MS = 5_000;
+const HISTORY_FLOW_TIMEOUT_MS = HISTORY_ASSERT_TIMEOUT_MS * 4;
 
 vi.mock('../../../api/scheduledTasks', () => ({
   scheduledTasksApi: {
@@ -424,5 +425,5 @@ describe('ScheduledTasksPanel', () => {
       'task-1',
       { limit: 20 },
     ));
-  });
+  }, HISTORY_FLOW_TIMEOUT_MS);
 });

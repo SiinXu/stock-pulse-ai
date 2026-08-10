@@ -8,6 +8,7 @@ without importing the full ReAct loop.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -81,7 +82,9 @@ _HOME_PATH_PATTERN = re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+)(/[^\s,;]*)?")
 _MAX_TOOL_ARGUMENT_INSPECTION_DEPTH = 12
 _MAX_TOOL_ARGUMENT_INSPECTION_NODES = 512
 _MAX_TOOL_CACHE_TEXT_CHARS = 16_384
+_MAX_UNTRUSTED_DOCUMENT_ARGUMENT_CHARS = 220_000
 _CACHE_VALUE_UNAVAILABLE = object()
+_UNTRUSTED_DOCUMENT_TOOL_NAMES = frozenset({"parse_earnings_transcript"})
 
 
 @dataclass
@@ -172,6 +175,11 @@ def _build_tool_cache_key(tool_name: str, arguments: Dict[str, Any]) -> Optional
     normalized_args = _bounded_tool_arguments(
         arguments,
         normalize_stock_code=True,
+        max_text_chars=(
+            _MAX_UNTRUSTED_DOCUMENT_ARGUMENT_CHARS
+            if tool_name in _UNTRUSTED_DOCUMENT_TOOL_NAMES
+            else _MAX_TOOL_CACHE_TEXT_CHARS
+        ),
     )
     if normalized_args is None:
         return None
@@ -185,13 +193,69 @@ def _build_tool_cache_key(tool_name: str, arguments: Dict[str, Any]) -> Optional
         )
     except (RecursionError, TypeError, ValueError):
         return None
+    if tool_name in _UNTRUSTED_DOCUMENT_TOOL_NAMES:
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        return f"{tool_name}:sha256:{digest}"
     return f"{tool_name}:{payload}"
+
+
+def _document_safe_arguments(tool_name: str, arguments: Any) -> Any:
+    """Replace raw untrusted-document content before audit/diagnostic storage."""
+    if tool_name not in _UNTRUSTED_DOCUMENT_TOOL_NAMES or not isinstance(arguments, dict):
+        return arguments
+    safe = dict(arguments)
+    text_value = safe.get("text")
+    if isinstance(text_value, str):
+        safe["text"] = {
+            "redacted": True,
+            "char_count": len(text_value),
+            "sha256": hashlib.sha256(text_value.encode("utf-8")).hexdigest(),
+        }
+    return safe
+
+
+def _document_safe_result(tool_name: str, result: Any) -> Any:
+    if tool_name not in _UNTRUSTED_DOCUMENT_TOOL_NAMES:
+        return result
+    parsed = result
+    if isinstance(result, str):
+        try:
+            parsed = json.loads(result)
+        except (TypeError, ValueError):
+            return {"result_redacted": True}
+    if not isinstance(parsed, dict):
+        return {"result_redacted": True}
+    source = parsed.get("source") if isinstance(parsed.get("source"), dict) else {}
+    return {
+        "schema_version": parsed.get("schema_version"),
+        "status": parsed.get("status"),
+        "reason_code": parsed.get("reason_code"),
+        "content_sha256": source.get("content_sha256"),
+        "text_char_count": parsed.get("text_char_count"),
+        "result_redacted": True,
+    }
+
+
+def redact_tool_diagnostic_value(
+    tool_name: str,
+    value: Any,
+    *,
+    kind: str,
+    limit: int = _SUMMARY_LIMIT,
+) -> str:
+    safe = (
+        _document_safe_arguments(tool_name, value)
+        if kind == "arguments"
+        else _document_safe_result(tool_name, value)
+    )
+    return redact_diagnostic_value(safe, limit=limit)
 
 
 def _bounded_tool_arguments(
     arguments: Dict[str, Any],
     *,
     normalize_stock_code: bool,
+    max_text_chars: int = _MAX_TOOL_CACHE_TEXT_CHARS,
 ) -> Optional[Dict[str, Any]]:
     """Copy JSON arguments within the shared ToolSurface inspection bounds."""
     node_count = 0
@@ -216,7 +280,7 @@ def _bounded_tool_arguments(
             text_chars += len(value)
             return (
                 value
-                if text_chars <= _MAX_TOOL_CACHE_TEXT_CHARS
+                if text_chars <= max_text_chars
                 else _CACHE_VALUE_UNAVAILABLE
             )
         if type(value) not in {dict, list}:
@@ -241,7 +305,7 @@ def _bounded_tool_arguments(
                 if type(key) is not str:
                     return _CACHE_VALUE_UNAVAILABLE
                 text_chars += len(key)
-                if text_chars > _MAX_TOOL_CACHE_TEXT_CHARS:
+                if text_chars > max_text_chars:
                     return _CACHE_VALUE_UNAVAILABLE
                 copied_item = _copy(item, depth=depth + 1)
                 if copied_item is _CACHE_VALUE_UNAVAILABLE:
@@ -370,7 +434,7 @@ def execute_runner_tool_call_via_session(
         else None
     )
     safe_arguments = redact_sensitive_data(
-        bounded_arguments
+        _document_safe_arguments(name if isinstance(name, str) else "", bounded_arguments)
         if bounded_arguments is not None
         else {"arguments_redacted": True}
     )
@@ -477,9 +541,13 @@ def build_tool_audit(
     ctx = context or ToolAccessContext()
     payload = {
         "tool_name": tool_name,
-        "arguments_summary": redact_diagnostic_value(arguments),
+        "arguments_summary": redact_tool_diagnostic_value(
+            tool_name, arguments, kind="arguments"
+        ),
         "duration": round(duration, 4),
-        "result_summary": redact_diagnostic_value(result),
+        "result_summary": redact_tool_diagnostic_value(
+            tool_name, result, kind="result"
+        ),
         "error_code": error_code,
         "backend": ctx.backend,
         "session_id": ctx.session_id,

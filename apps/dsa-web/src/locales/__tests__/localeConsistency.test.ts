@@ -42,6 +42,7 @@ import { SETTINGS_NOTIFICATION_TEXT } from '../settingsNotifications';
 import { SETTINGS_PAGE_TEXT } from '../settingsPage';
 import { SETTINGS_WIZARD_TEXT } from '../settingsWizard';
 import { STOCK_SEARCH_TEXT } from '../stockSearch';
+import { CHARTS_TEXT } from '../charts';
 
 type LocaleMap = Record<UiLanguage, unknown>;
 
@@ -71,6 +72,7 @@ const registries: Record<string, LocaleMap> = {
   settingsPage: SETTINGS_PAGE_TEXT,
   settingsWizard: SETTINGS_WIZARD_TEXT,
   stockSearch: STOCK_SEARCH_TEXT,
+  charts: CHARTS_TEXT,
 };
 
 const reportRegistries = {
