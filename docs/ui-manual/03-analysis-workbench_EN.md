@@ -98,6 +98,15 @@ The selector offers **Auto, Premarket, Intraday, and Postmarket**. Auto is the d
 
 The task list shows the **requested phase**, so you can confirm whether Auto or an explicit phase was submitted. The report page shows the **final phase** used after analysis and remains authoritative. These are intentionally distinct.
 
+### Recovery after an error
+
+- Transient network or rate-limit failures expose **Retry**. A single-run retry preserves the original symbol, mode, phase, Skill, notification, and force-refresh intent; the action is disabled while pending.
+- **Already running** never resubmits the symbol. **Running tasks** opens the exact known task, or falls back to the Tasks segment when its identity is unavailable.
+- Validation returns focus to stock search; model failures open their owning Settings view, while configuration-version conflicts reload the page; an expired session opens Admin login with a safe return to the current workbench. Unknown and permanently missing resources are not retried blindly.
+- After partial batch acceptance, accepted, duplicate, and unconfirmed symbols remain distinct. You can inspect confirmed tasks, while a safe retry submits only unconfirmed symbols and never accepted or duplicate work. Dismissing the notice leaves the launch surface usable.
+- Report-detail and Run Flow retries keep the same record ID or task/history source. A failed deletion remains in the confirmation dialog with **Retry / Cancel**, and keyboard focus returns to Retry.
+- **View details** is collapsed by default and includes only filtered code, reason token, trace ID, and status. Credentials, headers, bodies, and provider secrets are never rendered there.
+
 ## History & compare
 
 1. Open a record for full Markdown/report UI.  

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.
 - [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
+- [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).
 - [Changed] Adopt multi-market `marketFormat` for Stock Details quote/history and history trend drawer price/change colors (CN/HK/US precision, currency, and red_up/green_up semantics; issue #889).
 - [Added] Web report Decision Card view pins verdict/confidence/risks/watch conditions above evidence strata (default collapsed) across page, panel, and drawer report surfaces (#874).
 - [Added] Report three modes (brief/standard/research) with hard length limits, existing Decision Card integration, and explicit truncation notices for Jinja reports (#861 Phase 2).
