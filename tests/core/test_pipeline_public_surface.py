@@ -48,6 +48,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
 EXPECTED_DELIVERY_METHODS = (
     "_delivery_stage_key",
     "_run_delivery_attempt",
+    "_format_delta_first_notification",
     "_send_single_stock_notification",
     "_save_local_report",
     "_send_notifications",
