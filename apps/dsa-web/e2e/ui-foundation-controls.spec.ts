@@ -192,7 +192,9 @@ test.describe('touch-capable foundation controls', () => {
     await expectVisibleHeights(page.locator('[data-control="button"]:visible'), buttonHeights);
 
     await page.getByRole('button', { name: /打开.*日历/ }).first().click();
-    const iconButton = page.locator('[data-control="icon-button"]:visible').first();
+    const calendarDialog = page.getByRole('dialog', { name: /分析开始日期|Analysis start date/ });
+    await expect(calendarDialog).toBeVisible();
+    const iconButton = calendarDialog.locator('[data-control="icon-button"]:visible').first();
     await expect(iconButton).toBeVisible();
     await expectVisibleHeights(page.locator('[data-control="icon-button"]:visible'), iconButtonHeights);
     await expectCoarseHitTarget(iconButton, 'icon action');

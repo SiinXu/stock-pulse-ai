@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiErrorAlert } from '../ApiErrorAlert';
 
 describe('ApiErrorAlert', () => {
-  it('uses a compact Toast with shared controls and expandable diagnostics', () => {
+  it('uses a compact Toast with shared dismiss and retry controls', () => {
     const onAction = vi.fn();
     const onDismiss = vi.fn();
     render(
@@ -35,13 +35,11 @@ describe('ApiErrorAlert', () => {
     expect(retry).toHaveAttribute('data-control', 'button');
     expect(retry).toHaveAttribute('data-variant', 'ghost');
     expect(retry).toHaveAttribute('data-size', 'default');
-    const details = screen.getByText(/^(?:查看详情|View details)$/);
-    expect(screen.getByText('provider connection refused')).not.toBeVisible();
+    expect(screen.queryByText(/^(?:查看详情|View details)$/)).not.toBeInTheDocument();
+    expect(screen.queryByText('provider connection refused')).not.toBeInTheDocument();
 
     fireEvent.click(retry);
     expect(onAction).toHaveBeenCalledTimes(1);
-    fireEvent.click(details);
-    expect(screen.getByText('provider connection refused')).toBeVisible();
     fireEvent.click(dismiss);
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
