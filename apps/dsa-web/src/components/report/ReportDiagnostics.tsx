@@ -22,6 +22,7 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
+import { ReasoningTraceExportControls } from './ReasoningTraceExportControls';
 
 interface ReportDiagnosticsProps {
   recordId?: number;
@@ -300,6 +301,14 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
           </div>
 
           {copyError ? <InlineAlert variant="danger" message={copyError} /> : null}
+
+          {recordId !== undefined ? (
+            <ReasoningTraceExportControls
+              recordId={recordId}
+              variant="section"
+              disabled={isLoading}
+            />
+          ) : null}
 
           <div>
             <span className="label-uppercase">{text.components}</span>

@@ -76,6 +76,26 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '安全审计存储不可用', message: '无法读写安全审计记录。请稍后重试，或检查数据库与迁移状态。' },
     en: { title: 'Security audit storage is unavailable', message: 'Security audit records cannot be read or written. Retry later, or check the database and migration state.' },
   }),
+  reasoning_trace_export_disabled: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled", {
+    zh: {
+      title: '推理轨迹导出未启用',
+      message: '请在设置 → Agent 行为 → 执行中开启「推理轨迹导出」（REASONING_TRACE_EXPORT_ENABLED），保存后重试。',
+    },
+    en: {
+      title: 'Reasoning trace export is disabled',
+      message: 'Enable Reasoning Trace Export (REASONING_TRACE_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.',
+    },
+  }),
+  reasoning_trace_auth_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required", {
+    zh: {
+      title: '推理轨迹导出需要管理员认证',
+      message: '管理员认证未启用时无法导出推理轨迹（HTTP 403）。请先启用认证并登录。',
+    },
+    en: {
+      title: 'Reasoning trace export requires administrator authentication',
+      message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.',
+    },
+  }),
   password_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.password_required", {
     zh: { title: '请输入密码', message: '填写所需密码后再试。' },
     en: { title: 'Password required', message: 'Enter the required password and try again.' },

@@ -1211,5 +1211,71 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["restart_required"],
     },
+    "REASONING_TRACE_EXPORT_ENABLED": {
+        "title": "Reasoning Trace Export",
+        "description": (
+            "Master switch for the reasoning-trace export API and service gate. "
+            "Default off. Exports are redacted but still sensitive."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 724,
+        "help_key": "settings.agent.reasoning_trace_export",
+        "examples": [
+            "REASONING_TRACE_EXPORT_ENABLED=false",
+            "REASONING_TRACE_EXPORT_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Reasoning trace export (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md",
+            },
+            {
+                "label": "推理轨迹导出（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "REASONING_TRACE_EXPORT_MAX_CHARS": {
+        "title": "Reasoning Trace Max Chars",
+        "description": (
+            "Character budget for complete reasoning-trace export responses. "
+            "Default 500000; clamped to 10000–2000000 when loading config."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "500000",
+        "options": [],
+        "validation": {"min": 10000, "max": 2000000},
+        "display_order": 725,
+        "help_key": "settings.agent.reasoning_trace_export",
+        "examples": [
+            "REASONING_TRACE_EXPORT_MAX_CHARS=500000",
+            "REASONING_TRACE_EXPORT_MAX_CHARS=100000",
+        ],
+        "docs": [
+            {
+                "label": "Reasoning trace export (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md",
+            },
+            {
+                "label": "推理轨迹导出（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 
 }
