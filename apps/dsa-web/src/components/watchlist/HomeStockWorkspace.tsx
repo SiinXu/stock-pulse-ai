@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownWideNarrow,
   CalendarDays,
@@ -12,20 +12,24 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
+import { watchlistScoresApi } from '../../api/watchlistScores';
 import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput, Select, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
 import type { HomeWatchlistRow } from '../../types/watchlist';
 import { getSentimentColor } from '../../types/analysis';
+import type { WatchlistScoreItem, WatchlistScoreSortMode } from '../../types/watchlistScore';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import { truncateStockName } from '../../utils/stockName';
+import { orderWatchlistByScore } from '../../utils/watchlistScoreOrder';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/routes';
 import { Spinner } from '../common/Spinner';
 import { WatchlistGroupsPanel } from './WatchlistGroupsPanel';
+import { WatchlistScoreColumn } from './WatchlistScoreColumn';
 import type { WatchlistGroup } from '../../types/watchlist';
 
 export type HomeWorkspaceTab = HomeWorkspaceValue;
@@ -122,18 +126,35 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
   );
 };
 
+
+function unanalyzedScoreItem(code: string): WatchlistScoreItem {
+  return {
+    stockCode: code,
+    status: 'unanalyzed',
+    score: null,
+    asOf: null,
+    ageDays: null,
+    analysisId: null,
+    operationAdvice: null,
+    factors: [],
+    freshness: 'none',
+    degradedReasons: [],
+  };
+}
+
 const WatchlistRowItem: React.FC<{
   row: HomeWatchlistRow;
+  scoreItem: WatchlistScoreItem;
   onRemove: (code: string) => Promise<boolean | void>;
   disabled: boolean;
-}> = ({ row, onRemove, disabled }) => {
+}> = ({ row, scoreItem, onRemove, disabled }) => {
   const { language, t } = useUiLanguage();
   const taskLabel = getTaskStatusLabel(row.activeTask, t);
   const item = row.latestItem;
   const stockName = item?.stockName || row.code;
 
   return (
-    <div className="home-subpanel grid min-w-0 gap-2 px-3 py-2.5">
+    <div className="home-subpanel grid min-w-0 gap-2 px-3 py-2.5" data-testid="watchlist-row">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -166,8 +187,8 @@ const WatchlistRowItem: React.FC<{
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <ScoreBadge item={item} />
+        <div className="flex shrink-0 items-start gap-1.5">
+          <WatchlistScoreColumn item={scoreItem} className="max-w-40" />
           <IconButton
             type="button"
             variant="danger"
@@ -256,6 +277,46 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   const reactId = useId();
   const [draftCode, setDraftCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scoreSort, setScoreSort] = useState<WatchlistScoreSortMode>('manual');
+  const [scoresByCode, setScoresByCode] = useState<ReadonlyMap<string, WatchlistScoreItem>>(
+    () => new Map(),
+  );
+  const scoreRequestIdRef = useRef(0);
+  const watchlistCodesKey = useMemo(
+    () => watchlistRows.map((row) => row.code).join('\u0001'),
+    [watchlistRows],
+  );
+
+  useEffect(() => {
+    const codes = watchlistCodesKey ? watchlistCodesKey.split('\u0001').filter(Boolean) : [];
+    if (codes.length === 0) {
+      setScoresByCode(new Map());
+      return;
+    }
+    const requestId = scoreRequestIdRef.current + 1;
+    scoreRequestIdRef.current = requestId;
+    const controller = new AbortController();
+    void watchlistScoresApi.score({
+      stockCodes: codes,
+      sort: 'manual',
+      signal: controller.signal,
+    }).then((response) => {
+      if (scoreRequestIdRef.current !== requestId) return;
+      const next = new Map<string, WatchlistScoreItem>();
+      for (const item of response.items) {
+        next.set(item.stockCode, item);
+      }
+      setScoresByCode(next);
+    }).catch(() => {
+      if (scoreRequestIdRef.current !== requestId) return;
+      // Keep last successful scores; rows fall back to unanalyzed placeholders.
+    });
+    return () => {
+      controller.abort();
+      scoreRequestIdRef.current += 1;
+    };
+  }, [watchlistCodesKey]);
+
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
     .length;
@@ -270,15 +331,17 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredWatchlistRows = useMemo(() => {
-    if (!normalizedSearchQuery) return watchlistRows;
-    return watchlistRows.filter((row) => {
-      const stockName = row.latestItem?.stockName ?? '';
-      return (
-        row.code.toLowerCase().includes(normalizedSearchQuery) ||
-        stockName.toLowerCase().includes(normalizedSearchQuery)
-      );
-    });
-  }, [normalizedSearchQuery, watchlistRows]);
+    const searched = !normalizedSearchQuery
+      ? watchlistRows
+      : watchlistRows.filter((row) => {
+        const stockName = row.latestItem?.stockName ?? '';
+        return (
+          row.code.toLowerCase().includes(normalizedSearchQuery) ||
+          stockName.toLowerCase().includes(normalizedSearchQuery)
+        );
+      });
+    return orderWatchlistByScore(searched, scoresByCode, scoreSort);
+  }, [normalizedSearchQuery, scoreSort, scoresByCode, watchlistRows]);
   const filteredTodayItems = useMemo(() => {
     if (!normalizedSearchQuery) return todayItems;
     return todayItems.filter((item) => (
@@ -502,14 +565,27 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                   onRemoveFromWatchlist={onRemoveFromWatchlist}
                 />
               ) : null}
-              <div className="flex items-center gap-2 text-xs text-muted-text">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-text">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('watchlist.listHint')}
+                <span className="min-w-0 flex-1">{t('watchlist.listHint')}</span>
+                <Select
+                  value={scoreSort}
+                  onChange={(value) => setScoreSort(value as WatchlistScoreSortMode)}
+                  options={[
+                    { value: 'manual', label: t('watchlistScore.sortManual') },
+                    { value: 'score_desc', label: t('watchlistScore.sortScoreDesc') },
+                    { value: 'score_asc', label: t('watchlistScore.sortScoreAsc') },
+                  ]}
+                  ariaLabel={t('watchlistScore.sortManual')}
+                  className="min-w-36"
+                  size="default"
+                />
               </div>
               {filteredWatchlistRows.map((row) => (
                 <WatchlistRowItem
                   key={row.code}
                   row={row}
+                  scoreItem={scoresByCode.get(row.code) ?? unanalyzedScoreItem(row.code)}
                   onRemove={onRemoveFromWatchlist}
                   disabled={watchlistActioning}
                 />

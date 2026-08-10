@@ -1,9 +1,16 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { watchlistScoresApi } from '../../../api/watchlistScores';
 import { HomeStockWorkspace } from '../HomeStockWorkspace';
 import type { HomeWorkspaceTab } from '../HomeStockWorkspace';
+
+vi.mock('../../../api/watchlistScores', () => ({
+  watchlistScoresApi: {
+    score: vi.fn(),
+  },
+}));
 
 const buildProps = (activeTab: HomeWorkspaceTab, onTabChange = vi.fn()) => ({
   activeTab,
@@ -28,6 +35,31 @@ const buildProps = (activeTab: HomeWorkspaceTab, onTabChange = vi.fn()) => ({
 });
 
 describe('HomeStockWorkspace', () => {
+  beforeEach(() => {
+    vi.mocked(watchlistScoresApi.score).mockResolvedValue({
+      formulaVersion: 'watchlist_score_v1',
+      scoringMode: 'aggregate_existing',
+      sort: 'manual',
+      items: [
+        {
+          stockCode: '600519',
+          status: 'scored',
+          score: 82,
+          asOf: '2026-08-09T00:00:00Z',
+          ageDays: 0,
+          analysisId: 11,
+          operationAdvice: 'buy',
+          factors: [],
+          freshness: 'today',
+          degradedReasons: [],
+        },
+      ],
+      queryCount: { analysis: 1, signals: 1 },
+      sourceRows: { analysis: 1, signals: 0 },
+      disclaimerKey: 'watchlist_score.disclaimer',
+    });
+  });
+
   it('keeps the workspace controls compact', () => {
     render(
       <HomeStockWorkspace
@@ -126,5 +158,39 @@ describe('HomeStockWorkspace', () => {
     fireEvent.click(watchlistOption);
 
     expect(onTabChange).toHaveBeenCalledWith('watchlist');
+  });
+
+  it('mounts WatchlistScoreColumn from the live score API on the watchlist view', async () => {
+    render(
+      <HomeStockWorkspace
+        activeTab="watchlist"
+        onTabChange={vi.fn()}
+        watchlistRows={[{ code: '600519', analyzedToday: true }]}
+        watchlistLoading={false}
+        watchlistActioning={false}
+        watchlistMessage={null}
+        onAddToWatchlist={vi.fn(async () => undefined)}
+        onRemoveFromWatchlist={vi.fn(async () => undefined)}
+        onRefreshWatchlist={vi.fn(async () => undefined)}
+        onAnalyzeWatchlist={vi.fn(async () => undefined)}
+        isBatchAnalyzing={false}
+        batchStatus={null}
+        todayItems={[]}
+        isLoadingTodayItems={false}
+        todayLoadError={false}
+        watchlistAnalyzedTodayCount={1}
+        historyItems={[]}
+        isLoadingHistory={false}
+        onHistoryItemClick={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(watchlistScoresApi.score).toHaveBeenCalledWith(
+        expect.objectContaining({ stockCodes: ['600519'] }),
+      );
+    });
+    expect(await screen.findByTestId('watchlist-score-column')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('82');
   });
 });
