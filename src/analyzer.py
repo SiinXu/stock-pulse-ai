@@ -339,6 +339,7 @@ class AnalysisResult:
 
     # ========== Metadata =========
     market_snapshot: Optional[Dict[str, Any]] = None  # Daily market snapshot (for display)
+    indicator_snapshot: Optional[Dict[str, Any]] = None  # Resolved dynamic indicator evidence
     raw_response: Optional[str] = None  # Original response (for debugging)
     search_performed: bool = False  # Did it execute a web search?
     data_sources: str = ""  # Data source explanation
@@ -400,6 +401,7 @@ class AnalysisResult:
             'risk_warning': self.risk_warning,
             'buy_reason': self.buy_reason,
             'market_snapshot': self.market_snapshot,
+            'indicator_snapshot': self.indicator_snapshot,
             'search_performed': self.search_performed,
             'success': self.success,
             'error_message': self.error_message,

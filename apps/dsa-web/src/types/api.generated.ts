@@ -139,6 +139,7 @@ export interface paths {
          *       - pipeline_timeout: analysis stopped because the stage/pipeline budget expired
          *       - pipeline_budget_skipped: analysis stopped before an unstarted stage
          *         because the remaining budget was too low for useful work
+         *       - turn_persisted: the identified user turn and request context are durable
          *       - done: analysis complete, contains 'content' and 'success'
          *       - error: error occurred, contains 'message'
          */
@@ -826,6 +827,66 @@ export interface paths {
          * @description 对历史分析记录进行回测评估，并写入 backtest_results/backtest_summaries
          */
         post: operations["run_backtest_api_v1_backtest_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/compound-growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compound growth calculator
+         * @description Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.
+         */
+        post: operations["postCompoundGrowth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-contribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve contribution required to reach a target
+         * @description Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetContribution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calculators/target-duration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Solve periods required to reach a target
+         * @description Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.
+         */
+        post: operations["postTargetDuration"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1892,9 +1953,29 @@ export interface paths {
         };
         /**
          * List registered plugins and lifecycle state
-         * @description Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.
+         * @description Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.
          */
         get: operations["listPlugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read-only plugin health snapshot
+         * @description Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.
+         */
+        get: operations["getPluginHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4992,6 +5073,17 @@ export interface components {
              */
             saved: number;
         };
+        /** BalancePoint */
+        BalancePoint: {
+            /** Balance */
+            balance: number;
+            /** Gain */
+            gain: number;
+            /** Period */
+            period: number;
+            /** Total Contributed */
+            total_contributed: number;
+        };
         /**
          * BatchDuplicateTaskItem
          * @description 批量异步任务中的重复提交项。
@@ -5219,6 +5311,8 @@ export interface components {
             session_id?: string | null;
             /** Skills */
             skills?: string[] | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ChatResponse */
         ChatResponse: {
@@ -5231,6 +5325,66 @@ export interface components {
             session_id: string;
             /** Success */
             success: boolean;
+            /** Turn Id */
+            turn_id?: string | null;
+        };
+        /** CompoundGrowthRequest */
+        CompoundGrowthRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             * @default 0
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Years */
+            years: number;
+        };
+        /** CompoundGrowthResponse */
+        CompoundGrowthResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Final Value */
+            final_value: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Series */
+            series: components["schemas"]["BalancePoint"][];
+            /** Series Returned Points */
+            series_returned_points: number;
+            /** Series Sampled */
+            series_sampled: boolean;
+            /** Series Stride */
+            series_stride: number;
+            /** Series Total Points */
+            series_total_points: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /** Total Contributed */
+            total_contributed: number;
+            /** Total Gain */
+            total_gain: number;
+            /** Years */
+            years: number;
         };
         /** ConfigComponentDiff */
         ConfigComponentDiff: {
@@ -8450,6 +8604,56 @@ export interface components {
             win_rate_pct?: number | null;
         };
         /**
+         * PluginHealthEntryResponse
+         * @description One plugin health row for operator diagnostics consumers.
+         */
+        PluginHealthEntryResponse: {
+            /** Desired Enabled */
+            desired_enabled: boolean;
+            /** Extension Points */
+            extension_points?: string[];
+            /** Last Error Code */
+            last_error_code?: string | null;
+            /** Name */
+            name: string;
+            /** Package Root */
+            package_root?: string | null;
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Reloadable
+             * @default false
+             */
+            reloadable: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "builtin" | "external";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "registered" | "enabled" | "disabled" | "failed";
+            /** Version */
+            version: string;
+        };
+        /**
+         * PluginHealthResponse
+         * @description GET /api/v1/plugins/health — read-only plugin health snapshot.
+         */
+        PluginHealthResponse: {
+            /**
+             * Generated At
+             * @description UTC ISO-8601 timestamp when the snapshot was built
+             */
+            generated_at: string;
+            /** Plugins */
+            plugins?: components["schemas"]["PluginHealthEntryResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
          * PluginInfo
          * @description One registered plugin and its lifecycle state.
          */
@@ -8476,6 +8680,11 @@ export interface components {
              * @description Stable plugin id from the manifest
              */
             id: string;
+            /**
+             * Last Error Code
+             * @description Stable last lifecycle failure code when the plugin is degraded
+             */
+            last_error_code?: string | null;
             /** Name */
             name: string;
             /**
@@ -10504,6 +10713,70 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * SchedulerRunNowResponse
+         * @description Acceptance and correlation data for one immediate scheduler run.
+         */
+        SchedulerRunNowResponse: {
+            /** Accepted */
+            accepted: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at?: string | null;
+        };
+        /**
+         * SchedulerStatusResponse
+         * @description Authoritative status for this process's legacy day-batch scheduler.
+         */
+        SchedulerStatusResponse: {
+            /** Active Run Id */
+            active_run_id?: string | null;
+            /** Attached */
+            attached: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /** Last Run Id */
+            last_run_id?: string | null;
+            /** Last Run Outcome */
+            last_run_outcome?: ("succeeded" | "failed") | null;
+            /** Last Skip Reason */
+            last_skip_reason?: string | null;
+            /** Last Skipped At */
+            last_skipped_at?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /**
+             * Process Mode
+             * @enum {string}
+             */
+            process_mode: "serve" | "desktop" | "not_attached";
+            /** Run Now Available */
+            run_now_available: boolean;
+            /** Run Now Block Reason */
+            run_now_block_reason?: string | null;
+            /** Running */
+            running: boolean;
+            /** Schedule Times */
+            schedule_times?: string[];
+            /** Schedule Timezone */
+            schedule_timezone: string;
+            /**
+             * Track
+             * @constant
+             */
+            track: "legacy_day_batch";
+        };
         /** ScorecardBucket */
         ScorecardBucket: {
             /** Avg Return Pct */
@@ -10675,6 +10948,8 @@ export interface components {
             } | null;
             /** Role */
             role: string;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** SessionMessagesResponse */
         SessionMessagesResponse: {
@@ -10683,6 +10958,11 @@ export interface components {
             /** Session Id */
             session_id: string;
             session_state: components["schemas"]["SessionStateResponse"];
+            /**
+             * Turn Identity Supported
+             * @default true
+             */
+            turn_identity_supported: boolean;
         };
         /** SessionStateResponse */
         SessionStateResponse: {
@@ -11279,7 +11559,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**
@@ -11459,6 +11739,248 @@ export interface components {
             };
             /** Trace Id */
             trace_id?: string | null;
+        };
+        /** TargetContributionAlreadyMetResponse */
+        TargetContributionAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_growth_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionOkResponse */
+        TargetContributionOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "contribution_required";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionRequest */
+        TargetContributionRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetContributionUnreachableResponse */
+        TargetContributionUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period?: null;
+            /**
+             * Contribution Rounding
+             * @constant
+             */
+            contribution_rounding: "ceiling";
+            /**
+             * Currency Precision Digits
+             * @constant
+             */
+            currency_precision_digits: 2;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationAlreadyMetResponse */
+        TargetDurationAlreadyMetResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /**
+             * Period Count
+             * @constant
+             */
+            period_count: 0;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "principal_already_meets_target";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "already_met";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationOkResponse */
+        TargetDurationOkResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count: number;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @constant
+             */
+            reason_code: "duration_solved";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Target */
+            target: number;
+            /** Years */
+            years: number;
+        };
+        /** TargetDurationRequest */
+        TargetDurationRequest: {
+            /** Annual Rate */
+            annual_rate: number;
+            /**
+             * Contribution Per Period
+             * @description End-of-period contribution; negative values are withdrawals
+             */
+            contribution_per_period: number;
+            /**
+             * Periods Per Year
+             * @default 12
+             */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /** Target */
+            target: number;
+        };
+        /** TargetDurationUnreachableResponse */
+        TargetDurationUnreachableResponse: {
+            /** Annual Rate */
+            annual_rate: number;
+            /** Contribution Per Period */
+            contribution_per_period: number;
+            /** Period Count */
+            period_count?: null;
+            /** Period Rate */
+            period_rate: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Principal */
+            principal: number;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "non_positive_trajectory" | "max_years_exceeded" | "target_unreachable";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unreachable";
+            /** Target */
+            target: number;
+            /** Years */
+            years?: null;
         };
         /**
          * TaskAccepted
@@ -14537,6 +15059,159 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postCompoundGrowth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompoundGrowthRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompoundGrowthResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetContribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetContributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetContributionOkResponse"] | components["schemas"]["TargetContributionAlreadyMetResponse"] | components["schemas"]["TargetContributionUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    postTargetDuration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetDurationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDurationOkResponse"] | components["schemas"]["TargetDurationAlreadyMetResponse"] | components["schemas"]["TargetDurationUnreachableResponse"];
+                };
+            };
+            /** @description Invalid calculator inputs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Calculator computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -17728,6 +18403,35 @@ export interface operations {
             };
         };
     };
+    getPluginHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginHealthResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     updatePluginLifecycle: {
         parameters: {
             query?: never;
@@ -17790,6 +18494,15 @@ export interface operations {
             };
             /** @description Lifecycle operation failed unexpectedly */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -21950,9 +22663,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerRunNowResponse"];
                 };
             };
         };
@@ -21972,9 +22683,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SchedulerStatusResponse"];
                 };
             };
         };

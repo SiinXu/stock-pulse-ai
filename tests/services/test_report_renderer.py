@@ -158,6 +158,47 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("buy → **hold**", markdown)
         self.assertIn("Verdict: downgrade · buy→hold", wechat)
         self.assertIn("Verdict: downgrade · buy→hold", brief)
+    def test_render_markdown_includes_exact_configured_indicator_evidence(self) -> None:
+        r = _make_result()
+        r.indicator_snapshot = {
+            "indicator_period_source": "global_settings",
+            "indicator_bar_count": 250,
+            "indicator_as_of": "2026-03-27",
+            "ma_readings": {
+                "30": {
+                    "label": "MA30",
+                    "value": 101.25,
+                    "available": True,
+                    "reason": None,
+                },
+                "250": {
+                    "label": "MA250",
+                    "value": None,
+                    "available": False,
+                    "reason": "insufficient_history:need=250,got=120",
+                },
+            },
+            "rsi_readings": {},
+            "macd_reading": {
+                "label": "MACD(8,17,5)",
+                "dif": 0.1234,
+                "dea": 0.1111,
+                "bar": 0.0246,
+                "available": True,
+                "reason": None,
+            },
+        }
+
+        out = render("markdown", [r], summary_only=False)
+
+        self.assertIsNotNone(out)
+        self.assertIn("配置指标", out)
+        self.assertIn("MA30", out)
+        self.assertIn("101.25", out)
+        self.assertIn("MA250", out)
+        self.assertIn("insufficient_history:need=250,got=120", out)
+        self.assertIn("MACD(8,17,5)", out)
+        self.assertIn("DIF=0.1234", out)
 
     def test_render_markdown_omits_decision_signal_excerpt(self) -> None:
         """Markdown reports omit the duplicated DecisionSignal excerpt."""

@@ -4556,6 +4556,36 @@
         "title": "BacktestRunResponse",
         "type": "object"
       },
+      "BalancePoint": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "number"
+          },
+          "gain": {
+            "title": "Gain",
+            "type": "number"
+          },
+          "period": {
+            "minimum": 0.0,
+            "title": "Period",
+            "type": "integer"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          }
+        },
+        "required": [
+          "period",
+          "balance",
+          "total_contributed",
+          "gain"
+        ],
+        "title": "BalancePoint",
+        "type": "object"
+      },
       "BatchDuplicateTaskItem": {
         "description": "批量异步任务中的重复提交项。",
         "example": {
@@ -4915,6 +4945,20 @@
               }
             ],
             "title": "Skills"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S(?:.*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -4957,6 +5001,17 @@
           "success": {
             "title": "Success",
             "type": "boolean"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -4965,6 +5020,148 @@
           "session_id"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "CompoundGrowthRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "default": 0.0,
+            "description": "End-of-period contribution; negative values are withdrawals",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "CompoundGrowthRequest",
+        "type": "object"
+      },
+      "CompoundGrowthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "final_value": {
+            "title": "Final Value",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/BalancePoint"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "series_returned_points": {
+            "maximum": 241.0,
+            "minimum": 2.0,
+            "title": "Series Returned Points",
+            "type": "integer"
+          },
+          "series_sampled": {
+            "title": "Series Sampled",
+            "type": "boolean"
+          },
+          "series_stride": {
+            "minimum": 1.0,
+            "title": "Series Stride",
+            "type": "integer"
+          },
+          "series_total_points": {
+            "minimum": 2.0,
+            "title": "Series Total Points",
+            "type": "integer"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          },
+          "total_gain": {
+            "title": "Total Gain",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "principal",
+          "annual_rate",
+          "years",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "final_value",
+          "total_contributed",
+          "total_gain",
+          "series_total_points",
+          "series_returned_points",
+          "series_sampled",
+          "series_stride",
+          "series"
+        ],
+        "title": "CompoundGrowthResponse",
         "type": "object"
       },
       "ConfigComponentDiff": {
@@ -13117,6 +13314,119 @@
         "title": "PerformanceMetrics",
         "type": "object"
       },
+      "PluginHealthEntryResponse": {
+        "additionalProperties": false,
+        "description": "One plugin health row for operator diagnostics consumers.",
+        "properties": {
+          "desired_enabled": {
+            "title": "Desired Enabled",
+            "type": "boolean"
+          },
+          "extension_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Extension Points",
+            "type": "array"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Code"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "package_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Root"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "reloadable": {
+            "default": false,
+            "title": "Reloadable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "builtin",
+              "external"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "registered",
+              "enabled",
+              "disabled",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "name",
+          "version",
+          "source",
+          "state",
+          "desired_enabled"
+        ],
+        "title": "PluginHealthEntryResponse",
+        "type": "object"
+      },
+      "PluginHealthResponse": {
+        "additionalProperties": false,
+        "description": "GET /api/v1/plugins/health — read-only plugin health snapshot.",
+        "properties": {
+          "generated_at": {
+            "description": "UTC ISO-8601 timestamp when the snapshot was built",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHealthEntryResponse"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generated_at",
+          "total"
+        ],
+        "title": "PluginHealthResponse",
+        "type": "object"
+      },
       "PluginInfo": {
         "additionalProperties": false,
         "description": "One registered plugin and its lifecycle state.",
@@ -13147,6 +13457,18 @@
             "description": "Stable plugin id from the manifest",
             "title": "Id",
             "type": "string"
+          },
+          "last_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable last lifecycle failure code when the plugin is degraded",
+            "title": "Last Error Code"
           },
           "name": {
             "title": "Name",
@@ -17970,6 +18292,229 @@
         "title": "ScheduledTaskTodayResponse",
         "type": "object"
       },
+      "SchedulerRunNowResponse": {
+        "description": "Acceptance and correlation data for one immediate scheduler run.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          }
+        },
+        "required": [
+          "accepted",
+          "running"
+        ],
+        "title": "SchedulerRunNowResponse",
+        "type": "object"
+      },
+      "SchedulerStatusResponse": {
+        "description": "Authoritative status for this process's legacy day-batch scheduler.",
+        "properties": {
+          "active_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Run Id"
+          },
+          "attached": {
+            "title": "Attached",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Id"
+          },
+          "last_run_outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Outcome"
+          },
+          "last_skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skip Reason"
+          },
+          "last_skipped_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skipped At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "process_mode": {
+            "enum": [
+              "serve",
+              "desktop",
+              "not_attached"
+            ],
+            "title": "Process Mode",
+            "type": "string"
+          },
+          "run_now_available": {
+            "title": "Run Now Available",
+            "type": "boolean"
+          },
+          "run_now_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Now Block Reason"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "schedule_times": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Schedule Times",
+            "type": "array"
+          },
+          "schedule_timezone": {
+            "title": "Schedule Timezone",
+            "type": "string"
+          },
+          "track": {
+            "const": "legacy_day_batch",
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "track",
+          "enabled",
+          "running",
+          "attached",
+          "process_mode",
+          "schedule_timezone",
+          "run_now_available"
+        ],
+        "title": "SchedulerStatusResponse",
+        "type": "object"
+      },
       "ScorecardBucket": {
         "properties": {
           "avg_return_pct": {
@@ -18433,6 +18978,17 @@
           "role": {
             "title": "Role",
             "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -18458,6 +19014,11 @@
           },
           "session_state": {
             "$ref": "#/components/schemas/SessionStateResponse"
+          },
+          "turn_identity_supported": {
+            "default": true,
+            "title": "Turn Identity Supported",
+            "type": "boolean"
           }
         },
         "required": [
@@ -20031,6 +20592,7 @@
               "system",
               "agent",
               "backtest",
+              "indicators",
               "uncategorized"
             ],
             "title": "Category",
@@ -20454,6 +21016,504 @@
           "message"
         ],
         "title": "SystemConfigValidationErrorResponse",
+        "type": "object"
+      },
+      "TargetContributionAlreadyMetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "principal_growth_meets_target",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "already_met",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code",
+          "contribution_per_period"
+        ],
+        "title": "TargetContributionAlreadyMetResponse",
+        "type": "object"
+      },
+      "TargetContributionOkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "contribution_required",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code",
+          "contribution_per_period"
+        ],
+        "title": "TargetContributionOkResponse",
+        "type": "object"
+      },
+      "TargetContributionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "TargetContributionRequest",
+        "type": "object"
+      },
+      "TargetContributionUnreachableResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "null"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "target_unreachable",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unreachable",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code"
+        ],
+        "title": "TargetContributionUnreachableResponse",
+        "type": "object"
+      },
+      "TargetDurationAlreadyMetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "const": 0,
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "principal_already_meets_target",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "already_met",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "maximum": 0.0,
+            "minimum": 0.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code",
+          "period_count",
+          "years"
+        ],
+        "title": "TargetDurationAlreadyMetResponse",
+        "type": "object"
+      },
+      "TargetDurationOkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "minimum": 1.0,
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "duration_solved",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code",
+          "period_count",
+          "years"
+        ],
+        "title": "TargetDurationOkResponse",
+        "type": "object"
+      },
+      "TargetDurationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "description": "End-of-period contribution; negative values are withdrawals",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period"
+        ],
+        "title": "TargetDurationRequest",
+        "type": "object"
+      },
+      "TargetDurationUnreachableResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "null"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "enum": [
+              "non_positive_trajectory",
+              "max_years_exceeded",
+              "target_unreachable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unreachable",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "null"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code"
+        ],
+        "title": "TargetDurationUnreachableResponse",
         "type": "object"
       },
       "TaskAccepted": {
@@ -22973,7 +24033,7 @@
     },
     "/api/v1/agent/chat/stream": {
       "post": {
-        "description": "Chat with the AI Agent, streaming progress via SSE.\nEach SSE event is a JSON object with a 'type' field:\n  - thinking: AI is deciding next action\n  - stage_start: an agent or orchestrator stage has begun\n  - stage_done: an agent or orchestrator stage finished\n  - tool_start: a tool call has begun\n  - tool_done: a tool call finished\n  - generating: final answer being generated\n  - pipeline_timeout: analysis stopped because the stage/pipeline budget expired\n  - pipeline_budget_skipped: analysis stopped before an unstarted stage\n    because the remaining budget was too low for useful work\n  - done: analysis complete, contains 'content' and 'success'\n  - error: error occurred, contains 'message'",
+        "description": "Chat with the AI Agent, streaming progress via SSE.\nEach SSE event is a JSON object with a 'type' field:\n  - thinking: AI is deciding next action\n  - stage_start: an agent or orchestrator stage has begun\n  - stage_done: an agent or orchestrator stage finished\n  - tool_start: a tool call has begun\n  - tool_done: a tool call finished\n  - generating: final answer being generated\n  - pipeline_timeout: analysis stopped because the stage/pipeline budget expired\n  - pipeline_budget_skipped: analysis stopped before an unstarted stage\n    because the remaining budget was too low for useful work\n  - turn_persisted: the identified user turn and request context are durable\n  - done: analysis complete, contains 'content' and 'success'\n  - error: error occurred, contains 'message'",
         "operationId": "agent_chat_stream_api_v1_agent_chat_stream_post",
         "requestBody": {
           "content": {
@@ -25842,6 +26902,230 @@
         "summary": "触发回测",
         "tags": [
           "Backtest"
+        ]
+      }
+    },
+    "/api/v1/calculators/compound-growth": {
+      "post": {
+        "description": "Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.",
+        "operationId": "postCompoundGrowth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompoundGrowthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompoundGrowthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Compound growth calculator",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-contribution": {
+      "post": {
+        "description": "Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetContribution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetContributionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "already_met": "#/components/schemas/TargetContributionAlreadyMetResponse",
+                      "ok": "#/components/schemas/TargetContributionOkResponse",
+                      "unreachable": "#/components/schemas/TargetContributionUnreachableResponse"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TargetContributionOkResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetContributionAlreadyMetResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetContributionUnreachableResponse"
+                    }
+                  ],
+                  "title": "Response Posttargetcontribution"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve contribution required to reach a target",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-duration": {
+      "post": {
+        "description": "Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetDuration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetDurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "already_met": "#/components/schemas/TargetDurationAlreadyMetResponse",
+                      "ok": "#/components/schemas/TargetDurationOkResponse",
+                      "unreachable": "#/components/schemas/TargetDurationUnreachableResponse"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TargetDurationOkResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetDurationAlreadyMetResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetDurationUnreachableResponse"
+                    }
+                  ],
+                  "title": "Response Posttargetduration"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve periods required to reach a target",
+        "tags": [
+          "Calculators"
         ]
       }
     },
@@ -30519,7 +31803,7 @@
     },
     "/api/v1/plugins": {
       "get": {
-        "description": "Return every plugin registered on the process composition root, including runtime state and persisted desired_enabled intent. PLUG-02 UI consumes this.",
+        "description": "Return every plugin registered on the process composition root, including runtime state, last failure codes, and persisted desired_enabled intent. PLUG-02 UI and loaded-extensions consumers use this list.",
         "operationId": "listPlugins",
         "responses": {
           "200": {
@@ -30549,6 +31833,43 @@
           }
         ],
         "summary": "List registered plugins and lifecycle state",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/health": {
+      "get": {
+        "description": "Return each registered plugin's load state, extension points, and last stable failure code. Backs operator diagnostics and the loaded-extensions panel without introducing a new API version surface.",
+        "operationId": "getPluginHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Read-only plugin health snapshot",
         "tags": [
           "Plugins"
         ]
@@ -30639,6 +31960,16 @@
               }
             },
             "description": "Lifecycle operation failed unexpectedly"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable"
           }
         },
         "security": [
@@ -36779,9 +38110,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Run Scheduler Now Api V1 System Scheduler Run Now Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerRunNowResponse"
                 }
               }
             },
@@ -36803,9 +38132,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Scheduler Status Api V1 System Scheduler Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SchedulerStatusResponse"
                 }
               }
             },

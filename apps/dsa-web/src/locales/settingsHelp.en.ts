@@ -1235,6 +1235,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: 'Enable Offline OCR Agent Tool',
+    summary: 'Default-off bounded Tesseract text extraction. Image bytes stay local, but redacted untrusted text enters Agent context and may reach a remote model; enable LOCAL_ONLY_MODE for zero remote egress.',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR File Root',
+    summary: 'Filesystem sandbox for single-open regular images; root escapes, special files, oversized bytes, decoded pixels, and extra frames are rejected.',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR Languages',
+    summary: 'Tesseract language codes joined by +; default chi_sim+eng requires matching system language packs.',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR Timeout Seconds',
+    summary: 'Hard 1–120 second wall-clock limit; timed-out OCR workers and descendants are terminated and reaped.',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1268,6 +1284,43 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Different versions may use different evaluation algorithms or judgment rules.'],
     impact: ['Affects the evaluation algorithm and results.'],
     notes: ['Keep the default unless instructed to switch versions.'],
+  },
+  // ------------------------------------------------------------------
+  // Technical indicator periods (Issue #172)
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: 'Moving Average Periods',
+    summary: 'Comma-separated MA periods in trading days used by trend analysis (default 5,10,20,60).',
+    usage: 'Leave empty for historical defaults. Add longer horizons such as 120 or 250 for long-term trend context. The analysis history window expands automatically to cover the longest configured period.',
+    valueNotes: [
+      'Each value must be a positive integer up to 500.',
+      'Configured periods appear under their exact MA labels in ma_by_period and the typed indicator snapshot.',
+      'When bars are fewer than a period, that MA is omitted and annotated as insufficient data (no silent shorter-period substitute).',
+    ],
+    impact: ['Affects trend classification, bias ratios, support checks, and report MA values.'],
+    notes: ['Defaults preserve pre-configuration MA behavior when enough history is available.'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD Periods',
+    summary: 'MACD fast, slow, and signal EMA periods (default 12/26/9).',
+    usage: 'INDICATOR_MACD_FAST must be less than INDICATOR_MACD_SLOW. Signal is the DEA smoothing period.',
+    valueNotes: [
+      'Standard settings are 12/26/9; shorter pairs react faster but are noisier.',
+      'Explicit invalid values are rejected consistently at process start and by Settings validation.',
+    ],
+    impact: ['Affects MACD DIF/DEA/histogram and derived buy/sell scoring.'],
+    notes: ['Keep defaults unless you intentionally change the MACD convention.'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI Periods',
+    summary: 'Comma-separated RSI periods (default 6,12,24).',
+    usage: 'Configured values are exposed under their exact RSI labels. The second value (or first when only one is configured) drives RSI status thresholds.',
+    valueNotes: [
+      'Periods must be positive integers up to 250.',
+      'RSI uses Wilder/SMMA smoothing, consistent with alert-path RSI.',
+    ],
+    impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
+    notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
   },
   // ------------------------------------------------------------------
   // Report configuration

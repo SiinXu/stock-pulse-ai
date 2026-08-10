@@ -101,6 +101,29 @@ def emit_legacy_schedule_deprecation_if_needed(
     )
 
 
+def _load_indicator_period_fields() -> Dict[str, Any]:
+    """Load the same strict contract used by Settings and runtime reload."""
+    from src.utils.indicator_periods import validate_indicator_env_map
+
+    resolved = validate_indicator_env_map(
+        {
+            "INDICATOR_MA_PERIODS": os.getenv("INDICATOR_MA_PERIODS"),
+            "INDICATOR_MACD_FAST": os.getenv("INDICATOR_MACD_FAST"),
+            "INDICATOR_MACD_SLOW": os.getenv("INDICATOR_MACD_SLOW"),
+            "INDICATOR_MACD_SIGNAL": os.getenv("INDICATOR_MACD_SIGNAL"),
+            "INDICATOR_RSI_PERIODS": os.getenv("INDICATOR_RSI_PERIODS"),
+        }
+    )
+    return {
+        "indicator_ma_periods": list(resolved.ma_periods),
+        "indicator_macd_fast": resolved.macd_fast,
+        "indicator_macd_slow": resolved.macd_slow,
+        "indicator_macd_signal": resolved.macd_signal,
+        "indicator_rsi_periods": list(resolved.rsi_periods),
+        "indicator_period_source": resolved.source,
+    }
+
+
 def setup_env() -> None:
     from src import config as config_module
 
@@ -606,6 +629,11 @@ class _ConfigLoadingMethods:
         if report_show_llm_model_raw is not None and not report_show_llm_model_raw.strip():
             report_show_llm_model = False
 
+        # Import inside method body: _load_from_env is cloned into src.config globals.
+        from src.config_parts.loading import _load_indicator_period_fields
+
+        _indicator_period_fields = _load_indicator_period_fields()
+
         return cls(
             stock_list=stock_list,
             feishu_app_id=os.getenv('FEISHU_APP_ID'),
@@ -627,6 +655,10 @@ class _ConfigLoadingMethods:
             stock_index_remote_update_enabled=parse_env_bool(
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
                 default=True,
+            ),
+            plugin_data_provider_auto_bind_enabled=parse_env_bool(
+                os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
+                default=False,
             ),
             generation_backend=generation_backend,
             generation_fallback_backend=generation_fallback_backend,
@@ -736,6 +768,7 @@ class _ConfigLoadingMethods:
             ),
             newsnow_base_url=((os.getenv('NEWSNOW_BASE_URL') or '').strip().rstrip('/') or 'https://newsnow.busiyi.world'),
             bias_threshold=parse_env_float(os.getenv('BIAS_THRESHOLD'), 5.0, field_name='BIAS_THRESHOLD', minimum=1.0),
+            **_indicator_period_fields,
             agent_generation_backend=agent_generation_backend,
             agent_litellm_model=agent_litellm_model,
             agent_mode=os.getenv('AGENT_MODE', 'false').lower() == 'true',
@@ -1149,6 +1182,19 @@ class _ConfigLoadingMethods:
                 os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
             ),
             multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
+            ocr_agent_tool_enabled=parse_env_bool(
+                os.getenv('OCR_AGENT_TOOL_ENABLED'), default=False
+            ),
+            ocr_file_root=os.getenv('OCR_FILE_ROOT', '').strip() or None,
+            ocr_langs=(
+                os.getenv('OCR_LANGS', 'chi_sim+eng').strip() or 'chi_sim+eng'
+            ),
+            ocr_timeout_seconds=parse_env_int(
+                os.getenv('OCR_TIMEOUT_SECONDS'),
+                30,
+                field_name='OCR_TIMEOUT_SECONDS',
+                minimum=1,
+            ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
