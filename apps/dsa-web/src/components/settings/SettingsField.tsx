@@ -18,6 +18,7 @@ import {
   isMultiValueValidation,
   numberControlBounds,
   resolveSettingsFieldControl,
+  type ResolvedSettingsControl,
 } from './settingsFieldControl';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
@@ -54,9 +55,12 @@ function inferPasswordIconType(key: string): 'password' | 'key' {
   return key.toUpperCase().includes('PASSWORD') ? 'password' : 'key';
 }
 
-function resolveDisplayValue(item: SystemConfigItem, value: string): string {
+function resolveDisplayValue(
+  item: SystemConfigItem,
+  value: string,
+  resolvedControl: ResolvedSettingsControl,
+): string {
   const schema = item.schema;
-  const resolvedControl = resolveSettingsFieldControl(schema, { isMasked: item.isMasked });
 
   // Backfill the backend default for unset fields so the effective value is
   // visible instead of a blank control. Passwords are excluded so a secret-ish
@@ -106,11 +110,11 @@ function renderFieldControl(
   ariaDescribedBy: string | undefined,
   language: UiLanguage,
   t: (key: UiTextKey) => string,
+  controlType: ResolvedSettingsControl,
   enumOptionFilter?: (optionValue: string) => boolean,
   enumEmptyState?: React.ReactNode,
 ) {
   const schema = item.schema;
-  const controlType = resolveSettingsFieldControl(schema, { isMasked: item.isMasked });
   const isMultiValue = isMultiValueField(item);
 
   // Multi-value enums (finite options + multi_value validation) render as a
@@ -362,6 +366,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
+  // Resolve once per render and share across layout, default backfill, and control.
   const resolvedControl = resolveSettingsFieldControl(schema, { isMasked: item.isMasked });
   const isTextarea = resolvedControl === 'textarea';
   const helpContent = getSettingsHelpContent(schema?.helpKey, schema?.description, language);
@@ -381,7 +386,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   const controlId = `setting-${item.key}`;
   const issueDescriptionIds = issues.map((_, index) => `${controlId}-issue-${index}`);
   const ariaDescribedBy = issueDescriptionIds.join(' ') || undefined;
-  const displayValue = resolveDisplayValue(item, value);
+  const displayValue = resolveDisplayValue(item, value, resolvedControl);
 
   return (
     <div
@@ -446,6 +451,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           ariaDescribedBy,
           language,
           t,
+          resolvedControl,
           enumOptionFilter,
           enumEmptyState,
         )}
