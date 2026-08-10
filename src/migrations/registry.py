@@ -55,6 +55,9 @@ from src.migrations.versions.v202608090001_watchlist_groups_schema import (
 from src.migrations.versions.v202608100001_chat_turn_identity import (
     MIGRATION as CHAT_TURN_IDENTITY_MIGRATION,
 )
+from src.migrations.versions.v202608100002_analysis_history_search_fts import (
+    MIGRATION as ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -75,6 +78,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         TASK_QUEUE_INFLIGHT_MIGRATION,
         WATCHLIST_GROUPS_SCHEMA_MIGRATION,
         CHAT_TURN_IDENTITY_MIGRATION,
+        ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
     )
 )
 
