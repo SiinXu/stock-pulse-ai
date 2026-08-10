@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import pandas as pd
+import numpy as np
 import pytest
 
 from data_provider.data_validation import (
@@ -127,6 +128,11 @@ def test_nonnumeric_and_bool_numeric_inputs_are_rejected_with_field_codes():
     assert any(i.code == "dv_ohlcv_close_invalid_type" for i in close.issues)
     bool_volume = validate_ohlcv_bar(_normal_bar(volume=True))
     assert any(i.code == "dv_ohlcv_volume_invalid_type" for i in bool_volume.issues)
+    numpy_bool_volume = validate_ohlcv_bar(_normal_bar(volume=np.bool_(True)))
+    assert any(
+        i.code == "dv_ohlcv_volume_invalid_type"
+        for i in numpy_bool_volume.issues
+    )
 
 
 def test_dirty_pct_chg_inconsistent():
@@ -656,14 +662,19 @@ def test_wrappers_cover_subclass_partial_reload_and_concurrent_install(monkeypat
         def get_fundamental_context(self, _stock_code):
             return {}
 
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        assert all(executor.map(wiring.ensure_validation_wrappers, [BaseManager] * 32))
+
     class OverrideManager(BaseManager):
         def get_daily_data(self, _stock_code):
             return _normal_frame(), "override"
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        assert all(executor.map(wiring.ensure_validation_wrappers, [BaseManager] * 32))
-    wiring.ensure_validation_wrappers(OverrideManager)
     assert "get_daily_data" in OverrideManager.__dict__
+    assert getattr(
+        OverrideManager.__dict__["get_daily_data"],
+        "_stockpulse_data_validation_wrapper_token",
+        None,
+    ) is not None
     assert OverrideManager().get_daily_data("600519")[1] == "override"
 
     class PartialManager:
@@ -721,3 +732,99 @@ def test_validation_configuration_is_owned_by_typed_config(monkeypatch):
     monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "invalid-scope")
     Config.reset_instance()
     assert is_strict_mode(market="cn", instrument_type="equity")
+
+
+@pytest.mark.parametrize(
+    ("symbol", "market"),
+    [
+        ("SPY", "us"),
+        ("HK02800", "hk"),
+        ("1306.T", "jp"),
+        ("069500.KS", "kr"),
+        ("0050.TW", "tw"),
+    ],
+)
+def test_offshore_etf_override_reaches_real_manager_strict_policy(
+    monkeypatch,
+    symbol,
+    market,
+):
+    from data_provider.base import DataFetchError, DataFetcherManager
+    from src.application_services import reset_application_services
+    from src.config import Config
+    from src.services.run_diagnostics import (
+        activate_run_diagnostic_context,
+        current_diagnostic_snapshot,
+        reset_run_diagnostic_context,
+    )
+
+    class Provider:
+        name = "YfinanceFetcher"
+        priority = 0
+
+        def get_daily_data(self, **_kwargs):
+            return _normal_frame([_normal_bar(close="not-a-number")])
+
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", f"{market}/etf")
+    monkeypatch.setenv(
+        "DATA_VALIDATION_INSTRUMENT_OVERRIDES",
+        "SPY=etf,HK02800=etf,1306.T=etf,069500.KS=etf,0050.TW=etf",
+    )
+    monkeypatch.setenv("PROVIDER_DAILY_CACHE_ENABLED", "false")
+    reset_application_services()
+    Config.reset_instance()
+    manager = DataFetcherManager(fetchers=[Provider()])
+    token = activate_run_diagnostic_context(
+        trace_id=f"trace-offshore-etf-{market}",
+        stock_code=symbol,
+    )
+    try:
+        with pytest.raises(DataFetchError):
+            manager.get_daily_data(symbol)
+        evidence = current_diagnostic_snapshot()["data_quality_evidence"]
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert evidence
+    assert evidence[0]["market"] == market
+    assert evidence[0]["instrument_type"] == "etf"
+    assert evidence[0]["rejected"] is True
+
+
+def test_validation_rejected_fundamental_context_is_typed_not_pipeline_failure():
+    from data_provider.base import DataFetcherManager
+
+    result = validate_fundamental_context(
+        {"valuation": {"data": {"pe_ratio": "bad"}}},
+        market="cn",
+        stock_code="600519",
+    )
+    evidence = result.to_evidence(
+        data_type="fundamental_context",
+        stock_code="600519",
+        provider="fundamental_pipeline",
+        market="cn",
+        instrument_type="equity",
+        rejected=True,
+    )
+    rejection = DataValidationRejected(
+        result,
+        data_type="fundamental_context",
+        evidence=evidence,
+    )
+    context = DataFetcherManager(fetchers=[]).build_validation_rejected_fundamental_context(
+        "600519",
+        rejection,
+    )
+
+    assert context["status"] == "validation_rejected"
+    assert context["data_quality"] == "rejected"
+    assert context["source_chain"] == [
+        {"provider": "data_validation", "result": "rejected", "duration_ms": 0}
+    ]
+    assert context["validation_rejection"]["reason_codes"] == [
+        "dv_fund_pe_invalid_type"
+    ]
+    assert context["data_quality_evidence"] == [evidence]

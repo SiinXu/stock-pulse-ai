@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 _WRAPPED_TOKEN_ATTR = "_stockpulse_data_validation_wrapper_token"
 _WRAPPED_ORIGINAL_ATTR = "_stockpulse_data_validation_original"
+_SUBCLASS_HOOK_TOKEN_ATTR = "_stockpulse_data_validation_subclass_hook_token"
+_SUBCLASS_HOOK_ORIGINAL_ATTR = "_stockpulse_data_validation_subclass_hook_original"
 _INSTALL_TOKEN = object()
 _INSTALL_LOCK = RLock()
 
@@ -45,31 +47,28 @@ def _wrap_get_daily_data(original: Callable[..., Any]) -> Callable[..., Any]:
     def wrapped(self: Any, stock_code: str, *args: Any, **kwargs: Any) -> Any:
         result = original(self, stock_code, *args, **kwargs)
         try:
-            from data_provider.data_validation import (
-                ATTR_KEY,
-                is_validation_enabled,
-                validate_and_annotate,
-            )
+            from data_provider.data_validation import is_validation_enabled
 
             if not is_validation_enabled():
                 return result
             frame = result[0] if isinstance(result, tuple) and result else result
             attrs = getattr(frame, "attrs", None)
-            if isinstance(attrs, dict) and isinstance(attrs.get(ATTR_KEY), dict):
-                return result
-            provider = (
-                str(result[1])
-                if isinstance(result, tuple) and len(result) > 1 and result[1]
-                else "cache_or_final_exit"
-            )
-            validate_and_annotate(
-                result,
-                data_type="daily_data",
-                market=_infer_market_from_code(stock_code),
-                stock_code=stock_code,
-                provider=provider,
-                strict=False,
-            )
+            if not (isinstance(attrs, dict) and isinstance(attrs.get("data_validation"), dict)):
+                from data_provider.data_validation import validate_and_annotate
+
+                provider = (
+                    str(result[1])
+                    if isinstance(result, tuple) and len(result) > 1 and result[1]
+                    else "cache_or_final_exit"
+                )
+                validate_and_annotate(
+                    result,
+                    data_type="daily_data",
+                    market=_infer_market_from_code(stock_code),
+                    stock_code=stock_code,
+                    provider=provider,
+                    strict=False,
+                )
         except Exception as exc:  # broad-exception: fallback_recorded - final-exit evidence is fail-open
             log_safe_exception(
                 logger,
@@ -96,10 +95,7 @@ def _wrap_get_realtime_quote(original: Callable[..., Any]) -> Callable[..., Any]
                 validate_and_annotate,
             )
 
-            if not is_validation_enabled() or isinstance(
-                getattr(result, "data_quality_evidence", None),
-                dict,
-            ):
+            if not is_validation_enabled():
                 return result
             source = getattr(result, "source", None)
             provider = getattr(source, "value", source)
@@ -109,6 +105,7 @@ def _wrap_get_realtime_quote(original: Callable[..., Any]) -> Callable[..., Any]
                 market=_infer_market_from_code(stock_code),
                 stock_code=stock_code,
                 provider=str(provider or "final_exit"),
+                instrument_type=getattr(result, "instrument_type", None),
                 strict=False,
             )
         except Exception as exc:  # broad-exception: fallback_recorded - final-exit evidence is fail-open
@@ -193,5 +190,29 @@ def ensure_validation_wrappers(target_class: Type[Any]) -> bool:
             setattr(wrapped, _WRAPPED_TOKEN_ATTR, _INSTALL_TOKEN)
             setattr(wrapped, _WRAPPED_ORIGINAL_ATTR, original)
             setattr(target_class, method_name, wrapped)
+            installed_or_present = True
+        local_subclass_hook = target_class.__dict__.get("__init_subclass__")
+        if getattr(local_subclass_hook, _SUBCLASS_HOOK_TOKEN_ATTR, None) is not _INSTALL_TOKEN:
+            original_subclass_hook = getattr(
+                local_subclass_hook,
+                _SUBCLASS_HOOK_ORIGINAL_ATTR,
+                local_subclass_hook,
+            )
+
+            @classmethod
+            def validation_init_subclass(cls: Type[Any], **kwargs: Any) -> None:
+                if original_subclass_hook is None:
+                    super(target_class, cls).__init_subclass__(**kwargs)
+                else:
+                    original_subclass_hook.__get__(cls, target_class)(**kwargs)
+                ensure_validation_wrappers(cls)
+
+            setattr(validation_init_subclass, _SUBCLASS_HOOK_TOKEN_ATTR, _INSTALL_TOKEN)
+            setattr(
+                validation_init_subclass,
+                _SUBCLASS_HOOK_ORIGINAL_ATTR,
+                original_subclass_hook,
+            )
+            setattr(target_class, "__init_subclass__", validation_init_subclass)
             installed_or_present = True
     return installed_or_present

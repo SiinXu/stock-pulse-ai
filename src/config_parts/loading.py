@@ -666,6 +666,9 @@ class _ConfigLoadingMethods:
                 os.getenv('DATA_VALIDATION_STRICT_SCOPES', '*/*').strip()
                 or '*/*'
             ),
+            data_validation_instrument_overrides=(
+                os.getenv('DATA_VALIDATION_INSTRUMENT_OVERRIDES', '').strip()
+            ),
             data_validation_upper_layer_mode=(
                 "reject"
                 if os.getenv('DATA_VALIDATION_UPPER_LAYER_MODE', 'warn')

@@ -251,10 +251,11 @@ class DataQualityEvidenceRecord:
     issues: List[Dict[str, Any]]
     issue_count: int
     truncated: bool
+    provenance: Dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "schema_version": self.schema_version,
             "data_type": self.data_type,
             "severity": self.severity,
@@ -268,6 +269,9 @@ class DataQualityEvidenceRecord:
             "truncated": self.truncated,
             "created_at": self.created_at,
         }
+        if self.provenance:
+            payload["provenance"] = dict(self.provenance)
+        return payload
 
 
 @dataclass
@@ -1514,6 +1518,7 @@ def record_data_quality_evidence(
     issue_count: Optional[int] = None,
     truncated: bool = False,
     schema_version: str = "data_quality_evidence.v1",
+    provenance: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Log and persist one sanitized validation finding set."""
     normalized_severity = str(severity or "warn").strip().lower()
@@ -1580,6 +1585,11 @@ def record_data_quality_evidence(
                     max(len(safe_issues), int(issue_count or 0)),
                 ),
                 truncated=bool(truncated),
+                provenance=(
+                    _finite_diagnostic_value(provenance)
+                    if isinstance(provenance, Mapping)
+                    else {}
+                ),
             )
         )
     except Exception as exc:  # broad-exception: fallback_recorded - Data-quality diagnostic failures are safely logged and cannot affect analysis.

@@ -158,8 +158,9 @@ class ValidationResult:
         market: Optional[str] = None,
         instrument_type: Optional[str] = None,
         rejected: bool = False,
+        provenance: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
-        return {
+        evidence = {
             "schema_version": EVIDENCE_SCHEMA_VERSION,
             "data_type": _bounded_text(data_type, 64),
             "severity": self.status.value,
@@ -172,14 +173,25 @@ class ValidationResult:
             "issues": [issue.to_dict() for issue in self.issues[:MAX_EVIDENCE_ISSUES]],
             "truncated": len(self.issues) > MAX_EVIDENCE_ISSUES,
         }
+        safe_provenance = _json_safe(provenance or {})
+        if safe_provenance:
+            evidence["provenance"] = safe_provenance
+        return evidence
 
 
 class DataValidationRejected(Exception):
     """Provider candidate rejection with bounded, serializable reason evidence."""
 
-    def __init__(self, validation: ValidationResult, *, data_type: str = "unknown"):
+    def __init__(
+        self,
+        validation: ValidationResult,
+        *,
+        data_type: str = "unknown",
+        evidence: Optional[Mapping[str, Any]] = None,
+    ):
         self.validation_payload = validation.to_dict()
         self.data_type = data_type
+        self.evidence = dict(evidence or {})
         self.reason_codes = tuple(
             sorted(
                 {
@@ -269,6 +281,29 @@ def infer_instrument_type(
         return canonical_instrument_type(explicit)
     code = str(stock_code or "").strip()
     try:
+        from data_provider.symbol_normalization import normalize_stock_code
+
+        canonical_code = normalize_stock_code(code).upper()
+        raw_overrides = str(
+            getattr(
+                _validation_config(),
+                "data_validation_instrument_overrides",
+                "",
+            )
+            or ""
+        )
+        for raw_item in raw_overrides.split(","):
+            symbol, separator, raw_type = raw_item.strip().partition("=")
+            if not separator:
+                continue
+            if normalize_stock_code(symbol).upper() != canonical_code:
+                continue
+            normalized_type = str(raw_type).strip().lower()
+            if normalized_type in _INSTRUMENT_TYPES:
+                return normalized_type
+    except (ImportError, RuntimeError, TypeError, ValueError):
+        pass
+    try:
         from data_provider.symbol_normalization import _is_etf_code
         from data_provider.us_index_mapping import is_us_index_code
 
@@ -330,7 +365,11 @@ def classify_numeric(value: Any) -> Tuple[NumericKind, Optional[float]]:
         return NumericKind.MISSING, None
     if isinstance(value, str) and value.strip() in {"", "-", "--", "N/A", "n/a"}:
         return NumericKind.MISSING, None
-    if isinstance(value, bool):
+    value_type = type(value)
+    if isinstance(value, bool) or (
+        value_type.__name__ in {"bool", "bool_"}
+        and value_type.__module__.split(".", 1)[0] == "numpy"
+    ):
         return NumericKind.INVALID_TYPE, None
     try:
         number = float(value)
@@ -975,6 +1014,7 @@ def log_validation_result(
     market: Optional[str] = None,
     instrument_type: Optional[str] = None,
     rejected: bool = False,
+    provenance: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     evidence = outcome.to_evidence(
         data_type=data_type,
@@ -983,6 +1023,7 @@ def log_validation_result(
         market=market or outcome.context.get("market"),
         instrument_type=(instrument_type or outcome.context.get("instrument_type")),
         rejected=rejected,
+        provenance=provenance,
     )
     if outcome.ok:
         return evidence
@@ -1000,6 +1041,7 @@ def log_validation_result(
         issue_count=evidence["issue_count"],
         truncated=evidence["truncated"],
         schema_version=evidence["schema_version"],
+        provenance=evidence.get("provenance"),
     )
     return evidence
 
@@ -1019,12 +1061,19 @@ def validate_and_annotate(
         return ValidationResult(
             context={"data_type": data_type, "enabled": False, "stock_code": stock_code}
         )
+    frame = data[0] if data_type == "daily_data" and isinstance(data, tuple) and data else data
+    payload_instrument = None
+    if data_type == "daily_data":
+        attrs = getattr(frame, "attrs", None)
+        if isinstance(attrs, Mapping):
+            payload_instrument = attrs.get("instrument_type")
+    elif data is not None:
+        payload_instrument = getattr(data, "instrument_type", None)
     resolved_instrument = infer_instrument_type(
         stock_code,
-        explicit=instrument_type or asset_type,
+        explicit=instrument_type or asset_type or payload_instrument,
     )
     if data_type == "daily_data":
-        frame = data[0] if isinstance(data, tuple) and data else data
         result = validate_daily_frame(
             frame,
             market=market,
@@ -1064,6 +1113,22 @@ def validate_and_annotate(
         market=market,
         instrument_type=resolved_instrument,
     )
+    provenance: Dict[str, Any] = {}
+    if data_type == "daily_data":
+        attrs = getattr(frame, "attrs", None)
+        if isinstance(attrs, Mapping) and isinstance(attrs.get("provider_cache"), Mapping):
+            provenance["provider_cache"] = attrs["provider_cache"]
+    elif data_type == "realtime_quote" and data is not None:
+        for field_name in (
+            "fallback_from",
+            "fetched_at",
+            "provider_timestamp",
+            "is_stale",
+            "stale_seconds",
+        ):
+            field_value = getattr(data, field_name, None)
+            if field_value is not None:
+                provenance[field_name] = field_value
     evidence = log_validation_result(
         result,
         data_type=data_type,
@@ -1072,6 +1137,7 @@ def validate_and_annotate(
         market=market,
         instrument_type=resolved_instrument,
         rejected=reject,
+        provenance=provenance,
     )
     if data_type == "realtime_quote" and data is not None:
         try:
@@ -1079,5 +1145,9 @@ def validate_and_annotate(
         except (AttributeError, TypeError):
             pass
     if reject:
-        raise DataValidationRejected(result, data_type=data_type)
+        raise DataValidationRejected(
+            result,
+            data_type=data_type,
+            evidence=evidence,
+        )
     return result
