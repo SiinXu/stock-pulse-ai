@@ -20,7 +20,7 @@ exercised end-to-end against the **real** FastAPI app, **real**
 ``Config`` reload:
 
 1. Visible: key appears in GET with the expected category metadata
-2. Editable: schema marks the field editable with a non-empty title/control
+2. Editable: schema marks the field editable with title/description/help/default/control
 3. Savable: PUT with ``reload_now=True`` applies the change
 4. Effective after reload: subsequent GET and ``Config.get_instance()`` agree
 5. Failure: illegal values are rejected with a readable validation issue
@@ -55,7 +55,7 @@ from fastapi.testclient import TestClient
 import src.auth as auth
 from api.app import create_app
 from src.config import Config
-from src.core.config_registry import WEB_SETTINGS_HIDDEN_FROM_UI
+from src.core.config_registry import WEB_SETTINGS_HIDDEN_FROM_UI, get_category_definitions
 from src.storage import DatabaseManager
 from tests.litellm_stub import ensure_litellm_stub
 
@@ -260,24 +260,62 @@ def _get_config(client: TestClient) -> dict[str, Any]:
     return payload
 
 
-def _assert_visible_and_editable(item: dict[str, Any], case: CategoryLifecycleCase) -> None:
-    assert case.key not in WEB_SETTINGS_HIDDEN_FROM_UI, (
-        f"{case.key} is hidden from the Web settings UI"
+def _assert_presentation_schema(
+    item: dict[str, Any],
+    *,
+    key: str,
+    expected_category: str,
+    expected_ui_control: str,
+    expect_sensitive: bool,
+    require_default_value: bool,
+) -> dict[str, Any]:
+    """Assert the settings-page presentation contract for one config item."""
+    assert key not in WEB_SETTINGS_HIDDEN_FROM_UI, (
+        f"{key} is hidden from the Web settings UI"
     )
     schema = item.get("schema")
     assert isinstance(schema, dict), (
-        f"{case.key} missing schema on GET (settings page cannot render metadata)"
+        f"{key} missing schema on GET (settings page cannot render metadata)"
     )
-    assert schema.get("category") == case.category, (
-        f"{case.key} category drift: expected {case.category!r}, got {schema.get('category')!r}"
+    assert schema.get("category") == expected_category, (
+        f"{key} category drift: expected {expected_category!r}, got {schema.get('category')!r}"
     )
-    assert schema.get("is_editable") is True, f"{case.key} is not editable"
-    assert (schema.get("title") or "").strip(), f"{case.key} missing title"
-    assert schema.get("ui_control") == case.expected_ui_control, (
-        f"{case.key} ui_control drift: expected {case.expected_ui_control!r}, "
+    assert schema.get("is_editable") is True, f"{key} is not editable"
+    assert (schema.get("title") or "").strip(), f"{key} missing title"
+    assert (schema.get("description") or "").strip(), (
+        f"{key} missing description (settings help text would be empty)"
+    )
+    assert (schema.get("help_key") or "").strip(), (
+        f"{key} missing help_key (settings help lookup would fail)"
+    )
+    assert "default_value" in schema, (
+        f"{key} missing default_value field in schema metadata"
+    )
+    if require_default_value:
+        default_value = schema.get("default_value")
+        assert default_value is not None and str(default_value).strip() != "", (
+            f"{key} missing usable default_value for settings default hint"
+        )
+    assert schema.get("ui_control") == expected_ui_control, (
+        f"{key} ui_control drift: expected {expected_ui_control!r}, "
         f"got {schema.get('ui_control')!r}"
     )
-    assert schema.get("is_sensitive") is False
+    assert bool(schema.get("is_sensitive")) is expect_sensitive, (
+        f"{key} is_sensitive drift: expected {expect_sensitive}, "
+        f"got {schema.get('is_sensitive')!r}"
+    )
+    return schema
+
+
+def _assert_visible_and_editable(item: dict[str, Any], case: CategoryLifecycleCase) -> None:
+    _assert_presentation_schema(
+        item,
+        key=case.key,
+        expected_category=case.category,
+        expected_ui_control=case.expected_ui_control,
+        expect_sensitive=False,
+        require_default_value=True,
+    )
 
 
 @pytest.mark.parametrize("case", CATEGORY_CASES, ids=lambda c: f"{c.category}:{c.key}")
@@ -390,11 +428,15 @@ def test_sensitive_value_remains_masked_and_is_not_cleared_on_mask_save(
 
     before = _get_config(client)
     item = _items_by_key(before)[secret_key]
-    schema = item.get("schema") or {}
-    assert schema.get("category") == "data_source"
-    assert schema.get("is_sensitive") is True
-    assert schema.get("is_editable") is True
-    assert schema.get("ui_control") == "password"
+    # Sensitive secrets may have null defaults; still require title/description/help.
+    _assert_presentation_schema(
+        item,
+        key=secret_key,
+        expected_category="data_source",
+        expected_ui_control="password",
+        expect_sensitive=True,
+        require_default_value=False,
+    )
     assert item["is_masked"] is True
     assert item["raw_value_exists"] is True
     assert item["value"] == before["mask_token"]
@@ -429,22 +471,25 @@ def test_sensitive_value_remains_masked_and_is_not_cleared_on_mask_save(
 
 
 def test_all_declared_settings_categories_have_lifecycle_coverage() -> None:
-    """Guard against dropping a category from the representative matrix."""
+    """Guard against dropping a real UI category from the representative matrix.
+
+    ``uncategorized`` is intentionally excluded: it is the dump bucket for keys
+    missing from the registry, not a first-class settings section to exercise.
+    """
     expected = {
-        "base",
-        "data_source",
-        "ai_model",
-        "notification",
-        "system",
-        "agent",
-        "backtest",
-        "indicators",
+        item["category"]
+        for item in get_category_definitions()
+        if item.get("category") and item["category"] != "uncategorized"
     }
     covered = {case.category for case in CATEGORY_CASES}
-    assert covered == expected, f"category coverage drift: {sorted(expected ^ covered)}"
+    assert covered == expected, (
+        "category coverage drift vs config registry catalog: "
+        f"missing={sorted(expected - covered)} extra={sorted(covered - expected)}"
+    )
     # One representative key per category keeps the matrix intentional.
     by_category: dict[str, list[str]] = {}
     for case in CATEGORY_CASES:
         by_category.setdefault(case.category, []).append(case.key)
     for category, keys in by_category.items():
         assert len(keys) == 1, f"{category} has multiple representatives: {keys}"
+
