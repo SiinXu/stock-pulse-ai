@@ -173,7 +173,7 @@ test.describe('touch-capable foundation controls', () => {
 
     const historyDelete = page.getByRole('button', { name: /删除|Delete/, exact: true }).first();
     await expect(historyDelete).toBeVisible();
-    await expectVisibleHeights(historyDelete, buttonHeights);
+    await expectVisibleHeights(historyDelete, iconButtonHeights);
     await expectCoarseHitTarget(historyDelete, 'history delete action');
     await historyDelete.click();
     const deleteDialog = page.getByRole('dialog', { name: '删除历史记录' });
@@ -183,6 +183,10 @@ test.describe('touch-capable foundation controls', () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(APP_ROUTE_PATHS.researchBacktest);
+    const mobileFiltersToggle = page.getByTestId('backtest-mobile-filters-toggle');
+    await expect(mobileFiltersToggle).toBeVisible();
+    await mobileFiltersToggle.click();
+    await expect(mobileFiltersToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('[data-control="input"]:visible').first()).toBeVisible();
     await expectVisibleHeights(page.locator('[data-control="input"]:visible'), inputHeights);
     await expectVisibleHeights(page.locator('[data-control="button"]:visible'), buttonHeights);

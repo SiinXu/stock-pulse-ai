@@ -24,6 +24,8 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
   const { language, t } = useUiLanguage();
   const { showToast, dismissToast } = useToast();
   const localizedError = localizeParsedApiError(error, language);
+  const rawMessage = localizedError.rawMessage.trim();
+  const showDetails = Boolean(rawMessage && rawMessage !== localizedError.message.trim());
   const onActionRef = useRef(onAction);
   const onDismissRef = useRef(onDismiss);
   const hasAction = Boolean(actionLabel && onAction);
@@ -41,6 +43,8 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
     const toastId = showToast({
       title: localizedError.title,
       message: localizedError.message,
+      details: showDetails ? rawMessage : undefined,
+      detailsLabel: showDetails ? t('common.details') : undefined,
       tone: 'danger',
       durationMs: 0,
       closeLabel: dismissLabel ?? t('common.close'),
@@ -61,6 +65,8 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
     hasDismiss,
     localizedError.message,
     localizedError.title,
+    rawMessage,
+    showDetails,
     showToast,
     t,
   ]);

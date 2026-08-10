@@ -14,6 +14,8 @@ export interface ToastAction {
 export interface ToastInput {
   title: string;
   message?: React.ReactNode;
+  details?: React.ReactNode;
+  detailsLabel?: string;
   tone?: ToastTone;
   durationMs?: number;
   action?: ToastAction;

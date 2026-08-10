@@ -89,6 +89,16 @@ const ToastItem: React.FC<{
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">{toast.title}</p>
         {toast.message ? <div className="mt-0.5 break-words text-xs leading-4 text-secondary-text">{toast.message}</div> : null}
+        {toast.details ? (
+          <details className="mt-2 rounded-lg border border-danger/20 bg-background/45 px-2.5 py-1.5">
+            <summary className="control-hit-target flex min-h-7 cursor-pointer items-center text-xs font-medium text-danger">
+              {toast.detailsLabel}
+            </summary>
+            <pre className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-5 text-secondary-text">
+              {toast.details}
+            </pre>
+          </details>
+        ) : null}
       </div>
       {toast.action ? (
         <Button
