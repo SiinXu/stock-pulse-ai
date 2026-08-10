@@ -339,9 +339,9 @@ def render_inventory_table(
             notes_parts.append("commented template" if locale == "en" else "模板中注释")
         if key not in registry_keys:
             notes_parts.append(
-                "registry gap (see issue #1026)"
+                "registry gap (see inventory docs / tracking issue)"
                 if locale == "en"
-                else "注册表缺口（见 issue #1026）"
+                else "注册表缺口（见清单文档 / 跟踪 issue）"
             )
         if entry.description and key in registry_keys:
             short = entry.description.split(". ")[0].strip()
