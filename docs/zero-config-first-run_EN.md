@@ -27,8 +27,12 @@ Local detection reuses `src/services/local_runtime_detect.py`; primary-model rea
 
 - Self-contained component: `apps/dsa-web/src/components/onboarding/ZeroConfigFirstRunPanel.tsx`
 - Playground: `zero-config-first-run-panel`
-- This PR provides a self-contained foundation; a discoverable Home / Settings product entry remains an **Integration Point**.
+- Home mounts the panel whenever setup is incomplete and the user has not dismissed first-run guidance, so no Playground or manually typed route is required.
+- Home routes from authoritative readiness: local Ollama opens Settings → AI Models → Local Models; a configured model opens Analysis Workbench; the demo path opens the offline report in place.
+- FirstRunWizard lists and visually emphasizes the local-model path first while preserving explicit choice; cloud API and local CLI remain available.
 - For `configured` / `local_ollama`, the host must provide a settings-navigation handler. Without it, the primary button is disabled with an explanation; it never becomes a silent no-op or substitutes the demo action.
+
+Without an explicit experience preference, Analysis Workbench uses beginner mode while authoritative setup status is incomplete. An explicit professional preference is never overwritten.
 
 ## Related
 
