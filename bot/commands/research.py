@@ -9,21 +9,16 @@ Usage:
 """
 
 import logging
-import re
 import time
 from typing import List, Optional
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
 from src.config import get_config
+from bot.stock_symbols import BotStockSymbolError, parse_bot_stock_symbol
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
-
-_RESEARCH_STOCK_CODE_RE = re.compile(
-    r"^\d{6}$|^HK\d{5}$|^[A-Z]{1,5}(?:\.[A-Z]{1,2})?$"
-)
-
 
 class ResearchCommand(BotCommand):
     """
@@ -72,8 +67,11 @@ class ResearchCommand(BotCommand):
 
         # Try to detect a stock code in the first argument
         first = query_parts[0].upper().replace("，", ",")
-        if _RESEARCH_STOCK_CODE_RE.match(first):
-            stock_code = first
+        try:
+            stock_code = parse_bot_stock_symbol(first).code
+        except BotStockSymbolError:
+            stock_code = None
+        if stock_code:
             query_parts = query_parts[1:]
 
         # Build the research query
@@ -148,6 +146,7 @@ class ResearchCommand(BotCommand):
                 )
 
         except Exception as exc:
+            # broad-exception: fallback_recorded - bot command boundary must not leak a traceback; the failure is safe-logged and mapped to a stable public reply.
             log_safe_exception(
                 logger,
                 "[ResearchCommand] Deep research failed",
