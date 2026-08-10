@@ -1158,6 +1158,9 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=3650,
             ),
+            portfolio_stress_scenarios_path=(
+                os.getenv('PORTFOLIO_STRESS_SCENARIOS_PATH', '').strip() or None
+            ),
             portfolio_risk_concentration_alert_pct=parse_env_float(
                 os.getenv('PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT'),
                 35.0,
