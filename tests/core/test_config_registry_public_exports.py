@@ -60,10 +60,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "983370b85c2cbb8a7a8d66252a4ac05785c2aace218daf7da4a5d6528d80c55b"
+    "4ae8f387ee80dea2fa38f97b3c2104a8d597e72543b6ebfbeb639c7098e7dbdb"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "4b8460bc4b3f9a147d03a5216e5e9537e39a65972b3a0cae70ceeff6af92cc3c"
+    "a1e53d55f8a1a8eac46d9ad7160d3f33a142c54bf2fd97f2bde48413dc7fbb6c"
 )
 
 
@@ -120,4 +120,3 @@ def test_config_registry_reload_rebuilds_nested_definitions():
     assert reloaded.get_field_definition is not old_get_field_definition
     assert reloaded._FIELD_DEFINITIONS is not old_field_definitions
     assert reloaded.get_field_definition("STOCK_LIST")["title"] == "Stock List"
-# snapshot refresh note

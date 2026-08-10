@@ -177,3 +177,50 @@ def test_non_strict_unknown_skill_selection_keeps_legacy_fallback():
 
     assert selected == ["bull_trend"]
     assert explicit is False
+
+
+def _optional_tool_declarations(registry):
+    _generation, _entries, declarations = registry.capability_inventory_snapshot()
+    return {declaration.name: declaration for declaration in declarations}
+
+
+@pytest.mark.parametrize(
+    "outcome, expected_reason",
+    [
+        ("raises", "construction_failed"),
+        ("returns_none", "construction_produced_no_tool"),
+    ],
+)
+def test_configured_optional_tool_absence_keeps_construction_provenance(
+    outcome,
+    expected_reason,
+):
+    """A configured factory that produced nothing is never ``not_registered``."""
+    from src.agent import runtime_assembly
+    from src.agent.tools import valuation_tools
+
+    def _build(config, **kwargs):
+        if outcome == "raises":
+            raise RuntimeError("valuation dependency unavailable")
+        return None
+
+    original_registry = runtime_assembly._TOOL_REGISTRY
+    services = MagicMock()
+    services.config = MagicMock(valuation_agent_tool_enabled=True)
+    try:
+        runtime_assembly._TOOL_REGISTRY = None
+        with patch.object(valuation_tools, "build_valuation_tool", _build), patch(
+            "src.application_services.get_application_services",
+            return_value=services,
+        ):
+            registry = runtime_assembly.get_tool_registry()
+    finally:
+        runtime_assembly._TOOL_REGISTRY = original_registry
+
+    declaration = _optional_tool_declarations(registry)[
+        valuation_tools.VALUATION_TOOL_NAME
+    ]
+    assert valuation_tools.VALUATION_TOOL_NAME not in registry
+    assert declaration.configured is True
+    assert declaration.dependency_ready is False
+    assert declaration.reason_code == expected_reason

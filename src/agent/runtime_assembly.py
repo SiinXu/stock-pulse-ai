@@ -201,6 +201,31 @@ def _should_use_legacy_default_prompt(
     return getattr(bull_trend_skill, "source", None) == "builtin"
 
 
+def _declare_optional_tools(
+    registry,
+    names,
+    *,
+    configured,
+    reason_code,
+    scopes=(),
+    dependency_ready=None,
+):
+    """Publish owner truth for optional tools that may stay unregistered."""
+
+    from src.agent.tools.registry import ToolInventoryDeclaration
+
+    for name in names:
+        registry.declare_inventory_tool(
+            ToolInventoryDeclaration(
+                name=name,
+                configured=configured,
+                dependency_ready=dependency_ready,
+                scopes=tuple(scopes),
+                reason_code=reason_code,
+            )
+        )
+
+
 def get_tool_registry():
     """Return a cached ToolRegistry (built once, shared across requests)."""
     global _TOOL_REGISTRY
@@ -220,13 +245,53 @@ def get_tool_registry():
 
     # Optional multimodal PDF/chart tools (issue #253): default-off.
     try:
-        from src.agent.tools.multimodal_tools import build_multimodal_tools
+        from src.agent.tools.multimodal_tools import (
+            PARSE_PDF_TOOL_NAME,
+            READ_CHART_TOOL_NAME,
+            build_multimodal_tools,
+        )
         from src.application_services import get_application_services
 
-        multimodal_tools = build_multimodal_tools(get_application_services().config)
-        if multimodal_tools:
-            for tool_def in multimodal_tools:
-                registry.register(tool_def)
+        config = get_application_services().config
+        enabled = getattr(config, "multimodal_agent_tools_enabled", False) is True
+        root = str(getattr(config, "multimodal_file_root", "") or "").strip()
+        configured = enabled and bool(root)
+        reason_code = None if configured else (
+            "missing_config" if enabled else "feature_disabled"
+        )
+        names = (PARSE_PDF_TOOL_NAME, READ_CHART_TOOL_NAME)
+        _declare_optional_tools(
+            registry,
+            names,
+            configured=configured,
+            reason_code=reason_code,
+            scopes=("multimodal:read",),
+        )
+        try:
+            multimodal_tools = build_multimodal_tools(config)
+        except Exception:
+            _declare_optional_tools(
+                registry,
+                names,
+                configured=configured,
+                reason_code="construction_failed",
+                scopes=("multimodal:read",),
+                dependency_ready=False,
+            )
+            raise
+        built = {tool_def.name for tool_def in (multimodal_tools or ())}
+        for tool_def in multimodal_tools or ():
+            registry.register(tool_def)
+        # A configured optional tool that the owner's factory did not produce is
+        # a construction failure, not a plain "not registered" absence.
+        _declare_optional_tools(
+            registry,
+            tuple(name for name in names if name not in built),
+            configured=configured,
+            reason_code=reason_code or "construction_produced_no_tool",
+            scopes=("multimodal:read",),
+            dependency_ready=False if configured else None,
+        )
     except Exception as exc:  # broad-exception: fallback_recorded - optional tools stay absent.
         log_safe_exception(
             logger,
@@ -236,14 +301,65 @@ def get_tool_registry():
             level=logging.WARNING,
         )
 
-    # Optional valuation tool (issue #238): default-off, registered only when enabled.
+    # Optional earnings-transcript tool (issue #253 remaining): default-off.
+    # Separate module/name from OCR (T29) and PDF/chart multimodal tools.
     try:
-        from src.agent.tools.valuation_tools import build_valuation_tool
+        from src.agent.tools.earnings_transcript_tools import (
+            build_earnings_transcript_tools,
+        )
         from src.application_services import get_application_services
 
-        valuation_tool = build_valuation_tool(get_application_services().config)
+        transcript_tools = build_earnings_transcript_tools(
+            get_application_services().config
+        )
+        if transcript_tools:
+            for tool_def in transcript_tools:
+                registry.register(tool_def)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
+        log_safe_exception(
+            logger,
+            "Optional earnings transcript tool registration skipped",
+            exc,
+            error_code="earnings_transcript_tool_registration_failed",
+            level=logging.WARNING,
+        )
+
+    # Optional valuation tool (issue #238): default-off, registered only when enabled.
+    try:
+        from src.agent.tools.valuation_tools import (
+            VALUATION_TOOL_NAME,
+            build_valuation_tool,
+        )
+        from src.application_services import get_application_services
+
+        config = get_application_services().config
+        configured = getattr(config, "valuation_agent_tool_enabled", False) is True
+        reason_code = None if configured else "feature_disabled"
+        names = (VALUATION_TOOL_NAME,)
+        _declare_optional_tools(
+            registry, names, configured=configured, reason_code=reason_code,
+        )
+        try:
+            valuation_tool = build_valuation_tool(config)
+        except Exception:
+            _declare_optional_tools(
+                registry,
+                names,
+                configured=configured,
+                reason_code="construction_failed",
+                dependency_ready=False,
+            )
+            raise
         if valuation_tool is not None:
             registry.register(valuation_tool)
+        else:
+            _declare_optional_tools(
+                registry,
+                names,
+                configured=configured,
+                reason_code=reason_code or "construction_produced_no_tool",
+                dependency_ready=False if configured else None,
+            )
     except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
         log_safe_exception(
             logger,

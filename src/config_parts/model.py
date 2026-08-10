@@ -81,6 +81,13 @@ class Config:
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
     stock_index_remote_update_enabled: bool = True
+    # Unified provider-boundary validation policy.
+    data_validation_enabled: bool = True
+    data_validation_strict: bool = False
+    data_validation_strict_scopes: str = "*/*"
+    data_validation_instrument_overrides: str = ""
+    data_validation_upper_layer_mode: str = "warn"
+    plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
     alphasift_enabled: bool = False
@@ -94,6 +101,11 @@ class Config:
     # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
     multimodal_agent_tools_enabled: bool = False
     multimodal_file_root: Optional[str] = None
+    # === Optional offline OCR Agent Tool (issue #196) ===
+    ocr_agent_tool_enabled: bool = False
+    ocr_file_root: Optional[str] = None
+    ocr_langs: str = "chi_sim+eng"
+    ocr_timeout_seconds: int = 30
     # === Optional DCF / relative valuation Agent Tool (issue #238) ===
     valuation_agent_tool_enabled: bool = False
 
@@ -106,6 +118,10 @@ class Config:
     # === Public signal scorecard (Issue #379) ===
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
+
+    # === Reasoning-trace export (Issue #135) — default off ===
+    reasoning_trace_export_enabled: bool = False
+    reasoning_trace_export_max_chars: int = 500_000
 
     # === Daily brief with historical accuracy review (Issue #466) ===
     daily_brief_enabled: bool = False
@@ -225,6 +241,15 @@ class Config:
     newsnow_base_url: str = "https://newsnow.busiyi.world"  # NewsNow HTTP API base URL (Source side data, Does Not Affect LLM/provider base URL)
     bias_threshold: float = 5.0  # Standard deviation threshold (%), prompts not to chase highs if exceeded.
 
+    # === Technical indicator periods (Issue #172) ===
+    # Defaults match historical hard-coded StockTrendAnalyzer periods.
+    indicator_ma_periods: List[int] = field(default_factory=lambda: [5, 10, 20, 60])
+    indicator_macd_fast: int = 12
+    indicator_macd_slow: int = 26
+    indicator_macd_signal: int = 9
+    indicator_rsi_periods: List[int] = field(default_factory=lambda: [6, 12, 24])
+    indicator_period_source: str = "defaults"
+
     # == Agent Mode Configuration ===
     agent_generation_backend: str = AUTO_AGENT_BACKEND_ID
     agent_litellm_model: str = ""  # Optional Agent-only primary model; empty inherits LITELLM_MODEL
@@ -249,6 +274,7 @@ class Config:
     agent_portfolio_agent_timeout_s: float = 0
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
+    risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
@@ -274,6 +300,8 @@ class Config:
     # Report type: simple (concise) or full (complete)
     report_type: str = "simple"
     report_language: str = "zh"
+    # Optional single-face TTF/OTF used by the bounded report PDF exporter.
+    report_export_pdf_font_path: Optional[str] = None
 
     # Only analyze the result summary: true only pushes summaries, without individual stock details (Issue #262)
     report_summary_only: bool = False

@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
@@ -22,8 +22,11 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
+import {
+  DEFAULT_ONBOARDING_PROFILE,
+  type OnboardingPlan,
+} from '../../types/onboarding';
 import type { WatchlistGroup } from '../../types/watchlist';
-import { DEFAULT_ONBOARDING_PROFILE, type OnboardingPlan } from '../../types/onboarding';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
 import { usePlaygroundScenario } from '../scenarioContext';
@@ -33,6 +36,13 @@ const useSamples = () => {
   const { language } = useUiLanguage();
   return PLAYGROUND_TEXT[language].samples;
 };
+
+const LazyZeroConfigFirstRunPanelStory = lazy(async () => {
+  const module = await import('./zeroConfigFirstRunScenario');
+  return { default: module.ZeroConfigFirstRunPanelStory };
+});
+
+const ZeroConfigFirstRunPanelStory = () => <LazyZeroConfigFirstRunPanelStory />;
 
 const StockAutocompleteStory = () => {
   const text = useSamples();
@@ -342,7 +352,6 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
-
 const scoredFixture: WatchlistScoreItem = {
   stockCode: '600519',
   status: 'scored',
@@ -435,5 +444,6 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,
   'agent-onboarding-wizard': AgentOnboardingWizardStory,
+  'zero-config-first-run-panel': ZeroConfigFirstRunPanelStory,
   'watchlist-score-column': WatchlistScoreColumnStory,
 };

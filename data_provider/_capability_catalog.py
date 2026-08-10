@@ -91,6 +91,17 @@ class _CapabilityCatalogMethods:
     def plugin_registry(self) -> "ExtensionRegistry":
         """Return the manager-owned X2 registry used by provider plugins."""
 
+        return self.data_provider_runtime.registry
+
+    @property
+    def data_provider_runtime(self):
+        """Return the provider runtime owned by this exact manager instance.
+
+        Read-only observers must resolve the runtime through the manager that
+        actually serves requests. Constructing another manager would create a
+        different runtime owner whose active providers are unrelated.
+        """
+
         self._ensure_concurrency_guards()
         if self._data_provider_runtime is None:
             from .plugin_registry import _DataProviderPluginRuntime
@@ -101,7 +112,7 @@ class _CapabilityCatalogMethods:
             self._data_provider_runtime.reserve_provider_names(
                 fetcher.name for fetcher in getattr(self, "_fetchers", [])
             )
-        return self._data_provider_runtime.registry
+        return self._data_provider_runtime
 
     def _assign_fetcher_static_order_locked(
         self,

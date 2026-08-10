@@ -33,6 +33,10 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
 
     assert backend_job["needs"] == ["changes", "ai-governance"]
     assert backend_job["if"] == "needs.changes.outputs.backend == 'true'"
+    # The full suite currently needs about 27 minutes before coverage and
+    # cleanup, so both full-suite jobs require headroom beyond 30 minutes.
+    assert backend_job["timeout-minutes"] >= 45
+    assert job["timeout-minutes"] >= 45
     assert "backend" in changes_job["outputs"]
     assert "docker" in changes_job["outputs"]
     assert changes_job["outputs"]["backend"].startswith(

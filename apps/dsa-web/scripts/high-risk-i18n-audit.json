@@ -110,9 +110,9 @@
   },
   "decisionEvidence": {
     "count": 95,
-    "sha256": "2faa80b93b2962304e973f99d5a103233e2ddcb994bf718b95b76f4e970b27b8",
+    "sha256": "8551f046879b998f1154c4ca4de9ccd08d582ba31dd705c988f12415ffc3ff1d",
     "localeValueCount": 517,
-    "revisionSha256": "803c7f7f32bc386382705c3d313090319bea14ad5647bf12a2759d3d74d411c8"
+    "revisionSha256": "e7e31a9272a41219db270c7be78b9e4754b6c2182be6d6039bf06052a3c9f305"
   },
   "languageReview": {
     "zh": {
@@ -353,16 +353,16 @@
         "keyCount": 75,
         "keySetSha256": "fb6fdab4339afd794be39224f7643ee44bb60b158e21690297212bafa6664ce7",
         "bundleSha256": {
-          "zh": "b279e80767790f29046f00c6025e40372ec91c0bc72bed23e4beea9f5c406e3e",
-          "zh-TW": "2cea7e03ce8c610a3127d2ed8f957b6cad645e2e7f8155fc180ff7f261d917d8",
-          "en": "7bc155fae0ad636cce152da53c3d2211384b48291b198f69b0ca8fd21a9bc464",
-          "ja": "0989bc5bcf72f790afe02142e88ed14091035c5c1b54cb222ee5f0f8b99202d5",
-          "ko": "8defc554bd496934f47f34b871843bfad800fda6de50394f351ff838c16594b6",
-          "de": "d830ae0120cee11dc5861d33f9b1b98036de1df37e5d7eca497dedf902e58063",
-          "es": "7f1c4a592cb0e305a07e6924e51a86078b31167316eb16718dead1aa1be61060",
-          "ms": "7ece545ca43ddd97fd02cdd5c646ab1ad91db791c60234356e40ceae57cc0f6e",
-          "fr": "bf79b0c65e6b4f88eeb0d772259799671e7b9ac153b66a2e4b0a356f214b6a1b",
-          "id": "5bd2ab43e1908c728d16baf775e2133e6bdb5b6308b5a167e0df4a11d47aa68b"
+          "zh": "3d9085843eae4c608932883a95b82124d03e0dcac47a5ab7454dbc1c83e1ab81",
+          "zh-TW": "705e6d757501cc9877b385018d640e79bcb93e9000ea4fd889014e24a7183578",
+          "en": "6fe5f955a1c76d23a75888dae6873454d82acb3b9955349eabcfc9d19062fd69",
+          "ja": "1ffba3c43acd6453c843886a36e4743d9f0790f585958a037590b3810957ae94",
+          "ko": "fee19481df68e4e8c5cb560942cbb5c93fface1e1df3be61e7dd6b2b1074a973",
+          "de": "56ccea4f68e4fb965899dc1d2687de0cb60ee56687da45d04c49a1ea3ef27b9d",
+          "es": "c3a47d6024b42a94fef4943ee824c23459a2674aaeabcd14a5ff24a906c48021",
+          "ms": "ded7be6761580310ec6db353bdab89db8764090f33eb091a3f9077404cbbc885",
+          "fr": "706d0786cb5560099e33b1cd7476cb748a6e2cd05fbd8bf1b931a29e7723fd18",
+          "id": "1aeebf3d8ee190fb715c36e0205a354b96379fd27363918e506cd7398d26ccb4"
         }
       }
     },
@@ -1447,9 +1447,9 @@
       }
     },
     {
-      "id": "risk_agent_modes_and_downgrade_actions_are_literal",
+      "id": "legacy_risk_override_preserves_mandatory_profile_authority",
       "category": "risk",
-      "rationale": "The risk-agent control must retain the literal full/specialist contract values and describe downgrading buy recommendations to hold or sell without changing those runtime modes.",
+      "rationale": "The legacy risk override control must state that the mandatory Risk Manager still decides under the literal RISK_GATE_PROFILE contract.",
       "sourceIds": [
         "stockpulse_product_contract",
         "stockpulse_financial_guide",
@@ -1467,20 +1467,20 @@
         "id": "Saat diaktifkan, agen risiko dalam mode full/specialist dapat menurunkan rekomendasi beli menjadi tahan atau jual."
       },
       "recommended": {
-        "zh-TW": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為持有或賣出。該保守覆寫仍會自動生效，除非人工審批（/approvals）捕獲了對應路徑。",
-        "ja": "有効にすると、full/specialist モードのリスクエージェントは、買い推奨を保有または売却へ引き下げることができます。その保守的な上書きは、Human approvals（/approvals）が該当パスを捕捉しない限り、自動で適用されたままです。",
-        "ko": "활성화하면 full/specialist 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 하향 조정할 수 있습니다. 해당 보수적 재정의는 Human approvals(/approvals)가 해당 경로를 포착하지 않는 한 계속 자동 적용됩니다.",
-        "de": "Wenn aktiviert, kann der Risikoagent im Modus full/specialist Kaufempfehlungen auf Halten oder Verkaufen herabstufen. Diese konservative Überschreibung gilt weiterhin automatisch, sofern Human approvals (/approvals) den Pfad nicht übernimmt.",
-        "es": "Cuando está activado, el agente de riesgo en modo full/specialist puede rebajar una recomendación de compra a mantener o vender. Esa anulación conservadora sigue aplicándose automáticamente a menos que Human approvals (/approvals) capture la ruta.",
-        "ms": "Apabila didayakan, ejen risiko dalam mod full/specialist boleh menurunkan taraf cadangan beli kepada pegang atau jual. Overide konservatif itu masih diguna secara automatik melainkan Human approvals (/approvals) menangkap laluan tersebut.",
-        "fr": "Une fois activé, l’agent de risque en mode full/specialist peut abaisser une recommandation d’achat à conserver ou vendre. Cette surcharge conservatrice s’applique toujours automatiquement, sauf si Human approvals (/approvals) capture le chemin.",
-        "id": "Saat diaktifkan, agen risiko dalam mode full/specialist dapat menurunkan rekomendasi beli menjadi tahan atau jual. Override konservatif itu tetap diterapkan secara otomatis kecuali Human approvals (/approvals) menangkap jalur tersebut."
+        "zh-TW": "僅控制 legacy 風險計畫是否直接下調；不可關閉的 Risk Manager 仍依 RISK_GATE_PROFILE 裁決最終動作。",
+        "ja": "従来のリスク計画が直接引き下げるかだけを制御します。必須の Risk Manager は RISK_GATE_PROFILE に従って最終判断します。",
+        "ko": "기존 위험 계획의 직접 하향 적용만 제어합니다. 필수 Risk Manager는 RISK_GATE_PROFILE에 따라 최종 동작을 결정합니다.",
+        "de": "Steuert nur, ob der bisherige Risikoplan direkt herabstuft; der verbindliche Risk Manager entscheidet weiterhin gemäß RISK_GATE_PROFILE.",
+        "es": "Controla solo si el plan de riesgo anterior aplica una rebaja directamente; el Risk Manager obligatorio sigue decidiendo según RISK_GATE_PROFILE.",
+        "ms": "Hanya mengawal sama ada pelan risiko lama terus menurunkan tindakan; Risk Manager wajib tetap memutuskan mengikut RISK_GATE_PROFILE.",
+        "fr": "Contrôle uniquement l’application directe de l’ancien plan de risque ; le Risk Manager obligatoire décide toujours selon RISK_GATE_PROFILE.",
+        "id": "Hanya mengatur apakah rencana risiko lama langsung menerapkan penurunan; Risk Manager wajib tetap memutuskan sesuai RISK_GATE_PROFILE."
       }
     },
     {
-      "id": "risk_agent_veto_requires_the_risk_stage",
+      "id": "legacy_override_cannot_skip_final_action_evaluation",
       "category": "risk",
-      "rationale": "The value note must state that the veto is effective only when AGENT_ORCHESTRATOR_MODE includes the risk stage.",
+      "rationale": "The value note must state that the legacy override cannot skip mandatory final-action evaluation.",
       "sourceIds": [
         "stockpulse_product_contract",
         "stockpulse_financial_guide"
@@ -1493,10 +1493,10 @@
         "es": "Solo efectivo cuando AGENT_ORCHESTRATOR_MODE Incluye la etapa de riesgo."
       },
       "recommended": {
-        "ja": "AGENT_ORCHESTRATOR_MODE にリスクステージが含まれる場合にのみ有効です。",
-        "ko": "AGENT_ORCHESTRATOR_MODE에 위험 단계가 포함된 경우에만 적용됩니다.",
-        "de": "Nur wirksam, wenn AGENT_ORCHESTRATOR_MODE die Risikophase umfasst.",
-        "es": "Solo es efectivo cuando AGENT_ORCHESTRATOR_MODE incluye la etapa de riesgo."
+        "ja": "従来の上書きだけを制御し、最終アクション評価を回避することはできません。",
+        "ko": "기존 재정의만 제어하며 최종 동작 평가를 우회할 수 없습니다.",
+        "de": "Steuert nur die bisherige Überschreibung und kann die Bewertung der endgültigen Aktion nicht umgehen.",
+        "es": "Solo controla la anulación anterior y no puede omitir la evaluación de la acción final."
       }
     },
     {

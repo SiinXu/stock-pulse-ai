@@ -135,6 +135,8 @@ class UnifiedRealtimeQuote:
     missing_fields: Optional[list[str]] = None   # Key fields missing from the provider response
     granularity: Optional[str] = None            # Provider observation/candle granularity
     amount_period: Optional[str] = None          # Window represented by amount (for example rolling_24h)
+    # Versioned validation evidence; additive and optional for caller compatibility.
+    data_quality_evidence: Optional[Dict[str, Any]] = None
     
     # Core price data (available from nearly all sources)
     price: Optional[float] = None           # Latest price
@@ -176,7 +178,7 @@ class UnifiedRealtimeQuote:
         optional_fields = [
             'fetched_at', 'provider_timestamp', 'is_stale', 'stale_seconds',
             'fallback_from', 'market', 'currency', 'data_quality', 'missing_fields',
-            'granularity', 'amount_period',
+            'granularity', 'amount_period', 'data_quality_evidence',
             'price', 'change_pct', 'change_amount', 'volume', 'amount',
             'volume_ratio', 'turnover_rate', 'amplitude',
             'open_price', 'high', 'low', 'pre_close',
