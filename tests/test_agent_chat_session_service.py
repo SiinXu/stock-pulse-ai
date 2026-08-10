@@ -4,8 +4,17 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from src.services.agent_chat_session_service import AgentChatSessionService
 from src.storage import DatabaseManager
+
+
+@pytest.fixture(autouse=True)
+def _reset_database_singleton():
+    DatabaseManager.reset_instance()
+    yield
+    DatabaseManager.reset_instance()
 
 
 def test_skill_selection_distinguishes_inherit_clear_and_explicit() -> None:
