@@ -1,8 +1,67 @@
 """Agent configuration field definitions."""
 
+from __future__ import annotations
+
+import ast
+from pathlib import Path as _Path
 from typing import Any, Dict
 
 from src.config import AGENT_CONTEXT_COMPRESSION_PROFILES, AGENT_MAX_STEPS_DEFAULT
+
+# Read runtime-guard defaults/enums from guards.py source without importing the
+# heavy src.agent.runtime package (avoids package __init__ side effects).
+def _load_runtime_guard_contract() -> Dict[str, Any]:
+    guards_path = _Path(__file__).resolve().parents[2] / "agent" / "runtime" / "guards.py"
+    tree = ast.parse(guards_path.read_text(encoding="utf-8"), filename=str(guards_path))
+    constants: Dict[str, Any] = {}
+    policy_values: list = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id.startswith("DEFAULT_"):
+                    constants[target.id] = ast.literal_eval(node.value)
+        elif isinstance(node, ast.ClassDef) and node.name == "StageFailurePolicy":
+            for item in node.body:
+                if isinstance(item, ast.Assign):
+                    for target in item.targets:
+                        if isinstance(target, ast.Name):
+                            policy_values.append(ast.literal_eval(item.value))
+    required = (
+        "DEFAULT_TOOL_TIMEOUT_SECONDS",
+        "DEFAULT_MAX_IDENTICAL_TOOL_CALLS",
+        "DEFAULT_MAX_STAGE_ENTRIES",
+    )
+    missing = [name for name in required if name not in constants]
+    if missing or not policy_values:
+        raise RuntimeError(
+            f"Unable to extract runtime guard contract from {guards_path}: "
+            f"missing={missing}, policies={policy_values}"
+        )
+    return {
+        "defaults": constants,
+        "policy_values": policy_values,
+    }
+
+_RUNTIME_GUARD_CONTRACT = _load_runtime_guard_contract()
+DEFAULT_TOOL_TIMEOUT_SECONDS = _RUNTIME_GUARD_CONTRACT["defaults"]["DEFAULT_TOOL_TIMEOUT_SECONDS"]
+DEFAULT_MAX_IDENTICAL_TOOL_CALLS = _RUNTIME_GUARD_CONTRACT["defaults"]["DEFAULT_MAX_IDENTICAL_TOOL_CALLS"]
+DEFAULT_MAX_STAGE_ENTRIES = _RUNTIME_GUARD_CONTRACT["defaults"]["DEFAULT_MAX_STAGE_ENTRIES"]
+_STAGE_FAILURE_POLICY_VALUES = list(_RUNTIME_GUARD_CONTRACT["policy_values"])
+_STAGE_FAILURE_POLICY_OPTIONS = [
+    {
+        "label": "Isolate (degrade non-critical stages)",
+        "value": "isolate",
+    },
+    {
+        "label": "Fail fast (stop pipeline on stage failure)",
+        "value": "fail_fast",
+    },
+]
+# Keep option values bound to extracted enum values (order may differ from labels).
+if set(opt["value"] for opt in _STAGE_FAILURE_POLICY_OPTIONS) != set(_STAGE_FAILURE_POLICY_VALUES):
+    _STAGE_FAILURE_POLICY_OPTIONS = [
+        {"label": value, "value": value} for value in _STAGE_FAILURE_POLICY_VALUES
+    ]
 
 AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "AGENT_MODE": {
@@ -1210,6 +1269,355 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
         "warning_codes": ["restart_required"],
+    },
+
+    "AGENT_TOOL_TIMEOUT_S": {
+        "title": "Agent Tool Timeout",
+        "description": (
+            "Maximum seconds for one tool call during Agent execution. "
+            f"Default {int(DEFAULT_TOOL_TIMEOUT_SECONDS)}. When multiple budgets apply, "
+            "the shortest remaining budget wins."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": str(int(DEFAULT_TOOL_TIMEOUT_SECONDS)),
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 710,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": [
+            f"AGENT_TOOL_TIMEOUT_S={int(DEFAULT_TOOL_TIMEOUT_SECONDS)}",
+            "AGENT_TOOL_TIMEOUT_S=60",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_MAX_IDENTICAL_TOOL_CALLS": {
+        "title": "Max Identical Tool Calls",
+        "description": (
+            "Maximum times the same tool name with the same normalized arguments may run "
+            f"in one Agent execution. Default {DEFAULT_MAX_IDENTICAL_TOOL_CALLS}. "
+            "Set 0 to disable this guard."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": str(DEFAULT_MAX_IDENTICAL_TOOL_CALLS),
+        "options": [],
+        "validation": {"min": 0, "max": 50},
+        "display_order": 711,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": [
+            f"AGENT_MAX_IDENTICAL_TOOL_CALLS={DEFAULT_MAX_IDENTICAL_TOOL_CALLS}",
+            "AGENT_MAX_IDENTICAL_TOOL_CALLS=0",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_MAX_STAGE_ENTRIES": {
+        "title": "Max Stage Entries",
+        "description": (
+            "Maximum ordinary pipeline entries for the same stage name per run. "
+            f"Default {DEFAULT_MAX_STAGE_ENTRIES}. Set 0 to disable."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": str(DEFAULT_MAX_STAGE_ENTRIES),
+        "options": [],
+        "validation": {"min": 0, "max": 20},
+        "display_order": 712,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": [
+            f"AGENT_MAX_STAGE_ENTRIES={DEFAULT_MAX_STAGE_ENTRIES}",
+            "AGENT_MAX_STAGE_ENTRIES=0",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_STAGE_FAILURE_POLICY": {
+        "title": "Stage Failure Policy",
+        "description": (
+            "How multi-agent pipeline stages handle failure. "
+            "'isolate' (default) degrades non-critical stages; "
+            "'fail_fast' stops the ordinary pipeline on failure."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "isolate",
+        "options": _STAGE_FAILURE_POLICY_OPTIONS,
+        "validation": {"enum": list(_STAGE_FAILURE_POLICY_VALUES)},
+        "display_order": 713,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": [
+            "AGENT_STAGE_FAILURE_POLICY=isolate",
+            "AGENT_STAGE_FAILURE_POLICY=fail_fast",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_TECHNICAL_AGENT_TIMEOUT_S": {
+        "title": "Technical Stage Timeout",
+        "description": "Independent timeout for the technical multi-agent stage in seconds. Default 0 uses the shared orchestrator budget only.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 714,
+        "help_key": "settings.agent.stage_timeouts",
+        "examples": ["AGENT_TECHNICAL_AGENT_TIMEOUT_S=0", "AGENT_TECHNICAL_AGENT_TIMEOUT_S=180"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
+        "warning_codes": [],
+    },
+    "AGENT_INTEL_AGENT_TIMEOUT_S": {
+        "title": "Intelligence Stage Timeout",
+        "description": "Independent timeout for the intelligence multi-agent stage in seconds. Default 0 uses the shared orchestrator budget only.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 715,
+        "help_key": "settings.agent.stage_timeouts",
+        "examples": ["AGENT_INTEL_AGENT_TIMEOUT_S=0", "AGENT_INTEL_AGENT_TIMEOUT_S=180"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
+        "warning_codes": [],
+    },
+    "AGENT_RISK_AGENT_TIMEOUT_S": {
+        "title": "Risk Stage Timeout",
+        "description": "Independent timeout for the risk multi-agent stage in seconds. Default 0 uses the shared orchestrator budget only.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 716,
+        "help_key": "settings.agent.stage_timeouts",
+        "examples": ["AGENT_RISK_AGENT_TIMEOUT_S=0", "AGENT_RISK_AGENT_TIMEOUT_S=180"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
+        "warning_codes": [],
+    },
+    "AGENT_DECISION_AGENT_TIMEOUT_S": {
+        "title": "Decision Stage Timeout",
+        "description": "Independent timeout for the decision multi-agent stage in seconds. Default 0 uses the shared orchestrator budget only.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 717,
+        "help_key": "settings.agent.stage_timeouts",
+        "examples": ["AGENT_DECISION_AGENT_TIMEOUT_S=0", "AGENT_DECISION_AGENT_TIMEOUT_S=180"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
+        "warning_codes": [],
+    },
+    "AGENT_PORTFOLIO_AGENT_TIMEOUT_S": {
+        "title": "Portfolio Stage Timeout",
+        "description": "Independent timeout for the portfolio multi-agent stage in seconds. Default 0 uses the shared orchestrator budget only.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 718,
+        "help_key": "settings.agent.stage_timeouts",
+        "examples": ["AGENT_PORTFOLIO_AGENT_TIMEOUT_S=0", "AGENT_PORTFOLIO_AGENT_TIMEOUT_S=180"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
+        "warning_codes": [],
+    },
+    "AGENT_SKILL_AGENT_TIMEOUT_S": {
+        "title": "Skill Stage Timeout",
+        "description": "Independent timeout for specialist/skill multi-agent stages in seconds. Default 0 uses the shared orchestrator budget only.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 719,
+        "help_key": "settings.agent.stage_timeouts",
+        "examples": ["AGENT_SKILL_AGENT_TIMEOUT_S=0", "AGENT_SKILL_AGENT_TIMEOUT_S=180"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
+        "warning_codes": [],
+    },
+    "DECISION_MEMORY_ENABLED": {
+        "title": "Decision Memory",
+        "description": "When enabled, stock analysis may inject recent evaluated decision outcomes for reflection. Default on. Per-request override via use_memory remains available.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 720,
+        "help_key": "settings.agent.decision_memory",
+        "examples": ["DECISION_MEMORY_ENABLED=true", "DECISION_MEMORY_ENABLED=false"],
+        "docs": [{"label": "DecisionSignal documentation", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/decision-signals.md"}],
+        "warning_codes": [],
+    },
+    "DECISION_MEMORY_LOOKBACK": {
+        "title": "Decision Memory Lookback",
+        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "5",
+        "options": [],
+        "validation": {"min": 0, "max": 100},
+        "display_order": 721,
+        "help_key": "settings.agent.decision_memory",
+        "examples": ["DECISION_MEMORY_LOOKBACK=5", "DECISION_MEMORY_LOOKBACK=10"],
+        "docs": [{"label": "DecisionSignal documentation", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/decision-signals.md"}],
+        "warning_codes": [],
+    },
+    "DECISION_MEMORY_MIN_AGE_DAYS": {
+        "title": "Decision Memory Min Age (Days)",
+        "description": "Only reflect on signals at least this many days old so outcomes have time to exist. Default 3.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "3",
+        "options": [],
+        "validation": {"min": 0, "max": 365},
+        "display_order": 722,
+        "help_key": "settings.agent.decision_memory",
+        "examples": ["DECISION_MEMORY_MIN_AGE_DAYS=3", "DECISION_MEMORY_MIN_AGE_DAYS=7"],
+        "docs": [{"label": "DecisionSignal documentation", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/decision-signals.md"}],
+        "warning_codes": [],
+    },
+    "DECISION_MEMORY_MIN_SAMPLES": {
+        "title": "Decision Memory Min Samples",
+        "description": "Minimum decided outcomes (hit + miss) before a hit-rate is shown for a memory bucket. Default 5.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "5",
+        "options": [],
+        "validation": {"min": 1, "max": 1000},
+        "display_order": 723,
+        "help_key": "settings.agent.decision_memory",
+        "examples": ["DECISION_MEMORY_MIN_SAMPLES=5", "DECISION_MEMORY_MIN_SAMPLES=10"],
+        "docs": [{"label": "DecisionSignal documentation", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/decision-signals.md"}],
+        "warning_codes": [],
+    },
+    "REASONING_TRACE_EXPORT_ENABLED": {
+        "title": "Reasoning Trace Export",
+        "description": "Master switch for the reasoning-trace export API and service gate. Default off. Exports are redacted but still sensitive.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 724,
+        "help_key": "settings.agent.reasoning_trace_export",
+        "examples": ["REASONING_TRACE_EXPORT_ENABLED=false", "REASONING_TRACE_EXPORT_ENABLED=true"],
+        "docs": [
+            {"label": "Reasoning trace export (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md"},
+            {"label": "推理轨迹导出（中文）", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md"},
+        ],
+        "warning_codes": [],
+    },
+    "REASONING_TRACE_EXPORT_MAX_CHARS": {
+        "title": "Reasoning Trace Max Chars",
+        "description": "Character budget for complete reasoning-trace export responses. Default 500000; clamped to 10000–2000000 when loading config.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "500000",
+        "options": [],
+        "validation": {"min": 10000, "max": 2000000},
+        "display_order": 725,
+        "help_key": "settings.agent.reasoning_trace_export",
+        "examples": ["REASONING_TRACE_EXPORT_MAX_CHARS=500000", "REASONING_TRACE_EXPORT_MAX_CHARS=100000"],
+        "docs": [
+            {"label": "Reasoning trace export (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md"},
+            {"label": "推理轨迹导出（中文）", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md"},
+        ],
+        "warning_codes": [],
     },
 
 }

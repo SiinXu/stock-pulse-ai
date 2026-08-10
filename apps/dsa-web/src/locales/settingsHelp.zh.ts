@@ -775,6 +775,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响定时任务、CLI 和 GitHub Actions 手动运行是否在休市日执行；Web/API 大盘复盘按钮会直接提交任务。'],
     notes: ['关闭后休市日可能生成缺少实时行情的报告。'],
   },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: '插件数据源自动绑定',
+    summary: '可选：将 PluginManager 绑定到进程级数据管理器的 plugin_registry。',
+    usage: '默认保持 PLUGIN_DATA_PROVIDER_AUTO_BIND=false 以保留手动 manager 行为。仅当希望已注册的插件数据源经默认 ApplicationServices 组合根自动路由时开启。',
+    valueNotes: [
+      '默认关闭。',
+      '开启后，不兼容绑定会在启动时 fail-closed，而不是静默降级。',
+      '修改后需要进程重启。',
+    ],
+    impact: ['影响插件注册的行情/数据源是否自动接入个股服务与主分析流水线。'],
+    notes: ['详见 docs/plugin-extension-contract.md 与 docs/plugin-development-guide_zh.md。'],
+    examples: [
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=false',
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=true',
+    ],
+  },
   'settings.system.scorecard': {
     title: '公开信号计分卡',
     summary: '控制聚合信号计分卡（GET /api/v1/scorecard）的可选公开暴露。',
@@ -1224,6 +1240,53 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '该配置只影响问股可见历史压缩，不改变 LLM provider、模型、Base URL、保存清理或运行时优先级语义。',
     ],
   },
+  'settings.agent.runtime_guards': {
+    title: 'Agent 运行时护栏',
+    summary: '低敏的工具循环与 Stage 失败护栏，用于约束 Agent 执行。',
+    usage: 'AGENT_TOOL_TIMEOUT_S 限制单次工具调用；AGENT_MAX_IDENTICAL_TOOL_CALLS 与 AGENT_MAX_STAGE_ENTRIES 阻止失控循环；AGENT_STAGE_FAILURE_POLICY 在 isolate 与 fail_fast 之间选择。',
+    valueNotes: [
+      '工具超时默认 120 秒；相同调用次数或 Stage 进入次数设为 0 可单独关闭对应护栏。',
+      'isolate 对非关键 Stage 降级继续；fail_fast 在普通 Stage 失败时停止 Pipeline。',
+      '有界 Critic 白名单重试使用独立一次性预算，失败时始终 fail-soft 进入 Decision。',
+    ],
+    impact: ['影响 Agent 工具循环、Stage 重入与 Pipeline 失败行为，不改变公开 SSE/API 契约。'],
+    notes: ['三层超时模型见完整指南中的 Agent 配置说明。'],
+  },
+  'settings.agent.stage_timeouts': {
+    title: 'Agent Stage 超时',
+    summary: '为 multi-agent Pipeline 各 Stage 设置可选独立超时预算。',
+    usage: '各 Stage 超时保持 0 时仅跟随 AGENT_ORCHESTRATOR_TIMEOUT_S；设为正值可单独封顶该 Stage。',
+    valueNotes: [
+      '多预算同时生效时取剩余时间最短的一项。',
+      '超时后的 late stage 状态会被 fence，不能提交到后续 Stage。',
+    ],
+    impact: ['影响 multi-agent Stage 耗时，以及 Stage 超时后的降级路径。'],
+    notes: ['无法强制终止已在运行的原生线程；仅接受时限内 COMPLETED 的 Stage。'],
+  },
+  'settings.agent.decision_memory': {
+    title: '决策记忆',
+    summary: '向个股分析注入近期已评估决策结果，供反思使用。',
+    usage: 'DECISION_MEMORY_ENABLED 为全局开关（默认开启）；LOOKBACK、MIN_AGE_DAYS、MIN_SAMPLES 控制参与反思的结果范围。',
+    valueNotes: [
+      '请求级 use_memory 可覆盖全局开关。',
+      '最小天数避免结果尚未形成时就被反思。',
+      '最小样本数抑制噪声命中率分桶。',
+    ],
+    impact: ['影响分析提示词是否包含历史决策反思上下文。'],
+    notes: ['决策信号生命周期见 docs/decision-signals.md。'],
+  },
+  'settings.agent.reasoning_trace_export': {
+    title: '推理轨迹导出',
+    summary: '可选导出已记录诊断数据的脱敏 reasoning-trace-v1 包。',
+    usage: '除非运营需要导出 API，否则保持 REASONING_TRACE_EXPORT_ENABLED=false。REASONING_TRACE_EXPORT_MAX_CHARS 控制完整响应字符预算（10000–2000000）。',
+    valueNotes: [
+      '默认关闭。',
+      '导出会脱敏凭据与本地路径，但仍属敏感运营数据。',
+      '服务不保存导出文件；已下载副本需运营自行删除。',
+    ],
+    impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
+    notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
+  },
   'settings.agent.observability': {
     title: 'Agent 可观测性',
     summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',
@@ -1395,6 +1458,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['需要同时开启 REPORT_RENDERER_ENABLED 才会使用模板渲染。'],
     impact: ['影响报告渲染使用的模板来源。'],
     notes: ['自定义模板需要符合 Jinja2 语法并包含必要的变量占位。'],
+  },
+  'settings.report.REPORT_MODE': {
+    title: '报告呈现模式',
+    summary: '在报告渲染引擎开启时，控制 Jinja 个股报告的呈现深度。',
+    usage: '可选 brief、standard（默认）或 research。选项来自运行时 report-mode 契约。单次可通过 extra_context.report_mode 覆盖。',
+    valueNotes: [
+      'brief 仅保留 Decision Card + 关键风险。',
+      'standard 为 Decision Card + 主要分析段落。',
+      'research 展开细节与更高 strata 上限。',
+      '硬性上限永不丢弃 Decision Card 区块。',
+    ],
+    impact: ['影响报告渲染哪些段落，以及内容截断的激进程度。'],
+    notes: [
+      '仅在 REPORT_RENDERER_ENABLED=true 时生效。',
+      '渲染关闭时的硬编码通知 fallback 路径不变。',
+    ],
   },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: '报告渲染引擎',
