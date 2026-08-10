@@ -290,7 +290,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   useEffect(() => {
     const codes = watchlistCodesKey ? watchlistCodesKey.split('\u0001').filter(Boolean) : [];
     if (codes.length === 0) {
-      setScoresByCode(new Map());
+      // Avoid setState-in-effect: empty lists fall back via resolvedScoresByCode.
       return;
     }
     const requestId = scoreRequestIdRef.current + 1;
@@ -317,6 +317,13 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     };
   }, [watchlistCodesKey]);
 
+  const resolvedScoresByCode = useMemo(() => {
+    if (!watchlistCodesKey) {
+      return new Map<string, WatchlistScoreItem>();
+    }
+    return scoresByCode;
+  }, [scoresByCode, watchlistCodesKey]);
+
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
     .length;
@@ -340,8 +347,8 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           stockName.toLowerCase().includes(normalizedSearchQuery)
         );
       });
-    return orderWatchlistByScore(searched, scoresByCode, scoreSort);
-  }, [normalizedSearchQuery, scoreSort, scoresByCode, watchlistRows]);
+    return orderWatchlistByScore(searched, resolvedScoresByCode, scoreSort);
+  }, [normalizedSearchQuery, scoreSort, resolvedScoresByCode, watchlistRows]);
   const filteredTodayItems = useMemo(() => {
     if (!normalizedSearchQuery) return todayItems;
     return todayItems.filter((item) => (
@@ -585,7 +592,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 <WatchlistRowItem
                   key={row.code}
                   row={row}
-                  scoreItem={scoresByCode.get(row.code) ?? unanalyzedScoreItem(row.code)}
+                  scoreItem={resolvedScoresByCode.get(row.code) ?? unanalyzedScoreItem(row.code)}
                   onRemove={onRemoveFromWatchlist}
                   disabled={watchlistActioning}
                 />
