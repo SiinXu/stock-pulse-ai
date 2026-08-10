@@ -72,7 +72,7 @@ def _enabled_config(**overrides: Any) -> SimpleNamespace:
 def test_default_config_keeps_planning_disabled() -> None:
     cfg = SimpleNamespace(agent_planning_enabled=False)
     assert is_agent_planning_enabled(cfg) is False
-    assert try_run_with_planning(MagicMock(), task="x") is None
+    assert try_run_with_planning(MagicMock(), task="x", config=cfg) is None
 
 
 def test_run_source_gates_on_try_run_with_planning() -> None:
@@ -121,7 +121,7 @@ def test_agent_executor_run_uses_planning_loop_when_enabled() -> None:
     )
 
     with patch(
-        "src.agent.planning.product.get_config",
+        "src.agent.planning.product._resolve_config",
         return_value=_enabled_config(),
     ), patch(
         "src.agent.planning.product._open_plan_tool_session",
@@ -160,7 +160,7 @@ def test_agent_executor_run_terminates_on_tool_failure_without_fail_open() -> No
             return None
 
     with patch(
-        "src.agent.planning.product.get_config",
+        "src.agent.planning.product._resolve_config",
         return_value=_enabled_config(),
     ), patch(
         "src.agent.planning.product._open_plan_tool_session",
@@ -185,7 +185,7 @@ def test_disabled_run_path_does_not_enter_planning(monkeypatch: pytest.MonkeyPat
     classic = AgentResult(success=True, content="classic", total_steps=1)
 
     with patch(
-        "src.agent.planning.product.get_config",
+        "src.agent.planning.product._resolve_config",
         return_value=SimpleNamespace(agent_planning_enabled=False),
     ), patch.object(executor, "_run_loop", return_value=classic) as run_loop:
         result = executor.run("Analyze 600519", context={"stock_code": "600519"})

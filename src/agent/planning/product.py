@@ -6,6 +6,9 @@ invokes this module so the planning loop participates in the real analysis
 orchestration path. Tools dispatch through ``BoundToolSession`` (same authority
 as the native runner). Failures terminate with explicit reasons; nothing here
 claims success after a failed plan step or exhausted budget.
+
+Config is constructor/parameter injected (or resolved via the composition root).
+This module does not call bare ``get_config()``.
 """
 
 from __future__ import annotations
@@ -32,7 +35,6 @@ from src.agent.planning.loop import execute_plan_loop
 from src.agent.planning.observations import compact_observation_summary
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import resolve_stock_scope
-from src.config import get_config
 from src.services.security_audit_service import get_security_audit_service
 from src.utils.sanitize import log_safe_exception
 
@@ -41,9 +43,18 @@ logger = logging.getLogger(__name__)
 CancelledCheck = Callable[[], bool]
 
 
+def _resolve_config(config: Any = None) -> Any:
+    """Prefer injected Config; fall back to composition-root access."""
+    if config is not None:
+        return config
+    from src.application_services import get_application_services
+
+    return get_application_services().config
+
+
 def is_agent_planning_enabled(config: Any = None) -> bool:
     """Return whether the production planning path is opted in."""
-    cfg = config if config is not None else get_config()
+    cfg = _resolve_config(config)
     return bool(getattr(cfg, "agent_planning_enabled", False))
 
 
@@ -56,7 +67,7 @@ def resolve_planning_settings(
     ``PlanningSettings`` / ``PlanExecutionSettings`` re-validate and reject
     non-finite or out-of-range numbers.
     """
-    cfg = config if config is not None else get_config()
+    cfg = _resolve_config(config)
     strategy = str(getattr(cfg, "agent_planning_strategy", "template") or "template").strip().lower()
     if strategy not in {"template", "llm"}:
         strategy = "template"
@@ -97,21 +108,22 @@ def try_run_with_planning(
     task: str,
     context: Optional[Dict[str, Any]] = None,
     cancelled_check: Optional[CancelledCheck] = None,
+    config: Any = None,
 ) -> Optional[Any]:
     """Run the production planning path or return ``None`` when disabled.
 
     When enabled, always returns an ``AgentResult`` (success or explicit failure).
     When disabled, returns ``None`` so the caller continues the classic ReAct path.
     """
-    config = get_config()
-    if not is_agent_planning_enabled(config):
+    cfg = _resolve_config(config)
+    if not is_agent_planning_enabled(cfg):
         return None
     return run_with_planning(
         executor,
         task=task,
         context=context,
         cancelled_check=cancelled_check,
-        config=config,
+        config=cfg,
     )
 
 
@@ -132,7 +144,7 @@ def run_with_planning(
     # for pure library consumers of ``src.agent.planning``.
     from src.agent.executor import AgentResult
 
-    cfg = config if config is not None else get_config()
+    cfg = _resolve_config(config)
     started = time.perf_counter()
     scope_resolution = resolve_stock_scope(task, context)
     effective_context = dict(scope_resolution.effective_context or {})
