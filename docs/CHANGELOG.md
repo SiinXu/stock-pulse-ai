@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).
 - [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
+- [Added] Default-off CoinGecko market-data path for allowlisted `crypto:` identities, with UTC daily bars, 24×7 context, safe outbound requests, and an optional crypto specialist (Refs #236 and #195).
+- [Added] Portfolio stress-test service and read-only `/api/v1/portfolio/stress-test` endpoints with response-base valuation, strict bounded market/sector/FX/rate shocks, reproducible price/FX/scenario provenance, honest partial/unavailable states, and an atomic bounded YAML catalog (issues #158 and #210; historical replay remaining).
+- [Fixed] Bound portfolio stress snapshots to 512 rows, preserve two-stage FX provenance without fabricated dates, reconcile known and unknown excluded values, and warm configured scenario catalogs atomically.
 - [Added] Wire range-aware local-first daily data into `DataFetcherManager` with fail-closed mode validation, bounded schema-v2 persistence, zero-provider `local_only` misses, `auto` stale-if-error, and `refresh` persistence (refs #178, #218, and #159 data scope).
 - [Fixed] Preserve local-only boundaries across batch prefetch, stock-name lookup, scheduled execution, asynchronous task errors, adjustment-aware persistence, legacy overlap ordering, provider health, and analysis OpenAPI responses.
 - [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).
@@ -53,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Settings scheduler card shows next run with timezone, honest process-mode/deployment copy, run-now busy tracking, and last-skipped status (#869).
 - [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
 
+- [Added] Portfolio health stored GET and explicit refresh API with deterministic five-dimension scoring, coverage-gated comparable bands, strict finite configuration, migration-owned atomic persistence, provenance, and rule-based insights (refs #151).
 - [Added] Revisioned watchlist groups with pre-mutation CAS write leases, version-fenced STOCK_LIST reconciliation, failure-aware accessible controls, mobile non-drag controls, and typed score/focus projections (#189).
 - [Added] Report version comparison foundation with stable history-ID selection, paginated pickers, strict typed deltas, configuration-provenance states, graded field differences, and operation-owned recovery (#188 / T18).
 - [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).

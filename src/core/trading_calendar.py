@@ -142,6 +142,9 @@ def get_market_for_stock(code: str) -> Optional[str]:
         return None
     code = (code or "").strip().upper()
 
+    if code.startswith("CRYPTO:") and len(code) > len("CRYPTO:"):
+        return "crypto"
+
     from data_provider import is_us_stock_code, is_us_index_code, is_hk_stock_code
 
     if is_us_stock_code(code) or is_us_index_code(code):
@@ -159,6 +162,8 @@ def get_market_for_stock(code: str) -> Optional[str]:
 
 def classify_market_session(market: str, check_date: date) -> MarketSessionStatus:
     """Classify one market date without collapsing lookup failures into open."""
+    if market == "crypto":
+        return MarketSessionStatus.OPEN
     if not _XCALS_AVAILABLE or market not in MARKET_EXCHANGE:
         return MarketSessionStatus.UNKNOWN
     try:
@@ -205,7 +210,7 @@ def get_market_now(
     If current_time is naive, treat it as already expressed in the market timezone.
     Unknown markets fall back to the given datetime (or local system time).
     """
-    tz_name = MARKET_TIMEZONE.get(market or "")
+    tz_name = "UTC" if market == "crypto" else MARKET_TIMEZONE.get(market or "")
 
     if current_time is None:
         if tz_name:
@@ -236,6 +241,9 @@ def get_effective_trading_date(
     market_now = get_market_now(market, current_time=current_time)
     fallback_date = market_now.date()
 
+    if market == "crypto":
+        return fallback_date
+
     if not _XCALS_AVAILABLE:
         return fallback_date
 
@@ -264,7 +272,7 @@ def get_effective_trading_date(
             return session.date()
 
         return cal.previous_session(session).date()
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - Calendar lookup failures are logged before natural-date fallback.
         log_safe_exception(
             logger,
             "Effective trading date lookup failed open",
@@ -326,6 +334,8 @@ def infer_market_phase(
     ``closing_auction`` uses a small per-market near-close heuristic window and
     does not model full exchange auction microstructure.
     """
+    if market == "crypto":
+        return MarketPhase.INTRADAY
     if market not in MARKET_EXCHANGE or market not in MARKET_TIMEZONE:
         return MarketPhase.UNKNOWN
     if not _XCALS_AVAILABLE:
@@ -378,7 +388,7 @@ def infer_market_phase(
         if market_now < closing_window_start:
             return MarketPhase.INTRADAY
         return MarketPhase.CLOSING_AUCTION
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - Phase lookup failures are logged before returning unknown.
         log_safe_exception(
             logger,
             "Market phase inference failed closed",
@@ -521,7 +531,9 @@ def build_market_phase_context(
     market_now = get_market_now(market, current_time=current_time)
     warnings: List[str] = []
 
-    if market not in MARKET_EXCHANGE or market not in MARKET_TIMEZONE:
+    if market == "crypto":
+        phase = MarketPhase.INTRADAY
+    elif market not in MARKET_EXCHANGE or market not in MARKET_TIMEZONE:
         phase = MarketPhase.UNKNOWN
         _add_warning_code(warnings, "unknown_market")
     else:
@@ -542,6 +554,10 @@ def build_market_phase_context(
         current_time=current_time,
     )
     is_trading_day, is_market_open_now, is_partial_bar = _phase_booleans(phase)
+    if market == "crypto":
+        is_trading_day = True
+        is_market_open_now = True
+        is_partial_bar = True
     minutes_to_open, minutes_to_close, minutes_calendar_error = _phase_minutes(
         market,
         market_now,
