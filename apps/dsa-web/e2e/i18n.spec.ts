@@ -93,6 +93,8 @@ async function assertLocalizedStockListField(
 ) {
   await page.goto(buildSettingsHref({ section: 'overview', view: 'readiness' }));
   await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  // Settings is a large lazy chunk; wait for the field control before asserting labels.
+  await expect(page.getByTestId('settings-field-STOCK_LIST')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByLabel(STOCK_LIST_FIELD_LABELS[language], { exact: true })).toBeVisible();
   await expect(page.getByLabel('Stock List', { exact: true })).toHaveCount(0);
 }
@@ -118,7 +120,7 @@ test.describe('complete UI i18n acceptance', () => {
     await page.goBack();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en'); // 8
     await page.goForward();
-    await expect(page.getByText(UI_TEXT.en['chat.title'], { exact: true }).first()).toBeVisible(); // 9
+    await expect(page.getByText(UI_TEXT.en['chat.title'], { exact: true }).first()).toBeVisible({ timeout: 30_000 }); // 9
 
     await page.setViewportSize({ width: 390, height: 844 });
     const openNavigation = page.getByRole('button', { name: /Open navigation|Menu/i });
@@ -201,22 +203,24 @@ test.describe('complete UI i18n acceptance', () => {
     const routes = [
       { path: APP_ROUTE_PATHS.home, text: UI_TEXT.en['home.todayFocus'], title: UI_TEXT.en['home.pageTitle'] },
       { path: APP_ROUTE_PATHS.agent, text: UI_TEXT.en['chat.title'], title: UI_TEXT.en['chat.pageTitle'] },
-      { path: APP_ROUTE_PATHS.research, text: UI_TEXT.en['layout.nav.research'], title: UI_TEXT.en['researchOverview.documentTitle'] },
-      { path: APP_ROUTE_PATHS.researchMarket, text: UI_TEXT.en['home.marketReview'], title: UI_TEXT.en['home.marketReviewPageTitle'] },
+      { path: APP_ROUTE_PATHS.research, text: UI_TEXT.en['researchOverview.description'], title: UI_TEXT.en['researchOverview.documentTitle'] },
+      { path: APP_ROUTE_PATHS.researchMarket, text: UI_TEXT.en['home.marketReviewHistoryTitle'], title: UI_TEXT.en['home.marketReviewPageTitle'] },
       { path: APP_ROUTE_PATHS.researchDiscover, text: SCREENING_TEXT.en.title, title: SCREENING_TEXT.en.documentTitle },
       { path: APP_ROUTE_PATHS.researchAnalysis, text: UI_TEXT.en['analysisWorkbench.title'], title: UI_TEXT.en['analysisWorkbench.documentTitle'] },
       { path: APP_ROUTE_PATHS.portfolio, text: PORTFOLIO_TEXT.en.title, title: PORTFOLIO_TEXT.en.documentTitle },
       { path: APP_ROUTE_PATHS.signals, text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
       { path: APP_ROUTE_PATHS.researchBacktest, text: BACKTEST_TEXT.en.runBacktest, title: BACKTEST_TEXT.en.documentTitle },
-      { path: usageSettingsHref, text: UI_TEXT.en['usage.title'], title: UI_TEXT.en['usage.title'] },
-      { path: APP_ROUTE_PATHS.settings, text: UI_TEXT.en['settings.pageTitle'], title: UI_TEXT.en['settings.pageTitle'] },
+      { path: usageSettingsHref, text: UI_TEXT.en['usage.title'], title: UI_TEXT.en['usage.documentTitle'] },
+      { path: APP_ROUTE_PATHS.settings, text: UI_TEXT.en['settings.pageTitle'], title: UI_TEXT.en['settings.pageTitleDocument'] },
       { path: '/missing-i18n-route', text: UI_TEXT.en['notFound.title'], title: UI_TEXT.en['notFound.pageTitle'] },
     ];
 
     for (const route of routes) {
       await page.goto(route.path);
-      await expect(page.getByText(route.text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-      await expect(page).toHaveTitle(new RegExp(route.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+      // Scope to main so sidebar/nav chrome cannot satisfy the page-content assertion
+      // before the lazy route finishes mounting and setting document.title.
+      await expect(page.locator('main').getByText(route.text, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+      await expect(page).toHaveTitle(new RegExp(route.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), { timeout: 15_000 });
     }
     expect(routes).toHaveLength(12); // 16-27
   });

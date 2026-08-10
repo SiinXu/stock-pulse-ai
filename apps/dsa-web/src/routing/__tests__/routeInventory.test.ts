@@ -20,6 +20,7 @@ const CANONICAL_SHELL_ROUTES = [
   APP_ROUTE_PATHS.researchDiscover,
   APP_ROUTE_PATHS.researchAnalysis,
   APP_ROUTE_PATHS.researchBacktest,
+  APP_ROUTE_PATHS.calculators,
   APP_ROUTE_PATHS.researchSkillOutcomes,
   APP_ROUTE_PATHS.settings,
 ] as const;
