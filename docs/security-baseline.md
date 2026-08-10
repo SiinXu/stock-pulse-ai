@@ -75,7 +75,22 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 7. Confirm browser security headers (CSP, nosniff, frame deny, referrer) are present on the FastAPI origin; reverse proxies may tighten further but should not strip them unintentionally. See [Browser response headers (CSP)](#browser-response-headers-csp).
 8. Assume a single shared admin: anyone with the password or a stolen session cookie is the administrator.
 
-### 5. Related documents
+### 5. Optional MCP server surface
+
+| Fact | Meaning |
+| --- | --- |
+| Safe default | `MCP_SERVER_ENABLED` is **false**; the main API/Web process does **not** start MCP |
+| How to enable | Explicit operator process: `MCP_SERVER_ENABLED=true python -m src.mcp_server` |
+| Protocol | Official Python SDK `mcp==2.0.0`; stdio and standard Streamable HTTP with SDK-owned lifecycle/version/session behavior |
+| Auth model | HTTP requires administrator auth plus one SHA-256-pinned Bearer session; stdio uses an explicit local principal. Both require per-tool scopes |
+| Bind/origin policy | HTTP defaults to `127.0.0.1`; trusted Host and Origin are enforced before dispatch and public bind still uses `src/security/http_bind.py` |
+| Capability scope | Scope-filtered read-only tools plus async-only `trigger_analysis`; **configuration, secrets, auth/audit admin, plugins, watchlist mutation, and portfolio writes are not MCP tools** |
+| Abuse/audit boundary | Per-principal/tool rate and concurrency/cost bounds; durable `SecurityAuditService` is fail-closed for discovery/calls/auth |
+| Trust model | Still the single-administrator deployment model (`AUTH-05`); MCP is not multi-tenant isolation |
+
+Full inventory, client headers, and rollback: [MCP server integration (EN)](mcp-server-integration_EN.md) / [MCP server integration (ZH)](mcp-server-integration.md).
+
+### 6. Related documents
 
 | Topic | Document |
 | --- | --- |
@@ -85,6 +100,7 @@ Plugins can reach environment variables, secrets, databases, filesystem paths, a
 | Browser response headers (CSP) | [Browser response headers](#browser-response-headers-csp) |
 | Durable audit Phase 1 | [Security audit](security-audit.md) |
 | Sensitive log/export redaction | [Sensitive-data redaction](security-sensitive-data-redaction.md) |
+| Optional MCP server adapter | [mcp-server-integration_EN.md](mcp-server-integration_EN.md), [mcp-server-integration.md](mcp-server-integration.md) |
 | Deploy bind notes | [DEPLOY.md](DEPLOY.md), [DEPLOY_EN.md](DEPLOY_EN.md) |
 
 ## Threat Model
