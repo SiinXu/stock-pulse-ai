@@ -1136,16 +1136,27 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
-    usage: '开启后，full/specialist 模式中的风险 Agent 可将买入建议降级为观望或卖出。该保守覆写仍会自动生效，除非人工审批（/approvals）捕获了对应路径。',
+    usage: '控制 legacy 风险计划是否直接执行下调；不可关闭的 Risk Manager 最终动作仍会按 RISK_GATE_PROFILE 独立裁决。',
     valueNotes: [
-      '仅在 AGENT_ORCHESTRATOR_MODE 包含风险阶段时生效。',
+      '仅控制 legacy override；不能跳过最终动作裁决。',
       'HITL 风控绕过在 /approvals 默认关闭；在该页启用后，才可在限时窗口内一次性申请保留原始信号。',
     ],
     impact: ['影响最终投资建议的风险保守程度。'],
     notes: [
-      '关闭后风险 Agent 的意见仅作参考，不会否决决策。',
+      '关闭后 legacy override 不直接执行，但明确风险证据仍可能被最终动作裁决下调或拒绝。',
       '打开人工审批（/approvals）可配置默认关闭的 HITL 门禁。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: '风控经理档位',
+    summary: '选择最终建议发布前强制风控裁决的阈值档位。',
+    usage: 'balanced 为默认值；conservative 更早拒绝或下调，aggressive 仅在明确阻断证据下收紧。',
+    valueNotes: [
+      '支持 conservative、balanced、aggressive；非法值会阻止启动。',
+      '该闸门不可关闭；内部异常按 fail-closed 处理。',
+    ],
+    impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
+    notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
