@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
 - [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
 - [Added] Model Access hub surfaces local model runtime and local CLI detection status (available/unavailable/not configured, last checked, honest probe failures) alongside cloud connections (Refs #865).
 - [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
