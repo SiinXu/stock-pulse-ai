@@ -111,6 +111,18 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 >
 > The default `00-daily-analysis.yml` in this repository only exports fixed Secret / Variable names. Arbitrary numbered env vars such as `STOCK_GROUP_1` and `EMAIL_GROUP_1` are not auto-injected into the job, so grouped email routing is not available in the stock workflow unless you explicitly extend the workflow's `env:` mapping in your own fork. Actions now maps `CUSTOM_WEBHOOK_BODY_TEMPLATE`, `WEBHOOK_VERIFY_SSL`, `FEISHU_WEBHOOK_SECRET`, `FEISHU_WEBHOOK_KEYWORD`, `PUSHPLUS_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `GOTIFY_URL`, `GOTIFY_TOKEN`, the P3 notification route keys, and the P4 notification noise-control keys; `MARKDOWN_TO_IMAGE_CHANNELS` and `MERGE_EMAIL_NOTIFICATION` remain behavior toggles outside the default workflow mapping.
 
+#### Daily run summary and short failure notification (Issue #850)
+
+After each Daily Analysis job, the workflow always writes a plain-language bilingual **Step Summary** (Chinese primary, English secondary) from structured `data/run_status.json` when present, with exit code / job status / env readiness / log-keyword fallbacks.
+
+| Setting | Description |
+|---------|-------------|
+| `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | Optional route for a **one-line** failure IM (no secret values, no full traceback). Empty → Step Summary only under the default policy |
+| `FAILURE_NOTIFY_ENABLED` | Optional override: default enables notify when system-error channels are set; `false` forces Summary-only; `true` forces a notify attempt |
+| Success-path report push | **Unchanged** — still uses existing report routing |
+
+Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_watchlist`, `non_trading_day`, `data_source`, `timeout`, `quota`, `provider_down`, `unknown`.
+
 #### Push Behavior Configuration
 
 | Secret Name | Description | Required |
@@ -157,6 +169,8 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search (structured search results) | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `RSS_NEWS_FEED_URLS` | Optional RSS/Atom feed URLs (comma-separated) as a free on-demand news search supplement; empty keeps the feature inert. See Search Service Configuration and [Outbound HTTP Security Policy](security-outbound-policy.md) | Optional |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | Per-feed timeout seconds for on-demand RSS/Atom search (default 8) | Optional |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) token | Optional |
 | `TUSHARE_HTTP_URL` | Tushare Pro API endpoint (default `http://api.tushare.pro`), configurable in Web Settings or `.env`, for self-hosted nodes, proxies, or internal mirrors. Leaving it empty keeps default behavior; private/internal hosts must also be added to `OUTBOUND_HTTP_ALLOWLIST`, see [docs/security-outbound-policy.md](./security-outbound-policy.md). | Optional |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key for optional A-share daily K-lines, realtime quotes, stock list/name lookup, and CN market review enhancement; permission or entitlement failures fall back to existing providers | Optional |
@@ -323,8 +337,12 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API endpoint (default `https://api.adanos.org`) | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `RSS_NEWS_FEED_URLS` | Optional comma-separated RSS/Atom feed URLs used as a free **supplement** in the on-demand news search pipeline (not a replacement for SearXNG or paid search, and distinct from the local intelligence pool `NEWS_INTEL_*`). Empty keeps the feature inert. Feed fetching uses the fail-closed outbound policy; public feeds need no allowlist entry, while private/loopback hosts require an exact `OUTBOUND_HTTP_ALLOWLIST` entry. See [Outbound HTTP Security Policy](security-outbound-policy.md) | Optional |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | Per-feed timeout in seconds for on-demand RSS/Atom news search (1–30; default `8`). Independent of `NEWS_INTEL_FETCH_TIMEOUT_SEC` | Optional |
 
 > Behavior note: Search and social sentiment are optional enhancement services. If either service fails to initialize, the system logs a warning and degrades gracefully by skipping that stage without blocking the core analysis flow.
+
+> RSS/Atom note: Feed entries join the same dedup, freshness filter, relevance ranking, and run-diagnostics path as other search providers. Per-feed failure is logged and recorded in diagnostics without aborting the search run. Source attribution is preserved on each result's `source` field for reports.
 
 > Foreign-stock English news: mapped U.S./Hong Kong forms such as `AAPL.US`, `HK00700`, and `00700.HK` are canonicalized before search. Even when the display name is Chinese, news, event/comprehensive-intelligence queries, and relevance scoring use the shared English company aliases. Unmapped tickers retain the existing fallback behavior.
 
@@ -345,6 +363,11 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `ENABLE_CHIP_DISTRIBUTION` | Enable chip distribution analysis (this API is unstable, recommended to disable for cloud deployment). GitHub Actions users must set `ENABLE_CHIP_DISTRIBUTION=true` in Repository Variables to enable; disabled by default in workflows. | `true` | Optional |
 | `ENABLE_EASTMONEY_PATCH` | Eastmoney API patch: Recommended to set to `true` when Eastmoney APIs fail frequently (e.g., RemoteDisconnected, connection closed). Injects NID tokens and random User-Agents to reduce rate limiting probability. | `false` | Optional |
 | `REALTIME_SOURCE_PRIORITY` | Real-time quote source priority (comma-separated), e.g., `tencent,akshare_sina,efinance,akshare_em`; add `tickflow` explicitly to use TickFlow realtime quotes | See .env.example | Optional |
+| `DATA_VALIDATION_ENABLED` | Enable the unified numeric contract for daily, realtime, fundamental, and selected technical fields, with versioned diagnostic evidence. | `true` | Optional |
+| `DATA_VALIDATION_STRICT` | Reject invalid provider candidates before acceptance/cache so the existing bounded fallback loop can try the next source. | `false` | Optional |
+| `DATA_VALIDATION_STRICT_SCOPES` | Comma-separated `market/instrument` strict-mode selectors such as `cn/equity,hk/etf,us/index`; `*` is a wildcard. | `*/*` | Optional |
+| `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | Authoritative comma-separated `SYMBOL=instrument` identities for offshore symbols whose ETF/index type cannot be inferred safely from code alone. | - | Optional |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | Final aggregated-fundamental policy: `warn` preserves data with evidence; `reject` raises explicitly and is not provider failover. | `warn` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |
@@ -364,6 +387,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 >   - `fundamental_context.belong_boards` = related board list for the stock; A-shares are sourced from AkShare board membership, US/HK from yfinance `info.sector`/`info.industry`, `[]` when unavailable;
 >   - `fundamental_context.boards.data` = `sector_rankings` (sector rise/fall leaderboard, structure `{top, bottom}`; not provided for US/HK today);
 >   - `fundamental_context.concept_boards.data` = `concept_rankings` (concept/theme rise/fall leaderboard, structure `{top, bottom}`; currently A-share only and omitted or empty on fail-open);
+>   - `fundamental_context.earnings.data.financial_report` = statement summary (report period, revenue, parent net profit, operating cash flow, ROE, `currency`; A-shares default `CNY`, HK/US from `info.financialCurrency`). From issue #235, **additive** fields (legacy keys unchanged): `periods` (multi-period history, newest first), `statements` (income/balance/cash-flow coverage), `metrics` (derived values with `formula`/`basis`; missing stays `null`, never silent zero), `sufficiency` (`rich`/`partial`/`insufficient` + explicit message), `data_recency` (report period is not real-time). Reports and prompts must say “insufficient fundamentals” when empty — never invent zeros;
 >   - `fundamental_context.earnings.data.financial_report.currency` = financial statement currency (`info.financialCurrency`; HK ADRs commonly report CNY here);
 >   - `fundamental_context.earnings.data.dividend.currency` = trading / dividend currency (`info.currency`; HK ADRs use HKD here even when the statement currency is CNY). The renderer reads each block's own currency rather than assuming a single global currency;
 >   - `fundamental_context.earnings.data.dividend.ttm_dividend_yield_pct` = `ttm_cash_dividend_per_share / latest_price * 100`, both sides in the trading currency. Falls back to `info.trailingAnnualDividendYield` (decimal) or `info.dividendYield` (already-percent passthrough) only when TTM cash or latest price is unavailable;
@@ -384,6 +408,10 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 |--------|------|--------|
 | `STOCK_LIST` | Watchlist codes (comma-separated) | - |
 | `ADMIN_AUTH_ENABLED` | Set to `true` to protect the Web UI with an administrator password. Disabling active authentication requires the current password again; a valid session cookie is not sufficient. Generic system-configuration saves and `.env` imports may preserve the current value but cannot toggle it; use the dedicated authentication settings endpoint. Configuration keys must use canonical environment-variable syntax: `[A-Za-z_][A-Za-z0-9_]*`. | `false` |
+| `USE_PROXY` | Enable local proxy (maps `PROXY_HOST`/`PROXY_PORT` to process `http_proxy`/`https_proxy`); editable in Web Settings → System & Security → Web & Logs; skipped on GitHub Actions; full effect usually requires restart | `false` |
+| `PROXY_HOST` | Proxy host (may embed credentials; masked in Settings); only used when `USE_PROXY=true` | `127.0.0.1` |
+| `PROXY_PORT` | Proxy port; only used when `USE_PROXY=true` | `10809` |
+| `HTTP_PROXY` | Standard HTTP proxy URL; prefer over `USE_PROXY` when a full URL/credentials are needed | empty |
 | `MAX_WORKERS` | Concurrent threads | `3` |
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | Inject the daily market context into stock-analysis prompts and soften aggressive buy advice in high-risk/risk-off markets; enabled by default, and market review can still run when this is set to `false` | `true` |
@@ -393,6 +421,10 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
+| `DAILY_BRIEF_ENABLED` | Opt-in daily brief with historical accuracy review (decision-signal outcomes, backtest summary, skill-opinion performance). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
+| `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
+| `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |
+| `DAILY_BRIEF_MIN_SAMPLES` | Minimum completed samples before publishing an accuracy percentage; below this the brief states insufficient history | `10` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | Initial cash seeded (as a cash-in ledger entry) when a paper portfolio is created; simulated fills use the latest available close at the trade date, fees/slippage are ignored in the MVP, and buys are validated against available cash | `1000000` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), jp (JP stocks), kr (KR stocks), both (all five markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
@@ -712,7 +744,9 @@ python main.py --workers 5            # Specify concurrency
 
 When selected, the live scope overrides both `--stocks` and `STOCK_LIST`. A successfully read empty portfolio remains an empty list and never falls back to the static watchlist. Account discovery, position queries, security classification, and code-conversion failures fail the run explicitly instead of analyzing a partial untrusted scope. Scheduled mode queries OpenD on every actual execution rather than caching startup holdings. Existing behavior is unchanged when `--portfolio` is omitted.
 
-The endpoint defaults to `127.0.0.1:11111` and can be changed with `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT`. `FUTU_ACC_ID` selects one eligible live account; when empty, all eligible accounts are merged. `FUTU_SECURITY_FIRM=NONE` uses SDK auto-detection. Inside Docker, `127.0.0.1` refers to the container itself, so configure a trusted OpenD host reachable from the container network. The integration only calls account-list, position-list, and security-basic-information queries; it never unlocks trading or places, modifies, or cancels orders. This first phase does not write live positions into portfolio management.
+The endpoint defaults to `127.0.0.1:11111` and can be changed with `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT`. `FUTU_ACC_ID` selects one eligible live account; when empty, all eligible accounts are merged. `FUTU_SECURITY_FIRM=NONE` uses SDK auto-detection. Inside Docker, `127.0.0.1` refers to the container itself, so configure a trusted OpenD host reachable from the container network. The integration only calls account-list, position-list, and security-basic-information queries; it never unlocks trading or places, modifies, or cancels orders.
+
+Live positions can also be imported into portfolio management through `POST /api/v1/portfolio/imports/futu` (preview: `/imports/futu/preview`), which maps eligible long stocks to synthetic buys on the shared trade-import path. See [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md).
 
 ---
 
@@ -837,6 +871,7 @@ P3 itself did not add API/Web/Bot parameters, persist fields into history/task s
 ### Multi-Agent Decision Disagreement Summary Input (Issue #1904 P1 Plumbing)
 
 Before `DecisionAgent` runs, the multi-agent pipeline builds an internal low-sensitivity `agent_disagreement_summary` that summarizes directional disagreement across prior Agent opinions, risk-override evidence, whether risk override is enabled by the current `AGENT_RISK_OVERRIDE` setting, and non-critical stage degradation. The summary only contains agent name, signal, confidence, conflict type, decision path hint, low-sensitivity risk-control state, and degraded-stage markers. It does not include reasoning, raw data, raw error text, tokens, or private payloads.
+- `AGENT_MULTI_STRATEGY_DELIBERATION=false` — multi-strategy deliberation cluster (default off).
 
 This is currently only internal Prompt input plumbing for `DecisionAgent`: the summary is stored in runtime `ctx.meta`, is not injected through Agent pre-fetched data, and does not add public API fields, Web/Desktop display, history/task-status/report metadata, dashboard schema, or final explanation fields. `risk_level=high` is risk evidence only and does not trigger override by itself; the summary and final `_apply_risk_override()` share the same override predicate and respect `AGENT_RISK_OVERRIDE=false`. Non-critical degraded stages reuse the orchestrator contract for `intel`, `risk`, and specialist/skill agents, so a remaining single directional opinion is not described as multi-agent consensus. User-visible final explanation output for #1904 remains a later phase.
 
@@ -891,6 +926,27 @@ Signal attribution analysis is rendered in all report paths:
 - `generate_single_stock_report()` (single-stock push report)
 - `templates/report_markdown.j2` (Jinja2 template)
 - `HistoryService._generate_single_stock_markdown()` (Web history drawer)
+
+### Report Decision Card Front-Load (Issue #861 Phase 1)
+
+Phase 1 is presentation-only: each per-stock Jinja report section starts with a Decision Card assembled from **existing** fields (direction/score, one-line conclusion, confidence, key risks, watch/invalidation conditions, stop-loss / take-profit).
+
+| Template | Behavior |
+| --- | --- |
+| `templates/report_markdown.j2` | Full Decision Card immediately under each stock `##` heading; existing sections (Key Updates / Core Conclusion / Phase Guardrail / Battle Plan, etc.) move down but are not removed. |
+| `templates/report_wechat.j2` | Compact Decision Card (~4–5 lines) is the first content inside each stock block; original compact follow-up lines remain. |
+| `templates/report_brief.j2` | Uses the brief-specific length budget form (`decision_card(..., compact='brief')`): **1 primary line + at most 1 supplementary line per stock**. The primary line keeps parity with the origin/main one-liner (signal emoji/text, score, one-sentence conclusion) and marks 🃏; the supplementary line packs at most one risk and one watch condition (hard truncation). It does not emit the 5-line wechat compact card, and does not repeat stop/take levels on brief (those stay on wechat/markdown). |
+| Shared macro | `decision_card` in `templates/_macros.j2`; `compact=false` full card, `compact=true` push compact card, `compact='brief'` budgeted push form; missing fields are omitted (no empty card rows). |
+
+**Brief length budget and size impact** (vs the unbudgeted 5-line compact card):
+- Contract basis: `ReportType.BRIEF` (3–5 sentences, mobile/push) and Pushover `max_length = 1024` (overflow splits on `\n\n`).
+- Goal: a typical 10-stock brief fits in one Pushover message after `markdown_to_plain_text`; regression tests lock ≤2 lines per stock and plain total ≤1024 with a ≥10-stock fixture.
+- WeCom markdown defaults to ~4000 bytes: wechat keeps the full compact card as first screen, so a normal 5–10 stock watchlist may use one extra chunk vs pre-card — an intentional trade-off documented with byte/chunk evidence in the PR.
+
+Boundary and compatibility:
+- Does not change extractors, prompts, schemas, or the notification send chain — templates only.
+- Affects only the Jinja path when `REPORT_RENDERER_ENABLED=true`; the hard-coded fallback in `src/notification_parts/rendering.py` remains the default when disabled.
+- Notification chunking still keys off stock heading blocks (`###` / `---`). Markdown uses `### 🃏`; wechat uses multi-line compact blocks; brief uses the budgeted lines. Data contracts are unchanged.
 
 Normalization functions are explicitly called in `_parse_response()` and `parse_dashboard_json()` to ensure:
 - String percentages are converted to int (e.g., `"35%"` → `35`)
@@ -1345,7 +1401,7 @@ New API endpoints:
 - `GET /api/v1/decision-signals`: paginated query with `market`, `stock_code`, `action`, `market_phase`, `decision_profile`, `source_type`, `source_report_id`, `trace_id`, `trigger_source`, `status`, time ranges, `holding_only`, and `account_id`. Omitting or passing an empty `decision_profile` applies no profile condition and returns all profiles; `decision_profile=unknown` queries legacy `NULL` rows; valid profile values match exactly.
 - `POST /api/v1/decision-signals/outcomes/run`: explicitly trigger signal-level outcome evaluation; by default it skips completed and terminal unable rows, recomputes recoverable unable rows, and `force=true` recomputes and overwrites the current key.
 - `GET /api/v1/decision-signals/outcomes`: paginated query for signal outcome rows.
-- `GET /api/v1/decision-signals/outcomes/stats`: aggregate current outcome-engine stats; by default it excludes archived signals.
+- `GET /api/v1/decision-signals/outcomes/stats`: aggregate current outcome-engine stats; by default it excludes archived signals. With `DECISION_PROFILE_CALIBRATION_ENABLED`, the response may include `profile_calibration` (legacy servers without the new field keep the original stats card).
 - `GET /api/v1/decision-signals/{signal_id}/outcomes`: list the selected signal's outcome rows for the current outcome engine.
 - `GET /api/v1/decision-signals/{signal_id}/feedback`: fetch the selected signal's user feedback; missing feedback returns `feedback_value=null`.
 - `PUT /api/v1/decision-signals/{signal_id}/feedback`: upsert the selected signal's latest `useful|not_useful` feedback.
@@ -1365,7 +1421,7 @@ These endpoints inherit the existing `/api/v1/*` admin authentication middleware
 
 P5 outcome evaluation supports only daily-bar-verifiable `1d/3d/5d/10d`. The window means the next 1/3/5/10 `StockDaily` bars after the anchor, not the natural-day expiration semantics from `DecisionSignalService._horizon_days()`. `anchor_date` first reads `metadata.market_phase_summary.session_date`, then falls back to `created_at.date()`; the exact anchor date must have `StockDaily.close`, with no previous-trading-day fallback. Action mapping is `buy/add -> up`, `hold -> not_down`, and `reduce/sell/avoid -> not_up`. `watch/alert`, `intraday/swing/long`, missing anchor price, and insufficient forward bars persist `eval_status=unable` with an explicit `unable_reason`. Missing/invalid anchor price, insufficient forward bars, and missing/invalid window close are recoverable unable states that default reruns will evaluate again after data arrives; non-directional actions, unsupported horizons, and missing anchor dates are terminal unable states and stay idempotently skipped by default. Automatic extraction may receive runtime `portfolio_context.quantity`; it writes only low-sensitive `holding_state=holding|empty|unknown` into metadata for outcome snapshots, never quantity, account, or cost.
 
-P5 outcome-engine stats now live at `/signals?tab=review`; the details drawer lazily loads outcomes and lets the user submit useful/not useful feedback. The feature does not add a BacktestPage entry or background scheduler: outcome calculation is triggered explicitly through `POST /api/v1/decision-signals/outcomes/run`. Batch runs prioritize missing outcomes first and then retry recoverable unable rows, so completed or terminal-unable newest signals do not keep consuming the `limit`.
+P5 outcome-engine stats now live at `/signals?tab=review`; the details drawer lazily loads outcomes and lets the user submit useful/not useful feedback. The feature does not add a BacktestPage entry or background scheduler: outcome calculation is triggered explicitly through `POST /api/v1/decision-signals/outcomes/run`. Batch runs prioritize missing outcomes first and then retry recoverable unable rows, so completed or terminal-unable newest signals do not keep consuming the `limit`. When `DECISION_PROFILE_CALIBRATION_ENABLED=true`, `GET /api/v1/decision-signals/outcomes/stats` also returns `profile_calibration` (six independent breakdowns, a `completed >= 30` gate per exact bucket, and max adverse excursion from persisted prices only). With the gate off, the field is omitted so legacy stats clients remain compatible. Details are in [decision-signals.md](decision-signals.md).
 
 The portfolio page loads AI signals as a non-blocking enhancement: portfolio snapshots and risk cards render first, then the page calls `GET /api/v1/decision-signals/latest/{stock_code}?market=<market>&limit=1` for each unique holding in the current snapshot to read the latest active signal. It no longer scans the generic `holding_only=true` list endpoint and has no fixed page-count cutoff. If a single latest lookup fails, the page keeps other loaded signals and shows a visible degradation warning; rows without a matching signal show an empty placeholder. Matching reuses the Web stock-code equivalence rules for CN variants such as `600519/SH600519/600519.SH`, HK variants such as `00700/HK00700/00700.HK`, and case-insensitive US tickers.
 
@@ -1454,6 +1510,7 @@ FastAPI provides RESTful API service for configuration management and triggering
 - **Quick Analysis** - When required setup is incomplete and no explicit preference exists, Analysis Workbench defaults to Beginner mode and requests a `brief` report. Configured users keep the Professional default and `detailed` reports.
 - **Beginner / Professional modes** - Beginner mode presents a short conclusion, conservative risk level, next step, and the research disclaimer. "View professional details" restores the full report and history-trend controls. An explicit user selection is stored as a non-sensitive browser `localStorage` preference; logout clears session traces but preserves this UI preference.
 - **Strategy selection** - Analysis Workbench supports explicitly selecting analysis strategy skills; when `skills` is omitted, analysis uses the server default strategy so legacy clients keep existing behavior
+- **Session-level Skill selection** - Ask Stock sessions persist their current Skill selection; refresh and session switching restore each session independently, while new sessions keep the server default
 - **Pending-analysis refresh safety** - Workbench watchlist coverage uses history lookups with explicit timezone-aware date filtering and full pagination; a successful refresh from a newer stock-bar request is required to clear an unknown state, so stale in-flight responses cannot override completion refresh results
 - **First-run Setup Hint** - The Home page reads the read-only setup status and shows a dismissible guided-setup action when required items such as the primary LLM channel or watchlist are missing. Settings automatically opens the existing LLM wizard for this guided entry only when primary LLM setup is actually missing, and the setup card links directly to Data Sources for source configuration.
 - **Real-time Progress** - Analysis task status updates in real-time, supports parallel tasks; the regular stock-analysis path now prefers LiteLLM streaming during the LLM stage and pushes finer-grained `message/progress` updates through task SSE
@@ -1529,6 +1586,11 @@ For this feature, the product behavior is:
 > Issue #1520 compatibility note: The `model`/`model_used` returned here is read-only historical snapshot metadata from each record, used only for trend drawer/history display. It does not alter runtime model/model-provider/base URL resolution, config migration, or cleanup semantics in the analysis path. Rollback is by reverting this commit; history query, API response shapes, and UI drawer consumption remain compatible.
 > Note: history detail, sync analysis responses, and completed task status responses expose a low-sensitivity input data-block overview at `report.details.analysis_context_pack_overview`; sync analysis responses depend on the just-persisted `analysis_history.context_snapshot`, so new records do not guarantee the overview when `SAVE_CONTEXT_SNAPSHOT=false`. `details.context_snapshot` strips that top-level field and does not return the full `AnalysisContextPack` or prompt summary.
 > Note: `POST /api/v1/agent/chat` and `POST /api/v1/agent/chat/stream` use the frontend-provided `context.stock_code` as the active Ask Stock baseline only after server-side stock-scope resolution. When `context.report_language` is missing, the endpoints fall back to global `REPORT_LANGUAGE`; an explicit caller value stays authoritative. Each turn is classified as `maintain`, `switch`, or `compare`: unchanged follow-ups can call stock-scoped tools only for the current stock; explicit switches clear stale stock summaries and prefetched context; comparison prompts such as compare/vs/difference allow the explicitly mentioned codes for that turn without rewriting the current stock. If a model attempts to call a stock tool with financial abbreviations such as TTM, PE, MACD, KDJ, contextual indicator tokens such as `MA` in moving-average prompts, or exchange fragments such as SH/SZ/BJ/HK/SS, the backend returns a non-retriable `stock_scope_violation` tool result instead of executing that stock tool. Tool names are resolved only by exact registry name; provider namespaces or suffixes are not routed to existing tools.
+> Note: `POST /api/v1/backtest/run` accepts `analysis_date_from` / `analysis_date_to` (`YYYY-MM-DD`), `eval_window_days`, `min_age_days`, and `limit` as run configuration. When `analysis_date_from > analysis_date_to`, it returns 400 with code `invalid_analysis_date_range`. Other controlled validation failures use stable codes such as `invalid_stock_code`, `invalid_eval_window_days`, `invalid_min_age_days`, and `invalid_run_limit`.
+> Note: Successful runs echo the effective parameters in `BacktestRunResponse.applied_config` (and keep `applied_eval_window_days` for compatibility). When no new rows are written, `message` carries a readable diagnostic and `diagnostics` returns troubleshooting context (for example `empty_reason`, `engine_version`, `skipped_count`, date range, window, min age, limit).
+> Note: Result rows may include `resolution_notes` markers such as `legacy_analysis_date`, `prior_session_start`, `missing_daily_bars`, and `insufficient_forward_bars`. Insufficient/skipped rows remain queryable so summary integrity (completed vs insufficient) is honest.
+
+> Session Skill state: the top-level `skills` field is tri-state on both Chat requests and is the only authoritative request source for Skill selection. Omitting it or sending `null` inherits the selection saved for that `session_id`; sessions without state use the runtime server default. Sending `[]` clears the explicit selection and preserves the existing general/server-default execution semantics. A non-empty list is cleaned, deduplicated, and saved with the existing Skill catalog rules. Mixed valid and invalid entries keep the valid entries; if every entry is invalid, the normalized empty result is not treated as an explicit `[]`, so the request inherits session state or the runtime default without persisting an empty state. Any legacy `skills` or `strategies` fields left in the analysis-reuse `context` are removed by the server and cannot override the top-level tri-state or session state. The user message and an explicit Skill update are written in one transaction. `GET /api/v1/agent/chat/sessions/{session_id}` returns `session_state.selected_skill_ids` alongside messages: `null` means no state has been persisted, `[]` means the selection was explicitly cleared, and a non-empty list is the saved selection. The Web client restores only persisted selections from this field. For `null`, it may display the server default Skill, but an untouched follow-up still omits `skills` so a legacy session is not silently converted into an explicit-Skill session. Deleting a session also deletes its state.
 > Note: `POST /api/v1/backtest/run` adds `analysis_date_from` / `analysis_date_to` (`YYYY-MM-DD`) to filter candidates by analysis date range. When `analysis_date_from > analysis_date_to`, it returns 400 `invalid_params`.
 > Note: When backtest runs successfully but yields no new persisted rows, `BacktestRunResponse.message` carries a readable diagnostic and `diagnostics` returns troubleshooting context (for example `empty_reason`, `analysis_date_from`, `analysis_date_to`, `eval_window_days`, `min_age_days`, `limit`).
 > Note: `GET /api/v1/backtest/results`, `GET /api/v1/backtest/performance`, and `GET /api/v1/backtest/performance/{code}` all support `analysis_date_from` and `analysis_date_to` consistently. Omitting them keeps historical default behavior.

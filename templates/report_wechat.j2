@@ -1,4 +1,4 @@
-{% from '_macros.j2' import report_strata_section, report_disclaimer_line with context %}
+{% from '_macros.j2' import report_strata_section, report_disclaimer_line, decision_card, valuation_section with context %}
 ## 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ results|length }} {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -20,7 +20,7 @@
 {% set intel = dashboard.get('intelligence') or {} %}
 
 ### {{ e.signal_emoji }} **{{ e.signal_text }}** | {{ e.stock_name }}({{ result.code }})
-
+{{ decision_card(e, compact=true) }}
 {% set one_sentence = core.get('one_sentence', result.analysis_summary) if core else result.analysis_summary %}
 {% if one_sentence %}
 📌 **{{ one_sentence[:80] }}**
@@ -78,6 +78,14 @@
 {% endif %}
 {% endif %}
 
+{% set committee = dashboard.get('committee_deliberation') if dashboard else none %}
+{% if committee and committee.get('members') %}
+🏛 **{{ labels.committee_deliberation_heading }}**
+{% for member in (committee.get('members') or [])[:3] %}
+- {{ member.get('display_name') or member.get('persona_id') }}: {{ localize_strategy_signal(member.get('signal') or 'N/A', report_language) }}{% if member.get('invalid') %} ({{ member.get('invalid_reason') or 'invalid' }}){% endif %}
+{% endfor %}
+{% endif %}
+
 {% set checklist = battle.get('action_checklist', []) if battle else [] %}
 {% set fc = failed_checks(checklist) %}
 {% if fc %}
@@ -86,6 +94,8 @@
    {{ check[:40] }}
 {% endfor %}
 {% endif %}
+
+{{ valuation_section(e.valuation_projection, compact=true) }}
 
 {% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
 {% if strata %}

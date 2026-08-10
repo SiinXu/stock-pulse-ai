@@ -14,6 +14,7 @@ export interface ChatRequest {
 export interface ChatStreamRequest extends ChatRequest {
   session_id?: string;
   context?: unknown;
+  turn_id?: string;
 }
 
 export interface ChatResponse {
@@ -21,6 +22,7 @@ export interface ChatResponse {
   content: string;
   session_id: string;
   error?: string;
+  turn_id?: string;
   agent_runtime?: {
     soul_version: string;
     soul_hash: string;
@@ -53,6 +55,16 @@ export interface ChatSessionMessage {
   created_at: string | null;
   error?: string;
   params?: Record<string, unknown>;
+  turn_id?: string;
+}
+
+export interface ChatSessionDetail {
+  session_id: string;
+  messages: ChatSessionMessage[];
+  turn_identity_supported?: boolean;
+  session_state: {
+    selected_skill_ids: string[] | null;
+  };
 }
 
 export interface ResearchRequest {
@@ -96,11 +108,11 @@ export const agentApi = {
     const response = await apiClient.get<{ sessions: ChatSessionItem[] }>('/api/v1/agent/chat/sessions', { params: { limit } });
     return response.data.sessions;
   },
-  async getChatSessionMessages(sessionId: string): Promise<ChatSessionMessage[]> {
-    const response = await apiClient.get<{ messages: ChatSessionMessage[] }>(
+  async getChatSessionMessages(sessionId: string): Promise<ChatSessionDetail> {
+    const response = await apiClient.get<ChatSessionDetail>(
       `/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`,
     );
-    return response.data.messages;
+    return response.data;
   },
   async deleteChatSession(sessionId: string): Promise<void> {
     await apiClient.delete(`/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`);

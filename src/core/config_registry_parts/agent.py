@@ -314,6 +314,73 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+
+    "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED": {
+        "title": "Skill Opinion Outcome Weights",
+        "description": (
+            "When enabled, conservatively weight strategy-skill opinions from "
+            "sufficient attributable Outcome samples (Beta(15,15) prior, terminal "
+            "unable penalty, evidence-strength averaging, multiplicative bounds "
+            "[1/1.2, 1.2]). Default off keeps the aggregation path byte-identical "
+            "to the prior backtest/memory weighting behavior. Fail-neutral (1.0) "
+            "for missing, insufficient, malformed, or mismatched-version buckets."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 62,
+        "help_key": "settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED",
+        "examples": [
+            "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED=false",
+            "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Skill Opinion Outcome Evaluation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/skill-opinion-outcome-evaluation.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DECISION_PROFILE_CALIBRATION_ENABLED": {
+        "title": "Decision Profile Outcome Calibration",
+        "description": (
+            "When enabled, GET /api/v1/decision-signals/outcomes/stats includes "
+            "profile_calibration breakdowns (profile, action, horizon, market "
+            "phase, data quality, profile source) with a 30-completed-sample "
+            "gate per exact bucket. Default off keeps the stats response "
+            "compatible with pre-calibration clients and does not change "
+            "evaluation or persistence."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 63,
+        "help_key": "settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED",
+        "examples": [
+            "DECISION_PROFILE_CALIBRATION_ENABLED=false",
+            "DECISION_PROFILE_CALIBRATION_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "DecisionSignal documentation",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/decision-signals.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_CRITIC_ENABLED": {
         "title": "Bounded Multi-Agent Critic",
         "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request at most one retry of an already-entered intelligence or catalog-backed skill stage.",
@@ -336,6 +403,42 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "完整指南：Agent 配置",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_INVESTMENT_COMMITTEE_MODE": {
+        "title": "Investment Committee Mode",
+        "description": (
+            "Default-off preset that activates curated investment-persona Skills "
+            "through the existing multi-agent specialist path and StrategyEngine "
+            "synthesis. Does not replace Single/Multi analysis when disabled. "
+            "Expect higher token cost when enabled. Requires AGENT_ARCH=multi and "
+            "AGENT_ORCHESTRATOR_MODE=specialist for persona specialists to run."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 64,
+        "help_key": "settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE",
+        "examples": [
+            "AGENT_INVESTMENT_COMMITTEE_MODE=false",
+            "AGENT_INVESTMENT_COMMITTEE_MODE=true",
+        ],
+        "docs": [
+            {
+                "label": "Investment Committee Mode",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investment-committee-mode_EN.md",
+            },
+            {
+                "label": "投资委员会模式",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investment-committee-mode.md",
             },
         ],
         "warning_codes": [],
@@ -366,6 +469,62 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "RISK_GATE_PROFILE": {
+        "title": "Risk Manager Profile",
+        "description": "Select the mandatory final-action risk thresholds. The gate cannot be disabled and failures fail closed.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "balanced",
+        "options": [
+            {"label": "Conservative", "value": "conservative"},
+            {"label": "Balanced", "value": "balanced"},
+            {"label": "Aggressive", "value": "aggressive"},
+        ],
+        "validation": {
+            "enum": ["conservative", "balanced", "aggressive"],
+        },
+        "display_order": 63,
+        "help_key": "settings.agent.RISK_GATE_PROFILE",
+        "examples": [
+            "RISK_GATE_PROFILE=conservative",
+            "RISK_GATE_PROFILE=balanced",
+            "RISK_GATE_PROFILE=aggressive",
+        ],
+        "docs": [
+            {
+                "label": "Risk Manager gate",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/risk-manager-gate_EN.md",
+            },
+            {
+                "label": "风控经理闸门",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/risk-manager-gate.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_MULTI_STRATEGY_DELIBERATION": {
+        "title": "Multi-Strategy Deliberation",
+        "description": "Enable multi-strategy deliberation, concurrent specialist scheduling, and final disagreement explanation. Default off preserves Phase-1 synthesis byte-for-byte.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 64,
+        "help_key": "settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION",
+        "examples": ["AGENT_MULTI_STRATEGY_DELIBERATION=false", "AGENT_MULTI_STRATEGY_DELIBERATION=true"],
+        "docs": [{"label": "Multi-strategy contract", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md"}],
+        "warning_codes": [],
+    },
+
     "AGENT_DEEP_RESEARCH_BUDGET": {
         "title": "Deep Research Token Budget",
         "description": "Maximum token budget for Deep Research planning, follow-up research, and final synthesis.",
@@ -414,6 +573,37 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "完整指南：Agent 配置",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_EVENT_IMPACT_CONTEXT_ENABLED": {
+        "title": "Alert Impact Context",
+        "description": (
+            "When enabled, triggered alert notifications include a managed-data impact "
+            "context block: what happened, why it matters, and whether the symbol is on "
+            "the watchlist or in portfolio holdings. Uses intelligence items, portfolio "
+            "snapshots without realtime refresh, and recent analysis history only."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 72,
+        "help_key": "settings.agent.event_impact_context",
+        "examples": [
+            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=true",
+            "AGENT_EVENT_IMPACT_CONTEXT_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
             },
         ],
         "warning_codes": [],
@@ -624,6 +814,65 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+
+    "AGENT_OBSERVABILITY_ENABLED": {
+        "title": "Agent Observability Events",
+        "description": (
+            "Emit lightweight structured agent run events (phase/tool/model/decision) "
+            "with trace and span ids into run diagnostics and the run-flow view. Default on."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 705,
+        "help_key": "settings.agent.observability",
+        "examples": [
+            "AGENT_OBSERVABILITY_ENABLED=true",
+            "AGENT_OBSERVABILITY_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Agent Observability",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_OBSERVABILITY_DEEP_PAYLOAD": {
+        "title": "Agent Observability Deep Payload",
+        "description": (
+            "When enabled, capture sanitized tool argument/result previews on agent events. "
+            "Default off. Prompts, API keys, and other secrets remain redacted."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 706,
+        "help_key": "settings.agent.observability",
+        "examples": [
+            "AGENT_OBSERVABILITY_DEEP_PAYLOAD=false",
+            "AGENT_OBSERVABILITY_DEEP_PAYLOAD=true",
+        ],
+        "docs": [
+            {
+                "label": "Agent Observability",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_EVENT_MONITOR_ENABLED": {
         "title": "Event Monitor",
         "description": "Enable background Event Monitor polling in schedule mode.",
@@ -707,4 +956,260 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["legacy_json_only_basic_rules"],
     },
+    "MULTIMODAL_AGENT_TOOLS_ENABLED": {
+        "title": "Enable Multimodal Agent Tools",
+        "description": (
+            "Opt-in PDF parsing and chart-reading Agent Tools (issue #253 phase 1). "
+            "Default is off. When enabled with MULTIMODAL_FILE_ROOT, Agents may call "
+            "parse_financial_pdf and read_price_chart after a process restart. "
+            "PDF parsing is local-first; chart reading uses VISION_MODEL and degrades "
+            "honestly when vision is unavailable. See docs/multimodal-parsing_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 77,
+        "help_key": "settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED",
+        "examples": [
+            "MULTIMODAL_AGENT_TOOLS_ENABLED=false",
+            "MULTIMODAL_AGENT_TOOLS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Multimodal parsing guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing_EN.md",
+            },
+            {
+                "label": "多模态解析说明（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "MULTIMODAL_FILE_ROOT": {
+        "title": "Multimodal File Root",
+        "description": (
+            "Local directory that may contain user-provided PDF and chart files for "
+            "multimodal Agent Tools. Paths are sandboxed to this root; URLs and path "
+            "traversal are rejected. Required when MULTIMODAL_AGENT_TOOLS_ENABLED=true."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 78,
+        "help_key": "settings.agent.MULTIMODAL_FILE_ROOT",
+        "examples": [
+            "MULTIMODAL_FILE_ROOT=",
+            "MULTIMODAL_FILE_ROOT=/var/stockpulse/multimodal",
+        ],
+        "docs": [
+            {
+                "label": "Multimodal parsing guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_AGENT_TOOL_ENABLED": {
+        "title": "Enable Offline OCR Agent Tool",
+        "description": (
+            "Opt-in bounded Tesseract OCR Agent Tool (issue #196). Default is off. "
+            "When enabled with OCR_FILE_ROOT or MULTIMODAL_FILE_ROOT and optional "
+            "requirements-ocr.txt + system Tesseract, Agents may call "
+            "extract_image_text after a process restart. Image bytes stay local; "
+            "redacted, untrusted OCR text enters Agent context and may reach a remote "
+            "model unless LOCAL_ONLY_MODE=true. This phase is bounded raw-text "
+            "extraction, not verified table parsing. See docs/agent-ocr-tool_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 79,
+        "help_key": "settings.agent.OCR_AGENT_TOOL_ENABLED",
+        "examples": [
+            "OCR_AGENT_TOOL_ENABLED=false",
+            "OCR_AGENT_TOOL_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+            {
+                "label": "离线 OCR 说明（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_FILE_ROOT": {
+        "title": "OCR File Root",
+        "description": (
+            "Local directory for user-provided images for offline OCR. Paths are "
+            "sandboxed to this root. Falls back to MULTIMODAL_FILE_ROOT when empty. "
+            "Required (directly or via multimodal root) when OCR_AGENT_TOOL_ENABLED=true."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 80,
+        "help_key": "settings.agent.OCR_FILE_ROOT",
+        "examples": [
+            "OCR_FILE_ROOT=",
+            "OCR_FILE_ROOT=/var/stockpulse/ocr-uploads",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_LANGS": {
+        "title": "OCR Languages",
+        "description": (
+            "Tesseract language codes joined by '+'. Default chi_sim+eng for mixed "
+            "Chinese/English statements. Requires matching traineddata packages."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "chi_sim+eng",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 81,
+        "help_key": "settings.agent.OCR_LANGS",
+        "examples": [
+            "OCR_LANGS=chi_sim+eng",
+            "OCR_LANGS=eng",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "OCR_TIMEOUT_SECONDS": {
+        "title": "OCR Timeout Seconds",
+        "description": (
+            "Per-call OCR timeout in seconds (clamped 1-120). Default 30."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 120},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 82,
+        "help_key": "settings.agent.OCR_TIMEOUT_SECONDS",
+        "examples": [
+            "OCR_TIMEOUT_SECONDS=30",
+            "OCR_TIMEOUT_SECONDS=60",
+        ],
+        "docs": [
+            {
+                "label": "Offline OCR guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-ocr-tool_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "VALUATION_AGENT_TOOL_ENABLED": {
+        "title": "Enable Valuation Agent Tool",
+        "description": (
+            "Opt-in DCF and relative-valuation Agent Tool. Default is off. When enabled, "
+            "Agents may call estimate_stock_valuation after a process restart. Every "
+            "estimate includes explicit assumptions and a sensitivity range; missing "
+            "fundamentals return insufficient_fundamentals rather than a fabricated number. "
+            "See docs/valuation-models_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 76,
+        "help_key": "settings.agent.VALUATION_AGENT_TOOL_ENABLED",
+        "examples": [
+            "VALUATION_AGENT_TOOL_ENABLED=false",
+            "VALUATION_AGENT_TOOL_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Valuation models guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/valuation-models_EN.md",
+            },
+            {
+                "label": "估值模型说明（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/valuation-models.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+
 }

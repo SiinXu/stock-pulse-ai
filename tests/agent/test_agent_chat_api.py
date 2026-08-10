@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from api.app import create_app
 from src.agent.chat_context import build_agent_chat_market_context
@@ -87,7 +88,12 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     Config.reset_instance()
     db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'trace.db'}")
     session_id = "api-trace-hidden"
-    user_id = db.save_conversation_message(session_id, "user", "visible question")
+    user_id = db.save_conversation_user_turn(
+        session_id,
+        "visible question",
+        ["technical"],
+        turn_id="turn-visible",
+    )
     assistant_id = db.save_conversation_message(session_id, "assistant", "visible answer")
     db.save_conversation_message(
         session_id,
@@ -141,6 +147,11 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
     ]
+    assert payload["session_state"] == {
+        "selected_skill_ids": ["technical"],
+    }
+    assert payload["turn_identity_supported"] is True
+    assert payload["messages"][0]["turn_id"] == "turn-visible"
     assert "error" not in payload["messages"][0]
     assert "params" not in payload["messages"][0]
     assert "error" not in payload["messages"][1]
@@ -320,6 +331,14 @@ def test_build_agent_chat_context_normalizes_default_report_language(
         skills=None,
     )
     assert context["report_language"] == expected_language
+
+
+@pytest.mark.parametrize("turn_id", ["   ", " turn-1", "turn-1 "])
+def test_chat_request_rejects_noncanonical_turn_identity(turn_id: str) -> None:
+    from api.v1.endpoints import agent as agent_endpoint
+
+    with pytest.raises(ValidationError):
+        agent_endpoint.ChatRequest(message="question", turn_id=turn_id)
 
 
 def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> None:
@@ -562,6 +581,47 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["context"]["report_language"] == "zh"
 
 
+def test_agent_chat_stream_forwards_turn_identity_and_public_ack(tmp_path: Path) -> None:
+    executor = MagicMock()
+
+    def _chat(**kwargs):
+        kwargs["progress_callback"]({
+            "type": "turn_persisted",
+            "turn_id": kwargs["turn_id"],
+            "message_id": "17",
+        })
+        return SimpleNamespace(success=True, content="ok", error=None, total_steps=1)
+
+    executor.chat.side_effect = _chat
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "api.v1.endpoints.agent.get_config", return_value=config
+    ), patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+        client = TestClient(create_app(static_dir=tmp_path / "static"))
+        response = client.post(
+            "/api/v1/agent/chat/stream",
+            json={
+                "message": "continue",
+                "session_id": "s1",
+                "turn_id": "turn-17",
+            },
+        )
+
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert events[0] == {
+        "type": "turn_persisted",
+        "turn_id": "turn-17",
+        "message_id": "17",
+    }
+    assert events[-1]["type"] == "done"
+    assert executor.chat.call_args.kwargs["turn_id"] == "turn-17"
+
+
 def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
     tmp_path: Path,
 ) -> None:
@@ -764,3 +824,116 @@ def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: P
     assert "super-secret" not in caplog.text
     assert "private.example" not in caplog.text
     assert SENSITIVE_STREAM_SESSION_ID not in caplog.text
+
+
+
+def test_chat_session_messages_returns_null_when_state_is_missing(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'default-state.db'}")
+    db.save_conversation_message("legacy-session", "user", "legacy question")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).get(
+            "/api/v1/agent/chat/sessions/legacy-session"
+        )
+
+    assert response.status_code == 200
+    assert response.json()["session_state"] == {
+        "selected_skill_ids": None,
+    }
+
+
+def test_agent_chat_inherits_saved_skills_without_rewriting_session_state(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'inherit.db'}")
+    db.save_conversation_user_turn("saved-session", "first", ["technical"])
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=None,
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat",
+            json={
+                "message": "follow up",
+                "session_id": "saved-session",
+                "context": {
+                    "stock_code": "600519",
+                    "skills": ["old_skill"],
+                    "strategies": ["older_strategy"],
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    build_executor.assert_called_once_with(config, ["technical"])
+    context = executor.chat.call_args.kwargs["context"]
+    assert context["stock_code"] == "600519"
+    assert context["skills"] == ["technical"]
+    assert "strategies" not in context
+    assert executor.chat.call_args.kwargs["selected_skill_ids"] is None
+
+
+def test_agent_chat_all_invalid_skills_inherit_without_clearing_state(tmp_path: Path) -> None:
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'all-invalid.db'}")
+    db.save_conversation_user_turn("saved-session", "first", ["technical"])
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+    )
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=None,
+    )
+    skill_manager = MagicMock()
+    skill_manager.list_skills.return_value = [SimpleNamespace(name="technical")]
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("src.agent.factory.get_skill_manager", return_value=skill_manager), \
+         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat",
+            json={
+                "message": "follow up",
+                "session_id": "saved-session",
+                "skills": ["old_technical"],
+            },
+        )
+
+    assert response.status_code == 200
+    build_executor.assert_called_once_with(config, ["technical"])
+    assert executor.chat.call_args.kwargs["context"]["skills"] == ["technical"]
+    assert executor.chat.call_args.kwargs["selected_skill_ids"] is None
+    assert db.get_conversation_session_selected_skill_ids("saved-session") == [
+        "technical"
+    ]
+
+
+def test_requested_skill_normalization_reuses_agent_factory_catalog_rules() -> None:
+    from src.agent.factory import normalize_requested_skill_ids
+
+    skill_manager = MagicMock()
+    skill_manager.list_skills.return_value = [
+        SimpleNamespace(name="technical"),
+        SimpleNamespace(name="risk"),
+    ]
+
+    with patch("src.agent.factory.get_skill_manager", return_value=skill_manager):
+        normalized = normalize_requested_skill_ids(
+            SimpleNamespace(),
+            [" technical ", "technical", "unknown", "risk"],
+        )
+
+    assert normalized == ["technical", "risk"]

@@ -15,11 +15,27 @@ from src.agent.public_contract import (
     agent_history_public_fields,
     sanitize_agent_history_content,
 )
-from src.storage import AgentProviderTurn, ConversationMessage, ConversationSummary
+from src.storage import (
+    AgentProviderTurn,
+    ConversationMessage,
+    ConversationSessionState,
+    ConversationSummary,
+)
 from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
+
+
+def _load_conversation_context(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Decode trusted persisted request context without breaking history reads."""
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
 
 
 class _ConversationMethods:
@@ -38,6 +54,95 @@ class _ConversationMethods:
             session.add(msg)
             session.flush()
             return int(msg.id)
+
+    def save_conversation_user_turn(
+        self,
+        session_id: str,
+        content: str,
+        selected_skill_ids: Optional[List[str]] = None,
+        *,
+        turn_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Persist an idempotent user turn and optional session state atomically."""
+        with self.session_scope() as session:
+            normalized_turn_id = turn_id.strip() if isinstance(turn_id, str) else None
+            context_json = (
+                json.dumps(context, ensure_ascii=False, default=str)
+                if context
+                else None
+            )
+            if normalized_turn_id:
+                stmt = sqlite_insert(ConversationMessage).values(
+                    session_id=session_id,
+                    role="user",
+                    content=content,
+                    turn_id=normalized_turn_id,
+                    context_json=context_json,
+                )
+                session.execute(
+                    stmt.on_conflict_do_nothing(
+                        index_elements=["session_id", "turn_id"],
+                    )
+                )
+                msg = session.execute(
+                    select(ConversationMessage).where(
+                        and_(
+                            ConversationMessage.session_id == session_id,
+                            ConversationMessage.turn_id == normalized_turn_id,
+                        )
+                    )
+                ).scalar_one()
+                stored_context = _load_conversation_context(msg.context_json)
+                if (
+                    msg.role != "user"
+                    or msg.content != content
+                    or stored_context != (context if context else None)
+                ):
+                    raise ValueError("chat_turn_id_conflict")
+            else:
+                msg = ConversationMessage(
+                    session_id=session_id,
+                    role="user",
+                    content=content,
+                    context_json=context_json,
+                )
+                session.add(msg)
+                session.flush()
+
+            if selected_skill_ids is not None:
+                now = datetime.now()
+                values = {
+                    "session_id": session_id,
+                    "selected_skill_ids_json": json.dumps(
+                        selected_skill_ids, ensure_ascii=False
+                    ),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                stmt = sqlite_insert(ConversationSessionState).values(**values)
+                session.execute(
+                    stmt.on_conflict_do_update(
+                        index_elements=["session_id"],
+                        set_={
+                            "selected_skill_ids_json": values["selected_skill_ids_json"],
+                            "updated_at": now,
+                        },
+                    )
+                )
+
+            return int(msg.id)
+
+    def get_conversation_session_selected_skill_ids(
+        self,
+        session_id: str,
+    ) -> Optional[List[str]]:
+        """Return the saved Skill selection, or None when the session has no state row."""
+        with self.session_scope() as session:
+            state = session.get(ConversationSessionState, session_id)
+            if state is None:
+                return None
+            return json.loads(state.selected_skill_ids_json)
 
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
@@ -86,6 +191,8 @@ class _ConversationMethods:
                     "role": msg.role,
                     "content": sanitize_agent_history_content(msg.role, msg.content),
                     "created_at": msg.created_at,
+                    "turn_id": msg.turn_id,
+                    "context": _load_conversation_context(msg.context_json),
                 }
                 for msg in messages
                 if msg.content
@@ -377,6 +484,7 @@ class _ConversationMethods:
                     "role": msg.role,
                     **agent_history_public_fields(msg.role, msg.content),
                     "created_at": msg.created_at.isoformat() if msg.created_at else None,
+                    "turn_id": msg.turn_id,
                 }
                 for msg in messages
             ]
@@ -389,6 +497,11 @@ class _ConversationMethods:
             删除的消息数
         """
         with self.session_scope() as session:
+            session.execute(
+                delete(ConversationSessionState).where(
+                    ConversationSessionState.session_id == session_id
+                )
+            )
             session.execute(
                 delete(AgentProviderTurn).where(
                     AgentProviderTurn.session_id == session_id

@@ -172,6 +172,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         status = service.status()
         self.assertIsNone(status["last_success_at"])
         self.assertIn("reported failure", status["last_error"])
+        self.assertEqual(status["last_run_outcome"], "failed")
 
     def test_run_now_rejects_when_analysis_is_already_running(self) -> None:
         config = SimpleNamespace(
@@ -218,12 +219,73 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
             result = service.run_now()
 
         self.assertTrue(result["accepted"])
+        self.assertIsNotNone(result["run_id"])
+        self.assertTrue(result["started_at"].endswith("+00:00"))
         self.assertEqual(seen_stock_codes, [None])
         status = service.status()
         self.assertFalse(status["running"])
         self.assertIsNotNone(status["last_run_at"])
         self.assertIsNotNone(status["last_success_at"])
         self.assertIsNone(status["last_error"])
+        self.assertEqual(status["last_run_id"], result["run_id"])
+        self.assertEqual(status["last_run_outcome"], "succeeded")
+        self.assertIsNone(status["active_run_id"])
+
+    def test_run_now_fails_closed_when_scheduler_is_not_attached_or_disabled(self) -> None:
+        enabled_config = SimpleNamespace(
+            schedule_enabled=True,
+            schedule_time="18:00",
+            schedule_times=["18:00"],
+        )
+        detached = RuntimeSchedulerService(
+            config_provider=lambda: enabled_config,
+            legacy_schedule_enabled=False,
+        )
+
+        detached_result = detached.run_now()
+
+        self.assertFalse(detached_result["accepted"])
+        self.assertEqual(detached_result["reason"], "scheduler_not_attached")
+        self.assertFalse(detached.status()["run_now_available"])
+
+        disabled_config = SimpleNamespace(
+            schedule_enabled=False,
+            schedule_time="18:00",
+            schedule_times=["18:00"],
+        )
+        disabled = RuntimeSchedulerService(config_provider=lambda: disabled_config)
+
+        disabled_result = disabled.run_now()
+
+        self.assertFalse(disabled_result["accepted"])
+        self.assertEqual(disabled_result["reason"], "scheduler_disabled")
+
+    def test_status_exposes_authoritative_mode_timezone_and_aware_next_run(self) -> None:
+        fake_schedule = _FakeScheduleModule()
+        config = SimpleNamespace(
+            schedule_enabled=True,
+            schedule_time="18:00",
+            schedule_times=["18:00"],
+        )
+        service = RuntimeSchedulerService(
+            config_provider=lambda: config,
+            schedule_timezone="America/New_York",
+        )
+
+        with patch.dict(sys.modules, {"schedule": fake_schedule}), patch(
+            "src.services.runtime_scheduler.threading.Thread",
+            _NoopThread,
+        ):
+            service.reconcile_from_config()
+
+        status = service.status()
+        self.assertEqual(status["track"], "legacy_day_batch")
+        self.assertTrue(status["attached"])
+        self.assertEqual(status["process_mode"], "serve")
+        self.assertEqual(status["schedule_timezone"], "America/New_York")
+        self.assertTrue(status["run_now_available"])
+        self.assertIsNone(status["run_now_block_reason"])
+        self.assertTrue(status["next_run_at"].endswith("-05:00"))
 
     def test_run_now_uses_shared_lock_across_service_instances(self) -> None:
         config = SimpleNamespace(
@@ -265,6 +327,39 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertEqual(captured.exception.status_code, 409)
         self.assertEqual(captured.exception.detail["error"], "scheduler_busy")
         self.assertEqual(captured.exception.detail["reason"], "analysis_already_running")
+
+    def test_run_now_endpoint_maps_authoritative_unavailable_reason(self) -> None:
+        from api.v1.endpoints.system_config import run_scheduler_now
+
+        scheduler = MagicMock()
+        scheduler.run_now.return_value = {
+            "accepted": False,
+            "running": False,
+            "reason": "scheduler_not_attached",
+        }
+
+        with self.assertRaises(HTTPException) as captured:
+            run_scheduler_now(scheduler=scheduler)
+
+        self.assertEqual(captured.exception.status_code, 409)
+        self.assertEqual(captured.exception.detail["error"], "scheduler_not_attached")
+        self.assertEqual(captured.exception.detail["reason"], "scheduler_not_attached")
+
+    def test_run_now_endpoint_returns_typed_correlation_payload(self) -> None:
+        from api.v1.endpoints.system_config import run_scheduler_now
+
+        scheduler = MagicMock()
+        scheduler.run_now.return_value = {
+            "accepted": True,
+            "running": True,
+            "run_id": "run-1",
+            "started_at": "2026-06-21T01:00:00+00:00",
+        }
+
+        result = run_scheduler_now(scheduler=scheduler)
+
+        self.assertEqual(result.run_id, "run-1")
+        self.assertEqual(result.started_at, "2026-06-21T01:00:00+00:00")
 
     def test_reconcile_replaces_daily_jobs_without_triggering_old_jobs(self) -> None:
         fake_schedule = _FakeScheduleModule()
@@ -700,7 +795,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 pass
 
         self.assertEqual(events, [
-            ("init", True, False, True, True, True),
+            ("init", True, False, True, True, False),
             ("reconcile_scheduled_tasks",),
             ("stop",),
         ])
@@ -729,7 +824,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
 
         kwargs = scheduler_class.call_args.kwargs
         self.assertFalse(kwargs["personalized_schedule_enabled"])
-        self.assertTrue(kwargs["legacy_schedule_enabled"])
+        self.assertFalse(kwargs["legacy_schedule_enabled"])
         runtime_scheduler.reconcile_scheduled_tasks.assert_called_once_with()
         runtime_scheduler.reconcile_from_config.assert_not_called()
         self.assertIsNone(os.getenv(SCHEDULED_TASK_OWNER_ENV))

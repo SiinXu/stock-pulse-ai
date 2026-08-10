@@ -1,0 +1,21 @@
+{
+  "id": "tools-missing-fail",
+  "title": "Missing critical quote tool",
+  "tags": ["tool_usage", "fail"],
+  "dimensions": ["tool_usage"],
+  "context": {
+    "stock_code": "AAPL"
+  },
+  "agent_output": {
+    "signal": "buy",
+    "tool_calls": [
+      {"tool": "web_search", "attempted": true, "completed": true, "succeeded": true, "valid_result": true, "authorized": true}
+    ]
+  },
+  "evaluation": {
+    "tool_usage": {
+      "required_tools": ["get_realtime_quote", "analyze_trend"],
+      "forbidden_tools": []
+    }
+  }
+}

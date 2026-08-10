@@ -17,7 +17,9 @@ export const APP_ROUTE_PATHS = {
   researchDiscover: '/research/discover',
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
+  researchReportCompare: '/research/report-compare',
   settings: '/settings',
+  calculators: '/tools/calculators',
 } as const;
 
 export const LEGACY_ROUTE_PATHS = {
@@ -369,3 +371,12 @@ export function buildSettingsHref(search: SettingsRouteSearch = {}): string {
 export function buildSettingsSectionHref(section: string): string {
   return buildSettingsHref({ section });
 }
+
+/** Deep link to Settings → Agent Behavior → Investment Framework editor. */
+export function buildInvestmentFrameworkSettingsHref(): string {
+  return buildSettingsHref({
+    section: 'agent_behavior',
+    view: 'investment_framework',
+  });
+}
+

@@ -166,6 +166,8 @@ stock-pulse-ai/
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search（结构化搜索结果） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
+| `RSS_NEWS_FEED_URLS` | 可选 RSS/Atom feed URL（逗号分隔），按需新闻搜索免费补充源；留空则惰性关闭。详见「搜索服务配置」与 [出站 HTTP 安全策略](security-outbound-policy.md) | 可选 |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | 按需 RSS/Atom 单源拉取超时秒数（默认 8） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
 | `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`），可通过 Web 设置或 `.env` 配置；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | 可选 |
@@ -366,11 +368,15 @@ stock-pulse-ai/
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API 地址（默认 `https://api.adanos.org`） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
+| `RSS_NEWS_FEED_URLS` | 可选 RSS/Atom feed URL 列表（逗号分隔），作为按需新闻搜索链路的免费补充源（**不是** SearXNG/付费搜索的替代，也不同于本地资讯池 `NEWS_INTEL_*`）。留空时功能完全惰性。Feed 拉取走 fail-closed 出站策略；公网源无需 allowlist，私网/回环需精确 `OUTBOUND_HTTP_ALLOWLIST` 条目，详见 [出站 HTTP 安全策略](security-outbound-policy.md) | 可选 |
+| `RSS_NEWS_FETCH_TIMEOUT_SEC` | 按需 RSS/Atom 单源拉取超时（秒，1–30）；默认 `8`。与 `NEWS_INTEL_FETCH_TIMEOUT_SEC` 独立 | 可选 |
 | `NEWS_STRATEGY_PROFILE` | 新闻策略窗口档位：`ultra_short`(1天)/`short`(3天)/`medium`(7天)/`long`(30天)；实际窗口取与 `NEWS_MAX_AGE_DAYS` 的最小值 | 默认 `short` |
 | `NEWS_MAX_AGE_DAYS` | 新闻最大时效（天），搜索时限制结果在近期内 | 默认 `3` |
 | `BIAS_THRESHOLD` | 乖离率阈值（%），超过提示不追高；强势趋势股自动放宽到 1.5 倍 | 默认 `5.0` |
 
 > 行为说明：搜索服务与社交舆情服务为可选增强链路。任一服务初始化失败时，系统会记录 warning 并降级为跳过该服务，仅影响对应环节，不会阻塞技术面主链路和主任务流。
+
+> RSS/Atom 补充说明：条目进入与其他搜索引擎相同的去重、时效过滤、相关度排序与 run diagnostics 路径；单 feed 失败只记日志/诊断并继续，不中断整次搜索。源归属会保留在结果的 `source` 字段中并进入报告上下文。
 
 > 外股英文资讯：对已收录的美股/港股，`AAPL.US` / `HK00700` / `00700.HK` 等形式会先归一到标准 ticker。即使展示名为“苹果”或“腾讯控股”，新闻查询、事件/多维情报查询与相关度评分仍会使用统一英文别名；未收录的 ticker 保持原有降级行为。
 
@@ -416,6 +422,11 @@ stock-pulse-ai/
 | `ENABLE_CHIP_DISTRIBUTION` | 启用筹码分布分析（该接口不稳定，云端部署建议关闭）。GitHub Actions 用户需在 Repository Variables 中设置 `ENABLE_CHIP_DISTRIBUTION=true` 方可启用；workflow 默认关闭。 | `true` | 可选 |
 | `ENABLE_EASTMONEY_PATCH` | 东财接口补丁：东财接口频繁失败（如 RemoteDisconnected、连接被关闭）时建议设为 `true`，注入 NID 令牌与随机 User-Agent 以降低被限流概率 | `false` | 可选 |
 | `REALTIME_SOURCE_PRIORITY` | 实时行情源优先级，逗号分隔，例如 `tencent,akshare_sina,efinance,akshare_em`；需要显式加入 `tickflow` 才会使用 TickFlow 实时行情。 | 见 `.env.example` | 可选 |
+| `DATA_VALIDATION_ENABLED` | 启用日线、实时行情、基本面与选定技术指标的统一数值校验，并写入版本化诊断证据。 | `true` | 可选 |
+| `DATA_VALIDATION_STRICT` | 在数据源候选被接受或缓存前拒绝错误级数据，使既有有界回退链继续尝试下一数据源。 | `false` | 可选 |
+| `DATA_VALIDATION_STRICT_SCOPES` | 严格模式适用范围，逗号分隔 `市场/品种`，如 `cn/equity,hk/etf,us/index`；`*` 为通配符。 | `*/*` | 可选 |
+| `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | 海外代码无法可靠推断 ETF/指数身份时使用的权威映射，逗号分隔 `代码=品种`。 | - | 可选 |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | 聚合基本面最终出口策略：`warn` 保留结果并记录证据，`reject` 显式抛错；该模式不是数据源回退。 | `warn` | 可选 |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | 基本面聚合总开关；关闭时仅返回 `not_supported` 块，不改变原分析链路 | `true` | 可选 |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | 基本面阶段总时延预算（秒） | `8.0` | 可选 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | 单能力源调用超时（秒）；市场结构行业/概念排行也复用该预算 | `8.0` | 可选 |
@@ -445,7 +456,7 @@ stock-pulse-ai/
 >   - `fundamental_context.belong_boards` = 个股关联板块列表；A 股从 AkShare 板块名单写入，美股/港股从 yfinance `info.sector` / `info.industry` 写入，无数据时为 `[]`；
 >   - `fundamental_context.boards.data` = `sector_rankings`（板块涨跌榜，结构 `{top, bottom}`，HK/US 当前不提供）；
 >   - `fundamental_context.concept_boards.data` = `concept_rankings`（概念/题材涨跌榜，结构 `{top, bottom}`，当前仅 A 股提供；不可用时 fail-open 为空或缺失）；
->   - `fundamental_context.earnings.data.financial_report` = 财报摘要（报告期、营收、归母净利润、经营现金流、ROE，及 `currency` 来源 `info.financialCurrency`，HK ADR 常见为 CNY）；
+>   - `fundamental_context.earnings.data.financial_report` = 财报摘要（报告期、营收、归母净利润、经营现金流、ROE，及 `currency`；A 股默认 `CNY`，HK/US 来源 `info.financialCurrency`，HK ADR 常见为 CNY）。Issue #235 起 **附加**（不破坏旧字段）：`periods`（多期历史，新→旧）、`statements`（利润表/资产负债表/现金流量表覆盖）、`metrics`（带 `formula`/`basis` 的派生指标，缺失为 `null` 而非 0）、`sufficiency`（`rich`/`partial`/`insufficient` + 明确文案）、`data_recency`（报告期非实时说明）。缺数时报告与 Prompt 写 “insufficient fundamentals”，禁止静默填 0；
 >   - `fundamental_context.earnings.data.dividend` = 分红指标（仅现金分红税前口径，含 `events`、`ttm_cash_dividend_per_share`、`ttm_dividend_yield_pct`、`currency`）。`currency` 独立读取自 `info.currency`，与 `financial_report.currency` 可能不同（HK ADR 财报 CNY、分红 HKD）；TTM yield 默认按 `ttm_cash / latest_price * 100`（同币种）即时重算，仅在 TTM cash 或 latest price 缺失时回退到 yfinance `trailingAnnualDividendYield` 或 `dividendYield`；
 >   - `get_stock_info.belong_boards` = 个股所属板块列表；
 >   - `get_stock_info.boards` 为兼容别名，值与 `belong_boards` 相同（未来仅在大版本考虑移除）；
@@ -465,6 +476,10 @@ stock-pulse-ai/
 | `STOCK_LIST` | 自选股代码（逗号分隔） | - |
 | `ADMIN_AUTH_ENABLED` | Web 登录：设为 `true` 启用密码保护；首次访问在网页设置初始密码，可在「系统设置 > 修改密码」修改；忘记密码执行 `python -m src.auth reset_password`。关闭已启用的认证必须再次提交当前密码，有效 session Cookie 不能替代该校验。通用系统配置保存或 `.env` 导入只允许保留该键的当前值；切换状态必须使用认证专用入口，且配置键必须符合标准环境变量名格式 `[A-Za-z_][A-Za-z0-9_]*`。Web 的 `.env` 备份导入导出仅在开启该开关后可用（桌面端不受此限制）。 | `false` |
 | `TRUST_X_FORWARDED_FOR` | 单层可信反向代理部署时设为 `true`，取 `X-Forwarded-For` 最右值作为真实客户端 IP（用于登录限流等）；直连公网时保持 `false` 防伪造。多级代理/CDN 场景下限流 key 可能退化为边缘代理 IP，需额外评估 | `false` |
+| `USE_PROXY` | 是否启用本地代理（将 `PROXY_HOST`/`PROXY_PORT` 映射为进程 `http_proxy`/`https_proxy`）；可在 Web 设置 → 系统与安全 → 服务与日志 中编辑；GitHub Actions 跳过；完整生效通常需重启 | `false` |
+| `PROXY_HOST` | 代理主机（可能嵌入凭据，设置页脱敏）；仅 `USE_PROXY=true` 时生效 | `127.0.0.1` |
+| `PROXY_PORT` | 代理端口；仅 `USE_PROXY=true` 时生效 | `10809` |
+| `HTTP_PROXY` | 标准 HTTP 代理 URL；需要完整 URL/凭据时优先于 `USE_PROXY` | 空 |
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | 将当日大盘环境摘要注入个股分析 Prompt，并在高风险/退潮环境下软化激进买入建议；默认开启，设为 `false` 后仍可运行大盘复盘 | `true` |
@@ -474,6 +489,10 @@ stock-pulse-ai/
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | 计分卡中低于该“已判定”样本数（命中+偏离）的分桶返回 `insufficient_data` 而非比率 | `10` |
+| `DAILY_BRIEF_ENABLED` | 可选每日简报（历史准确率复盘：决策信号 outcome / 回测汇总 / 技能观点表现）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
+| `DAILY_BRIEF_SCHEDULE_TIME` | 本地 `HH:MM`，开启后在该时刻之后可触发（每个本地自然日最多一次） | `08:30` |
+| `DAILY_BRIEF_TIMEZONE` | 日程与「昨天」映射使用的 IANA 时区 | `Asia/Shanghai` |
+| `DAILY_BRIEF_MIN_SAMPLES` | 发布准确率百分比前的最小完成样本；不足时简报明确写出样本不足 | `10` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | 新建模拟组合（paper portfolio）时播种的初始现金（作为一笔现金流入记账）；模拟成交按交易时点最新可得收盘价成交，MVP 忽略费用与滑点，买入按可用现金校验 | `1000000` |
 | `MARKET_REVIEW_REGION` | 大盘复盘市场区域：cn(A股)、hk(港股)、us(美股)、jp(日股)、kr(韩股)、both(五市场)，us/jp/kr 适合仅关注单区域用户 | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盘复盘指数涨跌颜色：`green_up`=绿涨红跌（默认），`red_up`=红涨绿跌 | `green_up` |
@@ -763,7 +782,9 @@ python main.py --workers 5            # 指定并发数
 
 选择该参数后，实盘范围覆盖 `--stocks` 和 `STOCK_LIST`。成功读取到真实空仓时会保持空列表，不会回退到静态自选股；账户发现、持仓查询、证券类型确认或代码转换失败时，本次运行显式失败，避免分析不可信的部分范围。定时模式会在每次实际执行时重新查询，而不是缓存启动时持仓。未选择 `--portfolio` 时，现有行为完全不变。
 
-默认连接 `127.0.0.1:11111`，可通过 `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT` 调整；`FUTU_ACC_ID` 可限定一个符合条件的真实账户，留空则合并所有符合条件的账户；`FUTU_SECURITY_FIRM=NONE` 使用 SDK 自动识别。Docker 内的 `127.0.0.1` 指容器本身，使用容器运行时需显式配置一个受信任且从容器网络可达的 OpenD 地址。该集成只调用账户列表、持仓列表和证券基础信息查询，不解锁交易，也不下单、改单或撤单；第一版不会把实盘持仓写入组合持仓管理。
+默认连接 `127.0.0.1:11111`，可通过 `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT` 调整；`FUTU_ACC_ID` 可限定一个符合条件的真实账户，留空则合并所有符合条件的账户；`FUTU_SECURITY_FIRM=NONE` 使用 SDK 自动识别。Docker 内的 `127.0.0.1` 指容器本身，使用容器运行时需显式配置一个受信任且从容器网络可达的 OpenD 地址。该集成只调用账户列表、持仓列表和证券基础信息查询，不解锁交易，也不下单、改单或撤单。
+
+实盘持仓还可通过 `POST /api/v1/portfolio/imports/futu`（预览：`/imports/futu/preview`）写入组合管理：将符合条件的多头正股映射为共享交易导入路径上的合成买入。详见 [Futu OpenD 组合持仓导入](futu-opend-portfolio-import.md)。
 
 ---
 
@@ -788,6 +809,22 @@ schedule:
 | 15:00 | `'0 7 * * 1-5'` |
 | 18:00 | `'0 10 * * 1-5'` |
 | 21:00 | `'0 13 * * 1-5'` |
+
+#### GitHub Actions 运行摘要与失败短通知（Issue #850）
+
+`00-daily-analysis.yml` 在分析步骤结束后（`if: always()`）会：
+
+1. 读取 runner 写出的 `data/run_status.json`（优先），必要时结合退出码 / job 状态 / 环境就绪信号 / 日志关键词兜底
+2. 向 GitHub **Step Summary** 写入中文为主、英文并列的人话结果：成功 / 非交易日跳过 / 部分成功 / 失败原因与下一步
+3. 可选：当结果为失败且已配置 `NOTIFICATION_SYSTEM_ERROR_CHANNELS`（或显式 `FAILURE_NOTIFY_ENABLED=true`）时，向系统错误渠道推送**一句**短文本（不含 Secret 明文与完整 traceback）
+
+| 配置项 | 说明 |
+|--------|------|
+| `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | 失败短通知路由；为空且未强制开启时仅写 Step Summary |
+| `FAILURE_NOTIFY_ENABLED` | 可选。默认：有系统错误渠道则开启；`false` 强制仅 Summary；`true` 强制尝试通知 |
+| 成功路径报告推送 | **不改变**（仍走既有 report 渠道逻辑） |
+
+常见原因码：`missing_llm` / `missing_watchlist` / `non_trading_day` / `data_source` / `timeout` / `quota` / `provider_down` / `unknown`（与 Config Check #847 共用词汇，便于对照）。
 
 #### GitHub Actions 非交易日手动运行（Issue #461 / #466）
 
@@ -955,6 +992,7 @@ P3 当时不新增 API/Web/Bot 参数，不写入 history/task status/report met
 #### Multi-Agent 决策分歧摘要输入（Issue #1904 P1 plumbing）
 
 Multi-agent 在进入 `DecisionAgent` 前会构造内部低敏 `agent_disagreement_summary`，用于提示前序 Agent opinion 的方向分歧、风险 override 证据、风险 override 是否受当前 `AGENT_RISK_OVERRIDE` 配置启用，以及非关键阶段降级信息。该摘要只包含 agent name、signal、confidence、conflict type、decision path hint、低敏 risk control 状态和 degraded stage marker，不包含 reasoning、raw_data、原始错误文本、token 或私密 payload。
+- `AGENT_MULTI_STRATEGY_DELIBERATION=false` — 默认关闭的多策略审议集群。
 
 该能力当前只是 `DecisionAgent` 的内部 Prompt 输入管线：摘要写入运行态 `ctx.meta`，不进入 Agent pre-fetched data，不新增 public API、Web/Desktop 展示、history/task status/report metadata、dashboard schema 或最终解释字段。`risk_level=high` 只作为风险证据，不会单独触发 override；summary 与最终 `_apply_risk_override()` 复用同一套 override 判断，并尊重 `AGENT_RISK_OVERRIDE=false`。非关键降级阶段沿用 orchestrator 的 `intel`、`risk` 和 specialist/skill agent 降级契约，避免把单一方向意见误描述成 multi-agent 共识。#1904 的用户可见最终解释输出仍属于后续阶段。
 
@@ -1009,6 +1047,27 @@ Issue #1742 在个股分析报告的 `dashboard.signal_attribution` 中新增信
 - `generate_single_stock_report()`（单股推送报告）
 - `templates/report_markdown.j2`（Jinja2 模板）
 - `HistoryService._generate_single_stock_markdown()`（Web 历史抽屉）
+
+#### 报告 Decision Card 前置（Issue #861 Phase 1）
+
+Phase 1 只做呈现层重排：在 Jinja 报告模板的每只股票详情中，将「方向/评分、一句话结论、置信度、关键风险、观察/失效条件、止损止盈」等**已有字段**聚合成 Decision Card 并置顶展示。
+
+| 模板 | 行为 |
+| --- | --- |
+| `templates/report_markdown.j2` | 每只股票 `##` 标题下先渲染完整 Decision Card；原有「重要信息 / 核心结论 / 盘中护栏 / 作战计划」等段落整体后移，不删除。 |
+| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card（约 4–5 行）作为首屏内容；后续原有精简段落保留。 |
+| `templates/report_brief.j2` | 使用 brief 专用长度预算形态（`decision_card(..., compact='brief')`）：每股 **1 行主行 + 至多 1 行补充行**。主行保留与 `origin/main` 单行 brief 同等字段（信号 emoji/文案、评分、一句话结论），并标记 🃏；补充行最多打包 1 条风险 + 1 条观察条件（硬截断）。不输出 wechat 风格 5 行卡，也不在 brief 中重复止损/目标位（留给 wechat/markdown）。 |
+| 共享宏 | `templates/_macros.j2` 的 `decision_card`；`compact=false` 完整卡、`compact=true` 推送紧凑卡、`compact='brief'` 推送预算形态；字段缺失时省略对应行，不输出空卡字段。 |
+
+**brief 长度预算与体积影响**（相对未预算的 5 行紧凑卡）：
+- 契约依据：`ReportType.BRIEF`（3–5 句、适合移动端/推送）与 Pushover `max_length = 1024`（超长按 `\n\n` 分片）。
+- 目标：典型 10 只自选股的 brief 经 `markdown_to_plain_text` 后落在单条 Pushover 消息内；回归测试以 ≥10 只 fixture 锁定每股 ≤2 行与 plain 总长 ≤1024。
+- WeCom markdown 默认约 4000 字节：wechat 仍保留完整紧凑卡作首屏，常规 5–10 只规模可能比无卡时多 1 个分片，属有意取舍（首屏完整性优先），见 PR 证据中的字节/分片对照。
+
+边界与兼容：
+- 不改上游提取器、Prompt、Schema 或 notification 发送链；仅模板呈现。
+- 仅影响 `REPORT_RENDERER_ENABLED=true` 时的 Jinja 路径；默认关闭时仍走 `src/notification_parts/rendering.py` 硬编码 fallback。
+- 通知按 `###` / `---` 切块的逻辑仍以股票标题块为边界；Decision Card 使用 `### 🃏`（markdown）、wechat 紧凑多行块或 brief 预算行，不改变数据契约。
 
 归一化函数在 `_parse_response()` 和 `parse_dashboard_json()` 中显式调用，确保：
 - 字符串百分比转为 int（如 `"35%"` → `35`）
@@ -1516,7 +1575,7 @@ P3 开始，生命周期由 `DecisionSignalService` 统一补齐：显式传入�
 
 P5 后验评估只支持日线可验证的 `1d/3d/5d/10d`，窗口语义是 anchor 后 1/3/5/10 根 `StockDaily` 交易 bar，不复用 `DecisionSignalService._horizon_days()` 的自然日过期语义。`anchor_date` 优先读取 `metadata.market_phase_summary.session_date`，否则使用 `created_at.date()`；anchor 当日必须存在 `StockDaily.close`，不会回退到前一交易日。动作映射为 `buy/add -> up`、`hold -> not_down`、`reduce/sell/avoid -> not_up`；`watch/alert`、`intraday/swing/long`、缺 anchor 价、forward bars 不足等会写入 `eval_status=unable` 和明确 `unable_reason`。缺 anchor 价、非法 anchor 价、forward bars 不足、缺/非法窗口收盘价属于可恢复 unable，后续默认重跑会在数据补齐后重新评估；非方向动作、不支持 horizon 和缺 anchor date 属于终态 unable，默认保持幂等跳过。自动提取运行时可额外接收 `portfolio_context.quantity`，只把低敏 `holding_state=holding|empty|unknown` 写入 metadata 供后验快照使用，不保存数量、账户或成本。
 
-P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详情抽屉按需读取该信号 outcomes，并可提交 useful/not useful 反馈。该页面不进入 BacktestPage，也不新增后台定时任务；后验计算由 `POST /api/v1/decision-signals/outcomes/run` 显式触发。批量运行默认优先推进缺失 outcome 的信号，再重试可恢复 unable，不会让已完成或终态 unable 的最新信号长期占满 `limit`。
+P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详情抽屉按需读取该信号 outcomes，并可提交 useful/not useful 反馈。该页面不进入 BacktestPage，也不新增后台定时任务；后验计算由 `POST /api/v1/decision-signals/outcomes/run` 显式触发。批量运行默认优先推进缺失 outcome 的信号，再重试可恢复 unable，不会让已完成或终态 unable 的最新信号长期占满 `limit`。`DECISION_PROFILE_CALIBRATION_ENABLED=true` 时，`GET /api/v1/decision-signals/outcomes/stats` 额外返回 `profile_calibration`（六个独立分组、每组 `completed >= 30` 门槛、最大不利波动只读已保存价格）；默认关闭时响应不含该字段，旧统计卡片保持兼容。细节见 [decision-signals.md](decision-signals.md)。
 
 持仓页会把 AI 建议作为非阻断增强异步加载：组合快照和风险模块先按原逻辑渲染，随后按当前快照中的唯一持仓调用 `GET /api/v1/decision-signals/latest/{stock_code}?market=<market>&limit=1` 查询 latest active 信号；不再通过 `holding_only=true` 通用列表分页扫描，也不存在固定页数截断。单个持仓 latest 查询失败时，页面保留其他已加载信号并显示可见降级提示；无匹配信号时持仓行显示空占位。匹配逻辑复用 Web 端股票代码等价规则，覆盖 A 股 `600519/SH600519/600519.SH`、港股 `00700/HK00700/00700.HK` 和美股大小写 ticker。
 
@@ -1605,6 +1664,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 - 🚀 **快速分析** - 首次配置未完成且没有显式偏好时，分析工作台默认进入新手模式并提交 `brief` 报告；已配置用户默认保持专业模式和 `detailed` 报告
 - 🧭 **新手 / 专业模式** - 新手模式只展示简短结论、保守风险等级和下一步操作，保留研究声明；“查看专业详情”恢复完整报告和历史趋势入口。用户显式选择保存在浏览器 `localStorage`，登出只清理会话痕迹，不删除该非敏感界面偏好
 - 🎯 **策略选择** - 分析工作台支持显式选择分析策略 skill；不传 `skills` 时按系统默认策略运行，便于保持与历史行为兼容
+- 🧩 **会话级 Skill 选择** - 问股会话会持久化当前 Skill 选择；刷新与会话切换按会话独立恢复，新会话继续使用服务器默认
 - 🧪 **待分析状态/任务刷新防抖** - 分析工作台通过带有时区感知的历史区间判断并发起分页历史查询；任务完成后由最新一次 stock bar 刷新成功才清除失败态，避免旧请求乱序覆盖新状态导致重复提交
 - 🧭 **首次配置提示** - 首页会读取只读配置状态，缺少 LLM 主渠道、自选股等基础项时提示缺口；提示可关闭，从引导链接进入 Settings 时，只有确实缺少 LLM 主配置才自动打开现有 LLM 向导，数据源可从首次配置卡直接进入
 - 📊 **实时进度** - 分析任务状态实时更新，支持多任务并行；普通分析链路在进入 LLM 阶段后会优先尝试 LiteLLM 流式生成，并通过任务 SSE 回灌更细粒度的 `message/progress`
@@ -1684,6 +1744,11 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 > 说明（Issue #1520）：列表中的模型名展示字段仅来源于历史快照中的 `model_used`，仅用于历史回溯展示，不影响运行时模型模型路由（`litellm_model`、`llm_model_list`）、Provider、Base URL 与配置迁移/清理语义。回退方式为回退本次提交，现网历史查询/抽屉/接口链路兼容性保持不变。
 > 说明：历史详情、同步分析响应和 completed 任务状态会在 `report.details.analysis_context_pack_overview` 返回低敏输入数据块 overview；其中同步分析响应依赖本次已持久化的 `analysis_history.context_snapshot`，`SAVE_CONTEXT_SNAPSHOT=false` 时新记录不保证返回 overview。`details.context_snapshot` 会剥离该顶层字段，不返回完整 `AnalysisContextPack` 或 Prompt summary。
 > 说明：`POST /api/v1/agent/chat` 与 `POST /api/v1/agent/chat/stream` 会把前端传入的 `context.stock_code` 作为问股当前标的基线，并在 `context.report_language` 缺失时使用全局 `REPORT_LANGUAGE`；调用方显式提供的 `context.report_language` 保持优先。服务端会先重新判定 stock scope。前端从历史报告进入问股后会持续发送 active stock context；切回或重载已有会话时，会根据已加载的历史用户消息恢复基础 `{stock_code, stock_name: null}`。服务端会在每轮消息中重新判定 `maintain` / `switch` / `compare`：未明确切换时，带 `stock_code` 的股票工具调用只能访问当前标的；显式切换会清理旧标的历史摘要和预取数据；含比较/对比/vs/差异/相比等明确比较意图或多个非当前明确股票代码的问题允许本轮明确出现的多个代码，但不改写当前标的。若模型误把 TTM、PE、MACD、KDJ 等金融缩写、移动均线语境下的 `MA` 指标词，或 SH/SZ/BJ/HK/SS 等交易所片段当成股票代码调用工具，后端会返回不可重试的 `stock_scope_violation` 工具结果，而不会执行对应股票工具。工具名只解析注册表中的精确名称；任何 provider namespace 或 suffix 都不会路由到已有工具。
+> 说明：`POST /api/v1/backtest/run` 支持 `analysis_date_from` / `analysis_date_to`（`YYYY-MM-DD`）、`eval_window_days`、`min_age_days`、`limit` 作为运行配置；若 `analysis_date_from > analysis_date_to`，接口返回 400，错误码 `invalid_analysis_date_range`。其他受控校验失败使用稳定错误码，例如 `invalid_stock_code`、`invalid_eval_window_days`、`invalid_min_age_days`、`invalid_run_limit`。
+> 说明：执行成功时 `BacktestRunResponse.applied_config` 回显实际生效配置（并保留 `applied_eval_window_days` 兼容字段）。无新入库结果时，`message` 返回可读诊断，`diagnostics` 返回排查上下文（示例：`empty_reason`、`engine_version`、`skipped_count`、日期范围、窗口、最小天龄、limit）。
+> 说明：结果行可包含 `resolution_notes` 标记，例如 `legacy_analysis_date`、`prior_session_start`、`missing_daily_bars`、`insufficient_forward_bars`。数据不足/跳过行仍可查询，以保证汇总完整性（已完成 vs 数据不足）诚实可见。
+
+> Skill 会话状态：上述两个 Chat 请求中的顶层 `skills` 为三态字段，也是请求 Skill 选择的唯一权威来源。省略或传 `null` 时沿用该 `session_id` 已保存的选择；会话尚无状态时使用服务器运行时默认 Skill。传 `[]` 表示清空显式选择并使用现有通用/服务器默认执行语义；传非空列表时会按现有 Skill catalog 规则清理、去重并保存。非空列表中有效项与无效项混合时保留有效项；若全部条目均无效，则不会把归一化后的空结果视为显式 `[]`，而是沿用会话状态或运行时默认且不写入空状态。用于复用分析数据的 `context` 中即使残留 `skills` 或 `strategies`，服务端也会移除这些 legacy 字段，不能覆盖顶层三态或会话状态。用户消息与本轮显式 Skill 更新在同一事务中写入。`GET /api/v1/agent/chat/sessions/{session_id}` 会在消息之外返回 `session_state.selected_skill_ids`：没有持久化状态时为 `null`，显式清空时为 `[]`，否则为保存的 Skill 列表。Web 端使用该字段恢复持久化选择；对于 `null`，页面可以显示服务器默认 Skill，但未操作直接追问时仍省略 `skills`，不会把历史会话静默转换为显式 Skill 会话。删除会话会同时删除对应状态。
 > 说明：`POST /api/v1/backtest/run` 新增 `analysis_date_from` / `analysis_date_to`（`YYYY-MM-DD`）请求参数用于按历史分析日期筛选候选；若 `analysis_date_from > analysis_date_to`，接口返回 400 `invalid_params`。
 > 说明：回测执行成功但无新入库结果时，`BacktestRunResponse.message` 返回可读诊断说明，`diagnostics` 返回排查上下文（示例：`empty_reason`、`analysis_date_from`、`analysis_date_to`、`eval_window_days`、`min_age_days`、`limit`）。
 > 说明：`GET /api/v1/backtest/results`、`GET /api/v1/backtest/performance`、`GET /api/v1/backtest/performance/{code}` 同步支持 `analysis_date_from`、`analysis_date_to`；不传时保持历史行为。

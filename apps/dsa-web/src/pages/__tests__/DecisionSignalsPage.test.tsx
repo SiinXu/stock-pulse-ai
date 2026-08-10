@@ -1,11 +1,14 @@
 import type React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { BrowserRouter, Link } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
 } from '../../api/decisionSignals';
+import { createApiError, createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { alertsApi } from '../../api/alerts';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -399,16 +402,35 @@ const persistedReassessResponse: DecisionSignalReassessResponse = {
   blockedReason: null,
 };
 
+function createTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  return (
+    <QueryClientProvider client={createTestQueryClient()}>
+      {ui}
+    </QueryClientProvider>
+  );
+}
+
 function renderPage(navigationFixture?: React.ReactNode) {
   return render(
-    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-      <BrowserRouter>
-        <UiLanguageProvider>
-          {navigationFixture}
-          <DecisionSignalsPage />
-        </UiLanguageProvider>
-      </BrowserRouter>
-    </RouteFocusRegistrationContext.Provider>,
+    wrapWithQueryClient(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <BrowserRouter>
+          <UiLanguageProvider>
+            {navigationFixture}
+            <DecisionSignalsPage />
+          </UiLanguageProvider>
+        </BrowserRouter>
+      </RouteFocusRegistrationContext.Provider>,
+    ),
   );
 }
 
@@ -726,7 +748,8 @@ describe('DecisionSignalsPage', () => {
 
     const feedPanel = screen.getByRole('tabpanel', { name: '全部信号' });
     expect(await within(feedPanel).findByText('贵州茅台')).toBeInTheDocument();
-    expect(within(feedPanel).getByText('决策信号加载失败')).toBeInTheDocument();
+    expect(await screen.findByText('决策信号加载失败')).toBeInTheDocument();
+    expect(within(feedPanel).queryByText('决策信号加载失败')).not.toBeInTheDocument();
     expect(decisionSignalsApi.list).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: 'AAPL',
     }));
@@ -786,6 +809,7 @@ describe('DecisionSignalsPage', () => {
     ).search));
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
     expect(screen.getByRole('tab', { name: '规则' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
   });
 
   it('prefills a stock-scoped rule from a Signal Center deep link', async () => {
@@ -819,11 +843,12 @@ describe('DecisionSignalsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('button', { name: '创建告警规则' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: '信号范围' })).toBeInTheDocument();
     await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
       targetScope: 'portfolio_holdings',
     })));
+    expect(await screen.findByText('暂无告警规则')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('tab', { name: '推送历史' }));
 
@@ -1872,7 +1897,9 @@ describe('DecisionSignalsPage', () => {
     vi.mocked(decisionSignalsApi.getLatest).mockRejectedValueOnce(new Error('latest down'));
     submitCurrentStock('600519');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('latest down');
+    const latestErrorToast = await screen.findByRole('alert');
+    expect(latestErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(latestErrorToast).not.toHaveTextContent('latest down');
   });
 
   it('does not request the timeline before a current stock is selected', async () => {
@@ -2209,7 +2236,9 @@ describe('DecisionSignalsPage', () => {
     vi.mocked(decisionSignalsApi.list).mockRejectedValueOnce(new Error('boom'));
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
+    const listErrorToast = await screen.findByRole('alert');
+    expect(listErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(listErrorToast).not.toHaveTextContent('boom');
   });
 
   it('clears stale list data when refresh fails after leaving list details', async () => {
@@ -2225,7 +2254,9 @@ describe('DecisionSignalsPage', () => {
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('filter failed');
+    const filterErrorToast = await screen.findByRole('alert');
+    expect(filterErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(filterErrorToast).not.toHaveTextContent('filter failed');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).not.toBeInTheDocument();
     expect(screen.getByText('共 0 条信号')).toBeInTheDocument();
@@ -2415,7 +2446,9 @@ describe('DecisionSignalsPage', () => {
 
     submitCurrentStock('MSFT');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('latest failed');
+    const latestErrorToast = await screen.findByRole('alert');
+    expect(latestErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(latestErrorToast).not.toHaveTextContent('latest failed');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
@@ -2502,8 +2535,9 @@ describe('DecisionSignalsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '确定' }));
 
-    const errorMessage = await screen.findByText('status update failed');
-    expect(errorMessage.closest('[role="alert"]')).toBeInTheDocument();
+    const statusConfirmDialog = screen.getByRole('dialog', { name: '更新信号状态' });
+    const statusError = await within(statusConfirmDialog).findByRole('alert');
+    expect(statusError).not.toHaveTextContent('status update failed');
     expect(screen.getByRole('heading', { name: '更新信号状态' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
     expect(within(dialog).getByText('有效')).toBeInTheDocument();
@@ -2628,6 +2662,61 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByRole('heading', { name: '决策记忆' })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
+  });
+
+  it('opens a deep-linked signal by id when it is not in the loaded list page', async () => {
+    const remoteSignal = makeSignal({
+      id: 99,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+    });
+    // Loaded page only contains signal id 7; deep link targets 99.
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal]));
+    vi.mocked(decisionSignalsApi.get).mockImplementation(async (signalId: number) => {
+      if (signalId === remoteSignal.id) return remoteSignal;
+      return signal;
+    });
+    vi.mocked(decisionSignalsApi.getSignalOutcomes).mockResolvedValue(outcomeList);
+    vi.mocked(decisionSignalsApi.getMemoryFlag).mockResolvedValue({
+      signalId: remoteSignal.id,
+      memorable: false,
+      ignored: false,
+    });
+
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?signal=${remoteSignal.id}`);
+    renderPage();
+
+    await waitFor(() => expect(decisionSignalsApi.get).toHaveBeenCalledWith(remoteSignal.id));
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    expect(within(dialog).getByText('Apple')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe(String(remoteSignal.id));
+    await waitFor(() => expect(decisionSignalsApi.getSignalOutcomes).toHaveBeenCalledWith(remoteSignal.id));
+  });
+
+  it('clears a 404 deep-link signal param without crashing', async () => {
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal]));
+    vi.mocked(decisionSignalsApi.get).mockRejectedValue(
+      createApiError(
+        createParsedApiError({
+          title: '未找到',
+          message: '信号不存在',
+          status: 404,
+          category: 'http_error',
+          code: 'not_found',
+        }),
+      ),
+    );
+
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?signal=40404`);
+    renderPage();
+
+    await waitFor(() => expect(decisionSignalsApi.get).toHaveBeenCalledWith(40404));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
+    expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument();
+    // Existing statusError + ApiErrorAlert path surfaces the stable not_found copy (no new i18n key).
+    expect(await screen.findByText('该内容可能已删除、过期或尚未生成。')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '信号中心' })).toBeInTheDocument();
   });
 
   it('opens a Bell signal detail after same-route navigation', async () => {

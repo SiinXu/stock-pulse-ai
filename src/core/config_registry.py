@@ -31,6 +31,7 @@ _REGISTRY_PART_MODULES = (
     "src.core.config_registry_parts.notification",
     "src.core.config_registry_parts.system",
     "src.core.config_registry_parts.backtest",
+    "src.core.config_registry_parts.indicators",
     "src.core.config_registry_parts.agent",
     "src.core.config_registry_parts.help_metadata",
 )
@@ -68,6 +69,9 @@ from src.core.config_registry_parts.system import (
 from src.core.config_registry_parts.backtest import (
     BACKTEST_FIELD_DEFINITIONS as _BACKTEST_FIELD_DEFINITIONS,
 )
+from src.core.config_registry_parts.indicators import (
+    INDICATOR_FIELD_DEFINITIONS as _INDICATOR_FIELD_DEFINITIONS,
+)
 from src.core.config_registry_parts.agent import (
     AGENT_FIELD_DEFINITIONS as _AGENT_FIELD_DEFINITIONS,
 )
@@ -89,6 +93,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     **_NOTIFICATION_FIELD_DEFINITIONS,
     **_SYSTEM_FIELD_DEFINITIONS,
     **_BACKTEST_FIELD_DEFINITIONS,
+    **_INDICATOR_FIELD_DEFINITIONS,
     **_AGENT_FIELD_DEFINITIONS,
 }
 _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]]
@@ -100,6 +105,7 @@ del _AI_MODEL_LEGACY_FIELD_DEFINITIONS
 del _NOTIFICATION_FIELD_DEFINITIONS
 del _SYSTEM_FIELD_DEFINITIONS
 del _BACKTEST_FIELD_DEFINITIONS
+del _INDICATOR_FIELD_DEFINITIONS
 del _AGENT_FIELD_DEFINITIONS
 del _REGISTRY_PART_MODULES
 del _importlib
@@ -180,7 +186,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|API_SURFACE|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
 )
 
 
@@ -341,6 +347,7 @@ def _infer_category(key: str) -> str:
             "AKSHARE",
             "EFINANCE",
             "PYTDX",
+            "FUTU",
             "BAOSTOCK",
             "YFINANCE",
             "TAVILY",

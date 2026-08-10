@@ -89,7 +89,7 @@ right boundary.
 
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
-| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use top-level YAML under `strategies/` plus the reserved `strategies/personas/` YAML collection; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
+| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-in content lives as YAML under `strategies/` (plus reserved `strategies/personas/`) and is published as first-class `analysis_strategy` plugins; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
 | Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact point authority described by the implementation-status table | Trusted in-process code; the default process binds Analysis Strategies, Agent Tools, Report Templates, and the other implemented points listed below, while every unbound or contract-only point remains unavailable at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
@@ -146,18 +146,52 @@ remain available on the root for diagnostics and deterministic tests.
 X3 exposes its configured unified registry as
 `DataFetcherManager.plugin_registry`. Programmatic composition may pass that
 exact registry to `PluginManager`; the provider manager and plugin manager must
-not be given separate registries. The default process plugin manager does not
-invent a process-wide `DataFetcherManager`, because current provider consumers
-own distinct managers. A composition caller that activates Data Provider
-plugins must inject a `PluginManager` bound to the exact target manager registry.
-X2b does not silently redirect or replace those existing provider-manager
-ownership boundaries.
+not be given separate registries. Manual mode preserves existing independently
+owned provider managers. Auto-bind mode establishes an explicit process owner
+in `ApplicationServices` and routes the stock quote/history service plus the
+primary stock-analysis pipeline through it.
 
-Consequently, setting `PLUGINS_DIR` on the default process root discovers and
-loads plugin lifecycle objects but does not by itself activate a Data Provider
-implementation. A composition caller must construct `PluginManager` with the
-exact target `DataFetcherManager.plugin_registry`; no default process-wide
-provider manager is fabricated for external plugins.
+Consequently, setting only `PLUGINS_DIR` discovers and loads plugin lifecycle
+objects but does not activate a Data Provider implementation in standalone
+managers. Activation through the default process path also requires
+`PLUGIN_DATA_PROVIDER_AUTO_BIND=true`.
+
+### Opt-in Data Provider auto-bind
+
+`PLUGIN_DATA_PROVIDER_AUTO_BIND` defaults off. When the default composition root
+opts in, it constructs or accepts one `DataFetcherManager`, shares its exact
+registry with `PluginManager`, and exposes that owner to `StockService` quote
+and history calls plus the primary analysis pipeline. If a manager is injected,
+the root atomically binds the other process extension contracts into that exact
+registry before those points have registrations; an active conflicting contract
+fails closed. Custom composition roots may call
+`try_build_auto_bound_registry(data_fetcher_manager)` (or
+`resolve_data_provider_registry`) to obtain the **exact** manager-owned
+`plugin_registry` instance and pass it into `PluginManager`. Rebuilding a new
+`ExtensionRegistry` that only shares the native backend is not sufficient:
+`DataFetcherManager` discovers providers from its own registry registrations.
+
+Binding failures surface stable error codes
+(`data_provider_bind_interface_invalid`, `data_provider_bind_priority_conflict`,
+`data_provider_bind_unavailable`) and must not be silently ignored by the
+composition root.
+
+### Lifecycle audit and health
+
+Plugin lifecycle operations emit security-audit events with
+`event_type=plugin.lifecycle` through the existing `SecurityAuditService`
+contract. Automatic startup loading remains best-effort. Administrator
+enable/disable/reload requests require a persisted attempt before mutation; a
+completion-write failure is returned as `503 security_audit_unavailable` with
+the truthful completed state. One reload emits one correlated reload pair;
+internal disable/load steps are subordinate and are not separate operator
+events. `PluginManager.health_check()` returns a read-only snapshot of each
+plugin's state, extension points, and most recent stable `error_code`. Disable
+preserves that diagnostic; only a successful state-changing load/reload
+establishes recovery and clears it. An already-enabled no-op cannot erase a
+restart-required reload failure. Completion-audit 503 responses preserve the
+underlying error code, message, reload flag, and restart requirement. The
+loaded-extensions UI is a separate frontend task.
 
 ## Startup Composition
 
@@ -311,7 +345,7 @@ Example `manifest.json`:
 | `minAppVersion` | Required minimum compatible StockPulse application version. |
 | `description` | Required non-empty operator-facing summary. |
 | `author` | Required non-empty author or organization name. |
-| `permissions` | Required list of descriptive permission IDs; metadata only and not enforced in this batch. |
+| `permissions` | Required list of permission IDs using plugin-id syntax or ToolSurface `name:action` capability form. Visible in startup logs, health snapshots, and lifecycle audit metadata. For `agent_tool` plugins, every `ToolPolicy.permissions` entry must be a subset of this list at load time (stable error `manifest_permissions_undeclared`); extra declarations are allowed. **Not a sandbox** — declaration does not isolate process privileges. |
 | `apiVersion` | Optional plugin API major; defaults to `"1"`. |
 | `entrypoint` | Optional external entrypoint; defaults to `plugin.py:Plugin`. It must remain relative to the plugin directory. |
 
@@ -634,15 +668,20 @@ adapter validates and detaches the mutable `Skill`, pins plugin provenance, and
 publishes it through the same generation-aware catalog used by Single-Agent
 prompt assembly, Multi-Agent routing, and `SkillAgent` construction.
 
-Built-ins still load through `SkillManager.load_builtin_skills()`. A configured
-`AGENT_SKILL_DIR` preserves top-level YAML/YML plus nested `SKILL.md` discovery,
-and a custom definition may still replace a built-in with the same name. A
-plugin may not replace a built-in, custom definition, or another plugin: initial
-collisions reject registration, while a later custom-directory collision keeps
-the custom definition and excludes the enabled plugin definition until the
-conflict is removed. Load, disable, enable, custom-directory changes, and root
-replacement invalidate the next catalog clone by root identity and generation.
-An in-flight clone remains stable.
+Built-in strategies are first-class plugins: each `strategies/` root YAML and
+each reserved `strategies/personas/` YAML is registered as
+`builtin.analysis-strategy.<name>` through the Analysis Strategy adapter at
+startup. YAML remains the definition source; plugin lifecycle owns enable,
+disable, and catalog publication. `SkillManager.load_builtin_skills()` is retained
+only as a legacy YAML shim for offline tools and tests (it does not double-load
+into the process reserved-name set). A configured `AGENT_SKILL_DIR` preserves
+top-level YAML/YML plus nested `SKILL.md` discovery, and a custom definition may
+still replace a built-in with the same name. A plugin may not replace a custom
+definition or another plugin: initial collisions reject registration, while a
+later custom-directory collision keeps the custom definition and excludes the
+enabled plugin definition until the conflict is removed. Load, disable, enable,
+custom-directory changes, and root replacement invalidate the next catalog clone
+by root identity and generation. An in-flight clone remains stable.
 
 The default `ApplicationServices` root owns the paired native adapter and unified
 `PluginManager`. A caller supplying a custom manager must bind the exact
@@ -692,7 +731,7 @@ capability declarations and is also published as `capabilities` in the public
 descriptor. Every Agent Tool must declare one or more of the currently
 supported capabilities: `analysis_context:read`, `backtest:read`,
 `community_intel:read`, `intel:read`, `local_model:execute`,
-`market_data:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
+`market_data:read`, `multimodal:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
 empty, or execution-ungranted declarations fail closed before the handler.
 The `agent_tool` registration contract remains major version `1`: syntactically
 valid v1 definitions can still register, while the existing ToolSurface policy
@@ -715,8 +754,10 @@ This completes the ToolSurface execution boundary in #191, not an OS or Python
 process-containment sandbox. URL-bearing tool-call arguments use the shared
 outbound policy, but external plugin handlers remain reviewed,
 process-equivalent Python and can initiate raw network or other process access
-internally. The top-level plugin manifest `permissions` list remains
-descriptive; it is distinct from enforced `ToolPolicy.permissions`.
+internally. The top-level plugin manifest `permissions` list is a load-time
+declaration distinct from runtime ToolSurface enforcement of
+`ToolPolicy.permissions`: agent tools must declare required capabilities on the
+manifest (subset check), but that declaration still does not sandbox the process.
 
 ### Notification Channels
 
@@ -990,17 +1031,41 @@ route, imported module, or in-memory object available to that process. The
 plugin manager provides availability isolation, not confidentiality or code
 containment.
 
-The `permissions` manifest field is schema and documentation only. It may help
-reviewers understand intended access and may support a future enforcement
-design, but the application does not grant, deny, intercept, or audit Python
-capabilities from that list in this batch. An empty list does not mean a plugin
-is safe.
+The `permissions` manifest field is a **declaration**, not a sandbox. It is
+surfaced in startup logs, plugin health snapshots, and lifecycle audit metadata
+so operators can see what a package claims. For plugins that register
+`agent_tool` extensions, load/enable refuses the plugin (isolated failure,
+stable code `manifest_permissions_undeclared`) when a tool's
+`ToolPolicy.permissions` are not a subset of the manifest list. That check does
+**not** intercept arbitrary Python, OS privileges, network, or filesystem access
+inside the plugin process. An empty list means tools must declare no capabilities;
+it does not mean the plugin is safe. Runtime Agent ToolSurface capability gates
+remain separate and unchanged.
 
 Operators must review and trust external plugin code and dependencies. Keeping
 `PLUGINS_DIR` unset or blank is the safe default and loads no external code.
 Setting it is a startup-time trust decision and requires a process restart.
 There is no remote marketplace, automatic update, dependency installation,
-signature verification, sandbox, subprocess boundary, or hot reload in scope.
+signature verification, sandbox, or subprocess boundary in scope. Basic
+in-process hot-reload for external packages is described in
+[Lifecycle Controls](#lifecycle-controls-enable--disable--hot-reload);
+it never fetches remote code or auto-enables new packages.
+
+## Manifest Permissions Semantics And Validation Timing
+
+| Stage | Behavior |
+| --- | --- |
+| Manifest parse | `permissions` must be a unique list of plugin-id style IDs or `name:action` capability IDs. |
+| Register / external load | Declared permissions are written to startup logs. |
+| Load / enable (`onload`) | If the plugin registered any `agent_tool`, every `ToolPolicy.permissions` entry must be ⊆ manifest `permissions`. Failure yields `manifest_permissions_undeclared`, rolls back that plugin only, and does not stop core startup or other plugins. |
+| Health / audit | Health snapshots and lifecycle audit metadata include the declared `permissions` list. |
+| Runtime tool execute | Unchanged ToolSurface capability gate in `tool_surface` (out of scope for this declaration check). |
+
+**Declaration ≠ sandbox isolation.** Declaring fewer permissions does not contain
+process-equivalent Python. Declaring more than tools use is allowed (extra
+declarations are informational). Align `agent_tool` plugins with ToolSurface
+capability strings (for example `market_data:read`) rather than free-form labels
+when tools are registered.
 
 ## Deferred Surfaces
 
@@ -1009,3 +1074,59 @@ candidates. This batch defines no registration names, payloads, frontend bundle
 format, command parser, permission behavior, or implementation plan for them.
 They require a separate design that accounts for Web/Desktop compatibility,
 authentication, localization, and frontend supply-chain risk.
+
+## Lifecycle Controls (Enable / Disable / Hot-Reload)
+
+Version 1 of the extension **surface** remains frozen. Lifecycle **controls**
+operate on the existing manager contract without adding author-facing export
+names.
+
+### Persisted enable / disable
+
+- Operator intent is stored as a denylist of disabled plugin IDs in a JSON file
+  resolved by `PLUGIN_STATE_PATH` (default:
+  `<dir-of-DATABASE_PATH>/plugin_lifecycle_state.json`).
+- Missing IDs default to **enabled**, matching historical `load_all` behavior for
+  reviewed plugins already trusted via built-ins or `PLUGINS_DIR`.
+- On `load` / `load_all`, a disabled plugin transitions to `disabled` **without**
+  calling `onload`, so it never registers implementations for any extension
+  point (`data_provider`, `analysis_strategy`, `agent_tool`,
+  `notification_channel`, `report_template`, `event_hook`) and is never
+  selected by `enabled_registrations*`.
+- `enable` / `disable` update runtime state and the denylist. Process shutdown
+  unload does **not** rewrite operator intent.
+- Clear log lines record skip-load and disable outcomes.
+
+### Basic hot-reload
+
+- `PluginManager.reload(plugin_id)` re-imports **one** external package from its
+  recorded package root, then re-registers and optionally reloads it.
+- **Never** remote-fetches code, installs dependencies, or auto-enables a
+  plugin that is persisted as disabled.
+- **Never** scans `PLUGINS_DIR` for newly added sibling packages during reload
+  (no auto-enable of new files).
+- Built-in plugins always return `restart_required=true` because their code is
+  part of the application package.
+- If unload / cleanup cannot fully release registrations, the result is an
+  honest `restart_required` rather than a silent partial swap.
+
+### HTTP API (PLUG-02 contract)
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/plugins` | List registered plugins + lifecycle fields |
+| `POST` | `/api/v1/plugins/{plugin_id}/lifecycle` | Body `{ "action": "enable" \| "disable" \| "reload" }` |
+
+Auth follows neighbors: global admin-session middleware when
+`ADMIN_AUTH_ENABLED=true`. Response models live in
+`api/v1/schemas/plugins.py`.
+
+### Security reasoning
+
+Lifecycle controls do not weaken the trusted-plugin model:
+
+1. Code still executes only from built-ins or an operator-configured local
+   `PLUGINS_DIR` (no marketplace / remote fetch).
+2. Persistence records only enable/disable intent for already-registered IDs.
+3. Hot-reload re-imports an already-known package root; new directories are not
+   discovered or auto-enabled by the reload path.

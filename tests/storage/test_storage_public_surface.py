@@ -21,7 +21,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     ApprovalProposalRecord ApprovalRuleRecord
     AlertRuleRecord AlertTriggerRecord AnalysisHistory Any BacktestResult
     BacktestSummary Base Boolean CURRENT_SCHEMA_VERSION Callable Column
-    ConversationMessage ConversationSummary DatabaseManager
+    ConversationMessage ConversationSessionState ConversationSummary DatabaseManager
     DatabaseSchemaMigration Date DateTime DecisionSignalFeedbackRecord
     DecisionSignalMemoryFlagRecord
     DecisionSignalOutcomeRecord DecisionSignalRecord Dict Float ForeignKey
@@ -35,6 +35,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PortfolioCorporateAction PortfolioDailySnapshot PortfolioFxRate
     PortfolioIdempotencyRecord PortfolioPosition PortfolioPositionLot
     PortfolioTrade ScheduledTaskRecord ScheduledTaskRunRecord Session StockDaily
+    TaskQueueInflightRecord
     String T TYPE_CHECKING Text Tuple
     TypeVar Union UniqueConstraint agent_history_public_fields and_
     apply_pending_within_transaction atexit contextmanager
@@ -71,6 +72,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "PortfolioDailySnapshot",
     "PortfolioFxRate",
     "ConversationMessage",
+    "ConversationSessionState",
     "ConversationSummary",
     "AgentProviderTurn",
     "LLMUsage",
@@ -93,9 +95,10 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "ScheduledTaskRunRecord",
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
+    "TaskQueueInflightRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "f537207730c1e2aabb02112b4d64a4d5e3ea6b4f859d2a32979b24cc470f5569"
+    "ef3bda9447c18cfbd202edee46c81c37fd411cb7ca40a8843fab6271bbcf9fdd"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -117,6 +120,7 @@ EXPECTED_SCHEMA_MODELS = (
     "PortfolioDailySnapshot",
     "PortfolioFxRate",
     "ConversationMessage",
+    "ConversationSessionState",
     "ConversationSummary",
     "AgentProviderTurn",
     "LLMUsage",
@@ -136,6 +140,7 @@ EXPECTED_SCHEMA_MODELS = (
     "ScheduledTaskRunRecord",
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
+    "TaskQueueInflightRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -157,6 +162,7 @@ EXPECTED_SCHEMA_TABLES = (
     "portfolio_daily_snapshots",
     "portfolio_fx_rates",
     "conversation_messages",
+    "conversation_session_states",
     "conversation_summaries",
     "agent_provider_turns",
     "llm_usage",
@@ -176,6 +182,7 @@ EXPECTED_SCHEMA_TABLES = (
     "scheduled_task_runs",
     "investment_frameworks",
     "investment_framework_versions",
+    "task_queue_inflight",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -213,6 +220,9 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("investment_frameworks", "updated_at", "default"),
     ("investment_frameworks", "updated_at", "onupdate"),
     ("investment_framework_versions", "created_at", "default"),
+    ("task_queue_inflight", "created_at", "default"),
+    ("task_queue_inflight", "updated_at", "default"),
+    ("task_queue_inflight", "updated_at", "onupdate"),
 )
 
 EXPECTED_GROUPS = (
@@ -268,8 +278,10 @@ EXPECTED_GROUPS = (
             "save_analysis_history",
             "update_analysis_history_diagnostics",
             "get_analysis_history",
+            "get_analysis_history_batch",
             "get_latest_analysis_history_id",
             "get_analysis_history_paginated",
+            "search_analysis_history",
             "get_analysis_history_by_id",
             "delete_analysis_history_records",
             "get_distinct_stocks_from_history",
@@ -285,13 +297,15 @@ EXPECTED_GROUPS = (
             "_extract_sniper_points",
             "_build_fallback_url_key",
         ),
-        "f5aee9366c7cc397ff498a8ca194141ca0dd782f45758eeffcc14e92f6baf98d",
+        "d55af92829eab68c5cfb8eebc47cff79b150e96ed7b25daac681b7a677efc738",
     ),
     (
         "_ConversationMethods",
         "_CONVERSATION_METHOD_NAMES",
         (
             "save_conversation_message",
+            "save_conversation_user_turn",
+            "get_conversation_session_selected_skill_ids",
             "get_conversation_history",
             "get_visible_conversation_messages",
             "get_conversation_summary",
@@ -304,7 +318,7 @@ EXPECTED_GROUPS = (
             "get_conversation_messages",
             "delete_conversation_session",
         ),
-        "507c839d148e0284b30d5b057c14c2167811e8cd9b736340236ea6378d3f541e",
+        "b11e857f79dc5f3a3026e86bf426ecb7a3df8ebb389be3e5304fdcca787bdefb",
     ),
     (
         "_UsageMethods",

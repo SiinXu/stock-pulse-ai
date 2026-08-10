@@ -37,6 +37,7 @@ import json
 import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
@@ -388,6 +389,8 @@ BASE_CONFIG_FIELDS: Dict[str, Any] = {
     "agent_skill_dir": None,
     "agent_risk_override": True,
     "agent_memory_enabled": False,
+    "multimodal_agent_tools_enabled": False,
+    "multimodal_file_root": None,
     "agent_context_compression_enabled": False,
     "agent_context_compression_profile": "balanced",
     "agent_context_compression_trigger_tokens": 999999,
@@ -521,11 +524,51 @@ def _normalize_error(error: Optional[str]) -> Dict[str, Any]:
     return {"error": error}
 
 
+def _normalize_dashboard(dashboard: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Stabilize generated Risk Manager identity fields for replay snapshots."""
+    if dashboard is None:
+        return None
+    normalized = json.loads(json.dumps(dashboard, ensure_ascii=False))
+    risk_manager = normalized.get("risk_manager")
+    if not isinstance(risk_manager, dict):
+        return normalized
+
+    evaluation_id = risk_manager.get("evaluation_id")
+    if isinstance(evaluation_id, str) and re.fullmatch(r"[0-9a-f]{32}", evaluation_id):
+        risk_manager["evaluation_id"] = "<runtime-generated>"
+
+    evaluated_at = risk_manager.get("evaluated_at")
+    if isinstance(evaluated_at, str):
+        try:
+            parsed = datetime.fromisoformat(evaluated_at)
+        except ValueError:
+            pass
+        else:
+            if parsed.tzinfo is not None:
+                risk_manager["evaluated_at"] = "<runtime-evaluated-at>"
+    return normalized
+
+
+def _normalize_json_content(content: Any) -> Any:
+    """Normalize a dashboard serialized as JSON without masking non-JSON text."""
+    if not isinstance(content, str):
+        return content
+    try:
+        payload = json.loads(content)
+    except (TypeError, ValueError):
+        return content
+    if not isinstance(payload, dict) or "risk_manager" not in payload:
+        return content
+    normalized = _normalize_dashboard(payload)
+    return json.dumps(normalized, ensure_ascii=False, indent=2)
+
+
 def observe_case(case: Dict[str, Any]) -> Dict[str, Any]:
     """Run a case and return the frozen ``expected`` payload."""
     result, adapter, _executed_tools, chat_artifacts = run_case(case)
 
-    dashboard = result.dashboard if isinstance(result.dashboard, dict) else None
+    raw_dashboard = result.dashboard if isinstance(result.dashboard, dict) else None
+    dashboard = _normalize_dashboard(raw_dashboard)
     observed: Dict[str, Any] = {
         "success": result.success,
         "signal": dashboard.get("decision_type") if dashboard else None,
@@ -538,11 +581,17 @@ def observe_case(case: Dict[str, Any]) -> Dict[str, Any]:
         "model": result.model,
         "dashboard_keys": sorted(dashboard.keys()) if dashboard else None,
         "dashboard": dashboard,
-        "content": result.content,
+        "content": _normalize_json_content(result.content),
     }
     observed.update(_normalize_error(result.error))
     if chat_artifacts is not None:
-        observed["conversation"] = chat_artifacts["conversation"]
+        observed["conversation"] = [
+            {
+                **row,
+                "content": _normalize_json_content(row.get("content")),
+            }
+            for row in chat_artifacts["conversation"]
+        ]
         observed["provider_turns"] = chat_artifacts["provider_turns"]
     return observed
 

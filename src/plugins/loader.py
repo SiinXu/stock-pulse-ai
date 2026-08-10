@@ -139,6 +139,14 @@ class ExternalPluginLoader:
         except ValidationError:
             return self._failure(candidate_name, "external_manifest_invalid")
 
+        logger.info(
+            "External plugin manifest accepted candidate=%s id=%s version=%s permissions=%s",
+            candidate_name,
+            manifest.id,
+            manifest.version,
+            list(manifest.permissions),
+        )
+
         compatibility_error = self._manager.compatibility_error(manifest)
         if compatibility_error is not None:
             return self._failure(
@@ -186,7 +194,15 @@ class ExternalPluginLoader:
                 plugin_id=manifest.id,
             )
 
-        module_name = self._module_name(manifest, entrypoint_path)
+        try:
+            reload_token = f"{entrypoint_path.stat().st_mtime_ns}:{entrypoint_path.stat().st_size}"
+        except OSError:
+            reload_token = None
+        module_name = self._module_name(
+            manifest,
+            entrypoint_path,
+            reload_token=reload_token,
+        )
         module = None
         try:
             spec = importlib.util.spec_from_file_location(module_name, entrypoint_path)
@@ -256,7 +272,12 @@ class ExternalPluginLoader:
                 plugin_id=manifest.id,
             )
 
-        registration = self._manager.register(plugin, source="external")
+        registration = self._manager.register(
+            plugin,
+            source="external",
+            package_root=candidate_root,
+            module_name=module_name,
+        )
         if not registration.success:
             self._remove_module(module_name, module)
         return ExternalPluginResult(
@@ -267,9 +288,40 @@ class ExternalPluginLoader:
             error_code=registration.error_code,
         )
 
+    def register_one(self, package_root: str | Path) -> ExternalPluginResult:
+        """Import and register one external plugin package without scanning siblings.
+
+        Used by hot-reload. Does not discover or auto-enable newly added sibling
+        packages under ``PLUGINS_DIR``.
+        """
+
+        try:
+            candidate = Path(package_root).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError, FileNotFoundError) as exc:
+            log_safe_exception(
+                logger,
+                "External plugin package root unavailable for reload",
+                exc,
+                error_code="external_plugins_directory_unavailable",
+            )
+            return self._failure(
+                sanitize_diagnostic_text(str(package_root), max_length=128) or "plugin",
+                "external_plugins_directory_unavailable",
+            )
+        if not candidate.is_dir() or candidate.is_symlink():
+            return self._failure(candidate.name, "external_plugins_directory_unavailable")
+        return self._register_candidate(candidate)
+
     @staticmethod
-    def _module_name(manifest: PluginManifest, entrypoint_path: Path) -> str:
+    def _module_name(
+        manifest: PluginManifest,
+        entrypoint_path: Path,
+        *,
+        reload_token: str | None = None,
+    ) -> str:
         identity = f"{manifest.id}\x00{manifest.version}\x00{entrypoint_path}"
+        if reload_token:
+            identity = f"{identity}\x00{reload_token}"
         digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
         return f"_stockpulse_external_plugin_{digest}"
 

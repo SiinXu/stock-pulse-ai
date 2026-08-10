@@ -10,7 +10,7 @@ existing call sites and tests keep working without behavior changes.
 
 from __future__ import annotations
 
-import json
+import json as _json
 import logging
 import os
 import time
@@ -31,7 +31,7 @@ from typing import (
 import numpy as np
 import pandas as pd
 
-from src.utils.sanitize import sanitize_diagnostic_text
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 from ..realtime_types import CircuitBreaker
 from ..symbol_normalization import _market_tag, normalize_stock_code
@@ -162,9 +162,33 @@ class _DailySourceHealthMethods:
 
     def _call_fetcher_method(self, fetcher: BaseFetcher, method_name: str, *args, **kwargs):
         """Serialize shared fetcher state access through manager-owned per-instance locks."""
+        validation_instrument_type = kwargs.pop("_validation_instrument_type", None)
         method = getattr(fetcher, method_name)
+        result_validator = kwargs.pop("_manager_result_validator", None)
         with self._get_fetcher_call_lock(fetcher):
+            if method_name == "get_realtime_quote":
+                result = method(*args, **kwargs)
+                if result is not None:
+                    from data_provider.data_validation import validate_and_annotate
+
+                    stock_code = kwargs.get("stock_code") or (args[0] if args else "")
+                    validate_and_annotate(
+                        result,
+                        data_type="realtime_quote",
+                        market=_market_tag(normalize_stock_code(str(stock_code))),
+                        stock_code=str(stock_code),
+                        provider=fetcher.name,
+                        instrument_type=(
+                            validation_instrument_type
+                            or getattr(result, "instrument_type", None)
+                        ),
+                    )
+                return result
             if method_name != "get_daily_data":
+                if result_validator is not None:
+                    raise ValueError(
+                        "_manager_result_validator is only supported for get_daily_data"
+                    )
                 return method(*args, **kwargs)
 
             stock_code = kwargs.get("stock_code") or (args[0] if args else "")
@@ -183,13 +207,35 @@ class _DailySourceHealthMethods:
             started_at = time.monotonic()
             try:
                 result = method(*args, **kwargs)
-            except Exception:
+                if result_validator is not None:
+                    result = result_validator(result)
+                if isinstance(result, pd.DataFrame) and not result.empty:
+                    from data_provider.data_validation import validate_and_annotate
+
+                    validate_and_annotate(
+                        result,
+                        data_type="daily_data",
+                        market=market,
+                        stock_code=str(stock_code),
+                        provider=fetcher.name,
+                        instrument_type=(
+                            validation_instrument_type
+                            or result.attrs.get("instrument_type")
+                        ),
+                    )
+            except Exception as exc:
                 latency_ms = (time.monotonic() - started_at) * 1000.0
-                self._daily_source_health.record_failure(
-                    health_key,
-                    error="data_provider_daily_data_attempt_failed",
-                    latency_ms=latency_ms,
-                )
+                if type(exc).__name__ == "DataValidationRejected":
+                    self._daily_source_health.record_quality_failure(
+                        health_key,
+                        latency_ms=latency_ms,
+                    )
+                else:
+                    self._daily_source_health.record_failure(
+                        health_key,
+                        error="data_provider_daily_data_attempt_failed",
+                        latency_ms=latency_ms,
+                    )
                 self._mark_daily_health_recorded(health_key)
                 raise
 
@@ -363,7 +409,7 @@ class _DailySourceHealthMethods:
                     sanitize_diagnostic_text(fetcher.name, max_length=120)
                     for fetcher in selected_order
                 ),
-                json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
+                _json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
             )
         return selected_order
 
@@ -573,7 +619,7 @@ class _DailySourceHealthMethods:
         logger.info(
             "provider_health event=snapshot data_type=daily_data market=%s payload=%s",
             report["market"],
-            json.dumps(report, sort_keys=True, separators=(",", ":")),
+            _json.dumps(report, sort_keys=True, separators=(",", ":")),
         )
         return report
 
@@ -723,6 +769,19 @@ def bind_daily_source_health_facade(
             ),
         )
         bound_names.append(name)
+    # Reinstall final-exit validation after each facade bind/reload.
+    try:
+        from .data_validation_wiring import ensure_validation_wrappers
+
+        ensure_validation_wrappers(target_class)
+    except Exception as exc:  # broad-exception: fallback_recorded - validation install must not break imports
+        log_safe_exception(
+            logger,
+            "data validation wrapper install skipped",
+            exc,
+            error_code="data_validation_install",
+            level=logging.WARNING,
+        )
     return tuple(bound_names)
 
 

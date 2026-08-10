@@ -35,6 +35,7 @@ from src.agent.runner_parts import tools as _runner_tools
 parse_dashboard_json = _runner_parsing.parse_dashboard_json
 parse_dashboard_json_result = _runner_parsing.parse_dashboard_json_result
 run_agent_loop = _runner_loop.run_agent_loop
+_NATIVE_TOOL_RESULT_MAX_BYTES = _runner_loop._NATIVE_TOOL_RESULT_MAX_BYTES
 
 from src.agent.dashboard_payload import (
     has_reserved_explanation_field,
@@ -42,6 +43,15 @@ from src.agent.dashboard_payload import (
 )
 from src.agent.llm_adapter import LLMToolAdapter, ToolCall
 from src.agent.protocols import StageFailureReason
+from src.agent.observability import (
+    emit_decision,
+    emit_model_end,
+    emit_model_start,
+    emit_phase_end,
+    emit_phase_start,
+    emit_tool_end,
+    emit_tool_start,
+)
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.execution import (
@@ -356,6 +366,7 @@ _RUNNER_COMPAT_EXPORTS = (
     _is_stock_scoped_tool,
     _normalize_guard_stock_code,
     _normalize_tool_stock_code,
+    _NATIVE_TOOL_RESULT_MAX_BYTES,
     _try_parse_json,
     _try_repair_json,
     as_completed,
@@ -376,6 +387,13 @@ _RUNNER_COMPAT_EXPORTS = (
     sanitize_agent_dashboard_payload,
     serialize_tool_result,
     stream_event,
+    emit_decision,
+    emit_model_end,
+    emit_model_start,
+    emit_phase_end,
+    emit_phase_start,
+    emit_tool_end,
+    emit_tool_start,
     threading,
     time,
     uuid,

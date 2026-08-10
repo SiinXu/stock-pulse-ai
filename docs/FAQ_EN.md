@@ -136,14 +136,16 @@ This document compiles common issues encountered by users and their solutions.
 
 **Solution**:
 
-Configure in `.env`:
+1. **Recommended (Web Settings)**: open **Settings → System & Security → Web & Logs**, enable **Enable Local Proxy**, set host/port, and save. Fields carry a restart notice: a process restart is still required for full effect (especially disabling a previously applied proxy or refreshing long-lived clients).
+2. **Or edit `.env`**:
 ```bash
 USE_PROXY=true
 PROXY_HOST=127.0.0.1
 PROXY_PORT=10809
 ```
+You can also use the standard `HTTP_PROXY=http://host:port` form (prefer it when you need a full URL or credentials).
 
-> Note: Proxy configuration only works for local runs, GitHub Actions environment doesn't need proxy.
+> Note: Proxy configuration only works for local runs; GitHub Actions always skips `USE_PROXY`. `PROXY_HOST` may embed credentials—do not paste it into screenshots, public logs, or shared profile exports.
 
 ---
 

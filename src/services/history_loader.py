@@ -16,6 +16,7 @@ from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
+from data_provider.daily_cache import LocalDataMissingError
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -177,7 +178,9 @@ def load_history_df(
         df, source = manager.get_daily_data(stock_code, days=days)
         if df is not None and not df.empty:
             return df, source
-    except Exception as exc:
+    except LocalDataMissingError:
+        raise
+    except Exception as exc:  # broad-exception: fallback_recorded - provider fallback failure is logged before the established no-history result
         log_safe_exception(
             logger,
             "Historical bars provider fallback failed",

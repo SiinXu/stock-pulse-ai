@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState, type ReactNode } from 'react';
+import { lazy, useState, type ReactNode } from 'react';
 import { Button } from '../../components/common';
-import { AiOverviewMatrix } from '../../components/settings/AiOverviewMatrix';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
 import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard';
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
@@ -12,8 +11,12 @@ import { KronosStatusPanel } from '../../components/settings/KronosStatusPanel';
 import { LocalModelsWithKronos } from '../../components/settings/LocalModelsWithKronos';
 import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
+import { InvestmentFrameworkPromptPreview } from '../../components/settings/InvestmentFrameworkPromptPreview';
 import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
+import { emptyInvestmentFrameworkContent } from '../../components/settings/investmentFrameworkEditorModel';
 import { LLMChannelEditor } from '../../components/settings/LLMChannelEditor';
+import { SettingsOnboardingHosts } from '../../components/onboarding/SettingsOnboardingHosts';
+import type { SetupStatusResponse } from '../../types/systemConfig';
 import { LLMConfigModeBanner } from '../../components/settings/LLMConfigModeBanner';
 import { LocalModelsPanel } from '../../components/settings/LocalModelsPanel';
 import { ModelFallbackEditor } from '../../components/settings/ModelFallbackEditor';
@@ -21,6 +24,7 @@ import { ModelMultiSelect } from '../../components/settings/ModelMultiSelect';
 import { MultiSelectDropdown } from '../../components/settings/MultiSelectDropdown';
 import { NotificationChannelsPanel } from '../../components/settings/NotificationChannelsPanel';
 import { NotificationTestPanel } from '../../components/settings/NotificationTestPanel';
+import { buildNotificationEventRoutes } from '../../components/settings/notificationEventRoutes';
 import { ProviderQuickLinks } from '../../components/settings/ProviderQuickLinks';
 import { SettingsAlert } from '../../components/settings/SettingsAlert';
 import { SettingsConfigurationSummary, SystemConfigSummary } from '../../components/settings/SettingsConfigurationSummary';
@@ -131,27 +135,12 @@ const AVAILABLE_MODELS: AvailableModelEntry[] = [{
   available: true,
 }];
 
-const AiOverviewMatrixStory = () => {
-  const { language } = useStoryText();
-  const { scenario } = usePlaygroundScenario();
-  const values: Record<string, string> = scenario === 'states'
-    ? { GENERATION_BACKEND: 'litellm', LITELLM_MODEL: 'unavailable/route' }
-    : {
-        GENERATION_BACKEND: 'litellm',
-        LITELLM_MODEL: MODEL_REF,
-        AGENT_LITELLM_MODEL: MODEL_REF,
-        VISION_MODEL: MODEL_REF,
-        LITELLM_FALLBACK_MODELS: 'fixture/fixture-route-fast',
-      };
-  return (
-    <AiOverviewMatrix
-      getValue={(key) => values[key] ?? ''}
-      language={language}
-      availableRoutes={new Set([MODEL_REF])}
-      onEditRouting={() => undefined}
-    />
-  );
-};
+const agentSettingsScenarios = () => import('./agentBehaviorPanelScenario');
+const LazyAgentSettingsStory = lazy(agentSettingsScenarios);
+const AiOverviewMatrixStory = () => <LazyAgentSettingsStory story="overview" />;
+const SettingsAgentOnboardingHostStory = () => <LazyAgentSettingsStory story="onboarding" />;
+const SettingsModeToggleStory = () => <LazyAgentSettingsStory story="mode" />;
+const AgentBehaviorPanelStory = () => <LazyAgentSettingsStory story="presets" />;
 
 const DataProvidersPanelStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -320,10 +309,16 @@ const NotificationChannelsPanelStory = () => {
   return (
     <NotificationChannelsPanel
       items={items}
-      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom_webhook']}
+      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom']}
       disabled={false}
       issueByKey={{}}
       onChange={(key, value) => setItems((current) => current.map((item) => item.key === key ? { ...item, value } : item))}
+      eventRoutes={buildNotificationEventRoutes(scenario === 'empty' ? {} : {
+        NOTIFICATION_REPORT_CHANNELS: 'email,custom',
+        NOTIFICATION_ALERT_CHANNELS: 'email',
+        NOTIFICATION_SYSTEM_ERROR_CHANNELS: '',
+      }, scenario === 'empty' ? [] : ['email', 'custom'])}
+      maskToken={MASK_TOKEN}
     />
   );
 };
@@ -483,7 +478,94 @@ const SystemConfigSummaryStory = () => (
   <SystemConfigSummary items={NOTIFICATION_ITEMS} maskToken={MASK_TOKEN} />
 );
 
+const FIXTURE_SETUP_STATUS: SetupStatusResponse = {
+  isComplete: false,
+  readyForSmoke: false,
+  requiredMissingKeys: ['LITELLM_MODEL'],
+  nextStepKey: 'llm_primary',
+  checks: [
+    {
+      key: 'llm_primary',
+      title: 'Primary model',
+      category: 'ai_model',
+      required: true,
+      status: 'needs_action',
+      message: 'Primary model is not configured.',
+      nextStep: 'Configure a primary model in Settings.',
+    },
+    {
+      key: 'auth',
+      title: 'Authentication',
+      category: 'system',
+      required: false,
+      status: 'optional',
+      message: 'Password login is optional for local use.',
+    },
+  ],
+};
+
+const InvestmentFrameworkPromptPreviewStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const { text } = useStoryText();
+  const content = scenario === 'empty'
+    ? emptyInvestmentFrameworkContent()
+    : {
+      ...emptyInvestmentFrameworkContent(),
+      title: 'Quality first',
+      freeFormRules: 'Prefer durable cash flow',
+      riskRules: ['Cap single-name size at 10%'],
+      trackingCriteria: ['Review earnings revisions'],
+    };
+  return (
+    <InvestmentFrameworkPromptPreview
+      content={content}
+      frameworkId={scenario === 'empty' ? null : 1}
+      frameworkVersion={scenario === 'empty' ? null : 2}
+      draft
+      reportLanguage="en"
+      title={text.panelTitle}
+      description={text.fieldHint}
+      emptyLabel={text.preview}
+    />
+  );
+};
+
+const SettingsOnboardingHostsStory = () => {
+  const { language, text } = useStoryText();
+  const { t } = useUiLanguage();
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(true);
+  return (
+    <div className="space-y-3">
+      <Button variant="secondary" onClick={() => setIsWizardOpen(true)}>{text.openFirstRunWizard}</Button>
+      <Button variant="primary" onClick={() => setIsAgentOnboardingOpen(true)}>{text.openAgentOnboarding}</Button>
+      <SettingsOnboardingHosts
+        isWizardOpen={isWizardOpen}
+        isAgentOnboardingOpen={isAgentOnboardingOpen}
+        setIsWizardOpen={setIsWizardOpen}
+        setIsAgentOnboardingOpen={setIsAgentOnboardingOpen}
+        handleWizardComplete={async () => ({ success: true })}
+        isSaving={false}
+        uiLanguage={language}
+        existingChannelNames={[]}
+        providerCatalog={fixtureProviders}
+        providerConnectionFields={CONNECTION_FIELDS}
+        modelSelectorOptions={[{ value: MODEL_REF, label: 'Fixture Route' }]}
+        initialFallbackModels=""
+        initialVisionModel=""
+        onViewRouting={() => undefined}
+        onLocalModelConfigurationChanged={() => undefined}
+        onAgentApplied={() => setIsAgentOnboardingOpen(false)}
+        setupStatus={FIXTURE_SETUP_STATUS}
+        t={t}
+      />
+      <p className="text-xs text-muted-text">{text.preview}</p>
+    </div>
+  );
+};
+
 export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'agent-behavior-panel': AgentBehaviorPanelStory,
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
   'change-password-card': ChangePasswordCard,
@@ -495,6 +577,10 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'local-models-with-kronos': LocalModelsWithKronosStory,
   'intelligent-import': IntelligentImportStory,
   'investment-framework-settings-card': InvestmentFrameworkSettingsCard,
+  'investment-framework-prompt-preview': InvestmentFrameworkPromptPreviewStory,
+  'settings-mode-toggle': SettingsModeToggleStory,
+  'settings-agent-onboarding-host': SettingsAgentOnboardingHostStory,
+  'settings-onboarding-hosts': SettingsOnboardingHostsStory,
   'intelligence-sources-panel': IntelligenceSourcesPanel,
   'llm-channel-editor': LLMChannelEditorStory,
   'llm-config-mode-banner': LLMConfigModeBannerStory,

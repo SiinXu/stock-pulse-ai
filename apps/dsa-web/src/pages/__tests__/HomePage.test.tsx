@@ -209,8 +209,9 @@ describe('HomePage attention hub', () => {
       .toHaveAttribute('data-surface-level', 'interactive');
     expect(todos).toHaveAttribute('data-surface-level', 'interactive');
     expect(signalSummary).toHaveAttribute('data-surface-level', 'interactive');
-    expect(screen.getByRole('button', { name: 'Start analysis' }))
-      .toHaveAttribute('data-size', 'primary');
+    const startAnalysis = screen.getByRole('button', { name: 'Start analysis' });
+    expect(startAnalysis).toHaveAttribute('data-size', 'primary');
+    expect(startAnalysis.querySelector('.lucide-circle-play')).toHaveClass('h-4', 'w-4');
 
     expect(screen.getByTestId('home-attention-hub').querySelector('[data-slot="workspace-content"]'))
       .toHaveClass('rounded-xl', 'border', 'border-border', 'p-5');
@@ -273,16 +274,9 @@ describe('HomePage attention hub', () => {
     expect(within(recentAnalyses).getByText('Apple')).toBeInTheDocument();
     expect(recentAnalyses.querySelector(':scope > header .lucide-history')).toBeInTheDocument();
     const scheduled = screen.getByRole('region', { name: 'Versioned scheduled tasks today' });
-    expect(scheduled.parentElement).toHaveClass(
-      '[&>section>header]:rounded-lg',
-      '[&>section>header]:border',
-      '[&>section>header]:border-border',
-      '[&>section>header]:p-3',
-    );
-    expect(scheduled.parentElement).not.toHaveClass(
-      '[&>section>header]:!flex-col',
-      '[&>section>header]:!items-stretch',
-    );
+    expect(scheduled).toHaveAttribute('data-surface-level', 'interactive');
+    expect(scheduled).toHaveClass('border', 'border-border');
+    expect(scheduled.querySelector(':scope > header')).not.toHaveClass('border', 'border-border', 'p-3');
     expect(within(scheduled).getByText('AAPL downside review')).toBeInTheDocument();
     expect(within(scheduled).getByText('Risk check', { exact: false })).toBeInTheDocument();
     expect(within(scheduled).getByText('Waiting to retry')).toBeInTheDocument();
@@ -471,10 +465,22 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText('Base configuration incomplete')).toBeInTheDocument();
+    expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'System readiness' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Configurable area/ })).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    // Single dismiss owner: onboarding incomplete alert (not readiness card).
+    const closeButtons = screen.getAllByRole('button', { name: 'Close' });
+    expect(closeButtons).toHaveLength(1);
+    fireEvent.click(closeButtons[0]);
     expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
+  });
+
+  it('keeps home core blocks single-column below the xl breakpoint class', async () => {
+    renderHome();
+    const core = await screen.findByTestId('home-core-blocks');
+    expect(core).toHaveClass('xl:grid-cols-3');
+    expect(core).not.toHaveClass('lg:grid-cols-3');
+    expect(core).toHaveClass('min-w-0');
   });
 
   it('links the today scheduled-tasks card to Settings management', async () => {
@@ -517,9 +523,10 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText('Base configuration incomplete')).toBeInTheDocument();
-    // English UI maps keys rather than injecting backend Chinese titles.
-    expect(screen.getByText(/Missing Primary model, Watchlist/i)).toBeInTheDocument();
+    expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    // Goal-language labels, not backend Chinese titles.
+    expect(screen.getByText('Model is not connected yet')).toBeInTheDocument();
+    expect(screen.getByText('Watchlist is empty')).toBeInTheDocument();
     expect(screen.queryByText(/主要模型/)).not.toBeInTheDocument();
   });
 
@@ -541,7 +548,8 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText(/Missing Future readiness item/i)).toBeInTheDocument();
+    expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    expect(screen.getByText('Future readiness item')).toBeInTheDocument();
   });
 
 

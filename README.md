@@ -91,6 +91,8 @@ Architecture: [overview](docs/architecture-overview.md).
 
 ### Option A — GitHub Actions (no server)
 
+Minimal three-step path (one model Secret, `STOCK_LIST`, optional webhook): [GitHub Actions quickstart](docs/actions-quickstart.md) · [中文](docs/actions-quickstart_CN.md).
+
 1. **Fork** this repository.
 2. **Secrets** → `Settings` → `Secrets and variables` → `Actions`  
    - At least one model key: `ANSPIRE_API_KEYS` or `AIHUBMIX_KEY` (or Gemini / Anthropic / OpenAI-compatible).  
@@ -98,7 +100,7 @@ Architecture: [overview](docs/architecture-overview.md).
    - Required: `STOCK_LIST` e.g. `600519,hk00700,AAPL,2330.TW`  
    - Recommended: news keys (Anspire / SerpAPI / Tavily / …).  
    Details: [LLM guide](docs/LLM_CONFIG_GUIDE_EN.md), [Full guide](docs/full-guide_EN.md).
-3. Enable **Actions**, then run workflow **StockPulse Daily Analysis**.
+3. Enable **Actions**, run **Config Check** first (validates Secrets without a full analysis; see [job summary](docs/DEPLOY_EN.md#option-4-github-actions-deployment-serverless)), then **StockPulse Daily Analysis**.
 4. Default schedule: weekdays **18:00 Asia/Shanghai** (trading-day rules apply).
 
 ### Option B — Local / Docker / desktop

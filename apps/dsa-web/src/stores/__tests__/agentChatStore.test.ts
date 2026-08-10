@@ -34,6 +34,7 @@ beforeEach(() => {
   sessionStorage.clear();
   useAgentChatStore.setState({
     messages: [],
+    selectedSkillIds: null,
     loading: false,
     progressSteps: [],
     sessionId: 'session-test',
@@ -72,9 +73,13 @@ describe('agentChatStore session lifecycle', () => {
         last_active: '2026-07-15T00:00:00Z',
       },
     ]);
-    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([
-      { id: 'url-message', role: 'assistant', content: 'URL session reply', created_at: null },
-    ]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'session-url',
+      messages: [
+        { id: 'url-message', role: 'assistant', content: 'URL session reply', created_at: null },
+      ],
+      session_state: { selected_skill_ids: null },
+    });
 
     await useAgentChatStore.getState().loadInitialSession('session-url');
 
@@ -295,6 +300,21 @@ describe('agentChatStore.startStream', () => {
       .mockResolvedValueOnce(createStreamResponse([
         'data: {"type":"done","success":true,"content":"重试后的分析结果"}',
       ]));
+    vi.mocked(agentApi.getChatSessionMessages).mockImplementation(async () => {
+      const turnId = vi.mocked(agentApi.chatStream).mock.calls[0]?.[0].turn_id;
+      return {
+        session_id: 'session-test',
+        messages: [{
+          id: 'persisted-user',
+          role: 'user',
+          content: '分析茅台',
+          created_at: null,
+          turn_id: turnId,
+        }],
+        session_state: { selected_skill_ids: null },
+        turn_identity_supported: true,
+      };
+    });
 
     await useAgentChatStore
       .getState()
@@ -313,10 +333,96 @@ describe('agentChatStore.startStream', () => {
     expect(state.messages[1].content).toBe('重试后的分析结果');
     expect(agentApi.chatStream).toHaveBeenCalledTimes(2);
   });
+
+  it('keeps an ambiguous failed turn non-resendable for legacy services', async () => {
+    vi.mocked(agentApi.chatStream).mockResolvedValue(createStreamResponse([
+      'data: {"type":"error","error":"agent_stream_failed","message":"upstream disconnected"}',
+    ]));
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'session-test',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+    });
+
+    const outcome = await useAgentChatStore.getState().startStream({
+      message: '分析茅台',
+      session_id: 'session-test',
+      turn_id: 'turn-legacy-unknown',
+    });
+
+    expect(outcome.persistence).toBe('unknown');
+    expect(useAgentChatStore.getState().messages).toHaveLength(1);
+    expect(useAgentChatStore.getState().chatError).not.toBeNull();
+    expect(useAgentChatStore.getState().lastFailedRequest).toBeNull();
+    await useAgentChatStore.getState().retryLastStream();
+    expect(agentApi.chatStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores exactly one user message when retrying a confirmed absent turn', async () => {
+    vi.mocked(agentApi.chatStream)
+      .mockResolvedValueOnce(createStreamResponse([
+        'data: {"type":"error","error":"agent_stream_failed","message":"upstream disconnected"}',
+      ]))
+      .mockImplementationOnce(async (payload) => createStreamResponse([
+        `data: {"type":"turn_persisted","turn_id":"${payload.turn_id}","message_id":"9"}`,
+        'data: {"type":"done","success":true,"content":"重试后的分析结果"}',
+      ]));
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'session-test',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+      turn_identity_supported: true,
+    });
+
+    await useAgentChatStore.getState().startStream({
+      message: '分析茅台',
+      session_id: 'session-test',
+      turn_id: 'turn-retry-absent',
+    });
+
+    expect(useAgentChatStore.getState().messages).toEqual([]);
+    expect(useAgentChatStore.getState().lastFailedRequest?.payload.turn_id)
+      .toBe('turn-retry-absent');
+
+    await useAgentChatStore.getState().retryLastStream();
+
+    const messages = useAgentChatStore.getState().messages;
+    expect(messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(messages.filter((message) => message.turnId === 'turn-retry-absent'))
+      .toHaveLength(1);
+    expect(agentApi.chatStream).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ turn_id: 'turn-retry-absent' }),
+      expect.any(Object),
+    );
+  });
+
+  it('fences a completed response after controller ownership changes', async () => {
+    const response = createDeferred<Response>();
+    vi.mocked(agentApi.chatStream).mockReturnValue(response.promise);
+
+    const outcomePromise = useAgentChatStore.getState().startStream({
+      message: '分析茅台',
+      session_id: 'session-test',
+      turn_id: 'turn-stale-controller',
+    });
+    await vi.waitFor(() => expect(useAgentChatStore.getState().loading).toBe(true));
+    const replacementController = new AbortController();
+    useAgentChatStore.setState({ abortController: replacementController });
+    response.resolve(createStreamResponse([
+      'data: {"type":"done","success":true,"content":"stale answer"}',
+    ]));
+
+    await expect(outcomePromise).resolves.toMatchObject({ terminal: 'completed' });
+    expect(useAgentChatStore.getState().messages).toEqual([
+      expect.objectContaining({ role: 'user', turnId: 'turn-stale-controller' }),
+    ]);
+    expect(useAgentChatStore.getState().abortController).toBe(replacementController);
+  });
 });
 
 describe('agentChatStore.stopStream', () => {
-  it('aborts the in-flight stream and clears transient state, keeping messages', () => {
+  it('aborts the in-flight stream while retaining the send mutex, keeping messages', () => {
     const ac = new AbortController();
     useAgentChatStore.setState({
       loading: true,
@@ -329,9 +435,9 @@ describe('agentChatStore.stopStream', () => {
 
     const state = useAgentChatStore.getState();
     expect(ac.signal.aborted).toBe(true);
-    expect(state.loading).toBe(false);
+    expect(state.loading).toBe(true);
     expect(state.progressSteps).toEqual([]);
-    expect(state.abortController).toBeNull();
+    expect(state.abortController).toBe(ac);
     // The user's message is preserved so the transcript is not lost.
     expect(state.messages).toEqual([{ id: 'u1', role: 'user', content: '茅台怎么看' }]);
   });
@@ -341,15 +447,128 @@ describe('agentChatStore.stopStream', () => {
     expect(() => useAgentChatStore.getState().stopStream()).not.toThrow();
     expect(useAgentChatStore.getState().loading).toBe(false);
   });
+
+  it('returns aborted from startStream and keeps lastFailedRequest null when stopStream cancels the request', async () => {
+    const hang = createDeferred<Response>();
+    vi.mocked(agentApi.chatStream).mockImplementation((_payload, options) => {
+      const signal = options?.signal;
+      if (signal?.aborted) {
+        return Promise.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+      }
+      return new Promise<Response>((resolve, reject) => {
+        const onAbort = () => {
+          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+        void hang.promise.then(resolve, reject);
+      });
+    });
+    vi.mocked(agentApi.getChatSessionMessages).mockImplementation(async () => {
+      const turnId = vi.mocked(agentApi.chatStream).mock.calls[0]?.[0].turn_id;
+      return {
+        session_id: 'session-test',
+        messages: [{
+          id: 'user-1',
+          role: 'user',
+          content: '分析茅台',
+          created_at: null,
+          turn_id: turnId,
+        }],
+        session_state: { selected_skill_ids: null },
+        turn_identity_supported: true,
+      };
+    });
+
+    const outcomePromise = useAgentChatStore
+      .getState()
+      .startStream({ message: '分析茅台', session_id: 'session-test' }, { skillName: '趋势技能' });
+
+    await vi.waitFor(() => {
+      expect(useAgentChatStore.getState().loading).toBe(true);
+      expect(useAgentChatStore.getState().abortController).not.toBeNull();
+    });
+
+    useAgentChatStore.getState().stopStream();
+
+    await expect(outcomePromise).resolves.toMatchObject({
+      terminal: 'aborted',
+      persistence: 'persisted',
+    });
+    const state = useAgentChatStore.getState();
+    expect(state.lastFailedRequest).toBeNull();
+    expect(state.chatError).toBeNull();
+    expect(state.loading).toBe(false);
+  });
+
+  it('removes the optimistic turn when reconciliation confirms no persistence', async () => {
+    vi.mocked(agentApi.chatStream).mockImplementation((_payload, options) => (
+      new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+        }, { once: true });
+      })
+    ));
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'session-test',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+      turn_identity_supported: true,
+    });
+
+    const outcomePromise = useAgentChatStore.getState().startStream({
+      message: '分析茅台',
+      session_id: 'session-test',
+      turn_id: 'turn-not-persisted',
+    });
+    await vi.waitFor(() => expect(useAgentChatStore.getState().loading).toBe(true));
+    useAgentChatStore.getState().stopStream();
+
+    await expect(outcomePromise).resolves.toEqual({
+      terminal: 'aborted',
+      persistence: 'not_persisted',
+      turnId: 'turn-not-persisted',
+    });
+    expect(useAgentChatStore.getState().messages).toEqual([]);
+  });
+
+  it('does not await a slow session-list refresh before returning the outcome', async () => {
+    const sessionList = createDeferred<Awaited<ReturnType<typeof agentApi.getChatSessions>>>();
+    vi.mocked(agentApi.getChatSessions).mockReturnValue(sessionList.promise);
+    vi.mocked(agentApi.chatStream).mockImplementation(async (payload) => (
+      createStreamResponse([
+        `data: {"type":"turn_persisted","turn_id":"${payload.turn_id}","message_id":"7"}`,
+        'data: {"type":"done","success":true,"content":"ok"}',
+      ])
+    ));
+
+    const outcome = await useAgentChatStore.getState().startStream({
+      message: '分析茅台',
+      session_id: 'session-test',
+      turn_id: 'turn-fast-outcome',
+    });
+
+    expect(outcome).toEqual({
+      terminal: 'completed',
+      persistence: 'persisted',
+      turnId: 'turn-fast-outcome',
+    });
+    expect(useAgentChatStore.getState().sessionsLoading).toBe(true);
+    sessionList.resolve([]);
+    await vi.waitFor(() => expect(useAgentChatStore.getState().sessionsLoading).toBe(false));
+  });
 });
 
 describe('agentChatStore.switchSession', () => {
 
   it('clears transient loading state when switching sessions during a stream', async () => {
     const ac = new AbortController();
-    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([
-      { id: 'msg-2', role: 'assistant', content: '历史回复', created_at: null },
-    ]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'session-2',
+      messages: [
+        { id: 'msg-2', role: 'assistant', content: '历史回复', created_at: null },
+      ],
+      session_state: { selected_skill_ids: ['risk'] },
+    });
     useAgentChatStore.setState({
       loading: true,
       progressSteps: [{ type: 'thinking', message: '正在制定分析路径...' }],
@@ -374,19 +593,24 @@ describe('agentChatStore.switchSession', () => {
     expect(state.messages).toEqual([
       { id: 'msg-2', role: 'assistant', content: '历史回复' },
     ]);
+    expect(state.selectedSkillIds).toEqual(['risk']);
   });
 
   it('preserves stable failure metadata from persisted session history', async () => {
-    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([
-      {
-        id: 'msg-failed',
-        role: 'assistant',
-        content: 'Agent chat failed',
-        created_at: null,
-        error: 'agent_chat_failed',
-        params: {},
-      },
-    ]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'failed-session',
+      messages: [
+        {
+          id: 'msg-failed',
+          role: 'assistant',
+          content: 'Agent chat failed',
+          created_at: null,
+          error: 'agent_chat_failed',
+          params: {},
+        },
+      ],
+      session_state: { selected_skill_ids: null },
+    });
 
     await useAgentChatStore.getState().switchSession('failed-session');
 
@@ -400,25 +624,33 @@ describe('agentChatStore.switchSession', () => {
   });
 
   it('does not let a late session history response overwrite the current session', async () => {
-    const sessionA = createDeferred<
-      Array<{ id: string; role: 'user' | 'assistant'; content: string; created_at: string | null }>
-    >();
-    const sessionB = createDeferred<
-      Array<{ id: string; role: 'user' | 'assistant'; content: string; created_at: string | null }>
-    >();
+    const sessionA = createDeferred<Awaited<ReturnType<typeof agentApi.getChatSessionMessages>>>();
+    const sessionB = createDeferred<Awaited<ReturnType<typeof agentApi.getChatSessionMessages>>>();
     vi.mocked(agentApi.getChatSessionMessages).mockImplementation((targetSessionId: string) => {
       if (targetSessionId === 'session-a') return sessionA.promise;
       if (targetSessionId === 'session-b') return sessionB.promise;
-      return Promise.resolve([]);
+      return Promise.resolve({
+        session_id: targetSessionId,
+        messages: [],
+        session_state: { selected_skill_ids: [] },
+      });
     });
 
     const switchToA = useAgentChatStore.getState().switchSession('session-a');
     const switchToB = useAgentChatStore.getState().switchSession('session-b');
 
-    sessionB.resolve([{ id: 'msg-b', role: 'assistant', content: 'B 回复', created_at: null }]);
+    sessionB.resolve({
+      session_id: 'session-b',
+      messages: [{ id: 'msg-b', role: 'assistant', content: 'B 回复', created_at: null }],
+      session_state: { selected_skill_ids: ['risk'] },
+    });
     await switchToB;
 
-    sessionA.resolve([{ id: 'msg-a', role: 'assistant', content: 'A 回复', created_at: null }]);
+    sessionA.resolve({
+      session_id: 'session-a',
+      messages: [{ id: 'msg-a', role: 'assistant', content: 'A 回复', created_at: null }],
+      session_state: { selected_skill_ids: ['technical'] },
+    });
     await switchToA;
 
     const state = useAgentChatStore.getState();
@@ -426,6 +658,7 @@ describe('agentChatStore.switchSession', () => {
     expect(state.messages).toEqual([
       { id: 'msg-b', role: 'assistant', content: 'B 回复' },
     ]);
+    expect(state.selectedSkillIds).toEqual(['risk']);
   });
 });
 
@@ -434,7 +667,11 @@ describe('agentChatStore.loadInitialSession', () => {
     const sessions = createDeferred<Awaited<ReturnType<typeof agentApi.getChatSessions>>>();
     useAgentChatStore.setState({ hasInitialLoad: false });
     vi.mocked(agentApi.getChatSessions).mockImplementationOnce(() => sessions.promise);
-    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'url-session',
+      messages: [],
+      session_state: { selected_skill_ids: [] },
+    });
 
     const initialLoad = useAgentChatStore.getState().loadInitialSession('url-session');
     const switchLoad = useAgentChatStore.getState().switchSession('newer-session');
@@ -442,5 +679,71 @@ describe('agentChatStore.loadInitialSession', () => {
     await Promise.all([initialLoad, switchLoad]);
 
     expect(useAgentChatStore.getState().sessionId).toBe('newer-session');
+  });
+});
+
+
+describe('agentChatStore session Skill state', () => {
+  it('restores the saved Skill selection during the initial session load', async () => {
+    const { writeSessionItem, CHAT_SESSION_STORAGE_KEY } = await import('../../utils/sessionPersistence');
+    writeSessionItem(CHAT_SESSION_STORAGE_KEY, 'saved-session');
+    useAgentChatStore.setState({ hasInitialLoad: false });
+    vi.mocked(agentApi.getChatSessions).mockResolvedValue([
+      {
+        session_id: 'saved-session',
+        title: 'saved',
+        message_count: 1,
+        created_at: null,
+        last_active: null,
+      },
+    ]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'saved-session',
+      messages: [
+        { id: 'msg-1', role: 'user', content: '分析 AAPL', created_at: null },
+      ],
+      session_state: { selected_skill_ids: ['technical', 'risk'] },
+    });
+
+    await useAgentChatStore.getState().loadInitialSession();
+
+    expect(useAgentChatStore.getState().selectedSkillIds).toEqual([
+      'technical',
+      'risk',
+    ]);
+  });
+
+  it('preserves null when an initial legacy session has no persisted Skill state', async () => {
+    const { writeSessionItem, CHAT_SESSION_STORAGE_KEY } = await import('../../utils/sessionPersistence');
+    writeSessionItem(CHAT_SESSION_STORAGE_KEY, 'legacy-session');
+    useAgentChatStore.setState({ hasInitialLoad: false });
+    vi.mocked(agentApi.getChatSessions).mockResolvedValue([
+      {
+        session_id: 'legacy-session',
+        title: 'legacy',
+        message_count: 1,
+        created_at: null,
+        last_active: null,
+      },
+    ]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'legacy-session',
+      messages: [
+        { id: 'msg-1', role: 'user', content: '分析 AAPL', created_at: null },
+      ],
+      session_state: { selected_skill_ids: null },
+    });
+
+    await useAgentChatStore.getState().loadInitialSession();
+
+    expect(useAgentChatStore.getState().selectedSkillIds).toBeNull();
+  });
+
+  it('clears the previous session Skill selection for a new chat', () => {
+    useAgentChatStore.setState({ selectedSkillIds: ['risk'] });
+
+    useAgentChatStore.getState().startNewChat();
+
+    expect(useAgentChatStore.getState().selectedSkillIds).toBeNull();
   });
 });

@@ -36,11 +36,14 @@ The authority keeps these boundaries:
 - event streams are bounded and tied to their owning event loop;
 - shutdown marks active work `interrupted`, but runner cancellation remains
   cooperative;
-- the queue is process-local and in-memory, not durable or multi-process.
+- the queue is process-local and in-memory, not durable or multi-process;
+- optional SQLite in-flight checkpoints support single-process restart recovery
+  only (requeue safe kinds or mark others `interrupted`). They do not create a
+  distributed queue, cross-process lease, or second lifecycle authority.
 
 The living [task execution contract](../task-execution-contract.md) remains
 authoritative for transitions, retry reservations, SSE compatibility, overflow,
-and shutdown mechanics.
+shutdown mechanics, and the restart recovery decision matrix.
 
 ## Consequences
 
@@ -50,5 +53,7 @@ and shutdown mechanics.
 - Legacy polling and SSE names remain compatibility projections.
 - One deployment process owns one in-memory authority. Multi-worker deployments
   would create divergent state and require a new ADR and implementation.
-- There is no durable recovery after process loss; graceful shutdown can only
-  classify known active work as `interrupted`.
+- After an ungraceful process loss, a later process may re-admit idempotent
+  `stock_analysis` work or surface non-resumable work as terminal `interrupted`
+  with a stable message code. Graceful shutdown still terminalizes known active
+  work as `interrupted` and clears checkpoints so recovery does not double-run.

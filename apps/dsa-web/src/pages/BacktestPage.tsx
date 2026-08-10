@@ -1,11 +1,11 @@
 import type React from 'react';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Inbox, Minus, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useId, useRef } from 'react';
+import { Check, ChevronDown, Inbox, Minus, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DateRangePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
 import { Progress } from '../components/common/Progress';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -25,6 +25,7 @@ import {
   BACKTEST_OUTCOME_LABELS,
   BACKTEST_PHASE_FILTER_OPTIONS,
   BACKTEST_PHASE_LABELS,
+  BACKTEST_RESOLUTION_NOTE_LABELS,
   BACKTEST_STATUS_LABELS,
   BACKTEST_TEXT,
   BACKTEST_VALIDATION_TEXT,
@@ -36,6 +37,7 @@ import type {
   BacktestPhaseFilter,
 } from '../types/backtest';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
+import { cn } from '../utils/cn';
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_COMPACT_INPUT_CLASS =
@@ -88,6 +90,28 @@ function parseEvalWindowDays(value: string): number | undefined {
   }
 
   return parsed;
+}
+
+function parseBoundedInteger(value: string, min: number, max: number): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function formatResolutionNotes(notes: string | null | undefined, language: UiLanguage): string[] {
+  if (!notes) return [];
+  const labels = BACKTEST_RESOLUTION_NOTE_LABELS[language];
+  return notes
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => labels[part] ?? part);
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -214,10 +238,31 @@ function phaseBreakdownText(metrics: PerformanceMetrics, language: UiLanguage): 
 const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; language: UiLanguage }> = ({ metrics, title, language }) => {
   const text = BACKTEST_TEXT[language];
   const phaseText = phaseBreakdownText(metrics, language);
+  const completed = Number(metrics.completedCount);
+  const insufficient = Number(metrics.insufficientCount);
+  const total = Number(metrics.totalEvaluations);
+  const skipped = Math.max(total - completed, insufficient);
   return (
     <Card variant="gradient" padding="md" className="animate-fade-in">
       <div className="mb-3">
         <span className="label-uppercase">{title}</span>
+      </div>
+      <div
+        data-testid="backtest-summary-integrity"
+        className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-subtle bg-background/40 p-2"
+      >
+        <div className="flex flex-col">
+          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.completedCount}</span>
+          <span className="font-mono text-sm text-success">{completed}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.insufficientCount}</span>
+          <span className="font-mono text-sm text-warning">{insufficient}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.evaluationCount}</span>
+          <span className="font-mono text-sm text-secondary-text">{total}</span>
+        </div>
       </div>
       <MetricRow label={text.directionAccuracy} value={pct(metrics.directionAccuracyPct)} accent />
       <MetricRow label={text.winRate} value={pct(metrics.winRatePct)} accent />
@@ -227,10 +272,8 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
       <MetricRow label={text.takeProfitTriggerRate} value={pct(metrics.takeProfitTriggerRate)} />
       <MetricRow label={text.avgDaysToFirstHit} value={metrics.avgDaysToFirstHit != null ? metrics.avgDaysToFirstHit.toFixed(1) : '--'} />
       <div className="backtest-metric-footer">
-        <span className="text-xs text-muted-text">{text.evaluationCount}</span>
-        <span className="text-xs text-secondary-text font-mono">
-          {Number(metrics.completedCount)} / {Number(metrics.totalEvaluations)}
-        </span>
+        <span className="text-xs text-muted-text">{text.skippedCount}</span>
+        <span className="text-xs text-secondary-text font-mono">{skipped}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-text">{text.outcomeSummary}</span>
@@ -242,6 +285,11 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
           <span className="text-warning">{metrics.neutralCount}</span>
         </span>
       </div>
+      {metrics.engineVersion ? (
+        <div className="mt-2 text-xs text-muted-text">
+          {text.engineVersion}: <span className="font-mono text-secondary-text">{metrics.engineVersion}</span>
+        </div>
+      ) : null}
       {phaseText ? (
         <div className="mt-3 border-t border-subtle pt-2 text-xs text-muted-text">
           {formatUiText(text.phaseDistribution, { text: phaseText })}
@@ -255,14 +303,32 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
 
 const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> = ({ data, language }) => {
   const text = BACKTEST_TEXT[language];
+  const config = data.appliedConfig;
+  const configParts: string[] = [];
+  if (config) {
+    configParts.push(formatUiText(text.dayWindow, { days: String(config.evalWindowDays) }));
+    configParts.push(`${text.minAge} ${config.minAgeDays}`);
+    configParts.push(`${text.candidateLimit} ${config.limit}`);
+    configParts.push(`${text.engineVersion} ${config.engineVersion}`);
+    configParts.push(`${text.neutralBand} ${config.neutralBandPct}%`);
+    configParts.push(config.force ? text.forceOn : text.forceOff);
+    if (config.code) configParts.push(String(config.code));
+    if (config.analysisDateFrom) configParts.push(formatUiText(text.fromDate, { date: config.analysisDateFrom }));
+    if (config.analysisDateTo) configParts.push(formatUiText(text.toDate, { date: config.analysisDateTo }));
+  }
   return (
-  <div className="backtest-summary animate-fade-in">
+  <div data-testid="backtest-run-summary" className="backtest-summary animate-fade-in">
     <span className="label">{text.processed} <span className="value">{data.processed}</span></span>
     <span className="label">{text.saved} <span className="value primary">{data.saved}</span></span>
     <span className="label">{text.completed} <span className="value success">{data.completed}</span></span>
     <span className="label">{text.insufficient} <span className="value warning">{data.insufficient}</span></span>
     {data.errors > 0 && (
       <span className="label">{text.errors} <span className="value danger">{data.errors}</span></span>
+    )}
+    {configParts.length > 0 && (
+      <span data-testid="backtest-applied-config" className="label message">
+        {text.appliedConfig}: {configParts.join(' · ')}
+      </span>
     )}
     {data.message && (
       <span className="label message">{data.message}</span>
@@ -302,11 +368,17 @@ const BacktestPage: React.FC = () => {
   const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>(initialFilters.phase);
   const [evalDays, setEvalDays] = useState(initialFilters.windowDays ? String(initialFilters.windowDays) : '');
   const [evalDaysError, setEvalDaysError] = useState('');
+  const [minAgeDays, setMinAgeDays] = useState('');
+  const [minAgeError, setMinAgeError] = useState('');
+  const [candidateLimit, setCandidateLimit] = useState('200');
+  const [candidateLimitError, setCandidateLimitError] = useState('');
   const [dateFromError, setDateFromError] = useState('');
   const [dateToError, setDateToError] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<BacktestFilterSnapshot>(initialFilters);
   const [forceRerun, setForceRerun] = useState(false);
   const [pendingForceRun, setPendingForceRun] = useState<BacktestFilterSnapshot | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false); // mobile filters collapsed by default (#879 B2)
+  const filtersPanelId = useId();
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
   const [runError, setRunError] = useState<ParsedApiError | null>(null);
@@ -334,6 +406,26 @@ const BacktestPage: React.FC = () => {
     initialFilters.windowDays && initialFilters.windowDays > 1 ? initialFilters.windowDays : 10,
   );
 
+  const validateRunOptions = (): { minAgeDays?: number; limit: number } | null => {
+    const parsedMinAge = minAgeDays.trim()
+      ? parseBoundedInteger(minAgeDays, 0, 365)
+      : undefined;
+    const invalidMinAge = Boolean(minAgeDays.trim()) && parsedMinAge === undefined;
+    const parsedLimit = parseBoundedInteger(candidateLimit, 1, 2000);
+    const invalidLimit = parsedLimit === undefined;
+
+    setMinAgeError(invalidMinAge ? validationText.minAge : '');
+    setCandidateLimitError(invalidLimit ? validationText.candidateLimit : '');
+    if (invalidMinAge || invalidLimit) {
+      document.getElementById(invalidMinAge ? 'backtest-min-age' : 'backtest-candidate-limit')?.focus();
+      return null;
+    }
+    return {
+      minAgeDays: parsedMinAge,
+      limit: parsedLimit ?? 200,
+    };
+  };
+
   const validateDraftFilters = (windowOverride?: number, codeOverride?: string): BacktestFilterSnapshot | null => {
     const windowDays = windowOverride ?? parseEvalWindowDays(evalDays);
     const invalidWindow = windowDays === undefined;
@@ -351,9 +443,7 @@ const BacktestPage: React.FC = () => {
     if (invalidWindow || invalidStart || invalidEnd || invalidRange) {
       const firstInvalidId = invalidWindow
         ? 'backtest-eval-window'
-        : invalidStart || invalidRange
-          ? 'backtest-date-from'
-          : 'backtest-date-to';
+        : 'backtest-date-range';
       document.getElementById(firstInvalidId)?.focus();
       return null;
     }
@@ -473,7 +563,11 @@ const BacktestPage: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Run backtest
-  const runBacktest = async (validatedFilters: BacktestFilterSnapshot, force: boolean) => {
+  const runBacktest = async (
+    validatedFilters: BacktestFilterSnapshot,
+    force: boolean,
+    runOptions: { minAgeDays?: number; limit: number },
+  ) => {
     setAppliedFilters(validatedFilters);
     const requestGeneration = runRequestGenerationRef.current + 1;
     runRequestGenerationRef.current = requestGeneration;
@@ -489,21 +583,29 @@ const BacktestPage: React.FC = () => {
       const response = await backtestApi.run({
         code,
         force: force || undefined,
-        minAgeDays: force ? 0 : undefined,
+        minAgeDays: force ? 0 : runOptions.minAgeDays,
         evalWindowDays: requestedEvalWindowDays,
         analysisDateFrom: dateFrom,
         analysisDateTo: dateTo,
+        limit: runOptions.limit,
       });
       if (!isLatestRequest()) return;
       setRunResult(response);
       const effectiveEvalWindowDays =
-        response.appliedEvalWindowDays
+        response.appliedConfig?.evalWindowDays
+        ?? response.appliedEvalWindowDays
         ?? requestedEvalWindowDays
         ?? parseEvalWindowDays(evalDays)
         ?? overallPerf?.evalWindowDays;
       if (effectiveEvalWindowDays != null) {
         if (effectiveEvalWindowDays > 1) lastRegularWindowRef.current = effectiveEvalWindowDays;
         setEvalDays(String(effectiveEvalWindowDays));
+      }
+      if (response.appliedConfig?.minAgeDays != null && !force) {
+        setMinAgeDays(String(response.appliedConfig.minAgeDays));
+      }
+      if (response.appliedConfig?.limit != null) {
+        setCandidateLimit(String(response.appliedConfig.limit));
       }
       syncBacktestFiltersToUrl({
         code: code ?? '',
@@ -513,7 +615,6 @@ const BacktestPage: React.FC = () => {
         phase: validatedFilters.phase,
         page: 1,
       });
-      // Refresh data with same eval_window_days
       const nextAppliedFilters = { ...validatedFilters, windowDays: effectiveEvalWindowDays, page: 1 };
       setAppliedFilters(nextAppliedFilters);
       void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
@@ -528,11 +629,13 @@ const BacktestPage: React.FC = () => {
   const handleRun = () => {
     const validatedFilters = validateDraftFilters();
     if (!validatedFilters) return;
+    const runOptions = validateRunOptions();
+    if (!runOptions) return;
     if (forceRerun) {
       setPendingForceRun(validatedFilters);
       return;
     }
-    void runBacktest(validatedFilters, false);
+    void runBacktest(validatedFilters, false, runOptions);
   };
 
   // Phase is a result-only filter (backtestApi.run never receives it), so apply
@@ -680,138 +783,131 @@ const BacktestPage: React.FC = () => {
       header: text.status,
       cell: (row) => statusBadge(row.evalStatus, language),
     },
+    {
+      id: 'notes',
+      header: text.notes,
+      cell: (row) => {
+        const notes = formatResolutionNotes(row.resolutionNotes, language);
+        if (!notes.length) {
+          const isInsufficient = row.evalStatus === 'insufficient' || row.evalStatus === 'insufficient_data';
+          return isInsufficient
+            ? <span className="text-xs text-warning">{text.insufficientCount}</span>
+            : <span className="text-muted-text">--</span>;
+        }
+        const content = notes.join(' · ');
+        return (
+          <Tooltip content={content} focusable>
+            <span
+              data-testid="backtest-resolution-notes"
+              className="block max-w-48 truncate text-xs text-secondary-text"
+            >
+              {content}
+            </span>
+          </Tooltip>
+        );
+      },
+    },
   ];
+
+  const mobileFiltersToggleLabel = `${text.pageTitle} · ${text.filter}`;
 
   return (
     <AppPage className="flex min-h-full flex-col">
       <PageHeader className="shrink-0" title={text.pageTitle} />
       <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
-          <div
-            data-testid="backtest-stock-filter"
-            className="relative w-64 min-w-0 shrink-0 [&>div>p]:sr-only"
-          >
-            <StockAutocomplete
-              id="backtest-stock-filter"
-              value={codeFilter}
-              onChange={(value) => setCodeFilter(value.toUpperCase())}
-              onSubmit={(stockCode, _stockName, _selectionSource, metadata) => {
-                setCodeFilter((metadata?.displayCode ?? stockCode).toUpperCase());
-                handleFilter(stockCode);
-              }}
-              placeholder={text.codePlaceholder}
-              ariaLabel={text.codePlaceholder}
-              disabled={isRunning}
-              suggestionDensity="compact"
-              className="h-8 min-h-8 min-w-0 sm:h-8 sm:min-h-8 sm:min-w-0"
-            />
-          </div>
-          <div className="w-[5.25rem] shrink-0 [&>span]:w-full [&>span>button]:w-full">
-            <Tooltip content={text.resultPhaseHint} className="w-full">
-              <Button
-                type="button"
-                onClick={() => handleFilter()}
-                disabled={isRunning || isLoadingResults}
-                variant="secondary"
-                size="primary"
-                isLoading={isLoadingResults}
-                loadingText={text.filter}
-                className="whitespace-nowrap text-xs"
-              >
-                {text.filter}
-              </Button>
-            </Tooltip>
-          </div>
-          <Input
-            id="backtest-eval-window"
-            label={text.evalWindow}
-            type="number"
-            size="default"
-            min={1}
-            max={RESEARCH_BACKTEST_LIMITS.maxWindowDays}
-            value={evalDays}
-            onChange={(e) => {
-              const nextValue = e.target.value;
-              const parsedValue = parseEvalWindowDays(nextValue);
-              if (parsedValue && parsedValue > 1) {
-                lastRegularWindowRef.current = parsedValue;
-              }
-              setEvalDays(nextValue);
-              setEvalDaysError('');
-            }}
-            placeholder="10"
-            disabled={isRunning}
-            fieldClassName="w-24"
-            aria-invalid={evalDaysError ? true : undefined}
-            aria-describedby={evalDaysError ? 'backtest-eval-window-error' : undefined}
-            className={`text-center tabular-nums ${evalDaysError ? 'border-danger/40 focus:border-danger' : ''}`}
-          />
-          {evalDaysError ? (
-            <span id="backtest-eval-window-error" role="alert" className="sr-only">
-              {evalDaysError}
-            </span>
-          ) : null}
-          <DatePicker
-            id="backtest-date-from"
-            size="compact"
-            label={text.startDate}
-            ariaLabel={text.startDateAria}
-            value={analysisDateFrom}
-            onChange={(value) => {
-              setAnalysisDateFrom(value);
-              setDateFromError('');
-            }}
-            error={dateFromError}
-            disabled={isRunning}
-            className="w-40 whitespace-nowrap"
-            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
-          />
-          <DatePicker
-            id="backtest-date-to"
-            size="compact"
-            label={text.endDate}
-            ariaLabel={text.endDateAria}
-            value={analysisDateTo}
-            onChange={(value) => {
-              setAnalysisDateTo(value);
-              setDateToError('');
-            }}
-            error={dateToError}
-            disabled={isRunning}
-            className="w-40 whitespace-nowrap"
-            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
-          />
-          <SegmentedControl
-            value={isNextDayValidation ? 'oneDay' : 'window'}
-            options={[
-              { value: 'window', label: text.evalWindow, disabled: isRunning },
-              { value: 'oneDay', label: text.oneDayValidation, disabled: isRunning },
-            ]}
-            onChange={handleValidationModeChange}
-            ariaLabel={text.evalWindow}
-            semantics="single-select"
-            className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
-          />
-          <div className="flex h-8 items-center gap-1.5">
-            <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
-            <Tooltip content={text.forceRerunDescription}>
-              <Switch
-                checked={forceRerun}
+          {/* #879 B2: mobile disclosure; page-scoped name avoids legacy "筛选" action. */}
+          <Button type="button" variant="secondary" size="comfortable" aria-expanded={mobileFiltersOpen} aria-controls={filtersPanelId} aria-label={mobileFiltersToggleLabel} data-testid="backtest-mobile-filters-toggle" onClick={() => setMobileFiltersOpen((open) => !open)} className="whitespace-nowrap md:hidden">
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            <span>{text.filter}</span>
+            <ChevronDown className={cn('h-4 w-4 transition-transform', mobileFiltersOpen && 'rotate-180')} aria-hidden="true" />
+          </Button>
+          <div id={filtersPanelId} data-testid="backtest-run-filters" className={cn('flex min-w-0 flex-1 flex-wrap items-end gap-1.5', !mobileFiltersOpen && 'max-md:hidden')}>
+            <div data-testid="backtest-stock-filter" className="relative flex w-64 min-w-0 shrink-0 flex-col [&>div]:h-8 [&>div>p]:sr-only">
+              <label htmlFor="backtest-stock-filter" className="mb-1.5 text-xs font-medium text-secondary-text">{text.stock}</label>
+              <StockAutocomplete
+                id="backtest-stock-filter"
+                value={codeFilter}
+                onChange={(value) => setCodeFilter(value.toUpperCase())}
+                onSubmit={(stockCode, _stockName, _selectionSource, metadata) => {
+                  setCodeFilter((metadata?.displayCode ?? stockCode).toUpperCase());
+                  handleFilter(stockCode);
+                }}
+                placeholder={text.codePlaceholder}
+                ariaLabel={text.codePlaceholder}
                 disabled={isRunning}
-                onCheckedChange={setForceRerun}
-                aria-label={text.forceRerun}
+                suggestionDensity="compact"
+                className="h-8 min-h-8 min-w-0 sm:h-8 sm:min-h-8 sm:min-w-0"
+              />
+            </div>
+            <Input
+              id="backtest-eval-window" label={text.evalWindow} type="number" size="default" min={1}
+              max={RESEARCH_BACKTEST_LIMITS.maxWindowDays} value={evalDays}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                const parsedValue = parseEvalWindowDays(nextValue);
+                if (parsedValue && parsedValue > 1) lastRegularWindowRef.current = parsedValue;
+                setEvalDays(nextValue);
+                setEvalDaysError('');
+              }}
+              placeholder="10" disabled={isRunning} fieldClassName="w-24"
+              aria-invalid={evalDaysError ? true : undefined}
+              aria-describedby={evalDaysError ? 'backtest-eval-window-error' : undefined}
+              className={`text-center tabular-nums ${evalDaysError ? 'border-danger/40 focus:border-danger' : ''}`}
+            />
+            {evalDaysError ? <span id="backtest-eval-window-error" role="alert" className="sr-only">{evalDaysError}</span> : null}
+            <DateRangePicker
+              id="backtest-date-range" size="compact" label={text.analysisDate}
+              ariaLabel={`${text.startDateAria} – ${text.endDateAria}`}
+              placeholder={`${text.startDate} – ${text.endDate}`}
+              value={{ start: analysisDateFrom, end: analysisDateTo }}
+              onChange={({ start, end }) => {
+                setAnalysisDateFrom(start); setAnalysisDateTo(end); setDateFromError(''); setDateToError('');
+              }}
+              error={dateFromError || dateToError} disabled={isRunning} className="w-64 whitespace-nowrap"
+              triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-64 !rounded-xl text-center tabular-nums`}
+            />
+            <SegmentedControl
+              value={isNextDayValidation ? 'oneDay' : 'window'}
+              options={[
+                { value: 'window', label: formatUiText(text.dayWindow, { days: lastRegularWindowRef.current }), disabled: isRunning },
+                { value: 'oneDay', label: text.nextDayValidation, disabled: isRunning },
+              ]}
+              onChange={handleValidationModeChange}
+              ariaLabel={`${text.evalWindow} / ${text.nextDayValidation}`}
+              semantics="single-select"
+              className="[&_.segmented-control-tab]:font-medium dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
+            />
+            <Tooltip content={text.minAgeDescription}>
+              <Input
+                id="backtest-min-age" label={text.minAge} type="number" size="default" min={0} max={365}
+                value={minAgeDays} onChange={(e) => { setMinAgeDays(e.target.value); setMinAgeError(''); }}
+                placeholder="14" disabled={isRunning} fieldClassName="w-24"
+                aria-invalid={minAgeError ? true : undefined}
+                aria-describedby={minAgeError ? 'backtest-min-age-error' : undefined}
+                className={`text-center tabular-nums ${minAgeError ? 'border-danger/40 focus:border-danger' : ''}`}
               />
             </Tooltip>
+            {minAgeError ? <span id="backtest-min-age-error" role="alert" className="sr-only">{minAgeError}</span> : null}
+            <Tooltip content={text.candidateLimitDescription}>
+              <Input
+                id="backtest-candidate-limit" label={text.candidateLimit} type="number" size="default" min={1} max={2000}
+                value={candidateLimit} onChange={(e) => { setCandidateLimit(e.target.value); setCandidateLimitError(''); }}
+                placeholder="200" disabled={isRunning} fieldClassName="w-24"
+                aria-invalid={candidateLimitError ? true : undefined}
+                aria-describedby={candidateLimitError ? 'backtest-candidate-limit-error' : undefined}
+                className={`text-center tabular-nums ${candidateLimitError ? 'border-danger/40 focus:border-danger' : ''}`}
+              />
+            </Tooltip>
+            {candidateLimitError ? <span id="backtest-candidate-limit-error" role="alert" className="sr-only">{candidateLimitError}</span> : null}
+            <div className="flex h-8 items-center gap-1.5">
+              <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
+              <Tooltip content={text.forceRerunDescription}>
+                <Switch checked={forceRerun} disabled={isRunning} onCheckedChange={setForceRerun} aria-label={text.forceRerun} />
+              </Tooltip>
+            </div>
           </div>
-          <Button
-            type="button"
-            onClick={handleRun}
-            variant="primary"
-            size="primary"
-            isLoading={isRunning}
-            loadingText={text.running}
-            className="whitespace-nowrap text-xs"
-          >
+          <Button type="button" onClick={handleRun} variant="primary" size="primary" isLoading={isRunning} loadingText={text.running} className="whitespace-nowrap">
             {text.runBacktest}
           </Button>
         </div>
@@ -820,14 +916,7 @@ const BacktestPage: React.FC = () => {
             <RunSummary data={runResult} language={language} />
           </div>
         )}
-        {runError && (
-          <div
-            data-testid="backtest-run-error"
-            className="mt-2 max-w-4xl [&_details]:w-full [&_details]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto"
-          >
-            <ApiErrorAlert error={runError} />
-          </div>
-        )}
+        {runError ? <ApiErrorAlert error={runError} /> : null}
         <p className="mt-2 text-xs text-muted-text">
           {isNextDayValidation
             ? text.oneDayModeDescription
@@ -909,7 +998,7 @@ const BacktestPage: React.FC = () => {
         <section className="min-h-0 flex-1 overflow-y-auto">
           <Toolbar
             aria-label={text.resultToolbarLabel}
-            className="mb-3"
+            className="mb-3 border-y-0"
             left={(
               <>
                 <Select
@@ -1004,7 +1093,10 @@ const BacktestPage: React.FC = () => {
         onConfirm={() => {
           const filters = pendingForceRun;
           setPendingForceRun(null);
-          if (filters) void runBacktest(filters, true);
+          if (!filters) return;
+          const runOptions = validateRunOptions();
+          if (!runOptions) return;
+          void runBacktest(filters, true, runOptions);
         }}
         onCancel={() => setPendingForceRun(null)}
       />

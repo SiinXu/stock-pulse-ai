@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
+  "outDir": "../../static",
+  "gzipLevel": 9,
+  "measuredAt": "2026-08-10",
+  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, and only locale chunks enlarged by the Notifications hub's genuine translations; other measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "defaults": {
+    "jsMaxGzipBytes": 13436,
+    "cssMaxGzipBytes": 28791
+  },
+  "rules": [
+    {
+      "id": "IntelligenceSourcesPanel",
+      "match": "assets/IntelligenceSourcesPanel-*.js",
+      "maxGzipBytes": 206424,
+      "measuredGzipBytes": 187658
+    },
+    {
+      "id": "js-entry",
+      "match": "assets/index-*.js",
+      "maxGzipBytes": 177591,
+      "measuredGzipBytes": 161446
+    },
+    {
+      "id": "locale-ja",
+      "match": "assets/ja-*.js",
+      "maxGzipBytes": 131610,
+      "measuredGzipBytes": 131410,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "locale-de",
+      "match": "assets/de-*.js",
+      "maxGzipBytes": 126365,
+      "measuredGzipBytes": 126165,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "locale-ko",
+      "match": "assets/ko-*.js",
+      "maxGzipBytes": 125550,
+      "measuredGzipBytes": 125350,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "locale-fr",
+      "match": "assets/fr-*.js",
+      "maxGzipBytes": 125911,
+      "measuredGzipBytes": 125711,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "locale-es",
+      "match": "assets/es-*.js",
+      "maxGzipBytes": 121757,
+      "measuredGzipBytes": 121557,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "locale-zh-TW",
+      "match": "assets/zh-TW-*.js",
+      "maxGzipBytes": 119284,
+      "measuredGzipBytes": 119084,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "locale-ms",
+      "match": "assets/ms-*.js",
+      "maxGzipBytes": 112483,
+      "measuredGzipBytes": 102257
+    },
+    {
+      "id": "locale-id",
+      "match": "assets/id-*.js",
+      "maxGzipBytes": 112828,
+      "measuredGzipBytes": 112628,
+      "note": "Tight rebaseline for the Notifications hub translations; retains 200 bytes of headroom."
+    },
+    {
+      "id": "vendor-charts",
+      "match": "assets/vendor-charts-*.js",
+      "maxGzipBytes": 122352,
+      "measuredGzipBytes": 111229
+    },
+    {
+      "id": "vendor-react",
+      "match": "assets/vendor-react-*.js",
+      "maxGzipBytes": 66666,
+      "measuredGzipBytes": 60605
+    },
+    {
+      "id": "vendor-markdown",
+      "match": "assets/vendor-markdown-*.js",
+      "maxGzipBytes": 48618,
+      "measuredGzipBytes": 44198
+    },
+    {
+      "id": "vendor-motion",
+      "match": "assets/vendor-motion-*.js",
+      "maxGzipBytes": 43373,
+      "measuredGzipBytes": 39430
+    },
+    {
+      "id": "vendor-router",
+      "match": "assets/vendor-router-*.js",
+      "maxGzipBytes": 33202,
+      "measuredGzipBytes": 30183
+    },
+    {
+      "id": "vendor-icons",
+      "match": "assets/vendor-icons-*.js",
+      "maxGzipBytes": 10376,
+      "measuredGzipBytes": 9432
+    },
+    {
+      "id": "vendor-misc",
+      "match": "assets/vendor-*.js",
+      "maxGzipBytes": 86562,
+      "measuredGzipBytes": 78692,
+      "note": "First-match residual for vendor-* after the more-specific vendor-* rules above (measured from vendor-CRoa6YUW)."
+    },
+    {
+      "id": "RunFlowPanel",
+      "match": "assets/RunFlowPanel-*.js",
+      "maxGzipBytes": 74967,
+      "measuredGzipBytes": 68151
+    },
+    {
+      "id": "PlaygroundRenderPage",
+      "match": "assets/PlaygroundRenderPage-*.js",
+      "maxGzipBytes": 57000,
+      "measuredGzipBytes": 56827,
+      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
+    },
+    {
+      "id": "SettingsPage",
+      "match": "assets/SettingsPage-*.js",
+      "maxGzipBytes": 45391,
+      "measuredGzipBytes": 41264
+    },
+    {
+      "id": "AlertsWorkspace",
+      "match": "assets/AlertsWorkspace-*.js",
+      "maxGzipBytes": 46602,
+      "measuredGzipBytes": 42365
+    },
+    {
+      "id": "PortfolioPage",
+      "match": "assets/PortfolioPage-*.js",
+      "maxGzipBytes": 25543,
+      "measuredGzipBytes": 23220
+    },
+    {
+      "id": "DecisionSignalsPage",
+      "match": "assets/DecisionSignalsPage-*.js",
+      "maxGzipBytes": 23042,
+      "measuredGzipBytes": 20947
+    },
+    {
+      "id": "ChatPage",
+      "match": "assets/ChatPage-*.js",
+      "maxGzipBytes": 18277,
+      "measuredGzipBytes": 16615
+    },
+    {
+      "id": "screening",
+      "match": "assets/screening-*.js",
+      "maxGzipBytes": 17866,
+      "measuredGzipBytes": 16241
+    },
+    {
+      "id": "BacktestPage",
+      "match": "assets/BacktestPage-*.js",
+      "maxGzipBytes": 15368,
+      "measuredGzipBytes": 13970
+    },
+    {
+      "id": "css-entry",
+      "match": "assets/index-*.css",
+      "maxGzipBytes": 28791,
+      "measuredGzipBytes": 26173
+    },
+    {
+      "id": "css-vendor",
+      "match": "assets/vendor-*.css",
+      "maxGzipBytes": 576,
+      "measuredGzipBytes": 523
+    }
+  ]
+}

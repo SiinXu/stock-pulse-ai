@@ -84,6 +84,25 @@ def test_registry_returns_unknown_for_unregistered_openai_compatible_gateway():
     assert not caps.directive_support.prompt_cache_key
 
 
+
+
+def test_build_provider_cache_route_context_honors_model_list_responses_surface():
+    model_list = [
+        {
+            "model_name": "openai/gpt-5.6-sol",
+            "litellm_params": {"model": "openai/responses/gpt-5.6-sol"},
+            "model_info": {"dsa_api_surface": "responses"},
+        }
+    ]
+
+    route_context = build_provider_cache_route_context(
+        model="openai/gpt-5.6-sol",
+        provider="openai",
+        model_list=model_list,
+    )
+
+    assert route_context.api_surface == "responses"
+
 def test_registry_does_not_match_qwen_openai_compatible_route_to_dashscope_native_caps():
     route_context = build_provider_cache_route_context(model="openai/qwen-max", provider="openai_compatible")
 

@@ -8,9 +8,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
+- [Fixed] Aligned Web acceptance coverage with safe global error Toasts, current chat session payloads, semantic control sizing, and collapsed mobile Backtest filters.
+- [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
+- [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
+- [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Added] Project DCF/relative valuation into analysis reports (optional, missing-safe), add EV/EBITDA when explicit EBITDA/market cap/net debt exist, and ship interactive Web DCF sensitivity UI consuming server-side sensitivity tables (#238).
+- [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
+- [Added] Default-off CoinGecko market-data path for allowlisted `crypto:` identities, with UTC daily bars, 24×7 context, safe outbound requests, and an optional crypto specialist (Refs #236 and #195).
+- [Added] Portfolio stress-test service and read-only `/api/v1/portfolio/stress-test` endpoints with response-base valuation, strict bounded market/sector/FX/rate shocks, reproducible price/FX/scenario provenance, honest partial/unavailable states, and an atomic bounded YAML catalog (issues #158 and #210; historical replay remaining).
+- [Fixed] Bound portfolio stress snapshots to 512 rows, preserve two-stage FX provenance without fabricated dates, reconcile known and unknown excluded values, and warm configured scenario catalogs atomically.
+- [Added] Wire range-aware local-first daily data into `DataFetcherManager` with fail-closed mode validation, bounded schema-v2 persistence, zero-provider `local_only` misses, `auto` stale-if-error, and `refresh` persistence (refs #178, #218, and #159 data scope).
+- [Fixed] Preserve local-only boundaries across batch prefetch, stock-name lookup, scheduled execution, asynchronous task errors, adjustment-aware persistence, legacy overlap ordering, provider health, and analysis OpenAPI responses.
+- [Added] Today's Focus strict read-only API and standalone panel prioritize fresh local-day alert/event/directional-reversal evidence, expose exact evidence links and degradation provenance, and never treat lifetime portfolio P&L as a daily move (#157).
+- [Changed] Code-split the Today's Focus Playground scenario and rebaseline only its measured render-chunk budget so the production Web bundle gate retains explicit headroom.
+- [Added] Versioned read-only `GET /api/v1/capabilities` inventory sourced from live data-provider, tool, and plugin owners, with typed readiness fields, owner generations, and explicit partial-source errors; central registration and resolution remain tracked by #221.
+- [Fixed] The capability inventory observes the process data manager that actually serves callers instead of constructing an isolated one, publishes immutable tool entries and lifecycle-aware plugin generations, keeps multi-provider identities out of the bounded provider scalar, and preserves optional-tool construction-failure provenance.
+- [Added] Explicit principal-scoped Agent memory projection foundation with validated UTC point-in-time `as_of` semantics, horizon-owned outcome-grounded evidence, structurally bounded typed records, safe JSON data projection, and optional CJK-aware coarse ranking (refs #250 and #198; no production hook).
+- [Added] Offline benchmark trajectory evaluation with expected-tool precision/recall/F1, separate success/productivity/retry/redundancy metrics, causal run/agent scoping, strict bounded inputs, and joinable provenance (Refs #269).
+- [Fixed] Trajectory evaluation derives redundancy/retry from a whole-run causal frontier so parallel completion order cannot flip a later call, keys `evaluation_id` on the complete normalized result so duration/cache/result differences change it, and saturates the aggregate rejected-call counter with explicit evidence instead of raising on oversized sources (Refs #269).
+- [Added] Opt-in reasoning-trace export (`REASONING_TRACE_EXPORT_ENABLED`, default off) with a strict finite `reasoning-trace-v1` contract, bounded redacted JSON/Markdown responses, preserved structural correlation identities, payload-reconciled coverage and loss accounting, resolved-identity lookup attribution, durable access audit, and `GET /api/v1/reasoning-trace/{record_id}` (Issue #135, Refs #212).
+- [Added] Reusable Web financial chart components: KlineChart (volume + MA overlays + zoom, dirty OHLC guards) and RiskHeatmap (score + level labels; color not sole carrier), with playground previews and unit tests; no page wiring (#142).
+- [Added] Earnings-call transcript parsing (`earnings-transcript-v2`) with exact source coordinates, typed metrics, page-aware PDF provenance, compact chunk retrieval, untrusted-document privacy boundaries, and bounded valid-JSON Agent results; default-off tool `parse_earnings_transcript` behind existing multimodal gates (#253 remaining).
+
+- [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
+- [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, deterministic portfolio exposure/volatility/historical-loss thresholds, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
+- [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
+- [Added] Explicit proposal-only Agent planning foundation with a single limit authority, strict schema/tool validation, an unwidenable public step cap, projectability-guaranteed acceptance, one projected-string contract that makes the advisory boundary unforgeable and every accepted plan UTF-8 encodable, interruptible planner deadlines, truthful retry evidence, cancellation fencing, sanitized metadata, and no production runtime hook (refs #199).
+- [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
+- [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
+- [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.
+- [Fixed] Report→Chat Stop and disconnect handling now uses durable turn acknowledgements, exact-session reconciliation, and idempotent turn IDs so persisted prompts are not restored or submitted twice.
+- [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
+- [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
+- [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
+- [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
+- [Added] Manifest permissions load-time visibility (logs/health/audit) and agent_tool declaration subset check with stable `manifest_permissions_undeclared` isolation (declaration is not a sandbox).
+- [Fixed] Give full-suite backend CI jobs enough time to finish coverage enforcement and cleanup after the offline tests pass.
+- [Added] Optional official-SDK MCP process exposes a scope-filtered, strictly validated read-only plus async-analysis surface over stdio and Streamable HTTP, with pinned admin-session auth, Origin/Host protection, bounded rates/concurrency, and durable fail-closed audit (#244).
+- [Changed] Desktop startup records a bounded asynchronous path-safe CLI visibility summary and documents Desktop/Web capability boundaries for #884 without exposing raw paths to the renderer.
+- [Added] Confirmed Agent Behavior presets apply one atomic autosave draft, distinguish saved/pending/failed/conflicted state, preserve registry field groups, and summarize the saved model route, risk/HITL, and deep-tool readiness (#868).
+- [Added] Search and provider/model filtering for cloud/API model connections in Settings without changing runtime routing or connection-wizard ownership (#865).
+- [Fixed] Keep a single primary create-rule action in an empty Signal Center and strengthen Usage redirect/title acceptance.
+- [Added] Optional default-off bounded OCR Agent Tool (`extract_image_text`) with process-tree timeouts, single-open image/pixel/frame limits, redacted untrusted-text output, a 32 KiB result budget, and an explicit image-bytes-versus-model-text privacy boundary (#196).
+- [Added] Versioned watchlist AI scoring from bounded existing analysis and coherent decision signals, with strict source/time/degradation provenance and a localized independent Web column (Issue #147 / T25).
+- [Changed] Settings scheduler card shows next run with timezone, honest process-mode/deployment copy, run-now busy tracking, and last-skipped status (#869).
+- [Changed] Narrow the Data Providers settings view to an honest searchable configuration directory without runtime-health or routing claims.
+
+- [Added] Portfolio health stored GET and explicit refresh API with deterministic five-dimension scoring, coverage-gated comparable bands, strict finite configuration, migration-owned atomic persistence, provenance, and rule-based insights (refs #151).
+- [Added] Revisioned watchlist groups with pre-mutation CAS write leases, version-fenced STOCK_LIST reconciliation, failure-aware accessible controls, mobile non-drag controls, and typed score/focus projections (#189).
+- [Added] Report version comparison foundation with stable history-ID selection, paginated pickers, strict typed deltas, configuration-provenance states, graded field differences, and operation-owned recovery (#188 / T18).
+- [Added] Explicit offline agent output-quality evaluation in the canonical benchmark runner, with source-bound facts, verified tool outcomes, candidate/baseline regression comparison, rule/LLM-separated scores, and bounded failure mining (refs #252, #141, and #215 without closing their remaining scope).
+- [Chore] Enforce the Web production bundle gzip size budget inside the web-gate CI job and rebaseline the AlertsWorkspace chunk budget against the current main build.
+- [Added] Analysis history comparison service exposes strict-JSON deterministic deltas keyed by unique history-record ids, with stable latest ordering, explicit report-type isolation, and no-baseline distinct from no-change (#148).
+- [Chore] Pin desktop `js-yaml` to 4.3.1 via npm override so production `electron-updater` and the builder chain clear GHSA-5p4m-2wfm-xmqj (no CVE assigned; CVE-2026-59870 belongs to the separate 5.x advisory GHSA-724g-mxrg-4qvm) while keeping Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 (#615).
+- [Fixed] Ensure the `web-gate` check always concludes on pull requests, reports successful no-frontend runs, and fails closed when change detection is unavailable.
+- [Fixed] Shared ScrollArea no longer applies touch-pan-y, restoring pinch-to-zoom inside chat and history rails while keeping the min-h-0 height chain.
+- [Fixed] Treat non-finite numbers (±Infinity) as missing values in marketFormat price and change-color guards so sentinel/overflow inputs never render as prices or paint as up/down moves.
+- [Added] Report templates pin a Decision Card (direction/score, conclusion, confidence, key risks, watch/invalidation conditions) at the top of each stock section using existing dashboard fields only; brief uses a 1+1 line push length budget so a typical 10-stock brief stays within Pushover max_length=1024 (#861 Phase 1).
+- [Fixed] Restore Simplified Chinese Settings help source for RSS news feeds and multi-strategy deliberation so UI i18n resource extraction no longer fails at import.
+- [Fixed] Treat settings-help `examples` as non-translatable config literals (SETTINGS_HELP_MAPS only), regenerate English inventory and 8 locale bundles, and shrink the identical-to-English baseline without growth.
+- [Fixed] Localize four Playground story control labels through PLAYGROUND_TEXT samples and keep hardcoded-string scanning on the real scenario renderers.
+- [Fixed] Route Outbound Activity panel through shared DataTable instead of a bare table.
+- [Fixed] Backtest production-design/UI-governance: design token text sizes, remove native title on notes, restore shared Button size semantics without min-h overrides.
+- [Fixed] Scope i18n e2e route assertions to main content and real document title keys; wait for Settings field controls before label checks.
+- [Fixed] Playground scenario tests provide QueryClient for TanStack Query Alerts workspace; Settings env-import tests target the ConfigBackup file input after ConfigPresetsPanel landed.
+- [Tests] Add settings-help examples literal parity coverage and update localeConsistency for Scheme 3 inventory skip.
+- [Docs] Add GitHub Actions three-step quickstart (`docs/actions-quickstart.md` / `docs/actions-quickstart_CN.md`) and a README Quick start entry link (#852).
+- [Fixed] Daily provider all-empty/all-None failures now include per-provider detail lines in DataFetchError (no longer a bare failure header).
+- [Tests] Offline provider fallback contract suite with failure-mode fixtures (empty/rate-limit/missing-field/malformed) covering single-source failover, all-fail DataFetchError, STANDARD_COLUMNS normalization, and bounded retry.
+- [Added] OpenBB external-framework data_provider demonstration under `docs/examples/external-framework-data-provider/` with bilingual adapter guide and offline contract tests (proposal phase 2 / #892; surface v1 unchanged).
+- [Fixed] Bound the OpenBB example's real yfinance call, map advertised CN/HK symbols, and reject malformed daily bars before manager fallback.
+- [Added] Shared Web URL state helper (`urlState`) with typed schemas, replace/push history rules, unknown-param preservation, Decision Signals schema example, and unit tests (UI-03A / #879 A1 foundation; no page wiring yet).
+- [Fixed] Pagination collapses to prev/current/last on narrow containers (<480px) and allows horizontal scroll so 320px viewports never clip first/last page actions (#879 B4).
+- [Added] Web API reason mapper (`apiReasonMapper`) that maps ParsedApiError code/reason to actionable class, i18n keys, and CTA hints for #885 Phase 1 (module + tests only; no page adoption).
+- [Fixed] Signal Center deep links with `?signal=<id>` fall back to fetch-by-id when the signal is not on the currently loaded list/latest/timeline page, and clear the URL param on 404/forbidden without a blank page.
+- [Fixed] Home setup dismiss uses a single Close control, Home core blocks stay single-column below xl, and shared ScrollArea/StockBar height chains gain min-h-0 so constrained stock rails can scroll on mobile (#879 B1/B6).
+- [Tests] Sync the Web playground catalog and scenario renderers with 14 newly exported visual components so catalog coverage stays complete.
+- [Chore] Added Web production bundle gzip size budgets and `npm run build:check` gate (baseline = measured size + 10%; no business-code slimming in this change).
+- [Docs] Codified Page/Drawer/Modal/Wizard surface roles, density, working-region breakpoints, task-state CTA rules, and the text-vs-IconButton action matrix in `docs/web-ui-foundation.md` (issues #877 / #878 Phase 1), with a cross-link from `apps/dsa-web/DESIGN_GUIDE.md`.
+- [Added] Web multi-market number/timezone/change-color formatting contract module (`marketFormat`) with semantic matrix unit tests (issue #889).
+- [Fixed] Keep report→Chat stock/record URL context until the chat stream succeeds so a mid-flight refresh can restore the unsent follow-up draft (#879 A5).
+- [Fixed] Collapse Alerts rule filters behind AdvancedFilterSheet on mobile/desktop breakpoints and distinguish true-empty vs filtered-empty states with clear/create actions (#879 B2).
+- [Tests] Point hardcoded UI-string allowances for chat avatar markers U/AI at ChatMessageList.tsx after the ChatPage extraction.
+- [Changed] Migrated Decision Signals, Alerts, Skill Outcomes, Approvals (5s proposal poll), and Stock Details quote/history loads to TanStack Query schedule adapters (behavior parity; stacked on pilot #788).
+- [Docs] Documented TanStack Query wave-1 page migration and open-PR exclusions (`docs/tanstack-query-rollout-wave1-plan.md`).
+- [Fixed] Backtest page restores evaluation-window radiogroup accessible names, keeps a single PageHeader H1, and collapses dense run filters on mobile so results lead the first screen (#879 B2+B5).
+- [Chore] Add repository skills `develop-feature`, `run-verification`, `draft-issue`, and `handle-review-feedback` with a usage guide (`docs/claude-skills-guide.md`) and updated `AGENTS.md` skill inventory.
+- [Added] Ported multi-strategy deliberation cluster (evidence schemas, default-off mediator_v0, concurrent specialist scheduler, final disagreement explanation) behind `AGENT_MULTI_STRATEGY_DELIBERATION`.
+- [Added] Zero-config first success: loopback Ollama auto-detect for setup readiness, data-only dry-run guidance when no model is configured, and LOCAL_RUNTIME_AUTO_DETECT* settings.
+- [Added] Optional RSS/Atom market-news feeds (`RSS_NEWS_FEED_URLS`) as a free supplement in the on-demand search pipeline; empty config stays inert, per-feed failures degrade without aborting the run, and fetch uses the fail-closed outbound policy.
+- [Added] Investment Committee analysis mode (default-off `AGENT_INVESTMENT_COMMITTEE_MODE`): curated persona Skill preset via the existing specialist path + StrategyEngine, with a structured `committee_deliberation` report section (#545).
+- [Added] Exposed `USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` in Web Settings (system network group) with restart help, sensitive host masking, and setup_env re-application on config reload.
+
+- [Added] Added fail-closed `LOCAL_ONLY_MODE` outbound gate with redacted outbound-activity API/panel and bilingual local-only threat-model docs (issue #218).
+- [Added] Optional default-off DCF and relative valuation estimation (`valuation_service` + `estimate_stock_valuation` Agent Tool) with explicit assumptions, sensitivity ranges, and honest insufficient-fundamentals handling (issue #238 phase 1).
+- [Added] Agent observability L0: structured phase/tool/model/decision events with trace/span ids, persisted via run-diagnostics and shown in the existing run-flow view (deep payload capture remains default-off).
+- [Added] Config-gated daily brief with historical accuracy review from existing decision-signal, backtest, and skill-outcome stores (honesty-first; default off).
+- [Added] Recover process-local in-flight task-queue work across restarts: idempotent stock analyses requeue with a recovery marker; non-resumable kinds surface as explicit `interrupted` with `task.interrupted.process_restart` (no silent drop, no fake completion).
+- [Added] Backend V0 context-aware corporate event alerts (`corporate_event`) evaluate managed intelligence items, attach holdings/watchlist impact context, and enrich alert notifications without new provider calls on the hot path (`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`).
+- [Added] Integrate A-share multi-period financial statements into the existing fundamental pipeline (`financial_report.periods` / `metrics` with formulas / `sufficiency`), with explicit insufficient-fundamentals honesty in analysis prompts and report rendering (issue #235).
+- [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
+- [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
+- [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
+- [Fixed] Restored the Web UI i18n resource contract that a concurrent-merge race had broken: added the missing Simplified Chinese source note for `VALUATION_AGENT_TOOL_ENABLED`, regenerated the duplicated English key inventory, and backfilled 62 drifted proxy / observability / daily-brief / valuation keys across all eight locale bundles.
+- [Fixed] Corrected stale localized Settings copy that no longer matched its English source: `HTTP_PROXY` summary and usage, the restructured `VALUATION_AGENT_TOOL_ENABLED` notes, the zh-TW `LOCAL_ONLY_MODE` allowlist reference, and the untranslated investment-framework preview description.
+- [Fixed] Reduced the screening availability status surface to a compact size.
+- [Changed] Compact the Settings category sidebar and helper descriptions, improve dark-theme view-switch contrast, and move investment-framework basics, new-node, and new-dimension entry into configuration dialogs.
+- [Fixed] Moved API error notices into compact, top-centered, tone-matched Toast overlays and clarified Backtest, Home scheduled-task, and Market Review summary surfaces.
+- [Fixed] Tightened history metadata, task-count, chat-history, scheduler-status, and Market Review sentiment/share controls to match their intended visual hierarchy.
+- [Fixed] Removed the redundant Backtest Filter action, aligned its Stock field, and clarified the relationship between window days and next-day validation.
+- [Added] Offline financial agent evaluation benchmark (V0): structural metrics over frozen agent_runtime replays, deterministic runner, committed baseline, and bilingual docs (#252).
+- [Added] Official recommended config presets and secret-free stockpulse-profile YAML import/export (Settings panel, `/api/v1/config-profiles`, local-first ranking).
+- [Changed] Stale workflow no longer auto-closes issues (planning backlog stays open); issue stale nudge is 90 days, and common backlog labels are exempt. PRs still stale after 21 days and close after 14 more.
+- [Added] Home readiness health card from setup-status checks with per-gap action links, and Settings Essentials/Expert mode toggle (persisted; deep links remain valid).
+- [Added] Plugin enable/disable with persisted operator intent, basic external hot-reload (honest restart-required for built-ins), and GET/POST `/api/v1/plugins` lifecycle API for PLUG-02.
+- [Added] GitHub Actions Daily Analysis writes a plain-language bilingual run summary (Step Summary) and optional short system_error failure notification from structured `data/run_status.json` (#850).
+- [Changed] Web navigation mechanical IA hygiene: Research child labels use `layout.nav.*`, command palette indexes Home/Research/Analysis Workbench/Approvals with aligned labels, and deep links allow `/research/skill-outcomes` (no route renames).
+- [Docs] Added bilingual Navigation IA proposal with current-state route audit and DECISION NEEDED target options for issue #368.
+- [Added] Portfolio risk metrics service and read-only `GET /api/v1/portfolio/risk-metrics` (historical VaR, correlation, concentration/diversification) from stored daily data with explicit insufficient-history handling (issue #239 V0).
+- [Changed] Built-in strategies under `strategies/` (including `personas/`) are published as first-class `analysis_strategy` plugins (`builtin.analysis-strategy.<name>`); YAML remains the definition source, `SkillManager.load_builtin_skills()` is a legacy shim, and `AGENT_SKILL_DIR` custom overrides keep working without migration.
+- [Added] Desktop first-run opens the guided setup wizard on a fresh install, warms local Ollama detection, reveals the main window only after the loading page is ready, and composes runtime detect/start into one-click Model Pack import with actionable failures (no silent multi-GB downloads).
+- [Changed] Enable report share-image button in the desktop runtime (on-click generation only; WebView blob download fallback when native share is absent).
+- [Docs] Added the consolidated plugin development guide (EN/ZH) with quickstart, trust model, and links to the frozen contract plus official examples for all six extension points.
+- [Added] Runnable official plugin examples for analysis strategy, agent tool (load-and-register only; #539 boundary), report template, and event hook under `examples/plugins/`, with contract tests.
+- [Tests] Add offline recorded-fixture contract checks for AkShare (EM/Sina), Tencent, Tushare, and YFinance parse paths, plus a network-only refresh script wired into nightly network-smoke.
+- [Tests] Stabilize Analysis Workbench e2e Analyze clicks with shared readiness waits on the controlled stock-search value / Analyze enabled state, and add an empty `@quarantine` Playwright lane (tracking-issue required) for non-blocking flake isolation.
+- [Fixed] Replaced the Backtest page's separate start and end date fields with a single date-range picker.
+- [Added] Actions Config Check workflow and `scripts/actions_config_check.py` validate Secrets/Variables (watchlist, LLM keys, notifications, data paths) without running analysis; Step Summary is bilingual and never prints secret values (#847).
+- [Changed] Desktop release workflow: `workflow_dispatch` is artifacts-only (no GitHub Release publish), builds the workflow ref by default (optional `rebuild_from_tag`), and adds macOS `codesign` + `--version` launch smoke with ad-hoc sign fallback when unsigned binaries do not execute.
+- [Fixed] Desktop PyInstaller freeze excludes `pkg_resources` so frozen backends start under setuptools>=82 (which removed that module and broke `pyi_rth_pkgres`).
+- [Docs] Documented maintainer steps for the first StockPulse desktop `v0.1.0` cut and clarified desktop-release dispatch vs tag-push behavior.
+- [Chore] Speed up PR backend CI: path-selective offline tests for `backend-gate` and a 3.10 smoke for `python-minimum`; push-to-main still runs the full offline suite.
+- [Chore] Extracted StockScreeningPage sections into screening components and pure model helpers under a shrink-only page-size lint baseline.
+- [Added] Backtest phase-1 platform honesty: run responses echo `applied_config` (window, min age, candidate limit, engine, neutral band, force, dates), validation failures use stable error codes, insufficient rows persist resolution notes (`missing_daily_bars` / `insufficient_forward_bars`), and the Web backtest page surfaces notes, summary integrity counts, and advanced run options.
+- [Added] Optional default-off multimodal PDF parsing and chart-reading services (`pdf_parsing_service`, `chart_reading_service`) with Agent Tools `parse_financial_pdf` / `read_price_chart` behind `MULTIMODAL_AGENT_TOOLS_ENABLED` + `MULTIMODAL_FILE_ROOT` (issue #253 phase 1; HTTP upload UI deferred).
+- [Added] Recover process-local in-flight task-queue work across restarts: idempotent stock analyses requeue with a recovery marker; non-resumable kinds surface as explicit `interrupted` with `task.interrupted.process_restart` (no silent drop, no fake completion).
 - [Changed] Moved analysis API endpoint orchestration into an application service while preserving the HTTP contract and OpenAPI surface.
 - [Chore] PR CI runs only ruleset-required gates (plus path-filtered `web-gate`); `web-e2e` and `api-real-client` are push-to-main observation jobs, and `PR Review` is workflow_dispatch opt-in only.
+- [Added] Persist Agent Chat Skill selection per session (refresh/session switch restore; tri-state `skills` omit/empty/explicit; legacy null state preserved). Ported-from: ed848da6.
+- [Changed] Split the Agent Chat page into message list, composer, session sidebar, and UI-state reducer modules under `components/chat/**` (page under the 1,200-line target).
+- [Added] Personal investment framework editor shows a live analysis-context preview and injects a bounded decision-tree summary into the stock-analysis read-only prompt (no-op when no framework is active).
+- [Fixed] `refreshStockBar` sets `isLoadingStockBar` while in flight; history list accepts AbortSignal for stable workspace refreshes.
+- [Added] Config-driven LLM channel `API_SURFACE` routing (`chat_completions` default, opt-in `responses` → `openai/responses/<model>` wire models) with validation, registry key, and parity tests.
+
 - [Added] Added a shrink-only get_config() access ratchet to the deterministic CI gate and converted three pilot services to ApplicationServices injection.
 - [Fixed] Agent Chat inherits global `REPORT_LANGUAGE` when `context.report_language` is missing, null, or blank (explicit values still win).
 - [Chore] Accelerate CI selective gates: path-filter backend/python-minimum/docker jobs, scope pytest collection to `tests/`, and emit slow-test durations from the offline suite.
@@ -30,17 +172,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Extended the mypy ratchet to `api/v1/schemas` (kept `follow_imports=skip`; documented next-package order).
 - [Chore] Extracted shared web test helpers (`createDeferred`, `chooseOption`) into `apps/dsa-web/src/test-utils` with import-only test migrations.
 - [Chore] Upgraded the Electron desktop stack (Electron 43.3.0, electron-builder 26.15.7, electron-updater 6.8.9, tar override 7.5.22) and added ESLint flat config with // @ts-check for main.js.
+- [Chore] Extracted Portfolio page sections into a feature workspace and portfolio hooks without changing ledger or idempotency behavior.
 - [Fixed] AlphaSift hotspot detail search is response-only (never written to the shared detail cache), bounded by a 12s timeout and concurrency slots, reports `news_search_status` (`available`/`no_results`/`unavailable`), and supports `include_search` (default true for Web compatibility). Ported-from: e430fcfe.
 - [Tests] Added fixed-seed property-style invariant coverage for portfolio ledger money math (conservation, scoped idempotency, FX isolation, projection-after-write).
 
 - [Added] Weekly upstream parity checker (`scripts/check_upstream_parity.py` + SHA-pinned workflow) reports upstream-only drift, classifies paths via a maintained whitelist, and updates one tracking issue.
 - [Docs] Documented upstream parity whitelist semantics, `Ported-from` trailers, and triage flow (EN/CN).
 - [Chore] Extracted DecisionSignalsPage sections into components with reducer-backed state hooks and lowered the page max-lines baseline.
+- [Changed] Migrated integrations-cluster Web API modules (alerts, alphasift, intelligence, investmentFramework, localModels, modelPacks) to OpenAPI-generated types with Zod boundary validation.
 - [Changed] Piloted TanStack Query on the market review page (history list poll + trigger mutation) with an inert app-root QueryClientProvider and behavior parity for cadence and error surfaces.
 - [Changed] Repository query/persistence failures raise ``RepositoryError`` instead of returning ``None``/empty/0; history API keeps not-found as 404 and maps repository failures to 500.
 - [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
 - [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
+- [Added] Default-off Bayesian skill outcome weights at aggregation, plus an opt-in historical sample backfill script.
 - [Changed] Unified baostock/pytdx/longbridge retry and request-timeout policy via `data_provider/retry_policy.py` (BaseFetcher-level enforcement deferred).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
 - [Added] Recorded skill opinions into the outcome-evaluation store behind a default-off flag and exposed read-only performance endpoints.
@@ -2684,4 +2829,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 [1.2.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/4df277e109c38604e31e2184fcff36f561f8ffa5
 [1.1.0]: https://github.com/ZhuLinsen/daily_stock_analysis/commit/5d5c095be55ff8cc2b0ed219ea35a9135536de38
 [1.0.0]: https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v1.0.0
-

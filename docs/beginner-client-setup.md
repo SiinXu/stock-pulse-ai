@@ -6,6 +6,18 @@ English: [beginner-client-setup_EN.md](beginner-client-setup_EN.md). 装好后�
 
 > 本项目生成的是辅助分析报告，不构成投资建议。真实交易请自行判断风险。
 
+
+## 零配置首次成功（无 API Key）
+
+不必先准备云端 Key 也能完成第一次有用的运行。**本地 / 零成本路径是主路径**，云端 Key 是可选升级。
+
+1. **本机 Ollama 自动探测**：就绪检查与 `GET /api/v1/onboarding/first-run` 默认对回环地址（`127.0.0.1` / `localhost` / `::1`）做快速探测；失败只写日志，**不阻塞启动**。只有 Ollama 可达且至少有一个模型时才显示本地模型路径，主按钮打开模型设置，不会直接改写配置。
+2. **离线示例分析**：没有模型、也没有 Ollama 时，可打开内置**示例分析**（`GET /api/v1/onboarding/demo-analysis`）。界面会明确标注 **示例数据 — 非实时分析**，只用于熟悉报告布局。
+3. **data-only（与 `--dry-run` 产物一致）**：配置好自选股后执行 `python main.py --dry-run`，只拉行情数据、不调用 LLM。
+4. 关闭探测：`LOCAL_RUNTIME_AUTO_DETECT=false`。超时：`LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35`（默认）。
+
+**已有配置不会被首次运行逻辑改写。** 仅在未配置主要模型（且判定为全新环境）时推荐新手视图。完整 AI 分析仍需要主要模型（云端 Key 或已应用的本地 Ollama 配置）。云端配置见下文「配置 AI 模型」。
+
 ## 先准备
 
 1. Windows 或 macOS 电脑。
@@ -49,13 +61,15 @@ English: [beginner-client-setup_EN.md](beginner-client-setup_EN.md). 装好后�
 
 macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 
+**首次**打开桌面端（全新安装）会自动进入引导配置向导：可选云 API、**本地模型**（Ollama / Model Pack 一键探测并启动 runtime 后导入）或本地 CLI。打开应用本身不会调用付费云模型，只有你保存云路径后才会产生 token 消耗。细节见 [桌面端打包说明](desktop-package.md)。
+
 ## 3. 配置 AI 模型
 
-打开客户端，进入：
+若向导未打开，进入：
 
 `系统设置 -> AI 模型`
 
-只选下面一个方案即可。
+只选下面一个方案即可（也可在向导里走本地模型 / CLI 路径）。
 
 > 重要：每次改完设置后，都要点击页面上的保存按钮；看到保存成功提示后，再切换页面或回到首页。
 

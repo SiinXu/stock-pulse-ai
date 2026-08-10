@@ -101,9 +101,16 @@ def _manager(provider: _Provider, cache: DailyDataCache) -> DataFetcherManager:
 
 @pytest.fixture(autouse=True)
 def _reset_daily_health() -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    reset_application_services()
+    Config.reset_instance()
     DataFetcherManager.reset_daily_source_health()
     yield
     DataFetcherManager.reset_daily_source_health()
+    reset_application_services()
+    Config.reset_instance()
 
 
 def test_environment_defaults_enable_bounded_layered_cache(monkeypatch) -> None:
@@ -114,6 +121,11 @@ def test_environment_defaults_enable_bounded_layered_cache(monkeypatch) -> None:
         "PROVIDER_DAILY_CACHE_PERSISTENT_TTL_SECONDS",
         "PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS",
         "PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES",
+        "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS",
+        "PROVIDER_MARKET_DATA_MODE",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -125,6 +137,11 @@ def test_environment_defaults_enable_bounded_layered_cache(monkeypatch) -> None:
     assert config.persistent_ttl_seconds == 3600.0
     assert config.stale_if_error_seconds == 86400.0
     assert config.memory_max_entries == 256
+    assert config.persistent_max_age_seconds == 90 * 86400.0
+    assert config.persistent_max_entries == 512
+    assert config.local_only_max_age_seconds == 30 * 86400.0
+    assert config.rollover_grace_days == 1
+    assert config.fetch_mode.value == "auto"
 
 
 def test_memory_and_persistent_hits_return_isolated_frames(tmp_path: Path) -> None:
@@ -156,6 +173,52 @@ def test_memory_and_persistent_hits_return_isolated_frames(tmp_path: Path) -> No
     assert second_provider.calls == 0
     assert persistent_hit.loc[0, "close"] == pytest.approx(10.2)
     assert persistent_hit.attrs["provider_cache"]["layer"] == "persistent"
+
+
+def test_expired_memory_falls_through_to_fresh_persistent_layer(tmp_path: Path) -> None:
+    clock = _Clock()
+    provider = _Provider([_frame()])
+    manager = _manager(
+        provider,
+        _cache(tmp_path, clock, memory_ttl=5.0, persistent_ttl=30.0),
+    )
+
+    manager.get_daily_data("600519")
+    clock.advance(6.0)
+    persisted, _ = manager.get_daily_data("600519")
+
+    assert provider.calls == 1
+    assert persisted.attrs["provider_cache"]["layer"] == "persistent"
+    assert persisted.attrs["provider_cache"]["is_stale"] is False
+
+
+def test_fresh_cache_is_revalidated_when_policy_becomes_strict(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    clock = _Clock()
+    provider = _Provider([_frame("bad"), _frame(10.3)])
+    manager = _manager(provider, _cache(tmp_path, clock))
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "false")
+    reset_application_services()
+    Config.reset_instance()
+    first, _ = manager.get_daily_data("600519")
+    assert first.loc[0, "close"] == "bad"
+
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "cn/equity")
+    reset_application_services()
+    Config.reset_instance()
+    refreshed, source = manager.get_daily_data("600519")
+
+    assert source == "CacheTestProvider"
+    assert provider.calls == 2
+    assert refreshed.loc[0, "close"] == pytest.approx(10.3)
+    assert refreshed.attrs["provider_cache"]["cache_hit"] is False
 
 
 def test_expired_layers_fetch_and_replace_data(tmp_path: Path) -> None:
@@ -257,6 +320,43 @@ def test_stale_data_is_used_only_after_provider_failure(
     assert "provider_failover event=stale_cache" in caplog.text
 
 
+def test_stale_cache_rejection_does_not_escape_strict_policy(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    clock = _Clock()
+    provider = _Provider([_frame("bad"), TimeoutError("upstream unavailable")])
+    manager = _manager(
+        provider,
+        _cache(
+            tmp_path,
+            clock,
+            memory_ttl=5.0,
+            persistent_ttl=10.0,
+            stale_if_error=60.0,
+        ),
+    )
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "false")
+    reset_application_services()
+    Config.reset_instance()
+    manager.get_daily_data("600519")
+    clock.advance(11.0)
+
+    monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
+    monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "cn/equity")
+    reset_application_services()
+    Config.reset_instance()
+    with pytest.raises(DataFetchError):
+        manager.get_daily_data("600519")
+
+    assert provider.calls == 2
+    assert manager.get_daily_cache_stats()["invalidations"] >= 1
+
+
 def test_stale_candidate_expiring_during_provider_failure_is_rejected(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -308,7 +408,7 @@ def test_corrupt_persistent_entry_fails_open_to_provider(tmp_path: Path) -> None
     assert refreshed.attrs["provider_cache"]["cache_hit"] is False
 
 
-def test_cache_key_includes_explicit_window_and_days(tmp_path: Path) -> None:
+def test_range_identity_reuses_same_window_across_days_hint(tmp_path: Path) -> None:
     clock = _Clock()
     provider = _Provider([_frame(10.2), _frame(10.8)])
     manager = _manager(provider, _cache(tmp_path, clock))
@@ -327,8 +427,8 @@ def test_cache_key_includes_explicit_window_and_days(tmp_path: Path) -> None:
     )
 
     assert first.loc[0, "close"] == pytest.approx(10.2)
-    assert second.loc[0, "close"] == pytest.approx(10.8)
-    assert provider.calls == 2
+    assert second.loc[0, "close"] == pytest.approx(10.2)
+    assert provider.calls == 1
     assert DataFetcherManager._daily_cache_key("aapl", None, "2026-07-20", 30) == (
         DataFetcherManager._daily_cache_key("AAPL", None, "2026-07-20", 30)
     )

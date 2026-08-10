@@ -22,7 +22,7 @@ from .base import DataProvider
 
 _PROVIDER_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _CAPABILITY_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
-DATA_PROVIDER_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
+DATA_PROVIDER_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw", "crypto"})
 DATA_PROVIDER_CAPABILITY_METHODS = {
     "daily_data": "get_daily_data",
     "realtime_quote": "get_realtime_quote",
@@ -393,20 +393,33 @@ class _DataProviderBackend:
 class _DataProviderPluginRuntime:
     """Point-specific backend attached to the unified X2 registry."""
 
-    def __init__(self, builtin_identities: Mapping[str, str]) -> None:
+    def __init__(
+        self,
+        builtin_identities: Mapping[str, str],
+        *,
+        additional_contracts: Mapping[str, ExtensionContract] | None = None,
+    ) -> None:
         self._backend = _DataProviderBackend(builtin_identities)
-        self.registry = ExtensionRegistry(
-            {
-                "data_provider": ExtensionContract(
-                    identity_resolver=lambda implementation: implementation.provider_id,
-                    validator=lambda implementation: isinstance(
-                        implementation,
-                        DataProviderRegistration,
-                    ),
-                    backend=self._backend,
-                )
-            }
-        )
+        contracts: dict[str, ExtensionContract] = {
+            "data_provider": ExtensionContract(
+                identity_resolver=lambda implementation: implementation.provider_id,
+                validator=lambda implementation: isinstance(
+                    implementation,
+                    DataProviderRegistration,
+                ),
+                backend=self._backend,
+            )
+        }
+        if additional_contracts is not None:
+            for extension_point, contract in additional_contracts.items():
+                if extension_point == "data_provider":
+                    raise ValueError(
+                        "data_provider contract is owned by DataFetcherManager"
+                    )
+                if not isinstance(contract, ExtensionContract):
+                    raise TypeError("additional contracts must be ExtensionContract")
+                contracts[extension_point] = contract
+        self.registry = ExtensionRegistry(contracts)
 
     def reserve_provider_names(self, provider_names: Iterable[str]) -> None:
         self._backend.reserve_provider_names(provider_names)

@@ -45,6 +45,7 @@ from sqlalchemy import (
     event,
     func,
     inspect,
+    text as _sql_text,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import (
@@ -108,6 +109,7 @@ _STORAGE_FACADE_COMPAT_GLOBALS = (
     event,
     func,
     inspect,
+    _sql_text,
     sqlite_insert,
     sessionmaker,
     Session,
@@ -199,6 +201,7 @@ _LifecycleMethods = _storage_lifecycle._LifecycleMethods
 _MarketDataMethods = _storage_market_data._MarketDataMethods
 _HistoryMethods = _storage_history._HistoryMethods
 _ConversationMethods = _storage_conversation._ConversationMethods
+_load_conversation_context = _storage_conversation._load_conversation_context
 _UsageMethods = _storage_usage._UsageMethods
 
 _LIFECYCLE_METHOD_NAMES = _bind_storage_facade_methods(

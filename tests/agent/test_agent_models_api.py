@@ -349,6 +349,11 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
         )
         executor = MagicMock()
         executor.chat.return_value = SimpleNamespace(success=True, content="ok", error=None)
+        session_service = MagicMock()
+        session_service.resolve_skill_selection.return_value = SimpleNamespace(
+            effective_skill_ids=[],
+            selected_skill_ids_update=[],
+        )
         request = agent.ChatRequest(message="hello", skills=[], context={"skills": ["old_skill"]})
         real_get_running_loop = asyncio.get_running_loop
 
@@ -368,7 +373,7 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
             "api.v1.endpoints.agent.asyncio.get_running_loop",
             side_effect=lambda: _ImmediateLoop(real_get_running_loop()),
         ):
-            payload = asyncio.run(agent.agent_chat(request)).model_dump()
+            payload = asyncio.run(agent.agent_chat(request, session_service)).model_dump()
 
         mock_build_executor.assert_called_once_with(config, None)
         executor.chat.assert_called_once()

@@ -472,11 +472,16 @@ def _run_schedule_mode(
 
     def scheduled_task():
         runtime_config = _reload_runtime_config()
-        run_full_analysis(runtime_config, args, scheduled_stock_codes)
+        run_scheduled_analysis(runtime_config, args, scheduled_stock_codes)
 
     background_tasks = []
     from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
     from src.services.scheduled_task_service import ScheduledTaskService
+    from src.services.task_queue import get_task_queue
+
+    # CLI schedule mode has no FastAPI lifespan: recover in-flight tasks once
+    # before the first scheduled_task_tick so occurrence fences stay sound.
+    get_task_queue().recover_persisted_inflight()
 
     scheduled_task_service = None
 
@@ -510,6 +515,15 @@ def _run_schedule_mode(
             "run_immediately": True,
             "name": "agent_event_monitor",
         })
+    if getattr(config, "daily_brief_enabled", False):
+        from src.services.daily_brief_service import build_daily_brief_background_tasks
+
+        background_tasks.extend(
+            build_daily_brief_background_tasks(
+                config,
+                config_provider=_reload_runtime_config,
+            )
+        )
 
     schedule_kwargs = {
         "task": scheduled_task,

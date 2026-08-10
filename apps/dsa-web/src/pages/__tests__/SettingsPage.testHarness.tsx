@@ -134,7 +134,7 @@ function withTestConnectionCoreFields(
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
   useSystemConfig: () => useSystemConfigMock(),
-  useBeginnerMode: () => ({ beginnerMode: false, setBeginnerMode: () => {} }),
+  useBeginnerMode: () => ({ beginnerMode: false, mode: 'expert' as const, setBeginnerMode: () => {}, setMode: () => {} }),
 }));
 
 vi.mock('../../api/usage', () => ({
@@ -593,6 +593,7 @@ const baseCategories = [
 type ConfigState = {
   categories: Array<{ category: string; title: string; description: string; displayOrder: number; fields: [] }>;
   itemsByCategory: Record<string, Array<Record<string, unknown>>>;
+  serverItems: Array<Record<string, unknown>>;
   issueByKey: Record<string, unknown[]>;
   activeCategory: string;
   activeSubCategory: string | null;
@@ -626,6 +627,7 @@ type ConfigState = {
   retry: ReturnType<typeof vi.fn>;
   save: typeof save;
   resetDraft: typeof resetDraft;
+  resetDraftKeys: typeof resetDraftKeys;
   setDraftValue: typeof setDraftValue;
   applyPartialUpdate: typeof applyPartialUpdate;
   getChangedItems: () => Array<{ key: string; value: string }>;
@@ -754,6 +756,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
   return {
     categories: baseCategories,
     itemsByCategory,
+    serverItems: Object.values(itemsByCategory).flat(),
     issueByKey: {},
     activeCategory,
     activeSubCategory,
@@ -845,13 +848,24 @@ function registerSettingsPageBeforeEach(): void {
       updatedAt: '2026-03-21T00:00:00Z',
     });
     getSchedulerStatus.mockResolvedValue({
+      track: 'legacy_day_batch',
       enabled: true,
       running: false,
+      attached: true,
+      processMode: 'serve',
+      scheduleTimezone: 'Asia/Shanghai',
+      runNowAvailable: true,
+      runNowBlockReason: null,
       scheduleTimes: ['09:20', '15:10'],
       nextRunAt: '2026-06-21T09:20:00+08:00',
       lastRunAt: null,
       lastSuccessAt: null,
       lastError: null,
+      lastSkippedAt: null,
+      lastSkipReason: null,
+      activeRunId: null,
+      lastRunId: null,
+      lastRunOutcome: null,
     });
     getSetupStatus.mockResolvedValue({
       isComplete: true,
@@ -1008,6 +1022,7 @@ const SettingsPageTestHarness = {
   resetDraft,
   resetDraftKeys,
   setDraftValue,
+  applyPartialUpdate,
   getChangedItems,
   refreshAfterExternalSave,
   refreshStatus,

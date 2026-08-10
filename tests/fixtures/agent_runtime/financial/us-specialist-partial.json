@@ -132,6 +132,7 @@
       "decision_type",
       "key_points",
       "operation_advice",
+      "risk_manager",
       "risk_warning",
       "sentiment_score",
       "stock_name",
@@ -198,9 +199,35 @@
         "无重大风险信号。",
         "美股技术面多头排列，策略评估阶段降级，仅凭技术面给出谨慎买入。"
       ],
-      "risk_warning": "策略验证缺失，注意仓位控制"
+      "risk_warning": "策略验证缺失，注意仓位控制",
+      "risk_manager": {
+        "schema_version": "risk-manager-result/v1",
+        "verdict": "pass",
+        "original_action": "buy",
+        "final_action": "buy",
+        "reason_codes": [
+          "no_risk_evidence"
+        ],
+        "reason_params": {
+          "signal_adjustment": "none",
+          "risk_signal": "hold"
+        },
+        "adjustment": null,
+        "evidence_codes": [],
+        "evidence_provenance": [
+          "risk_agent_opinion"
+        ],
+        "profile": "balanced",
+        "override_enabled": true,
+        "override_would_apply": false,
+        "exit_id": "orchestrator_multi_agent",
+        "evaluation_id": "<runtime-generated>",
+        "evaluated_at": "<runtime-evaluated-at>",
+        "authorized_bypass_id": null,
+        "fail_closed": false
+      }
     },
-    "content": "{\n  \"stock_name\": \"Apple\",\n  \"sentiment_score\": 68,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"技术面多头，策略评估缺失，谨慎低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面完整，但策略评估阶段无输出\",\n      \"data_limitations\": \"bull_trend策略评估失败，无策略结论\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"美股技术面多头排列，策略评估阶段降级，仅凭技术面给出谨慎买入。\",\n  \"key_points\": [\n    \"美股均线多头排列，趋势延续。\",\n    \"消息面平稳，无重大催化。\",\n    \"无重大风险信号。\",\n    \"美股技术面多头排列，策略评估阶段降级，仅凭技术面给出谨慎买入。\"\n  ],\n  \"risk_warning\": \"策略验证缺失，注意仓位控制\"\n}",
+    "content": "{\n  \"stock_name\": \"Apple\",\n  \"sentiment_score\": 68,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"技术面多头，策略评估缺失，谨慎低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面完整，但策略评估阶段无输出\",\n      \"data_limitations\": \"bull_trend策略评估失败，无策略结论\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"美股技术面多头排列，策略评估阶段降级，仅凭技术面给出谨慎买入。\",\n  \"key_points\": [\n    \"美股均线多头排列，趋势延续。\",\n    \"消息面平稳，无重大催化。\",\n    \"无重大风险信号。\",\n    \"美股技术面多头排列，策略评估阶段降级，仅凭技术面给出谨慎买入。\"\n  ],\n  \"risk_warning\": \"策略验证缺失，注意仓位控制\",\n  \"risk_manager\": {\n    \"schema_version\": \"risk-manager-result/v1\",\n    \"verdict\": \"pass\",\n    \"original_action\": \"buy\",\n    \"final_action\": \"buy\",\n    \"reason_codes\": [\n      \"no_risk_evidence\"\n    ],\n    \"reason_params\": {\n      \"signal_adjustment\": \"none\",\n      \"risk_signal\": \"hold\"\n    },\n    \"adjustment\": null,\n    \"evidence_codes\": [],\n    \"evidence_provenance\": [\n      \"risk_agent_opinion\"\n    ],\n    \"profile\": \"balanced\",\n    \"override_enabled\": true,\n    \"override_would_apply\": false,\n    \"exit_id\": \"orchestrator_multi_agent\",\n    \"evaluation_id\": \"<runtime-generated>\",\n    \"evaluated_at\": \"<runtime-evaluated-at>\",\n    \"authorized_bypass_id\": null,\n    \"fail_closed\": false\n  }\n}",
     "error": null
   }
 }

@@ -156,7 +156,9 @@ export function registerSettingsPageSchedulerTests(): void {
     fireEvent.click(screen.getByRole('button', { name: '确定' }));
     expect(setDraftValue).toHaveBeenLastCalledWith('SCHEDULE_TIMES', '09:20,15:10,18:30');
 
-    fireEvent.click(screen.getByTestId('scheduler-run-now-button'));
+    const runNowButton = screen.getByTestId('scheduler-run-now-button');
+    await waitFor(() => expect(runNowButton).toBeEnabled());
+    fireEvent.click(runNowButton);
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
   });
@@ -271,10 +273,14 @@ export function registerSettingsPageSchedulerTests(): void {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByTestId('scheduler-run-now-button'));
+    const runNowButton = await screen.findByTestId('scheduler-run-now-button');
+    await waitFor(() => expect(runNowButton).toBeEnabled());
+    fireEvent.click(runNowButton);
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText(/A scheduled analysis is already running/)).toBeInTheDocument();
+    const errorToast = await screen.findByRole('alert');
+    expect(errorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(errorToast).not.toHaveTextContent('A scheduled analysis is already running');
   });
 
   it('does not show a failed run as the last successful scheduler run', async () => {

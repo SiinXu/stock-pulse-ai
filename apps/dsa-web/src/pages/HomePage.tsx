@@ -13,7 +13,6 @@ import {
   PlayCircle,
   RefreshCw,
   ShieldAlert,
-  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { alertsApi } from '../api/alerts';
@@ -21,6 +20,8 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { historyApi } from '../api/history';
 import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
+import type { ParsedApiError } from '../api/error';
+import { parseApiError } from '../api/error';
 import {
   Badge,
   Button,
@@ -32,6 +33,15 @@ import {
   StatePanel,
   WorkspacePage,
 } from '../components/common';
+import {
+  HomeReadinessCard,
+  getBrowserTimezone,
+  getScheduledTaskStatusPresentation,
+  getScheduledTaskTypeLabel,
+  resolveSetupCheckLabel,
+} from '../components/home';
+import { HomeOnboardingSection } from '../components/onboarding/HomeOnboardingSection';
+import { HomeWatchlistGroupsSection } from '../components/watchlist/HomeWatchlistGroupsSection';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -46,11 +56,9 @@ import {
 import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
 import type {
-  ScheduledTaskOccurrenceStatus,
   ScheduledTaskTodayItem,
 } from '../types/scheduledTasks';
-import type { SetupStatusCheck, SetupStatusResponse } from '../types/systemConfig';
-import type { UiTextKey } from '../i18n/uiText';
+import type { SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { buildDeepLink } from '../utils/deepLink';
@@ -62,25 +70,6 @@ import {
 import { getUiListSeparator } from '../utils/uiLocale';
 
 export const HOME_CONFIGURABLE_STORAGE_KEY = 'dsa.home.configurable.expanded';
-
-
-const SETUP_CHECK_LABEL_KEYS: Record<string, UiTextKey> = {
-  llm_primary: 'home.setupCheck.llm_primary',
-  llm_agent: 'home.setupCheck.llm_agent',
-  stock_list: 'home.setupCheck.stock_list',
-  notification: 'home.setupCheck.notification',
-  storage: 'home.setupCheck.storage',
-};
-
-/** Map setup-status check keys to localized labels; unknown keys fall back to backend title. */
-function resolveSetupCheckLabel(
-  check: Pick<SetupStatusCheck, 'key' | 'title'>,
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
-): string {
-  const textKey = SETUP_CHECK_LABEL_KEYS[check.key];
-  return textKey ? t(textKey) : check.title;
-}
-
 
 function readHomeConfigurableExpanded(): boolean {
   if (typeof window === 'undefined') return false;
@@ -99,6 +88,9 @@ function writeHomeConfigurableExpanded(expanded: boolean): void {
     // Persistence is best-effort; the in-memory disclosure state remains usable.
   }
 }
+
+
+
 
 const SIGNAL_PAGE_SIZE = 12;
 const FOCUS_ITEM_LIMIT = 3;
@@ -150,56 +142,6 @@ const EMPTY_ATTENTION_AVAILABILITY: HomeAttentionAvailability = {
   scheduledTasks: false,
 };
 
-type UiTranslator = ReturnType<typeof useUiLanguage>['t'];
-type ScheduledTaskBadgeVariant =
-  | 'default'
-  | 'info'
-  | 'success'
-  | 'warning'
-  | 'danger';
-
-function getBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
-}
-
-function getScheduledTaskTypeLabel(
-  taskType: string | undefined,
-  t: UiTranslator,
-): string {
-  if (taskType === 'stock_analysis') return t('home.scheduledTaskTypeAnalysis');
-  if (taskType === 'research_brief') return t('home.scheduledTaskTypeResearchBrief');
-  if (taskType === 'risk_check') return t('home.scheduledTaskTypeRiskCheck');
-  return t('home.scheduledTaskTypeUnknown');
-}
-
-function getScheduledTaskStatusPresentation(
-  status: ScheduledTaskOccurrenceStatus,
-  t: UiTranslator,
-): { label: string; variant: ScheduledTaskBadgeVariant } {
-  if (status === 'succeeded') {
-    return { label: t('taskPanel.completed'), variant: 'success' };
-  }
-  if (status === 'failed') {
-    return { label: t('taskPanel.failed'), variant: 'danger' };
-  }
-  if (status === 'interrupted') {
-    return { label: t('taskPanel.interrupted'), variant: 'warning' };
-  }
-  if (status === 'skipped') {
-    return { label: t('home.scheduledTaskSkipped'), variant: 'default' };
-  }
-  if (status === 'running' || status === 'dispatching') {
-    return { label: t('taskPanel.processing'), variant: 'info' };
-  }
-  if (status === 'retry_wait') {
-    return { label: t('home.scheduledTaskRetryWait'), variant: 'warning' };
-  }
-  return { label: t('taskPanel.pending'), variant: 'default' };
-}
 
 async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
   const reassessmentCutoff = new Date(Date.now() + REASSESSMENT_WINDOW_MS).toISOString();
@@ -278,11 +220,12 @@ const HomePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [failedSourceCount, setFailedSourceCount] = useState(0);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [setupStatusLoading, setSetupStatusLoading] = useState(true);
+  const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(readOnboardingDismissed);
   const [configurableExpanded, setConfigurableExpanded] = useState(
     readHomeConfigurableExpanded,
   );
-
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.home,
     headingRef: pageHeadingRef,
@@ -319,14 +262,36 @@ const HomePage: React.FC = () => {
     };
   }, [applyAttentionData]);
 
+  const loadSetupStatus = useCallback(async () => {
+    setSetupStatusLoading(true);
+    setSetupStatusError(null);
+    try {
+      const status = await systemConfigApi.getSetupStatus();
+      setSetupStatus(status);
+    } catch (error) {
+      setSetupStatus(null);
+      setSetupStatusError(parseApiError(error));
+    } finally {
+      setSetupStatusLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
+    setSetupStatusLoading(true);
     systemConfigApi.getSetupStatus()
       .then((status) => {
-        if (active) setSetupStatus(status);
+        if (!active) return;
+        setSetupStatus(status);
+        setSetupStatusError(null);
       })
-      .catch(() => {
-        if (active) setSetupStatus(null);
+      .catch((error) => {
+        if (!active) return;
+        setSetupStatus(null);
+        setSetupStatusError(parseApiError(error));
+      })
+      .finally(() => {
+        if (active) setSetupStatusLoading(false);
       });
     return () => {
       active = false;
@@ -339,11 +304,28 @@ const HomePage: React.FC = () => {
     [data.activeSignals],
   );
   const latestMarketReview = data.latestMarketReview;
+  const lastSuccessSignal = useMemo(() => {
+    if (isLoading || !availability.recentAnalyses) return null;
+    const latest = data.recentAnalyses[0];
+    return {
+      ok: Boolean(latest),
+      href: buildAnalysisWorkbenchHref({
+        segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+      }),
+      detail: latest
+        ? t('home.readiness.lastSuccess.detail', {
+          stock: latest.stockName || latest.stockCode,
+          time: formatDateTime(latest.createdAt, language),
+        })
+        : undefined,
+    };
+  }, [availability.recentAnalyses, data.recentAnalyses, isLoading, language, t]);
   const setupMissingLabels = useMemo(() => setupStatus?.checks
     .filter((check) => check.required && check.status === 'needs_action')
     .map((check) => resolveSetupCheckLabel(check, t))
     .slice(0, 3)
     .join(getUiListSeparator(language)) ?? '', [language, setupStatus, t]);
+
 
   const toggleConfigurable = useCallback(() => {
     setConfigurableExpanded((expanded) => {
@@ -357,10 +339,16 @@ const HomePage: React.FC = () => {
     dismissOnboarding();
     setOnboardingDismissed(true);
   }, []);
+  const refreshSetupStatus = useCallback(() => {
+    void systemConfigApi.getSetupStatus()
+      .then((status) => setSetupStatus(status))
+      .catch(() => setSetupStatus(null));
+  }, []);
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
     void loadAttentionData();
-  }, [loadAttentionData]);
+    void loadSetupStatus();
+  }, [loadAttentionData, loadSetupStatus]);
 
   const analysisHref = buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
@@ -393,46 +381,35 @@ const HomePage: React.FC = () => {
               <RefreshCw aria-hidden="true" />
             </IconButton>
             <Button variant="primary" size="primary" onClick={() => navigate(analysisHref)}>
-              <PlayCircle aria-hidden="true" />
+              <PlayCircle className="h-4 w-4" aria-hidden="true" />
               {t('home.startAnalysisTitle')}
             </Button>
           </>
         )}
       />
 
-      {setupStatus && !setupStatus.isComplete && !onboardingDismissed ? (
-        <InlineAlert
-          variant="warning"
-          size="compact"
-          title={t('home.setupIncomplete')}
-          message={setupMissingLabels
-            ? t('home.setupMissingWithLabels', { labels: setupMissingLabels })
-            : t('home.setupMissingGeneric')}
-          action={(
-            <div className="flex items-center gap-1">
-              <Button
-                variant="secondary"
-                size="default"
-                onClick={() => navigate(buildSettingsHref({
-                  section: 'overview',
-                  view: 'readiness',
-                  source: 'onboarding',
-                }))}
-              >
-                {t('home.startGuidedSetup')}
-              </Button>
-              <IconButton
-                variant="ghost"
-                size="default"
-                aria-label={t('common.close')}
-                onClick={handleDismissOnboarding}
-              >
-                <X aria-hidden="true" />
-              </IconButton>
-            </div>
-          )}
+      {!onboardingDismissed || setupStatusLoading || setupStatusError || setupStatus ? (
+        <HomeReadinessCard
+          status={setupStatus}
+          isLoading={setupStatusLoading}
+          error={setupStatusError}
+          lastSuccess={lastSuccessSignal}
+          onRefresh={() => { void loadSetupStatus(); }}
+          // Incomplete-setup dismiss lives only on HomeOnboardingSection so Home
+          // does not render two identical "Close" controls at once (#879 B6 spirit).
+          dismissible={false}
+          t={t}
         />
       ) : null}
+      <HomeOnboardingSection
+        setupStatus={setupStatus}
+        setupMissingLabels={setupMissingLabels}
+        onboardingDismissed={onboardingDismissed}
+        onDismissOnboarding={handleDismissOnboarding}
+        onSetupRefresh={refreshSetupStatus}
+        reportLanguage={language === 'zh' ? 'zh' : 'en'}
+        t={t}
+      />
 
       {failedSourceCount > 0 ? (
         <InlineAlert
@@ -448,7 +425,13 @@ const HomePage: React.FC = () => {
         />
       ) : null}
 
-      <div data-testid="home-core-blocks" className="grid gap-4 xl:grid-cols-3">
+      {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
+          avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
+      <HomeWatchlistGroupsSection />
+
+      {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
+          avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
+      <div data-testid="home-core-blocks" className="grid min-w-0 gap-4 xl:grid-cols-3">
         <Section
           title={t('home.todayFocus')}
           description={t('home.todayFocusDescription')}
@@ -738,11 +721,11 @@ const HomePage: React.FC = () => {
             )}
           </Section>
 
-          <div className="[&>section>header]:rounded-lg [&>section>header]:border [&>section>header]:border-border [&>section>header]:p-3">
+          <div>
             <Section
               title={t('home.scheduledTasksToday')}
               description={t('home.scheduledTasksTodayDescription')}
-              level="section"
+              level="interactive"
               padding="md"
               actions={(
                 <>

@@ -1,4 +1,4 @@
-{% from '_macros.j2' import report_strata_section, report_disclaimer_line with context %}
+{% from '_macros.j2' import report_strata_section, report_disclaimer_line, decision_card, valuation_section with context %}
 # 🎯 {{ report_date }} {{ labels.brief_title }}
 
 > {{ results|length }} {{ labels.stock_unit_compact }} | 🟢{{ buy_count }} 🟡{{ hold_count }} 🔴{{ sell_count }}
@@ -8,13 +8,12 @@
 
 {% for e in enriched %}
 {% set dash = e.result.dashboard or {} %}
-{% set core = (dash.get('core_conclusion') or {}) if dash else {} %}
-{% set one = (core.get('one_sentence') or e.result.analysis_summary or '')[:60] %}
-**{{ e.stock_name }}({{ e.result.code }})** {{ e.signal_emoji }} {{ e.signal_text }} | {{ labels.score_label }} {{ e.result.sentiment_score }} | {{ one }}
-{% set strata = e.report_strata or (dash.get('report_strata') if dash else none) %}
+{{ decision_card(e, compact='brief') }}
+{%- set strata = e.report_strata or (dash.get('report_strata') if dash else none) %}
 {% if strata %}
 {{ report_strata_section(strata, compact=true) }}
 {% endif %}
+{{ valuation_section(e.valuation_projection, compact=true) }}
 {% endfor %}
 
 {{ report_disclaimer_line() }}

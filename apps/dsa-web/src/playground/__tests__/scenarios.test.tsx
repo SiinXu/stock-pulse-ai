@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from 'next-themes';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,20 +10,33 @@ import { COMMON_SCENARIOS } from '../scenarios/commonScenarios';
 import { DECISION_REPORT_RUN_FLOW_SCENARIOS } from '../scenarios/decisionReportRunFlowScenarios';
 import { SETTINGS_SCENARIOS } from '../scenarios/settingsScenarios';
 import { ALERT_HISTORY_SCENARIOS } from '../scenarios/alertHistoryScenarios';
+import { getPlaygroundRenderer } from '../scenarios';
 
 let sandbox: ReturnType<typeof installPlaygroundApiMock> | null = null;
 
+function createPlaygroundQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+}
+
 function renderStory(Renderer: React.ComponentType, scenario = 'default') {
+  const queryClient = createPlaygroundQueryClient();
   return render(
-    <ThemeProvider attribute="class" defaultTheme="dark">
-      <UiLanguageProvider initialLanguage="en">
-        <MemoryRouter>
-          <PlaygroundScenarioProvider profile="ready" scenario={scenario as 'default'}>
-            <Renderer />
-          </PlaygroundScenarioProvider>
-        </MemoryRouter>
-      </UiLanguageProvider>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="dark">
+        <UiLanguageProvider initialLanguage="en">
+          <MemoryRouter>
+            <PlaygroundScenarioProvider profile="ready" scenario={scenario as 'default'}>
+              <Renderer />
+            </PlaygroundScenarioProvider>
+          </MemoryRouter>
+        </UiLanguageProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -32,6 +46,16 @@ afterEach(() => {
 });
 
 describe('representative playground scenarios', () => {
+  it('lazy-loads the financial chart story with 36 strictly increasing demo dates', async () => {
+    const Story = getPlaygroundRenderer('kline-chart');
+    expect(Story).toBeDefined();
+    renderStory(Story as React.ComponentType);
+
+    const summary = await screen.findByTestId('kline-chart-summary');
+    expect(summary).toHaveTextContent('2026-01-01 to 2026-02-05');
+    expect(screen.getAllByTestId(/^kline-chart-candle-/)).toHaveLength(36);
+  });
+
   it('renders shared variants and keeps modal focus/Escape behavior real', async () => {
     renderStory(COMMON_SCENARIOS.modal, 'interactive');
 

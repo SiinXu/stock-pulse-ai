@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   collectHardcodedUiStrings,
+  collectHardcodedUiStringsFromSources,
   findHardcodedUiStrings,
   findUnusedUiStringAllowances,
   type HardcodedUiStringAllowance,
@@ -79,19 +80,19 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'SI-compatible milliseconds unit appended to a numeric latency.',
   },
   {
-    file: 'pages/ChatPage.tsx',
+    file: 'components/chat/ChatMessageList.tsx',
     text: 'U',
     context: 'jsx-expression',
     purpose: 'Locale-independent one-letter user avatar marker.',
   },
   {
-    file: 'pages/ChatPage.tsx',
+    file: 'components/chat/ChatMessageList.tsx',
     text: 'AI',
     context: 'jsx-expression',
     purpose: 'Established technical acronym used as the assistant avatar marker.',
   },
   {
-    file: 'pages/ChatPage.tsx',
+    file: 'components/chat/ChatMessageList.tsx',
     text: 'AI',
     context: 'jsx-text',
     purpose: 'Established technical acronym used as the loading assistant avatar marker.',
@@ -103,7 +104,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'Product name in the login wordmark.',
   },
   {
-    file: 'pages/PortfolioPage.tsx',
+    file: 'components/portfolio/PortfolioWorkspace.tsx',
     text: 'CNY',
     context: 'jsx-expression',
     purpose: 'ISO 4217 fallback currency code from the portfolio data contract.',
@@ -115,7 +116,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'Literal diagnostic filename users must locate on disk.',
   },
   {
-    file: 'pages/StockScreeningPage.tsx',
+    file: 'components/screening/ScreeningResultsSection.tsx',
     text: 'LLM',
     context: 'jsx-text',
     purpose: 'Established technical acronym in a result-column heading.',
@@ -136,18 +137,45 @@ function collectSourceFiles(directory: string): string[] {
 
 let productionCandidateCache: ReturnType<typeof collectHardcodedUiStrings> | null = null;
 
+const nonJsxUserCopyContext = /(?:\btoast(?:\s*\.|\s*\()|\bnotify\s*\(|\b(?:set|show|add|push)[A-Za-z0-9]*Toast\s*\(|\bset[A-Za-z0-9]*Error(?:Message)?\s*\(|\bset[A-Za-z0-9]*(?:Notice|Feedback|Banner)\s*\(|\b(?:document|window\s*\.\s*document|globalThis\s*\.\s*document)\s*\.\s*title\s*=)/;
+
+function canContainUserCopyContext(filename: string, sourceText: string): boolean {
+  // JSX is not valid in .ts files. Avoid constructing a TypeScript Program for
+  // non-UI modules unless they contain one of the non-JSX contexts the guard
+  // intentionally scans (toast/notice/error calls or document.title).
+  return filename.endsWith('.tsx') || nonJsxUserCopyContext.test(sourceText);
+}
+
 function productionCandidates(): ReturnType<typeof collectHardcodedUiStrings> {
   if (productionCandidateCache) {
     return productionCandidateCache;
   }
-  productionCandidateCache = collectSourceFiles(sourceRoot).flatMap((filename) => {
+  const candidateSources: Array<readonly [string, string]> = [];
+  for (const filename of collectSourceFiles(sourceRoot)) {
     const relative = path.relative(sourceRoot, filename);
-    return collectHardcodedUiStrings(relative, fs.readFileSync(filename, 'utf8'));
-  });
+    const sourceText = fs.readFileSync(filename, 'utf8');
+    if (canContainUserCopyContext(filename, sourceText)) {
+      candidateSources.push([relative, sourceText]);
+    }
+  }
+  productionCandidateCache = collectHardcodedUiStringsFromSources(candidateSources);
   return productionCandidateCache;
 }
 
 describe('hardcoded UI string scanner', () => {
+  it.each([
+    ['component.tsx', 'export const Component = () => <p>Save changes</p>;'],
+    ['feedback.ts', "toast.error('Could not save settings');"],
+    ['notice.ts', "setSaveBanner({ title: 'Settings saved' });"],
+    ['document.ts', "window.document.title = 'Settings';"],
+  ])('keeps %s in the production candidate scan', (filename, sourceText) => {
+    expect(canContainUserCopyContext(filename, sourceText)).toBe(true);
+  });
+
+  it('skips non-JSX modules without a user-copy call or document title assignment', () => {
+    expect(canContainUserCopyContext('api.ts', "export const route = '/api/v1/stocks';")).toBe(false);
+  });
+
   it.each<[string, string, HardcodedUiStringContext]>([
     ['JSX text', 'const View = () => <p>Save changes</p>;', 'jsx-text'],
     ['JSX expression literal', "const View = () => <p>{'Save changes'}</p>;", 'jsx-expression'],
@@ -348,6 +376,17 @@ describe('hardcoded UI string scanner', () => {
     expect(findHardcodedUiStrings('other.tsx', sourceText, [allowance])).toHaveLength(1);
     expect(findHardcodedUiStrings('fixture.tsx', 'const View = () => <span>Stream</span>;', [allowance])).toHaveLength(1);
     expect(findHardcodedUiStrings('fixture.tsx', 'const View = () => <span title="JSON" />;', [allowance])).toHaveLength(1);
+  });
+
+  it('keeps batch results equivalent to isolated module scans', () => {
+    const sources = [
+      ['first.tsx', "const label = 'First label'; const View = () => <p>{label}</p>;"],
+      ['second.tsx', "const label = 'Second label'; const View = () => <p>{label}</p>;"],
+    ] as const;
+
+    expect(collectHardcodedUiStringsFromSources(sources)).toEqual(
+      sources.flatMap(([filename, source]) => collectHardcodedUiStrings(filename, source)),
+    );
   });
 });
 

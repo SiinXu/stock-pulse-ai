@@ -678,7 +678,29 @@ class ConversationMessage(Base):
     session_id = Column(String(100), index=True, nullable=False)
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
+    turn_id = Column(String(64), nullable=True)
+    context_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now, index=True)
+
+    __table_args__ = (
+        Index(
+            'uix_conversation_messages_session_turn',
+            'session_id',
+            'turn_id',
+            unique=True,
+        ),
+    )
+
+
+class ConversationSessionState(Base):
+    """Persisted user selections for an Agent chat session."""
+
+    __tablename__ = 'conversation_session_states'
+
+    session_id = Column(String(100), primary_key=True)
+    selected_skill_ids_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
 
 class ConversationSummary(Base):
@@ -1362,4 +1384,35 @@ class InvestmentFrameworkVersionRecord(Base):
             'version',
             name='uix_investment_framework_version',
         ),
+    )
+
+
+class TaskQueueInflightRecord(Base):
+    """Durable checkpoint for process-local in-flight task recovery.
+
+    Execution remains process-local (ADR-004 / ADR-008). This table only records
+    enough state for a single-process restart to requeue safe work or mark
+    non-resumable work as ``interrupted``; it is not a distributed queue.
+    """
+
+    __tablename__ = 'task_queue_inflight'
+
+    task_id = Column(String(64), primary_key=True)
+    kind = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False, index=True)
+    stock_code = Column(String(32))
+    recovery_class = Column(String(32), nullable=False, index=True)
+    dedupe_key = Column(String(128))
+    idempotency_key = Column(String(128))
+    idempotency_fingerprint = Column(String(128))
+    failure_error_code = Column(String(64))
+    none_is_success = Column(Boolean, nullable=False, default=False)
+    metadata_json = Column(Text, nullable=False, default='{}')
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=utc_naive_now,
+        onupdate=utc_naive_now,
+        nullable=False,
+        index=True,
     )

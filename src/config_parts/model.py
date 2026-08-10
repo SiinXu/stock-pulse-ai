@@ -1,6 +1,7 @@
 """Dataclass model for the public :mod:`src.config` facade."""
 
 import logging
+import os
 from dataclasses import dataclass, field
 from types import FunctionType
 from typing import Any, Dict, List, Optional, Tuple
@@ -71,11 +72,23 @@ class Config:
     tencent_priority: int = 5
     finnhub_api_key: Optional[str] = None
     alphavantage_api_key: Optional[str] = None
+    crypto_provider_enabled: bool = False
+    coingecko_api_key: Optional[str] = None
+    coingecko_api_plan: str = "keyless"
+    coingecko_api_base: Optional[str] = None
+    crypto_coingecko_priority: int = 10
     longbridge_app_key: Optional[str] = None
     longbridge_app_secret: Optional[str] = None
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
     stock_index_remote_update_enabled: bool = True
+    # Unified provider-boundary validation policy.
+    data_validation_enabled: bool = True
+    data_validation_strict: bool = False
+    data_validation_strict_scopes: str = "*/*"
+    data_validation_instrument_overrides: str = ""
+    data_validation_upper_layer_mode: str = "warn"
+    plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
     alphasift_enabled: bool = False
@@ -86,6 +99,17 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
+    # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
+    multimodal_agent_tools_enabled: bool = False
+    multimodal_file_root: Optional[str] = None
+    # === Optional offline OCR Agent Tool (issue #196) ===
+    ocr_agent_tool_enabled: bool = False
+    ocr_file_root: Optional[str] = None
+    ocr_langs: str = "chi_sim+eng"
+    ocr_timeout_seconds: int = 30
+    # === Optional DCF / relative valuation Agent Tool (issue #238) ===
+    valuation_agent_tool_enabled: bool = False
+
     # === Historical decision memory & reflection (Issue #118) ===
     decision_memory_enabled: bool = True
     decision_memory_lookback: int = 5
@@ -95,6 +119,19 @@ class Config:
     # === Public signal scorecard (Issue #379) ===
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
+
+    # === Reasoning-trace export (Issue #135) — default off ===
+    reasoning_trace_export_enabled: bool = False
+    reasoning_trace_export_max_chars: int = 500_000
+
+    # === Daily brief with historical accuracy review (Issue #466) ===
+    daily_brief_enabled: bool = False
+    daily_brief_schedule_time: str = "08:30"
+    daily_brief_timezone: str = "Asia/Shanghai"
+    daily_brief_min_samples: int = 10
+    daily_brief_notify: bool = True
+    daily_brief_persist_history: bool = True
+    daily_brief_save_report_file: bool = True
 
     # === Paper trading portfolio (Issue #370) ===
     paper_portfolio_initial_cash: float = 1_000_000.0
@@ -187,6 +224,9 @@ class Config:
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
     searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
+    # Optional RSS/Atom feeds for on-demand news search (supplement to SearXNG; empty = inert)
+    rss_news_feed_urls: List[str] = field(default_factory=list)
+    rss_news_fetch_timeout_sec: float = 8.0  # Per-feed pull timeout for search-pipeline RSS/Atom
 
     # === Social Sentiment (US stocks only, api.adanos.org) ===
     social_sentiment_api_key: Optional[str] = None
@@ -202,6 +242,15 @@ class Config:
     newsnow_base_url: str = "https://newsnow.busiyi.world"  # NewsNow HTTP API base URL (Source side data, Does Not Affect LLM/provider base URL)
     bias_threshold: float = 5.0  # Standard deviation threshold (%), prompts not to chase highs if exceeded.
 
+    # === Technical indicator periods (Issue #172) ===
+    # Defaults match historical hard-coded StockTrendAnalyzer periods.
+    indicator_ma_periods: List[int] = field(default_factory=lambda: [5, 10, 20, 60])
+    indicator_macd_fast: int = 12
+    indicator_macd_slow: int = 26
+    indicator_macd_signal: int = 9
+    indicator_rsi_periods: List[int] = field(default_factory=lambda: [6, 12, 24])
+    indicator_period_source: str = "defaults"
+
     # == Agent Mode Configuration ===
     agent_generation_backend: str = AUTO_AGENT_BACKEND_ID
     agent_litellm_model: str = ""  # Optional Agent-only primary model; empty inherits LITELLM_MODEL
@@ -215,7 +264,10 @@ class Config:
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
+    skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
+    decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
     agent_technical_agent_timeout_s: float = 0
     agent_intel_agent_timeout_s: float = 0
     agent_risk_agent_timeout_s: float = 0
@@ -223,6 +275,8 @@ class Config:
     agent_portfolio_agent_timeout_s: float = 0
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
+    risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
+    agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
@@ -232,9 +286,13 @@ class Config:
     agent_context_compression_profile: str = AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE
     agent_context_compression_trigger_tokens: int = 12000
     agent_context_protected_turns: int = 4
+    agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
+    agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
+    # Attach holdings/watchlist impact context to triggered alert notifications (managed data only).
+    agent_event_impact_context_enabled: bool = True
 
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)
@@ -243,6 +301,8 @@ class Config:
     # Report type: simple (concise) or full (complete)
     report_type: str = "simple"
     report_language: str = "zh"
+    # Optional single-face TTF/OTF used by the bounded report PDF exporter.
+    report_export_pdf_font_path: Optional[str] = None
 
     # Only analyze the result summary: true only pushes summaries, without individual stock details (Issue #262)
     report_summary_only: bool = False
@@ -345,6 +405,18 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+    portfolio_health_weight_concentration: float = 0.25
+    portfolio_health_weight_risk_exposure: float = 0.25
+    portfolio_health_weight_diversification: float = 0.20
+    portfolio_health_weight_pnl: float = 0.15
+    portfolio_health_weight_cash_ratio: float = 0.15
+    portfolio_health_concentration_alert_pct: float = 35.0
+    portfolio_health_var_alert_pct: float = 5.0
+    portfolio_health_diversification_alert: float = 0.35
+    portfolio_health_cash_low_alert_pct: float = 2.0
+    portfolio_health_cash_high_alert_pct: float = 50.0
+    portfolio_health_pnl_loss_alert_pct: float = -15.0
+    portfolio_stress_scenarios_path: Optional[str] = None
 
     # Discord Bot status
     discord_bot_status: str = "A股智能分析 | /help"
@@ -418,6 +490,21 @@ class Config:
 
     def __post_init__(self) -> None:
         _log = logging.getLogger(__name__)
+        if (
+            self.portfolio_stress_scenarios_path is not None
+            and len(self.portfolio_stress_scenarios_path) > 1024
+        ):
+            raise ValueError("PORTFOLIO_STRESS_SCENARIOS_PATH exceeds 1024 characters")
+        from src.services.portfolio_stress_scenarios import activate_scenario_catalog
+
+        activate_scenario_catalog(
+            scenarios_path=self.portfolio_stress_scenarios_path
+        )
+        # Market-data local-only intent must fail closed during application
+        # configuration load, before any manager can enter a provider path.
+        from data_provider.daily_cache import parse_market_data_fetch_mode
+
+        parse_market_data_fetch_mode(os.getenv("PROVIDER_MARKET_DATA_MODE"))
         if self.agent_arch not in self._VALID_AGENT_ARCH:
             _log.warning(
                 "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",
@@ -525,6 +612,7 @@ _CONFIG_METHOD_GROUPS = (
         (
             "reset_instance",
             "has_searxng_enabled",
+            "has_rss_news_feeds_enabled",
             "has_search_capability_enabled",
             "is_agent_available",
             "refresh_stock_list",

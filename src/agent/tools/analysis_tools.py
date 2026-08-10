@@ -22,32 +22,38 @@ _ANALYSIS_READ_POLICY = ToolPolicy.declared(
 )
 
 
-def _fetch_trend_data(stock_code: str):
+def _fetch_trend_data(stock_code: str, *, days: int):
     """Fetch historical OHLCV (DataFrame) for trend analysis. DB first, then DataFetcher fallback."""
     from src.services.history_loader import load_history_df
 
-    df, _ = load_history_df(stock_code, days=60)
+    df, _ = load_history_df(stock_code, days=days)
     return df
 
 
 def _handle_analyze_trend(stock_code: str) -> dict:
     """Run technical trend analysis on a stock."""
+    from src.application_services import get_application_services
     from src.stock_analyzer import StockTrendAnalyzer
+    from src.utils.indicator_periods import periods_from_config
 
     if not (stock_code and str(stock_code).strip()):
         return {"error": "stock_code is required"}
 
-    df = _fetch_trend_data(stock_code)
+    periods = periods_from_config(get_application_services().config)
+    df = _fetch_trend_data(
+        stock_code,
+        days=periods.required_history_calendar_days(),
+    )
     if df is None or df.empty:
         return {"error": f"No historical data available for trend analysis on {stock_code}"}
 
     if len(df) < 20:
         return {"error": f"Insufficient data for trend analysis on {stock_code} (need >= 20 days)"}
 
-    analyzer = StockTrendAnalyzer()
+    analyzer = StockTrendAnalyzer(periods=periods)
     try:
         result = analyzer.analyze(df, stock_code)
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - Tool failures return a bounded error while preserving agent execution.
         log_safe_exception(
             logger,
             "Agent trend analysis failed",
@@ -69,9 +75,26 @@ def _handle_analyze_trend(stock_code: str) -> dict:
         "ma20": result.ma20,
         "ma60": result.ma60,
         "current_price": result.current_price,
-        "bias_ma5": round(result.bias_ma5, 2),
-        "bias_ma10": round(result.bias_ma10, 2),
-        "bias_ma20": round(result.bias_ma20, 2),
+        "bias_ma5": None if result.bias_ma5 is None else round(result.bias_ma5, 2),
+        "bias_ma10": None if result.bias_ma10 is None else round(result.bias_ma10, 2),
+        "bias_ma20": None if result.bias_ma20 is None else round(result.bias_ma20, 2),
+        "ma_by_period": result.ma_by_period,
+        "ma_readings": {
+            str(period): reading.to_dict()
+            for period, reading in result.ma_readings.items()
+        },
+        "macd_reading": (
+            result.macd_reading.to_dict()
+            if result.macd_reading is not None
+            else None
+        ),
+        "bias_by_period": result.bias_by_period,
+        "support_by_period": result.support_by_period,
+        "primary_ma_periods": result.primary_ma_periods,
+        "primary_bias_period": result.primary_bias_period,
+        "indicator_period_source": result.indicator_period_source,
+        "indicator_bar_count": result.indicator_bar_count,
+        "indicator_as_of": result.indicator_as_of,
         "volume_status": result.volume_status.value,
         "volume_ratio_5d": round(result.volume_ratio_5d, 2),
         "volume_trend": result.volume_trend,
@@ -84,9 +107,14 @@ def _handle_analyze_trend(stock_code: str) -> dict:
         "macd_bar": round(result.macd_bar, 4),
         "macd_status": result.macd_status.value,
         "macd_signal": result.macd_signal,
-        "rsi_6": round(result.rsi_6, 2),
-        "rsi_12": round(result.rsi_12, 2),
-        "rsi_24": round(result.rsi_24, 2),
+        "rsi_6": None if result.rsi_6 is None else round(result.rsi_6, 2),
+        "rsi_12": None if result.rsi_12 is None else round(result.rsi_12, 2),
+        "rsi_24": None if result.rsi_24 is None else round(result.rsi_24, 2),
+        "rsi_by_period": result.rsi_by_period,
+        "rsi_readings": {
+            str(period): reading.to_dict()
+            for period, reading in result.rsi_readings.items()
+        },
         "rsi_status": result.rsi_status.value,
         "rsi_signal": result.rsi_signal,
         "buy_signal": result.buy_signal.value,

@@ -1176,7 +1176,7 @@ class TestOrchestratorExecution(unittest.TestCase):
         self.assertNotIn("private.example", rendered_logs)
         self.assertNotIn("Traceback", rendered_logs)
 
-    def test_pipeline_summary_and_risk_override_share_disabled_override_contract(self):
+    def test_disabled_legacy_override_cannot_bypass_final_risk_contract(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_risk_override=False))
         ctx = AgentContext(query="test", stock_code="600519")
         captured_messages = []
@@ -1206,8 +1206,8 @@ class TestOrchestratorExecution(unittest.TestCase):
                     result = orch._execute_pipeline(ctx, parse_dashboard=True)
 
         self.assertTrue(result.success)
-        self.assertEqual(result.dashboard["decision_type"], "buy")
-        self.assertIsNone(ctx.get_data("risk_override_applied"))
+        self.assertEqual(result.dashboard["decision_type"], "hold")
+        self.assertEqual(ctx.get_data("risk_override_applied")["to"], "hold")
 
         combined = "\n".join(
             str(message.get("content", ""))
@@ -1221,7 +1221,7 @@ class TestOrchestratorExecution(unittest.TestCase):
         self.assertNotIn('"conflict_type": "risk_override"', combined)
         self.assertNotIn("[Pre-fetched: agent_disagreement_summary]", combined)
 
-    def test_pipeline_risk_level_high_is_evidence_not_runtime_override(self):
+    def test_pipeline_bearish_risk_conflict_is_final_gate_downgrade(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_risk_override=True))
         ctx = AgentContext(query="test", stock_code="600519")
         captured_messages = []
@@ -1251,8 +1251,17 @@ class TestOrchestratorExecution(unittest.TestCase):
                     result = orch._execute_pipeline(ctx, parse_dashboard=True)
 
         self.assertTrue(result.success)
-        self.assertEqual(result.dashboard["decision_type"], "buy")
-        self.assertIsNone(ctx.get_data("risk_override_applied"))
+        self.assertEqual(result.dashboard["decision_type"], "hold")
+        self.assertEqual(ctx.get_data("risk_override_applied"), {
+            "from": "buy",
+            "to": "hold",
+            "adjustment": "buy_to_hold",
+            "reason": "downgrade",
+        })
+        self.assertIn(
+            "evidence_conclusion_conflict",
+            result.dashboard["risk_manager"]["evidence_codes"],
+        )
 
         combined = "\n".join(
             str(message.get("content", ""))
@@ -1299,8 +1308,8 @@ class TestOrchestratorExecution(unittest.TestCase):
         self.assertEqual(ctx.get_data("risk_override_applied"), {
             "from": "buy",
             "to": "hold",
-            "adjustment": "veto",
-            "reason": "risk_veto",
+            "adjustment": "buy_to_hold",
+            "reason": "downgrade",
         })
 
         combined = "\n".join(
@@ -1874,13 +1883,68 @@ class TestOrchestratorExecution(unittest.TestCase):
         fake_result = OrchestratorResult(success=True, content="assistant reply")
 
         with patch.object(orch, "_execute_pipeline", return_value=fake_result):
-            with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
+            with patch(
+                "src.agent.conversation.conversation_manager.add_user_message"
+            ) as add_user_message, patch(
+                "src.agent.conversation.conversation_manager.add_message"
+            ) as add_message:
                 result = orch.chat("hello", "session-1")
 
         self.assertTrue(result.success)
-        self.assertEqual(add_message.call_count, 2)
-        add_message.assert_any_call("session-1", "user", "hello")
-        add_message.assert_any_call("session-1", "assistant", "assistant reply")
+        add_user_message.assert_called_once_with(
+            "session-1",
+            "hello",
+            None,
+            turn_id=None,
+            context={},
+        )
+        add_message.assert_called_once_with("session-1", "assistant", "assistant reply")
+
+    def test_chat_persists_exact_fail_closed_final_content(self):
+        from src.agent.orchestrator import OrchestratorResult
+
+        orch = self._make_orchestrator()
+        orch.config = SimpleNamespace(
+            risk_gate_profile="balanced",
+            agent_risk_override=False,
+        )
+        fake_result = OrchestratorResult(
+            success=True,
+            content="Buy now",
+            dashboard={
+                "decision_type": "buy",
+                "report_language": "en",
+                "risk_assessment": {
+                    "veto_buy": True,
+                    "risk_level": "high",
+                },
+            },
+        )
+
+        with patch.object(orch, "_execute_pipeline", return_value=fake_result):
+            with patch(
+                "src.agent.conversation.conversation_manager.add_user_message"
+            ), patch(
+                "src.agent.conversation.conversation_manager.add_message"
+            ) as add_message:
+                result = orch.chat(
+                    "analyze AAPL",
+                    "risk-final-history",
+                    context={"report_language": "en"},
+                )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.dashboard["decision_type"], "hold")
+        self.assertIn("Risk Manager downgraded: buy -> hold.", result.content)
+        add_message.assert_called_once_with(
+            "risk-final-history",
+            "assistant",
+            result.content,
+        )
+        self.assertEqual(
+            result.runtime_facts.risk_gate_result.final_action,
+            "hold",
+        )
 
     def test_chat_persists_failure_message(self):
         from src.agent.orchestrator import OrchestratorResult
@@ -2856,7 +2920,7 @@ class TestRiskOverride(unittest.TestCase):
         self.assertEqual(dashboard["decision_type"], "hold")
         self.assertEqual(ctx.opinions[0].signal, "hold")
 
-    def test_risk_override_respects_disable_flag(self):
+    def test_risk_override_disable_does_not_disable_final_action_gate(self):
         from src.agent.orchestrator import AgentOrchestrator
 
         orch = AgentOrchestrator(
@@ -2877,10 +2941,10 @@ class TestRiskOverride(unittest.TestCase):
 
         dashboard = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
-        self.assertEqual(dashboard["decision_type"], "buy")
-        self.assertIsNone(ctx.get_data("risk_override_applied"))
+        self.assertEqual(dashboard["decision_type"], "hold")
+        self.assertEqual(ctx.get_data("risk_override_applied")["to"], "hold")
 
-    def test_risk_level_high_alone_does_not_override_buy_signal(self):
+    def test_risk_level_high_with_bearish_opinion_downgrades_buy_signal(self):
         from src.agent.orchestrator import AgentOrchestrator
 
         orch = AgentOrchestrator(
@@ -2901,8 +2965,12 @@ class TestRiskOverride(unittest.TestCase):
 
         dashboard = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
-        self.assertEqual(dashboard["decision_type"], "buy")
-        self.assertIsNone(ctx.get_data("risk_override_applied"))
+        self.assertEqual(dashboard["decision_type"], "hold")
+        self.assertEqual(ctx.get_data("risk_override_applied")["to"], "hold")
+        self.assertIn(
+            "evidence_conclusion_conflict",
+            dashboard["risk_manager"]["evidence_codes"],
+        )
 
 
 # ============================================================
