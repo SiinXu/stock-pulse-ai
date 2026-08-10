@@ -155,6 +155,26 @@ describe('FirstRunWizard', () => {
     vi.clearAllMocks();
   });
 
+  it('leads first-run setup with the local zero-cost path while requiring an explicit choice', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+      />,
+    );
+
+    const localChoice = screen.getByRole('button', { name: /Local model/ });
+    const cloudChoice = screen.getByRole('button', { name: /Cloud API/ });
+    expect(localChoice).toHaveAttribute('aria-pressed', 'false');
+    expect(localChoice).toHaveClass('border-primary/50', 'bg-primary/5');
+    expect(localChoice.compareDocumentPosition(cloudChoice) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
   it('uses borderless modal dividers for every wizard step', () => {
     render(
       <FirstRunWizard
