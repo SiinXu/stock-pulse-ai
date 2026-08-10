@@ -1,6 +1,5 @@
 import type React from 'react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   alphasiftApi,
@@ -11,16 +10,32 @@ import {
   type AlphaSiftScreenTaskStatus,
   type AlphaSiftStrategy,
 } from '../api/alphasift';
-import { formatParsedApiError, getParsedApiError, toApiErrorMessage } from '../api/error';
-import { AppPage, Button, InlineAlert, Surface } from '../components/common';
-import { ScreenAlertMessage } from '../components/screening/ScreenAlertMessage';
+import {
+  formatParsedApiError,
+  getParsedApiError,
+  toApiErrorMessage,
+} from '../api/error';
+import { AppPage } from '../components/common';
 import { ScreeningConfigurationModal } from '../components/screening/ScreeningConfigurationModal';
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
+import ScreeningPageAlerts from '../components/screening/ScreeningPageAlerts';
+import ScreeningPageHeader from '../components/screening/ScreeningPageHeader';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
 import { formatHotspotEmptyMessage } from '../components/screening/hotspotModel';
-import { getScreenMessages } from '../components/screening/screeningMessages';
+import { getScreeningDegradationReasons } from '../components/screening/screeningDegradation';
+import createScreeningResultsEmptyState from '../components/screening/screeningResultsEmptyState';
+import {
+  getScreeningCapabilityLabel,
+  getScreeningResultsEmptyKind,
+  getScreeningRunStatusTitle,
+  isFullSourceUnavailable,
+  isScreeningAttemptLoading,
+  type ScreeningAttemptState,
+  type ScreeningSuccessfulRun,
+} from '../components/screening/screeningPageState';
+import { useScreeningCapability } from '../components/screening/useScreeningCapability';
 import {
   SCREEN_TASK_POLL_INTERVAL_MS,
   clearPersistedScreenTask,
@@ -31,12 +46,14 @@ import {
   readPersistedScreenTask,
   readScreeningRunParameters,
   type PersistedScreenTask,
+  type ScreeningRunParameters,
 } from '../components/screening/screeningRunState';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import {
   RESEARCH_DISCOVER_LIMITS,
   RESEARCH_DISCOVER_MARKET_VALUES,
+  buildSettingsHref,
 } from '../routing/routes';
 import {
   DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE,
@@ -57,10 +74,7 @@ const StockScreeningPage: React.FC = () => {
     [text.marketCn],
   );
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
-  const [initialRunParameters] = useState(() => readScreeningRunParameters(restoredTask));
-  const [statusLoading, setStatusLoading] = useState(true);
-  const [enabled, setEnabled] = useState(false);
-  const [available, setAvailable] = useState(false);
+  const [initialRunParameters] = useState<ScreeningRunParameters>(() => readScreeningRunParameters(restoredTask));
   const [market, setMarket] = useState(initialRunParameters.market);
   const [strategy, setStrategy] = useState(initialRunParameters.strategy);
   const [strategies, setStrategies] = useState<AlphaSiftStrategy[]>([]);
@@ -69,7 +83,6 @@ const StockScreeningPage: React.FC = () => {
   const [maxResultsError, setMaxResultsError] = useState('');
   const [configurationOpen, setConfigurationOpen] = useState(false);
   const [configurationError, setConfigurationError] = useState('');
-  const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
   const strategiesRequestIdRef = useRef(0);
@@ -82,9 +95,20 @@ const StockScreeningPage: React.FC = () => {
   const [hotspotDetailError, setHotspotDetailError] = useState('');
   const [loadingHotspots, setLoadingHotspots] = useState(false);
   const [hotspotError, setHotspotError] = useState('');
-  const [screenMeta, setScreenMeta] = useState<AlphaSiftScreenResponse | null>(null);
-  const [loading, setLoading] = useState(Boolean(restoredTask?.taskId));
-  const [enabling, setEnabling] = useState(false);
+  const [lastSuccessfulRun, setLastSuccessfulRun] = useState<ScreeningSuccessfulRun | null>(null);
+  const [attemptResult, setAttemptResult] = useState<AlphaSiftScreenResponse | null>(null);
+  const [attemptState, setAttemptState] = useState<ScreeningAttemptState>(
+    restoredTask?.taskId ? 'running' : 'idle',
+  );
+  const lastValidatedParametersRef = useRef<ScreeningRunParameters | null>(
+    restoredTask
+      ? {
+          market: restoredTask.market,
+          strategy: restoredTask.strategy,
+          maxResults: restoredTask.maxResults,
+        }
+      : null,
+  );
   const [loadingStrategies, setLoadingStrategies] = useState(false);
   const [error, setError] = useState('');
   const [strategyLoadError, setStrategyLoadError] = useState('');
@@ -125,37 +149,41 @@ const StockScreeningPage: React.FC = () => {
     }
     return [{ value: strategy, label: displayedStrategy }, ...catalogOptions];
   }, [displayedStrategy, language, selectedStrategy, strategies, strategy]);
-  const screenMessages = useMemo(() => getScreenMessages(screenMeta, text), [screenMeta, text]);
-  const llmDegraded = screenMeta?.llmRanked === false;
-  const alertMessages = llmDegraded
-    ? screenMessages.length > 0
-      ? screenMessages
-      : [text.localRankingNotice]
-    : screenMessages;
-  const isScreeningEnabled = enabled && available;
-  const statusText = statusLoading ? text.statusLoading : isScreeningEnabled ? text.enabled : text.disabled;
-
+  const handleOpenDataSources = useCallback(() => {
+    navigate(buildSettingsHref({ section: 'data_sources', view: 'providers' }));
+  }, [navigate]);
+  const handleAdminLogin = useCallback(() => {
+    const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    navigate(`/login?redirect=${encodeURIComponent(redirect)}`);
+  }, [navigate]);
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
 
   const applyScreenResult = useCallback((result: AlphaSiftScreenResponse) => {
     const nextCandidates = result.candidates || [];
-    setScreenMeta(result);
-    setCandidates(nextCandidates);
-    setExpandedCode((current) => {
-      if (current && nextCandidates.some((item) => item.code === current)) return current;
-      return nextCandidates[0]?.code ?? null;
-    });
-  }, [setExpandedCode]);
-
+    const parameters = lastValidatedParametersRef.current;
+    setAttemptResult(result);
+    setAttemptState('completed');
+    setError('');
+    if (!isFullSourceUnavailable(result) && parameters) {
+      setLastSuccessfulRun({ result, parameters });
+      setExpandedCode((current) => {
+        if (current && nextCandidates.some((item) => item.code === current)) return current;
+        return nextCandidates[0]?.code ?? null;
+      });
+    } else if (!lastSuccessfulRun) {
+      setExpandedCode(null);
+    }
+  }, [lastSuccessfulRun, setExpandedCode]);
   const clearScreeningResults = () => {
-    setCandidates([]);
-    setScreenMeta(null);
+    setLastSuccessfulRun(null);
+    setAttemptResult(null);
+    setAttemptState('idle');
     setExpandedCode(null);
     clearCandidateFromUrl();
+    setError('');
   };
-
   const loadHotspotDetail = useCallback(async (topic: string, options: { refresh?: boolean } = {}) => {
     if (!topic) return;
     const cachedDetail = !options.refresh ? hotspotDetailsByTopicRef.current[topic] : null;
@@ -287,29 +315,52 @@ const StockScreeningPage: React.FC = () => {
     void loadHotspotDetail(selectedHotspotTopic);
   }, [loadHotspotDetail, selectedHotspotTopic]);
 
-  useEffect(() => {
-    let active = true;
-    alphasiftApi
-      .getStatus()
-      .then((status) => {
-        if (!active) return;
-        setEnabled(status.enabled);
-        setAvailable(status.available);
-        setStatusLoading(false);
-        if (status.enabled && status.available) {
-          void loadStrategies();
-          void loadHotspots(false);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setEnabled(false);
-          setAvailable(false);
-          setStatusLoading(false);
-        }
-      });
-    return () => { active = false; };
-  }, [loadHotspots, loadStrategies]);
+  const {
+    capability,
+    enabling,
+    actionError: capabilityActionError,
+    loadStatus,
+    enable: enableScreening,
+  } = useScreeningCapability({
+    language,
+    enableFailedText: text.enableFailed,
+    loadStrategies,
+    loadHotspots,
+  });
+  const loading = isScreeningAttemptLoading(attemptState);
+  const showingLastGood = Boolean(
+    lastSuccessfulRun
+    && (
+      loading
+      || attemptState === 'failed'
+      || capability.state === 'status_error'
+      || isFullSourceUnavailable(attemptResult)
+    ),
+  );
+  const displayedResult = showingLastGood
+    ? lastSuccessfulRun?.result ?? null
+    : attemptResult ?? lastSuccessfulRun?.result ?? null;
+  const screenMeta = displayedResult;
+  const candidates: AlphaSiftCandidate[] = displayedResult?.candidates ?? [];
+  const degradationReasons = useMemo(
+    () => getScreeningDegradationReasons(attemptResult ?? screenMeta, text),
+    [attemptResult, screenMeta, text],
+  );
+  const llmDegraded = screenMeta?.llmRanked === false;
+  const isScreeningEnabled = capability.state === 'ready';
+  const resultsEmptyKind = useMemo(
+    () => getScreeningResultsEmptyKind({
+      capability: capability.state,
+      loading,
+      candidatesCount: candidates.length,
+      screenMeta: attemptResult ?? screenMeta,
+    }),
+    [attemptResult, candidates.length, capability.state, loading, screenMeta],
+  );
+  const statusText = getScreeningCapabilityLabel(capability.state, text);
+  const runStatusTitle = getScreeningRunStatusTitle({
+    text, attemptState, candidatesCount: candidates.length, screenMeta, attemptResult,
+  });
 
   useEffect(() => {
     mountedRef.current = true;
@@ -330,7 +381,6 @@ const StockScreeningPage: React.FC = () => {
     function finishTask() {
       clearPersistedScreenTask();
       setActiveTaskId(null);
-      setLoading(false);
     }
 
     function applyTaskStatus(task: AlphaSiftScreenTaskStatus) {
@@ -341,20 +391,18 @@ const StockScreeningPage: React.FC = () => {
       if (task.status === 'completed') {
         if (task.result) {
           applyScreenResult(task.result);
-          setError('');
         } else {
           setError(text.noTaskResults);
-          setCandidates([]);
-          setScreenMeta(null);
+          setAttemptResult(null);
+          setAttemptState('failed');
         }
         finishTask();
         return;
       }
 
       if (task.status === 'failed') {
-        setCandidates([]);
-        setScreenMeta(null);
-        setExpandedCode(null);
+        setAttemptResult(null);
+        setAttemptState('failed');
         setError(getParsedApiError({
           error: 'alphasift_screen_failed',
           message: task.error || task.message || 'Screening failed',
@@ -365,12 +413,15 @@ const StockScreeningPage: React.FC = () => {
       }
 
       if (isRunningScreenTask(task.status)) {
-        setLoading(true);
+        setAttemptState('running');
+        setError('');
         timer = window.setTimeout(pollTask, SCREEN_TASK_POLL_INTERVAL_MS);
         return;
       }
 
       setError(formatUiText(text.unknownTaskStatus, { status: task.status || 'unknown' }));
+      setAttemptResult(null);
+      setAttemptState('failed');
       finishTask();
     }
 
@@ -384,13 +435,13 @@ const StockScreeningPage: React.FC = () => {
         const parsedError = getParsedApiError(err, language);
         if (isUnrecoverableScreenTaskError(parsedError)) {
           setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
-          setCandidates([]);
-          setScreenMeta(null);
+          setAttemptResult(null);
+          setAttemptState('failed');
           finishTask();
           return;
         }
         setError(formatRecoverableScreenTaskPollingError(parsedError, text));
-        setLoading(true);
+        setAttemptState('recoverable_poll_error');
         timer = window.setTimeout(pollTask, SCREEN_TASK_POLL_INTERVAL_MS);
       }
     }
@@ -401,35 +452,6 @@ const StockScreeningPage: React.FC = () => {
       if (timer) window.clearTimeout(timer);
     };
   }, [activeTaskId, applyScreenResult, language, setExpandedCode, text]);
-
-  const handleEnable = async () => {
-    setEnabling(true);
-    setError('');
-    try {
-      await alphasiftApi.enable();
-      if (!mountedRef.current) return;
-      setEnabled(true);
-      setAvailable(true);
-      setStatusLoading(false);
-      await loadStrategies();
-    } catch (err) {
-      try {
-        const status = await alphasiftApi.getStatus();
-        if (!mountedRef.current) return;
-        setEnabled(status.enabled);
-        setAvailable(status.available);
-        setStatusLoading(false);
-      } catch {
-        if (!mountedRef.current) return;
-        setEnabled(false);
-        setAvailable(false);
-        setStatusLoading(false);
-      }
-      if (mountedRef.current) setError(getParsedApiError(err, language).message || text.enableFailed);
-    } finally {
-      if (mountedRef.current) setEnabling(false);
-    }
-  };
 
   const handleStrategyChange = (nextStrategy: string) => {
     if (nextStrategy !== strategy) clearScreeningResults();
@@ -452,6 +474,43 @@ const StockScreeningPage: React.FC = () => {
     setConfigurationOpen(true);
   };
 
+  const executeScreen = useCallback(async (
+    parameters: ScreeningRunParameters,
+  ): Promise<boolean> => {
+    lastValidatedParametersRef.current = parameters;
+    setAttemptState('submitting');
+    setAttemptResult(null);
+    setError('');
+    setConfigurationError('');
+    setTaskProgress(0);
+    setTaskMessage(text.submittingTask);
+    try {
+      const task = await alphasiftApi.startScreen({
+        market: parameters.market,
+        strategy: parameters.strategy,
+        maxResults: parameters.maxResults,
+      });
+      if (!mountedRef.current) return false;
+      persistScreenTask({
+        taskId: task.taskId,
+        ...parameters,
+      });
+      setActiveTaskId(task.taskId);
+      setAttemptState('running');
+      setTaskProgress(0);
+      setTaskMessage(formatTaskMessage(task, language));
+      return true;
+    } catch (submitError) {
+      if (mountedRef.current) {
+        const message = toApiErrorMessage(submitError, text.taskSubmitFailed, language);
+        setAttemptState('failed');
+        setConfigurationError(message);
+        setError(message);
+      }
+      return false;
+    }
+  }, [language, text.submittingTask, text.taskSubmitFailed]);
+
   const handleSubmit = async (): Promise<boolean> => {
     const parsedMaxResults = Number(maxResultsDraft);
     if (
@@ -465,36 +524,18 @@ const StockScreeningPage: React.FC = () => {
     }
     setMaxResults(parsedMaxResults);
     setMaxResultsError('');
-    setConfigurationError('');
-    setLoading(true);
-    setError('');
-    setScreenMeta(null);
-    setTaskProgress(0);
-    setTaskMessage(text.submittingTask);
-    try {
-      const task = await alphasiftApi.startScreen({ market, strategy, maxResults: parsedMaxResults });
-      if (!mountedRef.current) return false;
-      persistScreenTask({
-        taskId: task.taskId,
-        market,
-        strategy,
-        maxResults: parsedMaxResults,
-      });
-      setActiveTaskId(task.taskId);
-      setTaskProgress(0);
-      setTaskMessage(formatTaskMessage(task, language));
-      return true;
-    } catch (err) {
-      if (mountedRef.current) {
-        const message = toApiErrorMessage(err, text.taskSubmitFailed, language);
-        setCandidates([]);
-        setLoading(false);
-        setConfigurationError(message);
-        setError(message);
-      }
-      return false;
-    }
+    return executeScreen({ market, strategy, maxResults: parsedMaxResults });
   };
+
+  const handleRetryScreen = useCallback(() => {
+    const parameters = lastValidatedParametersRef.current;
+    if (!parameters || capability.state !== 'ready' || loading) return;
+    setMarket(parameters.market);
+    setStrategy(parameters.strategy);
+    setMaxResults(parameters.maxResults);
+    setMaxResultsDraft(String(parameters.maxResults));
+    void executeScreen(parameters);
+  }, [capability.state, executeScreen, loading]);
 
   const handleConfigurationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -507,59 +548,29 @@ const StockScreeningPage: React.FC = () => {
 
   return (
     <AppPage className="space-y-6 pb-12 pt-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-primary text-primary shadow-soft-card">
-            <PlusCircle className="h-4 w-4" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-bold tracking-normal text-foreground">{text.title}</h1>
-            <p className="mt-1 text-sm text-secondary-text">{text.description}</p>
-          </div>
-        </div>
+      <ScreeningPageHeader text={text} enabled={isScreeningEnabled} status={statusText} />
 
-        <Surface level="interactive" className="inline-flex w-fit items-center gap-2 px-3 py-2 text-sm">
-          <span className={`h-2.5 w-2.5 rounded-full ${isScreeningEnabled ? 'bg-success' : 'bg-warning'}`} />
-          <span className="font-medium text-secondary-text">{statusText}</span>
-        </Surface>
-      </div>
-
-      {!statusLoading && !enabled ? (
-        <InlineAlert
-          variant="info"
-          title={text.notEnabledTitle}
-          message={text.notEnabledMessage}
-          action={
-            <Button variant="primary" size="default" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
-              {text.enable}
-            </Button>
-          }
-        />
-      ) : null}
-
-      {!statusLoading && enabled && !available ? (
-        <InlineAlert
-          variant="warning"
-          title={text.unavailableTitle}
-          message={text.unavailableMessage}
-        />
-      ) : null}
-
-      <InlineAlert
-        variant="warning"
-        title={text.riskTitle}
-        message={text.riskMessage}
+      <ScreeningPageAlerts
+        text={text}
+        capability={capability.state}
+        capabilityError={capability.error}
+        attemptState={attemptState}
+        enabling={enabling}
+        capabilityActionError={capabilityActionError}
+        error={error}
+        taskMessage={taskMessage}
+        activeTaskId={activeTaskId}
+        degradationReasons={degradationReasons}
+        attemptResult={attemptResult}
+        candidatesCount={candidates.length}
+        showingLastGood={showingLastGood}
+        canRetryScreen={Boolean(lastValidatedParametersRef.current)}
+        onEnable={() => void enableScreening()}
+        onOpenDataSources={handleOpenDataSources}
+        onRetryStatus={() => void loadStatus()}
+        onAdminLogin={handleAdminLogin}
+        onRetryScreen={handleRetryScreen}
       />
-
-      {loading ? (
-        <InlineAlert
-          variant="info"
-          title={text.taskRunningTitle}
-          message={`${taskMessage || text.runningTask}. ${text.taskId}: ${activeTaskId ? activeTaskId.slice(0, 12) : '-'}`}
-        />
-      ) : null}
-
-      {error ? <InlineAlert variant="danger" title={text.callFailed} message={error} /> : null}
 
       <ScreeningHotspotsSection
         text={text}
@@ -618,6 +629,7 @@ const StockScreeningPage: React.FC = () => {
         text={text}
         loading={loading}
         isScreeningEnabled={isScreeningEnabled}
+        statusTitle={runStatusTitle}
         candidatesCount={candidates.length}
         taskMessage={taskMessage}
         taskProgress={taskProgress}
@@ -625,28 +637,25 @@ const StockScreeningPage: React.FC = () => {
         marketLabel={markets.find((item) => item.id === market)?.label || market}
         activeTaskId={activeTaskId}
         screenMeta={screenMeta}
+        showingLastGood={showingLastGood}
       />
-
-      {screenMeta && alertMessages.length > 0 ? (
-        <InlineAlert
-          variant={llmDegraded ? 'warning' : 'info'}
-          title={llmDegraded ? text.llmDegraded : text.alphaSiftNotice}
-          message={<ScreenAlertMessage messages={alertMessages} />}
-        />
-      ) : null}
-
       <ScreeningResultsSection
         text={text}
         language={language}
         candidates={candidates}
         expandedCode={expandedCode}
         llmDegraded={llmDegraded}
-        loading={loading}
+        emptyState={createScreeningResultsEmptyState({
+          text,
+          kind: resultsEmptyKind,
+          loading,
+          onOpenConfiguration: handleOpenConfiguration,
+          onOpenDataSources: handleOpenDataSources,
+          onRetry: handleRetryScreen,
+        })}
         onExpandedCodeChange={handleExpandedCodeChange}
-        onOpenConfiguration={handleOpenConfiguration}
       />
     </AppPage>
   );
 };
-
 export default StockScreeningPage;
