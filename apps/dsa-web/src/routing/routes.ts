@@ -19,6 +19,7 @@ export const APP_ROUTE_PATHS = {
   researchSkillOutcomes: '/research/skill-outcomes',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
+  calculators: '/tools/calculators',
 } as const;
 
 export const LEGACY_ROUTE_PATHS = {

@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Aligned Web acceptance coverage with safe global error Toasts, current chat session payloads, semantic control sizing, and collapsed mobile Backtest filters.
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
+- [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Added] Financial calculators for bounded compound growth and goal planning with strict `/api/v1/calculators/*` contracts, actionable contribution precision, localized reason codes, sampled series, and discoverable Web navigation (Refs #240).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Configurable global MA/MACD/RSI periods via `INDICATOR_*`, with strict shared validation, exact legacy-field semantics, dynamic evidence in classic and Agent reports, and automatic long-history backfill (Refs #172).
 - [Added] Settings System → Extensions read-only panel listing loaded plugins from GET /api/v1/plugins with source path, state, and trusted local-load trust copy (issue #870; no marketplace/install actions).
