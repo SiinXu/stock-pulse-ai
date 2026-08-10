@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Changed] Notifications hub binds expiring test evidence to the exact saved channel configuration, distinguishes partial delivery, resolves effective routing diagnostics, and lets verified channels add event bindings (Refs #866).
 - [Added] Default-off CoinGecko market-data path for allowlisted `crypto:` identities, with UTC daily bars, 24×7 context, safe outbound requests, and an optional crypto specialist (Refs #236 and #195).
 - [Added] Portfolio stress-test service and read-only `/api/v1/portfolio/stress-test` endpoints with response-base valuation, strict bounded market/sector/FX/rate shocks, reproducible price/FX/scenario provenance, honest partial/unavailable states, and an atomic bounded YAML catalog (issues #158 and #210; historical replay remaining).
 - [Fixed] Bound portfolio stress snapshots to 512 rows, preserve two-stage FX provenance without fabricated dates, reconcile known and unknown excluded values, and warm configured scenario catalogs atomically.

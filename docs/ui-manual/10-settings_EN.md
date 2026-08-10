@@ -97,9 +97,15 @@ News / search keys improve events and themes; technical-only runs may still work
 
 1. Pick **one** channel you actually read.  
 2. Fill Token / Webhook / Chat ID.  
-3. **Test push** (some tests use draft values—read the help text).  
-4. **Save** after a green test.  
-5. Only then add a second channel.
+3. Wait for **Autosaved**, then use **Send test** on that channel.
+4. After every target passes, select events the channel does not yet receive and choose **Bind selected events** in the same dialog.
+5. Wait for the routing draft to save and appear in the effective Event routing summary; only then add a second channel.
+
+“Verified” is session evidence bound to the current config version and a one-way fingerprint of that channel's exact tested values; it expires after 30 minutes. Channel edits, failed/conflicted saves, server refreshes, and config-version changes invalidate old evidence. For multiple custom-webhook targets, only all-success is verified. Partial delivery lists the failed targets and cannot be bound.
+
+Event routing always describes the **effective path resolved from saved configuration**, never an unsaved draft. Empty routing keeps the backend's all-configured fan-out behavior. Case and duplicates follow backend normalization, while invalid or currently unconfigured targets are reported separately.
+
+The card and test selector cover the 14 built-in static channels. Dynamically registered trusted-plugin channels remain owned by extension/diagnostic surfaces and are never mislabeled here as built-ins.
 
 **Alerts & Automation** is mostly routing and rate limits. Price/condition **rules** live in [Signal Center → Rules](06-signals_EN.md).
 
