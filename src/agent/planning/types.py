@@ -5,14 +5,30 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from src.agent.planning.config import (
+    MAX_AVAILABLE_TOOLS,
+    MAX_CRITERIA_CHARS,
+    MAX_GOAL_CHARS,
+    MAX_PLAN_STEPS,
+    MAX_PROMPT_PROJECTION_CHARS,
+    MAX_TOOL_NAME_CHARS,
+    PROJECTION_ENVELOPE_CHARS,
+)
 
 PLAN_SCHEMA_VERSION = "agent-plan-v1"
-MAX_GOAL_CHARS = 500
-MAX_CRITERIA_CHARS = 500
-MAX_TOOL_NAME_CHARS = 128
+
+# Any spelling of the projection delimiter, so generated text cannot close the
+# advisory boundary early and have the remainder read as authoritative input.
+_PROPOSAL_MARKER_RE = re.compile(r"\[\s*/?\s*NON_AUTHORITATIVE_PLAN_PROPOSAL\s*\]", re.IGNORECASE)
+
+
+def _reject_marker_forgery(label: str, text: str) -> None:
+    if _PROPOSAL_MARKER_RE.search(text):
+        raise ValueError(f"{label} must not contain a plan-proposal boundary marker")
 
 
 @dataclass(frozen=True)
@@ -54,12 +70,15 @@ class AgentPlan:
     def step_count(self) -> int:
         return len(self.steps)
 
-    @property
-    def plan_id(self) -> str:
-        payload = json.dumps(
+    def to_canonical_json(self) -> str:
+        """Canonical JSON text used for both ``plan_id`` and prompt projection."""
+        return json.dumps(
             self.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False
         )
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @property
+    def plan_id(self) -> str:
+        return hashlib.sha256(self.to_canonical_json().encode("utf-8")).hexdigest()
 
     @property
     def expected_tool_names(self) -> Tuple[str, ...]:
@@ -82,6 +101,10 @@ class PlanningOutcome:
     plan: Optional[AgentPlan] = None
     fallback_reason: Optional[str] = None
     strategy: str = "none"
+    #: Strategy the caller asked for. Differs from ``strategy`` when an ``llm``
+    #: attempt failed and the retry degraded to ``template``, so billed tokens
+    #: and the recorded model stay attributable to the attempt that produced them.
+    requested_strategy: str = "none"
     replan_attempts: int = 0
     planning_tokens: int = 0
     planning_model: str = ""
@@ -94,6 +117,7 @@ class PlanningOutcome:
             "enabled": self.enabled,
             "applied": self.applied,
             "strategy": self.strategy,
+            "requested_strategy": self.requested_strategy,
             "replan_attempts": self.replan_attempts,
             "planning_tokens": self.planning_tokens,
             "planning_model": self.planning_model,
@@ -121,9 +145,18 @@ def validate_plan_payload(
 ) -> AgentPlan:
     """Validate and normalize a raw plan payload into ``AgentPlan``.
 
+    ``max_steps`` is a caller cap that may only tighten the absolute
+    ``config.MAX_PLAN_STEPS`` authority; it can never raise it. Acceptance
+    guarantees the plan is projectable by ``format_plan_for_prompt`` and that no
+    generated text can forge the projection boundary marker.
+
     Raises:
         ValueError: if the payload is not a well-formed plan within limits.
     """
+    if type(max_steps) is not int or not 1 <= max_steps <= MAX_PLAN_STEPS:
+        raise ValueError(f"max_steps must be an integer within [1, {MAX_PLAN_STEPS}]")
+    if isinstance(available_tools, (str, bytes)) or len(available_tools) > MAX_AVAILABLE_TOOLS:
+        raise ValueError(f"available tool set must be a sequence of at most {MAX_AVAILABLE_TOOLS} names")
     if not isinstance(payload, dict):
         raise ValueError("plan payload must be an object")
     if set(payload) != {"version", "goal", "max_steps", "steps"}:
@@ -137,6 +170,7 @@ def validate_plan_payload(
     goal = goal_raw.strip()
     if len(goal) > MAX_GOAL_CHARS:
         raise ValueError("plan goal exceeds length limit")
+    _reject_marker_forgery("plan goal", goal)
 
     raw_steps = payload.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
@@ -171,6 +205,8 @@ def validate_plan_payload(
         success = success_raw.strip()
         if len(step_goal) > MAX_GOAL_CHARS or len(success) > MAX_CRITERIA_CHARS:
             raise ValueError(f"plan step {index} text exceeds length limit")
+        _reject_marker_forgery(f"plan step {index} goal", step_goal)
+        _reject_marker_forgery(f"plan step {index} success_criteria", success)
 
         tools_raw = raw.get("expected_tools")
         if not isinstance(tools_raw, list):
@@ -205,9 +241,15 @@ def validate_plan_payload(
     plan_max = payload.get("max_steps")
     if type(plan_max) is not int or not len(steps) <= plan_max <= max_steps:
         raise ValueError("plan max_steps must bound steps within the caller cap")
-    return AgentPlan(
+    plan = AgentPlan(
         goal=goal,
         steps=tuple(steps),
         max_steps=plan_max,
         version=PLAN_SCHEMA_VERSION,
     )
+    # Per-field bounds alone do not bound the whole payload (a step may list many
+    # tools). Reject here so an accepted plan is always projectable.
+    projected = PROJECTION_ENVELOPE_CHARS + len(plan.to_canonical_json())
+    if projected > MAX_PROMPT_PROJECTION_CHARS:
+        raise ValueError("plan prompt projection exceeds size limit")
+    return plan

@@ -22,7 +22,13 @@ import re
 import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from src.agent.planning.config import PlanningSettings
+from src.agent.planning.config import (
+    MAX_AVAILABLE_TOOLS,
+    MAX_PLANNER_RESPONSE_CHARS,
+    MAX_TASK_CHARS,
+    MAX_TOOL_NAME_CHARS,
+    PlanningSettings,
+)
 from src.agent.planning.format import inject_plan_into_context, inject_plan_into_task
 from src.agent.planning.types import AgentPlan, PlanningOutcome, validate_plan_payload
 from src.utils.sanitize import log_safe_exception
@@ -93,19 +99,22 @@ class PlanningEngine:
                 enabled=True,
                 applied=False,
                 strategy=settings.strategy,
+                requested_strategy=settings.strategy,
                 fallback_reason="cancelled",
             )
-        if not isinstance(task, str) or not task.strip() or len(task) > 4_000:
+        if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
             return PlanningOutcome(
                 enabled=True,
                 applied=False,
                 strategy=settings.strategy,
+                requested_strategy=settings.strategy,
                 fallback_reason="invalid_task",
                 error_code="invalid_task",
             )
         if context is not None and not isinstance(context, dict):
             return PlanningOutcome(
                 enabled=True, applied=False, strategy=settings.strategy,
+                requested_strategy=settings.strategy,
                 fallback_reason="invalid_context", error_code="invalid_context",
             )
         stock_code = (context or {}).get("stock_code")
@@ -115,30 +124,37 @@ class PlanningEngine:
         ):
             return PlanningOutcome(
                 enabled=True, applied=False, strategy=settings.strategy,
+                requested_strategy=settings.strategy,
                 fallback_reason="invalid_context", error_code="invalid_context",
             )
         if (
             isinstance(available_tools, (str, bytes))
-            or len(available_tools) > 256
+            or len(available_tools) > MAX_AVAILABLE_TOOLS
             or any(
             not isinstance(name, str)
             or not name.strip()
-            or len(name.strip()) > 128
+            or len(name.strip()) > MAX_TOOL_NAME_CHARS
             for name in available_tools
             )
         ):
             return PlanningOutcome(
                 enabled=True, applied=False, strategy=settings.strategy,
+                requested_strategy=settings.strategy,
                 fallback_reason="invalid_tools", error_code="invalid_tools",
             )
 
-        strategy = self._resolve_strategy(settings.strategy)
+        requested_strategy = self._resolve_strategy(settings.strategy)
+        strategy = requested_strategy
         tools = [name.strip() for name in available_tools]
         if len(tools) != len(set(tools)):
             return PlanningOutcome(
                 enabled=True, applied=False, strategy=strategy,
+                requested_strategy=requested_strategy,
                 fallback_reason="invalid_tools", error_code="invalid_tools",
             )
+        # Retries actually performed beyond the first attempt. Kept equal to the
+        # current attempt index so every exit path reports the real count rather
+        # than whatever the last failure happened to leave behind.
         replan_attempts = 0
         last_error_code: Optional[str] = None
         last_exception_type: Optional[str] = None
@@ -158,11 +174,13 @@ class PlanningEngine:
                     enabled=True,
                     applied=False,
                     strategy=strategy,
+                    requested_strategy=requested_strategy,
                     replan_attempts=replan_attempts,
                     planning_tokens=planning_tokens,
                     planning_model=planning_model,
                     fallback_reason="cancelled",
                 )
+            replan_attempts = attempt
 
             try:
                 if strategy == "llm":
@@ -200,6 +218,7 @@ class PlanningEngine:
                         enabled=True,
                         applied=False,
                         strategy=strategy,
+                        requested_strategy=requested_strategy,
                         replan_attempts=replan_attempts,
                         planning_tokens=planning_tokens,
                         planning_model=planning_model,
@@ -218,6 +237,7 @@ class PlanningEngine:
                         enabled=True,
                         applied=False,
                         strategy=strategy,
+                        requested_strategy=requested_strategy,
                         replan_attempts=replan_attempts,
                         planning_tokens=planning_tokens,
                         planning_model=planning_model,
@@ -228,6 +248,7 @@ class PlanningEngine:
                     applied=True,
                     plan=plan,
                     strategy=strategy,
+                    requested_strategy=requested_strategy,
                     replan_attempts=replan_attempts,
                     planning_tokens=planning_tokens,
                     planning_model=planning_model,
@@ -235,7 +256,6 @@ class PlanningEngine:
             except Exception as exc:  # broad-exception: fallback_recorded - degrade to direct path
                 last_error_code = _planning_error_code(exc)
                 last_exception_type = type(exc).__name__
-                replan_attempts = attempt
                 log_safe_exception(
                     logger,
                     "Agent planning attempt failed",
@@ -249,13 +269,19 @@ class PlanningEngine:
                     strategy = "template"
                     continue
 
-        reason = "max_replans_exceeded" if replan_attempts >= settings.max_replans else "planning_failed"
+        # Only claim the replan budget was exhausted when replans were both
+        # permitted and actually spent.
+        if settings.max_replans > 0 and replan_attempts >= settings.max_replans:
+            reason = "max_replans_exceeded"
+        else:
+            reason = "planning_failed"
         if last_error_code == "max_plan_steps_exceeded":
             reason = "max_plan_steps_exceeded"
         return PlanningOutcome(
             enabled=True,
             applied=False,
             strategy=strategy,
+            requested_strategy=requested_strategy,
             replan_attempts=replan_attempts,
             planning_tokens=planning_tokens,
             planning_model=planning_model,
@@ -429,7 +455,7 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
     text = (raw or "").strip()
     if not text:
         raise ValueError("empty planner response")
-    if len(text) > 50_000:
+    if len(text) > MAX_PLANNER_RESPONSE_CHARS:
         raise ValueError("planner response exceeds size limit")
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
