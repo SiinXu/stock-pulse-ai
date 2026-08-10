@@ -3320,7 +3320,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.notes.0": "계약과 롤백은 docs/reasoning-trace-export_EN.md 를 참고하세요.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.summary": "기록된 진단에서 마스킹된 reasoning-trace-v1 패키지를 선택적으로 내보냅니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.title": "추론 트레이스 내보내기",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.usage": "운영상 export API 가 필요할 때만 REASONING_TRACE_EXPORT_ENABLED 를 켭니다. REASONING_TRACE_EXPORT_MAX_CHARS 는 전체 응답 문자 예산(10000–2000000)입니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.usage": "운영상 export API 가 필요할 때만 REASONING_TRACE_EXPORT_ENABLED=false 를 유지하고, 필요할 때 켭니다. REASONING_TRACE_EXPORT_MAX_CHARS 는 전체 응답 문자 예산(10000–2000000)입니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.valueNotes.0": "기본값은 꺼짐입니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.valueNotes.1": "자격 증명과 로컬 경로는 마스킹되지만 여전히 민감한 운영 데이터입니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.valueNotes.2": "서비스는 내보내기 파일을 저장하지 않습니다. 다운로드한 사본은 운영자가 삭제해야 합니다.",
