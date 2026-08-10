@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException
+from pydantic import TypeAdapter
 
 from api.v1.errors import api_error
 from api.v1.schemas.calculators import (
@@ -32,6 +33,9 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_TARGET_CONTRIBUTION_ADAPTER = TypeAdapter(TargetContributionResponse)
+_TARGET_DURATION_ADAPTER = TypeAdapter(TargetDurationResponse)
 
 _ERROR_RESPONSES = {
     400: {"model": ErrorResponse, "description": "Invalid calculator inputs"},
@@ -62,7 +66,7 @@ def _run_target_contribution(body: TargetContributionRequest) -> TargetContribut
         years=body.years,
         periods_per_year=body.periods_per_year,
     )
-    return TargetContributionResponse.model_validate(data)
+    return _TARGET_CONTRIBUTION_ADAPTER.validate_python(data)
 
 
 def _run_target_duration(body: TargetDurationRequest) -> TargetDurationResponse:
@@ -73,7 +77,7 @@ def _run_target_duration(body: TargetDurationRequest) -> TargetDurationResponse:
         contribution_per_period=body.contribution_per_period,
         periods_per_year=body.periods_per_year,
     )
-    return TargetDurationResponse.model_validate(data)
+    return _TARGET_DURATION_ADAPTER.validate_python(data)
 
 
 @router.post(

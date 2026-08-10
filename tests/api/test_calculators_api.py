@@ -80,6 +80,8 @@ class CalculatorsApiTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertAlmostEqual(payload["final_value"], 1000.0 * (1.01 ** 12), places=6)
         self.assertEqual(len(payload["series"]), 13)
+        self.assertEqual(payload["series_total_points"], 13)
+        self.assertFalse(payload["series_sampled"])
 
     def test_compound_growth_rejects_non_finite(self) -> None:
         resp = self.client.post(
@@ -95,6 +97,18 @@ class CalculatorsApiTests(unittest.TestCase):
         # Pydantic may reject before service; either 400 or 422 is acceptable.
         self.assertIn(resp.status_code, (400, 422), resp.text)
 
+    def test_compound_growth_rejects_boolean_and_extra_fields(self) -> None:
+        base = {
+            "principal": 1000,
+            "annual_rate": 0.05,
+            "years": 1,
+            "periods_per_year": 12,
+        }
+        for payload in ({**base, "principal": True}, {**base, "unexpected": 1}):
+            with self.subTest(payload=payload):
+                resp = self.client.post("/api/v1/calculators/compound-growth", json=payload)
+                self.assertEqual(resp.status_code, 422, resp.text)
+
     def test_target_contribution_ok(self) -> None:
         resp = self.client.post(
             "/api/v1/calculators/target-contribution",
@@ -109,7 +123,8 @@ class CalculatorsApiTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         payload = resp.json()
         self.assertEqual(payload["status"], "ok")
-        self.assertAlmostEqual(payload["contribution_per_period"], 4000.0 / 24.0, places=6)
+        self.assertEqual(payload["contribution_per_period"], 166.67)
+        self.assertEqual(payload["reason_code"], "contribution_required")
 
     def test_target_duration_unreachable(self) -> None:
         resp = self.client.post(
@@ -126,8 +141,7 @@ class CalculatorsApiTests(unittest.TestCase):
         payload = resp.json()
         self.assertEqual(payload["status"], "unreachable")
         self.assertIsNone(payload["period_count"])
-        self.assertIsInstance(payload["message"], str)
-        self.assertNotIn("inf", payload["message"].lower())
+        self.assertEqual(payload["reason_code"], "non_positive_trajectory")
 
     def test_target_duration_ok(self) -> None:
         resp = self.client.post(

@@ -8,12 +8,16 @@ Issue #240 / T09.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Mapping, Optional, Union
+from decimal import Decimal, ROUND_CEILING
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 Number = Union[int, float]
 
 # Hard caps keep solvers bounded even under adversarial inputs.
-MAX_PERIODS = 100 * 365  # 100 years of daily compounding
+MAX_YEARS = 100
+MAX_PERIODS = MAX_YEARS * 365
+MAX_SERIES_POINTS = 241
+CURRENCY_PRECISION_DIGITS = 2
 MAX_ABS_RATE = 10.0  # ±1000% annual nominal; beyond this is rejected as unrealistic
 MAX_ABS_MONEY = 1e15
 
@@ -130,7 +134,13 @@ def _future_value(
         return principal
     if abs(period_rate) < 1e-15:
         return principal + contribution_per_period * periods
-    growth = (1.0 + period_rate) ** periods
+    try:
+        growth = (1.0 + period_rate) ** periods
+    except OverflowError as exc:
+        raise CalculatorInputError(
+            "invalid_input",
+            "computation overflowed; reduce rate, horizon, or amounts",
+        ) from exc
     return principal * growth + contribution_per_period * (growth - 1.0) / period_rate
 
 
@@ -139,17 +149,18 @@ def _build_balance_series(
     period_rate: float,
     periods: int,
     contribution_per_period: float,
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any], int]:
     balance = float(principal)
     total_contributed = float(principal)
-    series: List[Dict[str, Any]] = [
-        {
-            "period": 0,
-            "balance": balance,
-            "total_contributed": total_contributed,
-            "gain": 0.0,
-        }
-    ]
+    first = {
+        "period": 0,
+        "balance": balance,
+        "total_contributed": total_contributed,
+        "gain": 0.0,
+    }
+    series: List[Dict[str, Any]] = [first]
+    final = first
+    sample_stride = max(1, math.ceil(periods / (MAX_SERIES_POINTS - 1)))
     for period in range(1, periods + 1):
         balance = balance * (1.0 + period_rate) + contribution_per_period
         total_contributed = principal + contribution_per_period * period
@@ -159,15 +170,23 @@ def _build_balance_series(
                 "invalid_input",
                 "computation overflowed to a non-finite balance; reduce rate, horizon, or amounts",
             )
-        series.append(
-            {
-                "period": period,
-                "balance": float(balance),
-                "total_contributed": float(total_contributed),
-                "gain": float(balance - total_contributed),
-            }
-        )
-    return series
+        final = {
+            "period": period,
+            "balance": float(balance),
+            "total_contributed": float(total_contributed),
+            "gain": float(balance - total_contributed),
+        }
+        if period % sample_stride == 0 or period == periods:
+            series.append(final)
+    return series, final, sample_stride
+
+
+def _round_contribution_up(contribution: float) -> float:
+    """Round a required contribution upward to an actionable currency amount."""
+    quantum = Decimal(1).scaleb(-CURRENCY_PRECISION_DIGITS)
+    float_noise = max(1e-12, abs(contribution) * 1e-12)
+    adjusted = contribution - float_noise
+    return float(Decimal(str(adjusted)).quantize(quantum, rounding=ROUND_CEILING))
 
 
 def compute_compound_growth(
@@ -195,8 +214,12 @@ def compute_compound_growth(
     period_rate = _period_rate(annual_rate_v, periods_per_year_v)
     _validate_period_rate(period_rate)
 
-    series = _build_balance_series(principal_v, period_rate, periods, contribution_v)
-    final = series[-1]
+    series, final, series_stride = _build_balance_series(
+        principal_v,
+        period_rate,
+        periods,
+        contribution_v,
+    )
     total_contributed = float(final["total_contributed"])
     final_value = float(final["balance"])
     total_gain = float(final["gain"])
@@ -213,6 +236,10 @@ def compute_compound_growth(
         "final_value": final_value,
         "total_contributed": total_contributed,
         "total_gain": total_gain,
+        "series_total_points": periods + 1,
+        "series_returned_points": len(series),
+        "series_sampled": len(series) < periods + 1,
+        "series_stride": series_stride,
         "series": series,
     }
 
@@ -243,6 +270,8 @@ def solve_target_contribution(
         "period_count": periods,
         "period_rate": period_rate,
         "contribution_per_period": None,
+        "currency_precision_digits": CURRENCY_PRECISION_DIGITS,
+        "contribution_rounding": "ceiling",
     }
 
     grown_principal = _future_value(principal_v, period_rate, periods, 0.0)
@@ -257,7 +286,7 @@ def solve_target_contribution(
             **base,
             "status": "already_met",
             "contribution_per_period": 0.0,
-            "message": "Principal growth alone meets or exceeds the target; no contribution is required.",
+            "reason_code": "principal_growth_meets_target",
         }
 
     shortfall = target_v - grown_principal
@@ -271,7 +300,7 @@ def solve_target_contribution(
             return {
                 **base,
                 "status": "unreachable",
-                "message": "Target cannot be reached under the given rate and horizon.",
+                "reason_code": "target_unreachable",
             }
         contribution = shortfall / denom
 
@@ -279,15 +308,26 @@ def solve_target_contribution(
         return {
             **base,
             "status": "unreachable",
-            "message": "Target cannot be reached under the given rate and horizon.",
+            "reason_code": "target_unreachable",
         }
 
-    # Negative contribution means the user would need to withdraw — treat as ok with signed amount.
+    actionable_contribution = _round_contribution_up(contribution)
+    reached = _future_value(
+        principal_v,
+        period_rate,
+        periods,
+        actionable_contribution,
+    )
+    verification_tolerance = max(1e-9, abs(target_v) * 1e-12)
+    if reached + verification_tolerance < target_v:
+        quantum = 10 ** -CURRENCY_PRECISION_DIGITS
+        actionable_contribution = round(actionable_contribution + quantum, CURRENCY_PRECISION_DIGITS)
+
     return {
         **base,
         "status": "ok",
-        "contribution_per_period": float(contribution),
-        "message": None,
+        "contribution_per_period": actionable_contribution,
+        "reason_code": "contribution_required",
     }
 
 
@@ -300,9 +340,8 @@ def solve_target_duration(
 ) -> Dict[str, Any]:
     """Solve how many periods are needed to reach ``target``.
 
-    Returns ``status="unreachable"`` with an explicit message when the trajectory
-    cannot hit the target (for example non-positive effective growth and
-    insufficient contributions). Never returns ``inf``.
+    Returns ``status="unreachable"`` with a stable reason code when the
+    trajectory cannot hit the target. Never returns ``inf``.
     """
     target_v = _require_finite_money("target", target)
     principal_v = _require_finite_money("principal", principal)
@@ -333,7 +372,7 @@ def solve_target_duration(
             "status": "already_met",
             "period_count": 0,
             "years": 0.0,
-            "message": "Principal already meets or exceeds the target.",
+            "reason_code": "principal_already_meets_target",
         }
 
     # Zero rate: pure linear accumulation.
@@ -342,23 +381,21 @@ def solve_target_duration(
             return {
                 **base,
                 "status": "unreachable",
-                "message": (
-                    "With a zero rate and non-positive contribution the target is unreachable."
-                ),
+                "reason_code": "non_positive_trajectory",
             }
         periods_needed = math.ceil((target_v - principal_v) / contribution_v)
-        if periods_needed > MAX_PERIODS:
+        if periods_needed > MAX_YEARS * periods_per_year_v:
             return {
                 **base,
                 "status": "unreachable",
-                "message": "Target requires more periods than the supported horizon cap.",
+                "reason_code": "max_years_exceeded",
             }
         return {
             **base,
             "status": "ok",
             "period_count": int(periods_needed),
             "years": float(periods_needed) / float(periods_per_year_v),
-            "message": None,
+            "reason_code": "duration_solved",
         }
 
     # Closed form for ordinary annuity:
@@ -371,7 +408,7 @@ def solve_target_duration(
         return {
             **base,
             "status": "unreachable",
-            "message": "Target cannot be reached under the given rate and contribution.",
+            "reason_code": "target_unreachable",
         }
 
     ratio = numerator / denominator
@@ -381,7 +418,7 @@ def solve_target_duration(
         return {
             **base,
             "status": "unreachable",
-            "message": "Target cannot be reached under the given rate and contribution.",
+            "reason_code": "target_unreachable",
         }
 
     # When r > 0 we need ratio > 1 to grow toward a higher target.
@@ -393,24 +430,25 @@ def solve_target_duration(
         return {
             **base,
             "status": "unreachable",
-            "message": "Target cannot be reached under the given rate and contribution.",
+            "reason_code": "target_unreachable",
         }
 
     if not math.isfinite(n_exact) or n_exact < 0:
         return {
             **base,
             "status": "unreachable",
-            "message": "Target cannot be reached under the given rate and contribution.",
+            "reason_code": "target_unreachable",
         }
 
     periods_needed = int(math.ceil(n_exact - 1e-12))
     if periods_needed < 1:
         periods_needed = 1
-    if periods_needed > MAX_PERIODS:
+    max_periods = MAX_YEARS * periods_per_year_v
+    if periods_needed > max_periods:
         return {
             **base,
             "status": "unreachable",
-            "message": "Target requires more periods than the supported horizon cap.",
+            "reason_code": "max_years_exceeded",
         }
 
     # Verify forward (handles float edge cases near boundaries).
@@ -419,7 +457,7 @@ def solve_target_duration(
         # Walk forward up to a small bound if ceil undershoots due to float noise.
         found: Optional[int] = None
         balance = principal_v
-        for period in range(1, min(periods_needed + 5, MAX_PERIODS) + 1):
+        for period in range(1, min(periods_needed + 5, max_periods) + 1):
             balance = balance * growth_base + contribution_v
             if not math.isfinite(balance):
                 break
@@ -430,7 +468,7 @@ def solve_target_duration(
             return {
                 **base,
                 "status": "unreachable",
-                "message": "Target cannot be reached under the given rate and contribution.",
+                "reason_code": "target_unreachable",
             }
         periods_needed = found
 
@@ -439,7 +477,7 @@ def solve_target_duration(
         "status": "ok",
         "period_count": int(periods_needed),
         "years": float(periods_needed) / float(periods_per_year_v),
-        "message": None,
+        "reason_code": "duration_solved",
     }
 
 

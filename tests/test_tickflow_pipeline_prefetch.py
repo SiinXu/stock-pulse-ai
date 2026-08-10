@@ -15,6 +15,7 @@ ensure_litellm_stub()
 
 from src.analyzer import AnalysisResult
 from src.core.pipeline import StockAnalysisPipeline
+from src.utils.indicator_periods import IndicatorPeriodConfig
 
 
 def _make_result(code: str) -> AnalysisResult:
@@ -76,11 +77,58 @@ class TestTickFlowPipelinePrefetch(unittest.TestCase):
 
         self.assertEqual(len(results), 5)
         self.assertEqual(events[0][0], "daily_prefetch")
-        self.assertEqual(events[0][2], 30)
+        self.assertEqual(
+            events[0][2],
+            IndicatorPeriodConfig().required_history_calendar_days(),
+        )
         self.assertEqual(events[1][0], "realtime_prefetch")
         self.assertEqual(events[2][0], "name_prefetch")
         self.assertTrue(all(event[0] != "process" for event in events[:3]))
         self.assertEqual([event[0] for event in events[3:]], ["process"] * 5)
+
+    def test_run_prefetch_window_covers_custom_longest_indicator_period(self):
+        events = []
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.max_workers = 1
+        pipeline.fetcher_manager = _TrackingFetcherManager(events)
+        pipeline._save_local_report = MagicMock()
+        pipeline._send_notifications = MagicMock()
+        pipeline.config = SimpleNamespace(
+            stock_list=[],
+            refresh_stock_list=lambda: None,
+            single_stock_notify=False,
+            report_type="simple",
+            analysis_delay=0,
+            indicator_ma_periods=[5, 10, 20, 250],
+            indicator_macd_fast=12,
+            indicator_macd_slow=26,
+            indicator_macd_signal=9,
+            indicator_rsi_periods=[6, 12, 24],
+            indicator_period_source="global_settings",
+        )
+        pipeline.process_single_stock = MagicMock(
+            side_effect=lambda code, **_kwargs: _make_result(code)
+        )
+
+        pipeline.run(
+            stock_codes=["600519", "000001", "300750", "000858", "601318"],
+            dry_run=False,
+            send_notification=False,
+        )
+
+        expected_periods = IndicatorPeriodConfig(
+            ma_periods=(5, 10, 20, 250),
+            source="global_settings",
+        )
+        self.assertEqual(
+            events[0],
+            (
+                "daily_prefetch",
+                ["600519", "000001", "300750", "000858", "601318"],
+                expected_periods.required_history_calendar_days(),
+            ),
+        )
+        self.assertEqual(events[1][0], "realtime_prefetch")
 
 
 if __name__ == "__main__":

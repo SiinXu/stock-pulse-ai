@@ -23,6 +23,8 @@ import {
   ApiErrorAlert,
   AppPage,
   Button,
+  DataTable,
+  type DataTableColumn,
   EmptyState,
   Input,
   PageHeader,
@@ -76,6 +78,8 @@ const FinancialCalculatorsPage: React.FC = () => {
   const { language } = useUiLanguage();
   const text = FINANCIAL_CALCULATORS_TEXT[language];
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const requestVersionRef = useRef(0);
+  const activeRequestRef = useRef<AbortController | null>(null);
 
   const [mode, setMode] = useState<CalculatorMode>('growth');
   const [principal, setPrincipal] = useState(DEFAULTS.principal);
@@ -100,6 +104,11 @@ const FinancialCalculatorsPage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
+
+  useEffect(() => () => {
+    requestVersionRef.current += 1;
+    activeRequestRef.current?.abort();
+  }, []);
 
   const modeOptions = useMemo(
     () => [
@@ -189,7 +198,15 @@ const FinancialCalculatorsPage: React.FC = () => {
     setError(null);
   };
 
+  const cancelActiveRequest = () => {
+    requestVersionRef.current += 1;
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
+    setLoading(false);
+  };
+
   const handleReset = () => {
+    cancelActiveRequest();
     setPrincipal(DEFAULTS.principal);
     setAnnualRatePercent(DEFAULTS.annualRatePercent);
     setYears(DEFAULTS.years);
@@ -203,28 +220,36 @@ const FinancialCalculatorsPage: React.FC = () => {
   const handleCalculate = async () => {
     const parsed = validate();
     if (!parsed) return;
+    activeRequestRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    const requestVersion = requestVersionRef.current + 1;
+    requestVersionRef.current = requestVersion;
+    const requestedMode = mode;
     setLoading(true);
     setError(null);
     try {
-      if (mode === 'growth') {
+      if (requestedMode === 'growth') {
         const result = await calculatorsApi.compoundGrowth({
           principal: parsed.principal,
           annualRate: parsed.annualRate,
           years: parsed.years,
           contributionPerPeriod: parsed.contribution,
           periodsPerYear: parsed.periodsPerYear,
-        });
+        }, { signal: controller.signal });
+        if (requestVersionRef.current !== requestVersion) return;
         setGrowthResult(result);
         setContributionResult(null);
         setDurationResult(null);
-      } else if (mode === 'contribution') {
+      } else if (requestedMode === 'contribution') {
         const result = await calculatorsApi.targetContribution({
           target: parsed.target,
           principal: parsed.principal,
           annualRate: parsed.annualRate,
           years: parsed.years,
           periodsPerYear: parsed.periodsPerYear,
-        });
+        }, { signal: controller.signal });
+        if (requestVersionRef.current !== requestVersion) return;
         setContributionResult(result);
         setGrowthResult(null);
         setDurationResult(null);
@@ -235,16 +260,21 @@ const FinancialCalculatorsPage: React.FC = () => {
           annualRate: parsed.annualRate,
           contributionPerPeriod: parsed.contribution,
           periodsPerYear: parsed.periodsPerYear,
-        });
+        }, { signal: controller.signal });
+        if (requestVersionRef.current !== requestVersion) return;
         setDurationResult(result);
         setGrowthResult(null);
         setContributionResult(null);
       }
     } catch (cause) {
+      if (controller.signal.aborted || requestVersionRef.current !== requestVersion) return;
       clearResults();
       setError(getParsedApiError(cause));
     } finally {
-      setLoading(false);
+      if (requestVersionRef.current === requestVersion) {
+        activeRequestRef.current = null;
+        setLoading(false);
+      }
     }
   };
 
@@ -267,6 +297,46 @@ const FinancialCalculatorsPage: React.FC = () => {
       contributed: row.totalContributed,
     }));
   }, [growthResult]);
+
+  const seriesColumns = useMemo<DataTableColumn<CompoundGrowthResponse['series'][number]>[]>(() => [
+    {
+      id: 'period',
+      header: text.seriesPeriod,
+      cell: (row) => row.period,
+      rowHeader: true,
+      nowrap: true,
+    },
+    {
+      id: 'balance',
+      header: text.seriesBalance,
+      cell: (row) => formatMoney(row.balance, language),
+      align: 'end',
+      nowrap: true,
+    },
+    {
+      id: 'contributed',
+      header: text.seriesContributed,
+      cell: (row) => formatMoney(row.totalContributed, language),
+      align: 'end',
+      nowrap: true,
+    },
+    {
+      id: 'gain',
+      header: text.seriesGain,
+      cell: (row) => formatMoney(row.gain, language),
+      align: 'end',
+      nowrap: true,
+    },
+  ], [language, text.seriesBalance, text.seriesContributed, text.seriesGain, text.seriesPeriod]);
+
+  const reasonDescription = (reasonCode: TargetContributionResponse['reasonCode'] | TargetDurationResponse['reasonCode']) => {
+    if (reasonCode === 'principal_growth_meets_target') return text.reasonPrincipalGrowthMeetsTarget;
+    if (reasonCode === 'principal_already_meets_target') return text.reasonPrincipalAlreadyMeetsTarget;
+    if (reasonCode === 'non_positive_trajectory') return text.reasonNonPositiveTrajectory;
+    if (reasonCode === 'max_years_exceeded') return text.reasonMaxYearsExceeded;
+    if (reasonCode === 'target_unreachable') return text.reasonTargetUnreachable;
+    return '';
+  };
 
   const hasAnyResult = Boolean(growthResult || contributionResult || durationResult);
   const statusTone = (status: string | undefined) => {
@@ -297,6 +367,7 @@ const FinancialCalculatorsPage: React.FC = () => {
             value={mode}
             options={modeOptions}
             onChange={(value) => {
+              cancelActiveRequest();
               setMode(value);
               clearResults();
               setFieldErrors({});
@@ -426,27 +497,23 @@ const FinancialCalculatorsPage: React.FC = () => {
 
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-foreground">{text.seriesTitle}</h3>
-              <div className="max-h-64 overflow-auto rounded-md border border-subtle">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-surface text-secondary-text">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">{text.seriesPeriod}</th>
-                      <th className="px-3 py-2 font-medium">{text.seriesBalance}</th>
-                      <th className="px-3 py-2 font-medium">{text.seriesContributed}</th>
-                      <th className="px-3 py-2 font-medium">{text.seriesGain}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {growthResult.series.map((row) => (
-                      <tr key={row.period} className="border-t border-subtle">
-                        <td className="px-3 py-1.5">{row.period}</td>
-                        <td className="px-3 py-1.5">{formatMoney(row.balance, language)}</td>
-                        <td className="px-3 py-1.5">{formatMoney(row.totalContributed, language)}</td>
-                        <td className="px-3 py-1.5">{formatMoney(row.gain, language)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <p className="text-xs text-secondary-text">
+                {(growthResult.seriesSampled ? text.seriesSampledSummary : text.seriesCompleteSummary)
+                  .replace('{returned}', String(growthResult.seriesReturnedPoints))
+                  .replace('{total}', String(growthResult.seriesTotalPoints))
+                  .replace('{stride}', String(growthResult.seriesStride))}
+              </p>
+              <div className="max-h-96 overflow-y-auto rounded-xl border border-subtle">
+                <DataTable
+                  caption={text.seriesTitle}
+                  columns={seriesColumns}
+                  rows={growthResult.series}
+                  getRowKey={(row) => row.period}
+                  emptyState={{ title: text.emptyResults }}
+                  density="compact"
+                  frame="embedded"
+                  minWidth="content"
+                />
               </div>
             </div>
           </Surface>
@@ -459,14 +526,14 @@ const FinancialCalculatorsPage: React.FC = () => {
               <StatePanel
                 state="error"
                 title={text.unreachableTitle}
-                description={contributionResult.message || text.unreachableDescription}
+                description={reasonDescription(contributionResult.reasonCode)}
               />
             ) : null}
             {contributionResult.status === 'already_met' ? (
               <StatePanel
                 state="partial"
                 title={text.alreadyMetTitle}
-                description={contributionResult.message || text.alreadyMetDescription}
+                description={reasonDescription(contributionResult.reasonCode)}
               />
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -492,7 +559,7 @@ const FinancialCalculatorsPage: React.FC = () => {
               <StatePanel
                 state="error"
                 title={text.unreachableTitle}
-                description={durationResult.message || text.unreachableDescription}
+                description={reasonDescription(durationResult.reasonCode)}
                 data-testid="unreachable-panel"
               />
             ) : null}
@@ -500,7 +567,7 @@ const FinancialCalculatorsPage: React.FC = () => {
               <StatePanel
                 state="partial"
                 title={text.alreadyMetTitle}
-                description={durationResult.message || text.alreadyMetDescription}
+                description={reasonDescription(durationResult.reasonCode)}
               />
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

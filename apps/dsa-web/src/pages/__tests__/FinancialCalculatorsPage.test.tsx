@@ -78,6 +78,10 @@ describe('FinancialCalculatorsPage', () => {
       finalValue: 1126.83,
       totalContributed: 1000,
       totalGain: 126.83,
+      seriesTotalPoints: 13,
+      seriesReturnedPoints: 2,
+      seriesSampled: true,
+      seriesStride: 12,
       series: [
         { period: 0, balance: 1000, totalContributed: 1000, gain: 0 },
         { period: 12, balance: 1126.83, totalContributed: 1000, gain: 126.83 },
@@ -92,7 +96,7 @@ describe('FinancialCalculatorsPage', () => {
       expect(calculatorsApi.compoundGrowth).toHaveBeenCalled();
     });
     expect(screen.getByTestId('growth-chart')).toBeInTheDocument();
-    expect(screen.getByText('Balance path')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Balance path' })).toBeInTheDocument();
   });
 
   it('shows unreachable status for duration mode', async () => {
@@ -106,7 +110,7 @@ describe('FinancialCalculatorsPage', () => {
       periodRate: 0,
       periodCount: null,
       years: null,
-      message: 'With a zero rate and non-positive contribution the target is unreachable.',
+      reasonCode: 'non_positive_trajectory',
     });
 
     renderPage();
@@ -114,9 +118,46 @@ describe('FinancialCalculatorsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Calculate' }));
 
     expect(await screen.findByText('Target unreachable')).toBeInTheDocument();
-    expect(
-      screen.getByText('With a zero rate and non-positive contribution the target is unreachable.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(
+      'The current growth and contribution trajectory does not increase toward the target.',
+    )).toBeInTheDocument();
     expect(calculatorsApi.targetDuration).toHaveBeenCalled();
+  });
+
+  it('discards an old-mode response after the user switches calculators', async () => {
+    let resolveGrowth: ((value: Awaited<ReturnType<typeof calculatorsApi.compoundGrowth>>) => void) | undefined;
+    vi.mocked(calculatorsApi.compoundGrowth).mockImplementation((_body, options) => new Promise((resolve) => {
+      expect(options?.signal).toBeInstanceOf(AbortSignal);
+      resolveGrowth = resolve;
+    }));
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Contribution needed' }));
+
+    resolveGrowth?.({
+      status: 'ok',
+      principal: 1000,
+      annualRate: 0.12,
+      years: 1,
+      contributionPerPeriod: 0,
+      periodsPerYear: 12,
+      periodCount: 12,
+      periodRate: 0.01,
+      finalValue: 999999,
+      totalContributed: 1000,
+      totalGain: 998999,
+      seriesTotalPoints: 13,
+      seriesReturnedPoints: 2,
+      seriesSampled: true,
+      seriesStride: 12,
+      series: [
+        { period: 0, balance: 1000, totalContributed: 1000, gain: 0 },
+        { period: 12, balance: 999999, totalContributed: 1000, gain: 998999 },
+      ],
+    });
+
+    await waitFor(() => expect(screen.queryByText('999,999')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Target amount')).toBeInTheDocument();
   });
 });

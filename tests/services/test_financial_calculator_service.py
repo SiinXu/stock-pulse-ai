@@ -67,6 +67,21 @@ class CompoundGrowthTests(unittest.TestCase):
         self.assertLess(result["final_value"], 1000.0)
         self.assertLess(result["total_gain"], 0.0)
 
+    def test_daily_horizon_returns_bounded_sample_with_exact_endpoint(self) -> None:
+        result = compute_compound_growth(
+            principal=1000.0,
+            annual_rate=0.05,
+            years=100.0,
+            contribution_per_period=1.0,
+            periods_per_year=365,
+        )
+        self.assertLessEqual(len(result["series"]), 241)
+        self.assertEqual(result["series_returned_points"], len(result["series"]))
+        self.assertEqual(result["series_total_points"], 36501)
+        self.assertTrue(result["series_sampled"])
+        self.assertEqual(result["series"][-1]["period"], 36500)
+        self.assertAlmostEqual(result["series"][-1]["balance"], result["final_value"])
+
     def test_rejects_non_finite_inputs(self) -> None:
         for bad in (math.nan, math.inf, -math.inf):
             with self.subTest(value=bad):
@@ -124,7 +139,17 @@ class TargetContributionTests(unittest.TestCase):
             periods_per_year=12,
         )
         self.assertEqual(result["status"], "ok")
-        self.assertAlmostEqual(result["contribution_per_period"], 4000.0 / 24.0, places=9)
+        self.assertEqual(result["contribution_per_period"], 166.67)
+        self.assertEqual(result["currency_precision_digits"], 2)
+        self.assertEqual(result["contribution_rounding"], "ceiling")
+        growth = compute_compound_growth(
+            principal=1000.0,
+            annual_rate=0.0,
+            years=2.0,
+            contribution_per_period=result["contribution_per_period"],
+            periods_per_year=12,
+        )
+        self.assertGreaterEqual(growth["final_value"], 5000.0)
 
     def test_positive_rate_round_trip(self) -> None:
         contribution = 100.0
@@ -144,7 +169,7 @@ class TargetContributionTests(unittest.TestCase):
             periods_per_year=12,
         )
         self.assertEqual(solved["status"], "ok")
-        self.assertAlmostEqual(solved["contribution_per_period"], contribution, places=6)
+        self.assertEqual(solved["contribution_per_period"], contribution)
 
     def test_already_met_when_principal_growth_suffices(self) -> None:
         result = solve_target_contribution(
@@ -192,7 +217,7 @@ class TargetDurationTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "unreachable")
         self.assertIsNone(result["period_count"])
-        self.assertNotIn("inf", str(result.get("message", "")).lower())
+        self.assertEqual(result["reason_code"], "non_positive_trajectory")
 
     def test_zero_rate_unreachable_with_negative_contribution(self) -> None:
         result = solve_target_duration(
@@ -255,6 +280,17 @@ class TargetDurationTests(unittest.TestCase):
                 contribution_per_period=math.inf,
                 periods_per_year=12,
             )
+
+    def test_duration_cap_is_one_hundred_years_for_annual_frequency(self) -> None:
+        result = solve_target_duration(
+            target=1000.0,
+            principal=0.0,
+            annual_rate=0.0,
+            contribution_per_period=1.0,
+            periods_per_year=1,
+        )
+        self.assertEqual(result["status"], "unreachable")
+        self.assertEqual(result["reason_code"], "max_years_exceeded")
 
 
 if __name__ == "__main__":
