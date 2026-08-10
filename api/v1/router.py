@@ -33,6 +33,7 @@ from api.v1.endpoints import (
     onboarding,
     portfolio,
     portfolio_risk_metrics,
+    reasoning_trace,
     report_export,
     report_version_compare,
     scheduled_tasks,
@@ -201,6 +202,12 @@ router.include_router(
     security_audit.router,
     prefix="/security",
     tags=["SecurityAudit"],
+)
+
+router.include_router(
+    reasoning_trace.router,
+    prefix="/reasoning-trace",
+    tags=["ReasoningTrace"],
 )
 
 router.include_router(
