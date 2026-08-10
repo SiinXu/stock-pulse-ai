@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
 - [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
 - [Fixed] Aligned Web acceptance coverage with safe global error Toasts, current chat session payloads, semantic control sizing, and collapsed mobile Backtest filters.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.
 - [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
+- [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).
 - [Fixed] Preserve the last successful screening result across failed attempts, distinguish capability/status/empty/degradation states, and provide exact-parameter retry and data-source recovery actions (Refs #871).
 - [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).
 - [Changed] Adopt multi-market `marketFormat` for Stock Details quote/history and history trend drawer price/change colors (CN/HK/US precision, currency, and red_up/green_up semantics; issue #889).
