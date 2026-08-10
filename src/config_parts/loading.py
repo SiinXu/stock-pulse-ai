@@ -1006,6 +1006,7 @@ class _ConfigLoadingMethods:
             single_stock_notify=os.getenv('SINGLE_STOCK_NOTIFY', 'false').lower() == 'true',
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
+            report_mode=cls._parse_report_mode(os.getenv('REPORT_MODE', 'standard')),
             report_export_pdf_font_path=(
                 os.getenv('REPORT_EXPORT_PDF_FONT_PATH') or ''
             ).strip() or None,
@@ -1421,6 +1422,13 @@ class _ConfigLoadingMethods:
             f"REPORT_TYPE '{value}' invalid, fallback to 'simple' (valid: simple/full/brief)"
         )
         return 'simple'
+
+    @classmethod
+    def _parse_report_mode(cls, value: Optional[str]) -> str:
+        """Parse REPORT_MODE (brief/standard/research); invalid values fall back to standard."""
+        from src.services.report_mode import normalize_report_mode
+
+        return normalize_report_mode(value, default="standard")
 
     @classmethod
     def _get_env_file_value(cls, key: str) -> Optional[str]:

@@ -3,6 +3,7 @@ export * from './ReportDiagnostics';
 export * from './AnalysisContextSummary';
 export * from './MarketStructureCard';
 export * from './ReportOverview';
+export * from './ReportDecisionCard';
 export * from './ReportStrategy';
 export * from './ReportStructuredInsights';
 export * from './ReportStrata';
