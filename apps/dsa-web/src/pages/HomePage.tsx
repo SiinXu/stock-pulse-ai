@@ -41,6 +41,7 @@ import {
   resolveSetupCheckLabel,
 } from '../components/home';
 import { HomeOnboardingSection } from '../components/onboarding/HomeOnboardingSection';
+import { HomeWatchlistGroupsSection } from '../components/watchlist/HomeWatchlistGroupsSection';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -225,7 +226,6 @@ const HomePage: React.FC = () => {
   const [configurableExpanded, setConfigurableExpanded] = useState(
     readHomeConfigurableExpanded,
   );
-
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.home,
     headingRef: pageHeadingRef,
@@ -424,6 +424,10 @@ const HomePage: React.FC = () => {
           )}
         />
       ) : null}
+
+      {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
+          avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
+      <HomeWatchlistGroupsSection />
 
       {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
           avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}

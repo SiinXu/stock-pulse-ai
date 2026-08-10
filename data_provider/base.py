@@ -22,7 +22,16 @@ import time
 from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Callable, Optional, List, Tuple, Dict, Any
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 import pandas as pd
 import numpy as np
@@ -550,6 +559,7 @@ class DataFetcherManager:
         *,
         provider_run_recorder: Optional[Callable[..., None]] = None,
         provider_run_started_recorder: Optional[Callable[..., None]] = None,
+        extension_contracts: Optional[Mapping[str, Any]] = None,
     ):
         """
         初始化管理器
@@ -559,6 +569,9 @@ class DataFetcherManager:
             provider_run_recorder: Optional diagnostic recorder (defaults to
                 production run-diagnostics wiring resolved at construction).
             provider_run_started_recorder: Optional start-event recorder pair.
+            extension_contracts: Optional non-data_provider extension contracts
+                merged into the manager-owned plugin registry (composition roots
+                use this when PLUGIN_DATA_PROVIDER_AUTO_BIND is enabled).
         """
         from .manager_parts.provider_run_wiring import resolve_provider_run_recorders
 
@@ -589,7 +602,8 @@ class DataFetcherManager:
         self._fetcher_call_locks: Dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
         self._data_provider_runtime = _DataProviderPluginRuntime(
-            self._BUILTIN_DATA_PROVIDER_IDS
+            self._BUILTIN_DATA_PROVIDER_IDS,
+            additional_contracts=extension_contracts,
         )
         self._registered_fetchers: Dict[str, DataProvider] = {}
         self._provider_priorities: Dict[int, int] = {}
@@ -1346,6 +1360,10 @@ class DataFetcherManager:
                             fallback_to=fallback_to,
                             record_count=0,
                         )
+                        # Quality failure (empty/None): do not open the exception circuit,
+                        # but still surface a per-provider line in the final DataFetchError.
+                        empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                        errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                         if df is not None and df.empty:
                             self._record_daily_source_success(fetcher, market)
                     except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
@@ -1465,6 +1483,10 @@ class DataFetcherManager:
                     fallback_to=fallback_to,
                     record_count=0,
                 )
+                # Quality failure (empty/None): keep circuit closed for empty frames,
+                # but still surface a per-provider line in the final DataFetchError.
+                empty_kind = "empty frame" if df is not None and df.empty else "none result"
+                errors.append(f"[{fetcher.name}] (empty) {empty_kind}")
                 if df is not None and df.empty:
                     self._record_daily_source_success(fetcher, market)
 

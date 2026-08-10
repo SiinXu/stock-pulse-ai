@@ -160,6 +160,28 @@ class _AnalysisContextStageMixin:
                 'trend_strength': trend_result.trend_strength,
                 'bias_ma5': trend_result.bias_ma5,
                 'bias_ma10': trend_result.bias_ma10,
+                'ma_by_period': trend_result.ma_by_period,
+                'ma_readings': {
+                    str(period): reading.to_dict()
+                    for period, reading in trend_result.ma_readings.items()
+                },
+                'rsi_by_period': trend_result.rsi_by_period,
+                'rsi_readings': {
+                    str(period): reading.to_dict()
+                    for period, reading in trend_result.rsi_readings.items()
+                },
+                'macd_reading': (
+                    trend_result.macd_reading.to_dict()
+                    if trend_result.macd_reading is not None
+                    else None
+                ),
+                'bias_by_period': trend_result.bias_by_period,
+                'support_by_period': trend_result.support_by_period,
+                'primary_ma_periods': trend_result.primary_ma_periods,
+                'primary_bias_period': trend_result.primary_bias_period,
+                'indicator_period_source': trend_result.indicator_period_source,
+                'indicator_bar_count': trend_result.indicator_bar_count,
+                'indicator_as_of': trend_result.indicator_as_of,
                 'volume_status': trend_result.volume_status.value,
                 'volume_trend': trend_result.volume_trend,
                 'buy_signal': trend_result.buy_signal.value,
@@ -170,7 +192,12 @@ class _AnalysisContextStageMixin:
 
         # Issue #234: Intra-day analysis uses real-time OHLC and trend MA coverage today.
         # Protection condition: trend_result.ma5 > 0 indicates MA calculation succeeded and data volume is sufficient.
-        if realtime_quote and trend_result and trend_result.ma5 > 0:
+        if (
+            realtime_quote
+            and trend_result
+            and trend_result.ma5 is not None
+            and trend_result.ma5 > 0
+        ):
             price = getattr(realtime_quote, 'price', None)
             if price is not None and price > 0:
                 yesterday_close = None
