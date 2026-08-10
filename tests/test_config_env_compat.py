@@ -625,6 +625,21 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_notification_delta_first_is_opt_in(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config._load_from_env()
+        self.assertFalse(config.notification_delta_first)
+
+        with patch.dict(os.environ, {"NOTIFICATION_DELTA_FIRST": "true"}, clear=True):
+            config = Config._load_from_env()
+        self.assertTrue(config.notification_delta_first)
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
     def test_market_review_color_scheme_defaults_and_accepts_red_up(
         self,
         _mock_parse_yaml,

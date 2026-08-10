@@ -182,6 +182,7 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'notification_timezone',
     'notification_min_severity',
     'notification_daily_digest_enabled',
+    'notification_delta_first',
     'single_stock_notify',
     'report_type',
     'report_language',

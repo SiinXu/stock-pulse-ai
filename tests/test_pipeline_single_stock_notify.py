@@ -136,6 +136,7 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
         pipeline.analyze_stock = MagicMock(return_value=_make_result("600519"))
         pipeline.notifier = _TrackingNotifier()
+        pipeline.config = SimpleNamespace(notification_delta_first=False)
 
         result = pipeline.process_single_stock(
             code="600519",
@@ -154,6 +155,34 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
             severity="info",
             dedup_key="report:single:600519:brief",
             cooldown_key="report:single:600519:brief",
+        )
+
+    def test_process_single_stock_applies_delta_prefix_only_to_delivery(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519"))
+        pipeline.notifier = _TrackingNotifier()
+        pipeline.config = SimpleNamespace(notification_delta_first=True)
+        pipeline._format_delta_first_notification = MagicMock(
+            return_value="delta-first:600519"
+        )
+
+        pipeline.process_single_stock(
+            code="600519",
+            skip_analysis=False,
+            single_stock_notify=True,
+            report_type=ReportType.SIMPLE,
+            analysis_query_id="query-1",
+        )
+
+        pipeline._format_delta_first_notification.assert_called_once()
+        pipeline.notifier.send.assert_called_once_with(
+            "delta-first:600519",
+            email_stock_codes=["600519"],
+            route_type="report",
+            severity="info",
+            dedup_key="report:single:600519:simple",
+            cooldown_key="report:single:600519:simple",
         )
 
     def test_process_single_stock_updates_saved_diagnostics_after_notification(self):
@@ -183,15 +212,20 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.save_context_snapshot = True
         pipeline.db = MagicMock()
-        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        pipeline.config = SimpleNamespace(
+            stock_email_groups=[],
+            notification_delta_first=True,
+        )
         pipeline.notifier = MagicMock()
         pipeline.notifier.generate_aggregate_report.return_value = "report"
+        pipeline._format_delta_first_notification = MagicMock(return_value="delta report")
         results = [_make_result("000001"), _make_result("600519")]
         for index, result in enumerate(results):
             result.query_id = f"query-{index}"
 
         pipeline._send_notifications(results, ReportType.SIMPLE, skip_push=True)
 
+        pipeline._format_delta_first_notification.assert_not_called()
         self.assertEqual(pipeline.db.update_analysis_history_diagnostics.call_count, 2)
         calls = pipeline.db.update_analysis_history_diagnostics.call_args_list
         self.assertEqual(calls[0].kwargs["query_id"], "query-0")

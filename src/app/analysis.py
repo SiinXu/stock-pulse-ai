@@ -572,6 +572,11 @@ def run_full_analysis(
                     results,
                     getattr(config, 'report_type', 'simple'),
                 )
+                dashboard_content = pipeline._format_delta_first_notification(
+                    dashboard_content,
+                    results,
+                    getattr(config, 'report_type', 'simple'),
+                )
                 parts.append(f"# 🚀 个股决策仪表盘\n\n{dashboard_content}")
             if parts:
                 combined_content = "\n\n---\n\n".join(parts)
