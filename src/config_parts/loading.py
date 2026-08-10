@@ -654,6 +654,29 @@ class _ConfigLoadingMethods:
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
                 default=True,
             ),
+            data_validation_enabled=parse_env_bool(
+                os.getenv('DATA_VALIDATION_ENABLED'),
+                default=True,
+            ),
+            data_validation_strict=parse_env_bool(
+                os.getenv('DATA_VALIDATION_STRICT'),
+                default=False,
+            ),
+            data_validation_strict_scopes=(
+                os.getenv('DATA_VALIDATION_STRICT_SCOPES', '*/*').strip()
+                or '*/*'
+            ),
+            data_validation_instrument_overrides=(
+                os.getenv('DATA_VALIDATION_INSTRUMENT_OVERRIDES', '').strip()
+            ),
+            data_validation_upper_layer_mode=(
+                "reject"
+                if os.getenv('DATA_VALIDATION_UPPER_LAYER_MODE', 'warn')
+                .strip()
+                .lower()
+                == "reject"
+                else "warn"
+            ),
             plugin_data_provider_auto_bind_enabled=parse_env_bool(
                 os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
                 default=False,
