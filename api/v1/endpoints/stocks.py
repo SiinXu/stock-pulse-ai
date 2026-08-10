@@ -13,7 +13,6 @@
 
 import logging
 from typing import Optional
-import re
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Depends
 
@@ -41,7 +40,7 @@ from src.services.import_parser import (
 from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
-from data_provider.base import normalize_stock_code
+from src.services.stock_code_utils import canonicalize_analysis_stock_code
 from data_provider.daily_cache import LocalDataMissingError
 from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
@@ -82,20 +81,6 @@ def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
     )
 
 
-# Stock code validation patterns (aligned with frontend validateStockCode)
-_STOCK_CODE_RE = re.compile(
-    r"^(?:\d{6}"                              # A-share 6-digit
-    r"|(?:SH|SZ|BJ)\d{6}"                     # exchange-prefixed A-share
-    r"|\d{6}\.(?:SH|SZ|SS|BJ)"                # exchange-suffixed A-share
-    r"|\d{1,5}\.HK"                           # HK suffix format
-    r"|HK\d{1,5}"                             # HK prefix format
-    r"|\d{5}"                                 # bare 5-digit HK code
-    r"|[A-Z]{1,5}(?:\.(?:US|[A-Z]))?"         # US ticker
-    r")$",
-    re.IGNORECASE,
-)
-
-
 def _validate_and_normalize_stock_code(code: str) -> str:
     """Validate stock code format and return canonical form.
 
@@ -107,7 +92,8 @@ def _validate_and_normalize_stock_code(code: str) -> str:
             status_code=400,
             detail={"error": "invalid_stock_code", "message": "股票代码不能为空"},
         )
-    if not _STOCK_CODE_RE.match(stripped):
+    normalized = canonicalize_analysis_stock_code(stripped)
+    if normalized is None:
         raise HTTPException(
             status_code=400,
             detail={
@@ -115,7 +101,7 @@ def _validate_and_normalize_stock_code(code: str) -> str:
                 "message": f"'{stripped}' 不是合法的股票代码格式",
             },
         )
-    return normalize_stock_code(stripped)
+    return normalized
 
 
 def _watchlist_match_key(code: str) -> str:
@@ -391,7 +377,7 @@ def add_to_watchlist(
         validated = _validate_and_normalize_stock_code(request.stock_code)
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
-        display_code = request.stock_code.strip()
+        display_code = validated
         if _watchlist_match_key(validated) not in existing_keys:
             codes.append(display_code)
             _write_watchlist_codes(service, codes)
