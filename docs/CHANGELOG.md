@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] Offline benchmark trajectory evaluation with expected-tool precision/recall/F1, separate success/productivity/retry/redundancy metrics, causal run/agent scoping, strict bounded inputs, and joinable provenance (Refs #269).
+- [Fixed] Trajectory evaluation derives redundancy/retry from a whole-run causal frontier so parallel completion order cannot flip a later call, keys `evaluation_id` on the complete normalized result so duration/cache/result differences change it, and saturates the aggregate rejected-call counter with explicit evidence instead of raising on oversized sources (Refs #269).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
 - [Added] Read-only zero-config first-run readiness, a fully labeled offline demo analysis, and a self-contained Web foundation that directs users to model setup without mutating configuration (Refs #796).
 - [Chore] Rebaseline only the Playground render chunk budget for the intentional zero-config first-run verification scenario while retaining 10% gzip headroom.

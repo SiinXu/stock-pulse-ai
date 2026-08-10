@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 from datetime import datetime
+from itertools import islice
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from pydantic import ValidationError
@@ -23,6 +24,7 @@ from src.schemas.agent_trajectory import (
     FAILURE_CLASS_NONE,
     FAILURE_CLASS_TIMEOUT,
     INPUT_SCHEMA_VERSION,
+    MAX_REPORTED_REJECTED_CALLS,
     PATH_ORCHESTRATOR,
     PATH_SINGLE,
     RUBRIC_VERSION,
@@ -211,7 +213,8 @@ def _parse_run(
     rejected = 0
     source_limit = min(MAX_SOURCE_CALLS_PER_RUN, max(0, remaining_capacity))
     clipped = len(calls_raw) > source_limit
-    for raw_call in list(calls_raw)[:source_limit]:
+    # Slice lazily: an oversized source must never be fully materialized here.
+    for raw_call in islice(calls_raw, source_limit):
         try:
             call = (
                 raw_call
@@ -230,6 +233,65 @@ def _parse_run(
     except ValidationError:
         return None
     return run, rejected, clipped
+
+
+_PreparedCall = Tuple[TrajectoryToolCallInput, str, str, Tuple[str, str], Optional[int]]
+
+
+def _prepare_run_calls(run: TrajectoryRunInput) -> List[_PreparedCall]:
+    """Resolve owner, argument fingerprint, causal scope and position per call."""
+    prepared: List[_PreparedCall] = []
+    for call in run.tool_calls:
+        agent_id = call.agent_id or run.agent_id
+        argument_json = normalize_tool_arguments(call.arguments)
+        argument_fingerprint = hashlib.sha256(argument_json.encode("utf-8")).hexdigest()
+        scope_key = (agent_id, f"{call.tool}\0{argument_fingerprint}")
+        position = call.dispatch_index if call.dispatch_index is not None else call.step
+        prepared.append((call, agent_id, argument_fingerprint, scope_key, position))
+    return prepared
+
+
+def _build_causal_frontier(
+    prepared: Sequence[_PreparedCall],
+) -> Dict[Tuple[str, str], Tuple[Optional[int], Optional[int]]]:
+    """Aggregate the earliest observed and earliest successful position per scope.
+
+    The aggregate depends only on the multiset of ``(position, success)`` pairs,
+    never on list order, so parallel same-position completions are interchangeable.
+    Calls without a position carry no causal precedence and are excluded.
+    """
+    frontier: Dict[Tuple[str, str], Tuple[Optional[int], Optional[int]]] = {}
+    for call, _agent_id, _fingerprint, scope_key, position in prepared:
+        if position is None:
+            continue
+        earliest_any, earliest_success = frontier.get(scope_key, (None, None))
+        if earliest_any is None or position < earliest_any:
+            earliest_any = position
+        if call.success and (earliest_success is None or position < earliest_success):
+            earliest_success = position
+        frontier[scope_key] = (earliest_any, earliest_success)
+    return frontier
+
+
+def _classify_causality(
+    frontier: Mapping[Tuple[str, str], Tuple[Optional[int], Optional[int]]],
+    scope_key: Tuple[str, str],
+    position: Optional[int],
+) -> Tuple[bool, bool]:
+    """Classify one call as redundant, retry, or neither.
+
+    An identical call that already succeeded at a strictly earlier position makes
+    this call redundant. Otherwise a strictly earlier identical attempt that never
+    succeeded makes it a retry. Same-position calls are parallel and are neither.
+    """
+    if position is None:
+        return False, False
+    earliest_any, earliest_success = frontier.get(scope_key, (None, None))
+    if earliest_success is not None and earliest_success < position:
+        return True, False
+    if earliest_any is not None and earliest_any < position:
+        return False, True
+    return False, False
 
 
 def _compute_result(
@@ -255,34 +317,19 @@ def _compute_result(
 
     for run in runs:
         # Fingerprints never cross run or agent ownership boundaries.
-        prior: Dict[Tuple[str, str], Tuple[Optional[int], bool]] = {}
-        for local_index, call in enumerate(run.tool_calls):
-            agent_id = call.agent_id or run.agent_id
-            argument_json = normalize_tool_arguments(call.arguments)
-            argument_fingerprint = hashlib.sha256(argument_json.encode("utf-8")).hexdigest()
-            scope_key = (agent_id, f"{call.tool}\0{argument_fingerprint}")
-            position = call.dispatch_index if call.dispatch_index is not None else call.step
-            is_redundant = False
-            is_retry = False
-            previous = prior.get(scope_key)
-            if previous is not None:
-                previous_position, previous_success = previous
-                causally_after = (
-                    position is not None
-                    and previous_position is not None
-                    and position > previous_position
-                )
-                if causally_after and previous_success:
-                    is_redundant = True
-                    redundant_count += 1
-                elif causally_after and not previous_success:
-                    is_retry = True
-                    retry_count += 1
-            if previous is None or (
-                position is not None
-                and (previous[0] is None or position >= previous[0])
-            ):
-                prior[scope_key] = (position, call.success)
+        prepared = _prepare_run_calls(run)
+        # Causality is derived from a position-based frontier aggregated over
+        # the whole run before any call is classified, so the completion order
+        # of same-position (parallel) results cannot change any classification.
+        frontier = _build_causal_frontier(prepared)
+        for local_index, (call, agent_id, argument_fingerprint, scope_key, position) in enumerate(
+            prepared
+        ):
+            is_redundant, is_retry = _classify_causality(frontier, scope_key, position)
+            if is_redundant:
+                redundant_count += 1
+            elif is_retry:
+                retry_count += 1
 
             duration_ms = duration_to_ms(call.duration)
             if duration_ms is None:
@@ -355,23 +402,28 @@ def _compute_result(
         sort_keys=True,
     )
     rubric_fingerprint = hashlib.sha256(rubric_json.encode("utf-8")).hexdigest()
+    reported_rejected_call_count = min(rejected_call_count, MAX_REPORTED_REJECTED_CALLS)
+    rejected_call_count_saturated = rejected_call_count > MAX_REPORTED_REJECTED_CALLS
+
+    # The identity payload covers the complete normalized result, so any input
+    # difference that moves a metric, a step field (duration, cache, causality,
+    # position, timestamps, failure class) or the rejection/truncation evidence
+    # also moves ``evaluation_id``. Output-side truncation is a deterministic
+    # function of this payload and therefore needs no separate contribution.
     identity_payload = {
         "as_of": as_of,
         "engine": TRAJECTORY_EVAL_ENGINE_VERSION,
+        "input_schema_version": INPUT_SCHEMA_VERSION,
+        "metrics": metrics.model_dump(mode="json"),
         "path": path_label,
+        "rejected_call_count": reported_rejected_call_count,
+        "rejected_call_count_saturated": rejected_call_count_saturated,
+        "rejected_run_count": rejected_run_count,
         "rubric": rubric_fingerprint,
+        "rubric_version": RUBRIC_VERSION,
         "runs": [item.model_dump(mode="json") for item in run_provenance],
-        "steps": [
-            {
-                "run_id": step.run_id,
-                "agent_id": step.agent_id,
-                "call_id": step.call_id,
-                "tool": step.tool,
-                "argument_fingerprint": step.argument_fingerprint,
-                "success": step.success,
-            }
-            for step in steps
-        ],
+        "source_truncated": source_truncated,
+        "steps": [step.model_dump(mode="json") for step in steps],
     }
     evaluation_id = hashlib.sha256(
         json.dumps(
@@ -392,7 +444,8 @@ def _compute_result(
         as_of=as_of,
         run_count=len(runs),
         rejected_run_count=rejected_run_count,
-        rejected_call_count=rejected_call_count,
+        rejected_call_count=reported_rejected_call_count,
+        rejected_call_count_saturated=rejected_call_count_saturated,
         source_truncated=source_truncated,
         output_truncated=False,
         output_dropped_step_count=0,

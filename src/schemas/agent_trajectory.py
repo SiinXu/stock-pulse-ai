@@ -23,6 +23,11 @@ FAILURE_CLASS_GUARDED = "guarded"
 FAILURE_CLASS_ERROR = "error"
 FailureClass = Literal["none", "timeout", "guarded", "error"]
 
+# Upper bound of the aggregate rejected-call counter carried in output
+# provenance. Oversized sources saturate at this value and set the companion
+# saturation flag rather than failing output validation.
+MAX_REPORTED_REJECTED_CALLS = 128_000
+
 
 class _StrictModel(BaseModel):
     model_config = ConfigDict(
@@ -179,7 +184,12 @@ class TrajectoryEvaluationProvenance(_StrictModel):
     as_of: Optional[str] = Field(default=None, max_length=64)
     run_count: int = Field(ge=0, le=64)
     rejected_run_count: int = Field(ge=0, le=64)
-    rejected_call_count: int = Field(ge=0, le=128_000)
+    # Bounded aggregate. When the true rejected total exceeds the reported cap,
+    # the value saturates and ``rejected_call_count_saturated`` says so instead
+    # of the evaluator raising on oversized input. Per-run provenance keeps the
+    # exact unsaturated count.
+    rejected_call_count: int = Field(ge=0, le=MAX_REPORTED_REJECTED_CALLS)
+    rejected_call_count_saturated: bool = False
     source_truncated: bool = False
     output_truncated: bool = False
     output_dropped_step_count: int = Field(ge=0, le=2_000)

@@ -11,9 +11,11 @@ import pytest
 
 from src.schemas.agent_trajectory import (
     FAILURE_CLASS_GUARDED,
+    MAX_REPORTED_REJECTED_CALLS,
     PATH_ORCHESTRATOR,
 )
 from src.services.agent_trajectory_eval_service import (
+    MAX_EVALUATED_CALLS,
     MAX_RESULT_CHARS,
     classify_failure,
     duration_to_ms,
@@ -140,6 +142,120 @@ def test_later_same_scope_call_after_success_is_redundant() -> None:
     assert result.metrics.redundant_call_count == 1
     assert result.steps[1].is_redundant is True
     assert result.metrics.productive_step_rate == 0.5
+
+
+def test_parallel_completion_order_cannot_flip_a_later_dependent_classification() -> None:
+    """Counterexample: two same-step parallel results plus one later call.
+
+    Ordering the parallel pair as success/failure or failure/success must not
+    move the later call between ``retry`` and ``redundant``.
+    """
+    success_first = _evaluate(
+        [
+            _call(step=1, success=True),
+            _call(step=1, success=False),
+            _call(step=2, success=True),
+        ]
+    )
+    failure_first = _evaluate(
+        [
+            _call(step=1, success=False),
+            _call(step=1, success=True),
+            _call(step=2, success=True),
+        ]
+    )
+
+    assert [step.is_redundant for step in success_first.steps][:2] == [False, False]
+    assert [step.is_retry for step in success_first.steps][:2] == [False, False]
+    assert success_first.steps[2].is_redundant is True
+    assert success_first.steps[2].is_retry is False
+
+    assert failure_first.steps[2].is_redundant is True
+    assert failure_first.steps[2].is_retry is False
+
+    # Causal aggregates are identical. ``evaluation_id`` still differs because
+    # the emitted step sequence itself differs, which is a real result difference.
+    assert (
+        success_first.metrics.redundant_call_count
+        == failure_first.metrics.redundant_call_count
+        == 1
+    )
+    assert success_first.metrics.retry_count == failure_first.metrics.retry_count == 0
+    assert (
+        success_first.metrics.redundancy_rate == failure_first.metrics.redundancy_rate
+    )
+    assert success_first.metrics.retry_rate == failure_first.metrics.retry_rate
+
+
+def test_parallel_failures_keep_a_later_call_a_retry_in_any_order() -> None:
+    """No same-step success means the later identical call stays a retry."""
+    forward = _evaluate(
+        [
+            _call(step=1, success=False, call_id="a"),
+            _call(step=1, success=False, call_id="b"),
+            _call(step=2, success=False, call_id="c"),
+        ]
+    )
+
+    assert forward.steps[2].is_retry is True
+    assert forward.steps[2].is_redundant is False
+    assert forward.metrics.retry_count == 1
+    assert forward.metrics.redundant_call_count == 0
+
+
+def test_evaluation_id_changes_when_duration_cache_or_result_identity_changes() -> None:
+    """Counterexample: identity must cover the material normalized result."""
+    base = _evaluate([_call(duration=0.1, cached=False)])
+    slower = _evaluate([_call(duration=0.2, cached=False)])
+    cached = _evaluate([_call(duration=0.1, cached=True)])
+    failed = _evaluate([_call(duration=0.1, cached=False, success=False)])
+
+    assert base.metrics.total_duration_ms != slower.metrics.total_duration_ms
+    assert base.metrics.cache_hit_rate != cached.metrics.cache_hit_rate
+
+    identifiers = {
+        base.provenance.evaluation_id,
+        slower.provenance.evaluation_id,
+        cached.provenance.evaluation_id,
+        failed.provenance.evaluation_id,
+    }
+    assert len(identifiers) == 4
+
+    for left, right in (
+        (base, slower),
+        (base, cached),
+        (base, failed),
+    ):
+        assert strict_json_dumps(left) != strict_json_dumps(right)
+        assert left.provenance.evaluation_id != right.provenance.evaluation_id
+
+    # Identical inputs still collapse to one deterministic identity.
+    assert base.provenance.evaluation_id == _evaluate(
+        [_call(duration=0.1, cached=False)]
+    ).provenance.evaluation_id
+
+
+def test_oversized_source_returns_saturated_evidence_instead_of_raising() -> None:
+    """Counterexample: 130,001 valid calls must not raise on output validation."""
+    call = _call(step=1)
+    result = _evaluate([call] * 130_001)
+
+    assert result.provenance.source_truncated is True
+    assert result.provenance.rejected_call_count == MAX_REPORTED_REJECTED_CALLS
+    assert result.provenance.rejected_call_count_saturated is True
+    # Per-run provenance keeps the exact, unsaturated rejection count.
+    assert result.runs[0].rejected_call_count == 130_001 - MAX_EVALUATED_CALLS
+    assert result.runs[0].source_truncated is True
+    assert result.metrics.sample_size == MAX_EVALUATED_CALLS
+    assert len(strict_json_dumps(result)) <= MAX_RESULT_CHARS
+
+
+def test_rejected_call_count_is_not_saturated_below_the_reported_cap() -> None:
+    result = _evaluate([_call(step=1)] * 2_050)
+
+    assert result.provenance.rejected_call_count == 50
+    assert result.provenance.rejected_call_count_saturated is False
+    assert result.provenance.source_truncated is True
 
 
 def test_string_boolean_is_rejected_instead_of_coerced() -> None:

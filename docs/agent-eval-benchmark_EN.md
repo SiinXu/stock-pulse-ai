@@ -84,12 +84,35 @@ step rate.
 
 ### Causality and ownership
 
-Fingerprint history is isolated by `run_id` and `agent_id`. A duplicate is
-classified only when its `dispatch_index` (preferred) or runner `step` is
-strictly greater than the previous matching call. Same-step parallel calls,
-calls without causal order, independent agents and independent runs are never
-classified as post-success redundancy merely because their completions appear
-later in a list.
+Fingerprint history is isolated by `run_id` and `agent_id`. Causality is not
+derived from list position. For each `(agent_id, tool, argument fingerprint)`
+scope the evaluator first aggregates, over the whole run, the earliest observed
+causal position and the earliest **successful** causal position, where position
+is `dispatch_index` (preferred) or the runner `step`. A call is then:
+
+- **redundant** when an identical call already succeeded at a strictly earlier
+  position;
+- **retry** when a strictly earlier identical attempt exists but none of those
+  earlier attempts succeeded;
+- **neither** otherwise.
+
+Because the aggregate depends only on the multiset of `(position, success)`
+pairs, the completion order of same-position (parallel) results can never move
+a later dependent call between `retry` and `redundant`. Same-step parallel
+calls, calls without a causal position, independent agents and independent runs
+are never classified as post-success redundancy merely because their
+completions appear later in a list.
+
+### Evaluation identity
+
+`evaluation_id` is a SHA-256 over the complete normalized result: rubric
+fingerprint, path label, `as_of`, schema/engine/rubric versions, run
+provenance, every evaluated step field (position, duration, cache state,
+failure class, causal classification, timestamps), the full metric set, and the
+rejection/truncation evidence. Any input difference that moves a metric or a
+step field — including duration or `cached` state alone — therefore moves
+`evaluation_id`. Output-side step truncation is a deterministic function of that
+payload, so identical identities always serialize identically.
 
 ### Validation, bounds and provenance
 
@@ -99,6 +122,11 @@ later in a list.
 - Evaluation is capped at 64 runs / 2,000 accepted source calls; returned step
   detail is capped at 1,000 and the strict-JSON result at 500,000 characters.
   Source and output truncation are explicit.
+- Oversized sources are clipped, never fatal. An input far beyond the accepted
+  call cap still returns a bounded result with `source_truncated=true`. The
+  aggregate `rejected_call_count` saturates at 128,000 and sets
+  `rejected_call_count_saturated=true` so the report never understates the
+  rejection silently; per-run provenance keeps the exact unsaturated count.
 - Each result carries deterministic evaluation/rubric fingerprints, input and
   engine schema versions, run/execution/task/agent/call IDs, stock/market where
   available, rejected counts, and capture/output truncation state.
