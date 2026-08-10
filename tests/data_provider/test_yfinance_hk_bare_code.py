@@ -85,6 +85,7 @@ def test_manager_routes_four_digit_hk_away_from_cn_only_fetchers() -> None:
 
     assert not frame.empty
     assert source == "YfinanceFetcher"
-    assert yfinance.calls == ["0001"]
+    # Manager runs normalize_stock_code first; bare 4-digit HK becomes HKxxxxx.
+    assert yfinance.calls == ["HK00001"]
     assert efinance.calls == []
     assert baostock.calls == []

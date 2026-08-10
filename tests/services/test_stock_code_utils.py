@@ -9,6 +9,7 @@ import pytest
 from unittest.mock import patch
 
 from src.services.stock_code_utils import (
+    canonicalize_analysis_stock_code,
     is_code_like,
     normalize_code,
     resolve_daily_stock_identity,
@@ -24,8 +25,8 @@ class TestIsCodeLike:
     def test_plain_5_digit(self):
         assert is_code_like("00700") is True
 
-    def test_4_digit_rejected(self):
-        assert is_code_like("6001") is False
+    def test_plain_4_digit_hk(self):
+        assert is_code_like("0941") is True
 
     # --- Suffix format ---
     def test_suffix_sh(self):
@@ -131,6 +132,9 @@ class TestNormalizeCode:
 
     def test_plain_5_digit(self):
         assert normalize_code("00700") == "00700"
+
+    def test_plain_4_digit_hk_is_padded(self):
+        assert normalize_code("0941") == "00941"
 
     def test_whitespace_stripped(self):
         assert normalize_code("  600519  ") == "600519"
@@ -243,7 +247,7 @@ class TestResolveIndexStockCodeForAnalysis:
             assert resolve_index_stock_code_for_analysis("005930") == "005930.KS"
 
     def test_resolves_indexed_4_digit_jp_base(self):
-        assert is_code_like("7203") is False
+        assert is_code_like("7203") is True
         with patch("src.data.stock_index_loader.resolve_index_stock_code", return_value="7203.T"):
             assert resolve_index_stock_code_for_analysis("7203") == "7203.T"
 
@@ -251,6 +255,46 @@ class TestResolveIndexStockCodeForAnalysis:
         with patch("src.data.stock_index_loader.resolve_index_stock_code", return_value=None):
             assert resolve_index_stock_code_for_analysis("005930") == "005930"
             assert resolve_index_stock_code_for_analysis("AAPL") == "AAPL"
+
+    def test_unindexed_four_digit_analysis_input_defaults_to_hong_kong(self) -> None:
+        with patch(
+            "src.data.stock_index_loader.resolve_index_stock_code",
+            return_value=None,
+        ):
+            assert resolve_index_stock_code_for_analysis("0941") == "HK00941"
+
+
+class TestCanonicalizeAnalysisStockCode:
+    def test_unresolved_four_digit_defaults_to_hk(self):
+        with patch("src.data.stock_index_loader.resolve_index_stock_code", return_value=None):
+            assert canonicalize_analysis_stock_code("0941") == "HK00941"
+
+    def test_indexed_four_digit_keeps_jp_precedence(self):
+        with patch(
+            "src.data.stock_index_loader.resolve_index_stock_code",
+            return_value="7203.T",
+        ):
+            assert canonicalize_analysis_stock_code("7203") == "7203.T"
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("hk1810", "HK01810"),
+            ("1810.HK", "HK01810"),
+            ("600519", "600519"),
+            ("000001", "000001"),
+            ("AAPL", "AAPL"),
+            ("7203.T", "7203.T"),
+            ("2330.TW", "2330.TW"),
+            ("005930.KS", "005930.KS"),
+        ],
+    )
+    def test_explicit_and_unambiguous_forms_preserve_identity(
+        self,
+        raw: str,
+        expected: str,
+    ) -> None:
+        assert canonicalize_analysis_stock_code(raw) == expected
 
 
 class TestResolveDailyStockIdentity:

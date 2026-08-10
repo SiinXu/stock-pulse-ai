@@ -51,6 +51,7 @@ _AUX_LIMITATION_STATUSES = {
     ContextFieldStatus.FETCH_FAILED,
     ContextFieldStatus.FALLBACK,
     ContextFieldStatus.STALE,
+    ContextFieldStatus.PARTIAL,
 }
 
 
@@ -72,6 +73,7 @@ class PipelineAnalysisArtifacts:
     news_result_count: Optional[int]
     metadata: Dict[str, Any]
     portfolio_context: Optional[Dict[str, Any]] = None
+    money_flow_data: Optional[Any] = None
 
 
 class AnalysisContextBuilder:
@@ -96,6 +98,9 @@ class AnalysisContextBuilder:
         blocks["technical"] = technical_block
         data_quality_warnings.extend(technical_warnings)
         blocks["chip"] = _build_chip_block(artifacts)
+        money_flow_block = _build_money_flow_block(artifacts)
+        if money_flow_block is not None:
+            blocks["money_flow"] = money_flow_block
         blocks["fundamentals"] = _build_fundamentals_block(artifacts)
         blocks["news"] = _build_news_block(artifacts)
         portfolio_block = _build_portfolio_block(artifacts)
@@ -387,6 +392,118 @@ def _build_chip_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBl
     )
 
 
+def _build_money_flow_block(
+    artifacts: PipelineAnalysisArtifacts,
+) -> Optional[AnalysisContextBlock]:
+    """Build a capital-flow block without collapsing quality/failure outcomes."""
+    outcome = _to_dict(artifacts.money_flow_data)
+    if not outcome:
+        # Do not force a missing block when the feature is disabled — keeps pack
+        # shape stable for default (SMARTMONEY_ENABLED=false) runs.
+        if not bool((artifacts.metadata or {}).get("smartmoney_enabled")):
+            return None
+        status = ContextFieldStatus.MISSING
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    missing_reason="money_flow_missing",
+                )
+            },
+        )
+
+    raw_status = str(outcome.get("status") or "").strip().lower()
+    status_map = {
+        "available": ContextFieldStatus.AVAILABLE,
+        "partial": ContextFieldStatus.PARTIAL,
+        "not_supported": ContextFieldStatus.NOT_SUPPORTED,
+        "fetch_failed": ContextFieldStatus.FETCH_FAILED,
+        "empty": ContextFieldStatus.MISSING,
+        "stale": ContextFieldStatus.STALE,
+        "fallback": ContextFieldStatus.FALLBACK,
+    }
+    status = status_map.get(raw_status, ContextFieldStatus.MISSING)
+    snapshot = outcome.get("snapshot")
+    snapshot = dict(snapshot) if isinstance(snapshot, Mapping) else {}
+    source_chain = outcome.get("source_chain")
+    source_chain = source_chain if isinstance(source_chain, list) else []
+    source = _source_text(snapshot.get("source")) or _source_from_chain(source_chain)
+    warnings = [str(item) for item in outcome.get("warnings", []) if item]
+    timestamp = _metadata_iso_datetime_value(
+        {"fetched_at": outcome.get("fetched_at"), "as_of": snapshot.get("as_of")},
+        "as_of",
+        "fetched_at",
+    )
+    metadata = {
+        "provider_date": outcome.get("provider_date") or snapshot.get("date"),
+        "age_days": outcome.get("age_days"),
+        "requested_days": outcome.get("requested_days") or snapshot.get("requested_days"),
+        "observed_days": snapshot.get("observed_days"),
+        "completeness": snapshot.get("completeness"),
+        "bucket_definition": snapshot.get("bucket_definition"),
+        "unit": snapshot.get("unit"),
+        "amount_scale": snapshot.get("amount_scale"),
+        "source_chain": source_chain,
+        "cache_state": outcome.get("cache_state"),
+        "fallback_from": outcome.get("fallback_from"),
+        "error_code": outcome.get("error_code"),
+    }
+    metadata = {key: value for key, value in metadata.items() if value not in (None, [], {})}
+
+    if not snapshot:
+        missing_reason = outcome.get("error_code") or f"money_flow_{raw_status or 'missing'}"
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    source=source,
+                    timestamp=timestamp,
+                    missing_reason=str(missing_reason),
+                    warnings=warnings,
+                    metadata=metadata,
+                )
+            },
+            source=source,
+            timestamp=timestamp,
+            warnings=warnings,
+            metadata=metadata,
+        )
+
+    excluded = {
+        "raw_field_map", "source", "date", "as_of", "bucket_definition",
+        "unit", "amount_scale", "requested_days", "observed_days", "completeness",
+    }
+    items = {
+        key: AnalysisContextItem(
+            status=status,
+            value=value,
+            source=source,
+            timestamp=timestamp,
+            fallback_from=outcome.get("fallback_from"),
+            warnings=warnings,
+            metadata={
+                "bucket_definition": snapshot.get("bucket_definition"),
+                "unit": snapshot.get("unit"),
+                "amount_scale": snapshot.get("amount_scale"),
+            }
+            if key.endswith("net_inflow") or key.endswith("net_inflow_ratio")
+            else {},
+        )
+        for key, value in snapshot.items()
+        if value is not None and key not in excluded
+    }
+    return AnalysisContextBlock(
+        status=status,
+        items=items,
+        source=source,
+        timestamp=timestamp,
+        warnings=warnings,
+        metadata=metadata,
+    )
+
+
 def _build_fundamentals_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBlock:
     context = artifacts.fundamental_context if isinstance(artifacts.fundamental_context, dict) else None
     if not context:
@@ -652,12 +769,12 @@ def _quality_limitations(blocks: Dict[str, AnalysisContextBlock]) -> List[str]:
         if status in _CORE_LIMITATION_STATUSES:
             limitations.append(f"{key}: {status.value}")
 
-    for key in ("news", "fundamentals", "chip"):
+    for key in ("news", "fundamentals", "chip", "money_flow"):
         status = _quality_block_status(blocks, key)
         if status in _AUX_LIMITATION_STATUSES:
             limitations.append(f"{key}: {status.value}")
 
-    return limitations[:5]
+    return limitations[:6]
 
 
 def _to_dict(value: Optional[Any]) -> Dict[str, Any]:

@@ -1280,5 +1280,145 @@ class TestUiPlacement(unittest.TestCase):
         self.assertEqual(get_field_definition("STOCK_LIST")["ui_placement"], None)
 
 
+class TestDataSourceDomainKeysRegistered(unittest.TestCase):
+    """Crypto, validation, and local-first keys must be explicitly registered (Refs #1023)."""
+
+    _CRYPTO_KEYS = (
+        "CRYPTO_PROVIDER_ENABLED",
+        "COINGECKO_API_PLAN",
+        "COINGECKO_API_KEY",
+        "COINGECKO_API_BASE",
+        "CRYPTO_COINGECKO_PRIORITY",
+    )
+    _VALIDATION_KEYS = (
+        "DATA_VALIDATION_ENABLED",
+        "DATA_VALIDATION_STRICT",
+        "DATA_VALIDATION_STRICT_SCOPES",
+        "DATA_VALIDATION_INSTRUMENT_OVERRIDES",
+        "DATA_VALIDATION_UPPER_LAYER_MODE",
+    )
+    _LOCAL_FIRST_KEYS = (
+        "PROVIDER_MARKET_DATA_MODE",
+        "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES",
+        "PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS",
+    )
+
+    def test_all_keys_are_explicitly_registered_in_data_source(self):
+        for key in self._CRYPTO_KEYS + self._VALIDATION_KEYS + self._LOCAL_FIRST_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "data_source", key)
+            self.assertNotEqual(
+                field["display_order"],
+                9000,
+                f"{key} should be explicitly registered, not inferred",
+            )
+            self.assertTrue(field.get("help_key"), f"{key} missing help_key")
+            self.assertTrue(field.get("examples"), f"{key} missing examples")
+            self.assertTrue(field.get("docs"), f"{key} missing docs")
+
+    def test_crypto_controls_and_defaults(self):
+        enabled = get_field_definition("CRYPTO_PROVIDER_ENABLED")
+        self.assertEqual(enabled["data_type"], "boolean")
+        self.assertEqual(enabled["ui_control"], "switch")
+        self.assertEqual(enabled["default_value"], "false")
+
+        plan = get_field_definition("COINGECKO_API_PLAN")
+        self.assertEqual(plan["ui_control"], "select")
+        self.assertEqual(plan["default_value"], "keyless")
+        self.assertEqual(plan["options"], ["keyless", "demo", "pro"])
+        self.assertEqual(plan["validation"]["enum"], ["keyless", "demo", "pro"])
+
+        key = get_field_definition("COINGECKO_API_KEY")
+        self.assertTrue(key["is_sensitive"])
+        self.assertEqual(key["ui_control"], "password")
+
+        base = get_field_definition("COINGECKO_API_BASE")
+        self.assertEqual(base["ui_control"], "text")
+        self.assertEqual(base["validation"]["item_type"], "url")
+        self.assertIn("https", base["validation"]["allowed_schemes"])
+
+        priority = get_field_definition("CRYPTO_COINGECKO_PRIORITY")
+        self.assertEqual(priority["data_type"], "integer")
+        self.assertEqual(priority["ui_control"], "number")
+        self.assertEqual(priority["default_value"], "10")
+        self.assertEqual(priority["validation"]["min"], 0)
+        self.assertEqual(priority["validation"]["max"], 99)
+        # Crypto priority belongs with other data-source provider priorities.
+        self.assertEqual(priority["category"], "data_source")
+
+    def test_validation_controls_and_defaults(self):
+        enabled = get_field_definition("DATA_VALIDATION_ENABLED")
+        self.assertEqual(enabled["data_type"], "boolean")
+        self.assertEqual(enabled["ui_control"], "switch")
+        self.assertEqual(enabled["default_value"], "true")
+
+        strict = get_field_definition("DATA_VALIDATION_STRICT")
+        self.assertEqual(strict["data_type"], "boolean")
+        self.assertEqual(strict["ui_control"], "switch")
+        self.assertEqual(strict["default_value"], "false")
+
+        scopes = get_field_definition("DATA_VALIDATION_STRICT_SCOPES")
+        self.assertEqual(scopes["default_value"], "*/*")
+        self.assertEqual(scopes["ui_control"], "text")
+
+        overrides = get_field_definition("DATA_VALIDATION_INSTRUMENT_OVERRIDES")
+        # Runtime stores comma-separated SYMBOL=instrument pairs, not JSON.
+        self.assertEqual(overrides["data_type"], "string")
+        self.assertEqual(overrides["ui_control"], "textarea")
+        self.assertEqual(overrides["default_value"], "")
+
+        upper = get_field_definition("DATA_VALIDATION_UPPER_LAYER_MODE")
+        self.assertEqual(upper["ui_control"], "select")
+        self.assertEqual(upper["default_value"], "warn")
+        self.assertEqual(upper["options"], ["warn", "reject"])
+        self.assertEqual(upper["validation"]["enum"], ["warn", "reject"])
+
+    def test_local_first_controls_and_defaults(self):
+        mode = get_field_definition("PROVIDER_MARKET_DATA_MODE")
+        self.assertEqual(mode["ui_control"], "select")
+        self.assertEqual(mode["default_value"], "auto")
+        self.assertEqual(mode["options"], ["auto", "local_only", "refresh"])
+        self.assertEqual(mode["validation"]["enum"], ["auto", "local_only", "refresh"])
+
+        local_only_age = get_field_definition(
+            "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS"
+        )
+        self.assertEqual(local_only_age["data_type"], "integer")
+        self.assertEqual(local_only_age["ui_control"], "number")
+        self.assertEqual(local_only_age["default_value"], "2592000")
+        self.assertEqual(local_only_age["unit"], "s")
+        self.assertEqual(local_only_age["validation"]["min"], 1)
+
+        persistent_age = get_field_definition(
+            "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS"
+        )
+        self.assertEqual(persistent_age["default_value"], "7776000")
+        self.assertEqual(persistent_age["unit"], "s")
+        self.assertEqual(persistent_age["validation"]["min"], 0)
+
+        max_entries = get_field_definition(
+            "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES"
+        )
+        self.assertEqual(max_entries["default_value"], "512")
+        self.assertEqual(max_entries["validation"]["min"], 1)
+
+        grace = get_field_definition("PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS")
+        self.assertEqual(grace["default_value"], "1")
+        self.assertEqual(grace["unit"], "d")
+        self.assertEqual(grace["validation"]["min"], 1)
+
+    def test_schema_response_includes_data_source_domain_keys(self):
+        schema = build_schema_response()
+        data_source = next(
+            (c for c in schema["categories"] if c["category"] == "data_source"),
+            None,
+        )
+        self.assertIsNotNone(data_source, "data_source category missing")
+        field_keys = {f["key"] for f in data_source["fields"]}
+        for key in self._CRYPTO_KEYS + self._VALIDATION_KEYS + self._LOCAL_FIRST_KEYS:
+            self.assertIn(key, field_keys, f"{key} missing from schema response")
+
 if __name__ == "__main__":
     unittest.main()

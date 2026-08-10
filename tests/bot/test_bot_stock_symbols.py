@@ -21,6 +21,7 @@ from bot.stock_symbols import (
         ("HK700", "HK00700", "hk"),
         ("00700", "HK00700", "hk"),
         ("00700.HK", "HK00700", "hk"),
+        ("0941", "HK00941", "hk"),
         ("aapl", "AAPL", "us"),
         ("BRK.B", "BRK.B", "us"),
     ],
