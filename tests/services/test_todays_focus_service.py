@@ -20,6 +20,10 @@ from src.services.todays_focus_service import (
 )
 
 NOW = datetime(2026, 8, 9, 8, 0, tzinfo=timezone.utc)
+# CN/HK local day starts 16:00 UTC previous calendar day (UTC+8).
+CN_WINDOW_START = datetime(2026, 8, 8, 16, 0, tzinfo=timezone.utc)
+# US Eastern (EDT, UTC-4) local day starts 04:00 UTC on the same calendar date.
+US_WINDOW_START = datetime(2026, 8, 9, 4, 0, tzinfo=timezone.utc)
 
 
 def _evidence_payload(reason: str, observed_at: datetime = NOW) -> Dict[str, Any]:
@@ -81,6 +85,9 @@ class EmptyAlertRepository:
         self.calls.append(kwargs)
         return []
 
+    def list_triggers(self, **_kwargs: Any) -> Any:
+        raise AssertionError("first-page list_triggers must not be used")
+
 
 class EmptyPortfolioRepository:
     def __init__(self, rows: List[Dict[str, Any]] | None = None) -> None:
@@ -98,6 +105,7 @@ def _service(
     portfolio: Any | None = None,
     history: Any | None = None,
     stock_list: List[str] | None = None,
+    clock: Any | None = None,
 ) -> TodaysFocusService:
     return TodaysFocusService(
         config_provider=lambda: SimpleNamespace(
@@ -108,8 +116,15 @@ def _service(
         alert_repository=alerts or EmptyAlertRepository(),
         portfolio_repository=portfolio or EmptyPortfolioRepository(),
         signal_changes_batch_loader=history or (lambda _codes, **_kwargs: {}),
-        clock=lambda: NOW,
+        clock=clock or (lambda: NOW),
     )
+
+
+def _market_window(payload: Dict[str, Any], market: str) -> Dict[str, Any]:
+    for window in payload["temporal_policy"]["markets"]:
+        if window["market"] == market:
+            return window
+    raise AssertionError(f"missing market window: {market}")
 
 
 def test_empty_evidences_never_padded() -> None:
@@ -179,25 +194,28 @@ def test_format_reason_display_language() -> None:
     assert "告警" in zh
 
 
-def test_service_empty_status_uses_executable_today_and_read_only_contract() -> None:
+def test_service_empty_status_uses_executable_market_today_contract() -> None:
     payload = _service().build_focus(max_items=5)
     assert payload["status"] == "empty"
     assert payload["items"] == []
     assert payload["empty_reason"] == "no_fresh_deterministic_signals"
-    assert payload["temporal_policy"] == {
-        "semantics": "local_calendar_day",
-        "timezone": "Asia/Shanghai",
-        "local_date": "2026-08-09",
-        "window_start": "2026-08-08T16:00:00+00:00",
-        "window_end": "2026-08-09T08:00:00+00:00",
-        "naive_timestamp_policy": "assume_utc",
-        "missing_timestamp_policy": "exclude",
-        "non_trading_day_policy": "same_local_day_only",
-    }
+    assert payload["pack_version"] == "todays_focus/2.1"
+    policy = payload["temporal_policy"]
+    assert policy["semantics"] == "per_market_local_calendar_day"
+    assert policy["cross_market_rule"] == "evidence_uses_target_symbol_market_timezone"
+    assert policy["fallback_timezone"] == "Asia/Shanghai"
+    assert policy["window_end"] == NOW.isoformat()
+    cn = _market_window(payload, "cn")
+    us = _market_window(payload, "us")
+    assert cn["timezone"] == "Asia/Shanghai"
+    assert us["timezone"] == "America/New_York"
+    assert cn["window_start"] == CN_WINDOW_START.isoformat()
+    assert us["window_start"] == US_WINDOW_START.isoformat()
     assert payload["cost_contract"]["database_writes"] == 0
     assert payload["cost_contract"]["provider_calls"] == 0
     assert payload["cost_contract"]["read_only"] is True
     assert payload["max_items"] == DEFAULT_MAX_FOCUS_ITEMS
+    assert payload["universe_contract"]["excluded_non_finite_positions"] == 0
     TodaysFocusResponse.model_validate(payload)
 
 
@@ -241,9 +259,7 @@ def test_stale_and_failed_alerts_are_excluded_and_query_is_targeted() -> None:
     assert len(alerts.calls) == 1
     assert alerts.calls[0]["per_target_limit"] == 1
     assert "AAPL" in alerts.calls[0]["targets"]
-    assert alerts.calls[0]["triggered_since"] == datetime(
-        2026, 8, 8, 16, 0, tzinfo=timezone.utc
-    )
+    assert alerts.calls[0]["triggered_since"] == CN_WINDOW_START
 
 
 def test_more_than_fifty_unrelated_alerts_cannot_hide_target_trigger() -> None:
@@ -331,14 +347,14 @@ def test_history_is_one_bounded_batch_call_and_type_error_is_not_retried() -> No
     payload = _service(history=history, stock_list=["AAPL", "MSFT"]).build_focus()
     assert len(calls) == 1
     assert calls[0]["limit"] == 2
-    assert calls[0]["created_at_from"] == NOW - timedelta(days=90)
+    assert calls[0]["created_at_from"] == CN_WINDOW_START - timedelta(days=90)
     assert payload["status"] == "degraded"
     assert payload["degraded_sources"] == ["analysis_history"]
 
 
 def test_portfolio_cache_is_read_once_and_lifetime_pnl_never_qualifies() -> None:
     portfolio = EmptyPortfolioRepository(
-        [{"symbol": "AAPL", "unrealized_pnl_pct": 900.0, "market_value": 50_000}]
+        [{"symbol": "AAPL", "quantity": 10, "unrealized_pnl_pct": 900.0, "market_value": 50_000}]
     )
     payload = _service(portfolio=portfolio).build_focus()
     assert portfolio.calls == 1
@@ -358,3 +374,127 @@ def test_non_finite_weight_is_rejected_before_json_serialization(invalid: float)
     valid["items"][0]["weight_pct"] = invalid
     with pytest.raises(ValidationError):
         TodaysFocusResponse.model_validate(valid)
+
+
+
+def test_cross_market_timestamp_freshness_is_market_local() -> None:
+    cn_morning = datetime(2026, 8, 9, 3, 30, tzinfo=timezone.utc)
+    us_morning = datetime(2026, 8, 9, 5, 0, tzinfo=timezone.utc)
+    payload = _service().build_focus(
+        evidences=[
+            _ev("600519", "alert_triggered", "cn-only-window", observed_at=cn_morning),
+            _ev("AAPL", "alert_triggered", "us-stale-at-cn-morning", observed_at=cn_morning),
+            _ev("MSFT", "alert_triggered", "us-fresh", observed_at=us_morning),
+        ]
+    )
+    codes = {item["code"] for item in payload["items"]}
+    assert "600519" in codes
+    assert "AAPL" not in codes
+    assert "MSFT" in codes
+
+
+def test_us_only_boundary_before_new_york_midnight_is_excluded() -> None:
+    just_before_us_day = US_WINDOW_START - timedelta(seconds=1)
+    payload = _service().build_focus(
+        evidences=[_ev("AAPL", "alert_triggered", "pre-us-midnight", observed_at=just_before_us_day)]
+    )
+    assert payload["items"] == []
+
+
+def test_alert_query_covers_all_targets_not_first_page_only() -> None:
+    class MultiStatusRepository:
+        def __init__(self) -> None:
+            self.calls: List[Dict[str, Any]] = []
+
+        def list_recent_triggered_for_targets(self, **kwargs: Any) -> List[Dict[str, Any]]:
+            self.calls.append(kwargs)
+            return [
+                {
+                    "id": 100 + index,
+                    "rule_id": 1,
+                    "target": target,
+                    "reason": f"fresh-{target}",
+                    "triggered_at": NOW,
+                    "status": "triggered",
+                }
+                for index, target in enumerate(kwargs["targets"])
+            ]
+
+        def list_triggers(self, **_kwargs: Any) -> Any:
+            raise AssertionError("focus must not paginate list_triggers")
+
+    alerts = MultiStatusRepository()
+    payload = _service(alerts=alerts, stock_list=["600519", "AAPL", "HK00700"]).build_focus()
+    assert len(alerts.calls) == 1
+    codes = {item["code"] for item in payload["items"]}
+    assert {"600519", "AAPL", "HK00700"} <= codes
+
+
+def test_portfolio_reads_full_set_and_excludes_non_finite_financials() -> None:
+    rows = [
+        {
+            "symbol": f"{600000 + i}",
+            "quantity": 1.0,
+            "market_value_base": float(i + 1),
+            "last_price": 10.0,
+        }
+        for i in range(60)
+    ]
+    rows.extend(
+        [
+            {"symbol": "NAN1", "quantity": float("nan"), "market_value_base": 100.0},
+            {"symbol": "INF1", "quantity": 1.0, "market_value_base": float("inf")},
+            {"symbol": "CHG", "quantity": 1.0, "change_pct": float("-inf")},
+            {"symbol": "WGT", "quantity": 1.0, "weight_pct": float("nan")},
+        ]
+    )
+    portfolio = EmptyPortfolioRepository(rows)
+    payload = _service(portfolio=portfolio).build_focus()
+    assert portfolio.calls == 1
+    assert payload["universe_contract"]["symbol_count"] == 60
+    assert payload["universe_contract"]["excluded_non_finite_positions"] == 4
+    assert payload["universe_contract"]["data_notes"]
+
+
+def test_all_non_finite_positions_without_watchlist_are_explicit_insufficient_data() -> None:
+    portfolio = EmptyPortfolioRepository(
+        [
+            {"symbol": "BAD", "quantity": float("nan"), "market_value_base": 1.0},
+            {"symbol": "BAD2", "quantity": 1.0, "weight_pct": float("inf")},
+        ]
+    )
+    payload = _service(portfolio=portfolio, stock_list=[]).build_focus()
+    assert payload["status"] == "empty"
+    assert payload["empty_reason"] == "insufficient_finite_data"
+    TodaysFocusResponse.model_validate(payload)
+
+
+def test_alert_rows_with_non_finite_change_or_price_are_excluded() -> None:
+    class Alerts:
+        def list_recent_triggered_for_targets(self, **_kwargs: Any) -> List[Dict[str, Any]]:
+            return [
+                {
+                    "id": 1,
+                    "rule_id": 1,
+                    "target": "AAPL",
+                    "reason": "nan price",
+                    "triggered_at": NOW,
+                    "status": "triggered",
+                    "price": float("nan"),
+                },
+                {
+                    "id": 2,
+                    "rule_id": 1,
+                    "target": "MSFT",
+                    "reason": "ok",
+                    "triggered_at": NOW,
+                    "status": "triggered",
+                    "change_pct": 1.5,
+                },
+            ]
+
+        def list_triggers(self, **_kwargs: Any) -> Any:
+            raise AssertionError("list_triggers must not be used")
+
+    payload = _service(alerts=Alerts(), stock_list=["AAPL", "MSFT"]).build_focus()
+    assert [item["code"] for item in payload["items"]] == ["MSFT"]

@@ -9,7 +9,7 @@ vi.mock('../index', () => ({ default: { get } }));
 
 function validPayload() {
   return {
-    pack_version: 'todays_focus/2.0',
+    pack_version: 'todays_focus/2.1',
     generated_at: '2026-08-09T08:00:00Z',
     status: 'ok',
     max_items: 5,
@@ -37,20 +37,55 @@ function validPayload() {
     sources_used: ['analysis_history'],
     degraded_sources: [],
     temporal_policy: {
-      semantics: 'local_calendar_day',
-      timezone: 'Asia/Shanghai',
-      local_date: '2026-08-09',
-      window_start: '2026-08-08T16:00:00Z',
+      semantics: 'per_market_local_calendar_day',
+      cross_market_rule: 'evidence_uses_target_symbol_market_timezone',
+      fallback_timezone: 'Asia/Shanghai',
       window_end: '2026-08-09T08:00:00Z',
       naive_timestamp_policy: 'assume_utc',
       missing_timestamp_policy: 'exclude',
       non_trading_day_policy: 'same_local_day_only',
+      markets: [
+        {
+          market: 'cn',
+          timezone: 'Asia/Shanghai',
+          local_date: '2026-08-09',
+          window_start: '2026-08-08T16:00:00Z',
+          window_end: '2026-08-09T08:00:00Z',
+          is_trading_day: true,
+        },
+        {
+          market: 'hk',
+          timezone: 'Asia/Hong_Kong',
+          local_date: '2026-08-09',
+          window_start: '2026-08-08T16:00:00Z',
+          window_end: '2026-08-09T08:00:00Z',
+          is_trading_day: true,
+        },
+        {
+          market: 'us',
+          timezone: 'America/New_York',
+          local_date: '2026-08-09',
+          window_start: '2026-08-09T04:00:00Z',
+          window_end: '2026-08-09T08:00:00Z',
+          is_trading_day: false,
+        },
+        {
+          market: 'unknown',
+          timezone: 'Asia/Shanghai',
+          local_date: '2026-08-09',
+          window_start: '2026-08-08T16:00:00Z',
+          window_end: '2026-08-09T08:00:00Z',
+          is_trading_day: null,
+        },
+      ],
     },
     universe_contract: {
       symbol_count: 1,
       hard_cap: 1000,
       truncated: false,
       sources: ['watchlist_config'],
+      excluded_non_finite_positions: 0,
+      data_notes: [],
     },
     cost_contract: {
       alert_repository_calls: 1,
@@ -85,6 +120,8 @@ describe('getTodaysFocus', () => {
       recordId: 42,
       latestAction: 'sell',
     });
+    expect(result.packVersion).toBe('todays_focus/2.1');
+    expect(result.temporalPolicy.semantics).toBe('per_market_local_calendar_day');
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(

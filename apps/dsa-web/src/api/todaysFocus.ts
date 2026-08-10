@@ -65,7 +65,7 @@ const todaysFocusItemSchema = z.object({
 }, { message: 'Reason code must match evidence type' });
 
 const todaysFocusResponseSchema = z.object({
-  packVersion: z.literal('todays_focus/2.0'),
+  packVersion: z.literal('todays_focus/2.1'),
   generatedAt: awareDatetime,
   status: z.enum(['ok', 'empty', 'degraded']),
   maxItems: z.number().int().min(0).max(10),
@@ -74,6 +74,7 @@ const todaysFocusResponseSchema = z.object({
   emptyReason: z.enum([
     'source_unavailable',
     'no_fresh_deterministic_signals',
+    'insufficient_finite_data',
   ]).nullable(),
   emptyMessage: z.string().max(240).nullable(),
   sourcesUsed: z.array(z.enum([
@@ -91,14 +92,21 @@ const todaysFocusResponseSchema = z.object({
     'portfolio_position_cache',
   ])).max(4),
   temporalPolicy: z.object({
-    semantics: z.literal('local_calendar_day'),
-    timezone: z.string().min(1).max(64),
-    localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    windowStart: awareDatetime,
+    semantics: z.literal('per_market_local_calendar_day'),
+    crossMarketRule: z.literal('evidence_uses_target_symbol_market_timezone'),
+    fallbackTimezone: z.string().min(1).max(64),
     windowEnd: awareDatetime,
     naiveTimestampPolicy: z.literal('assume_utc'),
     missingTimestampPolicy: z.literal('exclude'),
     nonTradingDayPolicy: z.literal('same_local_day_only'),
+    markets: z.array(z.object({
+      market: z.enum(['cn', 'hk', 'us', 'unknown']),
+      timezone: z.string().min(1).max(64),
+      localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      windowStart: awareDatetime,
+      windowEnd: awareDatetime,
+      isTradingDay: z.boolean().nullable(),
+    }).strict()).min(4).max(8),
   }).strict(),
   universeContract: z.object({
     symbolCount: z.number().int().min(0).max(1000),
@@ -110,6 +118,8 @@ const todaysFocusResponseSchema = z.object({
       'request',
       'watchlist_config',
     ])).max(4),
+    excludedNonFinitePositions: z.number().int().min(0),
+    dataNotes: z.array(z.string().max(160)).max(4),
   }).strict(),
   costContract: z.object({
     alertRepositoryCalls: z.number().int().min(0).max(1),

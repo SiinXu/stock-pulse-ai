@@ -15,7 +15,7 @@ from api.v1.endpoints import todays_focus
 
 def _payload() -> Dict[str, Any]:
     return {
-        "pack_version": "todays_focus/2.0",
+        "pack_version": "todays_focus/2.1",
         "generated_at": "2026-08-09T08:00:00+00:00",
         "status": "ok",
         "max_items": 5,
@@ -44,20 +44,55 @@ def _payload() -> Dict[str, Any]:
         "sources_used": ["alerts"],
         "degraded_sources": [],
         "temporal_policy": {
-            "semantics": "local_calendar_day",
-            "timezone": "Asia/Shanghai",
-            "local_date": "2026-08-09",
-            "window_start": "2026-08-08T16:00:00+00:00",
+            "semantics": "per_market_local_calendar_day",
+            "cross_market_rule": "evidence_uses_target_symbol_market_timezone",
+            "fallback_timezone": "Asia/Shanghai",
             "window_end": "2026-08-09T08:00:00+00:00",
             "naive_timestamp_policy": "assume_utc",
             "missing_timestamp_policy": "exclude",
             "non_trading_day_policy": "same_local_day_only",
+            "markets": [
+                {
+                    "market": "cn",
+                    "timezone": "Asia/Shanghai",
+                    "local_date": "2026-08-09",
+                    "window_start": "2026-08-08T16:00:00+00:00",
+                    "window_end": "2026-08-09T08:00:00+00:00",
+                    "is_trading_day": True,
+                },
+                {
+                    "market": "hk",
+                    "timezone": "Asia/Hong_Kong",
+                    "local_date": "2026-08-09",
+                    "window_start": "2026-08-08T16:00:00+00:00",
+                    "window_end": "2026-08-09T08:00:00+00:00",
+                    "is_trading_day": True,
+                },
+                {
+                    "market": "us",
+                    "timezone": "America/New_York",
+                    "local_date": "2026-08-09",
+                    "window_start": "2026-08-09T04:00:00+00:00",
+                    "window_end": "2026-08-09T08:00:00+00:00",
+                    "is_trading_day": False,
+                },
+                {
+                    "market": "unknown",
+                    "timezone": "Asia/Shanghai",
+                    "local_date": "2026-08-09",
+                    "window_start": "2026-08-08T16:00:00+00:00",
+                    "window_end": "2026-08-09T08:00:00+00:00",
+                    "is_trading_day": None,
+                },
+            ],
         },
         "universe_contract": {
             "symbol_count": 1,
             "hard_cap": 1000,
             "truncated": False,
             "sources": ["watchlist_config"],
+            "excluded_non_finite_positions": 0,
+            "data_notes": [],
         },
         "cost_contract": {
             "alert_repository_calls": 1,
@@ -97,7 +132,10 @@ def test_real_endpoint_returns_typed_evidence_contract(
     payload = response.json()
     assert payload["items"][0]["code"] == "HK00700"
     assert payload["items"][0]["evidence"]["type"] == "alert"
-    assert payload["temporal_policy"]["local_date"] == "2026-08-09"
+    assert payload["temporal_policy"]["semantics"] == "per_market_local_calendar_day"
+    assert {window["market"] for window in payload["temporal_policy"]["markets"]} == {
+        "cn", "hk", "us", "unknown",
+    }
     assert payload["cost_contract"]["read_only"] is True
 
 
@@ -126,3 +164,5 @@ def test_openapi_exposes_discriminator_bounds_and_datetime_contract(
     assert item["properties"]["weight_pct"]["anyOf"][0]["maximum"] == 100
     assert response["properties"]["items"]["maxItems"] == 10
     assert response["properties"]["generated_at"]["format"] == "date-time"
+    temporal = components["TodaysFocusTemporalPolicy"]
+    assert temporal["properties"]["semantics"]["const"] == "per_market_local_calendar_day"

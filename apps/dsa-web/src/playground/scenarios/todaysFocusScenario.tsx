@@ -5,7 +5,7 @@ import type { TodaysFocusResponse } from '../../types/todaysFocus';
 import { usePlaygroundScenario } from '../scenarioContext';
 
 const FIXTURE_TODAYS_FOCUS: TodaysFocusResponse = {
-  packVersion: 'todays_focus/2.0',
+  packVersion: 'todays_focus/2.1',
   generatedAt: '2026-08-09T08:00:00Z',
   status: 'ok',
   maxItems: 5,
@@ -31,20 +31,55 @@ const FIXTURE_TODAYS_FOCUS: TodaysFocusResponse = {
   sourcesUsed: ['alerts'],
   degradedSources: [],
   temporalPolicy: {
-    semantics: 'local_calendar_day',
-    timezone: 'Asia/Shanghai',
-    localDate: '2026-08-09',
-    windowStart: '2026-08-08T16:00:00Z',
+    semantics: 'per_market_local_calendar_day',
+    crossMarketRule: 'evidence_uses_target_symbol_market_timezone',
+    fallbackTimezone: 'Asia/Shanghai',
     windowEnd: '2026-08-09T08:00:00Z',
     naiveTimestampPolicy: 'assume_utc',
     missingTimestampPolicy: 'exclude',
     nonTradingDayPolicy: 'same_local_day_only',
+    markets: [
+      {
+        market: 'cn',
+        timezone: 'Asia/Shanghai',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-08T16:00:00Z',
+        windowEnd: '2026-08-09T08:00:00Z',
+        isTradingDay: true,
+      },
+      {
+        market: 'hk',
+        timezone: 'Asia/Hong_Kong',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-08T16:00:00Z',
+        windowEnd: '2026-08-09T08:00:00Z',
+        isTradingDay: true,
+      },
+      {
+        market: 'us',
+        timezone: 'America/New_York',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-09T04:00:00Z',
+        windowEnd: '2026-08-09T08:00:00Z',
+        isTradingDay: false,
+      },
+      {
+        market: 'unknown',
+        timezone: 'Asia/Shanghai',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-08T16:00:00Z',
+        windowEnd: '2026-08-09T08:00:00Z',
+        isTradingDay: null,
+      },
+    ],
   },
   universeContract: {
     symbolCount: 1,
     hardCap: 1000,
     truncated: false,
     sources: ['watchlist_config'],
+    excludedNonFinitePositions: 0,
+    dataNotes: [],
   },
   costContract: {
     alertRepositoryCalls: 1,
