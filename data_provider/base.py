@@ -1214,6 +1214,23 @@ class DataFetcherManager:
             *optional_fetchers,
         ):
             self._register_builtin_data_provider(fetcher)
+
+        # The provider is default-off and must only be activated by an explicit
+        # boolean value.  Partial config doubles (and older config objects) may
+        # synthesize truthy attributes for unknown fields.
+        if getattr(config, "crypto_provider_enabled", False) is True:
+            from .crypto_coingecko_fetcher import build_crypto_provider_registration
+
+            crypto_registration = build_crypto_provider_registration(config=config)
+            self._builtin_provider_handles.append(
+                self._data_provider_runtime.register_builtin(
+                    registration=crypto_registration,
+                    priority=getattr(config, "crypto_coingecko_priority", 10),
+                    plugin_id=self._BUILTIN_DATA_PROVIDER_PLUGIN_ID,
+                )
+            )
+        else:
+            logger.debug("[data source init] skip CoinGecko because crypto provider is disabled")
         self._sync_registered_data_providers()
 
         # Build the priority summary from the synchronized registry snapshot.
@@ -1403,7 +1420,7 @@ class DataFetcherManager:
         is_jp = (not is_us) and (not is_hk) and _is_jp_market(stock_code)
         is_kr = (not is_us) and (not is_hk) and _is_kr_market(stock_code)
         is_tw = (not is_us) and (not is_hk) and _is_tw_market(stock_code)
-        market = "us" if is_us else "hk" if is_hk else "jp" if is_jp else "kr" if is_kr else "tw" if is_tw else "cn"
+        market = _market_tag(stock_code)
         fetchers = self._filter_daily_fetchers_for_market(fetchers, market)
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
         if not is_us:
@@ -1411,7 +1428,7 @@ class DataFetcherManager:
         total_fetchers = len(fetchers)
 
         if total_fetchers == 0:
-            market_label = "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "台股" if is_tw else "A股"
+            market_label = "加密资产" if market == "crypto" else "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "台股" if is_tw else "A股"
             error_summary = f"{market_label} {stock_code} 获取失败:\n暂无可用数据源"
             logger.error(f"[数据源终止] {stock_code} 获取失败: {error_summary}")
             raise DataFetchError(error_summary, provider_failure_count=0)
@@ -1993,6 +2010,26 @@ class DataFetcherManager:
             logger.debug(f"[实时行情] 功能已禁用，跳过 {stock_code}")
             return None
 
+        if _market_tag(stock_code) == "crypto":
+            for fetcher in self._get_fetchers_for_capability(
+                "realtime_quote", market="crypto"
+            ):
+                if not self._is_fetcher_available(fetcher, capability="realtime_quote"):
+                    continue
+                quote = self._try_fetcher_quote(
+                    stock_code,
+                    fetcher.name,
+                    _selected_fetcher=fetcher,
+                )
+                if quote is not None:
+                    return self._enrich_realtime_quote(
+                        quote,
+                        realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
+                    )
+            if log_final_failure:
+                logger.info("[realtime quote] no crypto provider available for %s", stock_code)
+            return None
+
         # ----------------------------------------------------------
         # U.S. Stocks (Indices + Individual Stocks) / Hong Kong Stocks — Dedicated Dual-Source Routing
         #   Configure Longbridge: Longbridge is preferred, YFinance/AkShare supplement.
@@ -2480,6 +2517,9 @@ class DataFetcherManager:
         """
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
+        if _market_tag(stock_code) == "crypto":
+            logger.debug("[chip distribution] not applicable to crypto asset %s", stock_code)
+            return None
 
         from .realtime_types import get_chip_circuit_breaker
         from src.config import get_config
@@ -3631,6 +3671,11 @@ class DataFetcherManager:
         stock_code = normalize_stock_code(stock_code)
         market = _market_tag(stock_code)
         is_etf = _is_etf_code(stock_code)
+        if market == "crypto":
+            return self._build_market_not_supported(
+                market="crypto",
+                reason="equity fundamentals do not apply to crypto assets",
+            )
         if market in {"us", "hk", "jp", "kr", "tw"}:
             return self._build_offshore_fundamental_context(
                 stock_code,

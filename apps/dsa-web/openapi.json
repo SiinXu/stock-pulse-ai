@@ -9397,6 +9397,28 @@
         "title": "FirstRunReadinessResponse",
         "type": "object"
       },
+      "FxStressShock": {
+        "additionalProperties": false,
+        "properties": {
+          "factor": {
+            "const": "fx",
+            "title": "Factor",
+            "type": "string"
+          },
+          "value_pct": {
+            "maximum": 100.0,
+            "minimum": -100.0,
+            "title": "Value Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "factor",
+          "value_pct"
+        ],
+        "title": "FxStressShock",
+        "type": "object"
+      },
       "GenerationBackendStatus": {
         "description": "Cheap status for one generation backend.\n\n``health_status`` and ``last_error_*`` describe the current status request\nor the explicit smoke-test request only; they are not persisted history.",
         "properties": {
@@ -13363,6 +13385,28 @@
         "title": "MarketReviewRequest",
         "type": "object"
       },
+      "MarketStressShock": {
+        "additionalProperties": false,
+        "properties": {
+          "factor": {
+            "const": "market",
+            "title": "Factor",
+            "type": "string"
+          },
+          "value_pct": {
+            "maximum": 100.0,
+            "minimum": -100.0,
+            "title": "Value Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "factor",
+          "value_pct"
+        ],
+        "title": "MarketStressShock",
+        "type": "object"
+      },
       "ModelBreakdown": {
         "properties": {
           "calls": {
@@ -16017,6 +16061,821 @@
         "title": "PortfolioFxRefreshResponse",
         "type": "object"
       },
+      "PortfolioHealthBand": {
+        "additionalProperties": false,
+        "properties": {
+          "max_exclusive": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Max Exclusive",
+            "type": "number"
+          },
+          "min_inclusive": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Inclusive",
+            "type": "number"
+          },
+          "name": {
+            "enum": [
+              "healthy",
+              "fair",
+              "caution",
+              "poor"
+            ],
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "min_inclusive",
+          "max_exclusive"
+        ],
+        "title": "PortfolioHealthBand",
+        "type": "object"
+      },
+      "PortfolioHealthDataQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "fx_stale": {
+            "default": false,
+            "title": "Fx Stale",
+            "type": "boolean"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "missing_price_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Missing Price Symbols",
+            "type": "array"
+          },
+          "partial_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Partial Reasons",
+            "type": "array"
+          },
+          "risk_metrics_status": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Metrics Status"
+          },
+          "snapshot_data_quality": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Data Quality"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial",
+              "empty",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHealthDataQuality",
+        "type": "object"
+      },
+      "PortfolioHealthDimension": {
+        "additionalProperties": false,
+        "properties": {
+          "formula": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "input": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "maxProperties": 8,
+            "title": "Input",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioHealthDimension",
+        "type": "object"
+      },
+      "PortfolioHealthDimensions": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_ratio": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "diversification": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "pnl": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          },
+          "risk_exposure": {
+            "$ref": "#/components/schemas/PortfolioHealthDimension"
+          }
+        },
+        "required": [
+          "concentration",
+          "risk_exposure",
+          "diversification",
+          "pnl",
+          "cash_ratio"
+        ],
+        "title": "PortfolioHealthDimensions",
+        "type": "object"
+      },
+      "PortfolioHealthEffectiveWeights": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_ratio": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Ratio"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration"
+          },
+          "diversification": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "risk_exposure": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Exposure"
+          }
+        },
+        "title": "PortfolioHealthEffectiveWeights",
+        "type": "object"
+      },
+      "PortfolioHealthInputs": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Pct"
+          },
+          "diversification_score": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "total_cash": {
+            "default": 0.0,
+            "title": "Total Cash",
+            "type": "number"
+          },
+          "total_equity": {
+            "default": 0.0,
+            "title": "Total Equity",
+            "type": "number"
+          },
+          "total_market_value": {
+            "default": 0.0,
+            "title": "Total Market Value",
+            "type": "number"
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Pct"
+          }
+        },
+        "title": "PortfolioHealthInputs",
+        "type": "object"
+      },
+      "PortfolioHealthInsight": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "default": "rule",
+            "enum": [
+              "rule",
+              "rule+llm_polish"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "PortfolioHealthInsight",
+        "type": "object"
+      },
+      "PortfolioHealthProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "calculated_at": {
+            "format": "date-time",
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "config_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "fx_provenance": {
+            "additionalProperties": true,
+            "title": "Fx Provenance",
+            "type": "object"
+          },
+          "price_provenance": {
+            "additionalProperties": true,
+            "title": "Price Provenance",
+            "type": "object"
+          },
+          "risk_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Risk Hash",
+            "type": "string"
+          },
+          "risk_history": {
+            "additionalProperties": true,
+            "title": "Risk History",
+            "type": "object"
+          },
+          "snapshot_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Snapshot Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_hash",
+          "risk_hash",
+          "config_hash",
+          "calculated_at"
+        ],
+        "title": "PortfolioHealthProvenance",
+        "type": "object"
+      },
+      "PortfolioHealthResolvedConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_high_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Cash High Alert Pct",
+            "type": "number"
+          },
+          "cash_low_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Cash Low Alert Pct",
+            "type": "number"
+          },
+          "concentration_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Concentration Alert Pct",
+            "type": "number"
+          },
+          "diversification_alert": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Diversification Alert",
+            "type": "number"
+          },
+          "pnl_loss_alert_pct": {
+            "maximum": 0.0,
+            "minimum": -100.0,
+            "title": "Pnl Loss Alert Pct",
+            "type": "number"
+          },
+          "source": {
+            "const": "shared_config",
+            "title": "Source",
+            "type": "string"
+          },
+          "var_alert_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Var Alert Pct",
+            "type": "number"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/PortfolioHealthWeights"
+          }
+        },
+        "required": [
+          "weights",
+          "concentration_alert_pct",
+          "cash_low_alert_pct",
+          "cash_high_alert_pct",
+          "var_alert_pct",
+          "diversification_alert",
+          "pnl_loss_alert_pct",
+          "source"
+        ],
+        "title": "PortfolioHealthResolvedConfig",
+        "type": "object"
+      },
+      "PortfolioHealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "enum": [
+                  "healthy",
+                  "fair",
+                  "caution",
+                  "poor"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHealthBand"
+            },
+            "maxItems": 4,
+            "title": "Bands",
+            "type": "array"
+          },
+          "comparable": {
+            "title": "Comparable",
+            "type": "boolean"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PortfolioHealthResolvedConfig"
+          },
+          "cost_method": {
+            "enum": [
+              "fifo",
+              "avg"
+            ],
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "coverage_ratio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "currency": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Currency",
+            "type": "string"
+          },
+          "data_quality": {
+            "$ref": "#/components/schemas/PortfolioHealthDataQuality"
+          },
+          "dimensions": {
+            "$ref": "#/components/schemas/PortfolioHealthDimensions"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "effective_weights": {
+            "$ref": "#/components/schemas/PortfolioHealthEffectiveWeights"
+          },
+          "formula_version": {
+            "const": "portfolio_health_v2",
+            "default": "portfolio_health_v2",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/PortfolioHealthInputs"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioHealthInsight"
+            },
+            "maxItems": 64,
+            "title": "Insights",
+            "type": "array"
+          },
+          "llm_can_modify_score": {
+            "const": false,
+            "default": false,
+            "title": "Llm Can Modify Score",
+            "type": "boolean"
+          },
+          "partial_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fixed-denominator diagnostic estimate. Missing dimensions contribute zero; never compare this value with complete daily scores.",
+            "title": "Partial Score"
+          },
+          "persisted": {
+            "default": false,
+            "title": "Persisted",
+            "type": "boolean"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/PortfolioHealthProvenance"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comparable deterministic score; null for incomplete coverage.",
+            "title": "Score"
+          },
+          "score_source": {
+            "const": "rules",
+            "default": "rules",
+            "title": "Score Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial",
+              "empty_portfolio",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unavailable_dimensions": {
+            "items": {
+              "enum": [
+                "concentration",
+                "risk_exposure",
+                "diversification",
+                "pnl",
+                "cash_ratio"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Unavailable Dimensions",
+            "type": "array"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/PortfolioHealthWeights"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "coverage_ratio",
+          "comparable",
+          "disclaimer",
+          "weights",
+          "effective_weights",
+          "dimensions",
+          "data_quality",
+          "inputs",
+          "config",
+          "provenance"
+        ],
+        "title": "PortfolioHealthResponse",
+        "type": "object"
+      },
+      "PortfolioHealthWeights": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_ratio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Cash Ratio",
+            "type": "number"
+          },
+          "concentration": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Concentration",
+            "type": "number"
+          },
+          "diversification": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Diversification",
+            "type": "number"
+          },
+          "pnl": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Pnl",
+            "type": "number"
+          },
+          "risk_exposure": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Risk Exposure",
+            "type": "number"
+          }
+        },
+        "required": [
+          "concentration",
+          "risk_exposure",
+          "diversification",
+          "pnl",
+          "cash_ratio"
+        ],
+        "title": "PortfolioHealthWeights",
+        "type": "object"
+      },
       "PortfolioHistoricalVaRBlock": {
         "properties": {
           "confidence": {
@@ -16860,6 +17719,398 @@
         "title": "PortfolioSnapshotResponse",
         "type": "object"
       },
+      "PortfolioStressTestRequest": {
+        "additionalProperties": false,
+        "description": "Exactly one preset id or custom shock list is required.",
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "betas": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "maxProperties": 256,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Betas"
+          },
+          "cost_method": {
+            "default": "fifo",
+            "enum": [
+              "fifo",
+              "avg"
+            ],
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "custom_shocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "discriminator": {
+                    "mapping": {
+                      "fx": "#/components/schemas/FxStressShock",
+                      "market": "#/components/schemas/MarketStressShock",
+                      "rate": "#/components/schemas/RateStressShock",
+                      "sector": "#/components/schemas/SectorStressShock"
+                    },
+                    "propertyName": "factor"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/MarketStressShock"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SectorStressShock"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FxStressShock"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RateStressShock"
+                    }
+                  ]
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Shocks"
+          },
+          "rate_sensitivity_pct_per_100bp": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 20.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Sensitivity Pct Per 100Bp"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "sector_map": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "maxProperties": 256,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Map"
+          },
+          "target_sector": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Sector"
+          }
+        },
+        "title": "PortfolioStressTestRequest",
+        "type": "object"
+      },
+      "PortfolioStressTestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/StressAssumptions"
+          },
+          "authoritative_portfolio_value": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Authoritative Portfolio Value",
+            "type": "number"
+          },
+          "calculated_at": {
+            "format": "date-time",
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/StressConcentrationBlock"
+          },
+          "cost_method": {
+            "enum": [
+              "fifo",
+              "avg"
+            ],
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Currency",
+            "type": "string"
+          },
+          "excluded_known_market_value": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Excluded Known Market Value",
+            "type": "number"
+          },
+          "excluded_position_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Excluded Position Count",
+            "type": "integer"
+          },
+          "excluded_positions": {
+            "items": {
+              "$ref": "#/components/schemas/StressExcludedPosition"
+            },
+            "maxItems": 512,
+            "title": "Excluded Positions",
+            "type": "array"
+          },
+          "excluded_unknown_value_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Excluded Unknown Value Count",
+            "type": "integer"
+          },
+          "historical_replay_available": {
+            "const": false,
+            "default": false,
+            "title": "Historical Replay Available",
+            "type": "boolean"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "title": "Missing Data",
+            "type": "array"
+          },
+          "portfolio_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Pnl"
+          },
+          "portfolio_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Pnl Pct"
+          },
+          "portfolio_value": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Portfolio Value",
+            "type": "number"
+          },
+          "position_impacts": {
+            "items": {
+              "$ref": "#/components/schemas/StressPositionImpact"
+            },
+            "maxItems": 512,
+            "title": "Position Impacts",
+            "type": "array"
+          },
+          "positions_used": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Positions Used",
+            "type": "integer"
+          },
+          "reconciliation_delta": {
+            "default": 0,
+            "title": "Reconciliation Delta",
+            "type": "number"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/StressScenarioBlock"
+          },
+          "simulation_method": {
+            "const": "deterministic_factor_shock",
+            "title": "Simulation Method",
+            "type": "string"
+          },
+          "snapshot_data_quality": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "partial"
+            ],
+            "title": "Snapshot Data Quality",
+            "type": "string"
+          },
+          "snapshot_fx_stale": {
+            "default": false,
+            "title": "Snapshot Fx Stale",
+            "type": "boolean"
+          },
+          "snapshot_id": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "snapshot_limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "title": "Snapshot Limitations",
+            "type": "array"
+          },
+          "snapshot_version": {
+            "const": "portfolio_snapshot_v1",
+            "title": "Snapshot Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty_portfolio",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "stressed_portfolio_value": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stressed Portfolio Value"
+          },
+          "top_losers": {
+            "items": {
+              "$ref": "#/components/schemas/StressPositionImpact"
+            },
+            "maxItems": 5,
+            "title": "Top Losers",
+            "type": "array"
+          },
+          "top_winners": {
+            "items": {
+              "$ref": "#/components/schemas/StressPositionImpact"
+            },
+            "maxItems": 5,
+            "title": "Top Winners",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "calculated_at",
+          "snapshot_id",
+          "snapshot_version",
+          "cost_method",
+          "currency",
+          "status",
+          "simulation_method",
+          "scenario",
+          "assumptions",
+          "concentration"
+        ],
+        "title": "PortfolioStressTestResponse",
+        "type": "object"
+      },
       "PortfolioTradeCreateRequest": {
         "properties": {
           "account_id": {
@@ -17112,6 +18363,28 @@
           "page_size"
         ],
         "title": "PortfolioTradeListResponse",
+        "type": "object"
+      },
+      "RateStressShock": {
+        "additionalProperties": false,
+        "properties": {
+          "factor": {
+            "const": "rate",
+            "title": "Factor",
+            "type": "string"
+          },
+          "value_bp": {
+            "maximum": 1000.0,
+            "minimum": -1000.0,
+            "title": "Value Bp",
+            "type": "number"
+          }
+        },
+        "required": [
+          "factor",
+          "value_bp"
+        ],
+        "title": "RateStressShock",
         "type": "object"
       },
       "ReasoningTraceAgent": {
@@ -21327,6 +22600,28 @@
         "title": "ScorecardReturnBand",
         "type": "object"
       },
+      "SectorStressShock": {
+        "additionalProperties": false,
+        "properties": {
+          "factor": {
+            "const": "sector",
+            "title": "Factor",
+            "type": "string"
+          },
+          "value_pct": {
+            "maximum": 100.0,
+            "minimum": -100.0,
+            "title": "Value Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "factor",
+          "value_pct"
+        ],
+        "title": "SectorStressShock",
+        "type": "object"
+      },
       "SecurityAuditActor": {
         "additionalProperties": false,
         "description": "Bounded actor identity for the current single-admin execution model.",
@@ -22985,6 +24280,908 @@
           "current_price"
         ],
         "title": "StockQuote",
+        "type": "object"
+      },
+      "StressAssumptions": {
+        "additionalProperties": false,
+        "properties": {
+          "beta_policy": {
+            "maxLength": 120,
+            "title": "Beta Policy",
+            "type": "string"
+          },
+          "cash_excluded": {
+            "const": true,
+            "default": true,
+            "title": "Cash Excluded",
+            "type": "boolean"
+          },
+          "data_source": {
+            "const": "portfolio_read_only_replay",
+            "title": "Data Source",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "portfolio_stress_linear_v2",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "fx_policy": {
+            "maxLength": 200,
+            "title": "Fx Policy",
+            "type": "string"
+          },
+          "historical_replay": {
+            "const": false,
+            "default": false,
+            "title": "Historical Replay",
+            "type": "boolean"
+          },
+          "instantaneous_shock": {
+            "const": true,
+            "default": true,
+            "title": "Instantaneous Shock",
+            "type": "boolean"
+          },
+          "linear_factor_additivity": {
+            "const": true,
+            "default": true,
+            "title": "Linear Factor Additivity",
+            "type": "boolean"
+          },
+          "provider_calls_on_hot_path": {
+            "const": false,
+            "default": false,
+            "title": "Provider Calls On Hot Path",
+            "type": "boolean"
+          },
+          "rate_policy": {
+            "maxLength": 300,
+            "title": "Rate Policy",
+            "type": "string"
+          },
+          "rate_sensitivity_pct_per_100bp": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 20.0,
+            "title": "Rate Sensitivity Pct Per 100Bp",
+            "type": "number"
+          },
+          "reuses_risk_metrics_concentration": {
+            "const": true,
+            "default": true,
+            "title": "Reuses Risk Metrics Concentration",
+            "type": "boolean"
+          },
+          "scenario_category": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Category"
+          },
+          "sector_policy": {
+            "maxLength": 160,
+            "title": "Sector Policy",
+            "type": "string"
+          },
+          "simplified_assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Simplified Assumptions",
+            "type": "array"
+          },
+          "simulation_method": {
+            "const": "deterministic_factor_shock",
+            "title": "Simulation Method",
+            "type": "string"
+          },
+          "weight_basis": {
+            "const": "response_base_market_value",
+            "title": "Weight Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "simulation_method",
+          "formula_version",
+          "weight_basis",
+          "beta_policy",
+          "sector_policy",
+          "fx_policy",
+          "rate_policy",
+          "rate_sensitivity_pct_per_100bp",
+          "data_source"
+        ],
+        "title": "StressAssumptions",
+        "type": "object"
+      },
+      "StressConcentrationBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "diversification_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "position_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Position Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty_portfolio"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/StressWeightRow"
+            },
+            "maxItems": 512,
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StressConcentrationBlock",
+        "type": "object"
+      },
+      "StressExcludedPosition": {
+        "additionalProperties": false,
+        "properties": {
+          "account_base_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Account Base Currency",
+            "type": "string"
+          },
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "instrument_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Instrument Currency",
+            "type": "string"
+          },
+          "known_market_value": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Market Value"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Source"
+          },
+          "reason": {
+            "enum": [
+              "price_unavailable",
+              "non_positive_market_value"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "response_base_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Response Base Currency",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "value_status": {
+            "enum": [
+              "known",
+              "unknown"
+            ],
+            "title": "Value Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "symbol",
+          "instrument_currency",
+          "account_base_currency",
+          "response_base_currency",
+          "reason",
+          "value_status"
+        ],
+        "title": "StressExcludedPosition",
+        "type": "object"
+      },
+      "StressPositionImpact": {
+        "additionalProperties": false,
+        "properties": {
+          "account_base_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Account Base Currency",
+            "type": "string"
+          },
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "beta_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta As Of"
+          },
+          "beta_source": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Source"
+          },
+          "beta_used": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": -5.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta Used"
+          },
+          "classification_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification As Of"
+          },
+          "classification_source": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification Source"
+          },
+          "data_quality": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "partial"
+            ],
+            "title": "Data Quality",
+            "type": "string"
+          },
+          "fx_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx As Of"
+          },
+          "fx_rate_method": {
+            "enum": [
+              "zero",
+              "identity",
+              "direct_rate",
+              "inverse_rate",
+              "fallback_1_to_1"
+            ],
+            "title": "Fx Rate Method",
+            "type": "string"
+          },
+          "fx_rate_source": {
+            "maxLength": 80,
+            "title": "Fx Rate Source",
+            "type": "string"
+          },
+          "fx_rate_to_response_base": {
+            "exclusiveMinimum": 0.0,
+            "title": "Fx Rate To Response Base",
+            "type": "number"
+          },
+          "fx_stale": {
+            "title": "Fx Stale",
+            "type": "boolean"
+          },
+          "instrument_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Instrument Currency",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Limitations",
+            "type": "array"
+          },
+          "market_value": {
+            "minimum": 0.0,
+            "title": "Market Value",
+            "type": "number"
+          },
+          "pnl": {
+            "title": "Pnl",
+            "type": "number"
+          },
+          "position_key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Position Key",
+            "type": "string"
+          },
+          "price_available": {
+            "default": true,
+            "title": "Price Available",
+            "type": "boolean"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "price_provider": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Provider"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Source"
+          },
+          "price_stale": {
+            "default": false,
+            "title": "Price Stale",
+            "type": "boolean"
+          },
+          "response_base_currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Response Base Currency",
+            "type": "string"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "shock_pct": {
+            "minimum": -100.0,
+            "title": "Shock Pct",
+            "type": "number"
+          },
+          "source_market_value": {
+            "minimum": 0.0,
+            "title": "Source Market Value",
+            "type": "number"
+          },
+          "stressed_market_value": {
+            "minimum": 0.0,
+            "title": "Stressed Market Value",
+            "type": "number"
+          },
+          "symbol": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "valuation_fx_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx As Of"
+          },
+          "valuation_fx_rate_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "zero",
+                  "identity",
+                  "direct_rate",
+                  "inverse_rate",
+                  "fallback_1_to_1",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx Rate Method"
+          },
+          "valuation_fx_rate_source": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx Rate Source"
+          },
+          "valuation_fx_rate_to_account_base": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Fx Rate To Account Base"
+          },
+          "valuation_fx_stale": {
+            "default": false,
+            "title": "Valuation Fx Stale",
+            "type": "boolean"
+          },
+          "weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "position_key",
+          "account_id",
+          "symbol",
+          "instrument_currency",
+          "account_base_currency",
+          "response_base_currency",
+          "source_market_value",
+          "market_value",
+          "fx_rate_to_response_base",
+          "fx_rate_source",
+          "fx_rate_method",
+          "fx_stale",
+          "weight_pct",
+          "shock_pct",
+          "pnl",
+          "stressed_market_value"
+        ],
+        "title": "StressPositionImpact",
+        "type": "object"
+      },
+      "StressScenarioBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "availability": {
+            "default": "ready",
+            "enum": [
+              "ready",
+              "requires_parameters"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "category": {
+            "default": "custom",
+            "enum": [
+              "market",
+              "sector",
+              "fx",
+              "rate",
+              "custom"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "requires_target_sector": {
+            "default": false,
+            "title": "Requires Target Sector",
+            "type": "boolean"
+          },
+          "scenario_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Scenario Hash",
+            "type": "string"
+          },
+          "shocks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "fx": "#/components/schemas/FxStressShock",
+                  "market": "#/components/schemas/MarketStressShock",
+                  "rate": "#/components/schemas/RateStressShock",
+                  "sector": "#/components/schemas/SectorStressShock"
+                },
+                "propertyName": "factor"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/MarketStressShock"
+                },
+                {
+                  "$ref": "#/components/schemas/SectorStressShock"
+                },
+                {
+                  "$ref": "#/components/schemas/FxStressShock"
+                },
+                {
+                  "$ref": "#/components/schemas/RateStressShock"
+                }
+              ]
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Shocks",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "built_in",
+              "yaml",
+              "custom_api"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "target_sector": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Sector"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "shocks",
+          "source",
+          "version",
+          "scenario_hash"
+        ],
+        "title": "StressScenarioBlock",
+        "type": "object"
+      },
+      "StressScenarioListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "historical_replay_available": {
+            "const": false,
+            "default": false,
+            "title": "Historical Replay Available",
+            "type": "boolean"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/StressScenarioSummary"
+            },
+            "maxItems": 64,
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "simulation_method": {
+            "const": "deterministic_factor_shock",
+            "default": "deterministic_factor_shock",
+            "title": "Simulation Method",
+            "type": "string"
+          }
+        },
+        "title": "StressScenarioListResponse",
+        "type": "object"
+      },
+      "StressScenarioSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "availability": {
+            "default": "ready",
+            "enum": [
+              "ready",
+              "requires_parameters"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "category": {
+            "default": "custom",
+            "enum": [
+              "market",
+              "sector",
+              "fx",
+              "rate",
+              "custom"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "requires_target_sector": {
+            "default": false,
+            "title": "Requires Target Sector",
+            "type": "boolean"
+          },
+          "scenario_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Scenario Hash",
+            "type": "string"
+          },
+          "shocks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "fx": "#/components/schemas/FxStressShock",
+                  "market": "#/components/schemas/MarketStressShock",
+                  "rate": "#/components/schemas/RateStressShock",
+                  "sector": "#/components/schemas/SectorStressShock"
+                },
+                "propertyName": "factor"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/MarketStressShock"
+                },
+                {
+                  "$ref": "#/components/schemas/SectorStressShock"
+                },
+                {
+                  "$ref": "#/components/schemas/FxStressShock"
+                },
+                {
+                  "$ref": "#/components/schemas/RateStressShock"
+                }
+              ]
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Shocks",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "built_in",
+              "yaml",
+              "custom_api"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "shocks",
+          "source",
+          "version",
+          "scenario_hash"
+        ],
+        "title": "StressScenarioSummary",
+        "type": "object"
+      },
+      "StressWeightRow": {
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "StressWeightRow",
         "type": "object"
       },
       "SystemConfigCategorySchema": {
@@ -37035,6 +39232,238 @@
         ]
       }
     },
+    "/api/v1/portfolio/health": {
+      "get": {
+        "description": "Read-only lookup. This endpoint never replays the portfolio and never writes portfolio caches or health rows. Use POST /health/refresh for explicit computation.",
+        "operationId": "getPortfolioHealth",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "Snapshot date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Snapshot date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No stored daily health snapshot"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health snapshot retrieval failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio health migration required"
+          }
+        },
+        "summary": "Get a stored daily portfolio health snapshot",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/health/refresh": {
+      "post": {
+        "description": "Replays one side-effect-free portfolio snapshot, passes that immutable input to risk metrics, and optionally performs one atomic health upsert. With persist=false the complete operation performs zero writes.",
+        "operationId": "refreshPortfolioHealth",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Persist one atomic daily health upsert",
+            "in": "query",
+            "name": "persist",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Persist one atomic daily health upsert",
+              "title": "Persist",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Health score computation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Inputs or migration unavailable"
+          }
+        },
+        "summary": "Explicitly refresh a daily portfolio health snapshot",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
     "/api/v1/portfolio/imports/csv/brokers": {
       "get": {
         "operationId": "list_csv_brokers_api_v1_portfolio_imports_csv_brokers_get",
@@ -37862,6 +40291,273 @@
           }
         },
         "summary": "Get portfolio snapshot",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/stress-test": {
+      "get": {
+        "description": "Applies a declarative deterministic factor shock to current holdings and returns estimated PnL impact with explicit assumptions. Missing beta defaults to 1.0 with status=partial. Does not call market data providers. Historical replay is not implemented.",
+        "operationId": "getPortfolioStressTest",
+        "parameters": [
+          {
+            "description": "Built-in or YAML scenario id",
+            "in": "query",
+            "name": "scenario_id",
+            "required": true,
+            "schema": {
+              "description": "Built-in or YAML scenario id",
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Scenario Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "description": "Cost method: fifo or avg",
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "description": "Cost method: fifo or avg",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sector presets are POST-only because they also require sector_map",
+            "in": "query",
+            "name": "target_sector",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sector presets are POST-only because they also require sector_map",
+              "title": "Target Sector"
+            }
+          },
+          {
+            "description": "Equity return percent points per +100bp rate move (simplified)",
+            "in": "query",
+            "name": "rate_sensitivity_pct_per_100bp",
+            "required": false,
+            "schema": {
+              "default": 2.0,
+              "description": "Equity return percent points per +100bp rate move (simplified)",
+              "exclusiveMinimum": 0,
+              "maximum": 20,
+              "title": "Rate Sensitivity Pct Per 100Bp",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioStressTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Stress test computation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Scenario catalog unavailable"
+          }
+        },
+        "summary": "Run a built-in portfolio stress scenario",
+        "tags": [
+          "Portfolio"
+        ]
+      },
+      "post": {
+        "description": "Same deterministic engine as GET, with optional custom_shocks, per-symbol betas, and sector_map. Prefer supplying betas/sector_map to avoid unit-beta and unclassified-sector simplifications.",
+        "operationId": "postPortfolioStressTest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioStressTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioStressTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Stress test computation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Scenario catalog unavailable"
+          }
+        },
+        "summary": "Run portfolio stress test with optional custom shocks",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/stress-test/scenarios": {
+      "get": {
+        "description": "Built-in deterministic factor-shock scenarios plus any overrides loaded from PORTFOLIO_STRESS_SCENARIOS_PATH. Historical path replay is not available in this delivery.",
+        "operationId": "listPortfolioStressScenarios",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StressScenarioListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Scenario catalog unavailable"
+          }
+        },
+        "summary": "List portfolio stress scenarios",
         "tags": [
           "Portfolio"
         ]
