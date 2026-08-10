@@ -112,9 +112,7 @@ const ScreeningResultsSectionStory = () => {
       }]}
       expandedCode={empty ? null : '600519'}
       llmDegraded={false}
-      loading={false}
       onExpandedCodeChange={() => undefined}
-      onOpenConfiguration={() => undefined}
     />
   );
 };
@@ -127,6 +125,7 @@ const ScreeningRunStatusCardStory = () => {
       text={text}
       loading={loading}
       isScreeningEnabled
+      statusTitle={loading ? text.running : text.completed}
       candidatesCount={loading ? 0 : 3}
       taskMessage={loading ? text.runningTask : ''}
       taskProgress={loading ? 42 : 100}
@@ -144,6 +143,7 @@ const ScreeningRunStatusCardStory = () => {
         llmCoverage: 0.9,
         dsaEnrichment: { enrichedCount: 3, requestedCount: 3 },
       }}
+      showingLastGood={false}
     />
   );
 };
