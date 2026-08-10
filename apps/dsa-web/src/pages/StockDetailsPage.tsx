@@ -29,6 +29,7 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
+import { DcfSensitivityPanel } from '../components/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -551,6 +552,10 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label="DCF sensitivity" data-testid="stock-details-dcf-section">
+          <DcfSensitivityPanel stockCode={canonicalCode} />
+        </section>
       </div>
     </AppPage>
   );
