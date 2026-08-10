@@ -642,6 +642,7 @@ class DataFetcherManager:
     _ensure_concurrency_guards = None
 
     plugin_registry = None
+    data_provider_runtime = None
     _assign_fetcher_static_order_locked = None
     _provider_priority = None
     _sort_fetchers_locked = None
@@ -4213,6 +4214,7 @@ from .manager_parts import daily_source_health as _daily_source_health_module  #
 
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
     "plugin_registry",
+    "data_provider_runtime",
     "_assign_fetcher_static_order_locked",
     "_provider_priority",
     "_sort_fetchers_locked",
