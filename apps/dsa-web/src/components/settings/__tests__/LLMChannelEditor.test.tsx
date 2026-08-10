@@ -169,6 +169,54 @@ function officialItemsWithoutBaseUrl(providerId: 'gemini' | 'anthropic') {
   ];
 }
 
+
+const { getRuntime, getGenerationBackendStatus } = vi.hoisted(() => ({
+  getRuntime: vi.fn(async (): Promise<unknown> => ({
+    runtime: 'ollama',
+    status: 'running',
+    installedModels: ['qwen2.5'],
+    manualPullSupported: true,
+    localInstallPlatform: null,
+    configuration: {
+      configVersion: '1',
+      registeredModels: ['qwen2.5'],
+      primaryModel: 'qwen2.5',
+      agentModel: '',
+      importedModels: [],
+    },
+  })),
+  getGenerationBackendStatus: vi.fn(async (): Promise<unknown> => ({
+    primaryBackendId: 'litellm',
+    fallbackBackendId: null,
+    primary: {
+      backendId: 'litellm',
+      backendType: 'litellm',
+      providerId: 'litellm',
+      available: true,
+      healthStatus: 'passed',
+      supportsJson: true,
+      supportsStream: true,
+      supportsTools: true,
+      supportsVision: false,
+      isPrimary: true,
+      maxConcurrency: 1,
+      usageAvailable: false,
+    },
+    fallback: null,
+    backends: [],
+  })),
+}));
+
+vi.mock('../localModelTransport', () => ({
+  createLocalModelTransport: () => ({
+    kind: 'web',
+    installAction: 'guide',
+    installPlatform: null,
+    canControlRuntime: false,
+    getRuntime,
+  }),
+}));
+
 const { testLLMChannel, discoverLLMChannelModels } = vi.hoisted(() => ({
   testLLMChannel: vi.fn(),
   discoverLLMChannelModels: vi.fn(),
@@ -178,6 +226,7 @@ vi.mock('../../../api/systemConfig', () => ({
   systemConfigApi: {
     testLLMChannel: (...args: unknown[]) => testLLMChannel(...args),
     discoverLLMChannelModels: (...args: unknown[]) => discoverLLMChannelModels(...args),
+    getGenerationBackendStatus: () => getGenerationBackendStatus(),
   },
 }));
 
@@ -280,6 +329,42 @@ describe('LLMChannelEditor', () => {
   beforeEach(() => {
     testLLMChannel.mockReset();
     discoverLLMChannelModels.mockReset();
+    getRuntime.mockReset();
+    getRuntime.mockResolvedValue({
+      runtime: 'ollama',
+      status: 'running',
+      installedModels: ['qwen2.5'],
+      manualPullSupported: true,
+      localInstallPlatform: null,
+      configuration: {
+        configVersion: '1',
+        registeredModels: ['qwen2.5'],
+        primaryModel: 'qwen2.5',
+        agentModel: '',
+        importedModels: [],
+      },
+    });
+    getGenerationBackendStatus.mockReset();
+    getGenerationBackendStatus.mockResolvedValue({
+      primaryBackendId: 'litellm',
+      fallbackBackendId: null,
+      primary: {
+        backendId: 'litellm',
+        backendType: 'litellm',
+        providerId: 'litellm',
+        available: true,
+        healthStatus: 'passed',
+        supportsJson: true,
+        supportsStream: true,
+        supportsTools: true,
+        supportsVision: false,
+        isPrimary: true,
+        maxConcurrency: 1,
+        usageAvailable: false,
+      },
+      fallback: null,
+      backends: [],
+    });
     localStorage.clear();
   });
 
@@ -2289,4 +2374,107 @@ describe('LLMChannelEditor', () => {
     expect(container.textContent).not.toMatch(/渠道|LLM_|LITELLM_|GENERATION_BACKEND|主后端|备用后端/);
     expect(dialog.textContent).not.toMatch(/JSON|Tools|Stream|运行时能力/);
   });
+
+  it('renders local model runtime and CLI status groups with honest availability', async () => {
+    render(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    );
+
+    expect(await screen.findByTestId('model-sources-hub')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-cloud-group')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-local-group')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-cli-group')).toBeInTheDocument();
+
+    expect(await screen.findByTestId('model-sources-local-availability')).toHaveTextContent('可用');
+    expect(screen.getByTestId('model-sources-local-details')).toHaveTextContent('qwen2.5');
+    expect(screen.getByTestId('model-sources-local-checked-at')).toBeInTheDocument();
+
+    // litellm primary is not a local CLI — show unconfigured, not available
+    expect(await screen.findByTestId('model-sources-cli-availability')).toHaveTextContent('未配置');
+    expect(screen.getByTestId('model-sources-cli-none')).toBeInTheDocument();
+    expect(screen.getByTestId('model-sources-cli-checked-at')).toBeInTheDocument();
+  });
+
+  it('shows local runtime probe failure with reason instead of available', async () => {
+    getRuntime.mockRejectedValueOnce(new Error('ollama unreachable'));
+    render(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    );
+    expect(await screen.findByTestId('model-sources-local-error')).toHaveTextContent('本地模型运行时检测失败');
+    expect(screen.getByTestId('model-sources-local-availability')).toHaveTextContent('检测失败');
+    expect(screen.getByTestId('model-sources-local-error').textContent).toMatch(/ollama unreachable|失败原因/);
+  });
+
+  it('shows local CLI availability when generation backend is a local CLI', async () => {
+    getGenerationBackendStatus.mockImplementationOnce(async () => ({
+      primaryBackendId: 'codex_cli',
+      fallbackBackendId: 'litellm',
+      primary: {
+        backendId: 'codex_cli',
+        backendType: 'local_cli',
+        providerId: 'codex_cli',
+        available: true,
+        healthStatus: 'passed',
+        supportsJson: true,
+        supportsStream: false,
+        supportsTools: false,
+        supportsVision: false,
+        isPrimary: true,
+        maxConcurrency: 1,
+        usageAvailable: false,
+      },
+      fallback: {
+        backendId: 'litellm',
+        backendType: 'litellm',
+        providerId: 'litellm',
+        available: true,
+        healthStatus: 'not_tested',
+        supportsJson: true,
+        supportsStream: true,
+        supportsTools: true,
+        supportsVision: false,
+        isPrimary: false,
+        maxConcurrency: 1,
+        usageAvailable: false,
+      },
+      backends: [],
+    }));
+    render(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    );
+    expect(await screen.findByTestId('model-sources-cli-availability')).toHaveTextContent('可用');
+    expect(screen.getByTestId('model-sources-cli-details')).toHaveTextContent('codex_cli');
+    expect(screen.getByTestId('model-sources-cli-details')).toHaveTextContent('litellm');
+  });
+
+  it('shows local CLI failure reason when the probe reports unavailable', async () => {
+    getGenerationBackendStatus.mockImplementationOnce(async () => ({
+      primaryBackendId: 'claude_code',
+      fallbackBackendId: null,
+      primary: {
+        backendId: 'claude_code',
+        backendType: 'local_cli',
+        providerId: 'claude_code',
+        available: false,
+        healthStatus: 'failed',
+        supportsJson: false,
+        supportsStream: false,
+        supportsTools: false,
+        supportsVision: false,
+        isPrimary: true,
+        maxConcurrency: 1,
+        usageAvailable: false,
+        lastErrorCode: 'cli_not_found',
+        lastErrorMessage: 'binary missing',
+      },
+      fallback: null,
+      backends: [],
+    }));
+    render(
+      <LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />,
+    );
+    expect(await screen.findByTestId('model-sources-cli-availability')).toHaveTextContent('不可用');
+    expect(screen.getByTestId('model-sources-cli-details').textContent).toMatch(/cli_not_found|binary missing/);
+  });
+
 });
