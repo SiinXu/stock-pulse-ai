@@ -1,6 +1,7 @@
 """Dataclass model for the public :mod:`src.config` facade."""
 
 import logging
+import os
 from dataclasses import dataclass, field
 from types import FunctionType
 from typing import Any, Dict, List, Optional, Tuple
@@ -474,6 +475,11 @@ class Config:
 
     def __post_init__(self) -> None:
         _log = logging.getLogger(__name__)
+        # Market-data local-only intent must fail closed during application
+        # configuration load, before any manager can enter a provider path.
+        from data_provider.daily_cache import parse_market_data_fetch_mode
+
+        parse_market_data_fetch_mode(os.getenv("PROVIDER_MARKET_DATA_MODE"))
         if self.agent_arch not in self._VALID_AGENT_ARCH:
             _log.warning(
                 "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",

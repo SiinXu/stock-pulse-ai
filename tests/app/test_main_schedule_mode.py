@@ -446,7 +446,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
                 "resolved_schedule_time": "18:00",
             },
         )
-        run_full_analysis.assert_called_once_with(config, args, None)
+        run_full_analysis.assert_called_once_with(
+            config, args, None, raise_errors=True
+        )
         warning_log.assert_any_call(
             "Scheduled mode received --stocks; scheduled runs ignore the startup snapshot "
             "and reload the latest STOCK_LIST before each run"
@@ -500,7 +502,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
             scheduled_call,
             {"schedule_time": "18:00", "resolved_schedule_time": "09:30"},
         )
-        run_full_analysis.assert_called_once_with(runtime_config, args, None)
+        run_full_analysis.assert_called_once_with(
+            runtime_config, args, None, raise_errors=True
+        )
 
     def test_schedule_mode_registers_event_monitor_background_task(self) -> None:
         args = self._make_args(schedule=True)
@@ -741,7 +745,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         start_bots.assert_not_called()
-        run_full_analysis.assert_called_once_with(config, args, None)
+        run_full_analysis.assert_called_once_with(
+            config, args, None, raise_errors=True
+        )
         self.assertEqual(scheduled_call["schedule_time"], "18:00")
         self.assertEqual(scheduled_call["run_immediately"], True)
         self.assertEqual(len(scheduled_call["background_tasks"]), 1)
