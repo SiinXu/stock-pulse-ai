@@ -137,6 +137,16 @@ dev = [
     "uv==0.11.31",
 ]
 
+# Optional report PDF export (mirrors requirements-report-export.txt).
+# Prefer: python -m pip install --build-constraint build-constraints.txt -r requirements-report-export.txt
+# Exact optional versions keep PDF/font parsing behavior reproducible without
+# adding either package to the default install.
+report-export = [
+    "fpdf2==2.8.3",
+    "fonttools==4.63.0",
+    "markdown-it-py==4.2.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/SiinXu/stock-pulse-ai"
 Repository = "https://github.com/SiinXu/stock-pulse-ai"

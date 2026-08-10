@@ -21,7 +21,9 @@ from src.config import Config
 from src.migrations import cli as migration_cli
 from src.migrations.engine import read_only_migration_connection
 from src.migrations.registry import (
+    ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
     APPROVAL_GATE_SCHEMA_MIGRATION,
+    CHAT_TURN_IDENTITY_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
     INTELLIGENCE_ITEM_SCOPE_MIGRATION,
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
@@ -36,6 +38,7 @@ from src.migrations.registry import (
     BACKTEST_RESOLUTION_NOTES_MIGRATION,
     TASK_QUEUE_INFLIGHT_MIGRATION,
     TARGET_VERSION,
+    WATCHLIST_GROUPS_SCHEMA_MIGRATION,
     get_migrations,
 )
 from src.migrations.runner import verify
@@ -205,6 +208,9 @@ def test_pending_cli_subprocess_is_read_only(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
         TASK_QUEUE_INFLIGHT_MIGRATION.id,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION.id,
+        CHAT_TURN_IDENTITY_MIGRATION.id,
+        ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -274,6 +280,9 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         SKILL_OPINION_OUTCOME_SCHEMA_MIGRATION.id,
         BACKTEST_RESOLUTION_NOTES_MIGRATION.id,
         TASK_QUEUE_INFLIGHT_MIGRATION.id,
+        WATCHLIST_GROUPS_SCHEMA_MIGRATION.id,
+        CHAT_TURN_IDENTITY_MIGRATION.id,
+        ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}

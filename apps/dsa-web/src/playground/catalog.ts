@@ -127,6 +127,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('dashboard', 'home-onboarding-section', 'HomeOnboardingSection', 'components/onboarding/HomeOnboardingSection.tsx', ['default', 'empty']),
   entry('dashboard', 'onboarding-today-plan-card', 'OnboardingTodayPlanCard', 'components/onboarding/OnboardingTodayPlanCard.tsx', ['default']),
   entry('dashboard', 'agent-onboarding-wizard', 'AgentOnboardingWizard', 'components/onboarding/AgentOnboardingWizard.tsx', ['interactive']),
+  entry('dashboard', 'zero-config-first-run-panel', 'ZeroConfigFirstRunPanel', 'components/onboarding/ZeroConfigFirstRunPanel.tsx', ['default', 'empty']),
 
   entry('alerts', 'alert-rule-form', 'AlertRuleForm', 'components/alerts/AlertRuleForm.tsx', ['interactive', 'states']),
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
@@ -193,6 +194,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('runFlow', 'run-flow-summary-bar', 'RunFlowSummaryBar', 'components/run-flow/RunFlowSummaryBar.tsx'),
 
   entry('settings', 'ai-overview-matrix', 'AiOverviewMatrix', 'components/settings/AiOverviewMatrix.tsx', ['default', 'states']),
+  entry('settings', 'agent-behavior-panel', 'AgentBehaviorPanel', 'components/settings/AgentBehaviorPanel.tsx', ['interactive', 'states', 'empty', 'error']),
   entry('settings', 'auth-settings-card', 'AuthSettingsCard', 'components/settings/AuthSettingsCard.tsx', ['interactive', 'error']),
   entry('settings', 'change-password-card', 'ChangePasswordCard', 'components/settings/ChangePasswordCard.tsx', ['interactive', 'error']),
   entry('settings', 'data-providers-panel', 'DataProvidersPanel', 'components/settings/DataProvidersPanel.tsx', ['interactive', 'empty']),
@@ -229,6 +231,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
 
+  entry('stockSearch', 'kline-chart', 'KlineChart', 'components/charts/KlineChart.tsx', ['default', 'empty', 'states']),
+  entry('stockSearch', 'risk-heatmap', 'RiskHeatmap', 'components/charts/RiskHeatmap.tsx', ['default', 'empty']),
+
   entry('stockSearch', 'mini-sparkline', 'MiniSparkline', 'components/screening/MiniSparkline.tsx'),
   entry('stockSearch', 'screen-alert-message', 'ScreenAlertMessage', 'components/screening/ScreenAlertMessage.tsx'),
   entry('stockSearch', 'screening-configuration-modal', 'ScreeningConfigurationModal', 'components/screening/ScreeningConfigurationModal.tsx', ['interactive']),
@@ -242,6 +247,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),
   entry('tasks', 'task-panel', 'TaskPanel', 'components/tasks/TaskPanel.tsx', ['default', 'loading', 'states']),
   entry('watchlist', 'home-stock-workspace', 'HomeStockWorkspace', 'components/watchlist/HomeStockWorkspace.tsx', ['interactive', 'loading', 'empty', 'error']),
+  entry('watchlist', 'watchlist-score-column', 'WatchlistScoreColumn', 'components/watchlist/WatchlistScoreColumn.tsx', ['default', 'interactive', 'empty']),
+  entry('watchlist', 'home-watchlist-groups-section', 'HomeWatchlistGroupsSection', 'components/watchlist/HomeWatchlistGroupsSection.tsx', ['default', 'loading', 'error']),
+  entry('watchlist', 'watchlist-groups-panel', 'WatchlistGroupsPanel', 'components/watchlist/WatchlistGroupsPanel.tsx', ['interactive', 'empty', 'error']),
 ];
 
 export const PLAYGROUND_ENTRY_BY_ID = new Map(PLAYGROUND_CATALOG.map((item) => [item.id, item]));
