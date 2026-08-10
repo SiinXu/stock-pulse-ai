@@ -4556,6 +4556,36 @@
         "title": "BacktestRunResponse",
         "type": "object"
       },
+      "BalancePoint": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "number"
+          },
+          "gain": {
+            "title": "Gain",
+            "type": "number"
+          },
+          "period": {
+            "minimum": 0.0,
+            "title": "Period",
+            "type": "integer"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          }
+        },
+        "required": [
+          "period",
+          "balance",
+          "total_contributed",
+          "gain"
+        ],
+        "title": "BalancePoint",
+        "type": "object"
+      },
       "BatchDuplicateTaskItem": {
         "description": "批量异步任务中的重复提交项。",
         "example": {
@@ -4965,6 +4995,148 @@
           "session_id"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "CompoundGrowthRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "default": 0.0,
+            "description": "End-of-period contribution; negative values are withdrawals",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "CompoundGrowthRequest",
+        "type": "object"
+      },
+      "CompoundGrowthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "final_value": {
+            "title": "Final Value",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/BalancePoint"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "series_returned_points": {
+            "maximum": 241.0,
+            "minimum": 2.0,
+            "title": "Series Returned Points",
+            "type": "integer"
+          },
+          "series_sampled": {
+            "title": "Series Sampled",
+            "type": "boolean"
+          },
+          "series_stride": {
+            "minimum": 1.0,
+            "title": "Series Stride",
+            "type": "integer"
+          },
+          "series_total_points": {
+            "minimum": 2.0,
+            "title": "Series Total Points",
+            "type": "integer"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_contributed": {
+            "title": "Total Contributed",
+            "type": "number"
+          },
+          "total_gain": {
+            "title": "Total Gain",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "principal",
+          "annual_rate",
+          "years",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "final_value",
+          "total_contributed",
+          "total_gain",
+          "series_total_points",
+          "series_returned_points",
+          "series_sampled",
+          "series_stride",
+          "series"
+        ],
+        "title": "CompoundGrowthResponse",
         "type": "object"
       },
       "ConfigComponentDiff": {
@@ -20805,6 +20977,504 @@
         "title": "SystemConfigValidationErrorResponse",
         "type": "object"
       },
+      "TargetContributionAlreadyMetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "principal_growth_meets_target",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "already_met",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code",
+          "contribution_per_period"
+        ],
+        "title": "TargetContributionAlreadyMetResponse",
+        "type": "object"
+      },
+      "TargetContributionOkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "contribution_required",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code",
+          "contribution_per_period"
+        ],
+        "title": "TargetContributionOkResponse",
+        "type": "object"
+      },
+      "TargetContributionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years"
+        ],
+        "title": "TargetContributionRequest",
+        "type": "object"
+      },
+      "TargetContributionUnreachableResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "null"
+          },
+          "contribution_rounding": {
+            "const": "ceiling",
+            "title": "Contribution Rounding",
+            "type": "string"
+          },
+          "currency_precision_digits": {
+            "const": 2,
+            "title": "Currency Precision Digits",
+            "type": "integer"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "target_unreachable",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unreachable",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "years",
+          "periods_per_year",
+          "period_count",
+          "period_rate",
+          "currency_precision_digits",
+          "contribution_rounding",
+          "status",
+          "reason_code"
+        ],
+        "title": "TargetContributionUnreachableResponse",
+        "type": "object"
+      },
+      "TargetDurationAlreadyMetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "const": 0,
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "principal_already_meets_target",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "already_met",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "maximum": 0.0,
+            "minimum": 0.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code",
+          "period_count",
+          "years"
+        ],
+        "title": "TargetDurationAlreadyMetResponse",
+        "type": "object"
+      },
+      "TargetDurationOkResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "minimum": 1.0,
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "const": "duration_solved",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Years",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code",
+          "period_count",
+          "years"
+        ],
+        "title": "TargetDurationOkResponse",
+        "type": "object"
+      },
+      "TargetDurationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "description": "End-of-period contribution; negative values are withdrawals",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "default": 12,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Principal",
+            "type": "number"
+          },
+          "target": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period"
+        ],
+        "title": "TargetDurationRequest",
+        "type": "object"
+      },
+      "TargetDurationUnreachableResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "annual_rate": {
+            "title": "Annual Rate",
+            "type": "number"
+          },
+          "contribution_per_period": {
+            "title": "Contribution Per Period",
+            "type": "number"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "null"
+          },
+          "period_rate": {
+            "title": "Period Rate",
+            "type": "number"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "number"
+          },
+          "reason_code": {
+            "enum": [
+              "non_positive_trajectory",
+              "max_years_exceeded",
+              "target_unreachable"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "unreachable",
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "null"
+          }
+        },
+        "required": [
+          "target",
+          "principal",
+          "annual_rate",
+          "contribution_per_period",
+          "periods_per_year",
+          "period_rate",
+          "status",
+          "reason_code"
+        ],
+        "title": "TargetDurationUnreachableResponse",
+        "type": "object"
+      },
       "TaskAccepted": {
         "description": "异步任务接受响应",
         "example": {
@@ -26770,6 +27440,230 @@
         "summary": "触发回测",
         "tags": [
           "Backtest"
+        ]
+      }
+    },
+    "/api/v1/calculators/compound-growth": {
+      "post": {
+        "description": "Deterministic compound-growth projection with optional end-of-period contributions. Pure arithmetic; never calls market data providers.",
+        "operationId": "postCompoundGrowth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompoundGrowthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompoundGrowthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Compound growth calculator",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-contribution": {
+      "post": {
+        "description": "Solves the end-of-period contribution needed to reach a target amount within a fixed horizon. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetContribution",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetContributionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "already_met": "#/components/schemas/TargetContributionAlreadyMetResponse",
+                      "ok": "#/components/schemas/TargetContributionOkResponse",
+                      "unreachable": "#/components/schemas/TargetContributionUnreachableResponse"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TargetContributionOkResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetContributionAlreadyMetResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetContributionUnreachableResponse"
+                    }
+                  ],
+                  "title": "Response Posttargetcontribution"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve contribution required to reach a target",
+        "tags": [
+          "Calculators"
+        ]
+      }
+    },
+    "/api/v1/calculators/target-duration": {
+      "post": {
+        "description": "Solves how many periods are needed to reach a target given principal, rate, and contribution. Unreachable scenarios return status=unreachable instead of Infinity.",
+        "operationId": "postTargetDuration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetDurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "already_met": "#/components/schemas/TargetDurationAlreadyMetResponse",
+                      "ok": "#/components/schemas/TargetDurationOkResponse",
+                      "unreachable": "#/components/schemas/TargetDurationUnreachableResponse"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TargetDurationOkResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetDurationAlreadyMetResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TargetDurationUnreachableResponse"
+                    }
+                  ],
+                  "title": "Response Posttargetduration"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid calculator inputs"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Calculator computation failed"
+          }
+        },
+        "summary": "Solve periods required to reach a target",
+        "tags": [
+          "Calculators"
         ]
       }
     },
