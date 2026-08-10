@@ -34,6 +34,39 @@ from tests.agent_runtime_replay import observe_case  # noqa: E402
 from src.services.agent_trajectory_eval_service import (  # noqa: E402
     evaluate_agent_trajectory,
 )
+from src.services.agent_eval_service import (  # noqa: E402
+    AgentEvalService,
+    load_eval_cases,
+)
+
+
+def run_output_quality_comparison(
+    candidate_cases: Optional[Sequence[Mapping[str, Any]]] = None,
+    *,
+    baseline_agent_version: str = "frozen-agent-baseline",
+    candidate_agent_version: str = "frozen-agent-candidate",
+    baseline_config_version: str = "frozen-config-baseline",
+    candidate_config_version: str = "frozen-config-candidate",
+) -> Dict[str, Any]:
+    """Run output-quality candidate-vs-baseline evaluation in the owned runner."""
+    baseline_cases = load_eval_cases()
+    candidates = list(candidate_cases) if candidate_cases is not None else baseline_cases
+    service = AgentEvalService()
+    baseline = service.evaluate_suite(baseline_cases)
+    candidate = service.evaluate_suite(candidates)
+    comparison = service.compare_reports(
+        baseline,
+        candidate,
+        baseline_agent_version=baseline_agent_version,
+        candidate_agent_version=candidate_agent_version,
+        baseline_config_version=baseline_config_version,
+        candidate_config_version=candidate_config_version,
+    )
+    return {
+        "baseline": baseline.to_dict(),
+        "candidate": candidate.to_dict(),
+        "comparison": comparison,
+    }
 
 
 def run_scenario(scenario: Mapping[str, Any]) -> Dict[str, Any]:
@@ -82,6 +115,12 @@ def run_scenario(scenario: Mapping[str, Any]) -> Dict[str, Any]:
 
 def run_benchmark(
     scenario_ids: Optional[Sequence[str]] = None,
+    *,
+    output_quality_candidate_root: Optional[Path] = None,
+    baseline_agent_version: str = "frozen-agent-baseline",
+    candidate_agent_version: str = "frozen-agent-candidate",
+    baseline_config_version: str = "frozen-config-baseline",
+    candidate_config_version: str = "frozen-config-candidate",
 ) -> Dict[str, Any]:
     """Run all (or selected) scenarios and return a stable JSON-serializable report."""
     selected = set(scenario_ids) if scenario_ids else None
@@ -100,6 +139,18 @@ def run_benchmark(
     report["scenario_details"] = sorted(
         scenario_scores,
         key=lambda item: str(item.get("scenario_id") or ""),
+    )
+    candidate_cases = (
+        load_eval_cases(output_quality_candidate_root)
+        if output_quality_candidate_root is not None
+        else None
+    )
+    report["output_quality_evaluation"] = run_output_quality_comparison(
+        candidate_cases,
+        baseline_agent_version=baseline_agent_version,
+        candidate_agent_version=candidate_agent_version,
+        baseline_config_version=baseline_config_version,
+        candidate_config_version=candidate_config_version,
     )
     return report
 

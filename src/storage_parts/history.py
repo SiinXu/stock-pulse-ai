@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 from sqlalchemy import and_, delete, desc, func, or_, select
@@ -257,6 +257,7 @@ class _HistoryMethods:
         self,
         code: Optional[Union[str, List[str]]] = None,
         report_type: Optional[str] = None,
+        excluded_report_types: Optional[Sequence[str]] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         offset: int = 0,
@@ -290,6 +291,21 @@ class _HistoryMethods:
                     conditions.append(AnalysisHistory.code == code)
             if report_type:
                 conditions.append(AnalysisHistory.report_type == report_type)
+            if excluded_report_types:
+                excluded = sorted(
+                    {
+                        str(value).strip()
+                        for value in excluded_report_types
+                        if str(value).strip()
+                    }
+                )
+                if excluded:
+                    conditions.append(
+                        or_(
+                            AnalysisHistory.report_type.is_(None),
+                            AnalysisHistory.report_type.notin_(excluded),
+                        )
+                    )
             if start_date:
                 # created_at >= start_date 00:00:00
                 conditions.append(AnalysisHistory.created_at >= datetime.combine(start_date, datetime.min.time()))
@@ -308,7 +324,7 @@ class _HistoryMethods:
             data_query = (
                 select(AnalysisHistory)
                 .where(where_clause)
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
                 .offset(offset)
                 .limit(limit)
             )

@@ -75,6 +75,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--output-quality-candidate-root",
+        type=Path,
+        default=None,
+        help="Optional candidate fixture root with an exact versioned manifest.",
+    )
+    parser.add_argument(
+        "--candidate-agent-version",
+        default="frozen-agent-candidate",
+        help="Non-secret candidate agent version recorded in comparison provenance.",
+    )
+    parser.add_argument(
+        "--candidate-config-version",
+        default="frozen-config-candidate",
+        help="Non-secret candidate configuration version recorded in comparison provenance.",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Print only the aggregate score line to stdout.",
@@ -90,7 +106,12 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
 
-    report = run_benchmark(scenario_ids=args.scenarios)
+    report = run_benchmark(
+        scenario_ids=args.scenarios,
+        output_quality_candidate_root=args.output_quality_candidate_root,
+        candidate_agent_version=args.candidate_agent_version,
+        candidate_config_version=args.candidate_config_version,
+    )
     outputs = build_full_outputs(report, with_baseline=not args.write_baseline)
     score_view = outputs["score_view"]
     comparison = outputs["comparison"]
@@ -132,6 +153,15 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    output_comparison = (
+        (report.get("output_quality_evaluation") or {}).get("comparison") or {}
+    )
+    if args.strict_baseline and output_comparison.get("regressed"):
+        print(
+            "[agent-eval-benchmark] FAIL: output-quality regression vs frozen baseline",
+            file=sys.stderr,
+        )
+        return 2
 
     print("[agent-eval-benchmark] OK", file=sys.stderr)
     return 0

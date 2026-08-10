@@ -300,11 +300,16 @@ class _StockAnalysisStageMixin:
             # Step 3: Trend Analysis (Based on Trading Philosophy) – Execute before the Agent branch, shared by two paths
             trend_result: Optional[TrendAnalysisResult] = None
             try:
+                from src.utils.indicator_periods import periods_from_config
                 from src.services.history_loader import get_frozen_target_date
                 _mkt = get_market_for_stock(normalize_stock_code(code))
                 frozen = get_frozen_target_date()
                 end_date = frozen if frozen else get_market_now(_mkt).date()
-                start_date = end_date - timedelta(days=89)  # ~60 trading days for MA60
+                # Lookback scales with configured indicator periods (defaults ≈ MA60/MACD).
+                # stock_daily_window_resolver is for backtest eval windows only and is unchanged.
+                indicator_periods = periods_from_config(self.config)
+                lookback_calendar_days = indicator_periods.required_history_calendar_days()
+                start_date = end_date - timedelta(days=lookback_calendar_days)
                 historical_bars = self.db.get_data_range(code, start_date, end_date)
                 if historical_bars:
                     df = pd.DataFrame([bar.to_dict() for bar in historical_bars])
