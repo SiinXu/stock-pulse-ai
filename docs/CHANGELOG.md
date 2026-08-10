@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).
+- [Added] Optional history report export API with lossless Markdown and bounded PDF conversion using typed capabilities, validated full-glyph fonts, wrapped/page-aware tables, safe Unicode downloads, and reproducible optional fpdf2 dependencies (Refs #163; docx/xlsx/Web remaining).
 - [Changed] Make the Risk Manager the mandatory final-action authority on every Agent exit with pass/downgrade/reject profiles, deterministic portfolio exposure/volatility/historical-loss thresholds, fail-closed errors, structured persistence, localized report/notification evidence, and audited one-shot approval bypasses (#120).
 - [Added] Unified financial data validation for provider OHLCV/realtime candidates, PE/PB, and selected technical indicators with typed diagnostics/evidence, warn-only defaults, and scoped strict fallback policy (#185).
 - [Tests] Lock the Settings Help overlay fixture keys across every supported UI language so stale-source inventory drift cannot silently break fixture mounting again.
