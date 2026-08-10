@@ -9346,6 +9346,107 @@
         "title": "HistoryListResponse",
         "type": "object"
       },
+      "HistorySearchItem": {
+        "description": "Low-sensitive report projection returned by command-palette search.",
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Report creation timestamp",
+            "title": "Created At"
+          },
+          "id": {
+            "description": "Analysis history record primary key",
+            "title": "Id",
+            "type": "integer"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persisted report type",
+            "title": "Report Type"
+          },
+          "stock_code": {
+            "description": "Persisted stock code",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persisted stock name",
+            "title": "Stock Name"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Truncated conclusion excerpt",
+            "title": "Summary"
+          }
+        },
+        "required": [
+          "id",
+          "stock_code"
+        ],
+        "title": "HistorySearchItem",
+        "type": "object"
+      },
+      "HistorySearchResponse": {
+        "description": "Bounded full-text search results for analysis history summaries.",
+        "properties": {
+          "items": {
+            "description": "Ranked matching history summaries",
+            "items": {
+              "$ref": "#/components/schemas/HistorySearchItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "description": "Maximum returned result count",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "description": "Normalized literal search query",
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "limit"
+        ],
+        "title": "HistorySearchResponse",
+        "type": "object"
+      },
       "ImportSystemConfigRequest": {
         "description": "Import request payload for raw `.env` backups.",
         "properties": {
@@ -30090,6 +30191,77 @@
           }
         },
         "summary": "按股票代码删除历史分析记录",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/search": {
+      "get": {
+        "description": "Search stock code, stock name, report type, trend, summary, advice, and creation timestamp through a maintained full-text index. Raw reports, context snapshots, news content, and configuration values are not indexed.",
+        "operationId": "search_history_api_v1_history_search_get",
+        "parameters": [
+          {
+            "description": "Literal search query",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Literal search query",
+              "maxLength": 100,
+              "minLength": 3,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum returned result count",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "Maximum returned result count",
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorySearchResponse"
+                }
+              }
+            },
+            "description": "Bounded history search results"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Search analysis history summaries",
         "tags": [
           "History"
         ]
