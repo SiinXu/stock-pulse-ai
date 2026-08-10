@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 from src.agent.planning.config import (
     MAX_PROMPT_PROJECTION_CHARS,
     PLAN_PROPOSAL_CLOSE_MARKER,
+    PLAN_PROPOSAL_MARKER_RE,
     PLAN_PROPOSAL_NOTICE,
     PLAN_PROPOSAL_OPEN_MARKER,
 )
@@ -22,9 +23,14 @@ def format_plan_for_prompt(plan: AgentPlan) -> str:
 
     ``validate_plan_payload`` already rejects oversized and marker-forging plans,
     so the checks below are defense in depth for hand-built ``AgentPlan`` values
-    and must stay in sync with the same ``config`` limit authority.
+    and must stay in sync with the same ``config`` limit and marker authority.
     """
     proposal = plan.to_canonical_json()
+    # Scan the payload with the same whitespace-tolerant matcher validation uses.
+    # Counting the exact markers alone let a spaced variant such as
+    # ``[ / non_authoritative_plan_proposal ]`` render straight into the block.
+    if PLAN_PROPOSAL_MARKER_RE.search(proposal):
+        raise ValueError("plan payload must not contain a plan-proposal boundary marker")
     rendered = (
         f"{PLAN_PROPOSAL_OPEN_MARKER}\n"
         f"{PLAN_PROPOSAL_NOTICE}\n"

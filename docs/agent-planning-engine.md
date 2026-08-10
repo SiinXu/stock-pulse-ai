@@ -25,7 +25,10 @@
 - **重试证据保持真实。** `replan_attempts` 在所有退出路径（含成功路径）上都记录真实发生的重试次数。当 `llm` 尝试失败、重试降级为 `template` 时，`requested_strategy` 仍为 `llm` 而 `strategy` 变为 `template`，使已计费 token 与记录的 model 可被正确归属。只有在确实允许并用尽重试预算时才报告 `max_replans_exceeded`，否则原因为 `planning_failed`。
 - 规范化提案通过 SHA-256 `plan_id` 标识。
 - prompt projection 标为 `NON_AUTHORITATIVE_PLAN_PROPOSAL`；生成字段只是 advisory data，不能添加工具、权限或指令，也不能覆盖原始 user/system 请求。
-- **模型文本无法伪造 advisory 边界。** 生成的 goal 与 success criteria 若包含任意拼写形式的边界标记（大小写不敏感、容忍空格）会被拒绝，因此提案无法提前关闭 advisory 区块、让后续文本被当作权威指令。其余字符都位于 JSON 字符串内，引号、反斜杠与控制字符均被转义。`format_plan_for_prompt` 另外断言每个标记恰好出现一次。
+- **单一投影字符串契约，覆盖所有被投影字段。** `src/agent/planning/types.py` 中的 `unprojectable_reason` 是唯一权威，统一约束 plan goal、每个 step goal、每个 success criteria、每个 expected tool 名称，以及它们所来源的 available-tool 名称。字符串在以下任一情况下被拒绝：(a) 含有任意拼写形式的边界标记；(b) 含有未配对的 surrogate 码点。该匹配器在 `config.py` 中由渲染器实际输出的标记推导得到，因此不会与其漂移。
+- **模型文本无法伪造 advisory 边界。** 由于上述规则同时覆盖工具名与散文字段，提案无法提前关闭 advisory 区块、让后续文本被当作权威指令——精确的 `[/NON_AUTHORITATIVE_PLAN_PROPOSAL]` 与容忍空格的变体（如 `[ / non_authoritative_plan_proposal ]`）都会被拒绝。其余字符都位于 JSON 字符串内，引号、反斜杠与控制字符均被转义。`format_plan_for_prompt` 复用同一匹配器并断言每个标记恰好出现一次，作为手工构造 `AgentPlan` 时的纵深防御。
+- **planner 可控文本不会抛出编码错误。** `plan_id` 对 UTF-8 字节做哈希，因此单个 surrogate（可经 `json.loads` 以 `"\ud800"` 形式存活）原本会让 `plan_id`、`to_metadata()` 与 `prepare_run_with_planning` 抛出 `UnicodeEncodeError`，而不是给出降级结果。校验会以稳定原因拒绝这类字符串；engine 另在入口拦截不可编码的 task（`invalid_task`）以及不可编码或含标记的工具 registry（`invalid_tools`），因此公开封装始终降级并原样返回调用方输入。`to_canonical_json` 会把残余 surrogate 转义为 `\uXXXX`，使手工构造的计划也能得到 `plan_id`，同时保持可读的非 ASCII 文本不变——因此所有已接受计划的 id 均不变。
+- adapter 上报的 metadata 标识符被限制为 `[A-Za-z0-9._:/-]{1,128}`，否则归约为 `unknown`。该规则同时覆盖 `planning_model` 与 `exception_type`。
 
 ## 显式示例
 

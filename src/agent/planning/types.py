@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -16,19 +15,55 @@ from src.agent.planning.config import (
     MAX_PLAN_STEPS,
     MAX_PROMPT_PROJECTION_CHARS,
     MAX_TOOL_NAME_CHARS,
+    PLAN_PROPOSAL_MARKER_RE,
     PROJECTION_ENVELOPE_CHARS,
+    SURROGATE_CODE_POINT_RE,
 )
 
 PLAN_SCHEMA_VERSION = "agent-plan-v1"
 
-# Any spelling of the projection delimiter, so generated text cannot close the
-# advisory boundary early and have the remainder read as authoritative input.
-_PROPOSAL_MARKER_RE = re.compile(r"\[\s*/?\s*NON_AUTHORITATIVE_PLAN_PROPOSAL\s*\]", re.IGNORECASE)
+
+def unprojectable_reason(text: str) -> Optional[str]:
+    """The single projected-string contract, as a stable value-free reason or ``None``.
+
+    Every string that reaches the canonical JSON — the plan goal, each step goal,
+    each success criterion, each expected tool name, and the available tool names
+    those are drawn from — must satisfy both halves:
+
+    1. it must not forge the advisory boundary in any whitespace-tolerant spelling;
+    2. it must be UTF-8 encodable, so ``plan_id`` / ``to_metadata`` /
+       ``format_plan_for_prompt`` cannot raise on an accepted plan.
+
+    Returned as a reason rather than an exception so the engine can fence its
+    inputs into a stable degraded outcome without catching its own validator.
+    """
+    if PLAN_PROPOSAL_MARKER_RE.search(text):
+        return "must not contain a plan-proposal boundary marker"
+    if SURROGATE_CODE_POINT_RE.search(text):
+        return "must not contain unpaired surrogate code points"
+    return None
 
 
-def _reject_marker_forgery(label: str, text: str) -> None:
-    if _PROPOSAL_MARKER_RE.search(text):
-        raise ValueError(f"{label} must not contain a plan-proposal boundary marker")
+def reject_unprojectable_text(label: str, text: str) -> None:
+    """Raise the stable ``unprojectable_reason`` for ``text``, if any.
+
+    Raises:
+        ValueError: labelled with the field, never echoing the offending value.
+    """
+    reason = unprojectable_reason(text)
+    if reason is not None:
+        raise ValueError(f"{label} {reason}")
+
+
+def _escape_surrogates(text: str) -> str:
+    """Render surrogate code points as JSON escapes so canonical text always encodes.
+
+    ``validate_plan_payload`` already rejects them, so this is a no-op for every
+    accepted plan and ``plan_id`` provenance is unchanged. It exists so a
+    hand-built ``AgentPlan`` degrades to a stable id instead of raising
+    ``UnicodeEncodeError`` out of ``plan_id`` or ``to_metadata``.
+    """
+    return SURROGATE_CODE_POINT_RE.sub(lambda match: f"\\u{ord(match.group()):04x}", text)
 
 
 @dataclass(frozen=True)
@@ -71,9 +106,13 @@ class AgentPlan:
         return len(self.steps)
 
     def to_canonical_json(self) -> str:
-        """Canonical JSON text used for both ``plan_id`` and prompt projection."""
-        return json.dumps(
-            self.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False
+        """Canonical JSON text used for both ``plan_id`` and prompt projection.
+
+        The one safe encoding contract for this module: readable non-ASCII text is
+        preserved, and the result is always UTF-8 encodable.
+        """
+        return _escape_surrogates(
+            json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)
         )
 
     @property
@@ -147,8 +186,10 @@ def validate_plan_payload(
 
     ``max_steps`` is a caller cap that may only tighten the absolute
     ``config.MAX_PLAN_STEPS`` authority; it can never raise it. Acceptance
-    guarantees the plan is projectable by ``format_plan_for_prompt`` and that no
-    generated text can forge the projection boundary marker.
+    guarantees the plan is projectable by ``format_plan_for_prompt``: it fits the
+    projection budget, and every projected string satisfies
+    ``reject_unprojectable_text`` — including the tool names, which earlier bounded
+    only length and membership.
 
     Raises:
         ValueError: if the payload is not a well-formed plan within limits.
@@ -170,7 +211,7 @@ def validate_plan_payload(
     goal = goal_raw.strip()
     if len(goal) > MAX_GOAL_CHARS:
         raise ValueError("plan goal exceeds length limit")
-    _reject_marker_forgery("plan goal", goal)
+    reject_unprojectable_text("plan goal", goal)
 
     raw_steps = payload.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
@@ -179,13 +220,16 @@ def validate_plan_payload(
     if len(raw_steps) > max_steps:
         raise ValueError(f"plan step count {len(raw_steps)} exceeds max_steps={max_steps}")
 
-    if any(
-        not isinstance(name, str)
-        or not name.strip()
-        or len(name.strip()) > MAX_TOOL_NAME_CHARS
-        for name in available_tools
-    ):
-        raise ValueError("available tool names must be bounded non-empty strings")
+    for name in available_tools:
+        if (
+            not isinstance(name, str)
+            or not name.strip()
+            or len(name.strip()) > MAX_TOOL_NAME_CHARS
+        ):
+            raise ValueError("available tool names must be bounded non-empty strings")
+        # Tool names are projected verbatim inside the advisory block, so they are
+        # governed by exactly the same contract as the generated prose fields.
+        reject_unprojectable_text("available tool name", name.strip())
     available = {name.strip() for name in available_tools}
     if len(available) != len(available_tools):
         raise ValueError("available tool names must be unique")
@@ -205,8 +249,8 @@ def validate_plan_payload(
         success = success_raw.strip()
         if len(step_goal) > MAX_GOAL_CHARS or len(success) > MAX_CRITERIA_CHARS:
             raise ValueError(f"plan step {index} text exceeds length limit")
-        _reject_marker_forgery(f"plan step {index} goal", step_goal)
-        _reject_marker_forgery(f"plan step {index} success_criteria", success)
+        reject_unprojectable_text(f"plan step {index} goal", step_goal)
+        reject_unprojectable_text(f"plan step {index} success_criteria", success)
 
         tools_raw = raw.get("expected_tools")
         if not isinstance(tools_raw, list):
@@ -216,6 +260,7 @@ def validate_plan_payload(
             if not isinstance(tool, str) or not tool.strip():
                 raise ValueError(f"plan step {index} has invalid expected tool")
             name = tool.strip()
+            reject_unprojectable_text(f"plan step {index} expected tool", name)
             if len(name) > MAX_TOOL_NAME_CHARS or name not in available:
                 raise ValueError(f"plan step {index} requests unavailable tool {name!r}")
             if name in tools:

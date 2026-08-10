@@ -27,10 +27,16 @@ from src.agent.planning.config import (
     MAX_PLANNER_RESPONSE_CHARS,
     MAX_TASK_CHARS,
     MAX_TOOL_NAME_CHARS,
+    SURROGATE_CODE_POINT_RE,
     PlanningSettings,
 )
 from src.agent.planning.format import inject_plan_into_context, inject_plan_into_task
-from src.agent.planning.types import AgentPlan, PlanningOutcome, validate_plan_payload
+from src.agent.planning.types import (
+    AgentPlan,
+    PlanningOutcome,
+    unprojectable_reason,
+    validate_plan_payload,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -102,7 +108,18 @@ class PlanningEngine:
                 requested_strategy=settings.strategy,
                 fallback_reason="cancelled",
             )
-        if not isinstance(task, str) or not task.strip() or len(task) > MAX_TASK_CHARS:
+        # The task is the caller's own authoritative text and is projected outside
+        # the advisory block, so it is not marker-checked here; the template
+        # strategy derives the plan goal from it and the validator rejects a
+        # marker there. It must still be UTF-8 encodable, otherwise the derived
+        # goal, the planner transport payload, and the returned task would all
+        # carry an unencodable code point.
+        if (
+            not isinstance(task, str)
+            or not task.strip()
+            or len(task) > MAX_TASK_CHARS
+            or SURROGATE_CODE_POINT_RE.search(task)
+        ):
             return PlanningOutcome(
                 enabled=True,
                 applied=False,
@@ -127,16 +144,7 @@ class PlanningEngine:
                 requested_strategy=settings.strategy,
                 fallback_reason="invalid_context", error_code="invalid_context",
             )
-        if (
-            isinstance(available_tools, (str, bytes))
-            or len(available_tools) > MAX_AVAILABLE_TOOLS
-            or any(
-            not isinstance(name, str)
-            or not name.strip()
-            or len(name.strip()) > MAX_TOOL_NAME_CHARS
-            for name in available_tools
-            )
-        ):
+        if not _tools_are_projectable(available_tools):
             return PlanningOutcome(
                 enabled=True, applied=False, strategy=settings.strategy,
                 requested_strategy=settings.strategy,
@@ -255,7 +263,7 @@ class PlanningEngine:
                 )
             except Exception as exc:  # broad-exception: fallback_recorded - degrade to direct path
                 last_error_code = _planning_error_code(exc)
-                last_exception_type = type(exc).__name__
+                last_exception_type = _safe_identifier(type(exc).__name__)
                 log_safe_exception(
                     logger,
                     "Agent planning attempt failed",
@@ -409,7 +417,7 @@ class PlanningEngine:
                 tokens = 0
         tokens = max(0, min(tokens, 1_000_000))
 
-        model = _safe_model_name(getattr(response, "model", ""))
+        model = _safe_identifier(getattr(response, "model", ""))
         provider = str(getattr(response, "provider", "") or "")
         return content, tokens, model, provider
 
@@ -451,6 +459,24 @@ def prepare_run_with_planning(
     return new_task, new_context, meta
 
 
+def _tools_are_projectable(available_tools: Sequence[str]) -> bool:
+    """Fence the caller-supplied tool set at the engine entry.
+
+    Tool names reach both the planner prompt and the projected plan, so they carry
+    the same contract as generated prose. Rejecting here turns a marker-bearing or
+    unencodable registry into a stable ``invalid_tools`` degradation instead of an
+    exception raised out of ``format_plan_for_prompt``.
+    """
+    if isinstance(available_tools, (str, bytes)) or len(available_tools) > MAX_AVAILABLE_TOOLS:
+        return False
+    for name in available_tools:
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > MAX_TOOL_NAME_CHARS:
+            return False
+        if unprojectable_reason(name.strip()) is not None:
+            return False
+    return True
+
+
 def _parse_json_object(raw: str) -> Dict[str, Any]:
     text = (raw or "").strip()
     if not text:
@@ -488,7 +514,13 @@ def _planning_error_code(exc: Exception) -> str:
     return "planner_failed"
 
 
-def _safe_model_name(value: Any) -> str:
+def _safe_identifier(value: Any) -> str:
+    """Bound any adapter-controlled identifier reported through ``to_metadata``.
+
+    Covers both the provider model name and the exception class name: either can
+    be an arbitrary string from a caller-supplied adapter, and metadata must stay
+    a bounded, encodable, value-free record.
+    """
     text = str(value or "")
     if re.fullmatch(r"[A-Za-z0-9._:/-]{1,128}", text):
         return text
