@@ -1,85 +1,73 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Activity, Bell, BellRing, TriangleAlert } from 'lucide-react';
+import { Activity, Bell, BellRing, FlaskConical, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications';
 import { formatUiText } from '../../i18n/uiText';
+import { NOTIFICATION_CENTER_TEXT } from '../../locales/notificationCenter';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
-import {
-  APP_ROUTE_PATHS,
-  SIGNAL_CENTER_TAB_VALUES,
-  buildSignalCenterHref,
-} from '../../routing/routes';
-import type { AlertTriggerItem } from '../../types/alerts';
-import type { DecisionSignalItem } from '../../types/decisionSignals';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
+import type { NotificationInboxItem } from '../../types/notificationInbox';
 import { cn } from '../../utils/cn';
-import { buildDeepLink } from '../../utils/deepLink';
 import { formatUiDateTime } from '../../utils/uiLocale';
 import { IconButton } from '../common/IconButton';
 import { Popover } from '../common/Popover';
 
-const MAX_VISIBLE_ITEMS_PER_GROUP = 5;
+const MAX_VISIBLE_ITEMS = 10;
 
-function NotificationTimestamp({ value }: { value?: string | null }) {
+function NotificationTimestamp({ value }: { value: string }) {
   const { language } = useUiLanguage();
-  if (!value) return null;
   return (
     <time className="shrink-0 text-xs text-muted-text" dateTime={value}>
-      {formatUiDateTime(value, language, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      {formatUiDateTime(value, language, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}
     </time>
   );
 }
 
-function SignalRow({ item, close }: { item: DecisionSignalItem; close: () => void }) {
-  const title = item.stockName?.trim() || item.stockCode;
-  const detail = item.presentation?.label || item.actionLabel || item.action;
+function NotificationKindIcon({ kind }: { kind: NotificationInboxItem['kind'] }) {
+  const props = { className: 'size-3.5', 'aria-hidden': true } as const;
+  if (kind === 'alert_triggered') return <TriangleAlert {...props} />;
+  if (kind === 'decision_signal') return <Activity {...props} />;
+  if (kind === 'analysis_complete') return <FlaskConical {...props} />;
+  return <Bell {...props} />;
+}
+
+function NotificationRow({ item, close }: { item: NotificationInboxItem; close: () => void }) {
+  const { language } = useUiLanguage();
+  const text = NOTIFICATION_CENTER_TEXT[language];
+  const title = formatUiText(text[item.titleKey], item.titleParams);
   return (
     <Link
-      to={buildDeepLink({
-        page: 'decision-signals',
-        stockCode: item.stockCode,
-        signalId: item.id,
-      })}
+      to={item.href}
       onClick={close}
-      className="flex min-h-14 items-start gap-3 px-4 py-2.5 transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+      className={cn(
+        'flex min-h-14 items-start gap-3 px-4 py-2.5 transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25',
+        !item.isRead && 'bg-primary/5',
+      )}
     >
-      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-        <Activity className="size-3.5" aria-hidden="true" />
+      <span
+        className={cn(
+          'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md',
+          item.severity === 'error' && 'bg-danger/10 text-danger',
+          item.severity === 'warning' && 'bg-warning/10 text-warning',
+          item.severity === 'info' && 'bg-primary/10 text-primary',
+        )}
+      >
+        <NotificationKindIcon kind={item.kind} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline justify-between gap-2">
           <span className="truncate text-sm font-medium text-foreground">{title}</span>
           <NotificationTimestamp value={item.createdAt} />
         </span>
-        <span className="mt-0.5 block truncate text-xs text-secondary-text">{detail}</span>
-      </span>
-    </Link>
-  );
-}
-
-function AlertRow({ item, close }: { item: AlertTriggerItem; close: () => void }) {
-  return (
-    <Link
-      to={buildSignalCenterHref({
-        tab: SIGNAL_CENTER_TAB_VALUES.history,
-        triggerId: item.id,
-      })}
-      onClick={close}
-      className="flex min-h-14 items-start gap-3 px-4 py-2.5 transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
-    >
-      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning">
-        <TriangleAlert className="size-3.5" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-baseline justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{item.target}</span>
-          <NotificationTimestamp value={item.triggeredAt} />
-        </span>
-        <span className="mt-0.5 block truncate text-xs text-secondary-text">
-          {item.reason?.trim() || item.status}
-        </span>
+        <span className="mt-0.5 block truncate text-xs text-secondary-text">{item.summary}</span>
       </span>
     </Link>
   );
@@ -100,7 +88,7 @@ export function NotificationBell({
   const markedForCurrentOpenRef = useRef(false);
   const notifications = useUnreadNotifications();
   const { isLoading, markAllSeen } = notifications;
-  const hasItems = notifications.signalItems.length > 0 || notifications.alertItems.length > 0;
+  const hasItems = notifications.items.length > 0;
   const triggerLabel = notifications.unreadCount > 0
     ? formatUiText(text.bellLabelWithUnread, { count: notifications.unreadCount })
     : text.bellLabel;
@@ -112,18 +100,14 @@ export function NotificationBell({
     }
     if (!isLoading && !markedForCurrentOpenRef.current) {
       markedForCurrentOpenRef.current = true;
-      markAllSeen();
+      void markAllSeen().catch(() => undefined);
     }
   }, [isLoading, markAllSeen, open]);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-  };
 
   return (
     <Popover
       open={open}
-      onOpenChange={handleOpenChange}
+      onOpenChange={setOpen}
       placement={placement}
       align="end"
       contentRole="dialog"
@@ -163,7 +147,7 @@ export function NotificationBell({
             {notifications.hasPartialError ? (
               <div
                 className="flex items-center justify-between gap-3 border-b border-warning/35 bg-warning/10 px-4 py-2"
-                role="alert"
+                role="status"
               >
                 <p className="text-xs text-secondary-text">{text.partialUnavailable}</p>
                 <button
@@ -193,42 +177,11 @@ export function NotificationBell({
             ) : !hasItems ? (
               <p className="px-4 py-8 text-center text-sm text-secondary-text">{t('common.noData')}</p>
             ) : (
-              <>
-                {notifications.signalItems.length > 0 ? (
-                  <section aria-labelledby="notification-signals-heading">
-                    <h3
-                      id="notification-signals-heading"
-                      className="border-b border-border bg-base px-4 py-1.5 text-xs font-medium text-secondary-text"
-                    >
-                      {text.signalsGroup}
-                    </h3>
-                    <div className="divide-y divide-border">
-                      {notifications.signalItems.slice(0, MAX_VISIBLE_ITEMS_PER_GROUP).map((item) => (
-                        <SignalRow key={item.id} item={item} close={close} />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {notifications.alertItems.length > 0 ? (
-                  <section aria-labelledby="notification-alerts-heading">
-                    <h3
-                      id="notification-alerts-heading"
-                      className={cn(
-                        'border-b border-border bg-base px-4 py-1.5 text-xs font-medium text-secondary-text',
-                        notifications.signalItems.length > 0 && 'border-t',
-                      )}
-                    >
-                      {text.alertsGroup}
-                    </h3>
-                    <div className="divide-y divide-border">
-                      {notifications.alertItems.slice(0, MAX_VISIBLE_ITEMS_PER_GROUP).map((item) => (
-                        <AlertRow key={item.id} item={item} close={close} />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-              </>
+              <div className="divide-y divide-border">
+                {notifications.items.slice(0, MAX_VISIBLE_ITEMS).map((item) => (
+                  <NotificationRow key={item.id} item={item} close={close} />
+                ))}
+              </div>
             )}
           </div>
 

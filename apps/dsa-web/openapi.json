@@ -13713,7 +13713,8 @@
             "type": "string"
           },
           "id": {
-            "description": "Stable item key kind:source_id",
+            "description": "Versioned stable occurrence key",
+            "maxLength": 128,
             "title": "Id",
             "type": "string"
           },
@@ -13755,15 +13756,28 @@
             "title": "Summary",
             "type": "string"
           },
-          "title": {
-            "title": "Title",
+          "title_key": {
+            "enum": [
+              "analysisCompleteTitle",
+              "alertTriggeredTitle",
+              "scheduledTaskResultTitle",
+              "decisionSignalTitle"
+            ],
+            "title": "Title Key",
             "type": "string"
+          },
+          "title_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Title Params",
+            "type": "object"
           }
         },
         "required": [
           "id",
           "kind",
-          "title",
+          "title_key",
           "summary",
           "created_at",
           "href",
@@ -13776,6 +13790,23 @@
         "additionalProperties": false,
         "description": "GET /notification-inbox/items response body.",
         "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/NotificationInboxItem"
@@ -13787,6 +13818,18 @@
             "minimum": 1.0,
             "title": "Max Items",
             "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           },
           "page": {
             "minimum": 1.0,
@@ -13803,6 +13846,13 @@
             "minimum": 1.0,
             "title": "Retention Days",
             "type": "integer"
+          },
+          "source_statuses": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationInboxSourceStatus"
+            },
+            "title": "Source Statuses",
+            "type": "array"
           },
           "total": {
             "minimum": 0.0,
@@ -13874,8 +13924,10 @@
         "description": "POST /notification-inbox/items/mark-read request body.",
         "properties": {
           "item_ids": {
-            "description": "Composite inbox item ids (kind:source_id)",
+            "description": "Versioned stable inbox occurrence ids",
             "items": {
+              "maxLength": 128,
+              "minLength": 1,
               "type": "string"
             },
             "maxItems": 100,
@@ -13912,6 +13964,50 @@
         "title": "NotificationInboxMarkReadResponse",
         "type": "object"
       },
+      "NotificationInboxSourceStatus": {
+        "additionalProperties": false,
+        "description": "Availability and bounded provenance for one selected inbox source.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "item_count": {
+            "minimum": 0.0,
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "analysis",
+              "alerts",
+              "scheduled_tasks",
+              "decision_signals"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "available",
+          "item_count"
+        ],
+        "title": "NotificationInboxSourceStatus",
+        "type": "object"
+      },
       "NotificationInboxUnreadCountResponse": {
         "additionalProperties": false,
         "description": "GET /notification-inbox/unread-count response body.",
@@ -13925,6 +14021,13 @@
             "minimum": 1.0,
             "title": "Retention Days",
             "type": "integer"
+          },
+          "source_statuses": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationInboxSourceStatus"
+            },
+            "title": "Source Statuses",
+            "type": "array"
           },
           "unread_total": {
             "minimum": 0.0,
@@ -38101,6 +38204,24 @@
           },
           {
             "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
             "name": "kind",
             "required": false,
             "schema": {
@@ -38168,6 +38289,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "summary": "List in-app notification inbox items",
@@ -38236,6 +38367,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "summary": "Mark the current notification inbox window as read",
@@ -38297,6 +38438,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "summary": "Mark specific notification inbox items as read",
@@ -38368,6 +38519,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "summary": "Get unread notification inbox count",

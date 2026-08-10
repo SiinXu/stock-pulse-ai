@@ -9150,7 +9150,7 @@ export interface components {
             href: string;
             /**
              * Id
-             * @description Stable item key kind:source_id
+             * @description Versioned stable occurrence key
              */
             id: string;
             /**
@@ -9177,24 +9177,42 @@ export interface components {
             source_id: string;
             /** Summary */
             summary: string;
-            /** Title */
-            title: string;
+            /**
+             * Title Key
+             * @enum {string}
+             */
+            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle";
+            /** Title Params */
+            title_params?: {
+                [key: string]: string;
+            };
         };
         /**
          * NotificationInboxListResponse
          * @description GET /notification-inbox/items response body.
          */
         NotificationInboxListResponse: {
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
             /** Items */
             items: components["schemas"]["NotificationInboxItem"][];
             /** Max Items */
             max_items: number;
+            /** Next Cursor */
+            next_cursor?: string | null;
             /** Page */
             page: number;
             /** Page Size */
             page_size: number;
             /** Retention Days */
             retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
             /** Total */
             total: number;
             /** Unread Total */
@@ -9228,7 +9246,7 @@ export interface components {
         NotificationInboxMarkReadRequest: {
             /**
              * Item Ids
-             * @description Composite inbox item ids (kind:source_id)
+             * @description Versioned stable inbox occurrence ids
              */
             item_ids: string[];
         };
@@ -9243,6 +9261,23 @@ export interface components {
             unread_total: number;
         };
         /**
+         * NotificationInboxSourceStatus
+         * @description Availability and bounded provenance for one selected inbox source.
+         */
+        NotificationInboxSourceStatus: {
+            /** Available */
+            available: boolean;
+            /** Error Code */
+            error_code?: string | null;
+            /** Item Count */
+            item_count: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals";
+        };
+        /**
          * NotificationInboxUnreadCountResponse
          * @description GET /notification-inbox/unread-count response body.
          */
@@ -9251,6 +9286,8 @@ export interface components {
             max_items: number;
             /** Retention Days */
             retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
             /** Unread Total */
             unread_total: number;
         };
@@ -20977,6 +21014,7 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                cursor?: string | null;
                 kind?: string | null;
                 unread_only?: boolean;
             };
@@ -21015,6 +21053,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -21073,6 +21120,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post: {
@@ -21124,6 +21180,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     get_inbox_unread_count_api_v1_notification_inbox_unread_count_get: {
@@ -21166,6 +21231,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,241 +1,140 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { notificationInboxApi } from '../../api/notificationInbox';
+import type {
+  NotificationInboxItem,
+  NotificationInboxPage,
+  NotificationInboxUnreadCount,
+} from '../../types/notificationInbox';
 import { useUnreadNotifications } from '../useUnreadNotifications';
-import { decisionSignalsApi } from '../../api/decisionSignals';
-import { alertsApi } from '../../api/alerts';
-import type { DecisionSignalListResponse } from '../../types/decisionSignals';
-import type { AlertTriggerListResponse } from '../../types/alerts';
 
-vi.mock('../../api/decisionSignals', () => ({
-  decisionSignalsApi: { list: vi.fn() },
-}));
-vi.mock('../../api/alerts', () => ({
-  alertsApi: { listTriggers: vi.fn() },
+vi.mock('../../api/notificationInbox', () => ({
+  notificationInboxApi: {
+    list: vi.fn(),
+    unreadCount: vi.fn(),
+    markAllRead: vi.fn(),
+  },
 }));
 
-const listMock = vi.mocked(decisionSignalsApi.list);
-const triggersMock = vi.mocked(alertsApi.listTriggers);
+const listMock = vi.mocked(notificationInboxApi.list);
+const countMock = vi.mocked(notificationInboxApi.unreadCount);
+const markAllMock = vi.mocked(notificationInboxApi.markAllRead);
 
-function signalResponse(createdAts: string[]): DecisionSignalListResponse {
+const ITEM: NotificationInboxItem = {
+  id: 'v1:analysis_complete:1:1786320000000000',
+  kind: 'analysis_complete',
+  titleKey: 'analysisCompleteTitle',
+  titleParams: { label: 'AAPL' },
+  summary: 'Hold',
+  severity: 'info',
+  createdAt: '2026-08-10T00:00:00Z',
+  isRead: false,
+  href: '/research/analysis?segment=history&recordId=1',
+  sourceId: '1',
+};
+
+function page(overrides: Partial<NotificationInboxPage> = {}): NotificationInboxPage {
   return {
-    items: createdAts.map((createdAt, index) => ({
-      id: index + 1,
-      stockCode: '600519',
-      action: 'buy',
-      status: 'active',
-      createdAt,
-    })) as DecisionSignalListResponse['items'],
-    total: createdAts.length,
+    items: [ITEM],
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
+    total: 1,
+    unreadTotal: 1,
+    hasMore: false,
+    sourceStatuses: [
+      { source: 'analysis', available: true, itemCount: 1 },
+      { source: 'alerts', available: true, itemCount: 0 },
+      { source: 'scheduled_tasks', available: true, itemCount: 0 },
+      { source: 'decision_signals', available: true, itemCount: 0 },
+    ],
+    retentionDays: 90,
+    maxItems: 500,
+    ...overrides,
   };
 }
 
-function triggerResponse(triggeredAts: string[]): AlertTriggerListResponse {
+function count(overrides: Partial<NotificationInboxUnreadCount> = {}): NotificationInboxUnreadCount {
   return {
-    items: triggeredAts.map((triggeredAt, index) => ({
-      id: index + 1,
-      ruleId: 1,
-      target: '600519',
-      status: 'sent',
-      triggeredAt,
-    })),
-    total: triggeredAts.length,
-    page: 1,
-    pageSize: 20,
+    unreadTotal: 1,
+    sourceStatuses: page().sourceStatuses,
+    retentionDays: 90,
+    maxItems: 500,
+    ...overrides,
   };
 }
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve;
-  });
-  return { promise, resolve };
-}
-
-const OLD = '2026-07-20T00:00:00Z';
-const NEW_A = '2026-07-23T10:00:00Z';
-const NEW_B = '2026-07-23T11:00:00Z';
 
 describe('useUnreadNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-22T00:00:00Z'));
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
+    listMock.mockResolvedValue(page());
+    countMock.mockResolvedValue(count());
+    markAllMock.mockResolvedValue({ markedCount: 1, unreadTotal: 0 });
   });
 
-  it('uses the legacy shared boundary when per-channel boundaries are absent', async () => {
-    // lastSeen is 2026-07-21; OLD (07-20) is read, NEW_A/NEW_B (07-23) are unread.
-    window.localStorage.setItem(
-      'stockpulse.notifications.lastSeenAt',
-      String(Date.parse('2026-07-21T00:00:00Z')),
-    );
-    listMock.mockResolvedValue(signalResponse([OLD, NEW_A]));
-    triggersMock.mockResolvedValue(triggerResponse([NEW_B]));
-
+  it('uses the inbox list and unread-count endpoints as one server authority', async () => {
     const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.unreadSignalCount).toBe(1);
-    expect(result.current.unreadAlertCount).toBe(1);
-    expect(result.current.unreadCount).toBe(2);
-    expect(result.current.signalItems).toHaveLength(2);
+
+    expect(listMock).toHaveBeenCalledWith({ pageSize: 10 });
+    expect(countMock).toHaveBeenCalledWith();
+    expect(result.current.items).toEqual([ITEM]);
+    expect(result.current.unreadCount).toBe(1);
+    expect(window.localStorage.length).toBe(0);
   });
 
-  it('zeroes the unread count after markAllSeen', async () => {
-    listMock.mockResolvedValue(signalResponse([NEW_A]));
-    triggersMock.mockResolvedValue(triggerResponse([NEW_B]));
-
+  it('marks the same server-side occurrences read when the Bell opens', async () => {
     const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-    await waitFor(() => expect(result.current.unreadCount).toBe(2));
+    await waitFor(() => expect(result.current.unreadCount).toBe(1));
 
-    // The server timestamps are ahead of the client clock; opening the Bell
-    // must still mark every currently loaded item as seen.
-    act(() => result.current.markAllSeen());
+    await act(async () => result.current.markAllSeen());
 
+    expect(markAllMock).toHaveBeenCalledWith();
     expect(result.current.unreadCount).toBe(0);
-    expect(window.localStorage.getItem('stockpulse.notifications.signalsLastSeenAt')).toBe(
-      String(Date.parse(NEW_A)),
-    );
-    expect(window.localStorage.getItem('stockpulse.notifications.alertsLastSeenAt')).toBe(
-      String(Date.parse(NEW_B)),
-    );
+    expect(result.current.items[0]?.isRead).toBe(true);
   });
 
-  it('fails soft: a rejected signals channel still counts alert triggers', async () => {
-    listMock.mockRejectedValue(new Error('signals down'));
-    triggersMock.mockResolvedValue(triggerResponse([NEW_A]));
+  it('keeps the count available when the preview list fails', async () => {
+    listMock.mockRejectedValue(new Error('list down'));
 
     const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.signalItems).toEqual([]);
-    expect(result.current.alertItems).toHaveLength(1);
-    expect(result.current.unreadAlertCount).toBe(1);
-    expect(result.current.signalsFailed).toBe(true);
-    expect(result.current.alertsFailed).toBe(false);
+
+    expect(result.current.unreadCount).toBe(1);
+    expect(result.current.listFailed).toBe(true);
+    expect(result.current.countFailed).toBe(false);
     expect(result.current.hasPartialError).toBe(true);
     expect(result.current.hasError).toBe(false);
   });
 
-  it('keeps recovered signal items unread after the Bell opens during a signal failure', async () => {
-    const legacyBoundary = Date.parse('2026-07-21T00:00:00Z');
-    window.localStorage.setItem(
-      'stockpulse.notifications.lastSeenAt',
-      String(legacyBoundary),
-    );
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-07-24T00:00:00Z'));
-    listMock
-      .mockRejectedValueOnce(new Error('signals down'))
-      .mockResolvedValueOnce(signalResponse([NEW_A]));
-    triggersMock.mockResolvedValue(triggerResponse([OLD]));
+  it('surfaces bounded source degradation returned by the inbox API', async () => {
+    const degraded = page({
+      sourceStatuses: [
+        { source: 'analysis', available: true, itemCount: 1 },
+        { source: 'alerts', available: false, itemCount: 0, errorCode: 'alerts_unavailable' },
+      ],
+    });
+    listMock.mockResolvedValue(degraded);
+    countMock.mockResolvedValue(count({ sourceStatuses: degraded.sourceStatuses }));
 
     const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-    await waitFor(() => expect(result.current.hasPartialError).toBe(true));
-
-    act(() => result.current.markAllSeen());
-
-    expect(result.current.signalLastSeenAt).toBe(legacyBoundary);
-    expect(window.localStorage.getItem('stockpulse.notifications.signalsLastSeenAt'))
-      .toBe(String(legacyBoundary));
-    expect(result.current.alertLastSeenAt).toBe(Date.parse('2026-07-24T00:00:00Z'));
-
-    act(() => result.current.refresh());
-
-    await waitFor(() => expect(result.current.signalsFailed).toBe(false));
-    expect(result.current.unreadSignalCount).toBe(1);
-    expect(result.current.signalItems[0]?.createdAt).toBe(NEW_A);
-  });
-
-  it('advances a failed channel only through its visible cached items', async () => {
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-07-24T00:00:00Z'));
-    listMock
-      .mockResolvedValueOnce(signalResponse([NEW_A]))
-      .mockRejectedValueOnce(new Error('signals down'));
-    triggersMock.mockResolvedValue(triggerResponse([]));
-
-    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-    await waitFor(() => expect(result.current.signalItems).toHaveLength(1));
-
-    act(() => result.current.refresh());
-    await waitFor(() => expect(result.current.signalsFailed).toBe(true));
-    act(() => result.current.markAllSeen());
-
-    expect(result.current.signalLastSeenAt).toBe(Date.parse(NEW_A));
-    expect(result.current.alertLastSeenAt).toBe(Date.parse('2026-07-24T00:00:00Z'));
-  });
-
-  it('reports a hard error only when both channels fail', async () => {
-    listMock.mockRejectedValue(new Error('signals down'));
-    triggersMock.mockRejectedValue(new Error('alerts down'));
-
-    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.hasPartialError).toBe(true);
+    expect(result.current.hasError).toBe(false);
+  });
+
+  it('reports a hard error only when both inbox reads fail', async () => {
+    listMock.mockRejectedValue(new Error('list down'));
+    countMock.mockRejectedValue(new Error('count down'));
+
+    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
     expect(result.current.hasError).toBe(true);
     expect(result.current.hasPartialError).toBe(false);
-    expect(result.current.unreadCount).toBe(0);
-  });
-
-  it('retains cached rows but exposes total failure after a successful refresh', async () => {
-    listMock
-      .mockResolvedValueOnce(signalResponse([NEW_A]))
-      .mockRejectedValueOnce(new Error('signals down'));
-    triggersMock
-      .mockResolvedValueOnce(triggerResponse([NEW_B]))
-      .mockRejectedValueOnce(new Error('alerts down'));
-
-    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-    await waitFor(() => expect(result.current.unreadCount).toBe(2));
-
-    act(() => result.current.refresh());
-
-    await waitFor(() => expect(result.current.hasError).toBe(true));
-    expect(result.current.signalItems).toHaveLength(1);
-    expect(result.current.alertItems).toHaveLength(1);
-  });
-
-  it('requests active signals with a bounded page size', async () => {
-    listMock.mockResolvedValue(signalResponse([]));
-    triggersMock.mockResolvedValue(triggerResponse([]));
-
-    renderHook(() => useUnreadNotifications({ pollMs: 0, pageSize: 5 }));
-
-    await waitFor(() => expect(listMock).toHaveBeenCalled());
-    expect(listMock).toHaveBeenCalledWith({ status: 'active', page: 1, pageSize: 5 });
-    expect(triggersMock).toHaveBeenCalledWith({ page: 1, pageSize: 5 });
-  });
-
-  it('does not let an older refresh overwrite a newer generation', async () => {
-    const oldSignals = deferred<DecisionSignalListResponse>();
-    const oldAlerts = deferred<AlertTriggerListResponse>();
-    listMock
-      .mockReturnValueOnce(oldSignals.promise)
-      .mockResolvedValueOnce(signalResponse([NEW_B]));
-    triggersMock
-      .mockReturnValueOnce(oldAlerts.promise)
-      .mockResolvedValueOnce(triggerResponse([NEW_B]));
-
-    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
-    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
-
-    act(() => result.current.refresh());
-    await waitFor(() => expect(result.current.signalItems[0]?.createdAt).toBe(NEW_B));
-
-    await act(async () => {
-      oldSignals.resolve(signalResponse([OLD]));
-      oldAlerts.resolve(triggerResponse([OLD]));
-      await Promise.all([oldSignals.promise, oldAlerts.promise]);
-    });
-
-    expect(result.current.signalItems[0]?.createdAt).toBe(NEW_B);
-    expect(result.current.alertItems[0]?.triggeredAt).toBe(NEW_B);
   });
 });

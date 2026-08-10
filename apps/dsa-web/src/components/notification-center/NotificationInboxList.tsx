@@ -3,6 +3,7 @@
 import { Activity, Bell, CheckCheck, FlaskConical, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { formatUiText } from '../../i18n/uiText';
 import { NOTIFICATION_CENTER_TEXT } from '../../locales/notificationCenter';
 import type { NotificationInboxItem } from '../../types/notificationInbox';
 import { cn } from '../../utils/cn';
@@ -51,6 +52,8 @@ export function NotificationInboxList({
     <ul className="divide-y divide-border rounded-xl border border-border bg-card" data-testid="notification-center-list">
       {items.map((item) => {
         const Icon = kindIcon(item.kind);
+        const titleTemplate = text[item.titleKey];
+        const title = formatUiText(titleTemplate, item.titleParams);
         return (
           <li
             key={item.id}
@@ -73,7 +76,7 @@ export function NotificationInboxList({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="truncate text-sm font-semibold text-foreground">{item.title}</h3>
+                  <h3 className="truncate text-sm font-semibold text-foreground">{title}</h3>
                   <Badge variant={item.isRead ? 'history' : 'info'}>
                     {item.isRead ? text.read : text.unread}
                   </Badge>

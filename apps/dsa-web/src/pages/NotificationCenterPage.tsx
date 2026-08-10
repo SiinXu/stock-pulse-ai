@@ -41,30 +41,41 @@ const NotificationCenterPage: React.FC = () => {
   const [items, setItems] = useState<NotificationInboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [kind, setKind] = useState<'' | NotificationInboxKind>('');
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
-  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+  const load = useCallback(async (
+    mode: 'initial' | 'refresh' | 'more' = 'initial',
+    cursor?: string,
+  ) => {
     if (mode === 'initial') setLoading(true);
     if (mode === 'refresh') setRefreshing(true);
+    if (mode === 'more') setLoadingMore(true);
     setError(null);
     try {
       const response = await notificationInboxApi.list({
         page: 1,
         pageSize: 50,
+        cursor,
         kind: kind || undefined,
         unreadOnly: readFilter === 'unread',
       });
       setPageData(response);
-      setItems(response.items);
+      setItems((current) => {
+        if (mode !== 'more') return response.items;
+        const existingIds = new Set(current.map((item) => item.id));
+        return [...current, ...response.items.filter((item) => !existingIds.has(item.id))];
+      });
     } catch (err) {
       setError(getParsedApiError(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   }, [kind, readFilter]);
 
@@ -112,6 +123,7 @@ const NotificationCenterPage: React.FC = () => {
   const emptyDescription = readFilter === 'unread' || kind
     ? text.emptyFilteredDescription
     : text.emptyDescription;
+  const hasPartialSource = pageData?.sourceStatuses?.some((status) => !status.available) ?? false;
 
   return (
     <WorkspacePage data-testid="notification-center-page">
@@ -184,19 +196,44 @@ const NotificationCenterPage: React.FC = () => {
         </div>
       ) : null}
 
+      {hasPartialSource ? (
+        <div
+          className="mb-4 rounded-md border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-secondary-text"
+          role="status"
+          data-testid="notification-center-partial-source"
+        >
+          {text.partialSourceWarning}
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="py-12 text-center text-sm text-secondary-text" role="status">
           {t('common.loading')}
         </p>
       ) : (
-        <NotificationInboxList
-          items={items}
-          emptyTitle={emptyTitle}
-          emptyDescription={emptyDescription}
-          onMarkRead={(itemId) => void handleMarkRead(itemId)}
-          markingId={markingId}
-          disabled={markingAll}
-        />
+        <>
+          <NotificationInboxList
+            items={items}
+            emptyTitle={emptyTitle}
+            emptyDescription={emptyDescription}
+            onMarkRead={(itemId) => void handleMarkRead(itemId)}
+            markingId={markingId}
+            disabled={markingAll || loadingMore}
+          />
+          {pageData?.hasMore && pageData.nextCursor ? (
+            <div className="mt-4 flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void load('more', pageData.nextCursor ?? undefined)}
+                disabled={loadingMore}
+              >
+                <RefreshCw className={loadingMore ? 'size-4 animate-spin' : 'size-4'} aria-hidden="true" />
+                {loadingMore ? text.loadingMore : text.loadMore}
+              </Button>
+            </div>
+          ) : null}
+        </>
       )}
     </WorkspacePage>
   );

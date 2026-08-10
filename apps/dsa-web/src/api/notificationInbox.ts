@@ -14,7 +14,8 @@ import { toCamelCase } from './utils';
 const itemSchema = z.object({
   id: z.string(),
   kind: z.string(),
-  title: z.string(),
+  titleKey: z.string(),
+  titleParams: z.record(z.string(), z.string()),
   summary: z.string(),
   severity: z.string(),
   createdAt: z.string(),
@@ -30,12 +31,27 @@ const pageSchema = z.object({
   pageSize: z.number(),
   total: z.number(),
   unreadTotal: z.number(),
+  cursor: z.string().nullable().optional(),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean(),
+  sourceStatuses: z.array(z.object({
+    source: z.string(),
+    available: z.boolean(),
+    itemCount: z.number(),
+    errorCode: z.string().nullable().optional(),
+  }).passthrough()),
   retentionDays: z.number(),
   maxItems: z.number(),
 }).passthrough();
 
 const unreadSchema = z.object({
   unreadTotal: z.number(),
+  sourceStatuses: z.array(z.object({
+    source: z.string(),
+    available: z.boolean(),
+    itemCount: z.number(),
+    errorCode: z.string().nullable().optional(),
+  }).passthrough()),
   retentionDays: z.number(),
   maxItems: z.number(),
 }).passthrough();
@@ -72,6 +88,7 @@ export const notificationInboxApi = {
       params: {
         ...(query.page === undefined ? {} : { page: query.page }),
         ...(query.pageSize === undefined ? {} : { page_size: query.pageSize }),
+        ...(query.cursor ? { cursor: query.cursor } : {}),
         ...(query.kind ? { kind: query.kind } : {}),
         ...(query.unreadOnly ? { unread_only: true } : {}),
       },

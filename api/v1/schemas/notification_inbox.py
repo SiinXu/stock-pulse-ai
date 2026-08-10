@@ -4,12 +4,13 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.schemas.notification_inbox import (
     NOTIFICATION_INBOX_MAX_PAGE_SIZE,
+    NOTIFICATION_INBOX_MAX_ITEM_ID_LENGTH,
     NotificationInboxItem,
     NotificationInboxMarkAllReadResult,
     NotificationInboxMarkReadResult,
@@ -31,11 +32,13 @@ class NotificationInboxMarkReadRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    item_ids: List[str] = Field(
+    item_ids: List[
+        Annotated[str, Field(min_length=1, max_length=NOTIFICATION_INBOX_MAX_ITEM_ID_LENGTH)]
+    ] = Field(
         ...,
         min_length=1,
         max_length=NOTIFICATION_INBOX_MAX_PAGE_SIZE,
-        description="Composite inbox item ids (kind:source_id)",
+        description="Versioned stable inbox occurrence ids",
     )
 
 

@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Iterable, Optional, Sequence, Set
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.repositories.base import BaseRepository
 from src.storage import DatabaseManager, NotificationInboxReadStateRecord, utc_naive_now
@@ -38,7 +39,7 @@ class NotificationInboxRepository(BaseRepository):
                     )
                 ).scalars().all()
                 return {str(item_id) for item_id in rows}
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             self._log_and_raise(
                 logger,
                 "Notification inbox read-state lookup failed",
@@ -85,7 +86,7 @@ class NotificationInboxRepository(BaseRepository):
                         existing.kind = kind
                 session.commit()
             return written
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             self._log_and_raise(
                 logger,
                 "Notification inbox mark-read failed",
@@ -106,7 +107,7 @@ class NotificationInboxRepository(BaseRepository):
                 )
                 session.commit()
                 return int(result.rowcount or 0)
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             self._log_and_raise(
                 logger,
                 "Notification inbox retention cleanup failed",
@@ -130,7 +131,7 @@ class NotificationInboxRepository(BaseRepository):
                     )
                 session.commit()
                 return int(result.rowcount or 0)
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             self._log_and_raise(
                 logger,
                 "Notification inbox orphan cleanup failed",

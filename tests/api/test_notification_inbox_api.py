@@ -20,6 +20,7 @@ from src.schemas.notification_inbox import (
     NotificationInboxPage,
     NotificationInboxUnreadCount,
 )
+from src.repositories.base import RepositoryError
 from src.services.notification_inbox_service import NotificationInboxValidationError
 
 
@@ -31,11 +32,16 @@ def _client(service) -> TestClient:
     return TestClient(app)
 
 
-def _item(*, item_id: str = "analysis_complete:1", is_read: bool = False) -> NotificationInboxItem:
+def _item(
+    *,
+    item_id: str = "v1:analysis_complete:1:1786233600000000",
+    is_read: bool = False,
+) -> NotificationInboxItem:
     return NotificationInboxItem(
         id=item_id,
         kind="analysis_complete",
-        title="Analysis complete: 600519",
+        title_key="analysisCompleteTitle",
+        title_params={"label": "600519"},
         summary="hold",
         severity="info",
         created_at=datetime(2026, 8, 9, tzinfo=timezone.utc),
@@ -54,6 +60,12 @@ def test_list_items_returns_page() -> None:
         page_size=20,
         total=1,
         unread_total=1,
+        has_more=False,
+        source_statuses=[{
+            "source": "analysis",
+            "available": True,
+            "item_count": 1,
+        }],
         retention_days=90,
         max_items=500,
     )
@@ -61,7 +73,7 @@ def test_list_items_returns_page() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["total"] == 1
-    assert payload["items"][0]["id"] == "analysis_complete:1"
+    assert payload["items"][0]["id"].startswith("v1:analysis_complete:1:")
     service.list_items.assert_called_once()
 
 
@@ -69,6 +81,7 @@ def test_unread_count_endpoint() -> None:
     service = MagicMock()
     service.get_unread_count.return_value = NotificationInboxUnreadCount(
         unread_total=3,
+        source_statuses=[],
         retention_days=90,
         max_items=500,
     )
@@ -90,7 +103,7 @@ def test_mark_read_and_mark_all_read() -> None:
     client = _client(service)
     mark_one = client.post(
         "/api/v1/notification-inbox/items/mark-read",
-        json={"item_ids": ["analysis_complete:1"]},
+        json={"item_ids": ["v1:analysis_complete:1:1786233600000000"]},
     )
     assert mark_one.status_code == 200
     assert mark_one.json()["marked_count"] == 1
@@ -113,3 +126,16 @@ def test_validation_error_maps_to_400() -> None:
     body = response.json()
     detail = body.get("detail") or body
     assert detail.get("error") == "invalid_kind" or "invalid_kind" in str(body)
+
+
+def test_all_sources_unavailable_maps_to_retryable_503() -> None:
+    service = MagicMock()
+    service.list_items.side_effect = RepositoryError(
+        "none available",
+        error_code="notification_inbox_no_source_available",
+    )
+
+    response = _client(service).get("/api/v1/notification-inbox/items")
+
+    assert response.status_code == 503
+    assert response.json()["error"] == "internal_error"

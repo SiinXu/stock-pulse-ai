@@ -9,10 +9,30 @@ export type NotificationInboxKind =
 
 export type NotificationInboxSeverity = 'info' | 'warning' | 'error';
 
+export type NotificationInboxSource =
+  | 'analysis'
+  | 'alerts'
+  | 'scheduled_tasks'
+  | 'decision_signals';
+
+export type NotificationInboxTitleKey =
+  | 'analysisCompleteTitle'
+  | 'alertTriggeredTitle'
+  | 'scheduledTaskResultTitle'
+  | 'decisionSignalTitle';
+
+export type NotificationInboxSourceStatus = {
+  source: NotificationInboxSource;
+  available: boolean;
+  itemCount: number;
+  errorCode?: string | null;
+};
+
 export type NotificationInboxItem = {
   id: string;
   kind: NotificationInboxKind;
-  title: string;
+  titleKey: NotificationInboxTitleKey;
+  titleParams: Record<string, string>;
   summary: string;
   severity: NotificationInboxSeverity;
   createdAt: string;
@@ -28,12 +48,17 @@ export type NotificationInboxPage = {
   pageSize: number;
   total: number;
   unreadTotal: number;
+  cursor?: string | null;
+  nextCursor?: string | null;
+  hasMore: boolean;
+  sourceStatuses: NotificationInboxSourceStatus[];
   retentionDays: number;
   maxItems: number;
 };
 
 export type NotificationInboxUnreadCount = {
   unreadTotal: number;
+  sourceStatuses: NotificationInboxSourceStatus[];
   retentionDays: number;
   maxItems: number;
 };
@@ -46,6 +71,7 @@ export type NotificationInboxMarkReadResult = {
 export type NotificationInboxListQuery = {
   page?: number;
   pageSize?: number;
+  cursor?: string;
   kind?: NotificationInboxKind | '';
   unreadOnly?: boolean;
 };
