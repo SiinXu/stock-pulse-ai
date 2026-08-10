@@ -158,7 +158,7 @@ test.describe('surface and task-state foundation', () => {
 
     responseMode = 'refresh-error';
     await page.getByRole('button', { name: '刷新' }).click();
-    await expect(page.locator('[data-alert-tone="danger"]')).toHaveCount(1);
+    await expect(page.locator('[data-toast-tone="danger"]')).toHaveCount(1);
     await expect(page.getByText('400', { exact: true })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
     expect(requestCounts.error).toBeGreaterThan(0);
