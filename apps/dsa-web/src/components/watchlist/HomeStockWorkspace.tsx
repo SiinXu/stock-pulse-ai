@@ -321,7 +321,13 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     if (!watchlistCodesKey) {
       return new Map<string, WatchlistScoreItem>();
     }
-    return scoresByCode;
+    const codes = watchlistCodesKey.split('\u0001').filter(Boolean);
+    const next = new Map<string, WatchlistScoreItem>();
+    for (const code of codes) {
+      const item = scoresByCode.get(code);
+      if (item) next.set(code, item);
+    }
+    return next;
   }, [scoresByCode, watchlistCodesKey]);
 
   const pendingWatchlistCount = watchlistRows
