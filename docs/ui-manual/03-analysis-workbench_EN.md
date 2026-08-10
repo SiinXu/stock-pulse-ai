@@ -42,7 +42,7 @@ sequenceDiagram
 
 ## Start an analysis
 
-1. Enter a code or name in the suggestion-enabled stock search (`600519`, `hk00700`, `AAPL`, …).
+1. Enter a code or name in the suggestion-enabled stock search (`600519`, `0941` for Hong Kong, `hk00700`, `AAPL`, …).
 2. Optionally pick from the watchlist.  
 3. Optionally choose a **Skill** (style pack); omit for default.  
 4. Choose an **Analysis phase**: Auto by default, or Premarket, Intraday, or Postmarket for this request.
@@ -77,9 +77,11 @@ The selected phase applies consistently to single-symbol, batch, watchlist, smar
 | Market | Examples | Common mistake |
 | --- | --- | --- |
 | A-share | `600519` | Company name without code |
-| Hong Kong | `hk00700` | Missing `hk` |
+| Hong Kong | `0941`, `hk00700`, `00700.HK` | A bare four-digit code is zero-padded and canonicalized as `HKxxxxx` |
 | US | `AAPL`, `BRK.B` | Odd casing |
 | JP / KR | `7203.T`, `005930.KS` | Missing suffix |
+
+Bare four-digit input is checked against the stock index first, so indexed `7203` is submitted as Japanese `7203.T`; only an unresolved value such as `0941` defaults to Hong Kong. Prefer an explicit exchange suffix for cross-market input when ambiguity matters.
 
 ## Task states
 
@@ -90,15 +92,26 @@ The selected phase applies consistently to single-symbol, batch, watchlist, smar
 | Completed | Report ready | Open History |
 | Failed | Error | Read the reason, then retry |
 
+The Tasks tab shows a compact count badge only while tasks are running, without increasing the tab-row height.
+
 The selector offers **Auto, Premarket, Intraday, and Postmarket**. Auto is the default and preserves the pre-existing market/session inference behavior; a manual choice overrides only the current request.
 
 The task list shows the **requested phase**, so you can confirm whether Auto or an explicit phase was submitted. The report page shows the **final phase** used after analysis and remains authoritative. These are intentionally distinct.
+
+### Recovery after an error
+
+- Transient network or rate-limit failures expose **Retry**. A single-run retry preserves the original symbol, mode, phase, Skill, notification, and force-refresh intent; the action is disabled while pending.
+- **Already running** never resubmits the symbol. **Running tasks** opens the exact known task, or falls back to the Tasks segment when its identity is unavailable.
+- Validation returns focus to stock search; model failures open their owning Settings view, while configuration-version conflicts reload the page; an expired session opens Admin login with a safe return to the current workbench. Unknown and permanently missing resources are not retried blindly.
+- After partial batch acceptance, accepted, duplicate, and unconfirmed symbols remain distinct. You can inspect confirmed tasks, while a safe retry submits only unconfirmed symbols and never accepted or duplicate work. Dismissing the notice leaves the launch surface usable.
+- Report-detail and Run Flow retries keep the same record ID or task/history source. A failed deletion remains in the confirmation dialog with **Retry / Cancel**, and keyboard focus returns to Retry.
+- **View details** is collapsed by default and includes only filtered code, reason token, trace ID, and status. Credentials, headers, bodies, and provider secrets are never rendered there.
 
 ## History & compare
 
 1. Open a record for full Markdown/report UI.  
 2. Use history trend for the **same** symbol.  
-3. Multi-delete requires confirmation.  
+3. After multi-selecting records, use the trash icon to delete them; confirmation is still required.
 4. Market-review history is separate from single-stock history.
 
 ## Beginner vs Professional

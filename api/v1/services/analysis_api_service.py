@@ -57,12 +57,15 @@ from src.services._analysis_report_projection import (
     project_analysis_report,
     project_persisted_analysis_report,
 )
+from src.services.analysis_submission_service import (
+    AnalysisSubmissionService,
+    build_submission_command,
+)
 from src.services.name_to_code_resolver import resolve_name_to_code as _default_resolve_name_to_code
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
 from src.services.security_audit_service import (
     SecurityAuditRecorder,
-    SecurityAuditService,
     SecurityAuditUnavailable,
     require_security_audit_recorder,
 )
@@ -161,26 +164,16 @@ class AnalysisApiService:
         reason_code: str = "attempt_started",
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        common = dict(
-            event_type="analysis.submit",
-            actor_type="api_client",
-            actor_id="analysis_submitter",
-            execution_id=correlation_id,
-            action="analysis.submit",
-            target_type="stock",
-            target_id=stock_code,
-            correlation_id=correlation_id,
-            metadata=metadata or {},
-        )
         try:
-            if phase == "attempt":
-                service.record_attempt(**common)
-            else:
-                service.record_completion(
-                    **common,
-                    outcome=outcome,
-                    reason_code=reason_code,
-                )
+            AnalysisSubmissionService.record_audit(
+                service,
+                phase=phase,
+                correlation_id=correlation_id,
+                stock_code=stock_code,
+                outcome=outcome,
+                reason_code=reason_code,
+                metadata=metadata,
+            )
         except SecurityAuditUnavailable:
             raise api_error(
                 503,
@@ -302,12 +295,12 @@ class AnalysisApiService:
             return ""
 
         if is_code_like(text):
+            if text.isdigit() and len(text) == 4:
+                resolved = self.resolve_index_stock_code_for_analysis(text)
+                if resolved and resolved != canonical_stock_code(text):
+                    return resolved
+                return f"HK{text.zfill(5)}"
             return self.resolve_index_stock_code_for_analysis(text)
-
-        if text.isdigit() and len(text) == 4:
-            resolved_index_code = self.resolve_index_stock_code_for_analysis(text)
-            if resolved_index_code != canonical_stock_code(text):
-                return resolved_index_code
 
         if self.is_obviously_invalid_analysis_input(text):
             raise self.invalid_analysis_input_error()
@@ -408,101 +401,34 @@ class AnalysisApiService:
         """
         Handle asynchronous analysis requests, including batch submission.
         """
-        task_queue = self.get_task_queue()
-    
-        # Preserve metadata for single-stock requests. For batch requests,
-        # only carry through metadata that semantically applies to the whole
-        # batch, such as import/image source tracking.
-        is_single = len(stock_codes) == 1
-        preserve_batch_metadata = request.selection_source in {"import", "image"}
-
-        stock_name = request.stock_name if is_single else None
-        original_query = request.original_query if (is_single or preserve_batch_metadata) else None
-        selection_source = request.selection_source if (is_single or preserve_batch_metadata) else None
-        notify = getattr(request, "notify", True)
-        skills = getattr(request, "skills", None)
-        analysis_phase = request.analysis_phase
-        report_language = normalize_report_language(getattr(request, "report_language", None), default="")
-        use_memory = getattr(request, "use_memory", None)
-
-        submit_kwargs = dict(
+        command = build_submission_command(
             stock_codes=stock_codes,
-            stock_name=stock_name,
-            original_query=original_query,
-            selection_source=selection_source,
+            stock_name=request.stock_name,
+            original_query=request.original_query,
+            selection_source=request.selection_source,
             report_type=request.report_type,
-            analysis_phase=analysis_phase,
+            analysis_phase=request.analysis_phase,
             force_refresh=request.force_refresh,
-            notify=notify,
+            notify=getattr(request, "notify", True),
+            report_language=getattr(request, "report_language", None),
+            skills=getattr(request, "skills", None),
+            use_memory=getattr(request, "use_memory", None),
         )
-        if report_language:
-            submit_kwargs["report_language"] = report_language
-        if skills is not None:
-            submit_kwargs["skills"] = skills
-        if use_memory is not None:
-            submit_kwargs["use_memory"] = use_memory
-
-        correlations = {
-            stock_code: SecurityAuditService.new_correlation_id()
-            for stock_code in stock_codes
-        }
-        audit_metadata = {
-            "report_type": request.report_type,
-            "analysis_phase": analysis_phase,
-            "batch_size": len(stock_codes),
-        }
-        for stock_code in stock_codes:
-            self.record_analysis_submission_audit(
-                security_audit,
-                phase="attempt",
-                correlation_id=correlations[stock_code],
-                stock_code=stock_code,
-                metadata=audit_metadata,
-            )
-
         try:
-            accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
-        except Exception:
-            for stock_code in stock_codes:
-                self.record_analysis_submission_audit(
-                    security_audit,
-                    phase="completion",
-                    correlation_id=correlations[stock_code],
-                    stock_code=stock_code,
-                    outcome="failure",
-                    reason_code="task_submission_failed",
-                    metadata=audit_metadata,
-                )
-            raise
-
-        accepted_codes = {
-            normalize_stock_code(task.stock_code)
-            for task in accepted_tasks
-        }
-        duplicate_codes = {
-            normalize_stock_code(duplicate.stock_code)
-            for duplicate in duplicate_errors
-        }
-        for stock_code in stock_codes:
-            normalized_stock_code = normalize_stock_code(stock_code)
-            if normalized_stock_code in accepted_codes:
-                outcome = "accepted"
-                reason_code = "task_accepted"
-            elif normalized_stock_code in duplicate_codes:
-                outcome = "rejected"
-                reason_code = "duplicate_task"
-            else:
-                outcome = "failure"
-                reason_code = "submission_not_resolved"
-            self.record_analysis_submission_audit(
-                security_audit,
-                phase="completion",
-                correlation_id=correlations[stock_code],
-                stock_code=stock_code,
-                outcome=outcome,
-                reason_code=reason_code,
-                metadata=audit_metadata,
+            submission = AnalysisSubmissionService(
+                get_task_queue=self.get_task_queue,
+            ).submit(
+                command,
+                security_audit=security_audit,
             )
+        except SecurityAuditUnavailable:
+            raise api_error(
+                503,
+                "security_audit_unavailable",
+                "Security audit storage is unavailable",
+            ) from None
+        accepted_tasks = submission.accepted_tasks
+        duplicate_errors = submission.duplicate_errors
 
         accepted = [
             BatchTaskAcceptedItem(
@@ -587,6 +513,7 @@ class AnalysisApiService:
         from src.services.analysis_service import (
             AnalysisService,
             LLM_NOT_CONFIGURED_ERROR_CODE,
+            LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
             is_llm_not_configured_error,
         )
     
@@ -608,6 +535,15 @@ class AnalysisApiService:
 
             if result is None:
                 error_message = service.last_error or f"分析股票 {stock_code} 失败"
+                if service.last_error_code == LOCAL_MARKET_DATA_MISSING_ERROR_CODE:
+                    details = getattr(service, "last_error_details", None)
+                    raise api_error(
+                        409,
+                        LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
+                        "Local market data does not cover the requested analysis window",
+                        params={"stock_code": stock_code},
+                        details=details,
+                    )
                 # Known first-run configuration gap: map only this condition to a
                 # stable 422 so clients can show setup guidance instead of a generic 500.
                 if is_llm_not_configured_error(service.last_error_code, error_message):

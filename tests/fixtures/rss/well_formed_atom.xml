@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Exchange Atom Feed</title>
+  <link href="https://feeds.example.com/atom"/>
+  <updated>2026-08-05T12:00:00Z</updated>
+  <entry>
+    <title>AAPL filing accepted by regulator</title>
+    <link href="https://news.example.com/aapl-filing" rel="alternate"/>
+    <id>urn:example:aapl-filing</id>
+    <updated>2026-08-05T11:00:00Z</updated>
+    <summary>Apple Inc filed an 8-K related to capital return.</summary>
+  </entry>
+  <entry>
+    <title>Macro outlook unchanged</title>
+    <link href="https://news.example.com/macro"/>
+    <id>urn:example:macro</id>
+    <updated>2026-08-01T11:00:00Z</updated>
+    <summary>Central bank language steady.</summary>
+  </entry>
+</feed>

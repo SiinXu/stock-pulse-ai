@@ -1,19 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
-  CheckCircle2,
-  CircleHelp,
   FileText,
-  FileUp,
   FlaskConical,
   History,
-  ListChecks,
   MessageCircle,
   RefreshCw,
-  Upload,
   Workflow,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,26 +23,20 @@ import { historyApi } from '../api/history';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
 import {
-  ApiErrorAlert,
   AppPage,
   Badge,
   Button,
-  Checkbox,
   ConfirmDialog,
   EmptyState,
-  FileInput,
-  InlineAlert,
   Modal,
   PageHeader,
   SegmentedControl,
-  Select,
-  Surface,
   TabPanel,
-  Tooltip,
   WorkspaceLayout,
   getTabPanelId,
 } from '../components/common';
 import { AnalysisPhaseSelect } from '../components/analysis';
+import type { WorkbenchBatchNotice } from '../components/analysis/AnalysisWorkbenchErrorStack';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
 import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
@@ -55,15 +44,14 @@ import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer'
 import { ReportSummary } from '../components/report/ReportSummary';
 import { useRouteFocusTarget } from '../components/routing';
 import { RunFlowPanel } from '../components/run-flow';
-import { StockAutocomplete } from '../components/StockAutocomplete';
 import { TaskPanel } from '../components/tasks';
 import type { WatchlistAnalyzeMode } from '../components/watchlist/HomeStockWorkspace';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useAnalysisWorkbenchErrorContract } from '../hooks/useAnalysisWorkbenchErrorContract';
 import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
 import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useWatchlistAnalysisCoverage } from '../hooks/useWatchlistAnalysisCoverage';
-import { STOCK_SEARCH_TEXT } from '../locales/stockSearch';
 import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
@@ -78,13 +66,12 @@ import {
   setAnalysisWorkbenchRouteState,
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
-import { useStockPoolStore } from '../stores/stockPoolStore';
-import type { AnalysisPhase, TaskInfo } from '../types/analysis';
+import { useStockPoolStore, type SubmitAnalysisOptions } from '../stores/stockPoolStore';
+import type { AnalysisPhase, StockReportType, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
-import { areStockCodesEquivalent } from '../utils/stockCode';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import {
   readExperienceMode,
@@ -96,17 +83,27 @@ type RunFlowDialogState =
   | { open: false }
   | { open: true; source: RunFlowSnapshotSource; title: string };
 
-type WorkbenchNotice = {
-  variant: 'success' | 'warning' | 'danger';
-  message: string;
-} | null;
+type WorkbenchNotice = WorkbenchBatchNotice;
 
 type WorkbenchNavigationState = {
   focusStockSearch?: boolean;
 };
 
+type BatchLaunchIntent = {
+  codes: readonly string[];
+  reportType: StockReportType;
+  notify: boolean;
+  analysisPhase: AnalysisPhase;
+  skills?: readonly string[];
+};
+
 const WORKBENCH_TABS_ID = 'analysis-workbench-tabs';
-const WORKBENCH_PENDING_REASON_ID = 'analysis-workbench-pending-reason';
+const AnalysisWorkbenchErrorStack = lazy(
+  () => import('../components/analysis/AnalysisWorkbenchErrorStack'),
+);
+const AnalysisWorkbenchLaunchPanel = lazy(
+  () => import('../components/analysis/AnalysisWorkbenchLaunchPanel'),
+);
 function stateForSegment(
   current: AnalysisWorkbenchRouteState,
   segment: AnalysisWorkbenchSegment,
@@ -152,6 +149,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const completedRecordIdsRef = useRef(new Map<string, number>());
   const suppressedHistoryDefaultSearchRef = useRef<string | null>(null);
   const consumedStockContextRef = useRef<string | null>(null);
+  const lastAnalysisIntentRef = useRef<SubmitAnalysisOptions | null>(null);
+  const lastBatchIntentRef = useRef<BatchLaunchIntent | null>(null);
+  const failedRunFlowSourceRef = useRef<RunFlowSnapshotSource | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('auto');
@@ -487,6 +487,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     removeTask,
     onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,
   });
+
   const watchlistCoverage = useWatchlistAnalysisCoverage({
     watchlistCodes: watchlist.watchlistCodes,
     stockBarItems,
@@ -495,7 +496,6 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     stockBarRefreshFailed,
     activeTasks,
   });
-
   const selectedAnalysisSkills = useMemo(
     () => (selectedStrategyId ? [selectedStrategyId] : undefined),
     [selectedStrategyId],
@@ -523,155 +523,244 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     setExperiencePreference({ mode, explicit: true });
   }, []);
 
-  const handleSubmitAnalysis = useCallback(async (
-    stockCode?: string,
-    stockName?: string,
-    selectionSource: 'manual' | 'autocomplete' | 'import' = 'manual',
-  ) => {
-    if (!isExperienceModeReady) return;
-    const stockInput = (stockCode ?? query).trim();
-    if (!stockInput) {
-      await submitAnalysis({ stockCode: stockInput });
-      return;
-    }
-    const beforeTaskIds = new Set(analysisTasks.map((task) => task.taskId));
-    await submitAnalysis({
-      stockCode,
-      stockName,
-      originalQuery: query,
-      selectionSource,
-      reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
-      analysisPhase,
-      skills: selectedAnalysisSkills,
-    });
-    if (!isMountedRef.current) return;
-    const latest = useStockPoolStore.getState();
-    const taskAccepted = latest.activeTasks.some((task) => (
-      task.reportType !== 'market_review' && !beforeTaskIds.has(task.taskId)
-    ));
-    if (taskAccepted || latest.duplicateTask) {
-      selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
-    }
-  }, [analysisPhase, analysisTasks, experienceMode, isExperienceModeReady, query, selectSegment, selectedAnalysisSkills, submitAnalysis]);
-
-  const submitBatch = useCallback(async (sourceCodes: readonly string[]) => {
-    if (!isExperienceModeReady) return;
-    const codes = normalizeBatchAnalysisCodes(sourceCodes);
-    if (codes.length === 0) {
-      setBatchNotice({ variant: 'warning', message: t('watchlist.noStocksAnalyze') });
-      return;
-    }
-
-    setIsBatchSubmitting(true);
-    setBatchNotice(null);
-    try {
-      const result = await submitBatchAnalysis({
-        codes,
-        submitChunk: (stockCodes) => analysisApi.analyzeAsync({
-          stockCodes,
-          reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
-          notify,
-          analysisPhase,
-          skills: selectedAnalysisSkills,
-        }),
-        reconcile: refreshActiveTasks,
-        parseError: (error) => getParsedApiError(error, language),
-        incompleteResponseMessage: (confirmed, requested) => (
-          t('watchlist.batchIncompleteResponse', { confirmed, requested })
-        ),
-      });
-      const submissionError = result.submissionError ?? result.reconciliationError;
-      if (submissionError) {
-        setBatchNotice(result.accepted > 0 || result.duplicates > 0
-          ? {
-              variant: 'warning',
-              message: t('watchlist.batchPartiallySubmitted', {
-                accepted: result.accepted,
-                duplicates: result.duplicates,
-                unconfirmed: result.unconfirmed,
-                error: submissionError.message || t('watchlist.batchFailed'),
-              }),
-            }
-          : {
-              variant: 'danger',
-              message: submissionError.message || t('watchlist.batchFailed'),
-            });
-      } else {
-        setBatchNotice({
-          variant: result.accepted > 0 ? 'success' : 'warning',
-          message: t('watchlist.batchSubmitted', {
-            accepted: result.accepted,
-            duplicates: result.duplicates,
-          }),
-        });
-      }
-      if (result.accepted > 0 || result.duplicates > 0) {
+  const executeAnalysisIntent = useCallback(
+    async (intent: SubmitAnalysisOptions) => {
+      const beforeTaskIds = new Set(analysisTasks.map((task) => task.taskId));
+      lastAnalysisIntentRef.current = {
+        ...intent,
+        skills: intent.skills ? [...intent.skills] : undefined,
+      };
+      await submitAnalysis(lastAnalysisIntentRef.current);
+      if (!isMountedRef.current) return;
+      const latest = useStockPoolStore.getState();
+      const taskAccepted = latest.activeTasks.some(
+        (task) => task.reportType !== 'market_review' && !beforeTaskIds.has(task.taskId),
+      );
+      if (taskAccepted || latest.duplicateTask) {
+        lastAnalysisIntentRef.current = null;
         selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+      } else if (!latest.error) {
+        lastAnalysisIntentRef.current = null;
       }
-    } catch (batchError) {
-      setBatchNotice({
-        variant: 'danger',
-        message: getParsedApiError(batchError, language).message || t('watchlist.batchFailed'),
-      });
-    } finally {
-      setIsBatchSubmitting(false);
-    }
-  }, [analysisPhase, experienceMode, isExperienceModeReady, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
-
-  const submitWatchlistBatch = useCallback(async (mode: WatchlistAnalyzeMode) => {
-    if (mode === 'pending' && watchlistCoverage.isTodayStatusBlocked) {
-      setBatchNotice({
-        variant: 'warning',
-        message: t('watchlist.pendingStatusUnavailable'),
-      });
-      return;
-    }
-    const codes = mode === 'pending'
-      ? watchlistCoverage.pendingCodes
-      : watchlist.watchlistCodes;
-    if (codes.length === 0) {
-      setBatchNotice({
-        variant: 'warning',
-        message: mode === 'pending'
-          ? t('watchlist.noPendingAnalyze')
-          : t('watchlist.noStocksAnalyze'),
-      });
-      return;
-    }
-    await submitBatch(codes);
-  }, [submitBatch, t, watchlist.watchlistCodes, watchlistCoverage]);
-
-  const handleImportFile = useCallback(async (file: File) => {
-    setImportedCodes([]);
-    setIsImporting(true);
-    setImportNotice(null);
-    try {
-      const response = file.type.startsWith('image/')
-        ? await stocksApi.extractFromImage(file)
-        : await stocksApi.parseImport(file);
-      const codes = normalizeBatchAnalysisCodes(response.codes);
-      setImportedCodes(codes);
-      if (codes.length === 0) {
-        setImportNotice({ variant: 'warning', message: t('analysisWorkbench.importEmpty') });
+    },
+    [analysisTasks, selectSegment, submitAnalysis],
+  );
+  const handleSubmitAnalysis = useCallback(
+    async (
+      stockCode?: string,
+      stockName?: string,
+      selectionSource: 'manual' | 'autocomplete' | 'import' = 'manual',
+    ) => {
+      if (!isExperienceModeReady) return;
+      const stockInput = (stockCode ?? query).trim();
+      if (!stockInput) {
+        lastAnalysisIntentRef.current = null;
+        await submitAnalysis({ stockCode: stockInput });
         return;
       }
-      setQuery(codes[0]);
-      setImportNotice({
-        variant: 'success',
-        message: t('analysisWorkbench.importReady', { count: codes.length }),
+      await executeAnalysisIntent({
+        stockCode: stockInput,
+        stockName,
+        originalQuery: query,
+        selectionSource,
+        notify,
+        reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+        analysisPhase,
+        skills: selectedAnalysisSkills,
       });
-    } catch (importError) {
+    },
+    [
+      analysisPhase,
+      executeAnalysisIntent,
+      experienceMode,
+      isExperienceModeReady,
+      notify,
+      query,
+      selectedAnalysisSkills,
+      submitAnalysis,
+    ],
+  );
+  const retryAnalysis = useCallback(() => {
+    const intent = lastAnalysisIntentRef.current;
+    if (!intent || useStockPoolStore.getState().isAnalyzing) return;
+    void executeAnalysisIntent(intent);
+  }, [executeAnalysisIntent]);
+  const executeBatchIntent = useCallback(
+    async (intent: BatchLaunchIntent) => {
+      const codes = normalizeBatchAnalysisCodes(intent.codes);
+      lastBatchIntentRef.current = { ...intent, codes };
+      setIsBatchSubmitting(true);
+      setBatchNotice(null);
+      try {
+        const result = await submitBatchAnalysis({
+          codes,
+          submitChunk: (stockCodes) =>
+            analysisApi.analyzeAsync({
+              stockCodes,
+              reportType: intent.reportType,
+              notify: intent.notify,
+              analysisPhase: intent.analysisPhase,
+              skills: intent.skills ? [...intent.skills] : undefined,
+            }),
+          reconcile: refreshActiveTasks,
+          parseError: (error) => getParsedApiError(error, language),
+          incompleteResponseMessage: (confirmed, requested) =>
+            t('watchlist.batchIncompleteResponse', { confirmed, requested }),
+        });
+        const submissionError = result.submissionError ?? result.reconciliationError;
+        const confirmedCodes = [...result.acceptedCodes, ...result.duplicateCodes];
+        if (submissionError) {
+          // The async endpoint deduplicates active symbols. Retain only
+          // unconfirmed identities so recovery never replays accepted work.
+          lastBatchIntentRef.current =
+            result.unconfirmedCodes.length > 0
+              ? { ...intent, codes: result.unconfirmedCodes }
+              : null;
+          setBatchNotice(
+            result.accepted > 0 || result.duplicates > 0
+              ? {
+                  variant: 'warning',
+                  message: t('watchlist.batchPartiallySubmitted', {
+                    accepted: result.accepted,
+                    duplicates: result.duplicates,
+                    unconfirmed: result.unconfirmed,
+                    error: submissionError.message || t('watchlist.batchFailed'),
+                  }),
+                  error: submissionError,
+                  confirmedCodes,
+                  unconfirmedCodes: result.unconfirmedCodes,
+                  canRetryUnconfirmed: result.stoppedOnIncompleteResponse,
+                }
+              : {
+                  variant: 'danger',
+                  message: submissionError.message || t('watchlist.batchFailed'),
+                  error: submissionError,
+                  confirmedCodes,
+                  unconfirmedCodes: result.unconfirmedCodes,
+                  canRetryUnconfirmed: result.stoppedOnIncompleteResponse,
+                },
+          );
+        } else {
+          lastBatchIntentRef.current = null;
+          setBatchNotice({
+            variant: result.accepted > 0 ? 'success' : 'warning',
+            message: t('watchlist.batchSubmitted', {
+              accepted: result.accepted,
+              duplicates: result.duplicates,
+            }),
+          });
+        }
+        if (result.accepted > 0 || result.duplicates > 0) {
+          selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+        }
+      } catch (batchError) {
+        const parsed = getParsedApiError(batchError, language);
+        setBatchNotice({
+          variant: 'danger',
+          message: parsed.message || t('watchlist.batchFailed'),
+          error: parsed,
+          confirmedCodes: [],
+          unconfirmedCodes: codes,
+        });
+      } finally {
+        setIsBatchSubmitting(false);
+      }
+    },
+    [language, refreshActiveTasks, selectSegment, t],
+  );
+  const submitBatch = useCallback(
+    async (sourceCodes: readonly string[]) => {
+      if (!isExperienceModeReady) return;
+      const codes = normalizeBatchAnalysisCodes(sourceCodes);
+      if (codes.length === 0) {
+        lastBatchIntentRef.current = null;
+        setBatchNotice({
+          variant: 'warning',
+          message: t('watchlist.noStocksAnalyze'),
+        });
+        return;
+      }
+      await executeBatchIntent({
+        codes,
+        reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+        notify,
+        analysisPhase,
+        skills: selectedAnalysisSkills,
+      });
+    },
+    [
+      analysisPhase,
+      executeBatchIntent,
+      experienceMode,
+      isExperienceModeReady,
+      notify,
+      selectedAnalysisSkills,
+      t,
+    ],
+  );
+  const retryBatch = useCallback(() => {
+    const intent = lastBatchIntentRef.current;
+    if (!intent || isBatchSubmitting) return;
+    void executeBatchIntent(intent);
+  }, [executeBatchIntent, isBatchSubmitting]);
+  const submitWatchlistBatch = useCallback(
+    async (mode: WatchlistAnalyzeMode) => {
+      if (mode === 'pending' && watchlistCoverage.isTodayStatusBlocked) {
+        setBatchNotice({
+          variant: 'warning',
+          message: t('watchlist.pendingStatusUnavailable'),
+        });
+        return;
+      }
+      const codes = mode === 'pending' ? watchlistCoverage.pendingCodes : watchlist.watchlistCodes;
+      if (codes.length === 0) {
+        setBatchNotice({
+          variant: 'warning',
+          message:
+            mode === 'pending' ? t('watchlist.noPendingAnalyze') : t('watchlist.noStocksAnalyze'),
+        });
+        return;
+      }
+      await submitBatch(codes);
+    },
+    [submitBatch, t, watchlist.watchlistCodes, watchlistCoverage],
+  );
+  const handleImportFile = useCallback(
+    async (file: File) => {
       setImportedCodes([]);
-      setImportNotice({
-        variant: 'danger',
-        message: getParsedApiError(importError, language).message,
-      });
-    } finally {
-      setIsImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  }, [language, setQuery, t]);
-
+      setIsImporting(true);
+      setImportNotice(null);
+      try {
+        const response = file.type.startsWith('image/')
+          ? await stocksApi.extractFromImage(file)
+          : await stocksApi.parseImport(file);
+        const codes = normalizeBatchAnalysisCodes(response.codes);
+        setImportedCodes(codes);
+        if (codes.length === 0) {
+          setImportNotice({
+            variant: 'warning',
+            message: t('analysisWorkbench.importEmpty'),
+          });
+          return;
+        }
+        setQuery(codes[0]);
+        setImportNotice({
+          variant: 'success',
+          message: t('analysisWorkbench.importReady', { count: codes.length }),
+        });
+      } catch (importError) {
+        setImportedCodes([]);
+        setImportNotice({
+          variant: 'danger',
+          message: getParsedApiError(importError, language).message,
+        });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    },
+    [language, setQuery, t],
+  );
   const toggleHistorySelection = useCallback((recordId: number) => {
     setSelectedHistoryIds((current) => {
       const next = new Set(current);
@@ -680,7 +769,6 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       return next;
     });
   }, []);
-
   const toggleAllHistory = useCallback(() => {
     setSelectedHistoryIds((current) => {
       const visibleIds = analysisHistoryItems.map((item) => item.id);
@@ -689,24 +777,21 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       return new Set(visibleIds);
     });
   }, [analysisHistoryItems]);
-
   const requestDeleteSelectedHistory = useCallback(() => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     setDeleteError(null);
     setIsDeleteConfirmOpen(true);
   }, [isDeletingHistory, selectedHistoryIds.size]);
-
   const cancelDeleteSelectedHistory = useCallback(() => {
     if (isDeletingHistory) return;
     setIsDeleteConfirmOpen(false);
     setDeleteError(null);
   }, [isDeletingHistory]);
-
   const deleteSelectedHistory = useCallback(async () => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     const recordIds = [...selectedHistoryIds];
-    const deletesCurrentRecord = routeState.recordId !== null
-      && selectedHistoryIds.has(routeState.recordId);
+    const deletesCurrentRecord =
+      routeState.recordId !== null && selectedHistoryIds.has(routeState.recordId);
     setIsDeletingHistory(true);
     setDeleteError(null);
     try {
@@ -725,9 +810,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       }
       const refreshed = await refreshHistory(false);
       if (deletesCurrentRecord) {
-        const nextItem = refreshed?.items.find((item) => (
-          item.reportType !== 'market_review' && item.stockCode !== 'MARKET'
-        ));
+        const nextItem = refreshed?.items.find(
+          (item) => item.reportType !== 'market_review' && item.stockCode !== 'MARKET',
+        );
         if (nextItem) navigateToRecord(nextItem.id, true);
       }
       setIsDeleteConfirmOpen(false);
@@ -747,38 +832,53 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     routeState.recordId,
     selectedHistoryIds,
   ]);
-
-  const openTaskRunFlow = useCallback((task: TaskInfo) => {
-    setRunFlowError(null);
-    navigateToState({
-      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
-      recordId: null,
-      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
-      runFlowRecordId: null,
-      runFlowTaskId: task.taskId,
-    });
-  }, [navigateToState]);
-
-  const openHistoryRunFlow = useCallback((recordId: number) => {
-    setRunFlowError(null);
-    navigateToState({
-      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
-      recordId,
-      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
-      runFlowRecordId: recordId,
-      runFlowTaskId: null,
-    });
-  }, [navigateToState]);
-
+  const openRunFlowSource = useCallback(
+    (source: RunFlowSnapshotSource) => {
+      setRunFlowError(null);
+      failedRunFlowSourceRef.current = null;
+      if (source.type === 'task') {
+        navigateToState({
+          segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+          recordId: null,
+          runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+          runFlowRecordId: null,
+          runFlowTaskId: source.taskId,
+        });
+      } else {
+        navigateToState({
+          segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+          recordId: source.recordId,
+          runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+          runFlowRecordId: source.recordId,
+          runFlowTaskId: null,
+        });
+      }
+    },
+    [navigateToState],
+  );
+  const openTaskRunFlow = useCallback(
+    (task: TaskInfo) => {
+      openRunFlowSource({ type: 'task', taskId: task.taskId });
+    },
+    [openRunFlowSource],
+  );
+  const openHistoryRunFlow = useCallback(
+    (recordId: number) => {
+      openRunFlowSource({ type: 'history', recordId });
+    },
+    [openRunFlowSource],
+  );
   const closeRunFlow = useCallback(() => {
-    navigateToState({
-      ...routeState,
-      runFlow: null,
-      runFlowRecordId: null,
-      runFlowTaskId: null,
-    }, true);
+    navigateToState(
+      {
+        ...routeState,
+        runFlow: null,
+        runFlowRecordId: null,
+        runFlowTaskId: null,
+      },
+      true,
+    );
   }, [navigateToState, routeState]);
-
   const runFlowDialog = useMemo<RunFlowDialogState>(() => {
     if (routeState.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task && routeState.runFlowTaskId) {
       const task = analysisTasks.find((candidate) => candidate.taskId === routeState.runFlowTaskId);
@@ -791,8 +891,8 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       };
     }
     if (
-      routeState.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
-      && routeState.runFlowRecordId !== null
+      routeState.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history &&
+      routeState.runFlowRecordId !== null
     ) {
       const historyItem = analysisHistoryItems.find(
         (candidate) => candidate.id === routeState.runFlowRecordId,
@@ -801,117 +901,158 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         open: true,
         source: { type: 'history', recordId: routeState.runFlowRecordId },
         title: t('runFlow.historyDrawerTitle', {
-          stock: historyItem?.stockName
-            || historyItem?.stockCode
-            || String(routeState.runFlowRecordId),
+          stock:
+            historyItem?.stockName || historyItem?.stockCode || String(routeState.runFlowRecordId),
         }),
       };
     }
     return { open: false };
   }, [analysisHistoryItems, analysisTasks, routeState, t]);
-
-  const handleUnavailableRunFlow = useCallback((nextError: ParsedApiError) => {
-    setRunFlowError(nextError);
-    closeRunFlow();
-  }, [closeRunFlow]);
-
-  const runningTaskCount = analysisTasks.filter((task) => (
-    task.status === 'pending'
-    || task.status === 'processing'
-    || task.status === 'cancel_requested'
-  )).length;
-  const tabItems = useMemo(() => [
-    {
-      id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
-      label: t('analysisWorkbench.launch'),
+  const handleUnavailableRunFlow = useCallback(
+    (nextError: ParsedApiError) => {
+      if (runFlowDialog.open) {
+        failedRunFlowSourceRef.current = runFlowDialog.source;
+      }
+      setRunFlowError(nextError);
+      closeRunFlow();
     },
-    {
-      id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
-      label: (
-        <span className="flex items-center gap-2">
-          {t('analysisWorkbench.tasks')}
-          {runningTaskCount > 0 ? <Badge variant="info">{runningTaskCount}</Badge> : null}
-        </span>
-      ),
-    },
-    {
-      id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
-      label: t('analysisWorkbench.history'),
-    },
-  ], [runningTaskCount, t]);
-
-  const selectedAnalysisReport = selectedReport?.meta.reportType !== 'market_review'
-    && selectedReport?.meta.id === routeState.recordId
-    ? selectedReport
-    : null;
+    [closeRunFlow, runFlowDialog],
+  );
+  const retryRunFlow = useCallback(() => {
+    const source = failedRunFlowSourceRef.current;
+    if (!source) return;
+    openRunFlowSource(source);
+  }, [openRunFlowSource]);
+  const runningTaskCount = analysisTasks.filter(
+    (task) =>
+      task.status === 'pending' ||
+      task.status === 'processing' ||
+      task.status === 'cancel_requested',
+  ).length;
+  const tabItems = useMemo(
+    () => [
+      {
+        id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+        label: t('analysisWorkbench.launch'),
+      },
+      {
+        id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+        label: (
+          <span className="flex items-center gap-2">
+            {t('analysisWorkbench.tasks')}
+            {runningTaskCount > 0 ? (
+              <Badge
+                variant="info"
+                className="h-4 min-w-4 justify-center px-1 py-0 text-xxs leading-none"
+              >
+                {runningTaskCount}
+              </Badge>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+        label: t('analysisWorkbench.history'),
+      },
+    ],
+    [runningTaskCount, t],
+  );
+  const selectedAnalysisReport =
+    selectedReport?.meta.reportType !== 'market_review' &&
+    selectedReport?.meta.id === routeState.recordId
+      ? selectedReport
+      : null;
   const handleReanalyze = useCallback(async () => {
-    if (!selectedAnalysisReport) return;
-
-    const beforeTaskIds = new Set(analysisTasks.map((task) => task.taskId));
-    await submitAnalysis({
+    if (!selectedAnalysisReport || selectedAnalysisReport.meta.reportType === 'market_review')
+      return;
+    await executeAnalysisIntent({
       stockCode: selectedAnalysisReport.meta.stockCode,
       stockName: selectedAnalysisReport.meta.stockName,
       originalQuery: selectedAnalysisReport.meta.stockCode,
       selectionSource: 'manual',
+      notify,
       forceRefresh: true,
+      reportType: selectedAnalysisReport.meta.reportType,
       analysisPhase,
       skills: selectedAnalysisSkills,
     });
-    if (!isMountedRef.current) return;
-    const latest = useStockPoolStore.getState();
-    const taskAccepted = latest.activeTasks.some((task) => (
-      task.reportType !== 'market_review'
-      && !beforeTaskIds.has(task.taskId)
-      && areStockCodesEquivalent(task.stockCode, selectedAnalysisReport.meta.stockCode)
-    ));
-    if (taskAccepted || latest.duplicateTask) {
-      selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
-    }
   }, [
     analysisPhase,
-    analysisTasks,
-    selectSegment,
+    executeAnalysisIntent,
+    notify,
     selectedAnalysisReport,
     selectedAnalysisSkills,
-    submitAnalysis,
   ]);
   const handleAskFollowUp = useCallback(() => {
     const recordId = selectedAnalysisReport?.meta.id;
     const stockCode = selectedAnalysisReport?.meta.stockCode;
     if (recordId === undefined || !stockCode) return;
-
-    navigate(buildDeepLink({
-      page: 'chat',
-      stockCode,
-      stockName: selectedAnalysisReport.meta.stockName || undefined,
-      recordId,
-    }));
+    navigate(
+      buildDeepLink({
+        page: 'chat',
+        stockCode,
+        stockName: selectedAnalysisReport.meta.stockName || undefined,
+        recordId,
+      }),
+    );
   }, [navigate, selectedAnalysisReport]);
   const isHistoryTrendUnavailable = !selectedReport?.meta.stockCode;
   useEffect(() => {
     if (
-      isHistoryTrendOpen
-      && (
-        routeState.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
-        || isHistoryTrendUnavailable
-      )
+      isHistoryTrendOpen &&
+      (routeState.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.history ||
+        isHistoryTrendUnavailable)
     ) {
       closeHistoryTrend();
     }
   }, [closeHistoryTrend, isHistoryTrendOpen, isHistoryTrendUnavailable, routeState.segment]);
-  const hasUnresolvedReportIntent = routeState.recordId !== null
-    && selectedRecordId === routeState.recordId
-    && selectedAnalysisReport === null
-    && !isLoadingReport;
-  const visibleError = reportDetailError ?? error;
-
+  const hasUnresolvedReportIntent =
+    routeState.recordId !== null &&
+    selectedRecordId === routeState.recordId &&
+    selectedAnalysisReport === null &&
+    !isLoadingReport;
+  const { launchBlockedByBusy, openBusyTasks } = useAnalysisWorkbenchErrorContract({
+    duplicateError,
+    duplicateTask,
+    error,
+    analysisTasks,
+    openTaskRunFlow,
+    selectSegment,
+  });
+  const focusStockInput = useCallback(() => {
+    selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch);
+    window.requestAnimationFrame(() => {
+      document.getElementById('analysis-workbench-stock-search')?.focus();
+    });
+  }, [selectSegment]);
+  const dismissPrimaryError = useCallback(() => {
+    lastAnalysisIntentRef.current = null;
+    clearError();
+  }, [clearError]);
+  const dismissRunFlowError = useCallback(() => {
+    failedRunFlowSourceRef.current = null;
+    setRunFlowError(null);
+  }, []);
+  const dismissBatchNotice = useCallback(() => {
+    lastBatchIntentRef.current = null;
+    setBatchNotice(null);
+  }, []);
+  const hasWorkbenchErrorNotice = Boolean(
+    inputError
+    || duplicateError
+    || error
+    || reportDetailError
+    || runFlowError
+    || batchNotice,
+  );
   return (
     <AppPage data-testid="analysis-workbench-page">
       <PageHeader
         ref={pageHeadingRef}
         title={t('analysisWorkbench.title')}
         description={t('analysisWorkbench.description')}
-        actions={(
+        actions={
           <Button
             type="button"
             variant="primary"
@@ -920,9 +1061,8 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             <FlaskConical className="h-4 w-4" aria-hidden="true" />
             {t('home.analyze')}
           </Button>
-        )}
+        }
       />
-
       <SegmentedControl
         id={WORKBENCH_TABS_ID}
         className="mt-5"
@@ -934,241 +1074,79 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         }))}
         getPanelId={(value) => getTabPanelId(WORKBENCH_TABS_ID, value)}
         onChange={(value) => {
-          if (Object.values(ANALYSIS_WORKBENCH_SEGMENT_VALUES).includes(
-            value as AnalysisWorkbenchSegment,
-          )) {
+          if (
+            Object.values(ANALYSIS_WORKBENCH_SEGMENT_VALUES).includes(
+              value as AnalysisWorkbenchSegment,
+            )
+          ) {
             selectSegment(value as AnalysisWorkbenchSegment);
           }
         }}
       />
-
-      <div className="mt-4 space-y-3" aria-live="polite">
-        {inputError ? (
-          <InlineAlert variant="danger" title={t('home.inputInvalid')} message={inputError} />
-        ) : null}
-        {duplicateError ? (
-          <InlineAlert
-            variant="warning"
-            title={t('home.duplicateTask')}
-            message={duplicateTask
-              ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
-              : getParsedApiError(duplicateError, language).message}
+      {hasWorkbenchErrorNotice ? (
+        <Suspense fallback={null}>
+          <AnalysisWorkbenchErrorStack
+            inputError={inputError}
+            duplicateError={duplicateError}
+            duplicateTask={duplicateTask}
+            analysisError={error}
+            reportDetailError={reportDetailError}
+            runFlowError={runFlowError}
+            batchNotice={batchNotice}
+            isAnalyzing={isAnalyzing}
+            isBatchSubmitting={isBatchSubmitting}
+            onClearError={dismissPrimaryError}
+            onClearRunFlowError={dismissRunFlowError}
+            onClearBatchNotice={dismissBatchNotice}
+            onFocusInput={focusStockInput}
+            onRetryAnalysis={retryAnalysis}
+            onRetryReportDetail={() => void retrySelectedRecord()}
+            onRetryRunFlow={retryRunFlow}
+            onRetryBatch={retryBatch}
+            onViewTasks={openBusyTasks}
           />
-        ) : null}
-        {visibleError ? <ApiErrorAlert error={visibleError} onDismiss={clearError} /> : null}
-        {deleteError && !isDeleteConfirmOpen ? (
-          <ApiErrorAlert error={deleteError} onDismiss={() => setDeleteError(null)} />
-        ) : null}
-        {runFlowError ? <ApiErrorAlert error={runFlowError} onDismiss={() => setRunFlowError(null)} /> : null}
-        {batchNotice ? (
-          <InlineAlert variant={batchNotice.variant} message={batchNotice.message} />
-        ) : null}
-      </div>
-
-      <TabPanel
-        tabsId={WORKBENCH_TABS_ID}
-        value={ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch}
-        activeValue={routeState.segment}
+        </Suspense>
+      ) : null}
+      <Suspense
+        fallback={(
+          <TabPanel
+            tabsId={WORKBENCH_TABS_ID}
+            value={ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch}
+            activeValue={routeState.segment}
+          />
+        )}
       >
-        <Surface level="interactive" padding="lg">
-          <div className="mx-auto w-full max-w-5xl space-y-6">
-            <div className="max-w-2xl">
-              <h2 className="text-lg font-semibold text-foreground">
-                {t('analysisWorkbench.launch')}
-              </h2>
-              <p className="mt-1 text-sm text-secondary-text">
-                {t('analysisWorkbench.launchDescription')}
-              </p>
-            </div>
-
-            <div className="grid gap-4 rounded-xl border border-border bg-background/20 p-4 lg:grid-cols-3 lg:items-start">
-              <div>
-                <div className="mb-1.5 flex h-5 items-center gap-1">
-                  <label
-                    htmlFor="analysis-workbench-stock-search"
-                    className="text-xs font-medium text-secondary-text"
-                  >
-                    {STOCK_SEARCH_TEXT[language].inputLabel}
-                  </label>
-                  <Tooltip
-                    content={(
-                      <span className="space-y-1">
-                        <span className="block">{STOCK_SEARCH_TEXT[language].suffixExamples}</span>
-                        <span className="block">{STOCK_SEARCH_TEXT[language].manualEntryHint}</span>
-                      </span>
-                    )}
-                  >
-                    <button
-                      type="button"
-                      data-testid="analysis-stock-search-help"
-                      aria-label={`${STOCK_SEARCH_TEXT[language].inputLabel} · ${t('common.details')}`}
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                    >
-                      <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  </Tooltip>
-                </div>
-                <div className="[&>div>p]:sr-only">
-                  <StockAutocomplete
-                    id="analysis-workbench-stock-search"
-                    value={query}
-                    onChange={setQuery}
-                    onSubmit={(stockCode, stockName, selectionSource) => {
-                      void handleSubmitAnalysis(stockCode, stockName, selectionSource);
-                    }}
-                    placeholder={t('home.placeholder')}
-                    disabled={isAnalyzing || !isExperienceModeReady}
-                    className={inputError ? 'border-danger/50' : undefined}
-                  />
-                </div>
-              </div>
-              <Select
-                value={selectedStrategyId}
-                onChange={setSelectedStrategyId}
-                options={strategyOptions}
-                label={t('home.strategy')}
-                disabled={isAnalyzing || !isExperienceModeReady}
-                className="w-full [&>label]:flex [&>label]:h-5 [&>label]:items-center"
-                triggerClassName="w-full"
-              />
-              <AnalysisPhaseSelect
-                id="analysis-workbench-phase"
-                value={analysisPhase}
-                onChange={setAnalysisPhase}
-                label={t('analysis.phase')}
-                disabled={isAnalyzing || isBatchSubmitting || !isExperienceModeReady}
-                labelAction={(
-                  <Tooltip content={t('analysis.phaseHint')}>
-                    <button
-                      type="button"
-                      data-testid="analysis-phase-help"
-                      aria-label={`${t('analysis.phase')} · ${t('common.details')}`}
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                    >
-                      <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  </Tooltip>
-                )}
-              />
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <SegmentedControl
-                  value={experienceMode}
-                  onChange={handleExperienceModeChange}
-                  ariaLabel={t('home.experienceModeLabel')}
-                  semantics="single-select"
-                  options={[
-                    { value: 'beginner', label: t('home.beginnerMode') },
-                    { value: 'professional', label: t('home.professionalMode') },
-                  ]}
-                />
-                <Checkbox
-                  checked={notify}
-                  onChange={(event) => setNotify(event.target.checked)}
-                  label={t('home.notify')}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                className="shrink-0"
-                disabled={!query || isAnalyzing || !isExperienceModeReady}
-                isLoading={isAnalyzing}
-                loadingText={t('home.analyzing')}
-                onClick={() => void handleSubmitAnalysis()}
-              >
-                <FlaskConical className="h-4 w-4" aria-hidden="true" />
-                {experienceMode === 'beginner' ? t('home.quickAnalyze') : t('home.analyze')}
-              </Button>
-            </div>
-
-            <div className="rounded-xl border border-border bg-background/20 p-4">
-              <p className="text-sm text-secondary-text">
-                {t('analysisWorkbench.batchDescription')}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  isLoading={isBatchSubmitting}
-                  disabled={isBatchSubmitting || watchlist.isLoading || !isExperienceModeReady}
-                  onClick={() => void submitWatchlistBatch('all')}
-                >
-                  <ListChecks className="h-4 w-4" aria-hidden="true" />
-                  {t('watchlist.analyzeAll')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={(
-                    isBatchSubmitting
-                    || watchlist.isLoading
-                    || !isExperienceModeReady
-                    || watchlistCoverage.isTodayStatusBlocked
-                    || watchlistCoverage.pendingCodes.length === 0
-                  )}
-                  aria-describedby={watchlistCoverage.isTodayStatusBlocked
-                    ? WORKBENCH_PENDING_REASON_ID
-                    : undefined}
-                  onClick={() => void submitWatchlistBatch('pending')}
-                >
-                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                  {t('watchlist.analyzePending')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  isLoading={isImporting}
-                  loadingText={t('analysisWorkbench.importing')}
-                  disabled={isImporting || isBatchSubmitting}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-4 w-4" aria-hidden="true" />
-                  {t('analysisWorkbench.importAction')}
-                </Button>
-                {importedCodes.length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    isLoading={isBatchSubmitting}
-                    disabled={isImporting || isBatchSubmitting || !isExperienceModeReady}
-                    onClick={() => void submitBatch(importedCodes)}
-                  >
-                    <FileUp className="h-4 w-4" aria-hidden="true" />
-                    {t('analysisWorkbench.analyzeImported', { count: importedCodes.length })}
-                  </Button>
-                ) : null}
-                {watchlistCoverage.isTodayStatusBlocked ? (
-                  <p
-                    id={WORKBENCH_PENDING_REASON_ID}
-                    className="basis-full text-xs text-secondary-text"
-                  >
-                    {t('watchlist.pendingStatusUnavailable')}
-                  </p>
-                ) : null}
-                <FileInput
-                  ref={fileInputRef}
-                  accept="image/jpeg,image/png,image/webp,image/gif,.csv,.xlsx,.xls,.txt"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleImportFile(file);
-                  }}
-                />
-              </div>
-              {importNotice ? (
-                <InlineAlert
-                  className="mt-3"
-                  variant={importNotice.variant}
-                  message={importNotice.message}
-                />
-              ) : null}
-            </div>
-          </div>
-        </Surface>
-      </TabPanel>
-
+        <AnalysisWorkbenchLaunchPanel
+          activeSegment={routeState.segment}
+          query={query}
+          setQuery={setQuery}
+          inputError={inputError}
+          isAnalyzing={isAnalyzing}
+          isBatchSubmitting={isBatchSubmitting}
+          isImporting={isImporting}
+          isExperienceModeReady={isExperienceModeReady}
+          launchBlockedByBusy={launchBlockedByBusy}
+          experienceMode={experienceMode}
+          onExperienceModeChange={handleExperienceModeChange}
+          notify={notify}
+          setNotify={setNotify}
+          selectedStrategyId={selectedStrategyId}
+          setSelectedStrategyId={setSelectedStrategyId}
+          strategyOptions={strategyOptions}
+          analysisPhase={analysisPhase}
+          setAnalysisPhase={setAnalysisPhase}
+          onSubmitAnalysis={handleSubmitAnalysis}
+          onSubmitWatchlistBatch={submitWatchlistBatch}
+          onSubmitImportedBatch={() => submitBatch(importedCodes)}
+          onImportFile={handleImportFile}
+          importedCodes={importedCodes}
+          importNotice={importNotice}
+          watchlistLoading={watchlist.isLoading}
+          pendingBlocked={watchlistCoverage.isTodayStatusBlocked}
+          pendingCount={watchlistCoverage.pendingCodes.length}
+          fileInputRef={fileInputRef}
+        />
+      </Suspense>
       <TabPanel
         tabsId={WORKBENCH_TABS_ID}
         value={ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}
@@ -1363,10 +1341,17 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         isOpen={isDeleteConfirmOpen}
         title={t('history.deleteConfirmTitle')}
         message={t('history.deleteConfirmBatch', { count: selectedHistoryIds.size })}
-        confirmText={isDeletingHistory ? t('common.deleting') : t('common.delete')}
+        confirmText={
+          isDeletingHistory
+            ? t('common.deleting')
+            : deleteError
+              ? t('common.retry')
+              : t('common.delete')
+        }
         confirmDisabled={isDeletingHistory}
         cancelDisabled={isDeletingHistory}
         error={deleteError?.message ?? null}
+        focusConfirmOnError
         isDanger
         onConfirm={() => void deleteSelectedHistory()}
         onCancel={cancelDeleteSelectedHistory}

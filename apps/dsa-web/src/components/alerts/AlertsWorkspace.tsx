@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BellRing, RefreshCw } from 'lucide-react';
 import { alertsApi } from '../../api/alerts';
 import type { ParsedApiError } from '../../api/error';
@@ -24,6 +24,14 @@ import type {
   AlertType,
 } from '../../types/alerts';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import {
+  buildAlertNotificationsQueryKey,
+  buildAlertRulesQueryKey,
+  buildAlertTriggersQueryKey,
+  useAlertNotificationsQuery,
+  useAlertRulesQuery,
+  useAlertTriggersQuery,
+} from '../../hooks';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
   ALERT_NOTIFICATION_CHANNEL_LABELS,
@@ -309,24 +317,57 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    void loadRules();
-  }, [loadRules]);
-
+  // Deep-link selection jumps trigger history to page 1 before the load key changes.
   useEffect(() => {
     const selectionChanged = selectedTriggerId !== null
       && selectedTriggerId !== previousSelectedTriggerIdRef.current;
     previousSelectedTriggerIdRef.current = selectedTriggerId;
     if (selectionChanged && triggersPage !== 1) {
       setTriggersPage(1);
-      return;
     }
-    void loadTriggers(triggersPage);
-  }, [loadTriggers, selectedTriggerId, triggersPage]);
+  }, [selectedTriggerId, triggersPage]);
 
-  useEffect(() => {
-    void loadNotifications(notificationsPage);
-  }, [loadNotifications, notificationsPage]);
+  const rulesQueryKey = useMemo(() => buildAlertRulesQueryKey({
+    scope,
+    enabledFilter,
+    alertTypeFilter,
+    page: rulesPage,
+  }), [alertTypeFilter, enabledFilter, rulesPage, scope]);
+
+  useAlertRulesQuery({
+    queryKey: rulesQueryKey,
+    load: () => loadRules(),
+    onCancelInFlight: () => {
+      rulesRequestIdRef.current += 1;
+    },
+  });
+
+  const triggersQueryKey = useMemo(
+    () => buildAlertTriggersQueryKey(triggersPage),
+    [triggersPage],
+  );
+
+  useAlertTriggersQuery({
+    queryKey: triggersQueryKey,
+    load: () => loadTriggers(triggersPage),
+    onCancelInFlight: () => {
+      triggersRequestIdRef.current += 1;
+    },
+  });
+
+  const notificationsQueryKey = useMemo(() => buildAlertNotificationsQueryKey({
+    page: notificationsPage,
+    channelFilter: notificationChannelFilter,
+    successFilter: notificationSuccessFilter,
+  }), [notificationChannelFilter, notificationSuccessFilter, notificationsPage]);
+
+  useAlertNotificationsQuery({
+    queryKey: notificationsQueryKey,
+    load: () => loadNotifications(notificationsPage),
+    onCancelInFlight: () => {
+      notificationsRequestIdRef.current += 1;
+    },
+  });
 
   const handleCreateRule = async (payload: AlertRuleCreateRequest) => {
     setCreateLoading(true);
@@ -476,6 +517,13 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   const internalTabsId = embedded ? SIGNAL_CENTER_HISTORY_TABS_ID : ALERTS_TABS_ID;
   const panelOwnedByParent = embedded && activeView === 'rules';
   const internalTabsVisible = !embedded || activeView !== 'rules';
+  const filtersActive = enabledFilter !== 'all' || alertTypeFilter !== 'all';
+  // The empty table already owns the primary create action. Keep the toolbar
+  // action for populated, filtered-empty, and loading states without rendering
+  // two same-name primary buttons for a genuinely empty Signal Center.
+  const showEmbeddedCreateAction = embedded
+    && activeView === 'rules'
+    && (rulesLoading || rulesTotal > 0 || filtersActive);
   const ActivePanel: React.ElementType = panelOwnedByParent ? 'section' : TabPanel;
   const activePanelProps = panelOwnedByParent
     ? {}
@@ -499,7 +547,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             {text.createRule}
           </Button>
         )}
-      /> : activeView === 'rules' ? (
+      /> : showEmbeddedCreateAction ? (
         <div className="flex justify-end">
           <Button
             type="button"
@@ -645,6 +693,11 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             onEdit={(rule) => void handleEditOpen(rule)}
             onTest={(rule) => void handleTestRule(rule)}
             busyRules={busyRules}
+            onCreateRule={() => {
+              setCreateError(null);
+              setCreateRuleModalOpen(true);
+            }}
+            createRuleLabel={text.createRule}
           />
           {testResult ? (
             <InlineAlert

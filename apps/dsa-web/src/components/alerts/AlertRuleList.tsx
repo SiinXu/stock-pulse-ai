@@ -1,7 +1,19 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Bell, Trash2 } from 'lucide-react';
-import { Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, Pagination, Select } from '../common';
+import {
+  AdvancedFilterSheet,
+  AppliedFilterChips,
+  type AppliedFilterItem,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  DataTable,
+  type DataTableColumn,
+  Pagination,
+  Select,
+} from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
@@ -97,6 +109,13 @@ function hasChildTargetCooldown(rule: AlertRuleItem): boolean {
   return rule.targetScope === 'watchlist' || rule.targetScope === 'portfolio_holdings';
 }
 
+function optionLabel(
+  options: ReadonlyArray<{ value: string; label: string }>,
+  value: string,
+): string {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
 interface AlertRuleListProps {
   rules: AlertRuleItem[];
   total: number;
@@ -113,6 +132,8 @@ interface AlertRuleListProps {
   onEdit: (rule: AlertRuleItem) => void;
   onTest: (rule: AlertRuleItem) => void;
   busyRules?: AlertRuleBusyMap;
+  onCreateRule?: () => void;
+  createRuleLabel?: string;
 }
 
 export const AlertRuleList: React.FC<AlertRuleListProps> = ({
@@ -131,15 +152,60 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   onEdit,
   onTest,
   busyRules = {},
+  onCreateRule,
+  createRuleLabel,
 }) => {
   const { language } = useUiLanguage();
   const text = ALERT_LIST_TEXT[language];
+  const enabledOptions = ALERT_ENABLED_FILTER_OPTIONS[language];
+  const typeOptions = ALERT_TYPE_FILTER_OPTIONS[language];
   const [pendingDelete, setPendingDelete] = useState<AlertRuleItem | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isRuleBusy = (rule: AlertRuleItem) => Boolean(busyRules[rule.id]);
   const isRuleActionBusy = (rule: AlertRuleItem, action: AlertRuleBusyAction) => (
     busyRules[rule.id] === action
   );
+
+  const activeFilterCount = (enabledFilter !== 'all' ? 1 : 0) + (alertTypeFilter !== 'all' ? 1 : 0);
+  const filtersActive = activeFilterCount > 0;
+
+  const clearAllFilters = () => {
+    onEnabledFilterChange('all');
+    onAlertTypeFilterChange('all');
+  };
+
+  const appliedFilters: AppliedFilterItem[] = useMemo(() => {
+    const items: AppliedFilterItem[] = [];
+    if (enabledFilter !== 'all') {
+      items.push({
+        id: 'enabled',
+        label: text.enabledFilter,
+        value: optionLabel(enabledOptions, enabledFilter),
+        removeLabel: formatUiText(text.removeFilter, { label: text.enabledFilter }),
+        onRemove: () => onEnabledFilterChange('all'),
+      });
+    }
+    if (alertTypeFilter !== 'all') {
+      items.push({
+        id: 'alertType',
+        label: text.alertTypeFilter,
+        value: optionLabel(typeOptions, alertTypeFilter),
+        removeLabel: formatUiText(text.removeFilter, { label: text.alertTypeFilter }),
+        onRemove: () => onAlertTypeFilterChange('all'),
+      });
+    }
+    return items;
+  }, [
+    alertTypeFilter,
+    enabledFilter,
+    enabledOptions,
+    onAlertTypeFilterChange,
+    onEnabledFilterChange,
+    text.alertTypeFilter,
+    text.enabledFilter,
+    text.removeFilter,
+    typeOptions,
+  ]);
 
   const ruleColumns: DataTableColumn<AlertRuleItem>[] = [
     {
@@ -261,29 +327,89 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
     },
   ];
 
+  const emptyState = (() => {
+    if (isLoading) {
+      return {
+        icon: <Bell className="h-6 w-6" />,
+        title: text.loadingRules,
+        description: text.emptyDescription,
+      };
+    }
+    if (filtersActive) {
+      return {
+        icon: <Bell className="h-6 w-6" />,
+        title: text.filteredEmptyTitle,
+        description: text.filteredEmptyDescription,
+        action: (
+          <Button type="button" variant="secondary" size="comfortable" onClick={clearAllFilters}>
+            {text.clearFilters}
+          </Button>
+        ),
+      };
+    }
+    return {
+      icon: <Bell className="h-6 w-6" />,
+      title: text.emptyTitle,
+      description: text.emptyDescription,
+      action: onCreateRule && createRuleLabel ? (
+        <Button type="button" variant="primary" size="comfortable" onClick={onCreateRule}>
+          {createRuleLabel}
+        </Button>
+      ) : undefined,
+    };
+  })();
+
   return (
     <Card
       title={text.title}
       subtitle={formatUiText(text.subtitle, { total })}
       headerRight={(
-        <div className="grid w-full max-w-full items-end gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
-          <Select
-            ariaLabel={text.enabledFilter}
-            value={enabledFilter}
-            options={ALERT_ENABLED_FILTER_OPTIONS[language]}
-            onChange={(value) => {
-              onEnabledFilterChange(value as AlertRuleEnabledFilter);
+        <div className="flex w-full max-w-full flex-col items-stretch gap-2 sm:items-end">
+          <AdvancedFilterSheet
+            triggerLabel={text.filters}
+            triggerAriaLabel={
+              activeFilterCount > 0
+                ? formatUiText(text.filtersAria, { count: activeFilterCount })
+                : text.filters
+            }
+            activeCount={activeFilterCount}
+            title={text.filters}
+            resetLabel={text.resetFilters}
+            applyLabel={text.applyFilters}
+            onReset={clearAllFilters}
+            onApply={() => {
+              // Filters commit immediately on Select change; Apply only closes the sheet/popover.
             }}
-            className="w-full sm:w-32"
-          />
-          <Select
-            ariaLabel={text.alertTypeFilter}
-            value={alertTypeFilter}
-            options={ALERT_TYPE_FILTER_OPTIONS[language]}
-            onChange={(value) => {
-              onAlertTypeFilterChange(value as AlertTypeFilter);
-            }}
-            className="w-full max-w-full sm:w-44"
+          >
+            <div className="grid gap-3">
+              <Select
+                label={text.enabledFilter}
+                ariaLabel={text.enabledFilter}
+                value={enabledFilter}
+                options={enabledOptions}
+                onChange={(value) => {
+                  onEnabledFilterChange(value as AlertRuleEnabledFilter);
+                }}
+                className="w-full"
+              />
+              <Select
+                label={text.alertTypeFilter}
+                ariaLabel={text.alertTypeFilter}
+                value={alertTypeFilter}
+                options={typeOptions}
+                onChange={(value) => {
+                  onAlertTypeFilterChange(value as AlertTypeFilter);
+                }}
+                className="w-full max-w-full"
+              />
+            </div>
+          </AdvancedFilterSheet>
+          <AppliedFilterChips
+            aria-label={text.appliedFilters}
+            clearAllLabel={text.clearFilters}
+            onClearAll={clearAllFilters}
+            disabled={isLoading}
+            filters={appliedFilters}
           />
         </div>
       )}
@@ -300,11 +426,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
           columns={ruleColumns}
           rows={rules}
           getRowKey={(rule) => rule.id}
-          emptyState={{
-            icon: <Bell className="h-6 w-6" />,
-            title: isLoading ? text.loadingRules : text.emptyTitle,
-            description: text.emptyDescription,
-          }}
+          emptyState={emptyState}
           density="compact"
           minWidth="extra-wide"
         />

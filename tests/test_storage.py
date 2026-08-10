@@ -605,6 +605,107 @@ class TestStorage(unittest.TestCase):
 
         DatabaseManager.reset_instance()
 
+
+    def test_conversation_user_turn_persists_and_updates_session_skills(self):
+        DatabaseManager.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+
+        first_id = db.save_conversation_user_turn(
+            "skill-session",
+            "first question",
+            ["technical", "risk"],
+        )
+        second_id = db.save_conversation_user_turn(
+            "skill-session",
+            "use general analysis",
+            [],
+        )
+
+        self.assertGreater(first_id, 0)
+        self.assertGreater(second_id, first_id)
+        self.assertEqual(
+            [message["content"] for message in db.get_conversation_messages("skill-session")],
+            ["first question", "use general analysis"],
+        )
+        self.assertEqual(
+            db.get_conversation_session_selected_skill_ids("skill-session"),
+            [],
+        )
+
+        deleted = db.delete_conversation_session("skill-session")
+
+        self.assertEqual(deleted, 2)
+        self.assertIsNone(
+            db.get_conversation_session_selected_skill_ids("skill-session")
+        )
+        DatabaseManager.reset_instance()
+
+    def test_conversation_user_turn_without_skill_update_keeps_session_state(self):
+        DatabaseManager.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+
+        db.save_conversation_user_turn("skill-session", "first", ["technical"])
+        db.save_conversation_user_turn("skill-session", "follow up")
+
+        self.assertEqual(
+            db.get_conversation_session_selected_skill_ids("skill-session"),
+            ["technical"],
+        )
+        DatabaseManager.reset_instance()
+
+    def test_conversation_user_turn_is_idempotent_by_session_and_turn_id(self):
+        DatabaseManager.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+
+        first_id = db.save_conversation_user_turn(
+            "turn-session",
+            "compare with the report",
+            ["technical"],
+            turn_id="turn-1",
+            context={"stock_code": "600519", "stock_name": "Example"},
+        )
+        retry_id = db.save_conversation_user_turn(
+            "turn-session",
+            "compare with the report",
+            ["technical"],
+            turn_id="turn-1",
+            context={"stock_code": "600519", "stock_name": "Example"},
+        )
+
+        messages = db.get_conversation_messages("turn-session")
+        self.assertEqual(retry_id, first_id)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["turn_id"], "turn-1")
+
+        with self.assertRaisesRegex(ValueError, "chat_turn_id_conflict"):
+            db.save_conversation_user_turn(
+                "turn-session",
+                "different content",
+                turn_id="turn-1",
+            )
+        DatabaseManager.reset_instance()
+
+    def test_conversation_user_turn_rolls_back_message_when_state_write_fails(self):
+        DatabaseManager.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+
+        with patch(
+            "src.storage.sqlite_insert",
+            side_effect=RuntimeError("state write failed"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "state write failed"):
+                db.save_conversation_user_turn(
+                    "skill-session",
+                    "not accepted",
+                    ["technical"],
+                )
+
+        self.assertEqual(db.get_conversation_messages("skill-session"), [])
+        self.assertIsNone(
+            db.get_conversation_session_selected_skill_ids("skill-session")
+        )
+        DatabaseManager.reset_instance()
+
     def test_conversation_message_save_returns_id(self):
         DatabaseManager.reset_instance()
         db = DatabaseManager(db_url="sqlite:///:memory:")

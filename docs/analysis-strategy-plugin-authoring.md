@@ -133,18 +133,52 @@ would defer the conflict from registration diagnostics to catalog publication.
 One resolved catalog feeds Single-Agent prompt assembly, Multi-Agent routing,
 and `SkillAgent` construction:
 
-1. `SkillManager.load_builtin_skills()` loads the complete built-in catalog:
-   root YAML under `strategies/` plus the explicitly reserved
-   `strategies/personas/` YAML collection.
+1. **Built-in strategies are first-class plugins.** Each root YAML under
+   `strategies/` and each reserved `strategies/personas/` YAML is packaged as a
+   built-in plugin id `builtin.analysis-strategy.<skill-name>` and registered
+   through the `analysis_strategy` hook at ApplicationServices startup. YAML
+   content remains the single source of definition text (desktop packaging and
+   author edits stay on those files). Packaged built-ins keep runtime
+   `source="builtin"` for default-prompt parity.
 2. A configured `AGENT_SKILL_DIR` keeps its existing top-level YAML/YML and
-   nested `SKILL.md` discovery behavior. A custom name may replace a built-in.
-3. An enabled plugin may add only a name not owned by the resolved built-in or
-   custom catalog or by another plugin. Registration conflicts fail closed and
-   do not change the existing owner.
+   nested `SKILL.md` discovery behavior. A custom name may replace a built-in
+   (custom declarative wins; the still-enabled plugin definition is excluded
+   from the published catalog until the conflict is removed).
+3. An external or additional plugin may add only a name not owned by the
+   resolved custom catalog or by another plugin. Registration conflicts fail
+   closed and do not change the existing owner.
 4. If a runtime custom-directory change introduces a conflict with an already
    enabled plugin, the custom definition remains authoritative and the plugin
    definition is excluded from the published catalog. Removing that conflict
    makes the still-enabled plugin visible on the next rebuilt snapshot.
+
+### Legacy YAML shim (compatibility)
+
+`SkillManager.load_builtin_skills()` remains as a **thin legacy shim** that still
+reads `strategies/` YAML directly. Offline tools, unit tests, and migration
+callers may use it without plugin composition. The process composition path
+does **not** double-load those names as declarative reserved names; live catalogs
+come from the built-in plugins plus custom directory plus external plugins.
+
+**User-custom strategy files:** keep using `AGENT_SKILL_DIR` (or the legacy
+`AGENT_STRATEGY_DIR` alias) with top-level YAML/YML or nested `SKILL.md`. No
+migration is required for custom definitions. Do not put custom files only in
+the repo `strategies/` tree if you need them as operator overrides — that tree
+is the built-in catalog packaging surface.
+
+### Enable and disable
+
+Disable a single built-in strategy plugin through the existing PluginManager
+lifecycle (same semantics as other built-ins / PLUG-01 controls):
+
+```python
+services.plugin_manager.disable("builtin.analysis-strategy.bull_trend")
+services.plugin_manager.enable("builtin.analysis-strategy.bull_trend")
+```
+
+After disable, the skill is absent from the next catalog snapshot. External
+plugins continue to use `plugin:<manifest-id>` provenance and never impersonate
+`source="builtin"`.
 
 The cached prototype is keyed by custom-directory value, application-root
 identity, and plugin generation. Load, disable, enable, root replacement, and

@@ -81,6 +81,7 @@ class _AnalysisContextStageMixin:
         fundamental_context: Optional[Dict[str, Any]] = None,
         market_phase_context: Optional[Dict[str, Any]] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        money_flow_data: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         增强分析上下文
@@ -152,14 +153,56 @@ class _AnalysisContextStageMixin:
                 'chip_status': chip_data.get_chip_status(current_price or 0),
             }
 
+        # Optional SmartMoney money-flow context (fail-open; only when fetched).
+        if money_flow_data is not None:
+            try:
+                from src.services.smartmoney_flow_service import money_flow_to_context
+
+                money_flow_context = money_flow_to_context(money_flow_data)
+                if money_flow_context:
+                    enhanced["money_flow"] = money_flow_context
+            except Exception as exc:  # broad-exception: fallback_recorded - optional money-flow inject
+                log_safe_exception(
+                    logger,
+                    "SmartMoney money-flow context inject failed",
+                    exc,
+                    error_code="pipeline_money_flow_context_inject_failed",
+                    level=logging.DEBUG,
+                )
+
         # Add trend analysis results
         if trend_result:
-            enhanced['trend_analysis'] = {
+            technical_projection = {
                 'trend_status': trend_result.trend_status.value,
                 'ma_alignment': trend_result.ma_alignment,
+                'ma5': trend_result.ma5,
+                'ma10': trend_result.ma10,
+                'ma20': trend_result.ma20,
                 'trend_strength': trend_result.trend_strength,
                 'bias_ma5': trend_result.bias_ma5,
                 'bias_ma10': trend_result.bias_ma10,
+                'ma_by_period': trend_result.ma_by_period,
+                'ma_readings': {
+                    str(period): reading.to_dict()
+                    for period, reading in trend_result.ma_readings.items()
+                },
+                'rsi_by_period': trend_result.rsi_by_period,
+                'rsi_readings': {
+                    str(period): reading.to_dict()
+                    for period, reading in trend_result.rsi_readings.items()
+                },
+                'macd_reading': (
+                    trend_result.macd_reading.to_dict()
+                    if trend_result.macd_reading is not None
+                    else None
+                ),
+                'bias_by_period': trend_result.bias_by_period,
+                'support_by_period': trend_result.support_by_period,
+                'primary_ma_periods': trend_result.primary_ma_periods,
+                'primary_bias_period': trend_result.primary_bias_period,
+                'indicator_period_source': trend_result.indicator_period_source,
+                'indicator_bar_count': trend_result.indicator_bar_count,
+                'indicator_as_of': trend_result.indicator_as_of,
                 'volume_status': trend_result.volume_status.value,
                 'volume_trend': trend_result.volume_trend,
                 'buy_signal': trend_result.buy_signal.value,
@@ -167,10 +210,29 @@ class _AnalysisContextStageMixin:
                 'signal_reasons': trend_result.signal_reasons,
                 'risk_factors': trend_result.risk_factors,
             }
+            from data_provider.data_validation import project_technical_indicators
+
+            enhanced['trend_analysis'] = project_technical_indicators(
+                technical_projection,
+                market=get_market_for_stock(
+                    normalize_stock_code(enhanced.get('code', ''))
+                ),
+                stock_code=enhanced.get('code'),
+            )
 
         # Issue #234: Intra-day analysis uses real-time OHLC and trend MA coverage today.
-        # Protection condition: trend_result.ma5 > 0 indicates MA calculation succeeded and data volume is sufficient.
-        if realtime_quote and trend_result and trend_result.ma5 > 0:
+        # A positive projected MA5 indicates validation and MA coverage both succeeded.
+        projected_ma5 = (
+            enhanced.get('trend_analysis', {}).get('ma5')
+            if isinstance(enhanced.get('trend_analysis'), dict)
+            else None
+        )
+        if (
+            realtime_quote
+            and trend_result
+            and projected_ma5 is not None
+            and projected_ma5 > 0
+        ):
             price = getattr(realtime_quote, 'price', None)
             if price is not None and price > 0:
                 yesterday_close = None
@@ -199,17 +261,17 @@ class _AnalysisContextStageMixin:
                     'open': open_p,
                     'high': high_p,
                     'low': low_p,
-                    'ma5': trend_result.ma5,
-                    'ma10': trend_result.ma10,
-                    'ma20': trend_result.ma20,
                     'date': market_today,
                     'data_source': f"realtime:{source_name}",
                     'realtime_source': source_name,
                     'is_estimated': True,
                 }
-                estimated_fields = [
-                    'close', 'open', 'high', 'low', 'ma5', 'ma10', 'ma20',
-                ]
+                estimated_fields = ['close', 'open', 'high', 'low']
+                for ma_field in ('ma5', 'ma10', 'ma20'):
+                    ma_value = enhanced['trend_analysis'].get(ma_field)
+                    if ma_value is not None:
+                        realtime_today[ma_field] = ma_value
+                        estimated_fields.append(ma_field)
                 if vol is not None:
                     realtime_today['volume'] = vol
                     estimated_fields.append('volume')
@@ -243,7 +305,10 @@ class _AnalysisContextStageMixin:
                         realtime_today[k] = v
                 enhanced['today'] = realtime_today
                 enhanced['ma_status'] = self._compute_ma_status(
-                    price, trend_result.ma5, trend_result.ma10, trend_result.ma20
+                    price,
+                    enhanced['trend_analysis'].get('ma5') or 0,
+                    enhanced['trend_analysis'].get('ma10') or 0,
+                    enhanced['trend_analysis'].get('ma20') or 0,
                 )
                 enhanced['date'] = market_today
                 if yesterday_close is not None:

@@ -9,7 +9,7 @@
 后端配置注册表在 `src/core/config_registry.py` 中为字段追加帮助元数据：
 
 - `help_key`：前端多语言帮助文案的稳定 key。
-- `examples`：可直接展示的配置样例。敏感字段只能使用占位符，例如 `sk-xxxx`、`your_token`。
+- `examples`：配置样例**字面量**（`KEY=value`、URL、端口等），保存在中英文 source 中且必须逐字节一致；**不进入** UI 翻译 inventory，也不是按语言翻译的文案。当前 Settings 字段日常 UI **不渲染** raw examples（见 `SettingsField` / 相关测试）；它们是 source metadata，供校验、文档与将来显式展示使用。敏感字段只能使用占位符，例如 `sk-xxxx`、`your_token`。
 - `docs`：相关文档链接，优先指向仓库内已有专题文档或完整指南。
 - `warning_codes`：面向前端或后续校验扩展的稳定提示 code。
 
@@ -65,7 +65,7 @@ Issue #1512 收口后，Web 设置页只展示后端配置注册表中的正式�
 
 例外：`LLM_CHANNELS` 声明的动态连接详情键（如 `LLM_DEEPSEEK_PROVIDER`、`LLM_DEEPSEEK_API_KEY`、`LLM_MY_PROXY_MODELS`）会保留在配置接口返回中，供“模型接入”编辑器读取和保存；它们不作为普通配置卡片展示，也不复用 `WEB_SETTINGS_HIDDEN_FROM_UI` 的运维隐藏语义。
 
-暂不纳入 Web 设置页展示的低频/运维类 `.env` 变量包括 `DATABASE_PATH`、`SQLITE_*`、`USE_PROXY`、`PROXY_HOST`、`PROXY_PORT` 等。若后续需要在 Web 中编辑这些字段，应先在 `src/core/config_registry.py` 中正式注册并补齐 help 元数据，而不是依赖自动推断。
+暂不纳入 Web 设置页展示的低频/运维类 `.env` 变量包括 `DATABASE_PATH`、`SQLITE_*` 等。`USE_PROXY` / `PROXY_HOST` / `PROXY_PORT` 已在系统网络分组中注册展示（带 `restart_required` 与凭据脱敏说明）；若后续需要在 Web 中编辑其他隐藏字段，应先在配置注册表中正式注册并补齐 help 元数据，而不是依赖自动推断。
 
 ### 覆盖边界
 
@@ -101,4 +101,6 @@ Issue #1512 收口后，Web 设置页只展示后端配置注册表中的正式�
 - `SCHEDULE_ENABLED`：WebUI/API/Desktop 长运行进程（包括 `python main.py --serve --schedule`）会在保存后按新值启动或停止 runtime scheduler；纯 CLI schedule 模式（`python main.py --schedule`）仍按启动时参数和配置运行。
 - `SCHEDULE_TIME`、`SCHEDULE_TIMES`：不是重启必需项。`SCHEDULE_TIMES` 为空时使用 `SCHEDULE_TIME`；已运行的 scheduler 会按新时间重建 daily jobs。
 - `SCHEDULE_RUN_IMMEDIATELY`：schedule 模式启动行为，保存后不会让当前进程立即执行一次分析；手动执行请使用 runtime scheduler 的 run-now API。
-- runtime scheduler 的 run-now API 只会在没有分析任务运行时接受请求；如果已有分析在执行，会返回忙碌状态，Web 设置页会提示稍后重试。
+- runtime scheduler 的 run-now API 仅在本 API 进程已挂载且启用遗留批处理、并且没有分析任务运行时接受请求；否则会返回稳定的未挂载、未启用、状态不可用或忙碌原因。
+- scheduler status 返回本进程的挂载状态、进程模式、调度时区和 run-now 可用性。时间戳带明确偏移；Web 不得借用浏览器时区补写服务端缺失的时区。
+- 每次被接受的 run-now 都有 `run_id`，状态接口会用同一 ID 报告运行中及最终成功/失败；旧版服务端缺少关联字段时，Web 必须显示结果无法确认，不能把空闲误报为成功。

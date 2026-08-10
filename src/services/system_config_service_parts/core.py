@@ -82,7 +82,8 @@ class _SystemConfigCoreMethods:
 
     def get_config(self, include_schema: bool = True, mask_token: str = "******") -> Dict[str, Any]:
         """Return display config values with mask metadata for server-masked fields."""
-        saved_config_map = self._build_display_config_map(self._manager.read_config_map())
+        saved_values, config_version, updated_at = self._manager.read_config_snapshot()
+        saved_config_map = self._build_display_config_map(saved_values)
         runtime_config_map = self._build_runtime_display_config_map(saved_config_map)
         config_map = {
             **runtime_config_map,
@@ -135,11 +136,11 @@ class _SystemConfigCoreMethods:
         )
 
         return {
-            "config_version": self._manager.get_config_version(),
+            "config_version": config_version,
             "mask_token": mask_token,
             "items": items,
             "configured_notification_channels": configured_notification_channels,
-            "updated_at": self._manager.get_updated_at(),
+            "updated_at": updated_at,
         }
 
     def _detect_configured_notification_channels(self) -> List[str]:
@@ -260,12 +261,22 @@ class _SystemConfigCoreMethods:
     def get_setup_status(self) -> Dict[str, Any]:
         """Return read-only first-run setup status without mutating runtime state."""
         effective_map = self._build_setup_effective_config_map()
-        llm_check = self._build_setup_primary_llm_check(effective_map)
+        # One fast loopback probe per readiness call (never blocks startup).
+        local_detect = self._detect_local_runtime_for_setup(effective_map)
+        llm_check = self._build_setup_primary_llm_check(
+            effective_map,
+            local_detect=local_detect,
+        )
         agent_check = self._build_setup_agent_llm_check(effective_map, llm_check)
         checks = [
             llm_check,
             agent_check,
             self._build_setup_stock_list_check(effective_map),
+            self._build_setup_data_only_check(effective_map),
+            self._build_setup_local_runtime_check(
+                effective_map,
+                local_detect=local_detect,
+            ),
             self._build_setup_notification_check(effective_map),
             self._build_setup_storage_check(effective_map),
         ]

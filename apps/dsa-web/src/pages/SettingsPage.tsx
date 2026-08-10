@@ -1,28 +1,24 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker, useNavigate, useSearchParams } from 'react-router-dom';
+import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
-  buildAnalysisWorkbenchHref,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
 } from '../routing/routes';
-import { getUiListSeparator } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
-import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
-  AuthSettingsCard,
   InvestmentFrameworkSettingsCard,
-  ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
   LocalModelsWithKronos,
@@ -45,7 +41,6 @@ import {
   SettingsSectionCard,
   SettingsErrorSummary,
   type ErrorSummaryEntry,
-  FirstRunWizard,
   type WizardDraftItem,
   type WizardCompleteResult,
   type ModelReferenceReplacement,
@@ -53,9 +48,10 @@ import {
 import { parseModelAccessFieldKey, type ModelAccessFieldFocusRequest } from '../utils/modelAccessFieldKey';
 import { connectionItemsRespectSchema } from '../components/settings/settingsConnectionUpdateContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
-import SystemAboutCard from '../components/settings/SystemAboutCard';
 import ConfigBackupCard from '../components/settings/ConfigBackupCard';
-import AlphaSiftSettingsCard from '../components/settings/AlphaSiftSettingsCard';
+import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
+import OverviewSection from '../components/settings/sections/OverviewSection';
+import SystemSecuritySection from '../components/settings/sections/SystemSecuritySection';
 import {
   AiOverviewCard,
   AiTaskRoutingCard,
@@ -77,6 +73,7 @@ import {
 } from '../components/settings/settingsGenerationDraftModel';
 import SettingsConflictPanel from '../components/settings/SettingsConflictPanel';
 import SettingsActiveConfigPanel from '../components/settings/SettingsActiveConfigPanel';
+import { SettingsOnboardingHosts } from '../components/onboarding/SettingsOnboardingHosts';
 import {
   SETTINGS_SECTIONS,
   getDefaultView,
@@ -98,11 +95,6 @@ import {
   shouldMarkDirtyOnConflict,
 } from '../components/settings/autosaveMachine';
 import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
-import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
-import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
-import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
-import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
-import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { parseStockListValue } from '../utils/stockList';
 import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
@@ -149,7 +141,6 @@ function parseSetupStockList(value: unknown) {
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
-  const navigate = useNavigate();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -158,17 +149,18 @@ const SettingsPage: React.FC = () => {
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(false);
   const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
-  const { beginnerMode, setBeginnerMode } = useBeginnerMode();
+  const { beginnerMode, mode: settingsMode, setMode: setSettingsMode } = useBeginnerMode();
   // Advanced sections stay hidden until the user reveals them; re-hiding on
-  // enabling beginner mode keeps the simplified navigation predictable.
+  // Essentials mode keeps the simplified navigation predictable.
   const [advancedRevealed, setAdvancedRevealed] = useState(false);
-  const handleBeginnerModeChange = useCallback((next: boolean) => {
-    setBeginnerMode(next);
-    if (next) {
+  const handleSettingsModeChange = useCallback((next: 'essentials' | 'expert') => {
+    setSettingsMode(next);
+    if (next === 'essentials') {
       setAdvancedRevealed(false);
     }
-  }, [setBeginnerMode]);
+  }, [setSettingsMode]);
   const [isRefreshingSetupStatus, setIsRefreshingSetupStatus] = useState(false);
   const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [isRunningSetupSmoke, setIsRunningSetupSmoke] = useState(false);
@@ -230,8 +222,10 @@ const SettingsPage: React.FC = () => {
     load,
     retry,
     save,
+    serverItems,
     resetDraftKeys,
     setDraftValue,
+    applyPartialUpdate,
     getChangedItems,
     refreshAfterExternalSave,
     configVersion,
@@ -669,6 +663,11 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  const persistedValuesByKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    serverItems.forEach((item) => { map[item.key.toUpperCase()] = String(item.value ?? ''); });
+    return map;
+  }, [serverItems]);
   const rawValueKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const categoryItems of Object.values(itemsByCategory)) {
@@ -1334,6 +1333,21 @@ const SettingsPage: React.FC = () => {
   const activeConfigPanelTitle = sectionScopedCopy?.title
     ?? (hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle);
   const activeConfigPanelDescription = sectionScopedCopy?.description ?? activeCategoryDescription;
+  const persistedAgentModel = (persistedValuesByKey.AGENT_LITELLM_MODEL ?? '').trim();
+  const persistedReportModel = (persistedValuesByKey.LITELLM_MODEL ?? '').trim();
+  const effectivePersistedAgentModel = persistedAgentModel || persistedReportModel;
+  const resolvedPersistedAgentModel = effectivePersistedAgentModel ? resolveConfiguredModelRef(effectivePersistedAgentModel) : '';
+  const agentModelSummary = {
+    value: effectivePersistedAgentModel ? formatConfiguredModel(effectivePersistedAgentModel) : '',
+    source: persistedAgentModel ? 'explicit' as const : 'inherited' as const,
+    readiness: availableModelsLoading
+      ? 'checking' as const
+      : availableModelsError
+        ? 'unknown' as const
+        : !effectivePersistedAgentModel
+          ? 'unconfigured' as const
+          : availableModelRefSet.has(resolvedPersistedAgentModel) ? 'ready' as const : 'unavailable' as const,
+  };
   // For single-tab categories that a section split can narrow (agent →
   // Conversation / Agent Behavior), gate on the section-filtered content so an
   // empty section never renders a bare card.
@@ -1346,7 +1360,7 @@ const SettingsPage: React.FC = () => {
     && !isInvestmentFrameworkView
     && !isTopLevelAdvanced
     && !(isAlertsSection && activeView === 'events')
-    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
+    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about' || activeView === 'extensions'));
   const showActiveConfigEmptyState = !(
     activeSection === 'overview'
     || activeSection === 'ai_models'
@@ -1381,10 +1395,17 @@ const SettingsPage: React.FC = () => {
       isSaving={isSaving}
       issueByKey={issueByKey}
       allValuesByKey={allValuesByKey}
+      persistedValuesByKey={persistedValuesByKey}
       alphasiftEnabled={alphasiftEnabled}
       setDraftValue={setDraftValue}
+      applyPartialUpdate={applyPartialUpdate}
+      resetDraftKeys={resetDraftKeys}
+      activeSaveStatus={groupSaveStates[activeCategory]?.status ?? 'idle'}
+      agentModelSummary={agentModelSummary}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
+      maskToken={maskToken}
+      configVersion={configVersion}
     />
   );
   const activeSaveGroup = activeCategory;
@@ -1485,7 +1506,7 @@ const SettingsPage: React.FC = () => {
       {isLoading && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <SettingsLoading />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-4 lg:self-start space-y-3">
             <SettingsSectionNav
               activeSection={activeSection}
@@ -1498,26 +1519,11 @@ const SettingsPage: React.FC = () => {
               advancedRevealed={advancedRevealed}
               onRevealAdvanced={() => setAdvancedRevealed(true)}
             />
-            <Surface
-              level="interactive"
-              className="flex items-start justify-between gap-3 px-3 py-2.5"
-            >
-              <label htmlFor="settings-beginner-mode" className="min-w-0">
-                <span className="block text-sm font-medium text-foreground">
-                  {SETTINGS_MISC_TEXT[uiLanguage].beginnerModeLabel}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-text">
-                  {SETTINGS_MISC_TEXT[uiLanguage].beginnerModeHint}
-                </span>
-              </label>
-              <Switch
-                id="settings-beginner-mode"
-                testId="settings-beginner-mode"
-                checked={beginnerMode}
-                onCheckedChange={handleBeginnerModeChange}
-                aria-label={SETTINGS_MISC_TEXT[uiLanguage].beginnerModeLabel}
-              />
-            </Surface>
+            <SettingsModeToggle
+              mode={settingsMode}
+              onModeChange={handleSettingsModeChange}
+              language={uiLanguage}
+            />
           </aside>
 
           <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">
@@ -1544,127 +1550,49 @@ const SettingsPage: React.FC = () => {
                 message={t('settings.restartRequiredNotice')}
               />
             ) : null}
-            {shouldShowFirstRunSetup && !setupStatus?.isComplete ? (
-              <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    {settingsText.quickSetup}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-text">
-                    {settingsText.quickSetupDescription}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="default"
-                  className="shrink-0"
-                  disabled={isProviderCatalogLoading || providerCatalog.length === 0}
-                  onClick={() => setIsWizardOpen(true)}
-                >
-                  {settingsText.startWizard}
-                </Button>
-              </Surface>
-            ) : null}
-            {shouldShowFirstRunSetup ? (
-              <FirstRunSetupCard
-                status={setupStatus}
-                isLoading={isRefreshingSetupStatus}
-                error={setupStatusError}
-                firstStockCode={firstSetupStockCode}
-                isSaving={isSaving}
-                isRunningSmoke={isRunningSetupSmoke}
-                smokeError={setupSmokeError}
-                smokeSuccess={setupSmokeSuccess}
-                onRefresh={refreshSetupStatus}
-                onSelectCategory={(category) => {
-                  const target = legacyToSectionView(category, null);
-                  selectSectionView(target.section, target.view);
-                }}
-                onRunSmoke={handleRunSetupSmoke}
-                showStartWizard={Boolean(setupStatus?.isComplete)}
-                canStartWizard={!isProviderCatalogLoading && providerCatalog.length > 0}
-                startWizardLabel={settingsText.startWizard}
-                onStartWizard={() => setIsWizardOpen(true)}
-                listSeparator={getUiListSeparator(uiLanguage)}
-                t={t}
-              />
-            ) : null}
-            {shouldShowAlphaSiftSettings ? (
-              <AlphaSiftSettingsCard
-                enabled={alphasiftEnabled}
-                configVersion={configVersion}
-                maskToken={maskToken}
-                disabled={isSaving || isLoading}
-                onViewConfigItems={() => selectSectionView('data_sources', 'providers')}
-                onAfterChange={async () => {
-                  await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-                }}
-              />
-            ) : null}
-            {activeCategory === 'system' && activeView === 'security' ? (
-              <>
-                <AuthSettingsCard />
-                <SecurityAuditPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-              </>
-            ) : null}
+            <OverviewSection
+              shouldShowFirstRunSetup={shouldShowFirstRunSetup}
+              setupStatus={setupStatus}
+              isProviderCatalogLoading={isProviderCatalogLoading}
+              providerCatalogLength={providerCatalog.length}
+              setIsWizardOpen={setIsWizardOpen}
+              isRefreshingSetupStatus={isRefreshingSetupStatus}
+              setupStatusError={setupStatusError}
+              firstSetupStockCode={firstSetupStockCode}
+              isSaving={isSaving}
+              isLoading={isLoading}
+              isRunningSetupSmoke={isRunningSetupSmoke}
+              setupSmokeError={setupSmokeError}
+              setupSmokeSuccess={setupSmokeSuccess}
+              refreshSetupStatus={refreshSetupStatus}
+              selectSectionView={selectSectionView}
+              handleRunSetupSmoke={handleRunSetupSmoke}
+              shouldShowAlphaSiftSettings={shouldShowAlphaSiftSettings}
+              alphasiftEnabled={alphasiftEnabled}
+              configVersion={configVersion}
+              maskToken={maskToken}
+              refreshAfterExternalSave={refreshAfterExternalSave}
+            />
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
-            {activeCategory === 'system' && activeView === 'runtime' ? (
-              <>
-                <SchedulerSettingsCard
-                  items={rawActiveItems}
-                  disabled={isSaving || isLoading}
-                  issueByKey={issueByKey}
-                  statusRefreshToken={schedulerStatusRefreshToken}
-                  onSchedulerStateChange={handleSchedulerRuntimeStateChange}
-                  onChange={setDraftValue}
-                  t={t}
-                  language={uiLanguage}
-                />
-                <ScheduledTasksPanel
-                  disabled={isSaving || isLoading}
-                  t={t}
-                  language={uiLanguage}
-                />
-              </>
-            ) : null}
-            {activeCategory === 'system' && activeView === 'general' ? (
-              <SignalScorecardPanel
-                publicEnabled={['1', 'true', 'yes', 'on'].includes(
-                  String(allValuesByKey.SIGNAL_SCORECARD_PUBLIC_ENABLED ?? '').trim().toLowerCase(),
-                )}
-                minSamples={(() => {
-                  const raw = String(allValuesByKey.SIGNAL_SCORECARD_MIN_SAMPLES ?? '').trim();
-                  if (!raw) return 10;
-                  const parsed = Number.parseInt(raw, 10);
-                  return Number.isFinite(parsed) ? parsed : 10;
-                })()}
-                disabled={isSaving || isLoading}
-                t={t}
-                language={uiLanguage}
-              />
-            ) : null}
-            {activeCategory === 'system' && activeView === 'about' ? (
-              <SystemAboutCard />
-            ) : null}
+            <SystemSecuritySection
+              activeCategory={activeCategory}
+              activeView={activeView}
+              passwordChangeable={passwordChangeable}
+              items={rawActiveItems}
+              disabled={isSaving || isLoading}
+              issueByKey={issueByKey}
+              schedulerStatusRefreshToken={schedulerStatusRefreshToken}
+              onSchedulerStateChange={handleSchedulerRuntimeStateChange}
+              onChange={setDraftValue}
+              allValuesByKey={allValuesByKey}
+              t={t}
+              language={uiLanguage}
+            />
             {isTopLevelAdvanced && activeView === 'backup' ? (
-              <ConfigBackupCard
-                configVersion={configVersion}
-                hasDirty={hasDirty}
-                disabled={isSaving || isLoading}
-                load={load}
-                onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((current) => current + 1)}
-                onRefreshSetupStatus={() => { void refreshSetupStatus(); }}
-                onRolledBack={async (result) => {
-                  await refreshAfterExternalSave(result.updatedKeys);
-                  applyPostSaveEffects();
-                }}
-                onReloadLatest={() => refreshAfterExternalSave([])}
-              />
+              <>
+                <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
+                <ConfigBackupCard configVersion={configVersion} hasDirty={hasDirty} disabled={isSaving || isLoading} load={load} onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((c) => c + 1)} onRefreshSetupStatus={() => { void refreshSetupStatus(); }} onRolledBack={async (result) => { await refreshAfterExternalSave(result.updatedKeys); applyPostSaveEffects(); }} onReloadLatest={() => refreshAfterExternalSave([])} />
+              </>
             ) : null}
             {activeCategory === 'base' ? (
               <>
@@ -1873,9 +1801,6 @@ const SettingsPage: React.FC = () => {
                 />
               </section>
             ) : null}
-            {activeCategory === 'system' && activeView === 'security' && passwordChangeable ? (
-              <ChangePasswordCard />
-            ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
               <SettingsPanelErrorBoundary
                 title={t('settings.notificationTest')}
@@ -1885,6 +1810,7 @@ const SettingsPage: React.FC = () => {
                 <NotificationTestPanel
                   items={rawActiveItems.map((item) => ({ key: item.key, value: String(item.value ?? '') }))}
                   maskToken={maskToken}
+                  configVersion={configVersion}
                   disabled={isSaving || isLoading}
                 />
               </SettingsPanelErrorBoundary>
@@ -1992,37 +1918,27 @@ const SettingsPage: React.FC = () => {
           leaveBlocker.reset?.();
         }}
       />
-      {isWizardOpen ? (
-        <FirstRunWizard
-          onComplete={handleWizardComplete}
-          onClose={() => setIsWizardOpen(false)}
-          isSaving={isSaving}
-          language={uiLanguage}
-          existingChannelNames={existingChannelNames}
-          providers={providerCatalog}
-          connectionFields={providerConnectionFields}
-          emptyApiKeyHosts={providerEmptyApiKeyHosts}
-          routingOptions={modelSelectorOptions}
-          initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '')
-            .split(',')
-            .map((entry) => resolveConfiguredModelRef(entry))
-            .filter(Boolean)
-            .join(',')}
-          initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
-          onViewRouting={() => {
-            setIsWizardOpen(false);
-            selectSectionView('ai_models', 'task_routing');
-          }}
-          onLocalModelConfigurationChanged={async () => {
-            await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
-            applyPostSaveEffects();
-          }}
-          onStartFirstAnalysis={() => {
-            setIsWizardOpen(false);
-            navigate(buildAnalysisWorkbenchHref());
-          }}
-        />
-      ) : null}
+      <SettingsOnboardingHosts
+        isWizardOpen={isWizardOpen}
+        isAgentOnboardingOpen={isAgentOnboardingOpen}
+        setIsWizardOpen={setIsWizardOpen}
+        setIsAgentOnboardingOpen={setIsAgentOnboardingOpen}
+        handleWizardComplete={handleWizardComplete}
+        isSaving={isSaving}
+        uiLanguage={uiLanguage}
+        existingChannelNames={existingChannelNames}
+        providerCatalog={providerCatalog}
+        providerConnectionFields={providerConnectionFields}
+        providerEmptyApiKeyHosts={providerEmptyApiKeyHosts}
+        modelSelectorOptions={modelSelectorOptions}
+        initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '').split(',').map((entry) => resolveConfiguredModelRef(entry)).filter(Boolean).join(',')}
+        initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
+        onViewRouting={() => { setIsWizardOpen(false); selectSectionView('ai_models', 'task_routing'); }}
+        onLocalModelConfigurationChanged={async () => { await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS); applyPostSaveEffects(); }}
+        onAgentApplied={() => { void refreshAfterExternalSave([]); applyPostSaveEffects(); }}
+        setupStatus={setupStatus}
+        t={t}
+      />
     </AppPage>
   );
 };

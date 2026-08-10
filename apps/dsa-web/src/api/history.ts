@@ -4,6 +4,8 @@ import { createApiError, getParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type {
   HistoryListResponse,
+  HistorySearchResponse,
+  HistorySearchItem,
   HistoryItem,
   HistoryFilters,
   AnalysisReport,
@@ -56,12 +58,38 @@ export interface GetHistoryListParams extends HistoryFilters {
   limit?: number;
 }
 
+export interface GetHistoryListOptions {
+  signal?: AbortSignal;
+}
+
 export const historyApi = {
+  /** Search low-sensitive history summaries through the server-side full-text index. */
+  search: async (
+    query: string,
+    options: { limit?: number; signal?: AbortSignal } = {},
+  ): Promise<HistorySearchResponse> => {
+    const normalizedQuery = query.trim();
+    const limit = Math.max(1, Math.min(options.limit ?? 5, 10));
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/history/search', {
+      params: { q: normalizedQuery, limit },
+      signal: options.signal,
+    });
+    const data = toCamelCase<HistorySearchResponse>(response.data);
+    return {
+      query: data.query,
+      limit: data.limit,
+      items: (data.items ?? []).map((item) => toCamelCase<HistorySearchItem>(item)),
+    };
+  },
+
   /**
    * Get the history analysis list
    * @param params Filtering and pagination parameters
    */
-  getList: async (params: GetHistoryListParams = {}): Promise<HistoryListResponse> => {
+  getList: async (
+    params: GetHistoryListParams = {},
+    options: GetHistoryListOptions = {},
+  ): Promise<HistoryListResponse> => {
     const { stockCode, reportType, startDate, endDate, page = 1, limit = 20 } = params;
 
     const queryParams: Record<string, string | number> = { page, limit };
@@ -72,6 +100,7 @@ export const historyApi = {
 
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/history', {
       params: queryParams,
+      signal: options.signal,
     });
 
     const data = toCamelCase<{ total: number; page: number; limit: number; items: HistoryItem[] }>(response.data);

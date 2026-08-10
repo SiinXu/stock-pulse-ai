@@ -101,7 +101,7 @@ Legacy paths such as `/decision-signals`, `/alerts`, `/backtest`, and `/screenin
 | macOS | `Cmd + K` |
 | Windows / Linux | `Ctrl + K` |
 
-Useful queries: `analysis`, `portfolio`, `signals`, `settings`, or a ticker such as `600519`.
+Useful queries include `analysis`, `portfolio`, `signals`, `settings`, a ticker such as `600519`, or at least three characters from a saved report's stock name, code, report type, date, trend, summary, or advice. Results are grouped into stocks, reports, pages, and actions. Use `Up` / `Down` and `Enter` without leaving the search field; a report result opens its exact Analysis Workbench history record. If report search is temporarily unavailable, stock, page, and action search remain available.
 
 ---
 
@@ -122,6 +122,10 @@ Opens recent signals and alerts and deep-links into Signal Center. An empty bell
 They are independent: English menus + Chinese reports is a valid combination.
 
 Theme and UI language use the same compact dropdown treatment in the Profile menu, with a neutral selected state. On wide screens, both menus open to the right of their setting; on narrow screens, they adapt their direction and height to stay within the viewport.
+
+## Global error notifications
+
+API and external-service failures appear in a compact, top-centered Toast overlay instead of entering the page content flow, so they do not resize tables, reports, or forms. Error Toasts remain until dismissed. When recovery is available, the retry action appears on the right.
 
 ---
 

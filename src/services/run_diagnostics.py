@@ -9,6 +9,7 @@ diagnostic store is introduced.
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 import uuid
@@ -196,6 +197,40 @@ def sanitize_diagnostic_metadata(value: Any, *, depth: int = 0) -> Any:
     return sanitize_diagnostic_text(value, max_length=160)
 
 
+def sanitize_finite_diagnostic_metadata(value: Any) -> tuple[Any, bool]:
+    """Sanitize diagnostic metadata and omit non-finite numeric values.
+
+    The boolean reports whether the input was fully finite so consumers can
+    surface an integrity failure instead of silently treating an omitted value
+    as complete replay evidence.
+    """
+
+    def omit_non_finite(item: Any) -> tuple[Any, bool]:
+        if isinstance(item, float) and not math.isfinite(item):
+            return None, False
+        if isinstance(item, Mapping):
+            result: Dict[str, Any] = {}
+            valid = True
+            for key, child in item.items():
+                safe_child, child_valid = omit_non_finite(child)
+                valid = valid and child_valid
+                if safe_child not in (None, "", [], {}):
+                    result[str(key)] = safe_child
+            return result, valid
+        if isinstance(item, list):
+            result_list: List[Any] = []
+            valid = True
+            for child in item:
+                safe_child, child_valid = omit_non_finite(child)
+                valid = valid and child_valid
+                if safe_child not in (None, "", [], {}):
+                    result_list.append(safe_child)
+            return result_list, valid
+        return item, True
+
+    return omit_non_finite(sanitize_diagnostic_metadata(value))
+
+
 @dataclass
 class ProviderRun:
     """One provider attempt in a trace."""
@@ -233,6 +268,44 @@ class ProviderRun:
             "created_at": self.created_at,
         }
         return {key: value for key, value in payload.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class DataQualityEvidenceRecord:
+    """Finite, bounded validation evidence owned by run diagnostics."""
+
+    schema_version: str
+    data_type: str
+    severity: str
+    symbol: Optional[str]
+    provider: Optional[str]
+    market: str
+    instrument_type: str
+    rejected: bool
+    issues: List[Dict[str, Any]]
+    issue_count: int
+    truncated: bool
+    provenance: Dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = {
+            "schema_version": self.schema_version,
+            "data_type": self.data_type,
+            "severity": self.severity,
+            "symbol": self.symbol,
+            "provider": self.provider,
+            "market": self.market,
+            "instrument_type": self.instrument_type,
+            "rejected": self.rejected,
+            "issues": list(self.issues),
+            "issue_count": self.issue_count,
+            "truncated": self.truncated,
+            "created_at": self.created_at,
+        }
+        if self.provenance:
+            payload["provenance"] = dict(self.provenance)
+        return payload
 
 
 @dataclass
@@ -505,12 +578,18 @@ class RunDiagnosticContext:
     trigger_source: Optional[str] = None
     scope: Optional[str] = None
     provider_runs: List[ProviderRun] = field(default_factory=list)
+    data_quality_evidence: List[DataQualityEvidenceRecord] = field(default_factory=list)
     llm_runs: List[LLMRun] = field(default_factory=list)
     notification_runs: List[NotificationRun] = field(default_factory=list)
     history_runs: List[HistoryRun] = field(default_factory=list)
     pipeline_stage_runs: List[PipelineStageRun] = field(default_factory=list)
+    agent_events: List[Dict[str, Any]] = field(default_factory=list)
+    agent_events_original_count: int = 0
+    agent_events_dropped_count: int = 0
     event_sink: Optional[Callable[[Dict[str, Any]], None]] = None
     flow_event_index: int = 0
+    agent_event_index: int = 0
+    agent_tool_index: int = 0
     provider_attempt_index_by_type: Dict[str, int] = field(default_factory=dict)
     provider_pending_attempt_index_by_key: Dict[str, List[int]] = field(default_factory=dict)
     llm_attempt_index_by_type: Dict[str, int] = field(default_factory=dict)
@@ -536,6 +615,26 @@ class RunDiagnosticContext:
             attempt_index = self.provider_attempt_index_by_type.get(data_type_key, 0) + 1
             self.provider_attempt_index_by_type[data_type_key] = attempt_index
         self._emit_flow_event(_provider_flow_event(self, provider_run, attempt_index))
+
+    def record_data_quality_evidence(
+        self,
+        evidence: DataQualityEvidenceRecord,
+    ) -> None:
+        """Append one bounded finding set and suppress immediate duplicates."""
+        if self.data_quality_evidence:
+            previous = self.data_quality_evidence[-1]
+            if (
+                previous.data_type == evidence.data_type
+                and previous.symbol == evidence.symbol
+                and previous.provider == evidence.provider
+                and previous.severity == evidence.severity
+                and previous.rejected == evidence.rejected
+                and previous.issues == evidence.issues
+            ):
+                return
+        self.data_quality_evidence.append(evidence)
+        if len(self.data_quality_evidence) > 100:
+            del self.data_quality_evidence[: len(self.data_quality_evidence) - 100]
 
     def record_provider_run_started(
         self,
@@ -646,6 +745,35 @@ class RunDiagnosticContext:
         """Append a Pipeline stage without changing existing Run Flow events."""
         self.pipeline_stage_runs.append(stage_run)
 
+    def record_agent_event(self, event: Mapping[str, Any]) -> None:
+        """Append one sanitized agent observability event and mirror it to run-flow."""
+        payload = dict(event) if isinstance(event, Mapping) else {}
+        if not payload:
+            return
+        sanitized, finite = sanitize_finite_diagnostic_metadata(payload)
+        if not isinstance(sanitized, Mapping):
+            return
+        entry = dict(sanitized)
+        if not finite:
+            entry["detail_integrity"] = "invalid_non_finite"
+        self.agent_events_original_count += 1
+        self.agent_events.append(entry)
+        max_events = 200
+        if len(self.agent_events) > max_events:
+            dropped = len(self.agent_events) - max_events
+            self.agent_events_dropped_count += dropped
+            del self.agent_events[:dropped]
+        live_entry = {
+            **entry,
+            "capture": {
+                "original_count": self.agent_events_original_count,
+                "returned_count": len(self.agent_events),
+                "dropped_count": self.agent_events_dropped_count,
+                "truncated": self.agent_events_dropped_count > 0,
+            },
+        }
+        self._emit_flow_event(_agent_flow_event(self, live_entry))
+
     def _emit_flow_event(self, event: Dict[str, Any]) -> None:
         if self.event_sink is None:
             return
@@ -674,10 +802,20 @@ class RunDiagnosticContext:
             "trigger_source": self.trigger_source,
             "scope": self.scope,
             "provider_runs": [run.to_dict() for run in self.provider_runs],
+            "data_quality_evidence": [
+                evidence.to_dict() for evidence in self.data_quality_evidence
+            ],
             "llm_runs": [run.to_dict() for run in self.llm_runs],
             "notification_runs": [run.to_dict() for run in self.notification_runs],
             "history_runs": [run.to_dict() for run in self.history_runs],
             "pipeline_stage_runs": [run.to_dict() for run in self.pipeline_stage_runs],
+            "agent_events": list(self.agent_events),
+            "agent_events_capture": {
+                "original_count": self.agent_events_original_count,
+                "returned_count": len(self.agent_events),
+                "dropped_count": self.agent_events_dropped_count,
+                "truncated": self.agent_events_dropped_count > 0,
+            },
         }
         return _redact_diagnostic_payload(payload)
 
@@ -927,6 +1065,183 @@ def _started_at_from_end_and_duration(end: Any, duration_ms: Optional[int]) -> O
     else:
         return None
     return (parsed - timedelta(milliseconds=duration_ms)).isoformat()
+
+
+
+def _agent_flow_event(
+    context: "RunDiagnosticContext",
+    event: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Map one agent observability event into a run-flow event payload."""
+    event_type = _safe_event_key(event.get("event_type")) or "agent_event"
+    name = sanitize_diagnostic_text(event.get("name"), max_length=80) or "agent"
+    phase = sanitize_diagnostic_text(event.get("phase"), max_length=64)
+    status = sanitize_diagnostic_text(event.get("status"), max_length=32) or "unknown"
+    duration_ms = event.get("duration_ms")
+    try:
+        duration_ms_int = int(duration_ms) if duration_ms is not None else None
+    except (TypeError, ValueError, OverflowError):
+        duration_ms_int = None
+    if duration_ms_int is not None and duration_ms_int < 0:
+        duration_ms_int = 0
+    step = event.get("step")
+    try:
+        step_int = int(step) if step is not None else None
+    except (TypeError, ValueError, OverflowError):
+        step_int = None
+
+    sequence = event.get("sequence")
+    try:
+        sequence_int = int(sequence) if sequence is not None else None
+    except (TypeError, ValueError, OverflowError):
+        sequence_int = None
+    if sequence_int is not None and sequence_int < 1:
+        sequence_int = None
+
+    schema_version = event.get("schema_version")
+    try:
+        schema_version_int = int(schema_version) if schema_version is not None else None
+    except (TypeError, ValueError, OverflowError):
+        schema_version_int = None
+    if schema_version_int is not None and schema_version_int < 1:
+        schema_version_int = None
+
+    is_tool = event_type in {"agent_tool_start", "agent_tool_end"}
+    is_model = event_type in {"agent_model_start", "agent_model_end"}
+    is_phase = event_type in {"agent_phase_start", "agent_phase_end"}
+    is_start = event_type.endswith("_start")
+    span_key = _safe_event_key(event.get("span_id")) or ""
+
+    if is_tool:
+        if is_start:
+            context.agent_tool_index += 1
+        tool_index = max(1, context.agent_tool_index)
+        node_id = (
+            f"agent_tool_{span_key}"
+            if span_key
+            else f"agent_tool_{_safe_event_key(name) or 'tool'}_{tool_index}"
+        )
+        label = f"工具 · {name}"
+        lane = "analysis"
+        kind = "analysis"
+        title = f"工具开始: {name}" if is_start else f"工具完成: {name}"
+    elif is_model:
+        node_id = (
+            f"agent_model_{span_key}"
+            if span_key
+            else f"agent_model_{_safe_event_key(name) or 'model'}"
+        )
+        label = f"模型 · {name}"
+        lane = "analysis"
+        kind = "model"
+        title = f"模型开始: {name}" if is_start else f"模型完成: {name}"
+    elif is_phase:
+        node_id = (
+            f"agent_phase_{span_key}"
+            if span_key
+            else f"agent_phase_{_safe_event_key(name) or 'phase'}"
+        )
+        label = f"阶段 · {name}"
+        lane = "analysis"
+        kind = "analysis"
+        title = f"阶段开始: {name}" if is_start else f"阶段结束: {name}"
+    else:
+        node_id = (
+            f"agent_{span_key}"
+            if span_key
+            else f"agent_{event_type}_{_safe_event_key(name) or 'event'}"
+        )
+        label = f"Agent · {name}"
+        lane = "analysis"
+        kind = "analysis"
+        title = f"Agent: {name}"
+
+    flow_status = "running" if is_start else _agent_status_to_flow(status)
+    severity = "info" if is_start else (
+        "success" if flow_status in {"success", "fallback"} else (
+            "danger" if flow_status == "failed" else "warning"
+        )
+    )
+    timestamp = sanitize_diagnostic_text(event.get("timestamp"), max_length=64) or datetime.now().isoformat()
+    started_at = timestamp if is_start else _started_at_from_end_and_duration(timestamp, duration_ms_int)
+    ended_at = None if is_start else timestamp
+    message_bits = [name]
+    if phase and phase != name:
+        message_bits.append(f"phase={phase}")
+    if step_int is not None:
+        message_bits.append(f"step={step_int}")
+    if duration_ms_int is not None and not is_start:
+        message_bits.append(f"{duration_ms_int}ms")
+    if status and not is_start:
+        message_bits.append(status)
+    message = sanitize_diagnostic_text(" · ".join(message_bits), max_length=220)
+
+    attrs = event.get("attrs") if isinstance(event.get("attrs"), Mapping) else {}
+    payload = event.get("payload") if isinstance(event.get("payload"), Mapping) else {}
+    safe_attrs, attrs_finite = sanitize_finite_diagnostic_metadata(attrs)
+    safe_payload, payload_finite = sanitize_finite_diagnostic_metadata(payload)
+    detail_integrity = sanitize_diagnostic_text(event.get("detail_integrity"), max_length=40)
+    if not attrs_finite or not payload_finite:
+        detail_integrity = "invalid_non_finite"
+    elif not detail_integrity:
+        detail_integrity = "valid"
+    metadata = _clean_metadata(
+        {
+            "schema_version": schema_version_int,
+            "sequence": sequence_int,
+            "trace_id": event.get("trace_id") or context.trace_id,
+            "span_id": event.get("span_id"),
+            "parent_span_id": event.get("parent_span_id"),
+            "event_type": event.get("event_type") or event_type,
+            "phase": phase,
+            "step": step_int,
+            "duration_ms": duration_ms_int,
+            "status": status,
+            "tool": name if is_tool else None,
+            "model": name if is_model else None,
+            "success": attrs.get("success") if isinstance(attrs, Mapping) else None,
+            "attrs": safe_attrs if attrs else None,
+            "payload": safe_payload if payload else None,
+            "detail_integrity": detail_integrity,
+            "capture": event.get("capture") if isinstance(event.get("capture"), Mapping) else None,
+            "node": {
+                "id": node_id,
+                "lane": lane,
+                "kind": kind,
+                "label": label,
+                "status": flow_status,
+                "provider": name if (is_tool or is_model) else None,
+                "started_at": started_at,
+                "ended_at": ended_at,
+                "duration_ms": duration_ms_int,
+                "message": message,
+            },
+        }
+    )
+    return {
+        "timestamp": timestamp,
+        "severity": severity,
+        "type": event_type if event_type.startswith("agent_") else f"agent_{event_type}",
+        "node_id": node_id,
+        "title": sanitize_diagnostic_text(title, max_length=100) or "Agent 事件",
+        "message": message,
+        "metadata": metadata,
+    }
+
+
+def _agent_status_to_flow(status: Optional[str]) -> str:
+    normalized = (status or "").strip().lower()
+    if normalized in {"success", "ok", "completed", "done"}:
+        return "success"
+    if normalized in {"failed", "error", "fail"}:
+        return "failed"
+    if normalized in {"running", "started", "in_progress"}:
+        return "running"
+    if normalized in {"cancelled", "cancel_requested", "timeout", "skipped", "degraded", "fallback"}:
+        return normalized
+    if normalized:
+        return "degraded"
+    return "unknown"
 
 
 def _provider_started_flow_event(
@@ -1239,6 +1554,135 @@ def record_provider_run(
             "Provider diagnostic record failed",
             exc,
             error_code="provider_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
+
+
+def _finite_diagnostic_value(value: Any, *, depth: int = 0) -> Any:
+    """Constrain validation evidence before storage and strict JSON encoding."""
+    if depth > 4:
+        return "<truncated>"
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, str):
+        return sanitize_diagnostic_text(value, max_length=160)
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Mapping):
+        result: Dict[str, Any] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= 20:
+                result["truncated"] = True
+                break
+            safe_key = safe_diagnostic_key(key)
+            if safe_key:
+                result[safe_key] = _finite_diagnostic_value(
+                    item,
+                    depth=depth + 1,
+                )
+        return result
+    if isinstance(value, (list, tuple)):
+        return [
+            _finite_diagnostic_value(item, depth=depth + 1)
+            for item in list(value)[:24]
+        ]
+    return sanitize_diagnostic_text(value, max_length=160)
+
+
+def record_data_quality_evidence(
+    *,
+    data_type: str,
+    severity: str,
+    symbol: Optional[str],
+    provider: Optional[str],
+    market: Optional[str],
+    instrument_type: Optional[str],
+    rejected: bool,
+    issues: Iterable[Mapping[str, Any]],
+    issue_count: Optional[int] = None,
+    truncated: bool = False,
+    schema_version: str = "data_quality_evidence.v1",
+    provenance: Optional[Mapping[str, Any]] = None,
+) -> None:
+    """Log and persist one sanitized validation finding set."""
+    normalized_severity = str(severity or "warn").strip().lower()
+    if normalized_severity not in {"warn", "reject"}:
+        normalized_severity = "warn"
+    safe_issues: List[Dict[str, Any]] = []
+    for index, issue in enumerate(issues):
+        if index >= 24:
+            truncated = True
+            break
+        if not isinstance(issue, Mapping):
+            continue
+        safe_issue = _finite_diagnostic_value(issue)
+        if isinstance(safe_issue, dict):
+            safe_issues.append(safe_issue)
+    safe_symbol = sanitize_diagnostic_text(symbol, max_length=80)
+    safe_provider = sanitize_diagnostic_text(provider, max_length=120)
+    safe_market = sanitize_diagnostic_text(market, max_length=16) or "unknown"
+    safe_instrument = (
+        sanitize_diagnostic_text(instrument_type, max_length=24) or "equity"
+    )
+    codes = sorted(
+        {
+            str(issue.get("code"))
+            for issue in safe_issues
+            if issue.get("code")
+        }
+    )
+    log_method = logger.warning if normalized_severity == "reject" else logger.info
+    log_method(
+        "data_quality event=validation severity=%s symbol=%s provider=%s "
+        "market=%s instrument_type=%s rejected=%s codes=%s",
+        normalized_severity,
+        safe_symbol or "unknown",
+        safe_provider or "unknown",
+        safe_market,
+        safe_instrument,
+        bool(rejected),
+        ",".join(codes) or "unknown",
+    )
+
+    context = get_current_diagnostic_context()
+    if context is None:
+        return
+    try:
+        context.record_data_quality_evidence(
+            DataQualityEvidenceRecord(
+                schema_version=sanitize_diagnostic_text(
+                    schema_version,
+                    max_length=48,
+                )
+                or "data_quality_evidence.v1",
+                data_type=sanitize_diagnostic_text(data_type, max_length=64)
+                or "unknown",
+                severity=normalized_severity,
+                symbol=safe_symbol,
+                provider=safe_provider,
+                market=safe_market,
+                instrument_type=safe_instrument,
+                rejected=bool(rejected),
+                issues=safe_issues,
+                issue_count=min(
+                    1_000_000,
+                    max(len(safe_issues), int(issue_count or 0)),
+                ),
+                truncated=bool(truncated),
+                provenance=(
+                    _finite_diagnostic_value(provenance)
+                    if isinstance(provenance, Mapping)
+                    else {}
+                ),
+            )
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - Data-quality diagnostic failures are safely logged and cannot affect analysis.
+        log_safe_exception(
+            logger,
+            "Data-quality diagnostic record failed",
+            exc,
+            error_code="data_quality_diagnostic_record_failed",
             level=logging.WARNING,
             trace_id=context.trace_id,
         )
@@ -1781,6 +2225,65 @@ def _history_component(
     return _component("history", label, "unknown", "历史保存未记录诊断信息")
 
 
+def _data_quality_component(diagnostics: Dict[str, Any]) -> RunDiagnosticComponent:
+    """Project typed validation evidence into the user-facing run summary."""
+    evidence = [
+        item
+        for item in _as_list(diagnostics.get("data_quality_evidence"))
+        if isinstance(item, dict)
+    ]
+    if not evidence:
+        return _component(
+            "data_quality",
+            "数据质量",
+            "unknown",
+            "未记录数据质量校验证据",
+        )
+    rejected = [item for item in evidence if item.get("rejected") is True]
+    findings = [
+        item
+        for item in evidence
+        if item.get("severity") in {"warn", "reject"}
+    ]
+    codes = sorted(
+        {
+            str(issue.get("code"))
+            for item in findings
+            for issue in _as_list(item.get("issues"))
+            if isinstance(issue, dict) and issue.get("code")
+        }
+    )[:12]
+    details = {
+        "schema_version": evidence[-1].get("schema_version"),
+        "evidence_count": len(evidence),
+        "rejected_count": len(rejected),
+        "reason_codes": codes,
+    }
+    if rejected:
+        return _component(
+            "data_quality",
+            "数据质量",
+            "degraded",
+            "数据质量校验拒绝了一个或多个候选数据源，并继续执行既有降级链",
+            details,
+        )
+    if findings:
+        return _component(
+            "data_quality",
+            "数据质量",
+            "degraded",
+            "数据质量校验发现警告，证据已传递到分析上下文",
+            details,
+        )
+    return _component(
+        "data_quality",
+        "数据质量",
+        "ok",
+        "数据质量校验未发现问题",
+        details,
+    )
+
+
 def build_run_diagnostic_summary(
     *,
     context_snapshot: Optional[Any] = None,
@@ -1820,6 +2323,7 @@ def build_run_diagnostic_summary(
             snapshot,
         ),
         "news": _news_component(snapshot, raw),
+        "data_quality": _data_quality_component(diagnostics),
         "llm": _llm_component(diagnostics, raw),
         "notification": _notification_component(diagnostics),
         "history": _history_component(diagnostics, report_saved),
@@ -1900,6 +2404,7 @@ def format_copyable_diagnostics(summary: Dict[str, Any]) -> str:
         _component_line("realtime_quote"),
         _component_line("daily_data"),
         _component_line("news"),
+        _component_line("data_quality"),
         _component_line("llm"),
         _component_line("notification"),
         _component_line("history"),

@@ -51,6 +51,7 @@ _AUX_LIMITATION_STATUSES = {
     ContextFieldStatus.FETCH_FAILED,
     ContextFieldStatus.FALLBACK,
     ContextFieldStatus.STALE,
+    ContextFieldStatus.PARTIAL,
 }
 
 
@@ -72,6 +73,7 @@ class PipelineAnalysisArtifacts:
     news_result_count: Optional[int]
     metadata: Dict[str, Any]
     portfolio_context: Optional[Dict[str, Any]] = None
+    money_flow_data: Optional[Any] = None
 
 
 class AnalysisContextBuilder:
@@ -88,16 +90,31 @@ class AnalysisContextBuilder:
 
         blocks["quote"] = _build_quote_block(artifacts)
         blocks["daily_bars"] = _build_daily_bars_block(artifacts)
-        technical_block, technical_warnings = _build_technical_block(artifacts)
+        evidence = _validation_evidence_from_metadata(metadata)
+        technical_block, technical_warnings = _build_technical_block(
+            artifacts,
+            evidence,
+        )
         blocks["technical"] = technical_block
         data_quality_warnings.extend(technical_warnings)
         blocks["chip"] = _build_chip_block(artifacts)
+        money_flow_block = _build_money_flow_block(artifacts)
+        if money_flow_block is not None:
+            blocks["money_flow"] = money_flow_block
         blocks["fundamentals"] = _build_fundamentals_block(artifacts)
         blocks["news"] = _build_news_block(artifacts)
         portfolio_block = _build_portfolio_block(artifacts)
         if portfolio_block is not None:
             blocks["portfolio"] = portfolio_block
-        data_quality = _build_data_quality(blocks, warnings=data_quality_warnings)
+        evidence_codes = _validation_evidence_codes(evidence)
+        data_quality_warnings.extend(
+            code for code in evidence_codes if code not in data_quality_warnings
+        )
+        data_quality = _build_data_quality(
+            blocks,
+            warnings=data_quality_warnings,
+            validation_evidence=evidence,
+        )
 
         return AnalysisContextPack(
             subject=AnalysisSubject(
@@ -242,6 +259,7 @@ def _build_daily_bars_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisCon
 
 def _build_technical_block(
     artifacts: PipelineAnalysisArtifacts,
+    evidence: Sequence[Mapping[str, Any]],
 ) -> tuple[AnalysisContextBlock, List[str]]:
     trend = _to_dict(artifacts.trend_result)
     if not trend:
@@ -258,6 +276,18 @@ def _build_technical_block(
             [],
         )
 
+    validation_evidence = _technical_validation_evidence(evidence)
+    rejected_fields = _validation_rejected_fields(validation_evidence)
+    validation_codes = _validation_evidence_codes(
+        [validation_evidence] if validation_evidence is not None else []
+    )
+    trend = {
+        key: value
+        for key, value in trend.items()
+        if key not in rejected_fields
+    }
+    has_validation_reject = bool(rejected_fields)
+
     explicit_intraday_overlay = _has_explicit_intraday_overlay(
         artifacts.enhanced_context
     )
@@ -265,16 +295,24 @@ def _build_technical_block(
         artifacts.enhanced_context
     )
     warnings = [_REALTIME_OVERLAY_WARNING] if has_realtime_overlay else []
+    warnings.extend(code for code in validation_codes if code not in warnings)
     block_status = (
         ContextFieldStatus.PARTIAL
-        if has_realtime_overlay
+        if has_realtime_overlay or has_validation_reject
         else ContextFieldStatus.AVAILABLE
     )
     items: Dict[str, AnalysisContextItem] = {
         "trend_result": AnalysisContextItem(
-            status=ContextFieldStatus.AVAILABLE,
+            status=(
+                ContextFieldStatus.PARTIAL
+                if has_validation_reject
+                else ContextFieldStatus.AVAILABLE
+            ),
             value=trend,
             warnings=list(warnings),
+            metadata={"validation_evidence": validation_evidence}
+            if validation_evidence is not None
+            else {},
         )
     }
     if has_realtime_overlay:
@@ -351,6 +389,118 @@ def _build_chip_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBl
         },
         source=source,
         metadata={"date": chip.get("date")} if chip.get("date") else {},
+    )
+
+
+def _build_money_flow_block(
+    artifacts: PipelineAnalysisArtifacts,
+) -> Optional[AnalysisContextBlock]:
+    """Build a capital-flow block without collapsing quality/failure outcomes."""
+    outcome = _to_dict(artifacts.money_flow_data)
+    if not outcome:
+        # Do not force a missing block when the feature is disabled — keeps pack
+        # shape stable for default (SMARTMONEY_ENABLED=false) runs.
+        if not bool((artifacts.metadata or {}).get("smartmoney_enabled")):
+            return None
+        status = ContextFieldStatus.MISSING
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    missing_reason="money_flow_missing",
+                )
+            },
+        )
+
+    raw_status = str(outcome.get("status") or "").strip().lower()
+    status_map = {
+        "available": ContextFieldStatus.AVAILABLE,
+        "partial": ContextFieldStatus.PARTIAL,
+        "not_supported": ContextFieldStatus.NOT_SUPPORTED,
+        "fetch_failed": ContextFieldStatus.FETCH_FAILED,
+        "empty": ContextFieldStatus.MISSING,
+        "stale": ContextFieldStatus.STALE,
+        "fallback": ContextFieldStatus.FALLBACK,
+    }
+    status = status_map.get(raw_status, ContextFieldStatus.MISSING)
+    snapshot = outcome.get("snapshot")
+    snapshot = dict(snapshot) if isinstance(snapshot, Mapping) else {}
+    source_chain = outcome.get("source_chain")
+    source_chain = source_chain if isinstance(source_chain, list) else []
+    source = _source_text(snapshot.get("source")) or _source_from_chain(source_chain)
+    warnings = [str(item) for item in outcome.get("warnings", []) if item]
+    timestamp = _metadata_iso_datetime_value(
+        {"fetched_at": outcome.get("fetched_at"), "as_of": snapshot.get("as_of")},
+        "as_of",
+        "fetched_at",
+    )
+    metadata = {
+        "provider_date": outcome.get("provider_date") or snapshot.get("date"),
+        "age_days": outcome.get("age_days"),
+        "requested_days": outcome.get("requested_days") or snapshot.get("requested_days"),
+        "observed_days": snapshot.get("observed_days"),
+        "completeness": snapshot.get("completeness"),
+        "bucket_definition": snapshot.get("bucket_definition"),
+        "unit": snapshot.get("unit"),
+        "amount_scale": snapshot.get("amount_scale"),
+        "source_chain": source_chain,
+        "cache_state": outcome.get("cache_state"),
+        "fallback_from": outcome.get("fallback_from"),
+        "error_code": outcome.get("error_code"),
+    }
+    metadata = {key: value for key, value in metadata.items() if value not in (None, [], {})}
+
+    if not snapshot:
+        missing_reason = outcome.get("error_code") or f"money_flow_{raw_status or 'missing'}"
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    source=source,
+                    timestamp=timestamp,
+                    missing_reason=str(missing_reason),
+                    warnings=warnings,
+                    metadata=metadata,
+                )
+            },
+            source=source,
+            timestamp=timestamp,
+            warnings=warnings,
+            metadata=metadata,
+        )
+
+    excluded = {
+        "raw_field_map", "source", "date", "as_of", "bucket_definition",
+        "unit", "amount_scale", "requested_days", "observed_days", "completeness",
+    }
+    items = {
+        key: AnalysisContextItem(
+            status=status,
+            value=value,
+            source=source,
+            timestamp=timestamp,
+            fallback_from=outcome.get("fallback_from"),
+            warnings=warnings,
+            metadata={
+                "bucket_definition": snapshot.get("bucket_definition"),
+                "unit": snapshot.get("unit"),
+                "amount_scale": snapshot.get("amount_scale"),
+            }
+            if key.endswith("net_inflow") or key.endswith("net_inflow_ratio")
+            else {},
+        )
+        for key, value in snapshot.items()
+        if value is not None and key not in excluded
+    }
+    return AnalysisContextBlock(
+        status=status,
+        items=items,
+        source=source,
+        timestamp=timestamp,
+        warnings=warnings,
+        metadata=metadata,
     )
 
 
@@ -505,6 +655,7 @@ def _build_data_quality(
     blocks: Dict[str, AnalysisContextBlock],
     *,
     warnings: List[str],
+    validation_evidence: Optional[List[Dict[str, Any]]] = None,
 ) -> DataQuality:
     block_scores: Dict[str, int] = {}
     weighted_sum = 0
@@ -521,7 +672,68 @@ def _build_data_quality(
         block_scores=block_scores,
         limitations=_quality_limitations(blocks),
         warnings=warnings,
+        metadata={
+            "validation_evidence_schema": "data_quality_evidence.v1",
+            "validation_evidence": list(validation_evidence or [])[:24],
+        },
     )
+
+
+def _validation_evidence_from_metadata(
+    metadata: Mapping[str, Any],
+) -> List[Dict[str, Any]]:
+    raw = metadata.get("data_quality_evidence")
+    if not isinstance(raw, list):
+        return []
+    evidence: List[Dict[str, Any]] = []
+    for item in raw[-24:]:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("schema_version") != "data_quality_evidence.v1":
+            continue
+        evidence.append(dict(item))
+    return evidence
+
+
+def _validation_evidence_codes(evidence: Sequence[Mapping[str, Any]]) -> List[str]:
+    codes: List[str] = []
+    for item in evidence:
+        issues = item.get("issues")
+        if not isinstance(issues, list):
+            continue
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            code = str(issue.get("code") or "").strip()
+            if code and code not in codes:
+                codes.append(code)
+    return codes[:24]
+
+
+def _technical_validation_evidence(
+    evidence: Sequence[Mapping[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    for item in reversed(evidence):
+        if item.get("data_type") == "technical_indicators":
+            return dict(item)
+    return None
+
+
+def _validation_rejected_fields(
+    evidence: Optional[Mapping[str, Any]],
+) -> set[str]:
+    if not isinstance(evidence, Mapping):
+        return set()
+    issues = evidence.get("issues")
+    if not isinstance(issues, list):
+        return set()
+    return {
+        str(issue.get("field"))
+        for issue in issues
+        if isinstance(issue, Mapping)
+        and issue.get("severity") == "reject"
+        and issue.get("field")
+    }
 
 
 def _quality_block_status(
@@ -557,12 +769,12 @@ def _quality_limitations(blocks: Dict[str, AnalysisContextBlock]) -> List[str]:
         if status in _CORE_LIMITATION_STATUSES:
             limitations.append(f"{key}: {status.value}")
 
-    for key in ("news", "fundamentals", "chip"):
+    for key in ("news", "fundamentals", "chip", "money_flow"):
         status = _quality_block_status(blocks, key)
         if status in _AUX_LIMITATION_STATUSES:
             limitations.append(f"{key}: {status.value}")
 
-    return limitations[:5]
+    return limitations[:6]
 
 
 def _to_dict(value: Optional[Any]) -> Dict[str, Any]:

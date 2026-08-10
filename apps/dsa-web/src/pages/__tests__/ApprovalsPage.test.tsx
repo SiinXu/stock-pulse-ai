@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { approvalsApi } from '../../api/approvals';
@@ -47,13 +49,25 @@ function proposal(
   };
 }
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <UiLanguageProvider initialLanguage="en">
-        <ApprovalsPage />
-      </UiLanguageProvider>
-    </MemoryRouter>,
+    wrapWithQueryClient(
+      <MemoryRouter>
+        <UiLanguageProvider initialLanguage="en">
+          <ApprovalsPage />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    ),
   );
 }
 
@@ -95,7 +109,7 @@ describe('ApprovalsPage', () => {
 
     expect(await screen.findByTestId('approvals-precondition-rule-disabled')).toBeInTheDocument();
     expect(screen.getByTestId('approvals-precondition-risk-override')).toBeInTheDocument();
-    expect(screen.getAllByText(/AGENT_RISK_OVERRIDE/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/mandatory Risk Manager final-action decision always runs first/)).toBeInTheDocument();
     expect(screen.queryByTestId('approvals-precondition-auth-disabled')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
   });
@@ -299,7 +313,9 @@ describe('ApprovalsPage', () => {
 
     fireEvent.click(await screen.findByRole('switch', { name: 'Enable human approval' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
-    expect(await screen.findByText('Rule save failed')).toBeInTheDocument();
+    const ruleSaveToast = await screen.findByRole('alert');
+    expect(ruleSaveToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(ruleSaveToast).not.toHaveTextContent('Rule save failed');
 
     const proposalPoll = intervalSpy.mock.calls.find(([, delay]) => delay === 5_000)?.[0];
     expect(proposalPoll).toBeTypeOf('function');
@@ -307,7 +323,7 @@ describe('ApprovalsPage', () => {
       (proposalPoll as () => void)();
     });
 
-    expect(screen.getByText('Rule save failed')).toBeInTheDocument();
+    expect(ruleSaveToast).toBeInTheDocument();
     intervalSpy.mockRestore();
   });
 });

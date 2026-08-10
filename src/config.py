@@ -13,6 +13,7 @@ Responsibilities:
 import json
 import importlib as _importlib
 import logging
+import math as _math
 import os
 import re
 import sys as _sys
@@ -68,6 +69,7 @@ from src.llm.hermes import (
     HERMES_DEFAULT_MODEL,
     HERMES_DEFAULT_PROTOCOL,
     HermesConfigIssue,
+    hermes_blocked_route_candidates,
     hermes_model_info,
     is_reserved_hermes_name,
     parse_hermes_channel,
@@ -99,11 +101,13 @@ from src.config_parts.defaults import (
     NEWS_STRATEGY_WINDOWS,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
     PROMPT_CACHE_DIAGNOSTICS_LEVELS,
+    SUPPORTED_LLM_CHANNEL_API_SURFACES,
     SUPPORTED_LLM_CHANNEL_PROTOCOLS,
     TICKFLOW_KLINE_ADJUST_VALUES,
     AgentContextCompressionPreset,
     ConfigIssue,
     DEFAULT_ALPHASIFT_INSTALL_SPEC,
+    _FALLBACK_LITELLM_MODEL_PROVIDERS,
     _FALSEY_ENV_VALUES,
     _MANAGED_LITELLM_KEY_PROVIDERS,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
@@ -119,20 +123,29 @@ from src.config_parts.parsers import (
     _matches_exact_route,
     _matches_route_set,
     _uses_direct_env_provider,
+    apply_litellm_api_surface,
+    canonicalize_llm_channel_api_surface,
     canonicalize_llm_channel_protocol,
     channel_allows_empty_api_key,
+    find_incompatible_llm_channel_models,
+    find_llm_channel_surface_conflicts,
     get_agent_context_compression_preset,
     get_configured_llm_models,
     get_effective_agent_models_to_try,
     get_effective_agent_primary_model,
+    get_explicit_llm_channel_model_provider,
     get_fixed_litellm_temperature,
+    get_litellm_model_providers,
+    is_supported_llm_channel_api_surface_value,
     normalize_agent_context_compression_profile,
     normalize_agent_litellm_model,
     normalize_litellm_temperature,
+    normalize_llm_channel_api_surface,
     normalize_llm_channel_model,
     normalize_news_strategy_profile,
     parse_agent_context_compression_int,
     parse_env_bool,
+    parse_env_finite_float as _parse_env_finite_float,
     parse_env_float,
     parse_env_int,
     resolve_litellm_thinking_enabled,
@@ -154,6 +167,32 @@ del _compat_name, _compat_value
 _config_defaults_module._bind_config_facade(globals())
 
 logger = logging.getLogger(__name__)
+
+
+def apply_use_proxy_env() -> Optional[str]:
+    """Apply USE_PROXY/PROXY_HOST/PROXY_PORT onto process http(s)_proxy.
+
+    Mainland-friendly convenience mapping used at process bootstrap and after
+    Settings reload (``setup_env``). GitHub Actions always skips this path.
+
+    When ``USE_PROXY`` is not true, existing ``http_proxy`` / ``https_proxy``
+    values are left unchanged (they may come from ``HTTP_PROXY`` or the host
+    environment). Disabling a previously applied USE_PROXY-derived proxy still
+    requires a process restart for a clean env.
+
+    Returns:
+        The applied proxy URL when USE_PROXY is active, otherwise None.
+    """
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        return None
+    if os.getenv("USE_PROXY", "false").lower() != "true":
+        return None
+    proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
+    proxy_port = os.getenv("PROXY_PORT", "10809")
+    proxy_url = f"http://{proxy_host}:{proxy_port}"
+    os.environ["http_proxy"] = proxy_url
+    os.environ["https_proxy"] = proxy_url
+    return proxy_url
 
 
 def setup_env(override: bool = False):
@@ -180,7 +219,7 @@ def setup_env(override: bool = False):
     load_dotenv(dotenv_path=env_path, override=override)
     try:
         raw_env_values = dotenv_values(env_path, interpolate=False)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
         log_safe_exception(
             logger,
             "Raw environment file read failed",
@@ -188,6 +227,7 @@ def setup_env(override: bool = False):
             error_code="raw_environment_file_read_failed",
             level=logging.WARNING,
         )
+        apply_use_proxy_env()
         return
 
     key = "CUSTOM_WEBHOOK_BODY_TEMPLATE"
@@ -199,6 +239,9 @@ def setup_env(override: bool = False):
             key,
             "" if raw_value is None else str(raw_value),
         )
+
+    # Re-apply USE_PROXY after dotenv load so Settings reload updates process env.
+    apply_use_proxy_env()
 
 
 for _config_part_name in (

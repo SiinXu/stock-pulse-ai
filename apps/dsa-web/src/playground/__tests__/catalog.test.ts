@@ -6,7 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PLAYGROUND_CATALOG, PLAYGROUND_CATEGORIES } from '../catalog';
-import { getMissingPlaygroundRendererIds } from '../scenarios';
+import {
+  getMissingPlaygroundRendererIds,
+  getPlaygroundRenderer,
+  hasPlaygroundRenderer,
+  listMissingPlaygroundRendererIds,
+} from '../scenarios';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const componentsRoot = path.join(sourceRoot, 'components');
@@ -32,7 +37,7 @@ describe('playground catalog', () => {
   it('uses stable, unique ids and valid source paths', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PLAYGROUND_CATALOG).toHaveLength(163);
+    expect(PLAYGROUND_CATALOG).toHaveLength(199);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);
@@ -46,10 +51,29 @@ describe('playground catalog', () => {
     expect(catalogNames).not.toContain('TaskPanelDefault');
   });
 
-  it('has a real renderer for every catalog entry and entries in every category', () => {
+  it('has a real runtime renderer for every catalog entry and entries in every category', () => {
+    // Exercises the production RENDERERS map via getMissingPlaygroundRendererIds().
     expect(getMissingPlaygroundRendererIds()).toEqual([]);
+    for (const entry of PLAYGROUND_CATALOG) {
+      expect(hasPlaygroundRenderer(entry.id)).toBe(true);
+      expect(typeof getPlaygroundRenderer(entry.id)).toBe('function');
+    }
     for (const category of PLAYGROUND_CATEGORIES) {
       expect(PLAYGROUND_CATALOG.some((entry) => entry.category === category)).toBe(true);
     }
+  });
+
+  it('reports catalog ids omitted from a production-shaped registry map', () => {
+    // Counterexample for the pure helper owned by the production registry module.
+    // Proves an omitted renderer id fails the same check used at runtime.
+    const sample = PLAYGROUND_CATALOG.slice(0, 3);
+    const incompleteRegistry: Record<string, unknown> = Object.fromEntries(
+      sample.slice(0, 2).map((entry) => [entry.id, () => null]),
+    );
+    expect(listMissingPlaygroundRendererIds(sample, incompleteRegistry)).toEqual([sample[2].id]);
+    expect(listMissingPlaygroundRendererIds(sample, {
+      ...incompleteRegistry,
+      [sample[2].id]: () => null,
+    })).toEqual([]);
   });
 });

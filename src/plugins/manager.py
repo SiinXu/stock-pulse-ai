@@ -7,20 +7,39 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Iterable, Literal
 
 from src.utils.sanitize import log_safe_exception
 
+from .agent_tools import agent_tool_manifest_permissions_error
 from .errors import PluginError
+from .health import PluginHealthReport, build_plugin_health_report
+from .lifecycle_audit import LifecycleAuditRecorder, PluginLifecycleAuditor
 from .manifest import API_MAJOR_PATTERN, PluginManifest, parse_semver
 from .plugin import Plugin
 from .registry import ExtensionPoint, ExtensionRegistration, ExtensionRegistry, PluginContext, RegistrationHandle
+from .state_store import PluginLifecycleStateStore
 
 
 logger = logging.getLogger(__name__)
 
 PluginSource = Literal["builtin", "external"]
 PluginState = Literal["registered", "enabled", "disabled", "failed"]
+
+# Extension points that can be unregistered/re-registered in-process via the
+# unified registry. All six v1 points support that path; builtin packages and
+# failed cleanup still require a process restart.
+_HOT_RELOADABLE_EXTENSION_POINTS: frozenset[ExtensionPoint] = frozenset(
+    {
+        "data_provider",
+        "analysis_strategy",
+        "agent_tool",
+        "notification_channel",
+        "report_template",
+        "event_hook",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,12 +55,40 @@ class PluginOperationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PluginReloadResult:
+    """Result of one hot-reload attempt (honest restart-required when unsafe)."""
+
+    plugin_id: str
+    success: bool
+    state: PluginState
+    reloaded: bool
+    restart_required: bool
+    error_code: str | None = None
+    message: str | None = None
+
+
+class PluginLifecycleAuditCompletionUnavailable(RuntimeError):
+    """Audit completion failed after the lifecycle operation returned."""
+
+    code = "security_audit_unavailable"
+
+    def __init__(self, result: PluginOperationResult | PluginReloadResult) -> None:
+        super().__init__(self.code)
+        self.result = result
+
+
+@dataclass(frozen=True, slots=True)
 class PluginSnapshot:
     """Read-only manager state for diagnostics and later composition wiring."""
 
     manifest: PluginManifest
     source: PluginSource
     state: PluginState
+    desired_enabled: bool = True
+    package_root: str | None = None
+    reloadable: bool = False
+    extension_points: tuple[ExtensionPoint, ...] = ()
+    last_error_code: str | None = None
 
 
 @dataclass(slots=True)
@@ -53,6 +100,9 @@ class _ManagedPlugin:
     handles: list[RegistrationHandle] = field(default_factory=list)
     transition: str | None = None
     cleanup_pending: bool = False
+    package_root: Path | None = None
+    module_name: str | None = None
+    last_error_code: str | None = None
 
 
 class PluginManager:
@@ -64,6 +114,9 @@ class PluginManager:
         application_version: str,
         supported_api_versions: Iterable[str] = ("1",),
         registry: ExtensionRegistry | None = None,
+        state_store: PluginLifecycleStateStore | None = None,
+        audit: LifecycleAuditRecorder | None = None,
+        audit_enabled: bool = True,
     ) -> None:
         self._application_version = parse_semver(application_version)
         if isinstance(supported_api_versions, str):
@@ -79,6 +132,10 @@ class PluginManager:
         self._registry = registry or ExtensionRegistry()
         self._plugins: dict[str, _ManagedPlugin] = {}
         self._stable_enabled_plugin_ids: frozenset[str] = frozenset()
+        # Monotonic counter advanced by every lifecycle write (record add or
+        # removal, observed state transition, operator-intent write). Extension
+        # registration generations alone cannot represent these transitions.
+        self._lifecycle_generation = 0
         self._lock = threading.RLock()
         self._lifecycle_boundary: (
             Callable[[Callable[[], Any]], Any] | None
@@ -92,6 +149,15 @@ class PluginManager:
             | None
         ) = None
         self._lifecycle_boundary_state = threading.local()
+        self._state_store = (
+            state_store if state_store is not None else PluginLifecycleStateStore.from_env()
+        )
+        # Startup operations use best-effort auditing. API operator mutations
+        # opt into fail-closed attempt and completion persistence.
+        self._lifecycle_audit_disabled = not audit_enabled
+        self._lifecycle_auditor = PluginLifecycleAuditor(
+            recorder=None if self._lifecycle_audit_disabled else audit,
+        )
 
     def _bind_lifecycle_boundary(
         self,
@@ -147,6 +213,12 @@ class PluginManager:
 
         return self._registry
 
+    @property
+    def state_store(self) -> PluginLifecycleStateStore:
+        """Return the persisted enable/disable intent store."""
+
+        return self._state_store
+
     def compatibility_error(self, manifest: PluginManifest) -> str | None:
         """Return a stable compatibility code without importing plugin code."""
 
@@ -163,6 +235,8 @@ class PluginManager:
         plugin: Plugin,
         *,
         source: PluginSource,
+        package_root: str | Path | None = None,
+        module_name: str | None = None,
     ) -> PluginOperationResult:
         """Record a compatible plugin without invoking ``onload``."""
 
@@ -216,6 +290,14 @@ class PluginManager:
                 error_code=compatibility_error,
             )
 
+        resolved_root: Path | None = None
+        if package_root is not None:
+            try:
+                resolved_root = Path(package_root).expanduser().resolve()
+            except (OSError, RuntimeError):
+                resolved_root = Path(package_root).expanduser()
+        resolved_module = module_name if type(module_name) is str and module_name else None
+
         with self._lock:
             existing = self._plugins.get(manifest.id)
             if existing is not None:
@@ -230,7 +312,17 @@ class PluginManager:
                 plugin=plugin,
                 manifest=manifest,
                 source=source,
+                package_root=resolved_root,
+                module_name=resolved_module,
             )
+            self._lifecycle_generation += 1
+        logger.info(
+            "Plugin registered id=%s version=%s source=%s permissions=%s",
+            manifest.id,
+            manifest.version,
+            source,
+            list(manifest.permissions),
+        )
         return PluginOperationResult(
             plugin_id=manifest.id,
             operation="register",
@@ -251,17 +343,143 @@ class PluginManager:
             record = self._plugins.get(plugin_id)
             if record is None:
                 return None
-            return PluginSnapshot(
-                manifest=record.manifest,
-                source=record.source,
-                state=record.state,
-            )
+            return self._build_snapshot(record)
+
+    def list_snapshots(self) -> tuple[PluginSnapshot, ...]:
+        """Return immutable snapshots for every registered plugin in order."""
+
+        with self._lock:
+            return tuple(self._build_snapshot(record) for record in self._plugins.values())
 
     def plugin_ids(self) -> tuple[str, ...]:
         """Return plugin IDs in registration order."""
 
         with self._lock:
             return tuple(self._plugins)
+
+    def _build_snapshot(self, record: _ManagedPlugin) -> PluginSnapshot:
+        extension_points = tuple(
+            dict.fromkeys(
+                handle.extension_point
+                for handle in record.handles
+                if handle.active
+            )
+        )
+        package_root = (
+            None if record.package_root is None else str(record.package_root)
+        )
+        reloadable = (
+            record.source == "external"
+            and record.package_root is not None
+            and record.transition is None
+            and not record.cleanup_pending
+        )
+        return PluginSnapshot(
+            manifest=record.manifest,
+            source=record.source,
+            state=record.state,
+            desired_enabled=self._state_store.desired_enabled(record.manifest.id),
+            package_root=package_root,
+            reloadable=reloadable,
+            extension_points=extension_points,
+            last_error_code=record.last_error_code,
+        )
+
+    def health_check(self) -> PluginHealthReport:
+        """Return a read-only health report for every registered plugin."""
+
+        return build_plugin_health_report(self)
+
+    def bind_lifecycle_auditor(
+        self,
+        recorder: LifecycleAuditRecorder | None,
+    ) -> None:
+        """Attach or replace the best-effort lifecycle audit recorder."""
+
+        if self._lifecycle_audit_disabled:
+            return
+        self._lifecycle_auditor.bind_recorder(recorder)
+
+    def _audit_metadata_for(self, record: _ManagedPlugin) -> dict[str, Any]:
+        return {
+            "plugin_version": record.manifest.version,
+            "plugin_source": record.source,
+            "permissions": list(record.manifest.permissions),
+            "extension_points": [
+                handle.extension_point
+                for handle in record.handles
+                if handle.active
+            ],
+        }
+
+    def _audit_begin(
+        self,
+        record: _ManagedPlugin | None,
+        *,
+        plugin_id: str,
+        operation: str,
+        required: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> str | None:
+        if self._lifecycle_audit_disabled:
+            if required:
+                from src.services.security_audit_service import (
+                    SecurityAuditUnavailable,
+                )
+
+                raise SecurityAuditUnavailable()
+            return None
+        metadata = None if record is None else self._audit_metadata_for(record)
+        return self._lifecycle_auditor.begin(
+            plugin_id=plugin_id,
+            operation=operation,
+            metadata=metadata,
+            required=required,
+            actor_type=actor_type,
+            actor_id=actor_id,
+        )
+
+    def _audit_complete(
+        self,
+        record: _ManagedPlugin | None,
+        *,
+        plugin_id: str,
+        operation: str,
+        success: bool,
+        correlation_id: str | None,
+        error_code: str | None,
+        required: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> None:
+        if self._lifecycle_audit_disabled or correlation_id is None:
+            if required:
+                from src.services.security_audit_service import (
+                    SecurityAuditUnavailable,
+                )
+
+                raise SecurityAuditUnavailable()
+            return
+        metadata = None if record is None else self._audit_metadata_for(record)
+        self._lifecycle_auditor.complete(
+            plugin_id=plugin_id,
+            operation=operation,
+            success=success,
+            correlation_id=correlation_id,
+            error_code=error_code,
+            metadata=metadata,
+            required=required,
+            actor_type=actor_type,
+            actor_id=actor_id,
+        )
+
+    def _set_last_error(
+        self,
+        record: _ManagedPlugin,
+        error_code: str | None,
+    ) -> None:
+        record.last_error_code = error_code
 
     def registrations(
         self,
@@ -309,6 +527,46 @@ class PluginManager:
             if registration.plugin_id in enabled_plugin_ids
         )
 
+    def capability_inventory_snapshot(
+        self,
+    ) -> tuple[str, tuple[PluginSnapshot, ...], tuple[ExtensionRegistration, ...]]:
+        """Correlate lifecycle and active contributions at stable generations."""
+
+        from .registry import EXTENSION_POINTS
+
+        for _ in range(3):
+            with self._lock:
+                lifecycle_generation = self._lifecycle_generation
+                before = {
+                    point: self._registry.registration_snapshot_generation(point)
+                    for point in EXTENSION_POINTS
+                }
+                enabled_plugin_ids = self._stable_enabled_plugin_ids
+                registrations = tuple(
+                    registration
+                    for registration in self._registry.registrations_snapshot()
+                    if registration.plugin_id in enabled_plugin_ids
+                )
+                lifecycle = tuple(
+                    self._build_snapshot(record) for record in self._plugins.values()
+                )
+                after = {
+                    point: self._registry.registration_snapshot_generation(point)
+                    for point in EXTENSION_POINTS
+                }
+                lifecycle_generation_after = self._lifecycle_generation
+            if before == after and lifecycle_generation == lifecycle_generation_after:
+                # Lifecycle transitions never touch a registration generation, so
+                # the published generation must carry the lifecycle counter too.
+                generation = ",".join(
+                    (
+                        f"lifecycle:{lifecycle_generation}",
+                        *(f"{point}:{before[point]}" for point in sorted(before)),
+                    )
+                )
+                return generation, lifecycle, registrations
+        raise RuntimeError("extension registry generation drift")
+
     def enabled_native_owner_registrations_snapshot(
         self,
         extension_point: ExtensionPoint | None = None,
@@ -342,6 +600,14 @@ class PluginManager:
             for plugin_id, record in self._plugins.items()
             if record.state == "enabled" and record.transition is None
         )
+        self._lifecycle_generation += 1
+
+    def _write_desired_disabled(self, plugin_id: str, disabled: bool) -> None:
+        """Persist operator intent and advance the lifecycle generation."""
+
+        self._state_store.set_disabled(plugin_id, disabled)
+        with self._lock:
+            self._lifecycle_generation += 1
 
     def _shutdown_plugin_ids(self) -> tuple[str, ...]:
         """Return plugins whose owned lifecycle state still needs shutdown."""
@@ -353,27 +619,109 @@ class PluginManager:
                 if record.state in {"enabled", "failed"}
             )
 
-    def load(self, plugin_id: str) -> PluginOperationResult:
+    def load(
+        self,
+        plugin_id: str,
+        *,
+        require_audit: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> PluginOperationResult:
         """Perform the first ``registered -> enabled`` transition."""
 
         return self._run_lifecycle_boundary(
-            lambda: self._enable(
+            lambda: self._audited_operation(
                 plugin_id,
-                operation="load",
-                required_state="registered",
+                "load",
+                lambda: self._enable(
+                    plugin_id,
+                    operation="load",
+                    required_state="registered",
+                ),
+                require_audit=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
             )
         )
 
-    def enable(self, plugin_id: str) -> PluginOperationResult:
+    def enable(
+        self,
+        plugin_id: str,
+        *,
+        require_audit: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> PluginOperationResult:
         """Perform ``disabled -> enabled`` and remain idempotent when enabled."""
 
         return self._run_lifecycle_boundary(
-            lambda: self._enable(
+            lambda: self._audited_operation(
                 plugin_id,
-                operation="enable",
-                required_state="disabled",
+                "enable",
+                lambda: self._enable(
+                    plugin_id,
+                    operation="enable",
+                    required_state="disabled",
+                ),
+                require_audit=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
             )
         )
+
+    def _audited_operation(
+        self,
+        plugin_id: str,
+        operation: str,
+        run: Callable[[], PluginOperationResult],
+        *,
+        require_audit: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> PluginOperationResult:
+        """Run one lifecycle operation with selected audit strictness."""
+
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            starting_state = None if record is None else record.state
+        correlation_id = self._audit_begin(
+            record,
+            plugin_id=plugin_id,
+            operation=operation,
+            required=require_audit,
+            actor_type=actor_type,
+            actor_id=actor_id,
+        )
+        result = run()
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            if record is not None:
+                if (
+                    operation in {"load", "enable"}
+                    and result.success
+                    and result.error_code is None
+                    and starting_state != "enabled"
+                ):
+                    self._set_last_error(record, None)
+                elif result.error_code is not None:
+                    self._set_last_error(record, result.error_code)
+        from src.services.security_audit_service import SecurityAuditUnavailable
+
+        try:
+            self._audit_complete(
+                record,
+                plugin_id=plugin_id,
+                operation=operation,
+                success=result.success,
+                correlation_id=correlation_id,
+                error_code=result.error_code,
+                required=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        except SecurityAuditUnavailable:
+            raise PluginLifecycleAuditCompletionUnavailable(result) from None
+        return result
 
     def _enable(
         self,
@@ -406,6 +754,8 @@ class PluginManager:
                     error_code="plugin_transition_in_progress",
                 )
             if record.state == "enabled":
+                if operation == "enable":
+                    self._write_desired_disabled(plugin_id, False)
                 return PluginOperationResult(
                     plugin_id=plugin_id,
                     operation=operation,
@@ -420,6 +770,27 @@ class PluginManager:
                     state=record.state,
                     error_code="plugin_invalid_state",
                 )
+
+            # Honored across every extension point: disabled plugins never
+            # receive onload and therefore never register or invoke hooks.
+            if operation == "load" and self._state_store.is_disabled(plugin_id):
+                logger.info(
+                    "Plugin %s is disabled by persisted lifecycle state; skipping load",
+                    plugin_id,
+                )
+                record.state = "disabled"
+                record.transition = None
+                record.cleanup_pending = False
+                self._publish_stable_enabled_plugin_ids()
+                return PluginOperationResult(
+                    plugin_id=plugin_id,
+                    operation=operation,
+                    success=True,
+                    state="disabled",
+                )
+
+            if operation == "enable":
+                self._write_desired_disabled(plugin_id, False)
 
             record.transition = operation
             self._publish_stable_enabled_plugin_ids()
@@ -445,6 +816,27 @@ class PluginManager:
 
             if load_error_code is None:
                 load_error_code = context.recovery_error_code
+
+            # agent_tool load-time declaration check: every ToolPolicy capability
+            # must be declared on the plugin manifest. Fail this plugin only.
+            if load_error_code is None:
+                active_registrations = tuple(
+                    registration
+                    for registration in self._registry.registrations()
+                    if registration.plugin_id == plugin_id
+                )
+                load_error_code = agent_tool_manifest_permissions_error(
+                    manifest=record.manifest,
+                    registrations=active_registrations,
+                )
+                if load_error_code is not None:
+                    logger.warning(
+                        "Plugin %s rejected: agent_tool permissions exceed "
+                        "manifest declaration (error_code=%s, declared=%s)",
+                        plugin_id,
+                        load_error_code,
+                        list(record.manifest.permissions),
+                    )
 
             if load_error_code is not None:
                 remaining, cleanup_errors = self._cleanup_handles(
@@ -473,6 +865,17 @@ class PluginManager:
             record.state = "enabled"
             record.transition = None
             self._publish_stable_enabled_plugin_ids()
+            logger.info(
+                "Plugin enabled id=%s version=%s permissions=%s extension_points=%s",
+                plugin_id,
+                record.manifest.version,
+                list(record.manifest.permissions),
+                [
+                    handle.extension_point
+                    for handle in record.handles
+                    if handle.active
+                ],
+            )
             return PluginOperationResult(
                 plugin_id=plugin_id,
                 operation=operation,
@@ -480,18 +883,36 @@ class PluginManager:
                 state="enabled",
             )
 
-    def disable(self, plugin_id: str) -> PluginOperationResult:
+    def disable(
+        self,
+        plugin_id: str,
+        *,
+        require_audit: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> PluginOperationResult:
         """Unload an enabled plugin or converge a failed plugin after cleanup."""
 
-        def run_disable() -> PluginOperationResult:
-            if self._disable_boundary is None:
-                return self._disable(plugin_id)
-            return self._disable_boundary(
+        return self._run_lifecycle_boundary(
+            lambda: self._audited_operation(
                 plugin_id,
-                lambda: self._disable(plugin_id),
+                "disable",
+                lambda: self._run_disable_boundary(plugin_id),
+                require_audit=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
             )
+        )
 
-        return self._run_lifecycle_boundary(run_disable)
+    def _run_disable_boundary(self, plugin_id: str) -> PluginOperationResult:
+        """Apply the root's dispatch drain without creating a nested audit."""
+
+        if self._disable_boundary is None:
+            return self._disable(plugin_id)
+        return self._disable_boundary(
+            plugin_id,
+            lambda: self._disable(plugin_id),
+        )
 
     def _disable(self, plugin_id: str) -> PluginOperationResult:
         """Perform one disable transition inside the outer lifecycle boundary."""
@@ -508,7 +929,16 @@ class PluginManager:
                     state=record.state,
                     error_code="plugin_transition_in_progress",
                 )
+            # Root shutdown unload must not rewrite operator intent.
+            persist_intent = self._should_persist_operator_intent()
+
             if record.state == "disabled":
+                if persist_intent:
+                    self._write_desired_disabled(plugin_id, True)
+                    logger.info(
+                        "Plugin %s is already disabled; persisted lifecycle state updated",
+                        plugin_id,
+                    )
                 return PluginOperationResult(
                     plugin_id=plugin_id,
                     operation="disable",
@@ -530,12 +960,35 @@ class PluginManager:
                 cleanup_error = cleanup_errors[0] if cleanup_errors else None
                 if cleanup_error is None and remaining:
                     cleanup_error = "plugin_registration_cleanup_failed"
+                if not remaining and persist_intent:
+                    self._write_desired_disabled(plugin_id, True)
+                    logger.info(
+                        "Plugin %s disabled after failed-state cleanup; will not be invoked",
+                        plugin_id,
+                    )
                 return PluginOperationResult(
                     plugin_id=plugin_id,
                     operation="disable",
                     success=not cleanup_errors and not remaining,
                     state=record.state,
                     error_code=cleanup_error,
+                )
+            if record.state == "registered":
+                # Never loaded: mark disabled without onload so every hook type
+                # stays unregistered and uninvoked across restarts.
+                record.state = "disabled"
+                record.transition = None
+                if persist_intent:
+                    self._write_desired_disabled(plugin_id, True)
+                    logger.info(
+                        "Plugin %s disabled before load; skipping registration and invocation",
+                        plugin_id,
+                    )
+                return PluginOperationResult(
+                    plugin_id=plugin_id,
+                    operation="disable",
+                    success=True,
+                    state="disabled",
                 )
             if record.state != "enabled":
                 return PluginOperationResult(
@@ -582,6 +1035,12 @@ class PluginManager:
                         else "plugin_registration_cleanup_failed"
                     ),
                 )
+            if persist_intent:
+                self._write_desired_disabled(plugin_id, True)
+                logger.info(
+                    "Plugin %s disabled; owned registrations removed and will not be invoked",
+                    plugin_id,
+                )
             return PluginOperationResult(
                 plugin_id=plugin_id,
                 operation="disable",
@@ -604,6 +1063,345 @@ class PluginManager:
         selected = self.plugin_ids() if plugin_ids is None else tuple(plugin_ids)
         return self._run_lifecycle_boundary(
             lambda: tuple(self.disable(plugin_id) for plugin_id in reversed(selected))
+        )
+
+    def set_enabled(
+        self,
+        plugin_id: str,
+        enabled: bool,
+        *,
+        require_audit: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> PluginOperationResult:
+        """Enable or disable one plugin and persist operator intent."""
+
+        if enabled:
+            snapshot = self.snapshot(plugin_id)
+            if snapshot is None:
+                return self._not_found(plugin_id, "enable")
+            if snapshot.state == "registered":
+                return self._run_lifecycle_boundary(
+                    lambda: self._audited_operation(
+                        plugin_id,
+                        "enable",
+                        lambda: self._enable(
+                            plugin_id,
+                            operation="enable",
+                            required_state="registered",
+                        ),
+                        require_audit=require_audit,
+                        actor_type=actor_type,
+                        actor_id=actor_id,
+                    )
+                )
+            return self.enable(
+                plugin_id,
+                require_audit=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        return self.disable(
+            plugin_id,
+            require_audit=require_audit,
+            actor_type=actor_type,
+            actor_id=actor_id,
+        )
+
+    def forget(self, plugin_id: str) -> PluginOperationResult:
+        """Remove a fully cleaned-up plugin so it can be re-registered."""
+
+        return self._run_lifecycle_boundary(lambda: self._forget(plugin_id))
+
+    def _forget(self, plugin_id: str) -> PluginOperationResult:
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            if record is None:
+                return self._not_found(plugin_id, "forget")
+            if record.transition is not None:
+                return PluginOperationResult(
+                    plugin_id=plugin_id,
+                    operation="forget",
+                    success=False,
+                    state=record.state,
+                    error_code="plugin_transition_in_progress",
+                )
+            if record.state == "enabled":
+                return PluginOperationResult(
+                    plugin_id=plugin_id,
+                    operation="forget",
+                    success=False,
+                    state=record.state,
+                    error_code="plugin_invalid_state",
+                )
+            if record.handles or record.cleanup_pending:
+                return PluginOperationResult(
+                    plugin_id=plugin_id,
+                    operation="forget",
+                    success=False,
+                    state=record.state,
+                    error_code="plugin_registration_cleanup_failed",
+                )
+            del self._plugins[plugin_id]
+            self._publish_stable_enabled_plugin_ids()
+            return PluginOperationResult(
+                plugin_id=plugin_id,
+                operation="forget",
+                success=True,
+                state="disabled",
+            )
+
+    def reload(
+        self,
+        plugin_id: str,
+        *,
+        require_audit: bool = False,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
+    ) -> PluginReloadResult:
+        """Reload one external plugin's code/manifest without process restart.
+
+        Built-in plugins always return ``restart_required`` because their code
+        is part of the application package. External plugins are re-imported
+        from their on-disk package root only; this path never fetches remote
+        code and never auto-enables a plugin that is persisted as disabled.
+        """
+
+        return self._run_lifecycle_boundary(
+            lambda: self._audited_reload(
+                plugin_id,
+                require_audit=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        )
+
+    def _audited_reload(
+        self,
+        plugin_id: str,
+        *,
+        require_audit: bool,
+        actor_type: str | None,
+        actor_id: str | None,
+    ) -> PluginReloadResult:
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+        correlation_id = self._audit_begin(
+            record,
+            plugin_id=plugin_id,
+            operation="reload",
+            required=require_audit,
+            actor_type=actor_type,
+            actor_id=actor_id,
+        )
+        result = self._reload(plugin_id)
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            if record is not None:
+                if result.success and result.error_code is None:
+                    self._set_last_error(record, None)
+                elif result.error_code is not None:
+                    self._set_last_error(record, result.error_code)
+        from src.services.security_audit_service import SecurityAuditUnavailable
+
+        try:
+            self._audit_complete(
+                record,
+                plugin_id=plugin_id,
+                operation="reload",
+                success=result.success,
+                correlation_id=correlation_id,
+                error_code=result.error_code,
+                required=require_audit,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        except SecurityAuditUnavailable:
+            raise PluginLifecycleAuditCompletionUnavailable(result) from None
+        return result
+
+    def _reload(self, plugin_id: str) -> PluginReloadResult:
+        snapshot = self.snapshot(plugin_id)
+        if snapshot is None:
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=False,
+                state="failed",
+                reloaded=False,
+                restart_required=False,
+                error_code="plugin_not_found",
+                message="Plugin is not registered",
+            )
+        if snapshot.source != "external":
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=False,
+                state=snapshot.state,
+                reloaded=False,
+                restart_required=True,
+                error_code="plugin_reload_restart_required",
+                message=(
+                    "Built-in plugins are part of the application package and "
+                    "require a process restart to pick up code changes"
+                ),
+            )
+        if snapshot.package_root is None:
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=False,
+                state=snapshot.state,
+                reloaded=False,
+                restart_required=True,
+                error_code="plugin_reload_restart_required",
+                message=(
+                    "External plugin has no recorded package root; restart the "
+                    "process to rediscover it from PLUGINS_DIR"
+                ),
+            )
+
+        desired_enabled = self._state_store.desired_enabled(plugin_id)
+        was_enabled = snapshot.state == "enabled"
+        if was_enabled or snapshot.state == "failed":
+            disable_result = self._run_disable_boundary(plugin_id)
+            if not disable_result.success and disable_result.state != "disabled":
+                return PluginReloadResult(
+                    plugin_id=plugin_id,
+                    success=False,
+                    state=disable_result.state,
+                    reloaded=False,
+                    restart_required=True,
+                    error_code=disable_result.error_code or "plugin_reload_restart_required",
+                    message=(
+                        "Plugin could not be fully unloaded; restart the process "
+                        "to replace its registrations safely"
+                    ),
+                )
+            # Preserve operator intent after unload-side disable persistence.
+            if desired_enabled:
+                self._write_desired_disabled(plugin_id, False)
+
+        with self._lock:
+            record = self._plugins.get(plugin_id)
+            if record is None:
+                return PluginReloadResult(
+                    plugin_id=plugin_id,
+                    success=False,
+                    state="failed",
+                    reloaded=False,
+                    restart_required=False,
+                    error_code="plugin_not_found",
+                    message="Plugin disappeared during reload",
+                )
+            package_root = record.package_root
+            module_name = record.module_name
+            if package_root is None:
+                return PluginReloadResult(
+                    plugin_id=plugin_id,
+                    success=False,
+                    state=record.state,
+                    reloaded=False,
+                    restart_required=True,
+                    error_code="plugin_reload_restart_required",
+                    message="External plugin package root is unavailable",
+                )
+            active_points = {
+                handle.extension_point
+                for handle in record.handles
+                if handle.active
+            }
+            if active_points - _HOT_RELOADABLE_EXTENSION_POINTS:
+                return PluginReloadResult(
+                    plugin_id=plugin_id,
+                    success=False,
+                    state=record.state,
+                    reloaded=False,
+                    restart_required=True,
+                    error_code="plugin_reload_restart_required",
+                    message=(
+                        "Plugin still owns extension points that cannot be "
+                        "hot-reloaded safely"
+                    ),
+                )
+
+        forget_result = self._forget(plugin_id)
+        if not forget_result.success:
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=False,
+                state=forget_result.state,
+                reloaded=False,
+                restart_required=True,
+                error_code=forget_result.error_code or "plugin_reload_restart_required",
+                message=(
+                    "Plugin could not be removed from the manager; restart "
+                    "required"
+                ),
+            )
+
+        if module_name:
+            import sys
+
+            sys.modules.pop(module_name, None)
+
+        from .loader import ExternalPluginLoader
+
+        loader = ExternalPluginLoader(self)
+        register_result = loader.register_one(package_root)
+        if not register_result.success:
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=False,
+                state="failed",
+                reloaded=False,
+                restart_required=False,
+                error_code=register_result.error_code or "plugin_reload_failed",
+                message="External plugin could not be re-imported from disk",
+            )
+
+        if register_result.plugin_id != plugin_id:
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=False,
+                state="failed",
+                reloaded=False,
+                restart_required=False,
+                error_code="plugin_reload_id_mismatch",
+                message=(
+                    f"Reloaded package reports id {register_result.plugin_id!r}, "
+                    f"expected {plugin_id!r}"
+                ),
+            )
+
+        if not desired_enabled:
+            # Keep disabled plugins registered-but-not-loaded; do not auto-enable.
+            disable_again = self._disable(plugin_id)
+            return PluginReloadResult(
+                plugin_id=plugin_id,
+                success=disable_again.success,
+                state=disable_again.state,
+                reloaded=True,
+                restart_required=False,
+                error_code=disable_again.error_code,
+                message="Plugin code reloaded; remains disabled by operator intent",
+            )
+
+        load_result = self._enable(
+            plugin_id,
+            operation="load",
+            required_state="registered",
+        )
+        return PluginReloadResult(
+            plugin_id=plugin_id,
+            success=load_result.success,
+            state=load_result.state,
+            reloaded=load_result.success,
+            restart_required=False,
+            error_code=load_result.error_code,
+            message=(
+                "Plugin code and manifest reloaded in-process"
+                if load_result.success
+                else "Plugin re-imported but failed to enable"
+            ),
         )
 
     def _cleanup_handles(
@@ -634,6 +1432,13 @@ class PluginManager:
                 remaining.append(handle)
         remaining.reverse()
         return tuple(remaining), tuple(error_codes)
+
+    def _should_persist_operator_intent(self) -> bool:
+        """Skip persistence while the composition root is shutting down."""
+
+        if self._activation_allowed is not None and not self._activation_allowed():
+            return False
+        return True
 
     @staticmethod
     def _not_found(plugin_id: str, operation: str) -> PluginOperationResult:

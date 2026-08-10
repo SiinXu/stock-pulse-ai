@@ -103,14 +103,8 @@ const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-
 const STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN = /^(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|box-shadow)$/;
 const MAX_BUTTON_VISUAL_OVERRIDE_ALLOWANCES = 0;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([]);
-const MAX_STATE_SURFACE_VISUAL_OVERRIDE_ALLOWANCES = 16;
+const MAX_STATE_SURFACE_VISUAL_OVERRIDE_ALLOWANCES = 14;
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
-  ['../common/ApiErrorAlert.tsx', [47, 59].map((line) => ({
-    line,
-    owner: 'UIUX-HARNESS' as const,
-    removeWhen: 'ApiErrorAlert callers no longer need layout className pass-through after migration to external wrappers.',
-    tokens: ['dynamic:className'],
-  }))],
   ['../common/Card.tsx', [{
     line: 43,
     owner: 'UIUX-HARNESS',
@@ -172,14 +166,14 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:className'],
   }]],
   ['../report/ReportOverview.tsx', [
-    ...[304, 327].map((line) => ({
+    ...[317, 340].map((line) => ({
       line,
       owner: 'UIUX-HARNESS' as const,
       removeWhen: 'Report insight cards receive an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-insight-card'],
     })),
     {
-      line: 388,
+      line: 401,
       owner: 'UIUX-HARNESS',
       removeWhen: 'The report sentiment rail receives an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-rail-card'],

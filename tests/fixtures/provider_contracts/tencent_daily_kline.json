@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "provider": "tencent",
+    "endpoint": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+    "symbol": "sz000001",
+    "recorded_note": "Tencent fqkline qfqday row layout: [date, open, close, high, low, volume_lots, amount]."
+  },
+  "payload": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "sz000001": {
+        "qfqday": [
+          ["2026-05-06", "10.00", "10.50", "10.80", "9.90", "12345", "67890"],
+          ["2026-05-07", "10.50", "10.70", "10.90", "10.30", "22345", "77890"],
+          ["2026-05-08", "10.70", "10.60", "10.85", "10.40", "18900", "70012"]
+        ]
+      }
+    }
+  }
+}

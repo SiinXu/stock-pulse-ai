@@ -3,6 +3,34 @@
 from typing import Any, Dict
 
 SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+    "REPORT_EXPORT_PDF_FONT_PATH": {
+        "title": "Report Export PDF Font Path",
+        "description": (
+            "Optional absolute path to one parseable TTF/OTF face used by PDF report export. "
+            "An explicitly configured invalid path fails closed; it never falls back to another system font."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"maxLength": 1024},
+        "display_order": 9,
+        "help_key": "settings.system.REPORT_EXPORT_PDF_FONT_PATH",
+        "examples": [
+            "REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf",
+        ],
+        "docs": [
+            {
+                "label": "Report export configuration and font readiness",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/report-export.md",
+            },
+        ],
+        "warning_codes": ["restart_required", "path_must_exist"],
+    },
     "SCHEDULE_TIME": {
         "title": "Schedule Time",
         "description": (
@@ -77,9 +105,125 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
         ),
     },
+    "USE_PROXY": {
+        "title": "Enable Local Proxy",
+        "description": (
+            "Mainland-friendly toggle that maps PROXY_HOST and PROXY_PORT onto "
+            "process http_proxy/https_proxy at env bootstrap and config reload. "
+            "GitHub Actions always skips this regardless of the value. "
+            "A process restart is required for a full, reliable effect "
+            "(including disabling a previously applied proxy and any long-lived "
+            "HTTP clients that cached proxy settings)."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 17,
+        "help_key": "settings.system.USE_PROXY",
+        "examples": [
+            "USE_PROXY=false",
+            "USE_PROXY=true",
+            "PROXY_HOST=127.0.0.1",
+            "PROXY_PORT=10809",
+        ],
+        "docs": [
+            {
+                "label": "FAQ: configure proxy for Gemini/OpenAI",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/FAQ_EN.md#q7-how-to-configure-proxy-to-access-geminiopenai-api",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": ["restart_required", "network_scope"],
+    },
+    "PROXY_HOST": {
+        "title": "Proxy Host",
+        "description": (
+            "Host (or user:pass@host) used when USE_PROXY=true to build "
+            "http://{PROXY_HOST}:{PROXY_PORT}. May embed credentials; values are "
+            "masked in Settings and redacted in diagnostics. Prefer host-only "
+            "values when credentials are not required. Inside containers, "
+            "127.0.0.1 points at the container, not the host machine. "
+            "Requires process restart for full effect with USE_PROXY."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "127.0.0.1",
+        "options": [],
+        "validation": {},
+        "display_order": 18,
+        "help_key": "settings.system.PROXY_HOST",
+        "examples": [
+            "PROXY_HOST=127.0.0.1",
+            "PROXY_HOST=host.docker.internal",
+        ],
+        "docs": [
+            {
+                "label": "FAQ: configure proxy for Gemini/OpenAI",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/FAQ_EN.md#q7-how-to-configure-proxy-to-access-geminiopenai-api",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": ["restart_required", "secret_value", "network_scope"],
+    },
+    "PROXY_PORT": {
+        "title": "Proxy Port",
+        "description": (
+            "Port used when USE_PROXY=true to build "
+            "http://{PROXY_HOST}:{PROXY_PORT} (default 10809). "
+            "Requires process restart for full effect with USE_PROXY."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10809",
+        "options": [],
+        "validation": {"min": 1, "max": 65535},
+        "display_order": 19,
+        "help_key": "settings.system.PROXY_PORT",
+        "examples": [
+            "PROXY_PORT=10809",
+            "PROXY_PORT=7890",
+        ],
+        "docs": [
+            {
+                "label": "FAQ: configure proxy for Gemini/OpenAI",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/FAQ_EN.md#q7-how-to-configure-proxy-to-access-geminiopenai-api",
+            },
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": ["restart_required", "network_scope"],
+    },
     "HTTP_PROXY": {
         "title": "HTTP Proxy",
-        "description": "Optional HTTP proxy endpoint.",
+        "description": (
+            "Optional standard HTTP proxy URL for outbound requests "
+            "(data sources, LLM, search, notifications). Prefer this over "
+            "USE_PROXY/PROXY_HOST/PROXY_PORT when libraries honor HTTP_PROXY. "
+            "URL userinfo credentials are redacted in diagnostics; do not share "
+            "export dumps that include them."
+        ),
         "category": "system",
         "data_type": "string",
         "ui_control": "text",
@@ -337,6 +481,33 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "replacement": (
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
         ),
+    },
+    "LOCAL_ONLY_MODE": {
+        "title": "Local Only Mode",
+        "description": (
+            "When enabled, the outbound HTTP policy fails closed for every non-loopback "
+            "destination (public cloud APIs, private LAN hosts, and allowlisted remote "
+            "services). Only pure loopback targets remain reachable. Blocked calls raise "
+            "coded errors that name LOCAL_ONLY_MODE; they never silently fall through."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 40,
+        "help_key": "settings.system.LOCAL_ONLY_MODE",
+        "examples": ["LOCAL_ONLY_MODE=false", "LOCAL_ONLY_MODE=true"],
+        "docs": [
+            {"label": "Local Only mode (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-only-mode_EN.md"},
+            {"label": "本地专用模式", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/local-only-mode.md"},
+            {"label": "Outbound HTTP security policy", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md"},
+        ],
+        "warning_codes": ["restart_required", "network_scope", "local_only_blocks_cloud"],
     },
     "ADMIN_AUTH_ENABLED": {
         "title": "Admin Auth Enabled",
@@ -737,5 +908,290 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "LOCAL_RUNTIME_AUTO_DETECT": {
+        "title": "Local Runtime Auto-Detect",
+        "description": (
+            "When enabled (default), setup readiness performs a fast loopback-only probe for a "
+            "running local generation runtime such as Ollama (127.0.0.0/8, ::1, localhost). "
+            "Probe failures are log-only and never block startup. Disable to skip the probe."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 58,
+        "help_key": "settings.system.LOCAL_RUNTIME_AUTO_DETECT",
+        "examples": [
+            "LOCAL_RUNTIME_AUTO_DETECT=true",
+            "LOCAL_RUNTIME_AUTO_DETECT=false",
+        ],
+        "docs": [
+            {
+                "label": "Beginner client setup",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/beginner-client-setup_EN.md",
+            },
+            {
+                "label": "LLM configuration guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/LLM_CONFIG_GUIDE_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS": {
+        "title": "Local Runtime Detect Timeout",
+        "description": (
+            "Per-request timeout in seconds for the loopback local-runtime detect probe. "
+            "Clamped to 0.05–2.0; keep low so setup status stays fast when Ollama is down."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.35",
+        "options": [],
+        "validation": {"min": 0.05, "max": 2.0},
+        "display_order": 59,
+        "help_key": "settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS",
+        "examples": [
+            "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35",
+            "LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5",
+        ],
+        "docs": [
+            {
+                "label": "Beginner client setup",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/beginner-client-setup_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+
+    "DAILY_BRIEF_ENABLED": {
+        "title": "Daily Brief Enabled",
+        "description": (
+            "Opt-in daily brief that reviews historical prediction accuracy "
+            "(decision-signal outcomes, backtest summary, skill-opinion performance) "
+            "before summarizing yesterday's analyses and today's watchlist. "
+            "Default off. Does not invent hit rates when history is insufficient."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 58,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_ENABLED=false",
+            "DAILY_BRIEF_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_SCHEDULE_TIME": {
+        "title": "Daily Brief Schedule Time",
+        "description": (
+            "Local wall-clock time (24-hour HH:MM) when the enabled daily brief may fire. "
+            "The scheduler polls periodically and runs at most once per local calendar day "
+            "after this time."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "08:30",
+        "options": [],
+        "validation": {"pattern": r"^(?:[01]\d|2[0-3]):[0-5]\d$"},
+        "display_order": 59,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_SCHEDULE_TIME=08:30",
+            "DAILY_BRIEF_SCHEDULE_TIME=09:00",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_TIMEZONE": {
+        "title": "Daily Brief Timezone",
+        "description": (
+            "IANA timezone used for the daily brief schedule and for mapping "
+            "analysis timestamps onto 'yesterday'. Defaults to Asia/Shanghai when unset "
+            "or invalid."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "Asia/Shanghai",
+        "options": [],
+        "validation": {},
+        "display_order": 60,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_TIMEZONE=Asia/Shanghai",
+            "DAILY_BRIEF_TIMEZONE=America/New_York",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DAILY_BRIEF_MIN_SAMPLES": {
+        "title": "Daily Brief Min Samples",
+        "description": (
+            "Minimum completed (hit+miss or backtest completed) samples before the brief "
+            "publishes a percentage for a given accuracy source. Below this threshold the "
+            "brief states insufficient history explicitly."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10",
+        "options": [],
+        "validation": {"min": 1, "max": 10000},
+        "display_order": 61,
+        "help_key": "settings.system.daily_brief",
+        "examples": [
+            "DAILY_BRIEF_MIN_SAMPLES=10",
+            "DAILY_BRIEF_MIN_SAMPLES=20",
+        ],
+        "docs": [
+            {
+                "label": "Daily brief",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PORTFOLIO_STRESS_SCENARIOS_PATH": {
+        "title": "Portfolio Stress Scenario Catalog",
+        "description": (
+            "Optional local YAML file that adds or overrides bounded deterministic "
+            "portfolio stress scenarios. The last validated catalog remains active "
+            "when a later reload is invalid."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {"max_length": 1024},
+        "display_order": 62,
+        "help_key": "settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH",
+        "examples": ["PORTFOLIO_STRESS_SCENARIOS_PATH=./config/stress-scenarios.yaml"],
+        "docs": [
+            {
+                "label": "Portfolio stress testing",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/portfolio-stress-test_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required", "local_path"],
+    },
 
 }
+
+
+_PORTFOLIO_HEALTH_NUMBER_FIELDS = {
+    "PORTFOLIO_HEALTH_WEIGHT_CONCENTRATION": (
+        "Portfolio Health Concentration Weight", "0.25", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE": (
+        "Portfolio Health Risk Exposure Weight", "0.25", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION": (
+        "Portfolio Health Diversification Weight", "0.20", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_PNL": (
+        "Portfolio Health PnL Weight", "0.15", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_WEIGHT_CASH_RATIO": (
+        "Portfolio Health Cash Ratio Weight", "0.15", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT": (
+        "Portfolio Health Concentration Alert (%)", "35.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_VAR_ALERT_PCT": (
+        "Portfolio Health VaR Alert (%)", "5.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_DIVERSIFICATION_ALERT": (
+        "Portfolio Health Diversification Alert", "0.35", 0.0, 1.0
+    ),
+    "PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT": (
+        "Portfolio Health Low Cash Alert (%)", "2.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT": (
+        "Portfolio Health High Cash Alert (%)", "50.0", 0.0, 100.0
+    ),
+    "PORTFOLIO_HEALTH_PNL_LOSS_ALERT_PCT": (
+        "Portfolio Health PnL Loss Alert (%)", "-15.0", -100.0, 0.0
+    ),
+}
+
+for _offset, (_key, (_title, _default, _minimum, _maximum)) in enumerate(
+    _PORTFOLIO_HEALTH_NUMBER_FIELDS.items(),
+    start=0,
+):
+    SYSTEM_FIELD_DEFINITIONS[_key] = {
+        "title": _title,
+        "description": (
+            "Finite portfolio-health formula configuration. Invalid, non-finite, "
+            "or out-of-range values are rejected instead of clamped."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": _default,
+        "options": [],
+        "validation": {"min": _minimum, "max": _maximum},
+        "display_order": 170 + _offset,
+        "help_key": "settings.system.portfolio_health",
+        "examples": [f"{_key}={_default}"],
+        "docs": [
+            {
+                "label": "Portfolio health score",
+                "href": (
+                    "https://github.com/SiinXu/stock-pulse-ai/blob/main/"
+                    "docs/portfolio-health-score_EN.md"
+                ),
+            }
+        ],
+        "warning_codes": [],
+    }
+
+del _offset, _key, _title, _default, _minimum, _maximum

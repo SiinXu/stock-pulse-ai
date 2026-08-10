@@ -27,6 +27,7 @@ SUPPORTED_AGENT_TOOL_CAPABILITIES = frozenset({
     "intel:read",
     "local_model:execute",
     "market_data:read",
+    "multimodal:read",
     "news:read",
     "portfolio:read",
 })
@@ -194,6 +195,76 @@ class ToolDefinition:
             "description": self.description,
             "inputSchema": self._descriptor_json_schema(),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ToolInventoryDeclaration:
+    """Owner metadata for an expected tool that may not be registered."""
+
+    name: str
+    configured: Optional[bool] = None
+    dependency_ready: Optional[bool] = None
+    scopes: tuple[str, ...] = ()
+    reason_code: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.name, str)
+            or not self.name.strip()
+            or len(self.name) > 128
+        ):
+            raise ValueError("inventory tool name must be bounded and non-empty")
+        if self.configured is not None and type(self.configured) is not bool:
+            raise TypeError("configured must be bool or None")
+        if (
+            self.dependency_ready is not None
+            and type(self.dependency_ready) is not bool
+        ):
+            raise TypeError("dependency_ready must be bool or None")
+        if len(self.scopes) > 64 or any(
+            not isinstance(scope, str) or not scope or len(scope) > 128
+            for scope in self.scopes
+        ):
+            raise ValueError("inventory tool scopes must be bounded strings")
+        if self.reason_code is not None and (
+            not self.reason_code or len(self.reason_code) > 128
+        ):
+            raise ValueError("inventory tool reason code must be bounded")
+
+
+@dataclass(frozen=True, slots=True)
+class ToolInventoryEntry:
+    """Immutable projection of one registered tool at one owner generation.
+
+    The registry publishes copies instead of live ``ToolDefinition`` objects so
+    a later in-place mutation of a definition (for example appending to
+    ``policy.permissions``) cannot silently change a published inventory while
+    the owner generation stays the same. Any real change must go through
+    ``register`` / ``unregister``, which advance the generation.
+    """
+
+    name: str
+    category: str
+    scopes: tuple[str, ...]
+    definition_version: int
+
+    @classmethod
+    def from_definition(
+        cls,
+        definition: "ToolDefinition",
+        *,
+        definition_version: int,
+    ) -> "ToolInventoryEntry":
+        policy = getattr(definition, "policy", None)
+        scopes = tuple(sorted(
+            str(value) for value in (getattr(policy, "permissions", ()) or ())
+        ))
+        return cls(
+            name=str(definition.name),
+            category=str(definition.category),
+            scopes=scopes,
+            definition_version=definition_version,
+        )
 
 
 def _strict_contract_value_equal(
@@ -377,6 +448,9 @@ class ToolRegistry:
     def __init__(self):
         self._tools: Dict[str, ToolDefinition] = {}
         self._definition_versions: Dict[str, int] = {}
+        self._inventory_declarations: Dict[str, ToolInventoryDeclaration] = {}
+        self._inventory_entries: Dict[str, ToolInventoryEntry] = {}
+        self._registry_generation = 0
 
     # ----- Registration -----
 
@@ -388,6 +462,11 @@ class ToolRegistry:
             self._definition_versions.get(tool_def.name, 0) + 1
         )
         self._tools[tool_def.name] = tool_def
+        self._inventory_entries[tool_def.name] = ToolInventoryEntry.from_definition(
+            tool_def,
+            definition_version=self._definition_versions[tool_def.name],
+        )
+        self._registry_generation += 1
         logger.debug(f"Registered tool: {tool_def.name} (category={tool_def.category})")
 
     def unregister(self, name: str) -> None:
@@ -397,6 +476,15 @@ class ToolRegistry:
                 self._definition_versions.get(name, 0) + 1
             )
             self._tools.pop(name, None)
+            self._inventory_entries.pop(name, None)
+            self._registry_generation += 1
+
+    def declare_inventory_tool(self, declaration: ToolInventoryDeclaration) -> None:
+        """Publish optional-tool metadata through the ToolRegistry owner."""
+
+        if self._inventory_declarations.get(declaration.name) != declaration:
+            self._inventory_declarations[declaration.name] = declaration
+            self._registry_generation += 1
 
     # ----- Query -----
 
@@ -411,6 +499,31 @@ class ToolRegistry:
     def definition_version(self, name: str) -> int:
         """Return the monotonic registration generation for one exact name."""
         return self._definition_versions.get(name, 0)
+
+    def capability_inventory_snapshot(
+        self,
+    ) -> tuple[
+        int,
+        tuple[ToolInventoryEntry, ...],
+        tuple[ToolInventoryDeclaration, ...],
+    ]:
+        """Return immutable entries and owner declarations at one generation.
+
+        Entries are frozen copies captured at registration time. Callers never
+        receive a live ``ToolDefinition``, so no consumer can observe a scope
+        change that the published generation does not account for.
+        """
+
+        for _ in range(3):
+            generation = self._registry_generation
+            try:
+                entries = tuple(self._inventory_entries.values())
+                declarations = tuple(self._inventory_declarations.values())
+            except RuntimeError:
+                continue
+            if self._registry_generation == generation:
+                return generation, entries, declarations
+        raise RuntimeError("tool registry generation drift")
 
     def bind_definition(self, name: str) -> Optional[ToolDefinitionBinding]:
         """Freeze one exact live definition for a single execution boundary."""

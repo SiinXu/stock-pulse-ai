@@ -1,7 +1,20 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/common';
+import { ChatComposer } from '../../components/chat/ChatComposer';
+import { ChatSendFeedbackAlert } from '../../components/chat/ChatSendFeedback';
+import { ChatMessageList } from '../../components/chat/ChatMessageList'
+import { WhatIfScenarioPanel } from '../../components/chat/WhatIfScenarioPanel'
+import { DEFAULT_WHAT_IF_DRAFT } from '../../components/chat/whatIfScenario';
+import { ChatSessionSidebar } from '../../components/chat/ChatSessionSidebar';
+import {
+  ChatThinkingDetails,
+  ChatThinkingToggle,
+} from '../../components/chat/ChatThinkingDetails';
 import { DeepResearchPanel } from '../../components/chat/DeepResearchPanel';
+import type { ChatSessionItem, SkillInfo } from '../../api/agent';
+import { createParsedApiError } from '../../api/error';
+import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import { DecisionSignalCreateDrawer } from '../../components/decision-signals/DecisionSignalCreateDrawer';
 import {
   DecisionSignalCard,
@@ -12,6 +25,12 @@ import {
 import { DecisionSignalMemoryControls } from '../../components/decision-signals/DecisionSignalMemoryControls';
 import { DecisionSignalOutcomeExplorer } from '../../components/decision-signals/DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals/DecisionSignalOutcomeRunPanel';
+import { DecisionSignalOutcomeStatsCard } from '../../components/decision-signals/DecisionSignalOutcomeStatsCard';
+import { DecisionSignalProfileCalibration } from '../../components/decision-signals/DecisionSignalProfileCalibration';
+import type {
+  DecisionSignalOutcomeStatsResponse,
+  DecisionSignalProfileCalibration as DecisionSignalProfileCalibrationData,
+} from '../../types/decisionSignals';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
   type ManualSignalDraft,
@@ -23,6 +42,7 @@ import {
 import { AnalysisContextSummary } from '../../components/report/AnalysisContextSummary';
 import { MarketReviewReportView } from '../../components/report/MarketReviewReportView';
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
+import { ReportDecisionCard } from '../../components/report/ReportDecisionCard';
 import { ReportDetails } from '../../components/report/ReportDetails';
 import { ReportDiagnostics } from '../../components/report/ReportDiagnostics';
 import { ReportMarkdown } from '../../components/report/ReportMarkdown';
@@ -195,6 +215,372 @@ const DecisionSignalCreateDrawerStory = () => {
 
 const DecisionSignalOutcomeRunPanelStory = () => <DecisionSignalOutcomeRunPanel onCompleted={() => undefined} />;
 
+const fixtureProfileCalibration: DecisionSignalProfileCalibrationData = {
+  minimumCompletedSampleSize: 30,
+  breakdowns: {
+    decisionProfile: [
+      {
+        dimensions: { decisionProfile: 'balanced' },
+        total: 36,
+        completed: 36,
+        unable: 0,
+        hit: 20,
+        miss: 12,
+        neutral: 4,
+        sampleSufficient: true,
+        hitRatePct: 62.5,
+        avgStockReturnPct: 1.2,
+        missRatePct: 37.5,
+        unableRatePct: 0,
+        maxAdverseExcursionPct: 4.5,
+      },
+      {
+        dimensions: { decisionProfile: 'conservative' },
+        total: 12,
+        completed: 12,
+        unable: 0,
+        hit: 6,
+        miss: 6,
+        neutral: 0,
+        sampleSufficient: false,
+        hitRatePct: null,
+        avgStockReturnPct: null,
+        missRatePct: null,
+        unableRatePct: null,
+        maxAdverseExcursionPct: null,
+      },
+    ],
+    decisionProfileAction: [],
+    decisionProfileHorizon: [
+      {
+        dimensions: { decisionProfile: 'balanced', horizon: '3d' },
+        total: 30,
+        completed: 30,
+        unable: 0,
+        hit: 18,
+        miss: 12,
+        neutral: 0,
+        sampleSufficient: true,
+        hitRatePct: 60,
+        avgStockReturnPct: 0.8,
+        missRatePct: 40,
+        unableRatePct: 0,
+        maxAdverseExcursionPct: 3.1,
+      },
+    ],
+    decisionProfileMarketPhase: [],
+    decisionProfileDataQualityLevel: [],
+    profileSource: [],
+  },
+};
+
+const fixtureOutcomeStats: DecisionSignalOutcomeStatsResponse = {
+  engineVersion: 'decision-signal-v1',
+  statuses: ['active'],
+  total: 48,
+  completed: 48,
+  unable: 0,
+  hit: 26,
+  miss: 18,
+  neutral: 4,
+  hitRatePct: 59.09,
+  avgStockReturnPct: 0.9,
+  unableReasons: {},
+  breakdowns: {},
+  profileCalibration: fixtureProfileCalibration,
+};
+
+const DecisionSignalOutcomeStatsCardStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'loading') {
+    return (
+      <DecisionSignalOutcomeStatsCard
+        outcomeStats={null}
+        statsLoading
+        statsError={null}
+        onRetryStats={() => undefined}
+        onRunCompleted={() => undefined}
+      />
+    );
+  }
+  if (scenario === 'empty') {
+    return (
+      <DecisionSignalOutcomeStatsCard
+        outcomeStats={{ ...fixtureOutcomeStats, total: 0, completed: 0, hit: 0, miss: 0, neutral: 0, profileCalibration: undefined }}
+        statsLoading={false}
+        statsError={null}
+        onRetryStats={() => undefined}
+        onRunCompleted={() => undefined}
+      />
+    );
+  }
+  return (
+    <DecisionSignalOutcomeStatsCard
+      outcomeStats={fixtureOutcomeStats}
+      statsLoading={false}
+      statsError={null}
+      onRetryStats={() => undefined}
+      onRunCompleted={() => undefined}
+    />
+  );
+};
+
+const DecisionSignalProfileCalibrationStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'states') {
+    return (
+      <DecisionSignalProfileCalibration
+        calibration={{
+          ...fixtureProfileCalibration,
+          breakdowns: {
+            ...fixtureProfileCalibration.breakdowns,
+            decisionProfile: fixtureProfileCalibration.breakdowns.decisionProfile.map((bucket) => ({
+              ...bucket,
+              sampleSufficient: false,
+              hitRatePct: null,
+              avgStockReturnPct: null,
+              missRatePct: null,
+              unableRatePct: null,
+              maxAdverseExcursionPct: null,
+            })),
+          },
+        }}
+      />
+    );
+  }
+  return <DecisionSignalProfileCalibration calibration={fixtureProfileCalibration} />;
+};
+
+const FIXTURE_SKILLS: SkillInfo[] = [
+  { id: 'skill-a', name: 'Fixture Skill A', description: 'Playground skill A' },
+  { id: 'skill-b', name: 'Fixture Skill B', description: 'Playground skill B' },
+];
+
+const FIXTURE_SESSIONS: ChatSessionItem[] = [
+  {
+    session_id: 'session-1',
+    title: 'Fixture session one',
+    message_count: 4,
+    created_at: '2026-07-20T10:00:00Z',
+    last_active: '2026-07-20T11:00:00Z',
+  },
+  {
+    session_id: 'session-2',
+    title: 'Fixture session two',
+    message_count: 1,
+    created_at: '2026-07-19T09:00:00Z',
+    last_active: '2026-07-19T09:30:00Z',
+  },
+];
+
+const FIXTURE_CHAT_MESSAGES: Message[] = [
+  { id: 'msg-user-1', role: 'user', content: 'Summarize 600519 risk factors.' },
+  {
+    id: 'msg-assistant-1',
+    role: 'assistant',
+    content: 'Fixture assistant reply with a short risk summary.',
+    thinkingSteps: [
+      { type: 'thinking', step: 1, message: 'Gathering report context' },
+      { type: 'tool_done', tool: 'lookup', display_name: 'Lookup', duration: 0.4, success: true },
+    ],
+  },
+];
+
+const FIXTURE_PROGRESS_STEPS: ProgressStep[] = [
+  { type: 'thinking', step: 1, message: 'Planning next action' },
+  { type: 'tool_start', tool: 'search', display_name: 'Search' },
+  { type: 'tool_done', tool: 'search', display_name: 'Search', duration: 1.2, success: true },
+];
+
+const useChatTranslate = () => {
+  const { t } = useUiLanguage();
+  return t;
+};
+
+const ChatComposerStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = useChatTranslate();
+  const { language } = useUiLanguage();
+  const samples = useSamples();
+  const skillPickerRef = useRef<HTMLDivElement | null>(null);
+  const [input, setInput] = useState(scenario === 'error' ? '' : samples.preview);
+  const selectedSkillIds = scenario === 'empty' ? [] : [FIXTURE_SKILLS[0].id];
+  return (
+    <div className="max-w-3xl rounded-xl border border-border bg-card">
+      <ChatComposer
+        language={language}
+        t={t}
+        sessionError={scenario === 'error' ? createParsedApiError({ title: samples.fieldError, message: samples.fieldError, status: 500, code: 'fixture' }) : null}
+        sessionLoading={scenario === 'loading'}
+        chatError={null}
+        lastFailedRequest={null}
+        onRetryLastStream={() => undefined}
+        isFollowUpContextLoading={false}
+        contextCompressionEnabled={false}
+        contextCompressionLoaded
+        contextCompressionSaving={false}
+        contextCompressionError={null}
+        onContextCompressionChange={() => undefined}
+        skills={FIXTURE_SKILLS}
+        selectedSkillIds={selectedSkillIds}
+        selectedSkillIdSet={new Set(selectedSkillIds)}
+        skillLimitReached={false}
+        selectedSkillSummary={selectedSkillIds.length ? FIXTURE_SKILLS[0].name : samples.preview}
+        mobileSkillPickerOpen={false}
+        onMobileSkillPickerOpenChange={() => undefined}
+        skillPickerRef={skillPickerRef}
+        showSkillDesc={null}
+        onShowSkillDesc={() => undefined}
+        onToggleSkill={() => undefined}
+        onClearSkills={() => undefined}
+        activeStockCode="600519"
+        stockInWatchlist={false}
+        isWatchlistActioning={false}
+        watchlistMessage={null}
+        onToggleWatchlist={() => undefined}
+        input={input}
+        onInputChange={setInput}
+        onKeyDown={() => undefined}
+        loading={scenario === 'loading'}
+        isSkillsLoading={false}
+        onStop={() => undefined}
+        onSend={() => undefined}
+      />
+    </div>
+  );
+};
+
+const ChatSendFeedbackAlertStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const toast = scenario === 'empty'
+    ? null
+    : {
+        type: scenario === 'error' ? 'error' as const : 'success' as const,
+        message: scenario === 'error'
+          ? 'The message was not sent. Retry when the connection is restored.'
+          : 'Message sent successfully.',
+      };
+  return (
+    <ChatSendFeedbackAlert
+      toast={toast}
+      successTitle="Sent"
+      failureTitle="Send failed"
+    />
+  );
+};
+
+const ChatMessageListStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = useChatTranslate();
+  const { language } = useUiLanguage();
+  const samples = useSamples();
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messages = scenario === 'empty' ? [] : FIXTURE_CHAT_MESSAGES;
+  const [expandedThinking, setExpandedThinking] = useState(() => new Set(['msg-assistant-1']));
+  return (
+    <div className="flex h-[28rem] max-w-3xl flex-col rounded-xl border border-border bg-card">
+      <ChatMessageList
+        language={language}
+        t={t}
+        text={{ copied: samples.preview, copy: samples.secondaryAction }}
+        messages={messages}
+        loading={scenario === 'loading'}
+        progressSteps={scenario === 'loading' ? FIXTURE_PROGRESS_STEPS : []}
+        agentUnavailable={false}
+        quickQuestions={[{ label: samples.primaryAction, skill: 'skill-a' }]}
+        onQuickQuestion={() => undefined}
+        quickQuestionsDisabled={false}
+        expandedThinking={expandedThinking}
+        onToggleThinking={(messageId) => {
+          setExpandedThinking((current) => {
+            const next = new Set(current);
+            if (next.has(messageId)) next.delete(messageId);
+            else next.add(messageId);
+            return next;
+          });
+        }}
+        copiedMessages={new Set()}
+        onCopyMessage={() => undefined}
+        onDownloadMessage={() => undefined}
+        messagesViewportRef={messagesViewportRef}
+        messagesEndRef={messagesEndRef}
+        onScroll={() => undefined}
+      />
+    </div>
+  );
+};
+
+const ChatSessionSidebarStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = useChatTranslate();
+  const { language } = useUiLanguage();
+  const samples = useSamples();
+  const [search, setSearch] = useState('');
+  const sessions = scenario === 'empty' ? [] : FIXTURE_SESSIONS;
+  return (
+    <div className="flex h-[28rem] w-80 flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <ChatSessionSidebar
+        language={language}
+        t={t}
+        sessionSearch={search}
+        onSessionSearchChange={setSearch}
+        sessions={sessions}
+        filteredSessions={sessions}
+        sessionsLoading={scenario === 'loading'}
+        sessionsError={scenario === 'error' ? createParsedApiError({ title: samples.fieldError, message: samples.fieldError, status: 500, code: 'fixture' }) : null}
+        sessionLoading={false}
+        sessionId={sessions[0]?.session_id ?? ''}
+        onNewChat={() => undefined}
+        onRetryLoadSessions={() => undefined}
+        onSwitchSession={() => undefined}
+        onRequestDelete={() => undefined}
+      />
+    </div>
+  );
+};
+
+const ChatThinkingDetailsStory = () => {
+  const t = useChatTranslate();
+  return (
+    <div className="max-w-xl rounded-xl border border-border bg-card p-4">
+      <ChatThinkingDetails steps={FIXTURE_PROGRESS_STEPS} t={t} />
+    </div>
+  );
+};
+
+const ChatThinkingToggleStory = () => {
+  const samples = useSamples();
+  const [expanded, setExpanded] = useState(true);
+  return (
+    <div className="max-w-xl rounded-xl border border-border bg-card p-4">
+      <ChatThinkingToggle
+        isExpanded={expanded}
+        summary={samples.preview}
+        onToggle={() => setExpanded((value) => !value)}
+        thinkingProcessLabel={samples.details}
+      />
+      {expanded ? <p className="mt-2 text-sm text-secondary-text">{samples.preview}</p> : null}
+    </div>
+  );
+};
+
+const WhatIfScenarioPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = (key: string) => key;
+  const enabled = scenario === 'states' || scenario === 'empty';
+  const draft = {
+    ...DEFAULT_WHAT_IF_DRAFT,
+    enabled,
+    turnCount: scenario === 'empty' ? 5 : scenario === 'states' ? 1 : 0,
+  };
+  return (
+    <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
+      <WhatIfScenarioPanel t={t as never} draft={draft} onChange={() => undefined} />
+    </div>
+  );
+};
+
 const DeepResearchPanelStory = () => {
   const { scenario, profile } = usePlaygroundScenario();
   const text = useSamples();
@@ -243,6 +629,26 @@ const MarketReviewReportViewStory = () => {
 const MarketStructureCardStory = () => {
   const { scenario } = usePlaygroundScenario();
   return <MarketStructureCard context={scenario === 'empty' ? null : fixtureMarketStructure} language="en" />;
+};
+
+const ReportDecisionCardStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ReportDecisionCard
+      meta={fixtureReport.meta}
+      summary={scenario === 'empty'
+        ? {
+            analysisSummary: '',
+            operationAdvice: '',
+            trendPrediction: '',
+            sentimentScore: Number.NaN,
+          }
+        : fixtureReport.summary}
+      strategy={scenario === 'empty' ? undefined : fixtureReport.strategy}
+      details={scenario === 'empty' ? undefined : fixtureReport.details}
+      language="en"
+    />
+  );
 };
 
 const ReportDetailsStory = () => {
@@ -455,9 +861,12 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'decision-signal-timeline': DecisionSignalTimelineStory,
   'decision-signal-create-drawer': DecisionSignalCreateDrawerStory,
   'decision-signal-outcome-run-panel': DecisionSignalOutcomeRunPanelStory,
+  'decision-signal-outcome-stats-card': DecisionSignalOutcomeStatsCardStory,
+  'decision-signal-profile-calibration': DecisionSignalProfileCalibrationStory,
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,
+  'report-decision-card': ReportDecisionCardStory,
   'report-details': ReportDetailsStory,
   'report-diagnostics': ReportDiagnosticsStory,
   'report-markdown': ReportMarkdownStory,
@@ -473,6 +882,13 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-structured-insights': ReportStructuredInsightsStory,
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,
+  'chat-composer': ChatComposerStory,
+  'chat-send-feedback-alert': ChatSendFeedbackAlertStory,
+  'chat-message-list': ChatMessageListStory,
+  'what-if-scenario-panel': WhatIfScenarioPanelStory,
+  'chat-session-sidebar': ChatSessionSidebarStory,
+  'chat-thinking-details': ChatThinkingDetailsStory,
+  'chat-thinking-toggle': ChatThinkingToggleStory,
   'run-flow-event-list': RunFlowEventListStory,
   'run-flow-graph': RunFlowGraphStory,
   'run-flow-node-details': RunFlowNodeDetailsStory,

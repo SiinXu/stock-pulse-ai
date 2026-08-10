@@ -34,6 +34,8 @@ export interface ProgressStep {
   message?: string;
   content?: string;
   meta?: Record<string, unknown>;
+  turn_id?: string;
+  message_id?: string;
 }
 
 export interface Message {
@@ -48,6 +50,7 @@ export interface Message {
   /** Stable server error code for a persisted failure message. */
   error?: string;
   params?: Record<string, unknown>;
+  turnId?: string;
 }
 
 function fromSessionMessage(message: ChatSessionMessage): Message {
@@ -57,6 +60,7 @@ function fromSessionMessage(message: ChatSessionMessage): Message {
     content: message.content,
     ...(message.error ? { error: message.error } : {}),
     ...(message.params ? { params: message.params } : {}),
+    ...(message.turn_id ? { turnId: message.turn_id } : {}),
   };
 }
 
@@ -73,6 +77,38 @@ type FailedStreamRequest = {
 type StartStreamOptions = {
   appendUserMessage?: boolean;
 };
+
+export type StreamTerminalState = 'completed' | 'failed' | 'aborted' | 'skipped';
+export type TurnPersistenceState = 'persisted' | 'not_persisted' | 'unknown';
+
+/** Per-call result kept private to one invocation and its stable turn identity. */
+export type StreamOutcome = {
+  terminal: StreamTerminalState;
+  persistence: TurnPersistenceState;
+  turnId: string;
+};
+
+async function reconcileTurnPersistence(
+  sessionId: string,
+  turnId: string,
+  expectedContent: string,
+): Promise<TurnPersistenceState> {
+  try {
+    const detail = await agentApi.getChatSessionMessages(sessionId);
+    if (detail.turn_identity_supported !== true) {
+      return 'unknown';
+    }
+    const matchingTurn = detail.messages.find((message) => message.turn_id === turnId);
+    if (!matchingTurn) {
+      return 'not_persisted';
+    }
+    return matchingTurn.role === 'user' && matchingTurn.content === expectedContent
+      ? 'persisted'
+      : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 type StreamFailureEvent = {
   type: string;
@@ -130,6 +166,7 @@ function getStreamFailureError(
 
 interface AgentChatState {
   messages: Message[];
+  selectedSkillIds: string[] | null;
   loading: boolean;
   progressSteps: ProgressStep[];
   sessionId: string;
@@ -147,13 +184,18 @@ interface AgentChatState {
 }
 
 interface AgentChatActions {
+  setSelectedSkillIds: (skillIds: string[]) => void;
   setCurrentRoute: (path: string) => void;
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
   loadInitialSession: (preferredSessionId?: string) => Promise<void>;
   switchSession: (targetSessionId: string) => Promise<boolean>;
   startNewChat: () => string;
-  startStream: (payload: ChatStreamRequest, meta?: StreamMeta, options?: StartStreamOptions) => Promise<void>;
+  startStream: (
+    payload: ChatStreamRequest,
+    meta?: StreamMeta,
+    options?: StartStreamOptions,
+  ) => Promise<StreamOutcome>;
   retryLastStream: () => Promise<void>;
   stopStream: () => void;
   resetSessionState: () => void;
@@ -167,6 +209,7 @@ let sessionListGeneration = 0;
 
 export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set, get) => ({
   messages: [],
+  selectedSkillIds: null,
   loading: false,
   progressSteps: [],
   sessionId: getInitialSessionId(),
@@ -181,6 +224,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   hasInitialLoad: false,
   abortController: null,
   lastFailedRequest: null,
+
+  setSelectedSkillIds: (skillIds) => set({ selectedSkillIds: skillIds }),
 
   setCurrentRoute: (path) => set({ currentRoute: path }),
 
@@ -239,7 +284,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       if (!sessionExists && !preferred) {
         if (generation === sessionHistoryGeneration) {
           const newId = generateUUID();
-          set({ sessionId: newId });
+          set({ sessionId: newId, selectedSkillIds: null });
           writeSessionItem(CHAT_SESSION_STORAGE_KEY, newId);
         }
         return;
@@ -247,7 +292,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
 
       set({ sessionId: savedId });
       writeSessionItem(CHAT_SESSION_STORAGE_KEY, savedId);
-      const msgs = await agentApi.getChatSessionMessages(savedId);
+      const detail = await agentApi.getChatSessionMessages(savedId);
       if (
         generation !== sessionHistoryGeneration
         || get().sessionId !== savedId
@@ -255,7 +300,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         return;
       }
       set({
-        messages: msgs.map(fromSessionMessage),
+        messages: detail.messages.map(fromSessionMessage),
+        selectedSkillIds: detail.session_state.selected_skill_ids,
       });
     } catch (error) {
       if (generation === sessionHistoryGeneration) {
@@ -289,13 +335,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     });
 
     try {
-      const msgs = await agentApi.getChatSessionMessages(targetSessionId);
+      const detail = await agentApi.getChatSessionMessages(targetSessionId);
       if (generation !== sessionHistoryGeneration) {
         return false;
       }
       set({
         sessionId: targetSessionId,
-        messages: msgs.map(fromSessionMessage),
+        messages: detail.messages.map(fromSessionMessage),
+        selectedSkillIds: detail.session_state.selected_skill_ids,
         sessionError: null,
       });
       writeSessionItem(CHAT_SESSION_STORAGE_KEY, targetSessionId);
@@ -314,12 +361,12 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
 
   stopStream: () => {
     // User-initiated stop of an in-flight generation. Aborting rejects the
-    // reader with AbortError (handled silently), and the running startStream's
-    // finally would reset state anyway; reset here too for immediate feedback.
+    // reader with AbortError (handled silently). Keep the mutex and controller
+    // owned by startStream until its reconciliation and finally block settle.
     const { abortController } = get();
     if (!abortController) return;
     abortController.abort();
-    set({ loading: false, progressSteps: [], abortController: null });
+    set({ progressSteps: [] });
   },
 
   resetSessionState: () => {
@@ -329,6 +376,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     removeSessionItem(CHAT_SESSION_STORAGE_KEY);
     set({
       messages: [],
+      selectedSkillIds: null,
       loading: false,
       progressSteps: [],
       sessionId: generateUUID(),
@@ -354,6 +402,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     set({
       sessionId: newId,
       messages: [],
+      selectedSkillIds: null,
       loading: false,
       sessionsLoading: false,
       sessionLoading: false,
@@ -368,7 +417,11 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   },
 
   startStream: async (payload, meta, options) => {
-    if (get().loading) return;
+    // Concurrent-send guard: a stream is already in flight.
+    const turnId = payload.turn_id?.trim() || generateUUID();
+    if (get().loading) {
+      return { terminal: 'skipped', persistence: 'unknown', turnId };
+    }
     const { abortController: prevAc, sessionId: storeSessionId } = get();
     prevAc?.abort();
 
@@ -376,19 +429,21 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     set({ abortController: ac });
 
     const streamSessionId = payload.session_id || storeSessionId;
+    const identifiedPayload = { ...payload, turn_id: turnId };
     const skillNames = meta?.skillNames?.length
       ? meta.skillNames
       : [meta?.skillName ?? '通用'];
     const skillName = skillNames.join('、');
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: turnId,
       role: 'user',
       content: payload.message,
       skills: payload.skills,
       skill: payload.skills?.[0],
       skillNames,
       skillName,
+      turnId,
     };
     const appendUserMessage = options?.appendUserMessage !== false;
 
@@ -412,8 +467,11 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           ],
     }));
 
+    // Outcome is local to this invocation so a superseded stream cannot pollute a newer one.
+    let terminal: StreamTerminalState = 'completed';
+    let turnAcknowledged = false;
     try {
-      const response = await agentApi.chatStream(payload, { signal: ac.signal });
+      const response = await agentApi.chatStream(identifiedPayload, { signal: ac.signal });
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let buf = '';
@@ -424,6 +482,10 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         if (!line.startsWith('data: ')) return;
 
         const event = JSON.parse(line.slice(6)) as ProgressStep;
+        if (event.type === 'turn_persisted' && event.turn_id === turnId) {
+          turnAcknowledged = true;
+          return;
+        }
         if (event.type === 'done') {
           receivedDoneEvent = true;
           const doneEvent = event as unknown as StreamFailureEvent;
@@ -485,9 +547,22 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         });
       }
 
-      const { sessionId: currentSessionId, currentRoute } = get();
+      // Clean close after user/session abort without an AbortError throw.
+      if (ac.signal.aborted) {
+        terminal = 'aborted';
+      } else {
+        terminal = 'completed';
+      }
+
+      const {
+        sessionId: currentSessionId,
+        currentRoute,
+        abortController: currentController,
+      } = get();
       const shouldAppend =
-        currentSessionId === streamSessionId && !ac.signal.aborted;
+        currentSessionId === streamSessionId
+        && currentController === ac
+        && terminal === 'completed';
 
       if (shouldAppend) {
         set((s) => ({
@@ -507,36 +582,67 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         }));
       }
 
-      if (currentRoute !== APP_ROUTE_PATHS.agent) {
+      if (shouldAppend && currentRoute !== APP_ROUTE_PATHS.agent) {
         set({ completionBadge: true });
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
-        // User-initiated abort: silent, no badge
+        // User-initiated abort: silent, no badge, no retry entry.
+        // lastFailedRequest stays null so retryLastStream remains inert after Stop.
+        terminal = 'aborted';
       } else if (
         get().sessionId === streamSessionId
         && get().abortController === ac
       ) {
         set({
           chatError: getParsedApiError(error),
-          lastFailedRequest: { payload, meta },
+          lastFailedRequest: { payload: identifiedPayload, meta },
         });
         const { currentRoute } = get();
         if (currentRoute !== APP_ROUTE_PATHS.agent) {
           set({ completionBadge: true });
         }
+        terminal = 'failed';
+      } else {
+        // Stale non-abort error after session/controller identity no longer matches
+        // (superseded stream / switchSession). Not a backend acceptance of this turn.
+        terminal = 'failed';
       }
     } finally {
-      const { abortController: currentAc } = get();
-      if (currentAc === ac) {
-        set({
-          loading: false,
-          progressSteps: [],
-          abortController: null,
-        });
-      }
-      await get().loadSessions();
+      void get().loadSessions();
     }
+    const persistence: TurnPersistenceState = turnAcknowledged
+      ? 'persisted'
+      : await reconcileTurnPersistence(
+        streamSessionId,
+        turnId,
+        payload.message,
+      );
+    const invocationStillOwnsUi = (
+      get().sessionId === streamSessionId
+      && get().abortController === ac
+    );
+    if (persistence === 'not_persisted' && appendUserMessage && invocationStillOwnsUi) {
+      set((state) => ({
+        messages: state.messages.filter((message) => message.turnId !== turnId),
+      }));
+    }
+    if (persistence === 'unknown' && invocationStillOwnsUi) {
+      set((state) => ({
+        lastFailedRequest: state.lastFailedRequest?.payload.turn_id === turnId
+          ? null
+          : state.lastFailedRequest,
+      }));
+    }
+    const { abortController: currentAc } = get();
+    if (currentAc === ac) {
+      set({
+        loading: false,
+        progressSteps: [],
+        abortController: null,
+      });
+    }
+    return { terminal, persistence, turnId };
   },
 
   retryLastStream: async () => {
@@ -544,10 +650,16 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     if (!lastFailedRequest || loading) {
       return;
     }
+    const failedTurnId = lastFailedRequest.payload.turn_id;
+    const turnStillVisible = Boolean(
+      failedTurnId
+      && get().messages.some((message) => message.turnId === failedTurnId),
+    );
+    // Ignore StreamOutcome: retry UX is driven by lastFailedRequest / chatError only.
     await get().startStream(
       lastFailedRequest.payload,
       lastFailedRequest.meta,
-      { appendUserMessage: false },
+      { appendUserMessage: !turnStillVisible },
     );
   },
 }));

@@ -44,6 +44,7 @@ from src.agent.chat_context import (
 )
 from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.disagreement import build_agent_disagreement_summary
+from src.agent.deliberation_scheduler import AgentSkillScheduler, SkillBatchResult
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.protocols import (
     AgentContext,
@@ -61,11 +62,24 @@ from src.agent.public_contract import (
     AGENT_EXECUTION_FAILURE_MESSAGE,
     sanitize_agent_diagnostic,
 )
+from src.agent.committee_mode import META_COMMITTEE_MODE as _META_COMMITTEE_MODE
 from src.agent.risk_override import (
+    EXIT_COMMITTEE_MODE as _EXIT_COMMITTEE_MODE,
+    EXIT_ORCHESTRATOR_MULTI_AGENT as _EXIT_ORCHESTRATOR_MULTI_AGENT,
+    META_RISK_GATE_RESULT as _META_RISK_GATE_RESULT,
+    RiskGateOutcome as _RiskGateOutcome,
+    RiskGateResult as _RiskGateResult,
     RiskOverrideApplication,
+    apply_risk_manager_gate as _apply_risk_manager_gate,
+    authorize_risk_gate_bypass as _authorize_risk_gate_bypass,
+    build_approved_risk_application_from_gate as _build_approved_risk_application_from_gate,
     build_approved_risk_bypass_application as _build_approved_risk_bypass_application,
     build_risk_override_application,
+    build_risk_application_from_gate as _build_risk_application_from_gate,
     build_risk_override_plan,
+    get_risk_gate_result as _get_risk_gate_result,
+    render_risk_gate_notice as _render_risk_gate_notice,
+    resolve_risk_gate_flags as _resolve_risk_gate_flags,
 )
 from src.agent.runner import parse_dashboard_json, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
@@ -123,14 +137,20 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     _ApprovalService,
     _critic,
     AgentContext,
+    _apply_risk_manager_gate,
+    _authorize_risk_gate_bypass,
+    _build_approved_risk_application_from_gate,
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
     build_agent_disagreement_summary,
     build_agent_runtime_facts,
     _build_approved_risk_bypass_application,
     build_risk_override_application,
+    _build_risk_application_from_gate,
     build_risk_override_plan,
     build_visible_chat_history,
+    _EXIT_COMMITTEE_MODE,
+    _EXIT_ORCHESTRATOR_MULTI_AGENT,
     classify_result_terminal_state,
     _compose_agent_soul_prompt,
     contextvars,
@@ -145,7 +165,11 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     json,
     log_runtime_guard_event,
     log_safe_exception,
+    _META_COMMITTEE_MODE,
+    _META_RISK_GATE_RESULT,
     _build_agent_soul_runtime_facts,
+    _get_risk_gate_result,
+    _render_risk_gate_notice,
     _inherit_agent_soul_runtime_facts,
     _propagate_agent_soul_composition,
     normalize_decision_signal,
@@ -153,7 +177,10 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     normalize_stage_failure_reason,
     parse_dashboard_json,
     PipelineTerminationFact,
+    _resolve_risk_gate_flags,
     resolve_stock_scope,
+    _RiskGateOutcome,
+    _RiskGateResult,
     RiskOverrideApplication,
     run_agent_loop,
     sanitize_agent_dashboard_payload,
@@ -255,7 +282,11 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
-        self.strategy_engine = StrategyEngine()
+        self.strategy_engine = StrategyEngine(
+            deliberation_enabled=bool(
+                getattr(config, "agent_multi_strategy_deliberation", False)
+            ),
+        )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
         )

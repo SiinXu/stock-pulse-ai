@@ -30,6 +30,12 @@ import {
   Select,
 } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import {
+  buildStockDetailsHistoryQueryKey,
+  buildStockDetailsQuoteQueryKey,
+  useStockDetailsHistoryQuery,
+  useStockDetailsQuoteQuery,
+} from '../hooks';
 import type { UiTextKey } from '../i18n/uiText';
 import type {
   StockHistoryCandle,
@@ -43,6 +49,20 @@ import {
   buildSignalCenterHref,
 } from '../routing/routes';
 import { normalizeStockCode } from '../utils/stockCode';
+import {
+  changeColorCssVar,
+  changeSemantics,
+  formatMarketTime,
+  formatPrice,
+  formatSignedChangeAmount,
+  formatSignedChangePercent,
+  parseChangeColorPreference,
+  resolveMarketIdFromStockCode,
+  type ChangeColorPreference,
+  type MarketId,
+} from '../utils/marketFormat';
+import { formatUiNumber } from '../utils/uiLocale';
+import type { UiLanguage } from '../i18n/uiText';
 
 const PERIOD_OPTIONS: StockHistoryPeriod[] = ['daily', 'weekly', 'monthly'];
 const MIN_DAYS = 1;
@@ -59,29 +79,44 @@ function parseDaysParam(value: string | null): number {
   return DEFAULT_DAYS;
 }
 
-function formatNumber(value: number | null | undefined, fractionDigits = 2): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '-';
-  return Number(value).toLocaleString(undefined, {
+/** Non-price quantities (volume/amount) — host-locale grouping only. */
+function formatQuantity(value: number | null | undefined, language: UiLanguage, fractionDigits = 2): string {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  return formatUiNumber(Number(value), language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: fractionDigits,
   });
 }
 
-function formatSigned(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '-';
-  const formatted = formatNumber(value);
-  return value > 0 ? `+${formatted}` : formatted;
+function formatPriceCell(
+  value: number | null | undefined,
+  market: MarketId | null,
+  language: UiLanguage,
+): string {
+  if (market) return formatPrice(value, market, language);
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  return formatUiNumber(Number(value), language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }
 
-function changeToneClass(value: number | null | undefined): string {
-  if (value === null || value === undefined || value === 0 || Number.isNaN(value)) return 'text-foreground';
-  return value > 0 ? 'text-success' : 'text-danger';
+function formatSignedFallback(value: number | null | undefined, language: UiLanguage): string {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  const numeric = Number(value);
+  const body = formatUiNumber(Math.abs(numeric), language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  if (numeric > 0) return `+${body}`;
+  if (numeric < 0) return `-${body}`;
+  return body;
 }
 
 const StockDetailsPage: React.FC = () => {
   const { stockCode: rawParam = '' } = useParams<{ stockCode: string }>();
   const navigate = useNavigate();
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
 
   const decodedParam = useMemo(() => {
     try {
@@ -109,10 +144,16 @@ const StockDetailsPage: React.FC = () => {
 
   const [watchState, setWatchState] = useState<'idle' | 'adding' | 'added' | 'error'>('idle');
   const [watchError, setWatchError] = useState<ParsedApiError | null>(null);
+  /** Settings MARKET_REVIEW_COLOR_SCHEME when loadable; null → market convention. */
+  const [changeColorPref, setChangeColorPref] = useState<ChangeColorPreference | null>(null);
 
   const quoteReqRef = useRef(0);
   const historyReqRef = useRef(0);
   const mountedRef = useRef(true);
+  const marketId = useMemo(
+    () => resolveMarketIdFromStockCode(canonicalCode),
+    [canonicalCode],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -137,6 +178,25 @@ const StockDetailsPage: React.FC = () => {
   useEffect(() => {
     document.title = t('stocks.workspace.pageTitle', { code: canonicalCode || decodedParam });
   }, [t, canonicalCode, decodedParam]);
+
+  // Prefer Settings MARKET_REVIEW_COLOR_SCHEME when the config API is available;
+  // fail open to market convention (never block the quote surface).
+  useEffect(() => {
+    let cancelled = false;
+    void systemConfigApi
+      .getConfig(false)
+      .then((config) => {
+        if (cancelled) return;
+        const item = config.items.find((entry) => entry.key === 'MARKET_REVIEW_COLOR_SCHEME');
+        setChangeColorPref(parseChangeColorPreference(item?.value));
+      })
+      .catch(() => {
+        if (!cancelled) setChangeColorPref(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadQuote = useCallback(async (code: string) => {
     if (!code) return;
@@ -176,13 +236,32 @@ const StockDetailsPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (canonicalCode) void loadQuote(canonicalCode);
-  }, [canonicalCode, loadQuote]);
+  const quoteQueryKey = useMemo(
+    () => buildStockDetailsQuoteQueryKey(canonicalCode || ''),
+    [canonicalCode],
+  );
+  const historyQueryKey = useMemo(
+    () => buildStockDetailsHistoryQueryKey(canonicalCode || '', days),
+    [canonicalCode, days],
+  );
 
-  useEffect(() => {
-    if (canonicalCode) void loadHistory(canonicalCode, days);
-  }, [canonicalCode, days, loadHistory]);
+  useStockDetailsQuoteQuery({
+    queryKey: quoteQueryKey,
+    enabled: Boolean(canonicalCode),
+    load: () => loadQuote(canonicalCode),
+    onCancelInFlight: () => {
+      quoteReqRef.current += 1;
+    },
+  });
+
+  useStockDetailsHistoryQuery({
+    queryKey: historyQueryKey,
+    enabled: Boolean(canonicalCode),
+    load: () => loadHistory(canonicalCode, days),
+    onCancelInFlight: () => {
+      historyReqRef.current += 1;
+    },
+  });
 
   const displayCandles = useMemo(
     () => (dailyCandles ? aggregateCandles(dailyCandles, period) : []),
@@ -255,13 +334,29 @@ const StockDetailsPage: React.FC = () => {
 
   const quoteName = quote?.stockName?.trim();
 
+  const quoteChangeSemantics = marketId
+    ? changeSemantics(quote?.change, marketId, changeColorPref)
+    : null;
+  const quoteChangeColor = quoteChangeSemantics
+    ? changeColorCssVar(quoteChangeSemantics.color)
+    : undefined;
+  const quoteChangeLabel = marketId
+    ? `${formatSignedChangeAmount(quote?.change, marketId, language)} (${formatSignedChangePercent(quote?.changePercent)})`
+    : `${formatSignedFallback(quote?.change, language)} (${formatSignedChangePercent(quote?.changePercent)})`;
+  const quoteFreshness = quote?.updateTime
+    ? (marketId
+      ? (formatMarketTime(quote.updateTime, marketId, language)?.text
+        ?? new Date(quote.updateTime).toLocaleString())
+      : new Date(quote.updateTime).toLocaleString())
+    : null;
+
   const candleColumns: DataTableColumn<StockHistoryCandle>[] = [
     { id: 'date', header: t('stocks.workspace.date'), cell: (candle) => <span className="font-mono">{candle.date}</span> },
-    { id: 'open', header: t('stocks.workspace.open'), cell: (candle) => formatNumber(candle.open) },
-    { id: 'high', header: t('stocks.workspace.high'), cell: (candle) => formatNumber(candle.high) },
-    { id: 'low', header: t('stocks.workspace.low'), cell: (candle) => formatNumber(candle.low) },
-    { id: 'close', header: t('stocks.workspace.close'), cell: (candle) => formatNumber(candle.close) },
-    { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatNumber(candle.volume) },
+    { id: 'open', header: t('stocks.workspace.open'), cell: (candle) => formatPriceCell(candle.open, marketId, language) },
+    { id: 'high', header: t('stocks.workspace.high'), cell: (candle) => formatPriceCell(candle.high, marketId, language) },
+    { id: 'low', header: t('stocks.workspace.low'), cell: (candle) => formatPriceCell(candle.low, marketId, language) },
+    { id: 'close', header: t('stocks.workspace.close'), cell: (candle) => formatPriceCell(candle.close, marketId, language) },
+    { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatQuantity(candle.volume, language) },
   ];
 
   return (
@@ -325,29 +420,41 @@ const StockDetailsPage: React.FC = () => {
           ) : quote ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-baseline gap-3">
-                <span className="text-3xl font-semibold text-foreground">{formatNumber(quote.currentPrice)}</span>
-                <span className={`text-sm font-medium ${changeToneClass(quote.change)}`}>
-                  {formatSigned(quote.change)} ({formatSigned(quote.changePercent)}%)
+                <span className="text-3xl font-semibold text-foreground">
+                  {formatPriceCell(quote.currentPrice, marketId, language)}
+                </span>
+                <span
+                  className="text-sm font-medium text-foreground"
+                  style={quoteChangeColor ? { color: quoteChangeColor } : undefined}
+                  data-change-direction={quoteChangeSemantics?.direction}
+                  data-change-color={quoteChangeSemantics?.color}
+                  data-change-pref={quoteChangeSemantics?.colorPreference}
+                >
+                  {quoteChangeLabel}
                 </span>
               </div>
               <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
                 {([
-                  ['stocks.workspace.open', quote.open],
-                  ['stocks.workspace.high', quote.high],
-                  ['stocks.workspace.low', quote.low],
-                  ['stocks.workspace.prevClose', quote.prevClose],
-                  ['stocks.workspace.volume', quote.volume],
-                  ['stocks.workspace.amount', quote.amount],
-                ] as Array<[UiTextKey, number | null | undefined]>).map(([key, value]) => (
+                  ['stocks.workspace.open', quote.open, 'price'],
+                  ['stocks.workspace.high', quote.high, 'price'],
+                  ['stocks.workspace.low', quote.low, 'price'],
+                  ['stocks.workspace.prevClose', quote.prevClose, 'price'],
+                  ['stocks.workspace.volume', quote.volume, 'qty'],
+                  ['stocks.workspace.amount', quote.amount, 'qty'],
+                ] as Array<[UiTextKey, number | null | undefined, 'price' | 'qty']>).map(([key, value, kind]) => (
                   <div key={key} className="flex flex-col">
                     <dt className="text-xs text-secondary-text">{t(key)}</dt>
-                    <dd className="font-medium text-foreground">{formatNumber(value)}</dd>
+                    <dd className="font-medium text-foreground">
+                      {kind === 'price'
+                        ? formatPriceCell(value, marketId, language)
+                        : formatQuantity(value, language)}
+                    </dd>
                   </div>
                 ))}
               </dl>
               <p className="text-xs text-secondary-text">
-                {quote.updateTime
-                  ? t('stocks.workspace.freshness', { time: new Date(quote.updateTime).toLocaleString() })
+                {quoteFreshness
+                  ? t('stocks.workspace.freshness', { time: quoteFreshness })
                   : t('stocks.workspace.freshnessUnknown')}
               </p>
             </div>
@@ -403,9 +510,9 @@ const StockDetailsPage: React.FC = () => {
               <p className="text-sm text-secondary-text">
                 {t('stocks.workspace.summary', {
                   count: summary.count,
-                  start: summary.periodStart ?? '-',
-                  end: summary.periodEnd ?? '-',
-                  change: formatSigned(summary.changePercent),
+                  start: summary.periodStart ?? '—',
+                  end: summary.periodEnd ?? '—',
+                  change: formatSignedChangePercent(summary.changePercent).replace(/%$/, ''),
                 })}
               </p>
               <div className="h-64 w-full" role="img" aria-label={t('stocks.workspace.chartLabel', { code: canonicalCode })}>

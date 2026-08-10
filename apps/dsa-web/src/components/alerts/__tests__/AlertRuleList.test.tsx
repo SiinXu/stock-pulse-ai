@@ -69,11 +69,21 @@ describe('AlertRuleList', () => {
   const onDelete = vi.fn();
   const onEdit = vi.fn();
   const onTest = vi.fn();
+  const onCreateRule = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
   });
+
+  function openFilters() {
+    fireEvent.click(screen.getByRole('button', { name: /筛选/ }));
+    return screen.getByRole('dialog', { name: '筛选' });
+  }
+
+  function applyFilters(dialog: HTMLElement) {
+    fireEvent.click(within(dialog).getByRole('button', { name: '应用筛选' }));
+  }
 
   function renderList(overrides: Partial<React.ComponentProps<typeof AlertRuleList>> = {}) {
     render(
@@ -91,6 +101,8 @@ describe('AlertRuleList', () => {
         onDelete={onDelete}
         onEdit={onEdit}
         onTest={onTest}
+        onCreateRule={onCreateRule}
+        createRuleLabel="创建告警规则"
         {...overrides}
       />,
     );
@@ -114,13 +126,15 @@ describe('AlertRuleList', () => {
           onDelete={onDelete}
           onEdit={onEdit}
           onTest={onTest}
+          onCreateRule={onCreateRule}
+          createRuleLabel="Create alert rule"
           {...overrides}
         />
       </UiLanguageProvider>,
     );
   }
 
-  it('renders rules, filters, and pagination', () => {
+  it('renders rules, collapsed filters, and pagination', () => {
     renderList();
 
     expect(screen.getByText('茅台价格突破')).toBeInTheDocument();
@@ -135,8 +149,11 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('关闭冷却 · 0 秒')).toBeInTheDocument();
     expect(screen.getByText('自定义 · 3,600 秒')).toBeInTheDocument();
 
-    chooseOption(screen.getByLabelText('启停状态'), 'enabled');
-    chooseOption(screen.getByLabelText('规则类型'), 'price_cross');
+    const dialog = openFilters();
+    chooseOption(within(dialog).getByLabelText('启停状态'), 'enabled');
+    chooseOption(within(dialog).getByLabelText('规则类型'), 'price_cross');
+    applyFilters(dialog);
+
     fireEvent.click(screen.getByRole('button', { name: '2' }));
 
     expect(onEnabledFilterChange).toHaveBeenCalledWith('enabled');
@@ -144,17 +161,22 @@ describe('AlertRuleList', () => {
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
-  it('keeps the rule filters in the card header', () => {
-    renderList();
+  it('keeps the filter entry in the card header and shows active filter chips', () => {
+    renderList({ enabledFilter: 'enabled', alertTypeFilter: 'price_cross' });
 
     const heading = screen.getByRole('heading', { name: '告警规则' });
     const header = heading.parentElement?.parentElement;
-    expect(header).toContainElement(screen.getByLabelText('启停状态'));
-    expect(header).toContainElement(screen.getByLabelText('规则类型'));
+    expect(header).toContainElement(screen.getByRole('button', { name: '筛选，已启用 2 项' }));
     expect(heading.closest('[data-surface-level]')).toHaveClass(
       '[&>div:first-child]:flex-col',
       'sm:[&>div:first-child]:flex-row',
     );
+    expect(screen.getByRole('list', { name: '已应用筛选' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '移除启停状态筛选' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '移除规则类型筛选' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '清除筛选' }));
+    expect(onEnabledFilterChange).toHaveBeenCalledWith('all');
+    expect(onAlertTypeFilterChange).toHaveBeenCalledWith('all');
   });
 
   it('uses backend cooldownActive instead of parsing cooldownUntil locally', () => {
@@ -227,7 +249,9 @@ describe('AlertRuleList', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Alert rules' })).toBeInTheDocument();
-    const statusSelect = screen.getByLabelText('Status');
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    const statusSelect = within(dialog).getByLabelText('Status');
     const statusListbox = openListbox(statusSelect);
     expect(within(statusListbox).getByRole('option', { name: 'All statuses' })).toBeInTheDocument();
     fireEvent.click(statusSelect);
@@ -275,7 +299,9 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('红灯 / 黄灯')).toBeInTheDocument();
     expect(screen.getByText('Score 下降 >= 15')).toBeInTheDocument();
 
-    chooseOption(screen.getByLabelText('规则类型'), 'market_light_score_drop');
+    const dialog = openFilters();
+    chooseOption(within(dialog).getByLabelText('规则类型'), 'market_light_score_drop');
+    applyFilters(dialog);
 
     expect(onAlertTypeFilterChange).toHaveBeenCalledWith('market_light_score_drop');
   });
@@ -310,9 +336,28 @@ describe('AlertRuleList', () => {
     expect(onDelete).toHaveBeenCalledWith(rules[0]);
   });
 
-  it('shows an empty state for no rules', () => {
+  it('shows an empty state for no rules with create CTA', () => {
     renderList({ rules: [], total: 0 });
 
     expect(screen.getByText('暂无告警规则')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '创建告警规则' }));
+    expect(onCreateRule).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a distinct filtered empty state with clear-filters action', () => {
+    renderList({
+      rules: [],
+      total: 0,
+      enabledFilter: 'enabled',
+      alertTypeFilter: 'all',
+    });
+
+    expect(screen.getByText('无匹配的告警规则')).toBeInTheDocument();
+    expect(screen.queryByText('暂无告警规则')).not.toBeInTheDocument();
+    const emptyPanel = screen.getByText('无匹配的告警规则').closest('[data-state-panel="empty"]');
+    expect(emptyPanel).not.toBeNull();
+    fireEvent.click(within(emptyPanel as HTMLElement).getByRole('button', { name: '清除筛选' }));
+    expect(onEnabledFilterChange).toHaveBeenCalledWith('all');
+    expect(onAlertTypeFilterChange).toHaveBeenCalledWith('all');
   });
 });

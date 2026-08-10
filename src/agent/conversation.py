@@ -58,6 +58,26 @@ class ConversationSession:
             self.last_active = datetime.now()
         return message_id
 
+    def add_user_message(
+        self,
+        content: str,
+        selected_skill_ids: Optional[List[str]] = None,
+        *,
+        turn_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Add a user message and optionally update the persisted Skill selection."""
+        message_id = get_db().save_conversation_user_turn(
+            self.session_id,
+            content,
+            selected_skill_ids,
+            turn_id=turn_id,
+            context=context,
+        )
+        with self._context_lock:
+            self.last_active = datetime.now()
+        return message_id
+
     def update_context(self, key: str, value: Any):
         """Update session context."""
         with self._context_lock:
@@ -174,6 +194,9 @@ class ConversationSession:
         history_has_stock_scope = False
         for message in messages_to_replay:
             content = message["content"]
+            persisted_context = message.get("context")
+            if isinstance(persisted_context, dict):
+                replayed.update(_select_market_context(persisted_context))
             resolution = resolve_stock_scope(content, replayed)
             replayed = _select_market_context(resolution.effective_context)
             scope = resolution.stock_scope
@@ -238,6 +261,24 @@ class ConversationManager:
         """Add a message to a session."""
         session = self.get_or_create(session_id)
         return session.add_message(role, content)
+
+    def add_user_message(
+        self,
+        session_id: str,
+        content: str,
+        selected_skill_ids: Optional[List[str]] = None,
+        *,
+        turn_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Add a user message through the session-state transaction boundary."""
+        session = self.get_or_create(session_id)
+        return session.add_user_message(
+            content,
+            selected_skill_ids,
+            turn_id=turn_id,
+            context=context,
+        )
 
     def get_history(self, session_id: str) -> List[Dict[str, Any]]:
         """Get message history for a session."""

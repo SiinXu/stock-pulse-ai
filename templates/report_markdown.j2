@@ -1,4 +1,4 @@
-{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line with context %}
+{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line, decision_card, valuation_section with context %}
 # 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ labels.analyzed_prefix }} **{{ results|length }}** {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -16,7 +16,7 @@
 {% if not summary_only %}
 {% for e in enriched %}
 {% set result = e.result %}
-{% set dashboard = result.dashboard if result.dashboard else {} %}
+{% set dashboard = e.dashboard_view if e.dashboard_view is defined and e.dashboard_view else (result.dashboard if result.dashboard else {}) %}
 {% set intel = dashboard.get('intelligence') or {} %}
 {% set core = dashboard.get('core_conclusion') or {} %}
 {% set battle = dashboard.get('battle_plan') or {} %}
@@ -24,7 +24,13 @@
 
 ## {{ e.signal_emoji }} {{ e.stock_name }} ({{ result.code }})
 
-{% if intel %}
+{{ decision_card(e, compact=false) }}
+{% if e.truncation_notice %}
+{{ e.truncation_notice }}
+{% endif %}
+
+{% if mode_limits.include_detail_sections %}
+{% if mode_limits.include_intelligence and intel %}
 ### 📰 {{ labels.info_heading }}
 
 {% if intel.get('sentiment_summary') %}
@@ -54,6 +60,7 @@
 
 {% endif %}
 
+{% if mode_limits.include_core_duplicate %}
 ### 📌 {{ labels.core_conclusion_heading }}
 
 **{{ e.signal_emoji }} {{ e.signal_text }}** | {{ localize_trend_prediction(result.trend_prediction, report_language) }}
@@ -70,9 +77,40 @@
 | 💼 **{{ labels.has_position_label }}** | {{ pos_advice.get('has_position', labels.continue_holding) }} |
 {% endif %}
 
-{{ market_snapshot(result) }}
+{% endif %}
 
-{% if data_persp %}
+{% if mode_limits.include_market_snapshot %}
+{{ market_snapshot(result) }}
+{% endif %}
+
+{% set indicator_snapshot = result.indicator_snapshot if result.indicator_snapshot else {} %}
+{% set configured_mas = indicator_snapshot.get('ma_readings') or {} %}
+{% set configured_rsis = indicator_snapshot.get('rsi_readings') or {} %}
+{% set configured_macd = indicator_snapshot.get('macd_reading') or {} %}
+{% if configured_mas or configured_rsis or configured_macd %}
+{% set indicator_copy = {
+  'en': {'heading': 'Configured indicators', 'source': 'source', 'bars': 'bars', 'as_of': 'as-of', 'indicator': 'Indicator', 'value': 'Value', 'availability': 'Availability', 'available': 'available', 'unavailable': 'unavailable'},
+  'ko': {'heading': '설정된 지표', 'source': '출처', 'bars': '봉', 'as_of': '기준일', 'indicator': '지표', 'value': '값', 'availability': '사용 가능 여부', 'available': '사용 가능', 'unavailable': '사용 불가'},
+  'zh': {'heading': '配置指标', 'source': '来源', 'bars': 'K线', 'as_of': '截止', 'indicator': '指标', 'value': '数值', 'availability': '可用性', 'available': '可用', 'unavailable': '不可用'}
+}.get(report_language, {'heading': '配置指标', 'source': '来源', 'bars': 'K线', 'as_of': '截止', 'indicator': '指标', 'value': '数值', 'availability': '可用性', 'available': '可用', 'unavailable': '不可用'}) %}
+### 📈 {{ indicator_copy.heading }}
+
+> {{ indicator_copy.source }}={{ indicator_snapshot.get('indicator_period_source', 'unknown') }} · {{ indicator_copy.bars }}={{ indicator_snapshot.get('indicator_bar_count', 0) }} · {{ indicator_copy.as_of }}={{ indicator_snapshot.get('indicator_as_of', 'N/A') }}
+
+| {{ indicator_copy.indicator }} | {{ indicator_copy.value }} | {{ indicator_copy.availability }} |
+|---|---:|---|
+{% for reading in configured_mas.values() %}
+| {{ reading.get('label', 'MA') }} | {{ reading.get('value') if reading.get('value') is not none else 'N/A' }} | {{ indicator_copy.available if reading.get('available') else reading.get('reason', indicator_copy.unavailable) }} |
+{% endfor %}
+{% for reading in configured_rsis.values() %}
+| {{ reading.get('label', 'RSI') }} | {{ reading.get('value') if reading.get('value') is not none else 'N/A' }} | {{ indicator_copy.available if reading.get('available') else reading.get('reason', indicator_copy.unavailable) }} |
+{% endfor %}
+{% if configured_macd %}
+| {{ configured_macd.get('label', 'MACD') }} | {% if configured_macd.get('available') %}DIF={{ configured_macd.get('dif') }}, DEA={{ configured_macd.get('dea') }}, BAR={{ configured_macd.get('bar') }}{% else %}N/A{% endif %} | {{ indicator_copy.available if configured_macd.get('available') else configured_macd.get('reason', indicator_copy.unavailable) }} |
+{% endif %}
+{% endif %}
+
+{% if mode_limits.include_data_perspective and data_persp %}
 ### 📊 {{ labels.data_perspective_heading }}
 
 {% set trend_data = data_persp.get('trend_status', {}) %}
@@ -115,7 +153,7 @@
 {% set phase_decision_has_content = phase_decision_has_content or phase_decision.get('next_check_time') %}
 {% set phase_decision_has_content = phase_decision_has_content or phase_decision.get('confidence_reason') %}
 {% set phase_decision_has_content = phase_decision_has_content or phase_decision.get('data_limitations') %}
-{% if phase_decision_has_content %}
+{% if mode_limits.include_phase_decision and phase_decision_has_content %}
 ### 🛡️ {{ labels.phase_decision_heading }}
 
 | {{ labels.action_window_label }} | {{ labels.immediate_action_label }} | {{ labels.next_check_time_label }} |
@@ -142,7 +180,7 @@
 
 {% set signal_attr = dashboard.get('signal_attribution') or {} %}
 {% set signal_attr_weights = signal_attribution_weight_items(signal_attr) %}
-{% if signal_attribution_has_content(signal_attr) %}
+{% if mode_limits.include_signal_attribution and signal_attribution_has_content(signal_attr) %}
 ### 🎯 {{ labels.signal_attribution_heading }}
 
 {% if signal_attr_weights %}
@@ -165,7 +203,7 @@
 {% endif %}
 
 {% set strategy_synthesis = normalize_strategy_synthesis_payload(dashboard.get('strategy_synthesis')) %}
-{% if strategy_synthesis %}
+{% if mode_limits.include_strategy_synthesis and strategy_synthesis %}
 ### 🧩 {{ labels.strategy_synthesis_heading }}
 
 {% set strategy_confidence = strategy_synthesis.get('confidence') %}
@@ -182,7 +220,42 @@
 
 {% endif %}
 
-{% if battle %}
+{% set committee = dashboard.get('committee_deliberation') if dashboard else none %}
+{% if mode_limits.include_committee and committee and committee.get('members') %}
+### 🏛 {{ labels.committee_deliberation_heading }}
+
+**{{ labels.committee_members_label }}**
+{% for member in (committee.get('members') or []) %}
+- {{ member.get('display_name') or member.get('persona_id') }}: {{ labels.committee_persona_signal_label }} {{ localize_strategy_signal(member.get('signal') or 'N/A', report_language) }} | {{ labels.committee_persona_confidence_label }} {{ '%.0f%%' | format((member.get('confidence') or 0) * 100) if member.get('confidence') is number else 'N/A' }}{% if member.get('invalid') %} ({{ member.get('invalid_reason') or 'invalid' }}){% endif %}{% if member.get('reasoning_excerpt') %} — {{ member.get('reasoning_excerpt') }}{% endif %}
+{% endfor %}
+{% if committee.get('personas_invalid') %}
+- {{ labels.committee_invalid_personas_label }}: {{ (committee.get('personas_invalid') or []) | join(', ') }}
+{% endif %}
+{% if committee.get('personas_truncated') %}
+- {{ labels.committee_truncated_personas_label }}: {{ (committee.get('personas_truncated') or []) | join(', ') }}
+{% endif %}
+{% if committee.get('missing_or_conflicts') %}
+**{{ labels.committee_gaps_label }}**
+{% for gap in (committee.get('missing_or_conflicts') or [])[:5] %}
+- {{ gap.get('description') or gap }}
+{% endfor %}
+{% endif %}
+{% if committee.get('model_inference') %}
+**{{ labels.model_inference_heading }}**
+{% for line in (committee.get('model_inference') or []) %}
+- {{ line }}
+{% endfor %}
+{% endif %}
+{% if committee.get('risks_counter_evidence') %}
+**{{ labels.risks_counter_evidence_heading }}**
+{% for line in (committee.get('risks_counter_evidence') or [])[:5] %}
+- {{ line }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+{% if mode_limits.include_battle_plan and battle %}
 ### 🎯 {{ labels.battle_plan_heading }}
 
 {% set sniper = battle.get('sniper_points', {}) %}
@@ -223,7 +296,7 @@
 {% endif %}
 
 {% set hist = history_by_code.get(result.code, []) %}
-{% if hist %}
+{% if mode_limits.include_history and hist %}
 ### 📜 {{ labels.history_compare_heading }}
 | {{ labels.time_label }} | {{ labels.score_label }} | {{ labels.advice_label }} | {{ labels.trend_label }} |
 |------|------|------|------|
@@ -232,8 +305,13 @@
 {% endfor %}
 {% endif %}
 
+{{ valuation_section(e.valuation_projection, compact=false) }}
+
 {% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
-{{ report_strata_section(strata, compact=false) }}
+{% if mode_limits.strata_style != 'none' %}
+{{ report_strata_section(strata, compact=(mode_limits.strata_style != 'full')) }}
+{% endif %}
+{% endif %}
 
 ---
 {% endfor %}

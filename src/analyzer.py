@@ -339,6 +339,7 @@ class AnalysisResult:
 
     # ========== Metadata =========
     market_snapshot: Optional[Dict[str, Any]] = None  # Daily market snapshot (for display)
+    indicator_snapshot: Optional[Dict[str, Any]] = None  # Resolved dynamic indicator evidence
     raw_response: Optional[str] = None  # Original response (for debugging)
     search_performed: bool = False  # Did it execute a web search?
     data_sources: str = ""  # Data source explanation
@@ -365,6 +366,8 @@ class AnalysisResult:
     # ========== Historical Decision Reflection (Issue #118; runtime only, not persisted to to_dict) ==========
     # Carries a DecisionReflection so the report renderer can emit its section.
     decision_reflection: Optional[Any] = None
+    # Canonical low-sensitivity Risk Manager verdict, persisted by ``to_dict``.
+    risk_gate_result: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -398,6 +401,7 @@ class AnalysisResult:
             'risk_warning': self.risk_warning,
             'buy_reason': self.buy_reason,
             'market_snapshot': self.market_snapshot,
+            'indicator_snapshot': self.indicator_snapshot,
             'search_performed': self.search_performed,
             'success': self.success,
             'error_message': self.error_message,
@@ -406,6 +410,7 @@ class AnalysisResult:
             'change_pct': self.change_pct,
             'model_used': self.model_used,
             'market_structure_context': self.market_structure_context,
+            'risk_gate_result': self.risk_gate_result,
         }
 
     def get_core_conclusion(self) -> str:

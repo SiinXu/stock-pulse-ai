@@ -97,9 +97,15 @@ News / search keys improve events and themes; technical-only runs may still work
 
 1. Pick **one** channel you actually read.  
 2. Fill Token / Webhook / Chat ID.  
-3. **Test push** (some tests use draft values—read the help text).  
-4. **Save** after a green test.  
-5. Only then add a second channel.
+3. Wait for **Autosaved**, then use **Send test** on that channel.
+4. After every target passes, select events the channel does not yet receive and choose **Bind selected events** in the same dialog.
+5. Wait for the routing draft to save and appear in the effective Event routing summary; only then add a second channel.
+
+“Verified” is session evidence bound to the current config version and a one-way fingerprint of that channel's exact tested values; it expires after 30 minutes. Channel edits, failed/conflicted saves, server refreshes, and config-version changes invalidate old evidence. For multiple custom-webhook targets, only all-success is verified. Partial delivery lists the failed targets and cannot be bound.
+
+Event routing always describes the **effective path resolved from saved configuration**, never an unsaved draft. Empty routing keeps the backend's all-configured fan-out behavior. Case and duplicates follow backend normalization, while invalid or currently unconfigured targets are reported separately.
+
+The card and test selector cover the 14 built-in static channels. Dynamically registered trusted-plugin channels remain owned by extension/diagnostic surfaces and are never mislabeled here as built-ins.
 
 **Alerts & Automation** is mostly routing and rate limits. Price/condition **rules** live in [Signal Center → Rules](06-signals_EN.md).
 
@@ -115,11 +121,13 @@ English menus + Chinese reports is valid.
 
 ## Learn later
 
+On desktop, the category navigation uses a compact sidebar so the active settings content keeps more horizontal space. Mobile still uses the single-select dropdown.
+
 | Section | When you need it |
 | --- | --- |
 | Conversation · context | Long Agent chats / compression |
 | Agent behavior · Execution | Advanced Agent boundaries |
-| Agent behavior · Investment Framework | Maintain the personal framework injected read-only into research; the editor is inline on this horizontal tab and saved versions open in an in-page drawer where they can be copied into the current draft |
+| Agent behavior · Investment Framework | Maintain the personal framework injected read-only into research; basics, new nodes, and new dimensions use configuration dialogs, existing structured content stays inline, and saved versions open in an in-page drawer where they can be copied into the current draft |
 | Usage & cost | Token / spend visibility |
 | Backtest · engine | Engine defaults |
 | System & security · scheduling | Daily auto analysis (long-running process required) |
@@ -128,9 +136,19 @@ English menus + Chinese reports is valid.
 | Advanced · config backup | Export before reinstall; import on recovery |
 | Advanced · diagnostics | Troubleshooting |
 
+### Agent behavior presets
+
+**Agent behavior → Execution** offers Simple Q&A, Standard research, and Deep + governed as starting points. Preset status is derived from saved server values: a confirmed draft remains pending until autosave succeeds, and failed or conflicted saves never appear active. The summary also reports the effective Agent model source/readiness, Risk Agent/HITL boundary, and deep-tool state; `auto` alone is not proof that a model is configured.
+
+Selecting a preset opens confirmation without mutating the draft. Review every old/new value plus step/timeout, memory, Critic, and multi-strategy cost effects. Confirmation submits all changes as one Agent Settings batch for autosave. Cancel, Escape, focus, and hover write nothing. After failure or conflict, discard that preset draft before retrying or loading the server version.
+
+Presets enable Agent and clear “Agent acknowledged off,” but do not change credentials, skill lists, global Deep Research budgets, Risk Agent veto, or HITL approval policy. The default surface shows essentials; Advanced preserves the registry-owned runtime, skills, research, memory/context, and other semantic groups.
+
 ### Scheduling
 
-When enabled, a **long-running** Web/API/Desktop process must stay up. You may see next-run times and “run once” actions. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
+When enabled, a **long-running** Web/API/Desktop process must stay up. The status card reports this API process's mode, attachment state, and server schedule time zone without substituting the browser zone. **Run once** is available only when this process is attached, the legacy batch is enabled, and no analysis is running. An accepted run is correlated through success or failure; an older server without correlation data is shown as outcome unavailable rather than treating idle as success. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
+
+The legacy day-batch card keeps only its switch, times, and runtime status instead of repeating deprecation and process-ownership explanations. Enabled/Disabled appears on the same row as the status title; the migration warning still appears when the legacy batch is enabled.
 
 In a narrow Settings content column, legacy day-batch configuration and runtime status stay stacked; they become side by side only when the content area has enough room.
 
@@ -175,7 +193,7 @@ Trust **current `origin/main`**. Older running builds may still lack entries—b
 | --- | --- | --- | --- |
 | **Scheduled tasks** | **Shipped, including run history** | Settings → **Scheduling** (enable, daily times, next run, run once, versioned-definition run history); Home **Today's scheduled tasks** (read-only) | See Scheduling above and [02 Home](02-home_EN.md); contract: `docs/scheduled-tasks.md` |
 | **Notification channel plugins** | **Shipped** | Settings → notifications / plugin surfaces when discovery is enabled | Prove one built-in channel with **test push** first; plugin channels follow the UI list |
-| **Personal investment framework** | **Structured Web editor and history shipped** | Settings → **Agent behavior → Investment Framework**; the editor is inline on its own horizontal tab and history uses a read-only in-page drawer | Supports decision trees, evaluation dimensions, immutable history inspection/copy-to-draft, versioned save, deactivate, and delete; see `docs/personal-investment-framework_EN.md` |
+| **Personal investment framework** | **Structured Web editor and history shipped** | Settings → **Agent behavior → Investment Framework**; basics and new structured items use configuration dialogs, existing structures stay inline, and history uses a read-only in-page drawer | Supports decision trees, evaluation dimensions, immutable history inspection/copy-to-draft, versioned save, deactivate, and delete; see `docs/personal-investment-framework_EN.md` |
 | **Local model pack import** | **Shipped** | Settings → **AI & Models → Local Models** → Import Model Pack (labels as in UI) | Catalog pull/activate still apply; import path: `docs/model-packs.md` and in-product help |
 | **HITL human approvals** | **Shipped** (default off) | **Not** in primary sidebar; route `/approvals`; Home **Review human approvals** when administrator sign-in is enabled | See [01 Shell](01-shell_EN.md); contract `docs/human-approvals_EN.md`. One-shot risk-bypass approval — **not** broker trade approval |
 | **Report evidence strata** | **Shipped** | Full-report Web view strata panel (labels as in UI) | See [08 Reading reports](08-reading-reports_EN.md); contract `docs/report-strata-contract_EN.md` |

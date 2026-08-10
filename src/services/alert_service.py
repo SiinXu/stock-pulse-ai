@@ -55,6 +55,14 @@ from src.services.market_light_alerts import (
     make_market_light_payload,
     normalize_market_alert_parameters,
 )
+from src.services.event_alerts import (
+    CORPORATE_EVENT_DATA_SOURCE,
+    EVENT_ALERT_TYPES,
+    CorporateEventAlert,
+    evaluate_corporate_event_alert,
+    make_corporate_event_payload,
+    normalize_corporate_event_parameters,
+)
 from src.services.market_light_service import normalize_market_alert_region
 from src.services.decision_signal_summary import summarize_decision_signal
 from src.analysis_context_pack.overview import (
@@ -73,7 +81,7 @@ from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 
 LEGACY_RUNTIME_ALERT_TYPES = frozenset({"price_cross", "price_change_percent", "volume_spike"})
-SYMBOL_ALERT_TYPES = LEGACY_RUNTIME_ALERT_TYPES | TECHNICAL_ALERT_TYPES
+SYMBOL_ALERT_TYPES = LEGACY_RUNTIME_ALERT_TYPES | TECHNICAL_ALERT_TYPES | EVENT_ALERT_TYPES
 SUPPORTED_ALERT_TYPES = SYMBOL_ALERT_TYPES | PORTFOLIO_ALERT_TYPES | MARKET_ALERT_TYPES
 SUPPORTED_TARGET_SCOPES = frozenset({"single_symbol", "watchlist", "portfolio_holdings", "portfolio_account", "market"})
 SUPPORTED_SEVERITIES = frozenset({"info", "warning", "critical"})
@@ -182,7 +190,8 @@ class AlertService:
                 return self._dry_run_response_for_single(payloads[0], result, target_scope=row.target_scope)
             results = asyncio.run(self._evaluate_runtime_payloads(payloads, monitor))
             return aggregate_dry_run_results(rule_id, row.target_scope, results)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             sanitized_message = self._sanitize_text(str(exc) or "Alert evaluation failed")
             return {
                 "rule_id": rule_id,
@@ -221,6 +230,8 @@ class AlertService:
             return await asyncio.to_thread(evaluate_portfolio_risk_alert, rule)
         if isinstance(rule, MarketLightAlert):
             return await asyncio.to_thread(evaluate_market_light_alert, rule, cache=daily_cache)
+        if isinstance(rule, CorporateEventAlert):
+            return await asyncio.to_thread(evaluate_corporate_event_alert, rule)
         if isinstance(rule, StaticAlertEvaluation):
             return evaluate_static_alert(rule)
         return self._evaluation_error(rule, f"unsupported runtime alert type: {rule.alert_type}")
@@ -253,7 +264,8 @@ class AlertService:
                         "reason": "dry-run evaluation timed out",
                         "message": "dry-run evaluation timed out",
                     }
-                except Exception as exc:
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                    log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                     sanitized_message = self._sanitize_text(str(exc) or "Alert evaluation failed")
                     result = {
                         "rule_id": self._runtime_rule_id(payload.rule),
@@ -312,7 +324,8 @@ class AlertService:
         threshold = float(rule.price)
         try:
             quote = await monitor._get_realtime_quote(rule.stock_code)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(
                 rule,
                 exc,
@@ -376,7 +389,8 @@ class AlertService:
         threshold = abs(float(rule.change_pct))
         try:
             quote = await monitor._get_realtime_quote(rule.stock_code)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(
                 rule,
                 exc,
@@ -442,7 +456,8 @@ class AlertService:
 
         try:
             result = await asyncio.to_thread(_fetch_daily_data)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(rule, exc, data_source="daily_data")
         if result is None:
             return self._not_triggered(
@@ -542,7 +557,8 @@ class AlertService:
                 result = await asyncio.to_thread(_fetch_daily_data)
                 if daily_cache is not None:
                     daily_cache[cache_key] = result
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(rule, exc, data_source="daily_data")
 
         if result is None:
@@ -584,7 +600,8 @@ class AlertService:
                 data_source="daily_data",
                 data_timestamp=self._extract_daily_timestamp(df),
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return self._evaluation_error(
                 rule,
                 exc,
@@ -701,6 +718,8 @@ class AlertService:
             if rule.alert_type == "market_light_score_drop":
                 return float(rule.parameters.get("min_drop", 0) or 0)
             return None
+        if isinstance(rule, CorporateEventAlert):
+            return float((rule.parameters or {}).get("min_items") or 1)
         return None
 
     @staticmethod
@@ -715,6 +734,8 @@ class AlertService:
             return "portfolio_risk"
         if isinstance(rule, MarketLightAlert):
             return MARKET_LIGHT_DATA_SOURCE
+        if isinstance(rule, CorporateEventAlert):
+            return CORPORATE_EVENT_DATA_SOURCE
         return None
 
     @classmethod
@@ -747,7 +768,8 @@ class AlertService:
         if hasattr(quote, "to_dict"):
             try:
                 return quote.to_dict().get(field_name)
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 return None
         return None
 
@@ -760,7 +782,8 @@ class AlertService:
             if field_name in getattr(df, "columns", []):
                 try:
                     parsed = cls._coerce_datetime(df[field_name].iloc[-1])
-                except Exception:
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                    log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                     parsed = None
                 if parsed is not None:
                     return parsed
@@ -770,7 +793,8 @@ class AlertService:
             if isinstance(index_value, (int, float)):
                 return None
             return cls._coerce_datetime(index_value)
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
             return None
 
     @staticmethod
@@ -785,7 +809,8 @@ class AlertService:
             try:
                 parsed = value.to_pydatetime()
                 return parsed.replace(tzinfo=None) if parsed.tzinfo is not None else parsed
-            except Exception:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 return None
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             try:
@@ -989,6 +1014,12 @@ class AlertService:
             except ValueError as exc:
                 raise AlertServiceError(str(exc)) from exc
 
+        if alert_type in EVENT_ALERT_TYPES:
+            try:
+                return normalize_corporate_event_parameters(parameters)
+            except ValueError as exc:
+                raise AlertServiceError(str(exc)) from exc
+
         raise UnsupportedAlertTypeError(f"unsupported alert_type for Alert API: {alert_type}")
 
     @staticmethod
@@ -1022,6 +1053,9 @@ class AlertService:
         if data["alert_type"] in MARKET_ALERT_TYPES:
             return [make_market_light_payload(parent_key=parent_key, data=data, config=config)]
 
+        if data["alert_type"] in EVENT_ALERT_TYPES and data["target_scope"] == "single_symbol":
+            return [make_corporate_event_payload(parent_key=parent_key, data=data)]
+
         if data["target_scope"] in SYMBOL_BATCH_TARGET_SCOPES:
             if config is None:
                 from src.config import get_config
@@ -1033,7 +1067,8 @@ class AlertService:
                     target=data["target"],
                     config=config,
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+                log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
                 return [
                     make_static_payload(
                         parent_key=parent_key,
@@ -1050,6 +1085,16 @@ class AlertService:
             for target in targets:
                 child_data = dict(data)
                 child_data["target"] = target.symbol
+                if data["alert_type"] in EVENT_ALERT_TYPES:
+                    payloads.append(
+                        make_corporate_event_payload(
+                            parent_key=parent_key,
+                            data=child_data,
+                            effective_target=target.symbol,
+                            display_target=target.display_target,
+                        )
+                    )
+                    continue
                 rule = self._to_runtime_rule(row, child_data)
                 effective_target = target.symbol
                 payloads.append(
@@ -1140,6 +1185,14 @@ class AlertService:
                 indicator_params=parameters,
                 metadata=metadata,
             )
+        if data["alert_type"] in EVENT_ALERT_TYPES:
+            return CorporateEventAlert(
+                stock_code=data["target"],
+                parameters=parameters,
+                metadata=metadata,
+                description=data.get("name") or "",
+                target_scope=str(data.get("target_scope") or "single_symbol"),
+            )
         raise UnsupportedAlertTypeError(f"unsupported alert_type for Alert API: {data['alert_type']}")
 
     @staticmethod
@@ -1186,7 +1239,7 @@ class AlertService:
                 target=cooldown_target,
                 severity=str(row.severity) if row.severity else None,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
                 "Alert cooldown summary lookup failed",
@@ -1309,6 +1362,9 @@ class AlertService:
             return f"{target} market light status {statuses}"
         if alert_type == "market_light_score_drop":
             return f"{target} market light score drop {parameters['min_drop']}"
+        if alert_type == "corporate_event":
+            categories = ",".join(parameters.get("event_categories") or ["earnings"])
+            return f"{target} corporate event ({categories})"
         return f"{target} {alert_type}"
 
     @staticmethod

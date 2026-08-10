@@ -35,6 +35,7 @@ import {
   buildSettingsSectionHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
+import { expectAnalyzeButtonReady } from './workbench-fixture';
 
 type JsonObject = Record<string, unknown>;
 
@@ -467,6 +468,9 @@ async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
     strategies,
   }));
   await page.route('**/api/v1/alphasift/hotspots**', (route) => fulfillJson(route, {
+    enabled: true,
+    provider: 'akshare',
+    hotspot_count: 0,
     hotspots: [],
     details: {},
     cached_at: null,
@@ -476,6 +480,8 @@ async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
 
 function screeningResult(marker: string) {
   return {
+    enabled: true,
+    candidate_count: 1,
     run_id: `run-${marker}`,
     strategy: 'bull_trend',
     market: 'cn',
@@ -685,7 +691,7 @@ function backtestRow(id: number, code: string) {
 async function assertRouteChrome(page: Page, path: string, text: string, title: string) {
   await page.goto(path);
   await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveTitle(new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  await expect(page).toHaveTitle(title);
 }
 
 async function assertNoDocumentOverflow(page: Page, path: string) {
@@ -921,8 +927,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
-    await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
+    // Usage is hosted under Settings; chrome text is usage.title and document title is usage.documentTitle.
+    await assertRouteChrome(
+      page,
+      usageSettingsHref,
+      UI_TEXT.en['usage.title'],
+      UI_TEXT.en['usage.documentTitle'],
+    );
+    await assertRouteChrome(
+      page,
+      APP_ROUTE_PATHS.settings,
+      UI_TEXT.en['settings.pageTitle'],
+      UI_TEXT.en['settings.pageTitleDocument'],
+    );
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
   });
 
@@ -930,11 +947,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto(`${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#recent`);
 
+    // Settings is a large lazy chunk; wait for the embedded usage heading before URL checks.
     await expect(page.getByRole('heading', {
       level: 2,
       name: UI_TEXT.en['usage.title'],
       exact: true,
-    })).toBeVisible();
+    })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1')).toHaveCount(1);
     const redirectedUrl = new URL(page.url());
     expect(redirectedUrl.pathname).toBe(APP_ROUTE_PATHS.settings);
@@ -945,6 +963,22 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: 'Usage & cost' }))
       .toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
+
+    const canonicalUsageHref = `${redirectedUrl.pathname}${redirectedUrl.search}${redirectedUrl.hash}`;
+    // replace (not push): Back returns to the exact pre-navigation Home entry,
+    // while Forward restores the canonical Settings URL with query/hash intact.
+    await page.goBack();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(APP_ROUTE_PATHS.home);
+    await page.goForward();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(canonicalUsageHref);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
   });
 
   test('05b legacy Research deep links preserve context and replace into canonical routes', async ({ page }) => {
@@ -1143,9 +1177,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     let streamAttempts = 0;
     await page.route('**/api/v1/agent/chat/stream', async (route) => {
       streamAttempts += 1;
-      const body = streamAttempts === 1
+      const request = route.request().postDataJSON() as { turn_id?: string };
+      const persisted = `data: {"type":"turn_persisted","turn_id":"${request.turn_id}","message_id":"11"}\n\n`;
+      const body = persisted + (streamAttempts === 1
         ? 'data: {"type":"error","error":"upstream_timeout","message":"raw upstream detail"}\n\n'
-        : 'data: {"type":"progress","stage":"analysis","message":"streaming"}\n\ndata: {"type":"done","success":true,"content":"retry stream completed"}\n\n';
+        : 'data: {"type":"progress","stage":"analysis","message":"streaming"}\n\ndata: {"type":"done","success":true,"content":"retry stream completed"}\n\n');
       await route.fulfill({ status: 200, contentType: 'text/event-stream', body });
     });
     await login(page);
@@ -1172,10 +1208,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       ],
     }));
     await page.route('**/api/v1/agent/chat/sessions/url-session', (route) => fulfillJson(route, {
+      session_id: 'url-session',
       messages: [{ id: 'url-message', role: 'assistant', content: 'URL session restored' }],
+      session_state: { selected_skill_ids: null },
     }));
     await page.route('**/api/v1/agent/chat/sessions/stale-local', (route) => fulfillJson(route, {
+      session_id: 'stale-local',
       messages: [{ id: 'stale-message', role: 'assistant', content: 'stale local message' }],
+      session_state: { selected_skill_ids: null },
     }));
     await login(page);
     await page.evaluate(() => localStorage.setItem('dsa_chat_session_id', 'stale-local'));
@@ -1192,11 +1232,17 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       route,
       historyDetail(1, 'AAPL', 'Apple'),
     ));
-    await page.route('**/api/v1/agent/chat/stream', (route) => route.fulfill({
-      status: 200,
-      contentType: 'text/event-stream',
-      body: 'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
-    }));
+    await page.route('**/api/v1/agent/chat/stream', (route) => {
+      const request = route.request().postDataJSON() as { turn_id?: string };
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          `data: {"type":"turn_persisted","turn_id":"${request.turn_id}","message_id":"12"}\n\n`,
+          'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
+        ].join(''),
+      });
+    });
     await login(page);
     await page.goto('/chat?stock=AAPL&name=Apple&recordId=1');
 
@@ -1274,7 +1320,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(parametersTrigger).toBeFocused();
   });
 
-  test('14 Screening restores a successful task and reports a subsequent failed task through the shared task contract', async ({ page }) => {
+  test('14 Screening restores a successful task and preserves it through subsequent failed attempts', async ({ page }) => {
     await mockScreeningBase(page);
     let submissionAttempts = 0;
     await page.route('**/api/v1/alphasift/screen/tasks/restore-success', (route) => fulfillJson(route, {
@@ -1309,6 +1355,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       }
       await fulfillJson(route, {
         task_id: 'failing-task',
+        trace_id: 'failing-task',
         status: 'pending',
         message: 'accepted',
         message_code: 'task_pending',
@@ -1368,10 +1415,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText('外部行情或模型服务不可用，请稍后重试。', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('raw backend failure', { exact: true })).toHaveCount(0);
     expect(submissionAttempts).toBe(2);
-    await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(SCREENING_TEXT.zh.showingLastGoodTitle, { exact: true })).toBeVisible();
+    await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
   });
 
-  test('15 Alerts creation failure stays inside the modal and preserves all user input', async ({ page }) => {
+  test('15 Alerts creation failure uses the global error Toast and preserves all modal input', async ({ page }) => {
     await mockEmptyAlertCollections(page);
     await page.route('**/api/v1/alerts/rules', async (route) => {
       if (route.request().method() === 'POST') {
@@ -1393,7 +1441,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('价格阈值').fill('250');
     await dialog.getByRole('button', { name: '创建规则' }).click();
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/请求失败|创建失败/).first()).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText(/请求失败|创建失败/).first()).toBeVisible();
     await expect(dialog.getByLabel('规则名称')).toHaveValue('保留输入的失败规则');
     await expect(dialog.getByLabel('标的代码')).toHaveValue('AAPL');
     await expect(dialog.getByLabel('价格阈值')).toHaveValue('250');
@@ -1642,7 +1690,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('数量').fill('2');
     await dialog.getByLabel('成交价').fill('210');
     await dialog.getByRole('button', { name: '提交交易' }).click();
-    await expect(dialog.getByText('请求失败', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText('请求失败', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '提交交易' }).click();
     await expect(dialog).toBeHidden();
     expect(operationIds).toHaveLength(2);
@@ -2065,13 +2113,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(APP_ROUTE_PATHS.researchAnalysis);
-    // Analyze stays disabled until setup/experience readiness resolves.
-    const stockSearch = page.locator('#analysis-workbench-stock-search');
-    await expect(stockSearch).toBeEnabled({ timeout: 15_000 });
-    await stockSearch.fill('AAPL');
-    const analyze = page.getByRole('tabpanel', { name: '发起与批量' })
-      .getByRole('button', { name: '分析', exact: true });
-    await expect(analyze).toBeEnabled({ timeout: 10_000 });
+    // Analyze stays disabled until setup/experience readiness resolves
+    // (`isExperienceModeReady`) and query is non-empty. Shared helper waits on
+    // the real enabled state and sets the controlled input value deterministically.
+    const analyze = await expectAnalyzeButtonReady(page, 'AAPL', {
+      tabPanelName: '发起与批量',
+      buttonName: '分析',
+    });
     await analyze.click();
     const task = page.getByTestId('task-panel-item').filter({ hasText: 'AAPL' });
     await expect(task).toBeVisible();
@@ -2540,7 +2588,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.route('**/api/v1/agent/chat/sessions?**', (route) => fulfillJson(route, {
       sessions: [{ session_id: 'overlay-session', title: 'Overlay Session', message_count: 1, created_at: '2026-07-15T10:00:00Z', last_active: '2026-07-15T10:00:00Z' }],
     }));
-    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, { messages: [] }));
+    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, {
+      session_id: 'overlay-session',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+    }));
     await login(page);
     await page.goto('/chat?session=overlay-session');
     const historyButton = page.getByRole('button', { name: '历史对话' }).first();
@@ -2598,10 +2650,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
 
     await page.goto(APP_ROUTE_PATHS.researchAnalysis);
-    const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
-    await input.fill('AAPL');
-    const controls = [page.getByRole('tabpanel', { name: '发起与批量' })
-      .getByRole('button', { name: '分析', exact: true })];
+    // Same readiness + controlled-input path as test 31 before measuring layout.
+    const analyzeControl = await expectAnalyzeButtonReady(page, 'AAPL', {
+      tabPanelName: '发起与批量',
+      buttonName: '分析',
+    });
+    const controls = [analyzeControl];
     for (const control of controls) {
       await expect(control).toBeVisible();
       const box = await control.boundingBox();

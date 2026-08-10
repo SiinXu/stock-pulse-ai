@@ -334,6 +334,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects AlphaSift adapter source validation and explicit repair installs.'],
     notes: ['Use a trusted source only. AlphaSift is an experimental screening capability, so understand the risk before enabling it.'],
   },
+  'settings.data_source.RSS_NEWS_FEED_URLS': {
+    title: 'RSS/Atom News Feeds',
+    summary: 'Optional free RSS or Atom feed URLs used as a supplement in on-demand news search.',
+    usage: 'Provide comma-separated http(s) feed URLs. Leave empty to keep the feature inert. Feed fetching follows the fail-closed outbound policy.',
+    valueNotes: [
+      'This supplements SearXNG or paid search; it is not a full replacement.',
+      'Private or loopback hosts require an exact OUTBOUND_HTTP_ALLOWLIST entry.',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC controls per-feed timeout (1-30 seconds, default 8).',
+    ],
+    impact: ['Affects on-demand news search coverage when configured feeds return items.'],
+    notes: ['A single feed failure should not halt the rest of the news pipeline.'],
+  },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: 'Realtime Source Priority',
     summary: 'Configures the provider order for realtime quotes.',
@@ -390,6 +402,48 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects quote connectivity and availability when the Pytdx data source is used.'],
     notes: ['If a server is unreachable, rely on data-source fallback and avoid a single unstable endpoint.'],
   },
+
+  'settings.data_source.FUTU_OPEND_HOST': {
+    title: 'Futu OpenD Host',
+    summary: 'IPv4 host for the local Futu OpenD gateway used by analysis scope and portfolio position import.',
+    usage: 'Keep 127.0.0.1 for a local OpenD process, or set a trusted LAN IP when OpenD runs on another machine.',
+    valueNotes: [
+      'OpenD uses a local TCP protocol, not HTTP, so OUTBOUND_HTTP_ALLOWLIST does not apply.',
+      'The bundled Futu SDK requires IPv4 or an IPv4-resolving hostname.',
+    ],
+    impact: ['Affects --portfolio futu analysis scope and POST /api/v1/portfolio/imports/futu.'],
+    notes: [
+      'Inside Docker, 127.0.0.1 is the container itself; point at a reachable host on the container network.',
+      'See docs/futu-opend-portfolio-import_EN.md.',
+    ],
+    examples: ['127.0.0.1', '192.168.1.20'],
+  },
+  'settings.data_source.FUTU_OPEND_PORT': {
+    title: 'Futu OpenD Port',
+    summary: 'TCP port for the Futu OpenD gateway.',
+    usage: 'Match the port configured in OpenD. Default is 11111.',
+    valueNotes: ['Valid range is 1–65535.'],
+    impact: ['Affects Futu OpenD connectivity for analysis scope and portfolio import.'],
+    notes: ['Changing the port requires OpenD to listen on the same value.'],
+    examples: ['11111'],
+  },
+  'settings.data_source.FUTU_ACC_ID': {
+    title: 'Futu Account ID',
+    summary: 'Optional live securities account filter for OpenD position queries.',
+    usage: 'Leave empty to merge eligible ACTIVE REAL NORMAL/MASTER accounts, or set one account id.',
+    valueNotes: ['Must be a positive integer when set.'],
+    impact: ['Controls which Futu real accounts contribute positions to analysis and import.'],
+    notes: ['Simulate/paper accounts are never imported.'],
+  },
+  'settings.data_source.FUTU_SECURITY_FIRM': {
+    title: 'Futu Security Firm',
+    summary: 'Futu SecurityFirm enum used when opening the OpenD trade context.',
+    usage: 'Use NONE for SDK auto-detection unless your brokerage requires an explicit firm.',
+    valueNotes: ['Common values include NONE, FUTUSECURITIES, and FUTUSG.'],
+    impact: ['Affects account discovery when multiple Futu security firms are present.'],
+    notes: ['Unsupported enum names fail with a clear configuration error before any import write.'],
+    examples: ['NONE', 'FUTUSECURITIES'],
+  },
   'settings.data_source.news_window': {
     title: 'News Window',
     summary: 'Controls how old news can be before it is excluded from analysis context.',
@@ -397,6 +451,157 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['The effective window is constrained by both values.'],
     impact: ['Affects news context size, freshness, and report length.'],
     notes: ['Too wide can include stale news; too narrow can miss slow-moving events.'],
+  },
+
+  'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
+    title: 'Enable Crypto Provider',
+    summary: 'Registers the default-off CoinGecko path for crypto:TICKER market data.',
+    usage: 'Leave disabled unless you intentionally analyze crypto symbols such as crypto:BTC. Equity paths stay unchanged when this switch is off.',
+    valueNotes: [
+      'Bare BTC or ETH symbols are not auto-classified as crypto.',
+      'A process restart is required after changing provider registration switches.',
+    ],
+    impact: ['Controls whether newly created production data managers attach the CoinGecko crypto provider.'],
+    notes: ['See docs/crypto-market-support.md for identity, UTC daily bars, and outbound policy details.'],
+  },
+  'settings.data_source.COINGECKO_API_PLAN': {
+    title: 'CoinGecko API Plan',
+    summary: 'Selects keyless, Demo, or Pro authentication and the matching official origin.',
+    usage: 'Use keyless without a key. Use demo or pro only with a matching COINGECKO_API_KEY.',
+    valueNotes: [
+      'keyless uses the public API without credentials.',
+      'demo and pro select the official origin and request header for that plan.',
+      'Invalid values fall back to keyless at configuration load.',
+    ],
+    impact: ['Affects CoinGecko authentication headers and base origin selection.'],
+    notes: ['Custom COINGECKO_API_BASE is permitted only in keyless mode.'],
+  },
+  'settings.data_source.COINGECKO_API_KEY': {
+    title: 'CoinGecko API Key',
+    summary: 'Optional Demo or Pro API key for CoinGecko market data.',
+    usage: 'Leave empty in keyless mode. Paste the key only when COINGECKO_API_PLAN is demo or pro.',
+    valueNotes: ['Credentials are never sent to a custom COINGECKO_API_BASE origin.'],
+    impact: ['Enables authenticated CoinGecko Demo or Pro requests when the plan matches.'],
+    notes: ['Do not commit keys or paste them into public issues or screenshots.'],
+  },
+  'settings.data_source.COINGECKO_API_BASE': {
+    title: 'CoinGecko API Base URL',
+    summary: 'Optional custom HTTPS base for keyless CoinGecko requests only.',
+    usage: 'Leave empty for official endpoints. Enter a complete HTTPS URL only when a trusted keyless mirror is required.',
+    valueNotes: [
+      'Demo and Pro always use official origins regardless of this field.',
+      'Private hosts must also be allowed by OUTBOUND_HTTP_ALLOWLIST.',
+    ],
+    impact: ['Affects where keyless crypto market-data requests are sent.'],
+    notes: ['Verify that you trust the endpoint operator before saving a custom URL.'],
+    examples: ['https://api.coingecko.com/api/v3'],
+  },
+  'settings.data_source.CRYPTO_COINGECKO_PRIORITY': {
+    title: 'CoinGecko Crypto Provider Priority',
+    summary: 'Controls where CoinGecko sits among crypto market-data providers.',
+    usage: 'Use an integer from 0 to 99. Lower numbers are tried earlier. Default is 10.',
+    valueNotes: [
+      'This field belongs with other data-source provider priorities; it does not reorder equity daily or realtime chains.',
+      'It only applies when CRYPTO_PROVIDER_ENABLED is true.',
+    ],
+    impact: ['Affects crypto provider selection order for crypto: identities only.'],
+    notes: ['Keep the default unless you add additional crypto providers with competing priorities.'],
+  },
+  'settings.data_source.PROVIDER_MARKET_DATA_MODE': {
+    title: 'Provider Market Data Mode',
+    summary: 'Chooses local-first, offline-only, or forced-refresh daily market-data behavior.',
+    usage: 'Keep auto for normal operation. Use local_only for offline complete-cache reads. Use refresh to skip local reads and force one provider pass.',
+    valueNotes: [
+      'auto: fresh local complete data, then the provider chain, then eligible stale on total failure.',
+      'local_only: never constructs provider or socket paths; incomplete or over-age local data fails structured.',
+      'refresh: skips local read, runs the provider chain once, and does not serve stale on failure.',
+      'Invalid non-empty values fail closed at configuration load instead of silently becoming auto.',
+    ],
+    impact: ['Affects daily history reads for analysis, stock history API, and scheduled runs that depend on market data.'],
+    notes: [
+      'Independent of LOCAL_ONLY_MODE, which gates non-loopback outbound HTTP for the whole process.',
+      'See docs/local-first-market-data_EN.md.',
+    ],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS': {
+    title: 'Local-Only Cache Max Age',
+    summary: 'Maximum age of complete local daily cache entries that local_only mode may still serve.',
+    usage: 'Enter seconds. Default is 2592000 (30 days). Values must be greater than zero.',
+    valueNotes: ['Older complete entries are treated as structured offline misses, not as live quotes.'],
+    impact: ['Bounds how old local cache may be when PROVIDER_MARKET_DATA_MODE is local_only.'],
+    notes: ['Does not replace memory or persistent freshness TTL settings used by auto mode.'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS': {
+    title: 'Persistent Daily Cache Max Age',
+    summary: 'Deletes persistent daily-cache files older than this age on read and write.',
+    usage: 'Enter seconds. Default is 7776000 (90 days). Set 0 to disable age-based deletion.',
+    valueNotes: ['Retention cleanup is deterministic and does not rewrite user secrets into cache files.'],
+    impact: ['Controls disk footprint of the provider daily cache directory.'],
+    notes: ['Schema and column allowlists still apply independently of retention age.'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES': {
+    title: 'Persistent Daily Cache Max Entries',
+    summary: 'Caps how many persistent daily-cache entries are retained.',
+    usage: 'Enter a positive integer. Default is 512. Oldest entries are removed first.',
+    valueNotes: ['Equal timestamps break ties by filename for deterministic eviction.'],
+    impact: ['Bounds cache directory growth under long multi-symbol workloads.'],
+    notes: ['Combine with max-age settings for both time-based and count-based retention.'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS': {
+    title: 'Daily Cache Rollover Grace Days',
+    summary: 'Allows a covered local daily range to serve default-end-date rollover windows for a few calendar days.',
+    usage: 'Enter a positive integer. Default is 1 day of rollover grace.',
+    valueNotes: ['auto mode still revalidates aged data using freshness TTL settings.'],
+    impact: ['Reduces needless provider calls for overlapping default end-date windows after a day boundary.'],
+    notes: ['Keep the default unless you intentionally widen or tighten rollover reuse.'],
+  },
+  'settings.data_source.DATA_VALIDATION_ENABLED': {
+    title: 'Enable Data Validation',
+    summary: 'Runs the unified numeric validation layer and records versioned diagnostic evidence.',
+    usage: 'Enabled by default. Disable only when you need to bypass validation diagnostics temporarily.',
+    valueNotes: ['Validation covers daily, realtime, fundamental, and selected technical fields when enabled.'],
+    impact: ['Controls whether validation evidence is produced and whether strict rejection can apply.'],
+    notes: ['See docs/data-validation-layer.md for scope and rollback guidance.'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT': {
+    title: 'Data Validation Strict Mode',
+    summary: 'Rejects invalid provider candidates before acceptance or cache so fallback can continue.',
+    usage: 'Default is off (warn-oriented). Enable only when you want reject-severity findings to drop a candidate.',
+    valueNotes: ['Strict mode uses the existing bounded provider loop; it is not a second fetch pipeline.'],
+    impact: ['Can cause more provider fallbacks when a source returns structurally invalid numbers.'],
+    notes: ['Pair with DATA_VALIDATION_STRICT_SCOPES to limit which markets or instruments enforce rejection.'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT_SCOPES': {
+    title: 'Data Validation Strict Scopes',
+    summary: 'Limits where strict validation rejection applies using market/instrument selectors.',
+    usage: 'Comma-separated selectors such as cn/equity,hk/etf,us/index. Use */* for all scopes (default).',
+    valueNotes: ['Supported instruments include equity, etf, and index. * is a wildcard on either side.'],
+    impact: ['Narrows or widens which symbols can be rejected under DATA_VALIDATION_STRICT.'],
+    notes: ['Empty values normalize to the default */* at configuration load.'],
+  },
+  'settings.data_source.DATA_VALIDATION_INSTRUMENT_OVERRIDES': {
+    title: 'Data Validation Instrument Overrides',
+    summary: 'Authoritative symbol instrument map for offshore codes that cannot be typed safely from the code alone.',
+    usage: 'Comma-separated SYMBOL=instrument pairs, for example SPY=etf,HK02800=etf,1306.T=etf. Leave empty when built-in classification is enough.',
+    valueNotes: [
+      'This is a comma-separated mapping, not a JSON document.',
+      'Use only when ETF or index identity would otherwise be misclassified.',
+    ],
+    impact: ['Affects validation instrument identity and strict-scope matching for listed symbols.'],
+    notes: ['Prefer sparse authoritative overrides rather than a large hand-maintained catalog.'],
+    examples: ['SPY=etf,HK02800=etf,1306.T=etf'],
+  },
+  'settings.data_source.DATA_VALIDATION_UPPER_LAYER_MODE': {
+    title: 'Data Validation Upper-Layer Mode',
+    summary: 'Final policy for aggregated fundamental validation outcomes at the synthesis boundary.',
+    usage: 'Keep warn to preserve results with evidence. Use reject only when invalid aggregated fundamentals must fail the upper boundary.',
+    valueNotes: [
+      'warn records evidence and keeps the aggregated result.',
+      'reject raises at the upper layer and is not described as provider failover.',
+      'Other values normalize to warn at load time.',
+    ],
+    impact: ['Affects how final aggregated fundamental validation failures are surfaced to callers.'],
+    notes: ['Independent of DATA_VALIDATION_STRICT provider-candidate rejection.'],
   },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
@@ -618,7 +823,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Before disabling it in Docker or packages, make sure the built assets are already included.',
     ],
   },
+  'settings.system.LOCAL_ONLY_MODE': {
+    title: 'Local Only Mode',
+    summary: 'Fail-closed privacy mode that blocks every non-loopback outbound HTTP destination.',
+    usage: 'Enable only when you intentionally run with local models and cached data. Cloud LLM, search, news, remote data providers, and notification webhooks are denied with coded LOCAL_ONLY_MODE errors. Pure loopback remains allowed.',
+    valueNotes: ['Default is false.', 'OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.', 'Blocked calls never silently fall through.'],
+    impact: ['Remote-dependent analysis fails visibly unless local backends and cache cover the path.'],
+    notes: ['Restart after changing. See docs/local-only-mode_EN.md.'],
+  },
   'settings.system.ADMIN_AUTH_ENABLED': {
+
+
     title: 'Web Login Protection',
     summary: 'Enables admin password protection for WebUI.',
     usage: 'Use the WebUI auth settings entry to enable or disable this. Reset with python -m src.auth reset_password if needed.',
@@ -691,11 +906,77 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: 'Report Export PDF Font Path',
+    summary: 'Selects the single-face TTF/OTF used by optional PDF report export.',
+    usage:
+      'Enter an absolute path only when the server has a font that covers every visible report glyph. Leave empty to probe the documented system candidates.',
+    valueNotes: [
+      'An explicit invalid path fails closed and never falls back to another system font.',
+      'Capability checks validate representative language glyphs; each export validates the exact report glyph set again.',
+    ],
+    impact: ['Affects optional PDF export only; lossless Markdown export remains available.'],
+    notes: [
+      'TTF/OTF single faces are supported. TTC collection indices are not guessed.',
+      'Absolute paths and raw font-parser errors are omitted from public capability and error responses.',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
+    ],
+  },
+  'settings.system.USE_PROXY': {
+    title: 'Enable Local Proxy',
+    summary:
+      'Mainland-friendly switch that maps PROXY_HOST and PROXY_PORT onto process http_proxy/https_proxy.',
+    usage:
+      'Turn on when local outbound traffic must go through a local proxy (for example Gemini/OpenAI from mainland China). Set PROXY_HOST and PROXY_PORT together. GitHub Actions always ignores this switch.',
+    valueNotes: [
+      'Previously hidden as a low-frequency ops key because proxy env is applied at process bootstrap; Settings now exposes it with an honest restart requirement.',
+      'Saving reloads setup_env and re-applies USE_PROXY for libraries that re-read process env; a full process restart is still required to drop a previously applied proxy or refresh long-lived HTTP clients.',
+    ],
+    impact: ['Affects outbound data-source, LLM, search, and notification HTTP calls that honor process proxy env.'],
+    notes: [
+      'Prefer HTTP_PROXY when you need a full proxy URL with credentials or when libraries only honor standard HTTP_PROXY/HTTPS_PROXY.',
+      'Inside containers, 127.0.0.1 points to the container, not the host machine (use host.docker.internal or the host LAN IP).',
+    ],
+    examples: ['USE_PROXY=true', 'PROXY_HOST=127.0.0.1', 'PROXY_PORT=10809'],
+  },
+  'settings.system.PROXY_HOST': {
+    title: 'Proxy Host',
+    summary: 'Host used with USE_PROXY to build http://{PROXY_HOST}:{PROXY_PORT}.',
+    usage:
+      'Enter a hostname or IP. Values may embed credentials as user:pass@host; Settings masks this field because of that risk.',
+    valueNotes: [
+      'Default is 127.0.0.1. Only used when USE_PROXY is enabled.',
+      'Requires process restart for full, reliable effect together with USE_PROXY.',
+    ],
+    impact: ['Changes the proxy endpoint applied to process http_proxy/https_proxy when USE_PROXY is on.'],
+    notes: [
+      'Do not paste proxy credentials into screenshots, logs, issues, or shared profile exports.',
+      'Inside containers, 127.0.0.1 is the container itself.',
+    ],
+    examples: ['PROXY_HOST=127.0.0.1', 'PROXY_HOST=host.docker.internal'],
+  },
+  'settings.system.PROXY_PORT': {
+    title: 'Proxy Port',
+    summary: 'Port used with USE_PROXY to build http://{PROXY_HOST}:{PROXY_PORT}.',
+    usage: 'Enter a port from 1 to 65535. Default is 10809. Only used when USE_PROXY is enabled.',
+    valueNotes: [
+      'Requires process restart for full, reliable effect together with USE_PROXY.',
+    ],
+    impact: ['Changes the proxy endpoint applied to process http_proxy/https_proxy when USE_PROXY is on.'],
+    notes: ['Common local proxy ports include 10809, 7890, and 1080.'],
+    examples: ['PROXY_PORT=10809', 'PROXY_PORT=7890'],
+  },
   'settings.system.HTTP_PROXY': {
     title: 'Network Proxy',
-    summary: 'Sets a proxy for external API, model, or search requests.',
-    usage: 'Use http://host:port format. HTTPS_PROXY can be used for HTTPS proxying.',
-    valueNotes: ['Whether it applies depends on the underlying library and environment handling.'],
+    summary: 'Sets a standard HTTP proxy URL for external API, model, or search requests.',
+    usage:
+      'Use http://host:port format. HTTPS_PROXY can be used for HTTPS proxying. Prefer this over USE_PROXY when you need a full URL (including credentials) or library-standard env vars.',
+    valueNotes: [
+      'Whether it applies depends on the underlying library and environment handling.',
+      'URL userinfo credentials are redacted in diagnostics; do not share unredacted export dumps.',
+    ],
     impact: ['Affects data sources, LLM, search, and notification network calls.'],
     notes: ['Inside containers, 127.0.0.1 points to the container, not the host machine.'],
   },
@@ -928,6 +1209,58 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds best-effort sample writes; evaluation still requires an explicit API run.'],
     notes: ['Recording failures are logged and never fail analysis.'],
   },
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
+    title: 'Multi-Strategy Deliberation',
+    summary: 'Enable concurrent multi-strategy specialist scheduling with a final disagreement explanation.',
+    usage: 'Default off. When true, Native Multi can schedule strategy specialists and surface disagreement explanations without changing the Phase-1 synthesis path when off.',
+    valueNotes: [
+      'Off preserves the previous synthesis behavior byte-for-byte.',
+      'On enables multi-strategy deliberation and final disagreement explanation.',
+    ],
+    impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
+    notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
+  },
+  'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
+    title: 'Investment Committee Mode',
+    summary: 'Run multi-role investment committee style analysis with structured dissent.',
+    usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
+    valueNotes: ['Off preserves the existing single-path analysis behavior.'],
+    impact: ['Affects agent orchestration depth and report committee sections.'],
+    notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
+  },
+  'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
+    title: 'Decision Profile Outcome Calibration',
+    summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
+    usage: 'Keep off for API compatibility. Enable only when operators need profile, action, horizon, market-phase, data-quality, and profile-source calibration on GET /api/v1/decision-signals/outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off stats responses omit profile_calibration.',
+      'Each exact bucket needs at least 30 completed outcomes before rates or max adverse excursion are published.',
+      'Uses only persisted outcome prices; never triggers market reads.',
+    ],
+    impact: ['Adds an optional profile_calibration object to outcome stats; Web shows the calibration card when the field is present.'],
+    notes: ['Does not change outcome evaluation, persistence, or reassessment lifecycle.'],
+  },
+  'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
+    title: 'Skill Opinion Outcome Weights',
+    summary: 'Apply conservative Bayesian weights from sufficient skill-outcome buckets at aggregation.',
+    usage: 'Keep off for byte-identical aggregation. Enable only after recording/evaluating enough samples (or backfill) and reviewing GET /api/v1/skill-outcomes/stats.',
+    valueNotes: [
+      'Disabled by default; gate-off aggregation matches the prior backtest/memory path.',
+      'When on, each skill_id+horizon+engine_version bucket must independently reach 30 evaluated samples; factors stay in [1/1.2, 1.2] and fail neutral (1.0) otherwise.',
+    ],
+    impact: ['Changes skill consensus weights only when the gate is on and sufficient outcome data exists.'],
+    notes: ['Does not change canonical signals, consensus thresholds, or AGENT_ARCH=single behavior.'],
+  },
+  'settings.agent.VALUATION_AGENT_TOOL_ENABLED': {
+    title: 'Enable Valuation Agent Tool',
+    summary: 'Opt-in DCF and relative-valuation Agent Tool with transparent assumptions.',
+    usage: 'Leave disabled for default installs. Enable only when Agents should call estimate_stock_valuation after a process restart.',
+    notes: [
+      'Default is off; the process tool registry does not include the tool until enabled and restarted.',
+      'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
+      'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
+    ],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
@@ -942,16 +1275,27 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
-    usage: 'When enabled, the risk agent in full/specialist mode can downgrade buy recommendations to hold or sell. That conservative override still applies automatically unless Human approvals captures the path.',
+    usage: 'Controls whether the legacy risk plan directly applies a downgrade. The mandatory Risk Manager still decides the final action under RISK_GATE_PROFILE.',
     valueNotes: [
-      'Only effective when AGENT_ORCHESTRATOR_MODE includes the risk stage.',
+      'Controls only the legacy override and cannot skip final-action evaluation.',
       'HITL risk-control bypass is off by default on /approvals; enable it there for a one-shot, time-limited chance to preserve the original signal.',
     ],
     impact: ['Affects the risk conservatism of final investment recommendations.'],
     notes: [
-      'When disabled, the risk agent opinion is advisory only and cannot override decisions.',
+      'When disabled, the legacy override does not apply directly, but explicit risk evidence can still cause the final action to be downgraded or rejected.',
       'Open Human approvals (/approvals) to configure the default-off HITL gate. This is not broker or trade-order approval and does not expand Agent tool authority.',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: 'Risk Manager Profile',
+    summary: 'Selects the mandatory final-action thresholds before a recommendation is published.',
+    usage: 'Balanced is the default; conservative intervenes sooner, while aggressive requires explicit blocking evidence.',
+    valueNotes: [
+      'Supported values are conservative, balanced, and aggressive; invalid values stop startup.',
+      'The gate cannot be disabled, and internal failures fail closed.',
+    ],
+    impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
+    notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
@@ -1002,6 +1346,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'It only affects visible ask-stock history compression; it does not change LLM provider, model, Base URL, save cleanup, or runtime priority semantics.',
     ],
   },
+  'settings.agent.observability': {
+    title: 'Agent Observability',
+    summary: 'Lightweight structured agent run events with trace/span ids for the run-flow view.',
+    usage: 'AGENT_OBSERVABILITY_ENABLED toggles lightweight events (default on). AGENT_OBSERVABILITY_DEEP_PAYLOAD optionally captures sanitized tool argument/result previews (default off).',
+    valueNotes: [
+      'Events persist through run diagnostics and appear in the existing run-flow panel.',
+      'Deep payloads remain redacted for prompts, keys, and secrets.',
+    ],
+    impact: ['Adds low-overhead agent timeline detail for debugging multi-step runs.'],
+    notes: ['See docs/agent-observability_EN.md for privacy and overhead notes.'],
+  },
   'settings.agent.event_monitor': {
     title: 'Event Monitor',
     summary: 'Enables background event monitoring in schedule mode with periodic rule polling.',
@@ -1023,6 +1378,47 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Affects background alert detection and notification delivery.'],
     notes: ['This is a legacy configuration method. For advanced rules, use the alert center.'],
+  },
+  'settings.agent.MULTIMODAL_AGENT_TOOLS_ENABLED': {
+    title: 'Enable Multimodal Agent Tools',
+    summary: 'Opt-in PDF parsing and chart-reading Agent Tools with a local file sandbox.',
+    usage: 'Leave disabled for default installs. Enable only with MULTIMODAL_FILE_ROOT set, then restart so parse_financial_pdf and read_price_chart can register.',
+    valueNotes: [
+      'Default is off; the process tool registry does not include the tools until enabled, rooted, and restarted.',
+      'PDF parsing is local-first; chart reading uses VISION_MODEL and degrades honestly when vision is unavailable.',
+    ],
+    impact: ['Affects optional Agent tool availability only; default analysis reports stay unchanged when disabled.'],
+    notes: [
+      'See docs/multimodal-parsing_EN.md for the phase-1 contract and rollback steps.',
+      'HTTP upload UI and transcript analysis are deferred to later phases.',
+    ],
+  },
+  'settings.agent.MULTIMODAL_FILE_ROOT': {
+    title: 'Multimodal File Root',
+    summary: 'Local directory that may contain user-provided PDF and chart files for multimodal tools.',
+    usage: 'Set an absolute local path. Agent tool file_path values must resolve inside this root; URLs and path traversal are rejected.',
+    valueNotes: [
+      'Required when MULTIMODAL_AGENT_TOOLS_ENABLED=true; missing root keeps tools unregistered.',
+      'Content is never executed; only bounded read/parse paths are used.',
+    ],
+    impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
+    notes: ['Example: /var/stockpulse/multimodal-uploads'],
+  },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: 'Enable Offline OCR Agent Tool',
+    summary: 'Default-off bounded Tesseract text extraction. Image bytes stay local, but redacted untrusted text enters Agent context and may reach a remote model; enable LOCAL_ONLY_MODE for zero remote egress.',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR File Root',
+    summary: 'Filesystem sandbox for single-open regular images; root escapes, special files, oversized bytes, decoded pixels, and extra frames are rejected.',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR Languages',
+    summary: 'Tesseract language codes joined by +; default chi_sim+eng requires matching system language packs.',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR Timeout Seconds',
+    summary: 'Hard 1–120 second wall-clock limit; timed-out OCR workers and descendants are terminated and reaped.',
   },
   // ------------------------------------------------------------------
   // Backtest configuration
@@ -1057,6 +1453,43 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Different versions may use different evaluation algorithms or judgment rules.'],
     impact: ['Affects the evaluation algorithm and results.'],
     notes: ['Keep the default unless instructed to switch versions.'],
+  },
+  // ------------------------------------------------------------------
+  // Technical indicator periods (Issue #172)
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: 'Moving Average Periods',
+    summary: 'Comma-separated MA periods in trading days used by trend analysis (default 5,10,20,60).',
+    usage: 'Leave empty for historical defaults. Add longer horizons such as 120 or 250 for long-term trend context. The analysis history window expands automatically to cover the longest configured period.',
+    valueNotes: [
+      'Each value must be a positive integer up to 500.',
+      'Configured periods appear under their exact MA labels in ma_by_period and the typed indicator snapshot.',
+      'When bars are fewer than a period, that MA is omitted and annotated as insufficient data (no silent shorter-period substitute).',
+    ],
+    impact: ['Affects trend classification, bias ratios, support checks, and report MA values.'],
+    notes: ['Defaults preserve pre-configuration MA behavior when enough history is available.'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD Periods',
+    summary: 'MACD fast, slow, and signal EMA periods (default 12/26/9).',
+    usage: 'INDICATOR_MACD_FAST must be less than INDICATOR_MACD_SLOW. Signal is the DEA smoothing period.',
+    valueNotes: [
+      'Standard settings are 12/26/9; shorter pairs react faster but are noisier.',
+      'Explicit invalid values are rejected consistently at process start and by Settings validation.',
+    ],
+    impact: ['Affects MACD DIF/DEA/histogram and derived buy/sell scoring.'],
+    notes: ['Keep defaults unless you intentionally change the MACD convention.'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI Periods',
+    summary: 'Comma-separated RSI periods (default 6,12,24).',
+    usage: 'Configured values are exposed under their exact RSI labels. The second value (or first when only one is configured) drives RSI status thresholds.',
+    valueNotes: [
+      'Periods must be positive integers up to 250.',
+      'RSI uses Wilder/SMMA smoothing, consistent with alert-path RSI.',
+    ],
+    impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
+    notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
   },
   // ------------------------------------------------------------------
   // Report configuration
@@ -1234,6 +1667,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects total analysis time.'],
     notes: ['Total time ≈ stock count × per-stock time + (count-1) × ANALYSIS_DELAY.'],
   },
+  'settings.system.daily_brief': {
+    title: 'Daily Brief',
+    summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
+    usage: 'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown.',
+    valueNotes: [
+      'Default off keeps existing schedules unchanged.',
+      'Accuracy review is informational and does not auto-trade.',
+    ],
+    impact: ['Affects scheduled brief generation and accuracy review panels.'],
+    notes: ['Requires schedule mode for timed delivery.'],
+  },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: 'Portfolio Stress Scenario Catalog',
+    summary: 'Optional bounded YAML catalog for deterministic portfolio stress scenarios.',
+    usage: 'Set PORTFOLIO_STRESS_SCENARIOS_PATH to a readable local YAML file, or leave it empty to use only built-in scenarios.',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: 'Save Context Snapshot',
     summary: 'Controls whether the full analysis history context_snapshot is persisted to the database.',
@@ -1299,6 +1748,41 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
+  'settings.agent.event_impact_context': {
+    title: 'Alert Impact Context',
+    summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
+    usage: 'Leave off unless you want managed-data impact context on triggered alerts.',
+    notes: ['Uses watchlist/portfolio/intelligence context only; no realtime refresh.'],
+  },
+  'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
+    title: 'Local Runtime Auto-Detect',
+    summary: 'Fast loopback-only probe for a local Ollama runtime during setup readiness.',
+    usage:
+      'Leave enabled for zero-config first success. The probe only targets loopback ' +
+      '(127.0.0.0/8, ::1, localhost), never blocks startup, and logs failures only. ' +
+      'When Ollama is reachable, setup readiness offers non-secret local-zero-cost fields.',
+    examples: [
+      'LOCAL_RUNTIME_AUTO_DETECT=true',
+      'LOCAL_RUNTIME_AUTO_DETECT=false',
+    ],
+  },
+  'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
+    title: 'Local Runtime Detect Timeout',
+    summary: 'Per-request timeout for the loopback local-runtime detect probe.',
+    usage: 'Keep this low (default 0.35s, clamped to 0.05–2.0) so setup status stays fast when Ollama is down.',
+    examples: [
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.35',
+      'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
+    ],
+  },
+
+  'settings.system.portfolio_health': {
+    title: 'Portfolio Health Formula',
+    summary: 'Controls the fixed-denominator health-score weights and alert thresholds.',
+    usage: 'Use finite values within the displayed ranges. Invalid values are rejected rather than clamped.',
+    notes: ['Changing these values changes the configuration hash and requires an explicit health refresh.'],
+  },
+
 };
 
 export default settingsHelpEnUS;
