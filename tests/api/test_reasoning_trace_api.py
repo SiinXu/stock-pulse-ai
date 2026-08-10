@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import reasoning_trace as endpoint
 from src.services.reasoning_trace_export_service import (
+    CLIP_TRUNCATION_SENTINEL,
     ReasoningTraceNotFound,
     build_reasoning_trace_package,
 )
@@ -279,6 +280,51 @@ def test_primary_key_hit_audits_the_same_identity() -> None:
     assert audit.attempts[0]["target_id"] == "123"
     assert audit.completions[0]["target_id"] == "123"
     assert audit.completions[0]["metadata"]["lookup_mode"] == "primary_key"
+
+
+def test_clipped_payload_reports_the_truncated_response_header() -> None:
+    """Blocker 2 (API): X-Reasoning-Trace-Truncated must agree with the returned body."""
+    audit = SecurityAuditRecorderStub()
+    record = SimpleNamespace(
+        id=9,
+        query_id=PROD_QUERY_ID,
+        code="AAPL",
+        name="Apple",
+        model_used="gpt-test",
+        created_at=None,
+        context_snapshot=json.dumps(
+            {
+                "diagnostics": {
+                    "trace_id": "0123456789abcdef0123456789abcdef",
+                    "provider_runs": [{"provider": "P" * 300, "status": "ok"}],
+                }
+            }
+        ),
+        raw_result=json.dumps({"decision_type": "hold"}),
+    )
+    response = _signed_export(PROD_QUERY_ID, record, audit)
+
+    assert response.status_code == 200
+    assert CLIP_TRUNCATION_SENTINEL in response.text
+    assert response.headers["x-reasoning-trace-truncated"] == "1"
+    body = response.json()
+    assert body["truncated"] is True
+    assert body["truncation"]["marker"] == "truncated"
+    assert any(
+        drop["path"] == "data_sources.provider_trace" and drop["reason"] == "value_clipped"
+        for drop in body["truncation"]["dropped"]
+    )
+
+
+def test_unclipped_payload_reports_an_untruncated_response_header() -> None:
+    """Blocker 2 (API): the header stays 0 only when nothing was lost."""
+    audit = SecurityAuditRecorderStub()
+    response = _signed_export(PROD_QUERY_ID, _record(9, PROD_QUERY_ID), audit)
+
+    assert response.status_code == 200
+    assert CLIP_TRUNCATION_SENTINEL not in response.text
+    assert response.headers["x-reasoning-trace-truncated"] == "0"
+    assert response.json()["truncated"] is False
 
 
 def test_real_api_preserves_production_uuid_identities() -> None:

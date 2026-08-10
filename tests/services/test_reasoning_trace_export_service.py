@@ -13,7 +13,9 @@ from typing import Any, Dict
 import pytest
 
 from api.v1.schemas.reasoning_trace import ReasoningTraceExportResponse
+from src.services import reasoning_trace_export_service as export_module
 from src.services.reasoning_trace_export_service import (
+    CLIP_TRUNCATION_SENTINEL,
     MAX_MAX_EXPORT_CHARS,
     SCHEMA_VERSION,
     ReasoningTraceExportDisabled,
@@ -21,6 +23,8 @@ from src.services.reasoning_trace_export_service import (
     ReasoningTraceNotFound,
     build_reasoning_trace_package,
     is_reasoning_trace_export_enabled,
+    is_structural_identity,
+    redact_export_payload,
     resolve_max_export_chars,
 )
 
@@ -551,21 +555,80 @@ def test_production_uuid_identities_survive_opaque_token_redaction() -> None:
     ReasoningTraceExportResponse.model_validate(result.package)
 
 
+# Every shape ``redact_sensitive_data`` recognises. Structural-identity
+# restoration must never hand any of them back, whatever their charset looks like.
+REDACTED_CREDENTIAL_SHAPES = {
+    "openai_key": "sk-abcdefghijklmnopqrstuvwxyz1234567890ABCD",
+    "anthropic_key": "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+    "github_pat": "ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+    "github_fine_grained": "github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz012345",
+    "github_pat_hex_shaped": "ghp_0123456789abcdef0123456789abcdef",
+    "aws_access_key_id": "AKIAIOSFODNN7EXAMPLE",
+    "aws_temporary_key_id": "ASIAIOSFODNN7EXAMPLE",
+    "slack_bot_token": "xo" + "xb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx",
+    "google_api_key": "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+    "stripe_live_key": "sk_" + "live_abcdefghijklmnop1234567890",
+    "sendgrid_key": "SG.abcdefghijklmnop.abcdefghijklmnopqrstuvwxyz012345",
+    "local_path": FAKE_PATH,
+    "credentialed_url": FAKE_URL,
+    "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlWFla",
+}
+
+# Identifier forms the runtime actually generates for the restored ``run`` keys.
+PRODUCTION_IDENTIFIER_FORMS = {
+    "uuid_hex": PROD_QUERY_ID,
+    "dashed_uuid": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    "integer_primary_key": "77",
+    "zero_primary_key": "0",
+    "history_run_id": "history:9",
+    "market_review_query_id": "market_review_9f2c1ab84e7d4f0b8c3a5d6e7f801234",
+    "daily_brief_query_id": "daily_brief_2026-08-10_abcdef123456",
+}
+
+
 @pytest.mark.parametrize(
     "secret",
-    [FAKE_PATH, FAKE_URL, "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlWFla"],
+    list(REDACTED_CREDENTIAL_SHAPES.values()),
+    ids=list(REDACTED_CREDENTIAL_SHAPES),
 )
 def test_identity_restoration_never_resurrects_credential_shapes(secret: str) -> None:
     """Blocker 1 guard: identity preservation must not become a redaction bypass."""
+    assert is_structural_identity(secret) is False
+    # The shared redactor really does recognise this shape, so restoring it would
+    # be a genuine regression rather than a no-op.
+    assert redact_export_payload({"probe": secret})["probe"] != secret
     result = build_reasoning_trace_package(
         run_id=secret,
         record_id="1",
         query_id=secret,
         lookup_key=secret,
         diagnostics={"trace_id": secret},
+        include_markdown=True,
+    )
+    blob = result.to_json_text() + result.markdown
+    assert secret not in blob
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    list(PRODUCTION_IDENTIFIER_FORMS.values()),
+    ids=list(PRODUCTION_IDENTIFIER_FORMS),
+)
+def test_identity_restoration_preserves_production_identifier_forms(identifier: str) -> None:
+    """Blocker 1 guard: genuine numeric/history/UUID correlation ids must survive."""
+    assert is_structural_identity(identifier) is True
+    result = build_reasoning_trace_package(
+        run_id=identifier,
+        record_id=identifier,
+        query_id=identifier,
+        lookup_key=identifier,
+        diagnostics={"trace_id": identifier},
         include_markdown=False,
     )
-    assert secret not in result.to_json_text()
+    run = result.package["run"]
+    for key in ("record_id", "query_id", "trace_id", "run_id", "lookup_key"):
+        assert run[key] == identifier
+    ReasoningTraceExportResponse.model_validate(result.package)
 
 
 def test_budget_drop_updates_coverage_atomically() -> None:
@@ -639,6 +702,200 @@ def test_value_clipping_is_recorded_in_the_loss_ledger() -> None:
         drop["path"] == "dashboard.synthesis" and drop["reason"] == "value_clipped"
         for drop in package["truncation"]["dropped"]
     )
+
+
+LONG = "L" * 3_000
+
+# One case per ``_clip_text`` / ``_clip_string_list`` call-site family, so a
+# clip anywhere in the projection is covered — not only the reported examples.
+CLIP_SITE_CASES = {
+    "run": (
+        "run",
+        {"stock_name": LONG},
+    ),
+    "agents.role": (
+        "agents.role",
+        {"diagnostics": {"agent_events": [{"event_type": "agent.phase_end", "attrs": {"agent": LONG}}]}},
+    ),
+    "agents.events": (
+        "agents.events",
+        {"diagnostics": {"agent_events": [{"event_type": "agent.phase_end", "name": LONG, "attrs": {"agent": "a"}}]}},
+    ),
+    "agents.tool_calls": (
+        "agents.tool_calls",
+        {
+            "diagnostics": {
+                "agent_events": [
+                    {
+                        "event_type": "agent.tool_start",
+                        "name": "get_quote",
+                        "step": LONG,
+                        "attrs": {"agent": "a", "tool": "get_quote"},
+                    }
+                ]
+            }
+        },
+    ),
+    "agents.input_summary": (
+        "agents.input_summary",
+        {"diagnostics": {"agent_events": [{"event_type": "agent.phase_end", "attrs": {"agent": "a", "input_summary": LONG}}]}},
+    ),
+    "agents.output_opinion": (
+        "agents.output_opinion",
+        {"diagnostics": {"agent_events": [{"event_type": "agent.decision", "attrs": {"agent": "a", "signal": LONG}}]}},
+    ),
+    "data_sources.provider_trace": (
+        "data_sources.provider_trace",
+        {"diagnostics": {"provider_runs": [{"provider": LONG, "status": "ok"}]}},
+    ),
+    "data_sources.llm_runs": (
+        "data_sources.llm_runs",
+        {"diagnostics": {"llm_runs": [{"provider": "openai", "model": LONG}]}},
+    ),
+    "data_sources.pipeline_stage_runs": (
+        "data_sources.pipeline_stage_runs",
+        {"diagnostics": {"pipeline_stage_runs": [{"stage": LONG, "status": "ok"}]}},
+    ),
+    "context.data_quality": (
+        "context.data_quality",
+        {"context_snapshot": {"analysis_context_pack_overview": {"data_quality": {"status": LONG}}}},
+    ),
+    "dashboard.synthesis": (
+        "dashboard.synthesis",
+        {"raw_result": {"dashboard": {"core_conclusion": {"analysis_summary": LONG * 2}}}},
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "expected_path,kwargs",
+    list(CLIP_SITE_CASES.values()),
+    ids=list(CLIP_SITE_CASES),
+)
+def test_every_clip_site_records_the_loss_and_marks_the_package_truncated(
+    expected_path: str, kwargs: Dict[str, Any]
+) -> None:
+    """Blocker 2: no value may be clipped outside loss accounting, at any call site."""
+    result = build_reasoning_trace_package(
+        run_id="clip-site-run", include_markdown=True, **kwargs
+    )
+    package = result.package
+    body = result.to_json_text()
+    assert CLIP_TRUNCATION_SENTINEL in body
+    assert package["truncated"] is True
+    assert result.truncated is True
+    assert package["truncation"]["marker"] == "truncated"
+    assert any(
+        drop["path"] == expected_path and drop["reason"] == "value_clipped"
+        for drop in package["truncation"]["dropped"]
+    ), package["truncation"]["dropped"]
+    ReasoningTraceExportResponse.model_validate(package)
+
+
+def test_clipped_payload_keeps_coverage_counts_correct() -> None:
+    """Blocker 2: value-level loss must not disturb count/presence invariants."""
+    package = build_reasoning_trace_package(
+        run_id="clip-coverage-run",
+        diagnostics={
+            "provider_runs": [{"provider": LONG, "status": "ok"} for _ in range(3)],
+            "llm_runs": [{"provider": "openai", "model": LONG}],
+            "agent_events": [
+                {"event_type": "agent.phase_end", "name": LONG, "attrs": {"agent": "a"}}
+            ],
+        },
+        include_markdown=False,
+    ).package
+    assert package["truncated"] is True
+    provider = _coverage(package, "diagnostics.provider_runs")
+    assert provider["original_count"] == 3
+    assert provider["returned_count"] == 3 == len(package["data_sources"]["provider_trace"])
+    assert provider["dropped_count"] == 0
+    assert provider["present"] is True
+    events = _coverage(package, "diagnostics.agent_events")
+    assert events["returned_count"] == sum(
+        len(agent["events"]) for agent in package["agents"]
+    )
+    ReasoningTraceExportResponse.model_validate(package)
+
+
+def test_stored_clip_sentinel_still_agrees_with_the_truncated_flag() -> None:
+    """Blocker 2 backstop: a body carrying the sentinel can never report truncated=false."""
+    package = build_reasoning_trace_package(
+        run_id="sentinel-run",
+        diagnostics={
+            "provider_runs": [
+                {"provider": f"legacy{CLIP_TRUNCATION_SENTINEL}", "status": "ok"}
+            ]
+        },
+        include_markdown=False,
+    ).package
+    assert CLIP_TRUNCATION_SENTINEL in json.dumps(package, ensure_ascii=False)
+    assert package["truncated"] is True
+    assert package["truncation"]["marker"] == "truncated"
+    ReasoningTraceExportResponse.model_validate(package)
+
+
+def test_every_clip_call_site_uses_a_registered_ledger_path() -> None:
+    """Blocker 2 by construction: an unledgered clip cannot be added back."""
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(export_module))
+    # Local string constants such as ``base = "dashboard.synthesis"``.
+    literals = {
+        node.targets[0].id: node.value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    }
+    # ``_clip_string_list`` forwards its own already-registered ``path`` argument.
+    forwarding = {
+        node
+        for function in ast.walk(tree)
+        if isinstance(function, ast.FunctionDef) and function.name == "_clip_string_list"
+        for node in ast.walk(function)
+    }
+    call_sites = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in {"_clip_text", "_clip_string_list"}
+        and node not in forwarding
+    ]
+    assert call_sites, "clip helpers must still be used"
+    for node in call_sites:
+        keywords = {kw.arg: kw.value for kw in node.keywords}
+        assert "ledger" in keywords, f"line {node.lineno}: clip without a ledger"
+        path = keywords.get("path")
+        if isinstance(path, ast.Constant):
+            resolved = path.value
+        elif isinstance(path, ast.Name):
+            resolved = literals.get(path.id)
+        else:
+            resolved = None
+        assert resolved in export_module._LEDGER_PATHS, (
+            f"line {node.lineno}: unregistered or non-literal ledger path"
+        )
+
+
+def test_loss_ledger_stays_inside_the_response_truncation_bound() -> None:
+    """Blocker 2 bound: the closed path vocabulary cannot overflow the schema."""
+    from api.v1.schemas.reasoning_trace import ReasoningTraceTruncation
+
+    ledger_reasons = 5  # unsupported/non-finite/clipped/list-cap/unsupported-item
+    non_ledger_initial_drops = 13  # capture, caps, malformed, projection, legacy
+    budget_drops = 11  # every path _apply_size_budget can record
+    worst_case = (
+        len(export_module._LEDGER_PATHS) * ledger_reasons
+        + non_ledger_initial_drops
+        + budget_drops
+    )
+    bound = ReasoningTraceTruncation.model_fields["dropped"].metadata[0].max_length
+    assert worst_case <= bound
 
 
 def test_empty_source_does_not_claim_synthesis_coverage() -> None:

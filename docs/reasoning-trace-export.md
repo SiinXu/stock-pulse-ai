@@ -46,11 +46,18 @@ OpenAPI 同时声明 `application/json` 与 `text/markdown` 的 200 响应，以
 
 `run.record_id` 是实际导出的不可变分析历史主键；`run.lookup_key` 是调用方请求的值；`run.lookup_mode` 报告的是**实际解析方式**，而不是字符串的解析结果：历史查找先尝试整数主键，再回退到按 `query_id` 取最新记录，因此一个并非主键的数字查找键会经回退解析，并被报告为 `latest_by_query_id`。安全审计的 attempt 记录针对请求的查找键，completion 记录针对解析出的不可变记录。
 
-结构化关联标识（`record_id`、`query_id`、`trace_id`、`run_id`、`lookup_key`）按严格的标识字符集校验后在脱敏中予以保留，使导出结果仍可与运行时日志和审计记录关联。该字符集不包含 `.` 与 `/`，因此 JWT 形态值、带凭据的 URL 和文件系统路径永远无法通过校验，仍会被脱敏。证据载荷始终脱敏。
+结构化关联标识（`record_id`、`query_id`、`trace_id`、`run_id`、`lookup_key`）在脱敏中予以保留，使导出结果仍可与运行时日志和审计记录关联。之所以需要恢复，仅因为通用 opaque token 规则无法区分 32 位 UUID 关联标识与 bearer token；恢复受两道互相独立、必须同时成立的校验约束：
+
+1. **正向形态**：值必须匹配运行时实际生成的标识形态之一——整数历史主键、`history:<pk>`、UUID hex、带连字符的 UUID，或形如 `market_review_<uuid hex>`、`daily_brief_<date>_<hex>` 的小写 `<prefix>_<hex>` 生成标识。恢复**不**依据“缺少哪些字符”来判断：宽松字符集会放行 `sk-…`、`sk-ant-…`、`ghp_…`、`github_pat_…`、`xox…`、`AIza…`、`SG.…` 以及 `AKIA…`/`ASIA…` 等共享脱敏器确实能够识别的形态。
+2. **反向形态**：仅关闭通用 opaque token 规则后运行 `redact_sensitive_data`，该值必须保持不变；导出侧的 JWT 与本地路径清理同样必须保持不变。因此凡是共享脱敏器识别为凭据、API key、bearer token、带凭据 URL、JWT 或文件系统路径的值，无论形态如何都保持脱敏；探测失败按“已识别”处理，失败即关闭。
+
+证据载荷始终脱敏，且永不恢复。
 
 ### 损失核算
 
-coverage 在每个返回路径（含体积预算的每一步）都与实际返回的载荷对账，并在响应发出前断言数量与存在性不变量。因预算被丢弃的来源会报告 `present=false`、`returned_count=0` 和完整的 `dropped_count`，不会遗留过时的 `present=true` 或原始 `returned_count`。值级截断、不支持项与畸形项都会记入 `truncation.dropped`，不会静默生效。`present` 由真实投影内容推导，空来源或仅含 null 的来源报告为 absent。
+coverage 在每个返回路径（含体积预算的每一步）都与实际返回的载荷对账，并在响应发出前断言数量与存在性不变量。因预算被丢弃的来源会报告 `present=false`、`returned_count=0` 和完整的 `dropped_count`，不会遗留过时的 `present=true` 或原始 `returned_count`。`present` 由真实投影内容推导，空来源或仅含 null 的来源报告为 absent。
+
+任何值都不得在损失核算之外被截断。有界字符串与字符串列表投影强制要求传入损失账本和已注册的账本路径，因此没有任何调用点——`run` 标识与元数据、Agent 角色、事件摘要、工具调用、输入摘要、结论意见、provider/LLM/pipeline stage 投影、数据质量、synthesis——可以在不写入 `truncation.dropped` 的情况下缩短字符串或丢弃不支持的字符串列表项。账本路径来自封闭词表，因此账本不会超出响应 schema 的上限。只要任一返回值仍带有 `…[truncated]` 标记，`truncated` 即为 `true`、`truncation` 块必定存在，并且由同一标志派生的 `X-Reasoning-Trace-Truncated` 响应头报告 `1`；该一致性在响应发出前断言，因此响应头绝不会对已截断的响应体报告 `0`。
 
 运行时诊断保留最近 200 个 Agent 事件，并在 `agent_events_capture` 标记中持久化原始数、返回数和丢弃数。该标记出现之前写入的记录无法证明是否发生过捕获丢失：没有标记且事件数恰好等于历史上限 200 的记录，会报告 `source_truncated_unknown=true`、`original_count` 与 `dropped_count` 为 null，并附 `legacy_capture_loss_unknown` 原因，而不是宣称零丢失。`source_dropped_count` 表示捕获阶段的保留丢失，`dropped_count` 表示 `original_count` 与实际返回内容之间的总差额。导出器对 Agent 事件、每 Agent 工具调用、provider/LLM/stage 列表分别应用有界投影；任何上限都必须显式反映在 coverage 与 truncation 中。
 
