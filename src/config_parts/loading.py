@@ -156,6 +156,8 @@ class _ConfigLoadingMethods:
         2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
         3. 代码中的默认值
         """
+        from src.config_parts.parsers import parse_risk_gate_profile
+
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
 
@@ -654,6 +656,29 @@ class _ConfigLoadingMethods:
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
                 default=True,
             ),
+            data_validation_enabled=parse_env_bool(
+                os.getenv('DATA_VALIDATION_ENABLED'),
+                default=True,
+            ),
+            data_validation_strict=parse_env_bool(
+                os.getenv('DATA_VALIDATION_STRICT'),
+                default=False,
+            ),
+            data_validation_strict_scopes=(
+                os.getenv('DATA_VALIDATION_STRICT_SCOPES', '*/*').strip()
+                or '*/*'
+            ),
+            data_validation_instrument_overrides=(
+                os.getenv('DATA_VALIDATION_INSTRUMENT_OVERRIDES', '').strip()
+            ),
+            data_validation_upper_layer_mode=(
+                "reject"
+                if os.getenv('DATA_VALIDATION_UPPER_LAYER_MODE', 'warn')
+                .strip()
+                .lower()
+                == "reject"
+                else "warn"
+            ),
             plugin_data_provider_auto_bind_enabled=parse_env_bool(
                 os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
                 default=False,
@@ -832,7 +857,12 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_SKILL_AGENT_TIMEOUT_S'), 0,
                 field_name='AGENT_SKILL_AGENT_TIMEOUT_S', minimum=0,
             ),
-            agent_risk_override=os.getenv('AGENT_RISK_OVERRIDE', 'true').lower() == 'true',
+            agent_risk_override=parse_env_bool(
+                os.getenv('AGENT_RISK_OVERRIDE'), default=True
+            ),
+            risk_gate_profile=parse_risk_gate_profile(
+                os.getenv('RISK_GATE_PROFILE')
+            ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
@@ -954,6 +984,9 @@ class _ConfigLoadingMethods:
             single_stock_notify=os.getenv('SINGLE_STOCK_NOTIFY', 'false').lower() == 'true',
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
+            report_export_pdf_font_path=(
+                os.getenv('REPORT_EXPORT_PDF_FONT_PATH') or ''
+            ).strip() or None,
             report_summary_only=os.getenv('REPORT_SUMMARY_ONLY', 'false').lower() == 'true',
             report_show_llm_model=report_show_llm_model,
             report_templates_dir=os.getenv('REPORT_TEMPLATES_DIR', 'templates'),
@@ -1203,6 +1236,16 @@ class _ConfigLoadingMethods:
             ),
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
+            ),
+            reasoning_trace_export_enabled=parse_env_bool(
+                os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False
+            ),
+            reasoning_trace_export_max_chars=parse_env_int(
+                os.getenv('REASONING_TRACE_EXPORT_MAX_CHARS'),
+                500_000,
+                field_name='REASONING_TRACE_EXPORT_MAX_CHARS',
+                minimum=10_000,
+                maximum=2_000_000,
             ),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False

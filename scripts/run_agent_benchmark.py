@@ -126,6 +126,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json_out is not None:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        # The full report is the durable, joinable consumer output. The
+        # committed baseline remains the intentionally small score-only view.
         args.json_out.write_text(canonical_json(report), encoding="utf-8")
         print(f"[agent-eval-benchmark] wrote json {args.json_out}", file=sys.stderr)
 

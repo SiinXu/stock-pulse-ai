@@ -127,6 +127,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('dashboard', 'home-onboarding-section', 'HomeOnboardingSection', 'components/onboarding/HomeOnboardingSection.tsx', ['default', 'empty']),
   entry('dashboard', 'onboarding-today-plan-card', 'OnboardingTodayPlanCard', 'components/onboarding/OnboardingTodayPlanCard.tsx', ['default']),
   entry('dashboard', 'agent-onboarding-wizard', 'AgentOnboardingWizard', 'components/onboarding/AgentOnboardingWizard.tsx', ['interactive']),
+  entry('dashboard', 'zero-config-first-run-panel', 'ZeroConfigFirstRunPanel', 'components/onboarding/ZeroConfigFirstRunPanel.tsx', ['default', 'empty']),
 
   entry('alerts', 'alert-rule-form', 'AlertRuleForm', 'components/alerts/AlertRuleForm.tsx', ['interactive', 'states']),
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
@@ -229,6 +230,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-view-tabs', 'SettingsViewTabs', 'components/settings/SettingsNavigation.tsx', ['interactive']),
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
+
+  entry('stockSearch', 'kline-chart', 'KlineChart', 'components/charts/KlineChart.tsx', ['default', 'empty', 'states']),
+  entry('stockSearch', 'risk-heatmap', 'RiskHeatmap', 'components/charts/RiskHeatmap.tsx', ['default', 'empty']),
 
   entry('stockSearch', 'mini-sparkline', 'MiniSparkline', 'components/screening/MiniSparkline.tsx'),
   entry('stockSearch', 'screen-alert-message', 'ScreenAlertMessage', 'components/screening/ScreenAlertMessage.tsx'),
