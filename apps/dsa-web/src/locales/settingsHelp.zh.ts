@@ -360,15 +360,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.data_source.RSS_NEWS_FEED_URLS': {
     title: 'RSS/Atom 新闻源',
-    summary: '可选的免费 RSS/Atom 订阅地址，作为按需新闻检索的补充来源。',
-    usage: '填写逗号分隔的 http(s) feed URL；留空则保持关闭。抓取遵循 fail-closed 出站策略。',
+    summary: '可选的免费 RSS 或 Atom 订阅地址，作为按需新闻检索的补充来源。',
+    usage: '填写逗号分隔的 http(s) 订阅地址；留空则保持该能力不生效。拉取过程遵循 fail-closed 出站策略。',
     valueNotes: [
-      '这是对 SearXNG 或付费搜索的补充，不能完全替代。',
-      '私有或回环地址需要在 OUTBOUND_HTTP_ALLOWLIST 中给出精确条目。',
-      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制每个 feed 超时（1-30 秒，默认 8）。',
+      '这是对 SearXNG 或付费搜索的补充，不能完全替代它们。',
+      '私有或回环主机需要在 OUTBOUND_HTTP_ALLOWLIST 中写精确条目。',
+      'RSS_NEWS_FETCH_TIMEOUT_SEC 控制单源超时（1–30 秒，默认 8）。',
     ],
-    impact: ['在已配置 feed 返回内容时，影响按需新闻检索覆盖面。'],
-    notes: ['单个 feed 失败不应中断其余新闻流水线。'],
+    impact: ['配置后会影响按需新闻检索的覆盖范围。'],
+    notes: ['单个订阅源失败不应阻断其余新闻链路。'],
   },
   'settings.data_source.REALTIME_SOURCE_PRIORITY': {
     title: '实时行情源优先级',
@@ -1084,10 +1084,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
     title: '多策略合议',
-    summary: '启用并发多策略专家调度，并输出最终分歧说明。',
+    summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',
     usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持 Phase-1 合成路径不变。',
     valueNotes: [
-      '关闭时保持既有合成行为字节级一致。',
+      '关闭时按字节级兼容保留既有合成行为。',
       '开启后启用多策略合议与最终分歧说明。',
     ],
     impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
@@ -1254,6 +1254,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: '启用离线 OCR Agent 工具',
+    summary: '默认关闭的有界 Tesseract 文字提取。图片字节留在本机，但脱敏后的不可信文字会进入 Agent 上下文并可能发给远端模型；零远端出站需启用 LOCAL_ONLY_MODE。',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR 文件根目录',
+    summary: '单次打开普通图片的文件系统沙箱；拒绝越界路径、特殊文件、超限字节、解码像素与额外帧。',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR 语言',
+    summary: '用 + 连接的 Tesseract 语言码；默认 chi_sim+eng，需安装匹配的系统语言包。',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR 超时秒数',
+    summary: '1–120 秒的硬 wall-clock 上限；超时后终止并回收 OCR worker 及其子进程。',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1287,6 +1303,43 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['不同版本可能使用不同的评估算法或判定规则。'],
     impact: ['影响回测评估算法和结果。'],
     notes: ['除非明确要求切换版本，否则保持默认。'],
+  },
+  // ------------------------------------------------------------------
+  // 技术指标周期（Issue #172）
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: '均线周期',
+    summary: '趋势分析使用的均线周期列表（交易日，默认 5,10,20,60）。',
+    usage: '留空使用历史默认值。可追加 120/250 等长周期用于长线趋势。历史取数窗口会随最长周期自动放宽。',
+    valueNotes: [
+      '每个周期须为正整数，上限 500。',
+      '配置周期按真实 MA 标签写入 ma_by_period 与类型化指标快照。',
+      '可用 K 线不足时该均线返回空并标注数据不足，不会用更短周期静默顶替。',
+    ],
+    impact: ['影响趋势判定、乖离率、支撑判断与报告中的均线数值。'],
+    notes: ['在数据充足时，默认配置与改造前行为一致。'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD 周期',
+    summary: 'MACD 快线/慢线/信号线 EMA 周期（默认 12/26/9）。',
+    usage: 'INDICATOR_MACD_FAST 必须小于 INDICATOR_MACD_SLOW；信号线为 DEA 平滑周期。',
+    valueNotes: [
+      '标准设置为 12/26/9；更短周期更灵敏但噪声更大。',
+      '显式非法值在进程启动与 Settings 保存时都会按同一规则拒绝。',
+    ],
+    impact: ['影响 MACD DIF/DEA/柱体及综合评分中的 MACD 分量。'],
+    notes: ['除非有意更换 MACD 口径，否则保持默认。'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI 周期',
+    summary: 'RSI 周期列表（默认 6,12,24）。',
+    usage: '配置值按真实 RSI 标签输出；第二个值（仅配置一个时为第一个）用于超买超卖主判定。',
+    valueNotes: [
+      '周期须为正整数，上限 250。',
+      'RSI 使用 Wilder/SMMA 平滑，与告警路径 RSI 一致。',
+    ],
+    impact: ['影响 RSI 数值及趋势分析中的超买超卖评分。'],
+    notes: ['兼容字段 rsi_6/rsi_12/rsi_24 始终表示对应的真实历史周期，不按位置改名。'],
   },
   // ------------------------------------------------------------------
   // Report configuration
