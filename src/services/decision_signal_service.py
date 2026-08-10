@@ -38,6 +38,7 @@ from src.schemas.decision_scale import action_for_score, score_action_conflicts_
 from src.schemas.decision_signal_presentation import build_decision_signal_presentation
 from src.services.decision_signal_payload import build_decision_signal_payload_from_report
 from src.services.portfolio_service import VALID_MARKETS
+from src.services.stock_code_utils import resolve_daily_stock_identity
 from src.storage import (
     AnalysisHistory,
     DatabaseManager,
@@ -1151,6 +1152,11 @@ class DecisionSignalService:
             code = canonical_stock_code(raw)
         elif market == "hk":
             code = cls._normalize_hk_stock_code(raw)
+        elif market in {"cn", "jp", "kr", "tw"}:
+            identity = resolve_daily_stock_identity(raw, market_hint=market)
+            if identity is None or identity.market != market:
+                raise ValueError(f"stock_code is invalid for market={market}")
+            code = identity.refill_code or identity.normalized_code
         else:
             code = canonical_stock_code(normalize_stock_code(raw))
         if not code:

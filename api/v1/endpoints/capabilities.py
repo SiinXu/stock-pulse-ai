@@ -15,6 +15,8 @@ from api.v1.schemas.capabilities import (
     CapabilityListResponse,
     DataCapabilityItem,
     ExtensionCapabilityItem,
+    PipelineCapabilityItem,
+    SkillCapabilityItem,
     ToolCapabilityItem,
 )
 from api.v1.schemas.common import ErrorResponse
@@ -42,6 +44,8 @@ def _to_item(record: CapabilityRecord) -> CapabilityItem:
         "data": DataCapabilityItem,
         "tool": ToolCapabilityItem,
         "extension": ExtensionCapabilityItem,
+        "skill": SkillCapabilityItem,
+        "pipeline": PipelineCapabilityItem,
     }[record.domain]
     return item_model(
         id=record.capability_id,
@@ -76,16 +80,19 @@ def _to_item(record: CapabilityRecord) -> CapabilityItem:
     summary="List the runtime capability inventory (read-only)",
     description=(
         "Capture a versioned read-only inventory from the live data-provider, "
-        "tool, and plugin owners. Unknown readiness remains null. Source read "
+        "tool, plugin, skill, and pipeline owners. Availability comes only from "
+        "runtime registration and owner health state, never from a static "
+        "catalog. Unknown readiness remains null. Source or config read "
         "failures are returned explicitly with partial=true; this endpoint does "
-        "not register, resolve, grant, execute, or health-check capabilities."
+        "not register, resolve, grant, execute, or perform side-effecting "
+        "health checks."
     ),
     operation_id="listCapabilities",
 )
 def list_capabilities(
     domain: Optional[List[str]] = Query(
         default=None,
-        description="Optional domain filter. Allowed values: data, tool, extension.",
+        description="Optional domain filter. Allowed values: data, tool, extension, skill, pipeline.",
     ),
 ) -> CapabilityListResponse:
     try:

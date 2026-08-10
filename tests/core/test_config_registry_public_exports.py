@@ -48,11 +48,15 @@ EXPECTED_PRIVATE_EXPORTS = {
     "_UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES",
     "_UI_PLACEMENT_LOCAL_MODELS_KEYS",
     "_UI_PLACEMENT_TASK_ROUTING_KEYS",
+    "_BOOLEAN_KEY_PREFIXES",
+    "_BOOLEAN_KEY_SUFFIXES",
     "_extract_option_values",
     "_infer_category",
     "_infer_data_type",
     "_infer_ui_control",
+    "_is_boolean_named_key",
     "_is_sensitive_key",
+    "_normalize_value_hint_token",
 }
 EXPECTED_MODULE_ANNOTATIONS = {
     "_CATEGORY_DEFINITIONS": "List[Dict[str, Any]]",
@@ -60,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "6a427ee49517717e25c8b4492591cdb4f9af154fcc58813469396f0c12e7b23a"
+    "359d1812cc69cd38e23b78efd0ca9bf0dcb1954f98c4469ee17fbb2b30da6878"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "c15c2bf4f67c891f8f27b7bfe56f9745384f383ffcda15be74d001e5507cb925"
+    "2088639908dbff7ef3428c09837d83f7d4a8bc85bdc31fcafa2bbb5ed188a87e"
 )
 
 
@@ -100,6 +104,7 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
+    # snapshot refresh for data-source registration
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

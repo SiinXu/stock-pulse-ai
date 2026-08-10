@@ -16,6 +16,38 @@ ensure_litellm_stub()
 from data_provider.akshare_fetcher import AkshareFetcher, _akshare_call_with_timeout
 
 
+def test_money_flow_routes_through_cancellable_process_owner(monkeypatch) -> None:
+    captured = {}
+
+    def fake_call(func, *args, timeout=None, call_name="", **kwargs):
+        captured.update(func=func, timeout=timeout, call_name=call_name, kwargs=kwargs)
+        return pd.DataFrame(
+            {
+                "日期": ["2026-08-08"],
+                "收盘价": [10.0],
+                "涨跌幅": [1.0],
+                "主力净流入-净占比": [2.0],
+            }
+        )
+
+    api_method = object()
+    monkeypatch.setitem(
+        sys.modules,
+        "akshare",
+        SimpleNamespace(stock_individual_fund_flow=api_method),
+    )
+    monkeypatch.setattr("data_provider.akshare_fetcher._akshare_call_with_timeout", fake_call)
+    fetcher = AkshareFetcher(sleep_min=0, sleep_max=0)
+
+    snapshot = fetcher.get_money_flow("600519", days=1)
+
+    assert snapshot is not None
+    assert captured["func"] is api_method
+    assert captured["timeout"] == 12.0
+    assert captured["call_name"] == "akshare_money_flow"
+    assert captured["kwargs"] == {"stock": "600519", "market": "sh"}
+
+
 def _sleep_for(seconds: float) -> None:
     time.sleep(seconds)
 

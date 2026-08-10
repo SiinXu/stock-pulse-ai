@@ -900,8 +900,8 @@ from src.services.stock_list_parser import (
 
 def test_normalize_stock_codes_matches_agent_and_analysis_identities() -> None:
     assert normalize_stock_codes(
-        ["SH.600519", "HK.00700", "AAPL.US", "aapl", "invalid symbol"]
-    ) == ["600519", "HK00700", "AAPL"]
+        ["SH.600519", "0941", "HK.00700", "AAPL.US", "aapl", "invalid symbol"]
+    ) == ["600519", "HK00941", "HK00700", "AAPL"]
 
 
 def test_normalize_stock_codes_can_reject_invalid_broker_values() -> None:
