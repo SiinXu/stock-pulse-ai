@@ -82,6 +82,25 @@ class HistoryListResponse(BaseModel):
     })
 
 
+class HistorySearchItem(BaseModel):
+    """Low-sensitive report projection returned by command-palette search."""
+
+    id: int = Field(..., description="Analysis history record primary key")
+    stock_code: str = Field(..., description="Persisted stock code")
+    stock_name: Optional[str] = Field(None, description="Persisted stock name")
+    report_type: Optional[str] = Field(None, description="Persisted report type")
+    summary: Optional[str] = Field(None, max_length=240, description="Truncated conclusion excerpt")
+    created_at: Optional[str] = Field(None, description="Report creation timestamp")
+
+
+class HistorySearchResponse(BaseModel):
+    """Bounded full-text search results for analysis history summaries."""
+
+    query: str = Field(..., description="Normalized literal search query")
+    limit: int = Field(..., ge=1, le=10, description="Maximum returned result count")
+    items: List[HistorySearchItem] = Field(default_factory=list, description="Ranked matching history summaries")
+
+
 class DeleteHistoryRequest(BaseModel):
     """删除历史记录请求"""
 

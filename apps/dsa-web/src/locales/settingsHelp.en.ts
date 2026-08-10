@@ -1106,16 +1106,27 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
-    usage: 'When enabled, the risk agent in full/specialist mode can downgrade buy recommendations to hold or sell. That conservative override still applies automatically unless Human approvals captures the path.',
+    usage: 'Controls whether the legacy risk plan directly applies a downgrade. The mandatory Risk Manager still decides the final action under RISK_GATE_PROFILE.',
     valueNotes: [
-      'Only effective when AGENT_ORCHESTRATOR_MODE includes the risk stage.',
+      'Controls only the legacy override and cannot skip final-action evaluation.',
       'HITL risk-control bypass is off by default on /approvals; enable it there for a one-shot, time-limited chance to preserve the original signal.',
     ],
     impact: ['Affects the risk conservatism of final investment recommendations.'],
     notes: [
-      'When disabled, the risk agent opinion is advisory only and cannot override decisions.',
+      'When disabled, the legacy override does not apply directly, but explicit risk evidence can still cause the final action to be downgraded or rejected.',
       'Open Human approvals (/approvals) to configure the default-off HITL gate. This is not broker or trade-order approval and does not expand Agent tool authority.',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: 'Risk Manager Profile',
+    summary: 'Selects the mandatory final-action thresholds before a recommendation is published.',
+    usage: 'Balanced is the default; conservative intervenes sooner, while aggressive requires explicit blocking evidence.',
+    valueNotes: [
+      'Supported values are conservative, balanced, and aggressive; invalid values stop startup.',
+      'The gate cannot be disabled, and internal failures fail closed.',
+    ],
+    impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
+    notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
@@ -1273,6 +1284,43 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Different versions may use different evaluation algorithms or judgment rules.'],
     impact: ['Affects the evaluation algorithm and results.'],
     notes: ['Keep the default unless instructed to switch versions.'],
+  },
+  // ------------------------------------------------------------------
+  // Technical indicator periods (Issue #172)
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: 'Moving Average Periods',
+    summary: 'Comma-separated MA periods in trading days used by trend analysis (default 5,10,20,60).',
+    usage: 'Leave empty for historical defaults. Add longer horizons such as 120 or 250 for long-term trend context. The analysis history window expands automatically to cover the longest configured period.',
+    valueNotes: [
+      'Each value must be a positive integer up to 500.',
+      'Configured periods appear under their exact MA labels in ma_by_period and the typed indicator snapshot.',
+      'When bars are fewer than a period, that MA is omitted and annotated as insufficient data (no silent shorter-period substitute).',
+    ],
+    impact: ['Affects trend classification, bias ratios, support checks, and report MA values.'],
+    notes: ['Defaults preserve pre-configuration MA behavior when enough history is available.'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD Periods',
+    summary: 'MACD fast, slow, and signal EMA periods (default 12/26/9).',
+    usage: 'INDICATOR_MACD_FAST must be less than INDICATOR_MACD_SLOW. Signal is the DEA smoothing period.',
+    valueNotes: [
+      'Standard settings are 12/26/9; shorter pairs react faster but are noisier.',
+      'Explicit invalid values are rejected consistently at process start and by Settings validation.',
+    ],
+    impact: ['Affects MACD DIF/DEA/histogram and derived buy/sell scoring.'],
+    notes: ['Keep defaults unless you intentionally change the MACD convention.'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI Periods',
+    summary: 'Comma-separated RSI periods (default 6,12,24).',
+    usage: 'Configured values are exposed under their exact RSI labels. The second value (or first when only one is configured) drives RSI status thresholds.',
+    valueNotes: [
+      'Periods must be positive integers up to 250.',
+      'RSI uses Wilder/SMMA smoothing, consistent with alert-path RSI.',
+    ],
+    impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
+    notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
   },
   // ------------------------------------------------------------------
   // Report configuration

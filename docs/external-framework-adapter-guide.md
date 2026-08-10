@@ -151,21 +151,38 @@ Daily-data adapters must return a `pandas.DataFrame` with at least:
 | `amount` | Numeric; derive conservatively if upstream omits it |
 | `pct_chg` | Percent change; compute from `close` if omitted |
 
-Do not invent success from incomplete rows: drop unusable rows, and if nothing
-remains, **raise** so the manager can fall back.
+Do not invent success from incomplete rows. Define the row policy explicitly;
+the OpenBB demonstration rejects the whole attempt when any required date or
+OHLCV value is missing, non-numeric, non-finite, negative where forbidden, or
+violates `low <= open/close <= high`. It sorts timestamps ascending, keeps the
+latest observation for each UTC date, and only then derives `amount` and
+`pct_chg`.
+
+The demonstration maps StockPulse symbols before the hard-coded yfinance call:
+
+| StockPulse form | yfinance form |
+| --- | --- |
+| `AAPL` | `AAPL` |
+| `600519`, `600519.SH`, `SH600519` | `600519.SS` |
+| `000001`, `000001.SZ`, `SZ000001` | `000001.SZ` |
+| `HK00700`, `00700.HK`, `0700` | `0700.HK` |
+| BSE forms such as `920748` / `920748.BJ` | Unsupported; raise before I/O and let the manager fall back |
 
 ## Failure, timeout, and degradation
 
 | Situation | Required behavior |
 | --- | --- |
 | External package not installed | Raise a clear error naming the package and that StockPulse will not auto-install it |
-| Transport / SDK timeout | Raise from this attempt after configuring a finite client timeout |
+| Transport / SDK timeout | Enforce a finite deadline over the actual blocking call, terminate/reap timed-out work, then raise |
 | Empty or malformed upstream payload | Raise; do not return an empty “success” frame unless the capability explicitly allows empty data **and** the host contract documents that |
 | Partial multi-symbol batch failure | Fail the current attempt or return only validated rows per the host contract — never silent zeros for missing symbols |
 | Cross-provider fallback | **Forbidden inside the plugin**. One attempt; `DataFetcherManager` owns the chain |
 
 The host does **not** impose a universal deadline around every provider call.
-Finite connect/read (or SDK) timeouts are the adapter author's responsibility.
+The OpenBB demonstration supports `openbb>=4.7,<4.8` and performs exactly one
+`equity.price.historical(..., provider="yfinance")` call in an isolated process
+group. Deadline expiry terminates and reaps that group; arbitrary SDK
+`TypeError` is propagated and never triggers a second request.
 
 ## Dependency declaration and manual install
 
@@ -176,7 +193,7 @@ Finite connect/read (or SDK) timeouts are the adapter author's responsibility.
 3. Operators install into the **same** environment that runs StockPulse:
 
    ```bash
-   pip install 'openbb>=4'   # example only — pin to your reviewed version
+   pip install 'openbb>=4.7,<4.8'
    export PLUGINS_DIR=/opt/stockpulse/plugins
    ```
 
@@ -185,7 +202,7 @@ Finite connect/read (or SDK) timeouts are the adapter author's responsibility.
 
 ## Trust responsibility statement
 
-> **External adapter plugins run with full process privileges.**  
+> **External adapter plugins run with full process privileges.**
 > Setting `PLUGINS_DIR` is an explicit operator decision to load reviewed Python
 > that can read process memory, environment values, local files, and network
 > routes available to the StockPulse OS user. There is no plugin sandbox,
@@ -248,8 +265,8 @@ tree are reviewed.
 
 | Layer | Expectation |
 | --- | --- |
-| Unit / contract | Fixture client; assert column contract, missing-dependency error text, empty-upstream raise, register/load/disable |
-| Network | Optional, marked `@pytest.mark.network`; never required for `ci_gate` |
+| Unit / contract | OpenBB 4.7-shaped OBBject/provider fakes; assert one-call semantics, symbol mapping, process timeout cleanup, strict OHLCV/date validation, duplicate policy, manager fallback attribution, and lifecycle |
+| Network | Optional, marked `@pytest.mark.network`; never required for `ci_gate`. The demonstration's offline gate does not claim a live OpenBB smoke |
 | Core mechanisms | Do **not** patch `src/plugins` loader/manager/registry to “make the demo work” — if the host contract is insufficient, that is a separate ADR task |
 
 ## V1 surface declaration

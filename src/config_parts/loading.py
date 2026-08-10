@@ -101,6 +101,29 @@ def emit_legacy_schedule_deprecation_if_needed(
     )
 
 
+def _load_indicator_period_fields() -> Dict[str, Any]:
+    """Load the same strict contract used by Settings and runtime reload."""
+    from src.utils.indicator_periods import validate_indicator_env_map
+
+    resolved = validate_indicator_env_map(
+        {
+            "INDICATOR_MA_PERIODS": os.getenv("INDICATOR_MA_PERIODS"),
+            "INDICATOR_MACD_FAST": os.getenv("INDICATOR_MACD_FAST"),
+            "INDICATOR_MACD_SLOW": os.getenv("INDICATOR_MACD_SLOW"),
+            "INDICATOR_MACD_SIGNAL": os.getenv("INDICATOR_MACD_SIGNAL"),
+            "INDICATOR_RSI_PERIODS": os.getenv("INDICATOR_RSI_PERIODS"),
+        }
+    )
+    return {
+        "indicator_ma_periods": list(resolved.ma_periods),
+        "indicator_macd_fast": resolved.macd_fast,
+        "indicator_macd_slow": resolved.macd_slow,
+        "indicator_macd_signal": resolved.macd_signal,
+        "indicator_rsi_periods": list(resolved.rsi_periods),
+        "indicator_period_source": resolved.source,
+    }
+
+
 def setup_env() -> None:
     from src import config as config_module
 
@@ -133,6 +156,8 @@ class _ConfigLoadingMethods:
         2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
         3. 代码中的默认值
         """
+        from src.config_parts.parsers import parse_risk_gate_profile
+
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
 
@@ -604,6 +629,11 @@ class _ConfigLoadingMethods:
         if report_show_llm_model_raw is not None and not report_show_llm_model_raw.strip():
             report_show_llm_model = False
 
+        # Import inside method body: _load_from_env is cloned into src.config globals.
+        from src.config_parts.loading import _load_indicator_period_fields
+
+        _indicator_period_fields = _load_indicator_period_fields()
+
         return cls(
             stock_list=stock_list,
             feishu_app_id=os.getenv('FEISHU_APP_ID'),
@@ -625,6 +655,33 @@ class _ConfigLoadingMethods:
             stock_index_remote_update_enabled=parse_env_bool(
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
                 default=True,
+            ),
+            data_validation_enabled=parse_env_bool(
+                os.getenv('DATA_VALIDATION_ENABLED'),
+                default=True,
+            ),
+            data_validation_strict=parse_env_bool(
+                os.getenv('DATA_VALIDATION_STRICT'),
+                default=False,
+            ),
+            data_validation_strict_scopes=(
+                os.getenv('DATA_VALIDATION_STRICT_SCOPES', '*/*').strip()
+                or '*/*'
+            ),
+            data_validation_instrument_overrides=(
+                os.getenv('DATA_VALIDATION_INSTRUMENT_OVERRIDES', '').strip()
+            ),
+            data_validation_upper_layer_mode=(
+                "reject"
+                if os.getenv('DATA_VALIDATION_UPPER_LAYER_MODE', 'warn')
+                .strip()
+                .lower()
+                == "reject"
+                else "warn"
+            ),
+            plugin_data_provider_auto_bind_enabled=parse_env_bool(
+                os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
+                default=False,
             ),
             generation_backend=generation_backend,
             generation_fallback_backend=generation_fallback_backend,
@@ -734,6 +791,7 @@ class _ConfigLoadingMethods:
             ),
             newsnow_base_url=((os.getenv('NEWSNOW_BASE_URL') or '').strip().rstrip('/') or 'https://newsnow.busiyi.world'),
             bias_threshold=parse_env_float(os.getenv('BIAS_THRESHOLD'), 5.0, field_name='BIAS_THRESHOLD', minimum=1.0),
+            **_indicator_period_fields,
             agent_generation_backend=agent_generation_backend,
             agent_litellm_model=agent_litellm_model,
             agent_mode=os.getenv('AGENT_MODE', 'false').lower() == 'true',
@@ -799,7 +857,12 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_SKILL_AGENT_TIMEOUT_S'), 0,
                 field_name='AGENT_SKILL_AGENT_TIMEOUT_S', minimum=0,
             ),
-            agent_risk_override=os.getenv('AGENT_RISK_OVERRIDE', 'true').lower() == 'true',
+            agent_risk_override=parse_env_bool(
+                os.getenv('AGENT_RISK_OVERRIDE'), default=True
+            ),
+            risk_gate_profile=parse_risk_gate_profile(
+                os.getenv('RISK_GATE_PROFILE')
+            ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
