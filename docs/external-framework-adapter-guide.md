@@ -202,7 +202,7 @@ group. Deadline expiry terminates and reaps that group; arbitrary SDK
 
 ## Trust responsibility statement
 
-> **External adapter plugins run with full process privileges.**  
+> **External adapter plugins run with full process privileges.**
 > Setting `PLUGINS_DIR` is an explicit operator decision to load reviewed Python
 > that can read process memory, environment values, local files, and network
 > routes available to the StockPulse OS user. There is no plugin sandbox,

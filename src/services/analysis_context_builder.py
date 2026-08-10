@@ -88,7 +88,11 @@ class AnalysisContextBuilder:
 
         blocks["quote"] = _build_quote_block(artifacts)
         blocks["daily_bars"] = _build_daily_bars_block(artifacts)
-        technical_block, technical_warnings = _build_technical_block(artifacts)
+        evidence = _validation_evidence_from_metadata(metadata)
+        technical_block, technical_warnings = _build_technical_block(
+            artifacts,
+            evidence,
+        )
         blocks["technical"] = technical_block
         data_quality_warnings.extend(technical_warnings)
         blocks["chip"] = _build_chip_block(artifacts)
@@ -97,7 +101,15 @@ class AnalysisContextBuilder:
         portfolio_block = _build_portfolio_block(artifacts)
         if portfolio_block is not None:
             blocks["portfolio"] = portfolio_block
-        data_quality = _build_data_quality(blocks, warnings=data_quality_warnings)
+        evidence_codes = _validation_evidence_codes(evidence)
+        data_quality_warnings.extend(
+            code for code in evidence_codes if code not in data_quality_warnings
+        )
+        data_quality = _build_data_quality(
+            blocks,
+            warnings=data_quality_warnings,
+            validation_evidence=evidence,
+        )
 
         return AnalysisContextPack(
             subject=AnalysisSubject(
@@ -242,6 +254,7 @@ def _build_daily_bars_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisCon
 
 def _build_technical_block(
     artifacts: PipelineAnalysisArtifacts,
+    evidence: Sequence[Mapping[str, Any]],
 ) -> tuple[AnalysisContextBlock, List[str]]:
     trend = _to_dict(artifacts.trend_result)
     if not trend:
@@ -258,6 +271,18 @@ def _build_technical_block(
             [],
         )
 
+    validation_evidence = _technical_validation_evidence(evidence)
+    rejected_fields = _validation_rejected_fields(validation_evidence)
+    validation_codes = _validation_evidence_codes(
+        [validation_evidence] if validation_evidence is not None else []
+    )
+    trend = {
+        key: value
+        for key, value in trend.items()
+        if key not in rejected_fields
+    }
+    has_validation_reject = bool(rejected_fields)
+
     explicit_intraday_overlay = _has_explicit_intraday_overlay(
         artifacts.enhanced_context
     )
@@ -265,16 +290,24 @@ def _build_technical_block(
         artifacts.enhanced_context
     )
     warnings = [_REALTIME_OVERLAY_WARNING] if has_realtime_overlay else []
+    warnings.extend(code for code in validation_codes if code not in warnings)
     block_status = (
         ContextFieldStatus.PARTIAL
-        if has_realtime_overlay
+        if has_realtime_overlay or has_validation_reject
         else ContextFieldStatus.AVAILABLE
     )
     items: Dict[str, AnalysisContextItem] = {
         "trend_result": AnalysisContextItem(
-            status=ContextFieldStatus.AVAILABLE,
+            status=(
+                ContextFieldStatus.PARTIAL
+                if has_validation_reject
+                else ContextFieldStatus.AVAILABLE
+            ),
             value=trend,
             warnings=list(warnings),
+            metadata={"validation_evidence": validation_evidence}
+            if validation_evidence is not None
+            else {},
         )
     }
     if has_realtime_overlay:
@@ -505,6 +538,7 @@ def _build_data_quality(
     blocks: Dict[str, AnalysisContextBlock],
     *,
     warnings: List[str],
+    validation_evidence: Optional[List[Dict[str, Any]]] = None,
 ) -> DataQuality:
     block_scores: Dict[str, int] = {}
     weighted_sum = 0
@@ -521,7 +555,68 @@ def _build_data_quality(
         block_scores=block_scores,
         limitations=_quality_limitations(blocks),
         warnings=warnings,
+        metadata={
+            "validation_evidence_schema": "data_quality_evidence.v1",
+            "validation_evidence": list(validation_evidence or [])[:24],
+        },
     )
+
+
+def _validation_evidence_from_metadata(
+    metadata: Mapping[str, Any],
+) -> List[Dict[str, Any]]:
+    raw = metadata.get("data_quality_evidence")
+    if not isinstance(raw, list):
+        return []
+    evidence: List[Dict[str, Any]] = []
+    for item in raw[-24:]:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("schema_version") != "data_quality_evidence.v1":
+            continue
+        evidence.append(dict(item))
+    return evidence
+
+
+def _validation_evidence_codes(evidence: Sequence[Mapping[str, Any]]) -> List[str]:
+    codes: List[str] = []
+    for item in evidence:
+        issues = item.get("issues")
+        if not isinstance(issues, list):
+            continue
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            code = str(issue.get("code") or "").strip()
+            if code and code not in codes:
+                codes.append(code)
+    return codes[:24]
+
+
+def _technical_validation_evidence(
+    evidence: Sequence[Mapping[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    for item in reversed(evidence):
+        if item.get("data_type") == "technical_indicators":
+            return dict(item)
+    return None
+
+
+def _validation_rejected_fields(
+    evidence: Optional[Mapping[str, Any]],
+) -> set[str]:
+    if not isinstance(evidence, Mapping):
+        return set()
+    issues = evidence.get("issues")
+    if not isinstance(issues, list):
+        return set()
+    return {
+        str(issue.get("field"))
+        for issue in issues
+        if isinstance(issue, Mapping)
+        and issue.get("severity") == "reject"
+        and issue.get("field")
+    }
 
 
 def _quality_block_status(
