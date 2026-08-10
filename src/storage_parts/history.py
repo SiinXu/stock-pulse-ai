@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Analysis history, daily-data, and context helper methods."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 import logging
@@ -224,6 +224,65 @@ class _HistoryMethods:
             ).scalars().all()
 
             return list(results)
+
+    def get_analysis_history_batch(
+        self,
+        *,
+        codes: Sequence[str],
+        created_at_from: datetime,
+        limit_per_code: int = 2,
+    ) -> List[AnalysisHistory]:
+        """Return a stable bounded latest window for every stored code."""
+        normalized_codes = sorted({str(code or "").strip() for code in codes if str(code or "").strip()})
+        if not normalized_codes:
+            return []
+        safe_limit = max(1, int(limit_per_code))
+        since = created_at_from
+        if since.tzinfo is not None and since.utcoffset() is not None:
+            since = since.astimezone(timezone.utc).replace(tzinfo=None)
+
+        records_by_id: Dict[int, AnalysisHistory] = {}
+        with self.get_session() as session:
+            for start in range(0, len(normalized_codes), 200):
+                code_chunk = normalized_codes[start:start + 200]
+                ranked = (
+                    select(
+                        AnalysisHistory.id.label("history_id"),
+                        func.row_number().over(
+                            partition_by=AnalysisHistory.code,
+                            order_by=(
+                                desc(AnalysisHistory.created_at),
+                                desc(AnalysisHistory.id),
+                            ),
+                        ).label("code_rank"),
+                    )
+                    .where(
+                        AnalysisHistory.code.in_(code_chunk),
+                        AnalysisHistory.created_at >= since,
+                    )
+                    .subquery()
+                )
+                rows = session.execute(
+                    select(AnalysisHistory)
+                    .join(ranked, AnalysisHistory.id == ranked.c.history_id)
+                    .where(ranked.c.code_rank <= safe_limit)
+                    .order_by(
+                        AnalysisHistory.code.asc(),
+                        desc(AnalysisHistory.created_at),
+                        desc(AnalysisHistory.id),
+                    )
+                ).scalars().all()
+                for row in rows:
+                    records_by_id[int(row.id)] = row
+        return sorted(
+            records_by_id.values(),
+            key=lambda row: (
+                str(row.code or ""),
+                row.created_at or datetime.min,
+                int(row.id or 0),
+            ),
+            reverse=True,
+        )
 
     def get_latest_analysis_history_id(
         self,
