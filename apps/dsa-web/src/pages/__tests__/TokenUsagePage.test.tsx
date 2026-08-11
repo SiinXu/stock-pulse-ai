@@ -79,12 +79,22 @@ function makeDashboardResponse(overrides: Partial<typeof dashboardResponse> = {}
 
 function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="location-probe">{location.pathname}</div>;
+  return (
+    <div data-testid="location-probe">
+      {`${location.pathname}${location.search}`}
+    </div>
+  );
 }
 
-function renderPage({ embedded = false }: { embedded?: boolean } = {}) {
+function renderPage({
+  embedded = false,
+  initialEntry = APP_ROUTE_PATHS.settings,
+}: {
+  embedded?: boolean;
+  initialEntry?: string;
+} = {}) {
   return render(
-    <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <UiLanguageProvider>
         <TokenUsagePage embedded={embedded} />
         <LocationProbe />
@@ -362,5 +372,77 @@ describe('TokenUsagePage', () => {
         params: { period: 'today', limit: 50 },
       });
     });
+  });
+
+  it('writes the selected period into the URL and restores it on remount (refresh/share)', async () => {
+    const todayResponse = makeDashboardResponse({
+      period: 'today',
+      total_tokens: 900,
+      total_calls: 9,
+    });
+    get.mockImplementation((_url, config) => {
+      const period = config?.params?.period;
+      if (period === 'today') {
+        return Promise.resolve({ data: todayResponse });
+      }
+      return Promise.resolve({ data: dashboardResponse });
+    });
+
+    const { unmount } = renderPage({
+      embedded: true,
+      initialEntry: `${APP_ROUTE_PATHS.settings}?section=usage`,
+    });
+
+    await screen.findByRole('heading', { level: 2, name: 'Token 用量监控' });
+    fireEvent.click(screen.getByRole('radio', { name: '今日' }));
+
+    await waitFor(() => {
+      expect(get).toHaveBeenLastCalledWith('/api/v1/usage/dashboard', {
+        params: { period: 'today', limit: 50 },
+      });
+    });
+    expect(await screen.findByText('900')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('location-probe').textContent).toContain('period=today');
+    });
+    expect(screen.getByTestId('location-probe').textContent).toContain('section=usage');
+
+    unmount();
+    renderPage({
+      embedded: true,
+      initialEntry: `${APP_ROUTE_PATHS.settings}?section=usage&period=today`,
+    });
+
+    expect(await screen.findByText('900')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '今日' })).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => {
+      expect(get).toHaveBeenCalledWith('/api/v1/usage/dashboard', {
+        params: { period: 'today', limit: 50 },
+      });
+    });
+  });
+
+  it('restores a non-default period from the initial URL without dropping foreign keys', async () => {
+    const allResponse = makeDashboardResponse({
+      period: 'all',
+      total_tokens: 1200,
+      total_calls: 12,
+    });
+    get.mockResolvedValue({ data: allResponse });
+
+    renderPage({
+      embedded: true,
+      initialEntry: `${APP_ROUTE_PATHS.settings}?section=usage&period=all&keep=yes`,
+    });
+
+    expect(await screen.findByText('1,200')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '全部' })).toHaveAttribute('aria-checked', 'true');
+    expect(get).toHaveBeenCalledWith('/api/v1/usage/dashboard', {
+      params: { period: 'all', limit: 50 },
+    });
+    const locationText = screen.getByTestId('location-probe').textContent ?? '';
+    expect(locationText).toContain('period=all');
+    expect(locationText).toContain('keep=yes');
+    expect(locationText).toContain('section=usage');
   });
 });
