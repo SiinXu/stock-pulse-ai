@@ -15,6 +15,10 @@ const REPORT_A_SUMMARY = 'Contract report A';
 const REPORT_B_SUMMARY = 'Contract report B';
 const REPORT_C_SUMMARY = 'Contract report C';
 
+function reportSummaryText(page: Page, text: string) {
+  return page.getByText(text, { exact: true }).and(page.getByRole('paragraph'));
+}
+
 const HISTORY_ITEMS = [
   {
     id: 1,
@@ -695,7 +699,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
   test('390px history trend keeps the fixed table inside its own scroll region', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=1`);
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await page.getByRole('button', { name: 'History trend' }).click();
 
     const table = page.getByRole('table', { name: 'Historical analysis records' });
@@ -720,28 +724,28 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       page,
       `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=2`,
     );
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
 
     await page.reload();
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expect.poll(() => fixture.detailRequests.filter((recordId) => recordId === 2).length).toBeGreaterThanOrEqual(2);
 
     await historyButton(page, 'Moutai', '600519').click();
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
 
     const backDetailRequestIndex = fixture.detailRequests.length;
     await page.goBack();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
     await expect.poll(() => fixture.detailRequests.slice(backDetailRequestIndex)).toEqual([2]);
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
 
     const forwardDetailRequestIndex = fixture.detailRequests.length;
     await page.goForward();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
     await expect.poll(() => fixture.detailRequests.slice(forwardDetailRequestIndex)).toEqual([1]);
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
   });
 
   test('legacy stock and workspace context normalizes into the Workbench after refresh', async ({ page }) => {
@@ -755,10 +759,10 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       workspace: null,
       keep: 'yes',
     });
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { segment: 'history', recordId: '1', stock: 'HK00700' });
   });
 
@@ -767,7 +771,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       page,
       `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=1&stock=00700.HK`,
     );
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await expect.poll(() => page.evaluate(() => (
       window.sessionStorage.getItem('dsa.web.sessionContinuity.v1') ?? ''
     ))).toContain('HK00700');
@@ -828,7 +832,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     );
     await expect.poll(() => fixture.detailRequests.includes(1)).toBe(true);
     await historyButton(page, 'Apple', 'AAPL').click();
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { recordId: '2' });
 
     const staleResponse = page.waitForResponse((response) => (
@@ -837,7 +841,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     fixture.releaseFirstRecord();
     await staleResponse;
 
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toHaveCount(0);
     await expectSearchParams(page, { recordId: '2' });
   });
@@ -848,7 +852,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=1`,
       { deferCompletedTask: true },
     );
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     const historyLength = await page.evaluate(() => window.history.length);
     const completionRequestIndex = fixture.detailRequests.length;
 
@@ -857,7 +861,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expect(page.getByText('Analysis completed', { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', segment: 'history', recordId: '1' });
     await page.getByRole('button', { name: 'View report' }).click();
-    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_C_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', segment: 'history', recordId: '3' });
     expect(fixture.detailRequests.slice(completionRequestIndex)).toEqual([3]);
     expect(await page.evaluate(() => window.history.length)).toBe(historyLength + 1);
@@ -879,7 +883,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
 
     fixture.releaseFirstRecord();
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
     await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
   });
@@ -889,7 +893,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       page,
       `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=1`,
     );
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     const historyLength = await page.evaluate(() => window.history.length);
     const deleteRequestIndex = fixture.detailRequests.length;
 
@@ -899,7 +903,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       .getByRole('button', { name: 'Delete', exact: true })
       .click();
 
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
     expect(fixture.detailRequests.slice(deleteRequestIndex)).toEqual([2]);
     expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
@@ -912,7 +916,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       { marketReviewOnlyFirstHistoryPage: true },
     );
 
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     expect(fixture.historyRequests.some((search) => new URLSearchParams(search).get('page') === '1')).toBe(true);
     expect(fixture.historyRequests.some((search) => new URLSearchParams(search).get('page') === '2')).toBe(true);
     await expect(page.getByText('No analysis history', { exact: true })).toHaveCount(0);
@@ -1005,7 +1009,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       runFlowTaskId: null,
       runFlowRecordId: null,
     });
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
 
   });
 
@@ -1034,7 +1038,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
   test('320px history Run Flow Modal traps focus and restores its trigger on close', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await page.getByTestId('run-diagnostics').locator('summary').first().click();
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
@@ -1065,7 +1069,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
   test('390px history Run Flow Modal closes with Escape and restores its trigger', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
-    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await page.getByTestId('run-diagnostics').locator('summary').first().click();
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
@@ -1109,14 +1113,14 @@ test.describe('Analysis Workbench interaction contract', () => {
       [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
       [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId]: '1',
     });
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await expect.poll(() => fixture.detailRequests).toContain(1);
 
     await page.getByRole('button', { name: 'History trend' }).click();
     await expect(page.getByRole('heading', { name: 'History trend' })).toBeVisible();
     await expect(page.getByRole('table', { name: 'Historical analysis records' })).toBeVisible();
     await page.getByRole('button', { name: 'Back to current report' }).click();
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
 
     await page.getByTestId('run-diagnostics').locator('summary').first().click();
     await page.getByRole('button', { name: 'View run flow for history record 1' }).click();

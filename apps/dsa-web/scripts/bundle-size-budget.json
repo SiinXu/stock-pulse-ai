@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #1033 MCP registry inventory + post-#1036 data-source help + #1031 model-access hub + #1022 report export chrome, followed by PR #953's genuine notification-inbox translations and Playground scenario. Changed rules use exact Linux CI gzip measurements plus 200 B headroom.",
+  "baselineNote": "PR #841 adds 67 translated portfolio-risk keys without expanding the i18n baseline; PR #953 adds genuine notification-inbox translations and a Playground scenario. Changed locale and Playground rules use production gzip measurements plus 200 B headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 141364,
-      "measuredGzipBytes": 141164,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 141164 B + 200 B headroom."
+      "maxGzipBytes": 142581,
+      "measuredGzipBytes": 142381,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 142381 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 135509,
-      "measuredGzipBytes": 135309,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 135309 B + 200 B headroom."
+      "maxGzipBytes": 136459,
+      "measuredGzipBytes": 136259,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 136259 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 135440,
-      "measuredGzipBytes": 135240,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 135240 B + 200 B headroom."
+      "maxGzipBytes": 136570,
+      "measuredGzipBytes": 136370,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 136370 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 135873,
-      "measuredGzipBytes": 135673,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 135673 B + 200 B headroom."
+      "maxGzipBytes": 137007,
+      "measuredGzipBytes": 136807,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 136807 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 131785,
-      "measuredGzipBytes": 131585,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 131585 B + 200 B headroom."
+      "maxGzipBytes": 132934,
+      "measuredGzipBytes": 132734,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 132734 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 128507,
-      "measuredGzipBytes": 128307,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 128307 B + 200 B headroom."
+      "maxGzipBytes": 129634,
+      "measuredGzipBytes": 129434,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 129434 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 122247,
-      "measuredGzipBytes": 122047,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 122047 B + 200 B headroom."
+      "maxGzipBytes": 123346,
+      "measuredGzipBytes": 123146,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 123146 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 122390,
-      "measuredGzipBytes": 122190,
-      "note": "Linux CI measurement after PR #953's genuine notification-inbox translations; measured 122190 B + 200 B headroom."
+      "maxGzipBytes": 123497,
+      "measuredGzipBytes": 123297,
+      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 123297 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -149,10 +149,18 @@
       "measuredGzipBytes": 42365
     },
     {
+      "id": "PortfolioRiskMetricsPanel",
+      "match": "assets/PortfolioRiskMetricsPanel-*.js",
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 9685,
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
+    },
+    {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 25543,
-      "measuredGzipBytes": 23220
+      "measuredGzipBytes": 24263,
+      "note": "PR #841 code-splits the risk panel; the route remains below the unchanged 25543 B cap."
     },
     {
       "id": "DecisionSignalsPage",
