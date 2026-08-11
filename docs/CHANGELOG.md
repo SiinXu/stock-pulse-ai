@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Fixed] Token Usage period selection is owned by the URL (`?period=`) so refresh/share under Settings keeps the time range (#879 A1).
 - [Fixed] Overflowing pagination controls use safe centering so the leading prev control remains reachable under horizontal scroll (follow-up to #910 / #879 B4).
 - [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).
 - [Added] Agent Chat what-if scenario mode with structured assumptions, hypothetical markers, turn limits, and hard isolation from AnalysisHistory / DecisionSignal / Agent memory (#130).
@@ -216,6 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
 - [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
+- [Changed] Emitted stable validation error codes for the top analysis/stocks user-facing messages (Chinese fallback retained; Web localizes via the error catalog) and remeasured only the affected locale chunk budgets with 200 B headroom.
 - [Added] Default-off Bayesian skill outcome weights at aggregation, plus an opt-in historical sample backfill script.
 - [Changed] Unified baostock/pytdx/longbridge retry and request-timeout policy via `data_provider/retry_policy.py` (BaseFetcher-level enforcement deferred).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
