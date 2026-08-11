@@ -23,6 +23,7 @@ from api.v1.endpoints import (
     capabilities,
     config_profiles,
     decision_signals,
+    event_calendar,
     health,
     history,
     investment_framework,
@@ -180,15 +181,9 @@ router.include_router(
 )
 
 router.include_router(
-    notification_inbox.router,
-    prefix="/notification-inbox",
-    tags=["NotificationInbox"],
-)
-
-router.include_router(
-    todays_focus.router,
-    prefix="/focus",
-    tags=["TodaysFocus"],
+    event_calendar.router,
+    prefix="/event-calendar",
+    tags=["EventCalendar"],
 )
 
 router.include_router(
