@@ -124,6 +124,11 @@ class Config:
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
 
+    # === Durable security-audit trail (Issue #535) ===
+    # Time retention and hard row capacity for privileged-operation events.
+    security_audit_retention_days: int = 90
+    security_audit_max_events: int = 10_000
+
     # === Daily brief with historical accuracy review (Issue #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
@@ -280,6 +285,23 @@ class Config:
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
+    # Layered memory lifecycle (principal-scoped; minimize-by-default).
+    layered_memory_collection_enabled: bool = False
+    layered_memory_retention_days: int = 90
+    layered_memory_vector_enabled: bool = False
+    layered_memory_max_records_per_principal: int = 200
+    layered_memory_audit_enabled: bool = True
+    # Opt-in plan→act→observe production path on AgentExecutor.run (#199). Default off.
+    agent_planning_enabled: bool = False
+    agent_planning_strategy: str = "template"  # template | llm
+    agent_planning_max_plan_steps: int = 8
+    agent_planning_max_replans: int = 1
+    agent_planning_max_tokens: int = 1500
+    agent_planning_proposal_timeout_seconds: float = 30.0
+    agent_planning_max_total_tool_calls: int = 16
+    agent_planning_max_observation_replans: int = 1
+    agent_planning_exec_timeout_seconds: float = 60.0
+    agent_planning_on_step_failure: str = "replan"  # replan | terminate
     agent_skill_autoweight: bool = True  # Auto-weight skills by backtest performance
     agent_skill_routing: str = "auto"  # Skill routing: 'auto' (regime-based) or 'manual'
     agent_context_compression_enabled: bool = False  # Compress visible chat history before Agent calls
@@ -595,6 +617,8 @@ _CONFIG_METHOD_GROUPS = (
         _ConfigLoadingMethods,
         (
             "_parse_stock_email_groups",
+            "_parse_agent_planning_strategy",
+            "_parse_agent_planning_on_step_failure",
             "_parse_report_type",
             "_parse_report_mode",
             "_get_env_file_value",

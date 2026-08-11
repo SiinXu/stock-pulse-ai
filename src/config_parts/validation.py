@@ -19,7 +19,6 @@ from src.config_parts.parsers import (
 )
 from src.llm.backend_registry import (
     AUTO_AGENT_BACKEND_ID,
-    GENERATION_ONLY_BACKEND_IDS,
     LITELLM_BACKEND_ID,
     LOCAL_CLI_GENERATION_BACKEND_IDS,
     OPENCODE_CLI_BACKEND_ID,
@@ -156,13 +155,10 @@ class _ConfigValidationMethods:
             ))
         if agent_generation_backend not in SUPPORTED_AGENT_GENERATION_BACKENDS:
             agent_ui_backends = "、".join(sorted(SUPPORTED_AGENT_UI_BACKENDS))
-            local_toolless_backends = "、".join(sorted(GENERATION_ONLY_BACKEND_IDS))
             issues.append(ConfigIssue(
                 severity="error",
                 message=(
-                    f"AGENT_GENERATION_BACKEND 当前支持 {agent_ui_backends}；"
-                    f"local CLI backend（{local_toolless_backends}）仅作为显式 unsupported diagnostic 保留，"
-                    "不支持 Agent 工具调用。"
+                    f"AGENT_GENERATION_BACKEND 当前支持 {agent_ui_backends}。"
                     f"已配置的值为：{agent_generation_backend}。"
                 ),
                 field="AGENT_GENERATION_BACKEND",
@@ -171,7 +167,7 @@ class _ConfigValidationMethods:
         local_model_prefix = next(
             (
                 backend_id
-                for backend_id in GENERATION_ONLY_BACKEND_IDS
+                for backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS
                 if litellm_model_lower.startswith(f"{backend_id}/")
             ),
             "",
@@ -277,7 +273,17 @@ class _ConfigValidationMethods:
                 return any(k and len(k) >= 8 for k in (self.openai_api_keys or []))
             return False
 
-        configured_agent_primary_model = bool((self.agent_litellm_model or "").strip())
+        agent_uses_litellm = (
+            agent_generation_backend == LITELLM_BACKEND_ID
+            or (
+                agent_generation_backend == AUTO_AGENT_BACKEND_ID
+                and generation_backend not in LOCAL_CLI_GENERATION_BACKEND_IDS
+            )
+        )
+        configured_agent_primary_model = (
+            agent_uses_litellm
+            and bool((self.agent_litellm_model or "").strip())
+        )
         effective_agent_primary_model = get_effective_agent_primary_model(self)
 
         if available_router_model_set:

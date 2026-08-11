@@ -158,13 +158,24 @@ def test_render_and_parse_inventory_roundtrip(tmp_path: Path) -> None:
         "CRYPTO_PROVIDER_ENABLED": EnvEntry(
             "CRYPTO_PROVIDER_ENABLED", "false", False, "Crypto toggle"
         ),
+        "PROVIDER_MARKET_DATA_MODE": EnvEntry(
+            "PROVIDER_MARKET_DATA_MODE",
+            "auto",
+            False,
+            "Manager mode (auto|local_only|refresh)",
+        ),
     }
-    registry = {"STOCK_LIST"}
+    registry = {"STOCK_LIST", "PROVIDER_MARKET_DATA_MODE"}
     body = render_inventory_table(entries, registry, locale="en")
     path = tmp_path / "inv.md"
     _write_skeleton(path)
     replace_inventory_block(path, body)
     parsed = parse_inventory_table(path)
-    assert set(parsed) == {"STOCK_LIST", "CRYPTO_PROVIDER_ENABLED"}
+    assert set(parsed) == {
+        "STOCK_LIST",
+        "CRYPTO_PROVIDER_ENABLED",
+        "PROVIDER_MARKET_DATA_MODE",
+    }
     assert parsed["STOCK_LIST"]["default"] == "1,2"
     assert parsed["CRYPTO_PROVIDER_ENABLED"]["registered"] in {"no", "否"}
+    assert "auto|local_only|refresh" in parsed["PROVIDER_MARKET_DATA_MODE"]["notes"]

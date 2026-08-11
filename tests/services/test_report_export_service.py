@@ -19,13 +19,22 @@ from src.services.report_export_service import (
     ReportExportFormatError,
     ReportExportLimitError,
     capabilities_public_view,
+    export_html_bytes,
     export_markdown_bytes,
     export_pdf_bytes,
     export_report,
     get_export_capabilities,
     inspect_font_file,
+    is_html_dependency_available,
     missing_font_codepoints,
     resolve_pdf_font_path,
+)
+
+FIXTURE_PATH = (
+    Path(__file__).parents[1]
+    / "fixtures"
+    / "report_export"
+    / "representative_full_report.md"
 )
 
 
@@ -84,6 +93,76 @@ def test_export_report_md_roundtrip_and_format_bounds():
     assert exc.value.error_code == "export_empty"
 
 
+def test_representative_fixture_markdown_roundtrip_is_exact():
+    markdown = FIXTURE_PATH.read_text(encoding="utf-8")
+    artifact = export_report(markdown, "md", filename_stem="representative-full-report")
+    assert artifact.format == "md"
+    assert artifact.content.decode("utf-8") == markdown
+    assert "中文结论完整保留-ZH-END" in markdown
+    assert "完整报告归档标记-ARCHIVE-END" in markdown
+
+
+@pytest.mark.skipif(
+    not is_html_dependency_available(),
+    reason="optional markdown-it-py not installed",
+)
+def test_representative_fixture_html_roundtrip_preserves_structure_and_strips_secrets():
+    markdown = FIXTURE_PATH.read_text(encoding="utf-8")
+    artifact = export_html_bytes(
+        markdown,
+        filename_stem="representative-full-report",
+        title="representative-full-report",
+    )
+    assert artifact.format == "html"
+    assert artifact.media_type.startswith("text/html")
+    html_text = artifact.content.decode("utf-8")
+    assert html_text.startswith("<!DOCTYPE html>")
+    for marker in (
+        "Representative full multilingual report",
+        "中文结论完整保留-ZH-END",
+        "TREND-EVIDENCE-END",
+        "估值证据结束",
+        "Nested condition B",
+        "完整报告归档标记-ARCHIVE-END",
+        "Disclaimer / 免责声明 / 면책조항",
+    ):
+        assert marker in html_text
+    assert "link-secret" not in html_text
+    assert "image-secret" not in html_text
+    assert "https://example.invalid" not in html_text
+    assert "href=" not in html_text
+    assert "src=" not in html_text
+    assert "<table>" in html_text
+    assert "<th>" in html_text
+
+
+@pytest.mark.skipif(
+    not is_html_dependency_available(),
+    reason="optional markdown-it-py not installed",
+)
+def test_html_input_and_output_bounds_are_explicit(monkeypatch):
+    with pytest.raises(ReportExportLimitError) as exc:
+        export_html_bytes("x" * (export_mod.MAX_HTML_INPUT_BYTES + 1))
+    assert exc.value.error_code == "export_input_too_large"
+
+    monkeypatch.setattr(export_mod, "HTML_MAX_OUTPUT_BYTES", 32)
+    with pytest.raises(ReportExportLimitError) as exc:
+        export_html_bytes("# Tiny\n\nbody")
+    assert exc.value.error_code == "export_output_too_large"
+
+
+def test_html_rejects_missing_markdown_it(monkeypatch):
+    monkeypatch.setattr(
+        export_mod,
+        "inspect_html_backend",
+        lambda: export_mod.HtmlBackendStatus(False, "dependency_missing", installed=False),
+    )
+    with pytest.raises(ReportExportDependencyError) as exc:
+        export_html_bytes("# Report")
+    assert exc.value.error_code == "export_dependency_missing"
+    assert "requirements-report-export" in exc.value.install_hint
+
+
 def test_capabilities_are_language_aware_and_never_expose_paths(monkeypatch, tmp_path):
     invalid = tmp_path / "operator-secret" / "broken.ttf"
     invalid.parent.mkdir()
@@ -93,13 +172,22 @@ def test_capabilities_are_language_aware_and_never_expose_paths(monkeypatch, tmp
         "inspect_pdf_backend",
         lambda: PdfBackendStatus(True, "ready", "2.8.3", True),
     )
+    monkeypatch.setattr(
+        export_mod,
+        "inspect_html_backend",
+        lambda: export_mod.HtmlBackendStatus(True, "ready", "4.2.0", True),
+    )
     monkeypatch.setattr(export_mod, "_configured_font_path", lambda: str(invalid))
     caps = get_export_capabilities("zh")
     assert caps["formats"]["md"]["available"] is True
+    assert caps["formats"]["html"]["available"] is True
+    assert caps["formats"]["html"]["status"] == "ready"
     assert caps["formats"]["pdf"]["available"] is False
     assert caps["formats"]["pdf"]["status"] == "configured_font_invalid"
     assert caps["requested_language"] == "zh"
+    assert caps["office_formats_status"] == "html_only"
     assert caps["chart_handling"] == "markdown_images_omitted_without_destinations"
+    assert caps["supported_query_formats"] == ["md", "html", "pdf"]
     public = capabilities_public_view(caps)
     assert "font_path" not in str(public)
     assert str(invalid) not in str(public)
@@ -378,17 +466,41 @@ def test_pdf_rejects_report_glyphs_missing_from_otherwise_valid_font():
     not export_mod.is_pdf_dependency_available(),
     reason="optional fpdf2 not installed",
 )
+def test_chinese_glyph_coverage_fails_closed_instead_of_tofu(monkeypatch):
+    """Latin-only coverage must reject Chinese reports before any PDF render."""
+    monkeypatch.setattr(
+        export_mod,
+        "inspect_pdf_backend",
+        lambda: PdfBackendStatus(True, "ready", "2.8.3", True),
+    )
+    latin_only = frozenset(range(32, 127))
+    monkeypatch.setattr(
+        export_mod,
+        "inspect_font_file",
+        lambda _path: export_mod.FontInspection(True, "font_parsed", latin_only),
+    )
+    chinese_report = "# 中文报告\n\n当前建议**持有**。唯一标记：中文结论完整保留-ZH-END。\n"
+    missing = missing_font_codepoints("/fake/latin-only.ttf", chinese_report)
+    assert missing
+    assert any("\u4e00" <= chr(code) <= "\u9fff" for code in missing)
+    with pytest.raises(ReportExportFontError) as exc:
+        export_pdf_bytes(chinese_report, font_path="/fake/latin-only.ttf")
+    assert exc.value.error_code == "export_font_coverage_missing"
+    assert "glyph" in exc.value.message.lower() or "coverage" in exc.value.message.lower()
+
+
+@pytest.mark.skipif(
+    not export_mod.is_pdf_dependency_available(),
+    reason="optional fpdf2 not installed",
+)
 def test_representative_multilingual_fixture_is_complete_or_explicitly_rejected():
     pypdf = pytest.importorskip("pypdf")
-    fixture_path = (
-        Path(__file__).parents[1]
-        / "fixtures"
-        / "report_export"
-        / "representative_full_report.md"
-    )
-    markdown = fixture_path.read_text(encoding="utf-8")
+    markdown = FIXTURE_PATH.read_text(encoding="utf-8")
     blocks = export_mod._parse_markdown_blocks(markdown)
     visible = export_mod._rendered_text(blocks)
+    # Full-fixture roundtrip must exercise the real archive, not SAMPLE_ZH.
+    assert "中文结论完整保留-ZH-END" in visible
+    assert "完整报告归档标记-ARCHIVE-END" in visible
     parsed_fonts = [
         candidate
         for candidate in export_mod._DEFAULT_FONT_CANDIDATES
@@ -413,7 +525,8 @@ def test_representative_multilingual_fixture_is_complete_or_explicitly_rejected(
                 filename_stem="representative-multilingual-report",
             )
         assert exc.value.error_code == "export_font_coverage_missing"
-        assert missing_font_codepoints(parsed_fonts[0], visible)
+        missing = missing_font_codepoints(parsed_fonts[0], visible)
+        assert missing
         return
 
     artifact = export_pdf_bytes(
@@ -426,12 +539,22 @@ def test_representative_multilingual_fixture_is_complete_or_explicitly_rejected(
     for marker in (
         "Representative full multilingual report",
         "결론 요약",
+        "中文结论完整保留-ZH-END",
         "TREND-EVIDENCE-END",
         "估值证据结束",
+        "风险证据结束",
+        "技术面证据结束",
+        "基本面证据结束",
         "Nested condition B",
+        "完整报告归档标记-ARCHIVE-END",
         "Disclaimer / 免责声明 / 면책조항",
     ):
         assert marker in extracted
+    # Chinese must be present as real text, not only Latin transliteration.
+    assert any("\u4e00" <= ch <= "\u9fff" for ch in extracted)
+
+
+
 
 
 @pytest.mark.skipif(
@@ -478,3 +601,31 @@ def test_busy_capacity_has_explicit_retryable_error(monkeypatch):
     with pytest.raises(ReportExportBusyError) as exc:
         export_pdf_bytes("# Report", font_path=font)
     assert exc.value.error_code == "export_busy"
+
+@pytest.mark.skipif(
+    not export_mod.is_pdf_dependency_available(),
+    reason="optional fpdf2 not installed",
+)
+def test_pdf_page_limit_is_hard_bound_for_large_reports(monkeypatch):
+    """Large reports must hit an explicit page ceiling, not unbounded render.
+
+    The page guard is enforced inside the in-process renderer. Spawn workers load
+    a fresh module copy, so this contract is validated against ``_render_pdf_bytes``
+    directly after lowering ``MAX_PDF_PAGES``.
+    """
+    monkeypatch.setattr(export_mod, "MAX_PDF_PAGES", 2)
+    font = _font_covering("Large report page limit marker")
+    sections = "\n\n".join(
+        f"## Section {index}\n\nLarge report page limit marker paragraph {index}."
+        for index in range(80)
+    )
+    markdown = f"# Large report\n\n{sections}\n"
+    blocks = export_mod._parse_markdown_blocks(markdown)
+    with pytest.raises(ReportExportLimitError) as exc:
+        export_mod._render_pdf_bytes(
+            blocks,
+            font_path=font,
+            title="large-report",
+            deadline=export_mod.time.monotonic() + 30.0,
+        )
+    assert exc.value.error_code == "export_page_limit_exceeded"

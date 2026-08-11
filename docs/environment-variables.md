@@ -93,14 +93,14 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | 键名 | 默认值（``.env.example``） | 已注册 | 备注 |
 |------|---------------------------|--------|------|
 | `ADMIN_AUTH_ENABLED` | `false` | 是 | =================================== Web login authentication (optional) =================================== Set to tr... |
-| `ADMIN_SESSION_MAX_AGE_HOURS` | `24` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `ADMIN_SESSION_MAX_AGE_HOURS` | `24` | 是 | 模板中注释; Session expiration (hours) |
 | `AGENT_ARCH` | `single` | 是 | 模板中注释; Agent architecture mode (default single; multi is multi-agent orchestration mode) |
-| `AGENT_CONTEXT_COMPRESSION_ENABLED` | `false` | 是 | 模板中注释; AskStock visible conversation context compression (disabled by default) |
+| `AGENT_CONTEXT_COMPRESSION_ENABLED` | `false` | 是 | 模板中注释; Agent Chat what-if: structured scenario turns are enabled by default in the Web UI |
 | `AGENT_CONTEXT_COMPRESSION_PROFILE` | `balanced` | 是 | 模板中注释; Compression strategy: cost=save tokens / balanced=balance both goals / long_context_raw_first=preserve more original ... |
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
-| `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |
 | `AGENT_EVENT_ALERT_RULES_JSON` | `[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800},{"stock_code":"300750","alert_type":"price_change_percent","direction":"down","change_pct":3.0},{"stock_code":"000858","alert_type":"volume_spike","multiplier":2.5}]` | 是 | 模板中注释 |
@@ -109,11 +109,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_EVENT_MONITOR_INTERVAL_MINUTES` | `5` | 是 | 模板中注释 |
 | `AGENT_FEATURES_ACKNOWLEDGED_OFF` | `false` | 是 | 模板中注释; When true, settles the Agent readiness check for CLI-only users who do not need Q&A Agent |
 | `AGENT_GENERATION_BACKEND` | `auto` | 是 | Agent Chat backend; Web settings page only exposes auto/litellm, hand-written local CLI backend will return unsupport... |
-| `AGENT_INTEL_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `AGENT_INTEL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_INVESTMENT_COMMITTEE_MODE` | `false` | 是 | 模板中注释; Investment Committee mode (default off) |
 | `AGENT_LITELLM_MODEL` | `空` | 是 | 模板中注释; Agent main model (optional): Empty when inheriting from the main model; without provider prefix will parse as openai/... |
-| `AGENT_MAX_IDENTICAL_TOOL_CALLS` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `AGENT_MAX_STAGE_ENTRIES` | `1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `AGENT_MAX_IDENTICAL_TOOL_CALLS` | `3` | 是 | 模板中注释; Within one agent run, calls with the same tool name and normalized arguments are limited to 3; the fourth is blocked ... |
+| `AGENT_MAX_STAGE_ENTRIES` | `1` | 是 | 模板中注释; An ordinary stage name may enter at most once per Pipeline run; the bounded Critic retry uses its separate one-shot b... |
 | `AGENT_MAX_STEPS` | `10` | 是 | 模板中注释; Agent maximum inference step limit (default 10, each sub-agent runs according to its preset value; higher than the de... |
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
@@ -123,17 +123,27 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
-| `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `AGENT_RISK_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
+| `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
+| `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
+| `AGENT_PLANNING_MAX_PLAN_STEPS` | `8` | 是 | 模板中注释 |
+| `AGENT_PLANNING_MAX_REPLANS` | `1` | 是 | 模板中注释 |
+| `AGENT_PLANNING_MAX_TOKENS` | `1500` | 是 | 模板中注释 |
+| `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | 是 | 模板中注释 |
+| `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | 是 | 模板中注释 |
+| `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
+| `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
+| `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
+| `AGENT_RISK_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_RISK_OVERRIDE` | `true` | 是 | 模板中注释; Whether the risk-control agent may reject buy signals (enabled by default) |
 | `AGENT_SKILLS` | `空` | 是 |  |
-| `AGENT_SKILL_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `AGENT_SKILL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
-| `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `AGENT_TOOL_TIMEOUT_S` | `120` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
+| `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
+| `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |
 | `AIHUBMIX_KEY` | `空` | 是 | 模板中注释; AIHubmix Aggregation(https://aihubmix.com/) A Key using GPT/Claude/Gemini/GLM/Qwen models, without requiring VPN access |
 | `AKSHARE_PRIORITY` | `1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALLOW_INSECURE_PUBLIC_BIND` | `false` | 否 | 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -170,33 +180,33 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `BIAS_THRESHOLD` | `5.0` | 是 | 模板中注释; Bias-ratio threshold (%); when deviation from MA5 exceeds this value, strong-trend stocks use a 1.5x threshold before... |
 | `BOCHA_API_KEYS` | `your_bocha_key_here` | 是 | 模板中注释; =================================== Search engine configuration (for fetching stock news) |
 | `BRAVE_API_KEYS` | `空` | 是 | Brave Search API Keys(Supports multiple, Comma-separated) Get: https://brave.com/search/api/ |
-| `COINGECKO_API_BASE` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `COINGECKO_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `COINGECKO_API_PLAN` | `keyless` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `CRYPTO_COINGECKO_PRIORITY` | `10` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `CRYPTO_PROVIDER_ENABLED` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `COINGECKO_API_BASE` | `空` | 是 | 模板中注释; Optional custom HTTPS base for keyless mode only; credentials are never sent to it. |
+| `COINGECKO_API_KEY` | `空` | 是 | 模板中注释; Optional CoinGecko key; leave empty in keyless mode. |
+| `COINGECKO_API_PLAN` | `keyless` | 是 | 模板中注释; Authentication mode: keyless, demo, or pro |
+| `CRYPTO_COINGECKO_PRIORITY` | `10` | 是 | 模板中注释 |
+| `CRYPTO_PROVIDER_ENABLED` | `false` | 是 | 模板中注释; Cryptocurrency provider (optional, Issue #236) |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | `空` | 是 | 模板中注释; Optional: For Webhooks requiring authentication (Header Authorization: Bearer <token>) |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | `空` | 是 | 模板中注释; Optional global JSON body template, overrides Bark/Slack/Discord etc |
 | `CUSTOM_WEBHOOK_URLS` | `https://oapi.dingtalk.com/robot/send?access_token=xxx,https://hooks.slack.com/services/xxx` | 是 | 模板中注释; Custom Webhook (Supports multiple, comma-separated) Suitable for: DingTalk, Discord, Slack, Bark, and any service tha... |
 | `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Daily brief with historical accuracy review (Issue #466; default off) When enabled, the runtime scheduler may emit at... |
 | `DAILY_BRIEF_MIN_SAMPLES` | `10` | 是 | 模板中注释 |
-| `DAILY_BRIEF_NOTIFY` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DAILY_BRIEF_PERSIST_HISTORY` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DAILY_BRIEF_SAVE_REPORT_FILE` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `DAILY_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
+| `DAILY_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
+| `DAILY_BRIEF_SAVE_REPORT_FILE` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_SCHEDULE_TIME` | `08:30` | 是 | 模板中注释 |
 | `DAILY_BRIEF_TIMEZONE` | `Asia/Shanghai` | 是 | 模板中注释 |
 | `DAILY_MARKET_CONTEXT_ENABLED` | `true` | 是 | Should the market summary be injected into individual stock analysis prompts and should conservative barriers be enab... |
 | `DATABASE_PATH` | `./data/stock_analysis.db` | 否 | 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DATA_VALIDATION_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DATA_VALIDATION_STRICT` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `DATA_VALIDATION_ENABLED` | `true` | 是 | 模板中注释; Financial data validation layer at provider candidate and synthesis boundaries |
+| `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | `空` | 是 | 模板中注释; Optional authoritative identities for symbols whose instrument type cannot be inferred safely from their market code,... |
+| `DATA_VALIDATION_STRICT` | `false` | 是 | 模板中注释; Reject invalid daily/realtime provider candidates before acceptance/cache so the existing bounded provider loop can c... |
+| `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 是 | 模板中注释; Comma-separated market/instrument selectors; supported instruments are equity, etf, and index |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | 是 | 模板中注释; Separate final aggregated-fundamental policy: warn or reject |
 | `DEBUG` | `false` | 是 | Enable debugging logs |
-| `DECISION_MEMORY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DECISION_MEMORY_LOOKBACK` | `5` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DECISION_MEMORY_MIN_AGE_DAYS` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `DECISION_MEMORY_MIN_SAMPLES` | `5` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `DECISION_MEMORY_ENABLED` | `true` | 是 | 模板中注释; Historical decision memory & reflection (Issue #118; default on, no config needed) Injects a "Historical Decision Ref... |
+| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max recent evaluated signals per stock to reflect on |
+| `DECISION_MEMORY_MIN_AGE_DAYS` | `3` | 是 | 模板中注释; Only reflect on signals at least this many days old (so outcomes exist) |
+| `DECISION_MEMORY_MIN_SAMPLES` | `5` | 是 | 模板中注释; Min decided outcomes (hit+miss) before a hit-rate is shown; smaller buckets are noise |
 | `DECISION_PROFILE_CALIBRATION_ENABLED` | `false` | 是 | 模板中注释 |
 | `DEEPSEEK_API_KEY` | `空` | 是 | 模板中注释; DeepSeek（https://platform.deepseek.com） Compatibility default: Only fill in DEEPSEEK_API_KEY, still using deepseek-ch... |
 | `DEEPSEEK_API_KEYS` | `key1,key2,key3` | 是 | 模板中注释; Multi-key load balancing (comma-separated); takes priority over DEEPSEEK_API_KEY when set. |
@@ -221,10 +231,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `EMAIL_SENDER` | `空` | 是 | 模板中注释; [Method Four]Email Push (requires only 2 configurations, SMTP auto-recognition) Supports QQ email, 163 email, Gmail, etc |
 | `ENABLE_CHIP_DISTRIBUTION` | `true` | 是 | 模板中注释; Enable chip distribution analysis (the upstream API is unstable; disabling it is recommended for cloud deployments) |
 | `ENABLE_EASTMONEY_PATCH` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `ENABLE_FUNDAMENTAL_PIPELINE` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `ENABLE_FUNDAMENTAL_PIPELINE` | `true` | 是 | 模板中注释; Enable fundamental aggregation (new P0 capability) |
 | `ENABLE_REALTIME_QUOTE` | `true` | 是 | 模板中注释; Enable real-time quotes (disabling uses historical closing prices for analysis) |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | `true` | 是 | 模板中注释; Intraday technical analysis: when enabled, real-time prices are used to calculate moving averages and bullish MA alig... |
-| `FAILURE_NOTIFY_ENABLED` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
 | `FEISHU_CHAT_ID` | `oc_xxxxxxxxxxxxx` | 是 | 模板中注释; App Bot proactively pushes targets; Stream Bot or Cloud Docs do not need this item |
@@ -237,11 +247,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `FEISHU_WEBHOOK_SECRET` | `your_feishu_webhook_secret` | 是 | 模板中注释; Feishu group robot Webhook security configuration (only used in Webhook push mode) |
 | `FEISHU_WEBHOOK_URL` | `https://open.feishu.cn/open-apis/bot/v2/hook/your_key_here` | 是 | 模板中注释; Method Two: Feishu Robot (Choose one of two) Method 2a — Group Custom Robot Webhook In Feishu group -> Settings -> Gr... |
 | `FINNHUB_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `FUNDAMENTAL_CACHE_MAX_ENTRIES` | `256` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `FUNDAMENTAL_CACHE_TTL_SECONDS` | `120` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | `8.0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `FUNDAMENTAL_RETRY_MAX` | `1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | `8.0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `FUNDAMENTAL_CACHE_MAX_ENTRIES` | `256` | 是 | 模板中注释 |
+| `FUNDAMENTAL_CACHE_TTL_SECONDS` | `120` | 是 | 模板中注释 |
+| `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | `8.0` | 是 | 模板中注释 |
+| `FUNDAMENTAL_RETRY_MAX` | `1` | 是 | 模板中注释 |
+| `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | `8.0` | 是 | 模板中注释; Fundamentals aggregation performance and stability parameters (units: seconds) |
 | `FUTU_ACC_ID` | `空` | 是 | Leave empty to merge eligible ACTIVE REAL NORMAL/MASTER securities accounts. |
 | `FUTU_OPEND_HOST` | `127.0.0.1` | 是 | Optional Futu OpenD gateway for `python main.py --portfolio futu` (analysis scope) and POST /api/v1/portfolio/imports... |
 | `FUTU_OPEND_PORT` | `11111` | 是 |  |
@@ -269,6 +279,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `KRONOS_ENABLED` | `false` | 是 | Optional local Kronos K-line forecasting Agent Tool |
 | `KRONOS_MODEL_SIZE` | `mini` | 是 |  |
 | `KRONOS_WEIGHTS_DIR` | `/absolute/path/to/kronos-weights` | 是 | 模板中注释 |
+| `LAYERED_MEMORY_AUDIT_ENABLED` | `true` | 是 | 模板中注释 |
+| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Principal-scoped layered memory lifecycle (Issue #250 / #198 foundation) |
+| `LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL` | `200` | 是 | 模板中注释 |
+| `LAYERED_MEMORY_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
+| `LAYERED_MEMORY_VECTOR_ENABLED` | `false` | 是 | 模板中注释 |
 | `LITELLM_CONFIG` | `./litellm_config.yaml` | 是 | 模板中注释; Advanced: Model Routing YAML Configuration (optional, see docs/examples/litellm_config.example.yaml) |
 | `LITELLM_FALLBACK_MODELS` | `空` | 是 | 模板中注释; First-run readiness: GET /api/v1/onboarding/first-run (read-only; never writes .env) |
 | `LITELLM_LOG_LEVEL` | `WARNING` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -309,7 +324,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_HERMES_MODELS` | `hermes-agent` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_HERMES_PROTOCOL` | `openai` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_HERMES_PROVIDER` | `custom` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `LLM_MAX_TOKENS` | `2048` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `LLM_MAX_TOKENS` | `2048` | 是 | 模板中注释; AlphaSift LLM re-order request output limit; only affects AlphaSift stock selection re-ordering, default 2048. |
 | `LLM_MIMO_API_KEY` | `sk-xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_MIMO_BASE_URL` | `https://your-mimo-endpoint.example/v1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_MIMO_MODELS` | `mimo-xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -352,7 +367,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_SILICONFLOW_PROTOCOL` | `openai` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_SILICONFLOW_PROVIDER` | `siliconflow` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_TEMPERATURE` | `0.7` | 是 | 模板中注释; Sampling temperature (0.0-2.0, default 0.7; 0 is most deterministic and 2 is most random) |
-| `LLM_TIMEOUT_SEC` | `60` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `LLM_TIMEOUT_SEC` | `60` | 是 | 模板中注释; The timeout seconds for a single LLM request; AlphaSift stock selection reuses DSA configuration, downgrades to non-L... |
 | `LLM_USAGE_HMAC_KEY_VERSION` | `local-v1` | 是 | 模板中注释 |
 | `LLM_USAGE_HMAC_SECRET` | `空` | 是 | 模板中注释; LLM usage telemetry message HMAC configuration (optional) |
 | `LLM_VOLCENGINE_API_KEY` | `xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -392,43 +407,44 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `MARKET_REVIEW_ENABLED` | `true` | 是 | Enable market review (true/false) |
 | `MARKET_REVIEW_REGION` | `cn` | 是 | 模板中注释; Main Market Review Market Region: cn(A-shares), hk(Hong Kong stocks), us(U.S |
 | `MAX_WORKERS` | `3` | 是 | Maximum number of concurrent threads (recommended to keep low concurrency to avoid bans) |
-| `MCP_ANALYSIS_MAX_STOCKS` | `5` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_ALLOWED_HOSTS` | `127.0.0.1:*,localhost:*,[::1]:*` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_ALLOWED_ORIGINS` | `http://127.0.0.1:*,http://localhost:*,http://[::1]:*` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_BACKLOG` | `16` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS` | `5` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_MAX_BODY_BYTES` | `1000000` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_MAX_CONNECTIONS` | `32` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_MAX_HEADER_BYTES` | `32768` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_READ_TIMEOUT_SECONDS` | `10` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_RESOURCE` | `http://127.0.0.1:8765/mcp` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_SCOPES` | `market.read,history.read` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_HTTP_SESSION_TOKEN_SHA256` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_MAX_CONCURRENT_TOOLS` | `8` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_RATE_LIMIT_PER_MINUTE` | `60` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_SERVER_ENABLED` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_SERVER_HOST` | `127.0.0.1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_SERVER_PORT` | `8765` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_SERVER_TRANSPORT` | `stdio` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_STDIO_PRINCIPAL` | `local-operator` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `MCP_STDIO_SCOPES` | `market.read,history.read` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `MCP_ANALYSIS_MAX_STOCKS` | `5` | 是 | 模板中注释 |
+| `MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE` | `2` | 是 | 模板中注释 |
+| `MCP_HTTP_ALLOWED_HOSTS` | `127.0.0.1:*,localhost:*,[::1]:*` | 是 | 模板中注释; Comma-separated exact values; wildcard ports use the official SDK `:*` form. |
+| `MCP_HTTP_ALLOWED_ORIGINS` | `http://127.0.0.1:*,http://localhost:*,http://[::1]:*` | 是 | 模板中注释 |
+| `MCP_HTTP_BACKLOG` | `16` | 是 | 模板中注释 |
+| `MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS` | `5` | 是 | 模板中注释 |
+| `MCP_HTTP_MAX_BODY_BYTES` | `1000000` | 是 | 模板中注释 |
+| `MCP_HTTP_MAX_CONNECTIONS` | `32` | 是 | 模板中注释 |
+| `MCP_HTTP_MAX_HEADER_BYTES` | `32768` | 是 | 模板中注释 |
+| `MCP_HTTP_READ_TIMEOUT_SECONDS` | `10` | 是 | 模板中注释 |
+| `MCP_HTTP_RESOURCE` | `http://127.0.0.1:8765/mcp` | 是 | 模板中注释 |
+| `MCP_HTTP_SCOPES` | `market.read,history.read` | 是 | 模板中注释 |
+| `MCP_HTTP_SESSION_TOKEN_SHA256` | `空` | 是 | 模板中注释 |
+| `MCP_MAX_CONCURRENT_TOOLS` | `8` | 是 | 模板中注释; Per-principal/tool resource and cost budgets. |
+| `MCP_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释 |
+| `MCP_SERVER_ENABLED` | `false` | 是 | 模板中注释; =========================================== Optional MCP server (Model Context Protocol) — Issue #244 ===============... |
+| `MCP_SERVER_HOST` | `127.0.0.1` | 是 | 模板中注释; HTTP always requires ADMIN_AUTH_ENABLED=true, an Authorization Bearer admin session, explicit scopes, and the SHA-256... |
+| `MCP_SERVER_PORT` | `8765` | 是 | 模板中注释 |
+| `MCP_SERVER_TRANSPORT` | `stdio` | 是 | 模板中注释; Official SDK transports: stdio (default) or streamable-http (`http` is an alias). |
+| `MCP_STDIO_PRINCIPAL` | `local-operator` | 是 | 模板中注释 |
+| `MCP_STDIO_SCOPES` | `market.read,history.read` | 是 | 模板中注释; stdio is a local process boundary but still requires explicit least-privilege scopes. |
 | `MD2IMG_ENGINE` | `wkhtmltoimage` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `MERGE_EMAIL_NOTIFICATION` | `false` | 是 | 模板中注释; Merge individual-stock analysis and market-review notifications (default false) to reduce email volume and spam risk. |
 | `MINIMAX_API_KEYS` | `your_minimax_key_here` | 是 | 模板中注释; MiniMax API Key(Coding Plan Web Search, Supports multiple, Comma-separated) Get: https://platform.minimax.io/ |
 | `MULTIMODAL_AGENT_TOOLS_ENABLED` | `false` | 是 | Optional multimodal PDF/chart/transcript Agent Tools (issue #253) |
 | `MULTIMODAL_FILE_ROOT` | `/absolute/path/to/multimodal-uploads` | 是 | 模板中注释 |
-| `NEWSNOW_BASE_URL` | `https://newsnow.busiyi.world` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `NEWS_INTEL_AUTO_FETCH_ENABLED` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `NEWS_INTEL_FETCH_TIMEOUT_SEC` | `8` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `NEWS_INTEL_MAX_ITEMS_PER_SOURCE` | `50` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `NEWS_INTEL_RETENTION_DAYS` | `30` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `NEWSNOW_BASE_URL` | `https://newsnow.busiyi.world` | 是 | 模板中注释; NewsNow HTTP API base address – external dependency configuration - Official project and deployment guide: https://gi... |
+| `NEWS_INTEL_AUTO_FETCH_ENABLED` | `false` | 是 | 模板中注释; When enabled, automatically initialize built-in news sources and pull them into use before reading local news pools i... |
+| `NEWS_INTEL_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; RSS/Atom feed source pull timeout (seconds) |
+| `NEWS_INTEL_MAX_ITEMS_PER_SOURCE` | `50` | 是 | 模板中注释; Maximum number of items collected from each information source per request |
+| `NEWS_INTEL_RETENTION_DAYS` | `30` | 是 | 模板中注释; News/intelligence pool retention period; only cleans intelligence_items, does not affect historical reports. |
 | `NEWS_MAX_AGE_DAYS` | `3` | 是 | 模板中注释; Maximum news timeliness (days), limit search results to recent periods, avoid using outdated information |
 | `NEWS_STRATEGY_PROFILE` | `short` | 是 | 模板中注释; =================================== News timeliness and analysis filtering configuration ============================... |
 | `NOTIFICATION_ALERT_CHANNELS` | `空` | 是 | 模板中注释 |
 | `NOTIFICATION_COOLDOWN_SECONDS` | `0` | 是 | 模板中注释; Limit the frequency of the same cooling key within the window; 0 disables |
 | `NOTIFICATION_DAILY_DIGEST_ENABLED` | `false` | 是 | 模板中注释; Reserve configuration; daily summary will not be sent currently |
 | `NOTIFICATION_DEDUP_TTL_SECONDS` | `0` | 是 | 模板中注释; [Notification Noise Reduction Mechanism](Issue #1200 P4) Default to disable all; only affects static notification cha... |
+| `NOTIFICATION_DELTA_FIRST` | `false` | 是 | 模板中注释; Prepend compact changes since the previous persisted analysis to outbound notifications only. |
 | `NOTIFICATION_MIN_SEVERITY` | `空` | 是 | 模板中注释; info,warning,error,critical; Leave blank to keep the status quo |
 | `NOTIFICATION_QUIET_HOURS` | `空` | 是 | 模板中注释; Silent time period, format HH:MM-HH:MM, supports crossing midnight |
 | `NOTIFICATION_REPORT_CHANNELS` | `空` | 是 | 模板中注释; Image conversion tool: wkhtmltopdf (apt install wkhtmltopdf / brew install wkhtmltopdf), or markdown-to-file [Notific... |
@@ -448,12 +464,13 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `OPENAI_TEMPERATURE` | `0.7` | 是 | 模板中注释; Legacy OpenAI sampling temperature (0.0-2.0); prefer LLM_TEMPERATURE for new setups. |
 | `OPENAI_VISION_MODEL` | `空` | 是 | 模板中注释; Deprecated OpenAI-only vision model; prefer VISION_MODEL for image stock extraction. |
 | `OPENCODE_CLI_MODEL` | `provider/model` | 是 | 模板中注释 |
-| `OUTBOUND_HTTP_ALLOWLIST` | `192.168.1.100:11434,searxng.internal:8080,10.0.0.20:3000` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PAPER_PORTFOLIO_INITIAL_CASH` | `1000000` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `OUTBOUND_HTTP_ALLOWLIST` | `192.168.1.100:11434,searxng.internal:8080,10.0.0.20:3000` | 是 | 模板中注释 |
+| `OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP` | `false` | 是 | 模板中注释; Clash/Mihomo TUN Fake-IP users can opt in to the standard synthetic DNS ranges for public hostnames only |
+| `PAPER_PORTFOLIO_INITIAL_CASH` | `1000000` | 是 | 模板中注释; Paper trading portfolio (Issue #370; forward simulation with persistent positions) Initial paper cash seeded as a dep... |
 | `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 是 | 模板中注释; Opt-in Data Provider auto-bind (default off) |
 | `PLUGIN_STATE_PATH` | `./data/plugin_lifecycle_state.json` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PORTFOLIO_FX_UPDATE_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PORTFOLIO_FX_UPDATE_ENABLED` | `true` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT` | `50.0` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT` | `2.0` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT` | `35.0` | 是 | 模板中注释; Optional finite insight thresholds (cash low must be strictly below cash high): |
@@ -465,12 +482,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PORTFOLIO_HEALTH_WEIGHT_DIVERSIFICATION` | `0.20` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_WEIGHT_PNL` | `0.15` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_WEIGHT_RISK_EXPOSURE` | `0.25` | 是 | 模板中注释 |
-| `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` | `7` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT` | `35.0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT` | `15.0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PORTFOLIO_RISK_LOOKBACK_DAYS` | `180` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT` | `10.0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO` | `0.8` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` | `7` | 是 | 模板中注释; =========================================== Portfolio P0: Import / Risk / Exchange rate downgrade configuration =====... |
+| `PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT` | `35.0` | 是 | 模板中注释 |
+| `PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT` | `15.0` | 是 | 模板中注释 |
+| `PORTFOLIO_RISK_LOOKBACK_DAYS` | `180` | 是 | 模板中注释 |
+| `PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT` | `10.0` | 是 | 模板中注释 |
+| `PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO` | `0.8` | 是 | 模板中注释 |
 | `PORTFOLIO_STRESS_SCENARIOS_PATH` | `空` | 是 | 模板中注释; Optional YAML path (maximum 1,024 characters) that adds/overrides bounded portfolio stress scenarios by id |
 | `PREFETCH_REALTIME_QUOTES` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -480,16 +497,16 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_DAILY_CACHE_DIR` | `data/provider_cache/daily` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_DAILY_CACHE_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS` | `2592000` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS` | `2592000` | 是 | 模板中注释; Offline reads fail after 30 days |
 | `PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES` | `256` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_DAILY_CACHE_MEMORY_TTL_SECONDS` | `60` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS` | `7776000` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES` | `512` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS` | `7776000` | 是 | 模板中注释; Delete entries older than 90 days |
+| `PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES` | `512` | 是 | 模板中注释; Deterministic oldest-first footprint bound |
 | `PROVIDER_DAILY_CACHE_PERSISTENT_TTL_SECONDS` | `3600` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS` | `1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS` | `1` | 是 | 模板中注释; Reuse a covered range across one default-end-date rollover |
 | `PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS` | `86400` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_HEALTH_WINDOW_SIZE` | `20` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `PROVIDER_MARKET_DATA_MODE` | `auto` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PROVIDER_MARKET_DATA_MODE` | `auto` | 是 | 模板中注释; Manager-level local-first mode (auto\|local_only\|refresh) |
 | `PROXY_HOST` | `127.0.0.1` | 是 | Proxy server address (default 127.0.0.1) |
 | `PROXY_PORT` | `10809` | 是 | Proxy server port (default 10809) |
 | `PUSHOVER_API_TOKEN` | `空` | 是 | 模板中注释 |
@@ -501,14 +518,14 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PYTDX_PRIORITY` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PYTDX_SERVERS` | `192.168.1.100:7709,10.0.0.1:7709` | 是 | 模板中注释; Comma-separated ip:port list; overrides PYTDX_HOST/PYTDX_PORT when set. |
 | `REALTIME_SOURCE_PRIORITY` | `tencent,akshare_sina,efinance,akshare_em` | 是 | 模板中注释 |
-| `REASONING_TRACE_EXPORT_ENABLED` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
-| `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `REASONING_TRACE_EXPORT_ENABLED` | `false` | 是 | 模板中注释; Reasoning-trace export (Issue #135): default off |
+| `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 是 | 模板中注释; clamped to 10000..2000000 |
 | `REPORT_EXPORT_PDF_FONT_PATH` | `空` | 是 | 模板中注释; Report export (optional PDF) |
 | `REPORT_HISTORY_COMPARE_N` | `0` | 是 | 模板中注释 |
 | `REPORT_INTEGRITY_ENABLED` | `true` | 是 | 模板中注释 |
 | `REPORT_INTEGRITY_RETRY` | `1` | 是 | 模板中注释 |
 | `REPORT_LANGUAGE` | `zh` | 是 | 模板中注释; Report output language: zh(Chinese, default) / en(English) / ko(Korean) |
-| `REPORT_MODE` | `standard` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `REPORT_MODE` | `standard` | 是 | 模板中注释; Report presentation mode for the Jinja renderer (#861 Phase 2): brief = Decision Card + key risk (push-oriented) stan... |
 | `REPORT_RENDERER_ENABLED` | `false` | 是 | 模板中注释 |
 | `REPORT_SHOW_LLM_MODEL` | `true` | 是 | 模板中注释; The bottom of the notification report displays the name of the LLM model used in this analysis; set to false to hide it |
 | `REPORT_SUMMARY_ONLY` | `false` | 是 | 模板中注释; Only analyze the result summary: when set to true, it only pushes summaries, without individual stock details |
@@ -525,6 +542,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SCHEDULE_TIMES` | `空` | 是 | List execution over multiple time periods (comma-separated, use SCHEDULE_TIME if empty) |
 | `SEARXNG_BASE_URLS` | `空` | 是 | SearXNG instance address (comma-separated, private deployments have no quotas; enable format: json in settings.yml) P... |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | `true` | 是 |  |
+| `SECURITY_AUDIT_MAX_EVENTS` | `10000` | 是 | 模板中注释; Hard capacity (max retained rows) |
+| `SECURITY_AUDIT_RETENTION_DAYS` | `90` | 是 | 模板中注释; =========================================== Durable security audit (privileged operations) ==========================... |
 | `SERPAPI_API_KEYS` | `空` | 是 | SerpAPI Keys (supports multiple, comma-separated) |
 | `SERVERCHAN3_SENDKEY` | `空` | 是 | 模板中注释; Method Ten: ServerChan 3 configuration (domestic push service with WeChat delivery) Register a ServerChan 3 account a... |
 | `SHARE_IMAGE_MAX_CHARS` | `100000` | 是 | 模板中注释; Web/API history share-image Markdown cap (independent of MARKDOWN_TO_IMAGE_MAX_CHARS) |
@@ -540,7 +559,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SLACK_BOT_TOKEN` | `xoxb-...` | 是 | 模板中注释; Method Nine: Slack Configuration Supports two methods: Bot API (recommended) and Incoming Webhook |
 | `SLACK_CHANNEL_ID` | `C01234567` | 是 | 模板中注释 |
 | `SLACK_WEBHOOK_URL` | `https://hooks.slack.com/services/T.../B.../xxx` | 是 | 模板中注释; Method 2: Slack Incoming Webhook (simple configuration, does not support image uploads) Create Incoming Webhook in Sl... |
-| `SMARTMONEY_ENABLED` | `false` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `SMARTMONEY_ENABLED` | `false` | 是 | 模板中注释; Enable SmartMoney main-force / large-order money-flow tracking (default off; no extra network when disabled) |
 | `SNAPSHOT_SOURCE_PRIORITY` | `tushare,sina,efinance,akshare_em,em_datacenter` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SOCIAL_SENTIMENT_API_KEY` | `sk_live_your_key_here` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SOCIAL_SENTIMENT_API_URL` | `https://api.adanos.org` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Hosted CI entry points:
+#   all                 — full offline suite with coverage floor (local single-node)
+#   syntax|flake8|deterministic — shared preflight
+#   offline-tests       — full offline suite + coverage floor
+#   offline-tests-selective — path-mapped pytest (PR tier); FULL fallback when uncertain
+#   offline-tests-shard — one shard of the full suite; writes coverage data for combine
+#   offline-tests-combine — combine shard coverage data and enforce the floor once
+#   python-min-smoke    — 3.10 import/schema/smoke subset (PR tier)
 
 set -euo pipefail
 
@@ -76,10 +87,6 @@ offline_test_suite() {
   # still collect under --strict-markers; scheduled/manual runner:
   #   .github/workflows/benchmarks.yml  (pytest -m benchmark)
   #   python -m pytest -m benchmark
-  # Per-test timeout + thread method: hard-fail hangs with an attributed
-  # traceback instead of burning the full job budget. faulthandler_timeout
-  # dumps every thread stack when a single test (including teardown) is silent
-  # for 300s, which is complementary post-mortem signal beyond pytest-timeout.
   # Coverage is measured for src/api/data_provider/bot and enforced by the
   # checked-in floor in scripts/coverage_floor_baseline.json.
   # Keep --cov= flags in lockstep with baseline.packages (order-sensitive).
@@ -89,7 +96,6 @@ offline_test_suite() {
   _run_pytest_offline "${test_data_dir}" \
       --durations=30 --durations-min=0.5 \
       --cov=src --cov=api --cov=data_provider --cov=bot \
-      --cov-report=term \
       --cov-report="json:${coverage_report}" \
     || test_exit_code=$?
   if [ "${test_exit_code}" -eq 0 ]; then
@@ -134,6 +140,76 @@ offline_test_suite_selective() {
     || test_exit_code=$?
   rm -rf "${test_data_dir}"
   return "${test_exit_code}"
+}
+
+offline_test_suite_shard() {
+  local splits="${PYTEST_SPLITS:-}"
+  local group="${PYTEST_GROUP:-}"
+  local overhead="${PYTEST_FIRST_SHARD_OVERHEAD:-0}"
+  local shard_dir="${COVERAGE_SHARD_DIR:-}"
+  if [[ ! "${splits}" =~ ^[1-9][0-9]*$ ]] \
+    || [[ ! "${group}" =~ ^[1-9][0-9]*$ ]] \
+    || (( group > splits )); then
+    echo "PYTEST_SPLITS and PYTEST_GROUP must be positive integers with group <= splits" >&2
+    return 2
+  fi
+  if [[ -z "${shard_dir}" ]]; then
+    echo "COVERAGE_SHARD_DIR is required for offline-tests-shard" >&2
+    return 2
+  fi
+
+  echo "==> backend-gate: offline test suite shard ${group}/${splits}"
+  mkdir -p "${shard_dir}"
+  local test_data_dir
+  local coverage_file="${shard_dir}/.coverage.shard${group}"
+  local test_exit_code=0
+  test_data_dir="$(mktemp -d)"
+  python scripts/check_coverage_floor.py --assert-cov-flags \
+    --cov src --cov api --cov data_provider --cov bot
+  DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
+    COVERAGE_FILE="${coverage_file}" \
+    python scripts/ci_test_shard.py \
+      --splits "${splits}" \
+      --group "${group}" \
+      --first-shard-overhead "${overhead}" \
+      -- \
+      -m "not network and not benchmark" \
+      --timeout=120 --timeout-method=thread \
+      -o faulthandler_timeout=300 \
+      --durations=30 --durations-min=0.5 \
+      --cov=src --cov=api --cov=data_provider --cov=bot \
+      --cov-report="json:${shard_dir}/coverage-shard-${group}.json" \
+      || test_exit_code=$?
+  rm -rf "${test_data_dir}"
+  if [[ "${test_exit_code}" -eq 0 && ! -f "${coverage_file}" ]]; then
+    echo "Coverage shard was not produced: ${coverage_file}" >&2
+    return 1
+  fi
+  return "${test_exit_code}"
+}
+
+offline_test_suite_combine() {
+  local shard_dir="${COVERAGE_SHARD_DIR:-}"
+  if [[ -z "${shard_dir}" || ! -d "${shard_dir}" ]]; then
+    echo "COVERAGE_SHARD_DIR must name the downloaded shard directory" >&2
+    return 2
+  fi
+  if ! find "${shard_dir}" -type f -name '.coverage.shard*' -print -quit | grep -q .; then
+    echo "No coverage shard files found in ${shard_dir}" >&2
+    return 1
+  fi
+
+  echo "==> backend-gate: combine shard coverage and enforce floor"
+  local combine_dir
+  local coverage_file
+  local coverage_report
+  combine_dir="$(mktemp -d)"
+  coverage_file="${combine_dir}/.coverage"
+  coverage_report="${combine_dir}/coverage.json"
+  COVERAGE_FILE="${coverage_file}" python -m coverage combine "${shard_dir}"
+  COVERAGE_FILE="${coverage_file}" python -m coverage json -o "${coverage_report}"
+  python scripts/check_coverage_floor.py --report "${coverage_report}"
+  rm -rf "${combine_dir}"
 }
 
 python_min_smoke() {
@@ -191,11 +267,17 @@ case "$phase" in
   offline-tests-selective)
     offline_test_suite_selective
     ;;
+  offline-tests-shard)
+    offline_test_suite_shard
+    ;;
+  offline-tests-combine)
+    offline_test_suite_combine
+    ;;
   python-min-smoke)
     python_min_smoke
     ;;
   *)
-    echo "Usage: $0 [all|syntax|flake8|deterministic|offline-tests|offline-tests-selective|python-min-smoke]" >&2
+    echo "Usage: $0 [all|syntax|flake8|deterministic|offline-tests|offline-tests-selective|offline-tests-shard|offline-tests-combine|python-min-smoke]" >&2
     exit 2
     ;;
 esac

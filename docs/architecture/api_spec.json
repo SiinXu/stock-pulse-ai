@@ -2354,15 +2354,12 @@
     },
     "/api/v1/alerts/triggers": {
       "get": {
-        "tags": [
-          "Alerts"
-        ],
-        "summary": "List alert trigger history",
         "operationId": "list_triggers_api_v1_alerts_triggers_get",
         "parameters": [
           {
-            "name": "rule_id",
+            "description": "Optional rule id filter",
             "in": "query",
+            "name": "rule_id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2375,12 +2372,12 @@
               ],
               "description": "Optional rule id filter",
               "title": "Rule Id"
-            },
-            "description": "Optional rule id filter"
+            }
           },
           {
-            "name": "target",
+            "description": "Optional target filter",
             "in": "query",
+            "name": "target",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2393,12 +2390,12 @@
               ],
               "description": "Optional target filter",
               "title": "Target"
-            },
-            "description": "Optional target filter"
+            }
           },
           {
-            "name": "status",
+            "description": "Optional status filter",
             "in": "query",
+            "name": "status",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2411,53 +2408,100 @@
               ],
               "description": "Optional status filter",
               "title": "Status"
-            },
-            "description": "Optional status filter"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
             }
           },
           {
-            "name": "page_size",
+            "description": "Optional typed corporate-event filter",
             "in": "query",
+            "name": "alert_type",
             "required": false,
             "schema": {
-              "type": "integer",
+              "anyOf": [
+                {
+                  "const": "corporate_event",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional typed corporate-event filter",
+              "title": "Alert Type"
+            }
+          },
+          {
+            "description": "Stable continuation cursor",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Stable continuation cursor",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
               "maximum": 100,
               "minimum": 1,
-              "default": 20,
-              "title": "Page Size"
+              "title": "Page Size",
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AlertTriggerListResponse"
                 }
               }
-            }
+            },
+            "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
           },
           "500": {
             "content": {
@@ -2468,8 +2512,22 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        }
+        },
+        "summary": "List alert trigger history",
+        "tags": [
+          "Alerts"
+        ]
       }
     },
     "/api/v1/portfolio/risk": {
@@ -9411,48 +9469,7 @@
       },
       "AlertTriggerItem": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "rule_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rule Id"
-          },
-          "target": {
-            "type": "string",
-            "title": "Target"
-          },
-          "observed_value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Observed Value"
-          },
-          "threshold": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Threshold"
-          },
-          "reason": {
+          "alert_type": {
             "anyOf": [
               {
                 "type": "string"
@@ -9461,7 +9478,29 @@
                 "type": "null"
               }
             ],
-            "title": "Reason"
+            "title": "Alert Type"
+          },
+          "analysis_context_pack_overview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisContextPackOverview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysis_visibility_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "公开摘要来源：alert_trigger_market_context / analysis_history_snapshot / evaluator_snapshot / legacy_text / null",
+            "title": "Analysis Visibility Source"
           },
           "data_source": {
             "anyOf": [
@@ -9485,20 +9524,17 @@
             ],
             "title": "Data Timestamp"
           },
-          "triggered_at": {
+          "decision_signal_summary": {
             "anyOf": [
               {
-                "type": "string"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Triggered At"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
+            "title": "Decision Signal Summary"
           },
           "diagnostics": {
             "anyOf": [
@@ -9511,6 +9547,40 @@
             ],
             "title": "Diagnostics"
           },
+          "event_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertEventContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "impact_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertImpactContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "impact_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertImpactResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "market_phase_summary": {
             "anyOf": [
               {
@@ -9521,17 +9591,18 @@
               }
             ]
           },
-          "analysis_context_pack_overview": {
+          "observed_value": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AnalysisContextPackOverview"
+                "type": "number"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Observed Value"
           },
-          "analysis_visibility_source": {
+          "reason": {
             "anyOf": [
               {
                 "type": "string"
@@ -9540,29 +9611,73 @@
                 "type": "null"
               }
             ],
-            "title": "Analysis Visibility Source",
-            "description": "公开摘要来源：alert_trigger_market_context / analysis_history_snapshot / evaluator_snapshot / legacy_text / null"
+            "title": "Reason"
           },
-          "decision_signal_summary": {
+          "rule_id": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Decision Signal Summary"
+            "title": "Rule Id"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "triggered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggered At"
           }
         },
-        "type": "object",
         "required": [
           "id",
           "target",
           "status"
         ],
-        "title": "AlertTriggerItem"
+        "title": "AlertTriggerItem",
+        "type": "object"
       },
       "AlertTriggerListResponse": {
         "properties": {
@@ -9570,29 +9685,40 @@
             "items": {
               "$ref": "#/components/schemas/AlertTriggerItem"
             },
-            "type": "array",
-            "title": "Items"
+            "title": "Items",
+            "type": "array"
           },
-          "total": {
-            "type": "integer",
-            "title": "Total"
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           },
           "page": {
-            "type": "integer",
-            "title": "Page"
+            "title": "Page",
+            "type": "integer"
           },
           "page_size": {
-            "type": "integer",
-            "title": "Page Size"
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
           }
         },
-        "type": "object",
         "required": [
           "total",
           "page",
           "page_size"
         ],
-        "title": "AlertTriggerListResponse"
+        "title": "AlertTriggerListResponse",
+        "type": "object"
       },
       "PortfolioDecisionSignalRiskBlock": {
         "properties": {
@@ -13266,6 +13392,341 @@
           "sample_sufficient"
         ],
         "title": "DecisionSignalProfileCalibrationBucket",
+        "type": "object"
+      },
+      "AlertEventAffectedContext": {
+        "properties": {
+          "in_portfolio": {
+            "default": false,
+            "title": "In Portfolio",
+            "type": "boolean"
+          },
+          "in_watchlist": {
+            "default": false,
+            "title": "In Watchlist",
+            "type": "boolean"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "title": "AlertEventAffectedContext",
+        "type": "object"
+      },
+      "AlertEventContext": {
+        "properties": {
+          "event_categories": {
+            "items": {
+              "enum": [
+                "earnings",
+                "shareholder",
+                "mna",
+                "regulatory",
+                "analyst"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Event Categories",
+            "type": "array"
+          },
+          "event_category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "earnings",
+                  "shareholder",
+                  "mna",
+                  "regulatory",
+                  "analyst"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Category"
+          },
+          "matched_count": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Count"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "what_happened": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "What Happened"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters"
+          }
+        },
+        "title": "AlertEventContext",
+        "type": "object"
+      },
+      "AlertImpactContext": {
+        "properties": {
+          "affected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertEventAffectedContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "event_categories": {
+            "items": {
+              "enum": [
+                "earnings",
+                "shareholder",
+                "mna",
+                "regulatory",
+                "analyst"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Event Categories",
+            "type": "array"
+          },
+          "event_category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "earnings",
+                  "shareholder",
+                  "mna",
+                  "regulatory",
+                  "analyst"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Category"
+          },
+          "matched_count": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Count"
+          },
+          "related_analysis": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Analysis"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "what_happened": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "What Happened"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters"
+          }
+        },
+        "title": "AlertImpactContext",
+        "type": "object"
+      },
+      "AlertImpactResult": {
+        "properties": {
+          "grade": {
+            "enum": [
+              "major",
+              "routine",
+              "unclassified"
+            ],
+            "title": "Grade",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "rule_severity",
+              "unavailable"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          }
+        },
+        "required": [
+          "grade",
+          "provenance"
+        ],
+        "title": "AlertImpactResult",
         "type": "object"
       }
     },

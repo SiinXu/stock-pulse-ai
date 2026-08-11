@@ -281,14 +281,23 @@ def parse_inventory_table(path: Path) -> Dict[str, Dict[str, str]]:
     block = text[start + len(INVENTORY_START) : end]
     rows: Dict[str, Dict[str, str]] = {}
     for line in block.splitlines():
-        match = INVENTORY_ROW_RE.match(line.strip())
-        if not match:
+        stripped = line.strip()
+        if not stripped.startswith("|") or not stripped.endswith("|"):
             continue
-        key = match.group(1)
+        cells = [
+            cell.strip().replace("\\|", "|")
+            for cell in re.split(r"(?<!\\)\|", stripped[1:-1])
+        ]
+        if len(cells) != 4:
+            continue
+        key_match = re.fullmatch(r"`([A-Z][A-Z0-9_]*)`", cells[0])
+        if not key_match:
+            continue
+        key = key_match.group(1)
         rows[key] = {
-            "default": match.group(2).strip().strip("`"),
-            "registered": match.group(3).strip().lower(),
-            "notes": match.group(4).strip(),
+            "default": cells[1].strip("`"),
+            "registered": cells[2].lower(),
+            "notes": cells[3],
         }
     return rows
 

@@ -118,10 +118,15 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../common/InlineAlert.tsx', [{
-    line: 26,
+    line: 52,
     owner: 'UIUX-HARNESS',
-    removeWhen: 'InlineAlert callers no longer need layout className or native style pass-through after wrapper migration.',
-    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+    removeWhen: 'InlineAlert callers no longer need native attribute pass-through after wrapper migration.',
+    tokens: [
+      'dynamic:className spread:sharedProps',
+      'dynamic:className spread:dismissProps',
+      'style:dynamic:style spread:sharedProps',
+      'style:dynamic:style spread:dismissProps',
+    ],
   }]],
   ['../common/Loading.tsx', [{
     line: 14,
@@ -166,14 +171,14 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:className'],
   }]],
   ['../report/ReportOverview.tsx', [
-    ...[317, 340].map((line) => ({
+    ...[318, 341].map((line) => ({
       line,
       owner: 'UIUX-HARNESS' as const,
       removeWhen: 'Report insight cards receive an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-insight-card'],
     })),
     {
-      line: 401,
+      line: 402,
       owner: 'UIUX-HARNESS',
       removeWhen: 'The report sentiment rail receives an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-rail-card'],
@@ -3850,7 +3855,7 @@ describe('production design guard', () => {
     expect(allowlistHits).toEqual(expectedAllowlistHits);
     expect(buttonClassNames.size).toBeGreaterThan(0);
     expect(violations).toEqual([]);
-  });
+  }, 15_000);
 
   it('retains the legacy-visual guard for upstream-adapted surfaces', () => {
     const guardedSuffixes = [

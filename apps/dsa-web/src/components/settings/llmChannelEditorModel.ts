@@ -80,20 +80,20 @@ export function canonicalizeHermesRouteModel(model: string): string {
   return trimmed.startsWith('openai/') ? trimmed : `openai/${trimmed}`;
 }
 
-export const shouldUseSavedHermesSecret = (
-  channel: Pick<ChannelConfig, 'name' | 'apiKey'>,
+export const shouldUseSavedConnectionSecret = (
+  channel: Pick<ChannelConfig, 'apiKey'>,
   maskToken: string,
   hasPersistedSecret: boolean,
 ): boolean => (
-  isHermesChannel(channel) && channel.apiKey === maskToken && hasPersistedSecret
+  channel.apiKey === maskToken && hasPersistedSecret
 );
 
-export const hasRuntimeOnlyMaskedHermesSecret = (
-  channel: Pick<ChannelConfig, 'name' | 'apiKey'>,
+export const hasRuntimeOnlyMaskedConnectionSecret = (
+  channel: Pick<ChannelConfig, 'apiKey'>,
   maskToken: string,
   hasPersistedSecret: boolean,
 ): boolean => (
-  isHermesChannel(channel) && channel.apiKey === maskToken && !hasPersistedSecret
+  channel.apiKey === maskToken && !hasPersistedSecret
 );
 
 export interface ChannelConfig {
@@ -115,6 +115,7 @@ export interface ChannelConfig {
   /** Schema field that owns apiKey, independent of how many keys it contains. */
   credentialField: ConnectionCredentialField;
   models: string;
+  modelIdMode?: 'route' | 'literal';
   extraHeaders: string;
   enabled: boolean;
   /** A persisted false is a value; an absent boolean is not. */
@@ -135,6 +136,7 @@ export interface LlmConnectionCheckInput {
   baseUrl?: string;
   apiKey?: string;
   models: string[];
+  modelIdMode?: 'route' | 'literal';
   enabled?: boolean;
   useSavedSecret?: boolean;
   capabilityChecks?: LLMCapabilityCheck[];
@@ -455,6 +457,9 @@ function buildChangedItemKeys(
     if (current.models !== previous.models) {
       changedKeys.add(`${prefix}_MODELS`);
     }
+    if ((current.modelIdMode ?? 'route') !== (previous.modelIdMode ?? 'route')) {
+      changedKeys.add(`${prefix}_MODEL_ID_MODE`);
+    }
     if (current.extraHeaders !== previous.extraHeaders) {
       changedKeys.add(`${prefix}_EXTRA_HEADERS`);
     }
@@ -640,6 +645,7 @@ export async function runLlmConnectionCheck(
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
       models: input.models,
+      modelIdMode: input.modelIdMode,
       enabled: input.enabled,
       useSavedSecret: input.useSavedSecret,
       capabilityChecks: input.capabilityChecks,
@@ -682,6 +688,7 @@ export async function runChannelConnectionTest(
     baseUrl: channel.baseUrl,
     apiKey: channel.apiKey,
     models: splitModels(channel.models),
+    modelIdMode: channel.modelIdMode ?? 'route',
     enabled: channel.enabled,
     useSavedSecret,
   }, language);
@@ -1101,6 +1108,7 @@ export function parseChannelsFromItems(
     );
     const baseUrl = itemMap.get(`LLM_${upperName}_BASE_URL`) || '';
     const rawModels = itemMap.get(`LLM_${upperName}_MODELS`) || '';
+    const rawModelIdMode = itemMap.get(`LLM_${upperName}_MODEL_ID_MODE`) || '';
     const models = splitModels(rawModels);
     const explicitProviderId = fieldHasSource(providerKey)
       ? (itemMap.get(providerKey) || '').trim().toLowerCase()
@@ -1123,6 +1131,7 @@ export function parseChannelsFromItems(
       apiKey: resolveInitialChannelApiKeyValue(name, itemMap, itemSourceByKey),
       credentialField: resolveInitialChannelCredentialField(name, itemMap),
       models: rawModels,
+      modelIdMode: rawModelIdMode.trim().toLowerCase() === 'literal' ? 'literal' : 'route',
       extraHeaders: itemMap.get(`LLM_${upperName}_EXTRA_HEADERS`) || '',
       enabled: parseEnabled(rawEnabled),
       enabledValuePresent: Boolean(rawEnabled?.trim()) || legacyMode,
@@ -1165,6 +1174,7 @@ function channelsToUpdateItems(
       updates.push({ key: `${prefix}_${siblingSuffix}`, value: '' });
     }
     updates.push({ key: `${prefix}_MODELS`, value: channel.models });
+    updates.push({ key: `${prefix}_MODEL_ID_MODE`, value: channel.modelIdMode ?? 'route' });
     updates.push({ key: `${prefix}_EXTRA_HEADERS`, value: channel.extraHeaders });
   }
 
@@ -1183,6 +1193,7 @@ function channelsToUpdateItems(
     updates.push({ key: `${prefix}_API_KEY`, value: '' });
     updates.push({ key: `${prefix}_API_KEYS`, value: '' });
     updates.push({ key: `${prefix}_MODELS`, value: '' });
+    updates.push({ key: `${prefix}_MODEL_ID_MODE`, value: '' });
     updates.push({ key: `${prefix}_EXTRA_HEADERS`, value: '' });
   }
 
@@ -1472,6 +1483,7 @@ export function channelsAreEqual(left: ChannelConfig, right: ChannelConfig): boo
     && left.apiKey === right.apiKey
     && left.credentialField === right.credentialField
     && left.models === right.models
+    && (left.modelIdMode ?? 'route') === (right.modelIdMode ?? 'route')
     && left.extraHeaders === right.extraHeaders
     && left.enabled === right.enabled
     && left.enabledValuePresent === right.enabledValuePresent

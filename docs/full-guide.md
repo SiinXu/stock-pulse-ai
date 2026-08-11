@@ -28,7 +28,6 @@ stock-pulse-ai/
 - [项目结构](#项目结构)
 - [GitHub Actions 详细配置](#github-actions-详细配置)
 - [环境变量完整列表](#环境变量完整列表)
-- [环境变量完整清单与配置新增流程](environment-variables.md)
 - [Docker 部署](#docker-部署)
 - [本地运行详细配置](#本地运行详细配置)
 - [定时任务配置](#定时任务配置)
@@ -121,6 +120,7 @@ stock-pulse-ai/
 | `REPORT_MODE` | Jinja 报告呈现模式（`brief` / `standard` / `research`，默认 `standard`）。`brief` 仅 Decision Card + 关键风险；`standard` 为 Decision Card + 主要分析段落；`research` 为全量细节与更高 strata 上限。硬性上限永不丢弃 Decision Card。单次可通过 `extra_context.report_mode` 覆盖。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
 | `REPORT_SUMMARY_ONLY` | 仅分析结果摘要：设为 `true` 时只推送汇总，不含个股详情；多股时适合快速浏览（默认 false，Issue #262） | 可选 |
 | `REPORT_SHOW_LLM_MODEL` | 通知报告底部是否显示本次分析使用的 LLM 模型名称，默认 `true`；设为 `false` 可隐藏运行时模型信息。该变量仅调整展示，不影响 provider/model/Base URL、LiteLLM 路由或运行时模型保存/迁移/清理语义。 | 可选 |
+| `NOTIFICATION_DELTA_FIRST` | 是否在个股出站通知顶部增加确定性的“较上次分析变化”摘要，默认 `false`。首次分析、无实质变化和暂时无法对比会明确区分；只读取已持久化历史，不额外调用模型，也不修改本地保存的报告。 | 可选 |
 | `REPORT_TEMPLATES_DIR` | Jinja2 模板目录（相对项目根，默认 `templates`） | 可选 |
 | `REPORT_RENDERER_ENABLED` | 启用 Jinja2 模板渲染（默认 `false`，保证零回归） | 可选 |
 | `REPORT_INTEGRITY_ENABLED` | 启用报告完整性校验，缺失必填字段时重试或占位补全（默认 `true`） | 可选 |
@@ -145,6 +145,8 @@ stock-pulse-ai/
 | `PREFETCH_REALTIME_QUOTES` | 设为 `false` 可禁用实时行情预取，避免 efinance/akshare_em 全市场拉取（默认 true） | 可选 |
 
 > 兼容性说明：`REPORT_SHOW_LLM_MODEL` 维持默认 `true` 的原始展示语义，关闭时只影响底部模型文案输出。该配置不会变更 provider/model/Base URL、LiteLLM 路由、模型保存、迁移或清理语义；回退方式为恢复或删除该变量，并设为 `true`。
+
+> `NOTIFICATION_DELTA_FIRST` 只影响通知且默认关闭。对比或格式化失败不会阻断原通知；回退时删除该变量或设为 `false`，无需迁移已存数据。
 
 > 说明：`REPORT_LANGUAGE` 影响报告文本、Web 报告页固定文案与未显式指定语言的 Agent Chat 回复；WebUI 页面语言（导航、登录页、侧边栏、设置页、通用控件）使用独立状态，不与其联动。
 > WebUI 语言状态保存在浏览器 `localStorage` 的 `dsa.uiLanguage`，启动顺序为：
@@ -229,8 +231,7 @@ stock-pulse-ai/
 
 ## 环境变量完整列表
 
-> **完整键清单与配置项新增流程**见 [环境变量清单与配置事实源](environment-variables.md)。  
-> 本节为高频精选说明；`.env.example`、配置注册表与文档三方必须同步更新。一致性检查：`python scripts/check_config_doc_consistency.py`。注册表缺口由注册表任务与 Task 1 守卫处理，不要只改文档。
+> 完整键清单与配置项新增流程见 [环境变量清单与配置事实源](environment-variables.md)。本节只保留高频说明；修改配置后运行 `python scripts/check_config_doc_consistency.py` 检查 `.env.example`、注册表与文档是否同步。
 
 ### AI 模型配置
 
@@ -313,7 +314,7 @@ stock-pulse-ai/
 | `EMAIL_SENDER` | 发件人邮箱 | 可选 |
 | `EMAIL_PASSWORD` | 邮箱授权码（非登录密码） | 可选 |
 | `EMAIL_RECEIVERS` | 收件人邮箱（逗号分隔，留空发给自己） | 可选 |
-| `EMAIL_SENDER_NAME` | 发件人显示名称（代码支持；当前未写入 `.env.example`，完整清单以 [environment-variables.md](environment-variables.md) / 模板为准） | 可选 |
+| `EMAIL_SENDER_NAME` | 发件人显示名称 | 可选 |
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | 邮件分组路由（Issue #268）：`STOCK_GROUP_N` 应为 `STOCK_LIST` 子集，仅影响邮件收件人，不改变分析范围或其他通知渠道 | 可选 |
 | `CUSTOM_WEBHOOK_URLS` | 自定义 Webhook（逗号分隔） | 可选 |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | 自定义 Webhook Bearer Token | 可选 |
@@ -346,7 +347,7 @@ stock-pulse-ai/
 |--------|------|:----:|
 | `FEISHU_APP_ID` | 飞书应用 ID | 可选 |
 | `FEISHU_APP_SECRET` | 飞书应用 Secret | 可选 |
-| `FEISHU_FOLDER_TOKEN` | 飞书云盘文件夹 Token（代码支持；当前未写入 `.env.example`，完整清单以 [environment-variables.md](environment-variables.md) / 模板为准） | 可选 |
+| `FEISHU_FOLDER_TOKEN` | 飞书云盘文件夹 Token | 可选 |
 | `FEISHU_SEND_AS_FILE` | 飞书 App Bot 以文件形式发送报告（默认 `false`） | 可选 |
 
 > 飞书云文档配置步骤：

@@ -84,6 +84,10 @@ _VOLATILE_ERROR_PATTERNS = (
     re.compile(r"^(Pipeline timed out after) .+$"),
     re.compile(r"^(Pipeline skipped before stage '[^']+' due to insufficient budget) .+$"),
 )
+_TOOL_TIMEOUT_PREVIEW_PATTERN = re.compile(
+    r'^(\{"error": "Tool execution timed out after) '
+    r'\d+(?:\.\d+)?s(", "timeout": true\})$'
+)
 
 
 def detect_stage(system_text: str) -> str:
@@ -509,6 +513,13 @@ def _normalize_tool_log(tool_calls_log: List[Dict[str, Any]]) -> List[Dict[str, 
     normalized = []
     for entry in tool_calls_log or []:
         row = {key: value for key, value in entry.items() if key != "duration"}
+        result_preview = row.get("result_preview")
+        if isinstance(result_preview, str):
+            match = _TOOL_TIMEOUT_PREVIEW_PATTERN.fullmatch(result_preview)
+            if match:
+                row["result_preview"] = (
+                    f"{match.group(1)} <runtime-duration>{match.group(2)}"
+                )
         normalized.append(row)
     return normalized
 

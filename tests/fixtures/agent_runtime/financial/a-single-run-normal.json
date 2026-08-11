@@ -101,7 +101,8 @@
         },
         "success": true,
         "result_length": 126,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"600519\", \"name\": \"Synthetic Co\", \"price\": 100.0, \"change_pct\": 1.5, \"volume_ratio\": 1.2, \"turnover_rate\": 2.4}"
       },
       {
         "step": 2,
@@ -111,7 +112,8 @@
         },
         "success": true,
         "result_length": 179,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"600519\", \"ma_alignment\": \"bullish\", \"trend_score\": 78, \"ma5\": 99.0, \"ma10\": 97.5, \"ma20\": 95.0, \"bias_ma5\": 1.0, \"current_price\": 100.0, \"volume_status\": \"normal\"}"
       },
       {
         "step": 3,
@@ -121,7 +123,8 @@
         },
         "success": true,
         "result_length": 90,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"600519\", \"profit_ratio\": 0.62, \"avg_cost\": 92.0, \"concentration_90\": 0.12}"
       }
     ],
     "total_steps": 4,

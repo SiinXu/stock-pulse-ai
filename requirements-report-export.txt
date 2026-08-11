@@ -1,4 +1,4 @@
-# Optional report export dependencies (PDF).
+# Optional report export dependencies (HTML AST + PDF).
 #
 # NOT included in requirements.txt. Default StockPulse install stays free of
 # PDF tooling. Install the base application first, then:
@@ -7,8 +7,9 @@
 #     -r requirements-report-export.txt
 #
 # Selection notes (see docs/report-export.md):
+# - markdown-it-py powers secret-safe HTML and PDF Markdown AST parsing.
 # - fpdf2 is pure Python (no Cairo/Pango system libraries unlike WeasyPrint).
-# - No headless browser required.
+# - No headless browser required; office-friendly export is HTML, not DOCX.
 # - Chinese PDF still needs a local .ttf/.otf font (REPORT_EXPORT_PDF_FONT_PATH).
 #
 # Versions are exact so an operator gets the same fpdf2/fontTools behavior on

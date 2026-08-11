@@ -28,7 +28,6 @@ stock-pulse-ai/
 - [Project Structure](#project-structure)
 - [GitHub Actions Configuration](#github-actions-configuration)
 - [Complete Environment Variables List](#complete-environment-variables-list)
-- [Full environment variable inventory and config addition process](environment-variables_EN.md)
 - [Docker Deployment](#docker-deployment)
 - [Local Deployment](#local-deployment)
 - [Scheduled Task Configuration](#scheduled-task-configuration)
@@ -93,7 +92,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `EMAIL_SENDER` | Sender email (e.g., `xxx@qq.com`) | Optional |
 | `EMAIL_PASSWORD` | Email authorization code (not login password) | Optional |
 | `EMAIL_RECEIVERS` | Receiver emails (comma-separated, leave empty to send to self) | Optional |
-| `EMAIL_SENDER_NAME` | Sender display name (supported in code; not yet listed in `.env.example`; full inventory is [environment-variables_EN.md](environment-variables_EN.md) / the template) | Optional |
+| `EMAIL_SENDER_NAME` | Sender display name | Optional |
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | Email routing groups (Issue #268): `STOCK_GROUP_N` should be a subset of `STOCK_LIST`; affects email recipients only, not analysis scope or other channels | Optional |
 | `PUSHPLUS_TOKEN` | PushPlus Token ([Get here](https://www.pushplus.plus), Chinese push service) | Optional |
 | `SERVERCHAN3_SENDKEY` | ServerChan v3 Sendkey ([Get here](https://sc3.ft07.com/), mobile app push service) | Optional |
@@ -133,6 +132,7 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
 | `REPORT_MODE` | Jinja report presentation mode (`brief` / `standard` / `research`, default `standard`). `brief` keeps Decision Card + key risk; `standard` is Decision Card + main analysis; `research` is full detail with expanded strata limits. Hard limits apply; Decision Card is never dropped. Per-request override: `extra_context.report_mode`. Presentation only when `REPORT_RENDERER_ENABLED=true`. | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
+| `NOTIFICATION_DELTA_FIRST` | Prepend a compact, deterministic “changes since previous analysis” section to outbound stock notifications. Defaults to `false`; first analysis, no material change, and unavailable comparison remain distinct. Uses persisted history only and makes no extra model call. Local saved reports are unchanged. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
 | `REPORT_RENDERER_ENABLED` | Enable Jinja2 template rendering (default `false`, zero regression) | Optional |
 | `REPORT_INTEGRITY_ENABLED` | Enable report integrity checks, retry or placeholder on missing fields (default `true`) | Optional |
@@ -151,6 +151,8 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `NOTIFICATION_DAILY_DIGEST_ENABLED` | Reserved daily digest flag. The current implementation does not send or persist digests | Optional |
 
 > Compatibility note: `REPORT_SHOW_LLM_MODEL` keeps the previous default-visible behavior (`true`) and only changes report footer rendering. It does not alter provider/model/Base URL, LiteLLM routing, or runtime model persistence/migration/cleanup semantics. Rollback is to remove the variable or set it back to `true`.
+
+> `NOTIFICATION_DELTA_FIRST` is notification-only and defaults off. Comparison or formatting failure is isolated and cannot block the original notification. Rollback is to remove the variable or set it to `false`; no stored data needs migration.
 
 > `REPORT_LANGUAGE` affects report text, report page fixed copy, and Agent Chat replies that do not explicitly set a language. Web UI chrome language (navigation, login, settings, shell labels, shared controls) is intentionally independent and stored in browser `localStorage` as `dsa.uiLanguage`.
 > UI language resolution is: explicit localStorage value (`zh` or `en`) -> browser language (`navigator.languages` / `navigator.language`) -> default `zh`.
@@ -212,8 +214,7 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 
 ## Complete Environment Variables List
 
-> **Full key inventory and the config addition process** live in [Environment variable inventory](environment-variables_EN.md).  
-> This section is a curated high-frequency guide. `.env.example`, the configuration registry, and docs must be updated together. Consistency check: `python scripts/check_config_doc_consistency.py`. Registry gaps are owned by registry tasks and the Task 1 guard—do not fix them in docs-only PRs.
+> The full key inventory and config-addition process live in [Environment variable inventory](environment-variables_EN.md). This section is a curated guide; after changing configuration, run `python scripts/check_config_doc_consistency.py` to check `.env.example`, registry, and docs alignment.
 
 ### AI Model Configuration
 
@@ -282,7 +283,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `EMAIL_SENDER` | Sender email | Optional |
 | `EMAIL_PASSWORD` | Email authorization code (not login password) | Optional |
 | `EMAIL_RECEIVERS` | Receiver emails (comma-separated, leave empty to send to self) | Optional |
-| `EMAIL_SENDER_NAME` | Sender display name (supported in code; not yet listed in `.env.example`; full inventory is [environment-variables_EN.md](environment-variables_EN.md) / the template) | Optional |
+| `EMAIL_SENDER_NAME` | Sender display name | Optional |
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | Email routing groups (Issue #268): `STOCK_GROUP_N` should stay within `STOCK_LIST` and only changes email recipients | Optional |
 | `CUSTOM_WEBHOOK_URLS` | Custom Webhook (comma-separated) | Optional |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | Custom Webhook Bearer Token | Optional |
@@ -315,7 +316,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 |--------|------|:----:|
 | `FEISHU_APP_ID` | Feishu App ID | Optional |
 | `FEISHU_APP_SECRET` | Feishu App Secret | Optional |
-| `FEISHU_FOLDER_TOKEN` | Feishu Cloud Drive Folder Token (supported in code; not yet listed in `.env.example`; full inventory is [environment-variables_EN.md](environment-variables_EN.md) / the template) | Optional |
+| `FEISHU_FOLDER_TOKEN` | Feishu Cloud Drive Folder Token | Optional |
 | `FEISHU_SEND_AS_FILE` | Send reports as files via Feishu App Bot (default `false`) | Optional |
 
 > Feishu Cloud Document setup steps:

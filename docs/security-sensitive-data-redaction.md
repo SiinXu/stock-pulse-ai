@@ -20,7 +20,7 @@ The central implementation is the `src/utils/sanitize/` package (imported as `sr
 
 The shared rules cover:
 
-- Mapping keys that denote API keys, tokens, passwords, credentials, secrets, cookies, authorization, webhooks, complete header/prompt/proxy fields, or raw responses. Safe usage counters such as `prompt_tokens` remain intact.
+- Mapping keys that denote API keys, tokens, passwords, credentials, secrets, cookies, authorization, webhooks, complete header/prompt/proxy fields, install specifications, or raw responses. Bare credential suffixes such as `PUSHOVER_USER_KEY` are covered, while structural names such as `issue_key`, `help_key`, `scope_key`, `requires_api_key`, `install_spec_is_default`, public keys, and safe usage counters such as `prompt_tokens` remain intact.
 - `Authorization` and `Proxy-Authorization` values, including Bearer, Basic, Token, and Digest forms.
 - Bearer values and labelled assignments such as `OPENAI_API_KEY=...`, `access_token: ...`, or JSON secret fields.
 - Common prefixed credentials, including OpenAI/Anthropic-style `sk-` keys, Stripe secret keys, GitHub tokens, Slack tokens, Google API keys, AWS access-key IDs, and SendGrid keys.
@@ -66,6 +66,6 @@ If a secret may have appeared in an output, rotate or revoke it, restrict access
 
 ## Verification And Rollback
 
-Deterministic coverage is in `tests/security/test_sensitive_redaction.py`; it exercises logs, API errors, Agent traces/SSE, diagnostics exports, provider errors, and tool audits without network access.
+Deterministic coverage is in `tests/security/test_sensitive_redaction.py` and `tests/security/test_config_sensitive_masking_e2e.py`; it exercises logs, API errors, Agent traces/SSE, diagnostics exports, provider errors, tool audits, Settings read masking, profile exclusion, and mask-token save preservation without network access.
 
 Rollback is a revert of the redaction change. No database or configuration migration is required. Reverting restores the prior, less complete leak boundary and should not be used as a workaround for an integration that emits secrets.

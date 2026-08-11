@@ -116,6 +116,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     return sortItemsByOrder(
       serverItems.map((item) => ({
         ...item,
+        persistedValue: item.value,
         value: draftValues[item.key] ?? item.value,
       })),
     );
