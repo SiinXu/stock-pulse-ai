@@ -1056,6 +1056,33 @@ class _SystemConfigUpdateMethods:
             )
             return issues
 
+        if key in {"INDICATOR_MA_PERIODS", "INDICATOR_RSI_PERIODS"}:
+            from src.utils.indicator_periods import (
+                MAX_MA_PERIOD,
+                MAX_RSI_PERIOD,
+                validate_period_list_string,
+            )
+
+            is_ma = key == "INDICATOR_MA_PERIODS"
+            valid, message = validate_period_list_string(
+                value,
+                min_items=3 if is_ma else 1,
+                max_items=16 if is_ma else 8,
+                maximum=MAX_MA_PERIOD if is_ma else MAX_RSI_PERIOD,
+            )
+            if not valid:
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_indicator_periods",
+                        "message": message,
+                        "severity": "error",
+                        "expected": "unique comma-separated integer periods in range",
+                        "actual": value,
+                    }
+                )
+            return issues
+
         if data_type == "integer":
             try:
                 numeric = int(value)

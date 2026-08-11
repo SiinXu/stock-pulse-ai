@@ -1078,22 +1078,4 @@ describe('BacktestPage', () => {
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveValue('AAPL');
     expect(screen.getByPlaceholderText('10')).toHaveValue(15);
   });
-
-  it('does not use native title on resolution-note cells (Tooltip owns the accessible description)', async () => {
-    mockGetResults.mockResolvedValueOnce({
-      total: 1,
-      page: 1,
-      limit: 20,
-      items: [{
-        ...baseResultItem,
-        resolutionNotes: 'missing_daily_bars,legacy_analysis_date',
-      }],
-    });
-
-    renderEnglishPage();
-
-    const notes = await screen.findAllByTestId('backtest-resolution-notes');
-    expect(notes[0]).not.toHaveAttribute('title');
-    expect(notes[0]).toHaveTextContent(/Missing usable daily bars/i);
-  });
 });

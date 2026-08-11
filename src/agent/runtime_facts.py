@@ -8,8 +8,10 @@ errors, tokens, or a user-facing final explanation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, replace
 from enum import Enum
+from math import isfinite
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 from src.agent.protocols import (
@@ -25,7 +27,7 @@ from src.agent.soul import (
 )
 
 if TYPE_CHECKING:
-    from src.agent.risk_override import RiskOverrideApplication
+    from src.agent.risk_override import RiskGateResult, RiskOverrideApplication
 
 
 _BULLISH_SIGNALS = {"strong_buy", "buy"}
@@ -39,6 +41,24 @@ class BaseAgentOpinionFact:
     agent: str
     signal: str
     confidence: float
+
+
+@dataclass(frozen=True)
+class RiskEvidenceFact:
+    """Bounded facts needed to re-evaluate the final action at later exits."""
+
+    signal: str = "hold"
+    confidence: float = 0.0
+    risk_level: Optional[str] = None
+    veto_buy: bool = False
+    signal_adjustment: Optional[str] = None
+    flags: Tuple[Tuple[str, str, str], ...] = ()
+    portfolio_exposure: Optional[float] = None
+    volatility: Optional[float] = None
+    historical_outcomes: Optional[str] = None
+    current_holdings: Optional[str] = None
+    invalid_fields: Tuple[str, ...] = ()
+    as_of: Optional[str] = None
 
 
 class DegradationBoundary(str, Enum):
@@ -91,6 +111,8 @@ class AgentRuntimeFacts:
     degraded_events: Tuple[DegradedEvent, ...] = ()
     pipeline_termination: Optional[PipelineTerminationFact] = None
     risk_override_application: Optional[RiskOverrideApplication] = None
+    risk_gate_result: Optional[RiskGateResult] = None
+    risk_evidence: Optional[RiskEvidenceFact] = None
 
     @property
     def soul_version(self) -> Optional[str]:
@@ -130,7 +152,14 @@ def inherit_agent_soul_runtime_facts(facts: Any) -> Optional[AgentRuntimeFacts]:
     """Copy only a module-verified Soul identity into a new result snapshot."""
     if type(facts) is not _VerifiedAgentRuntimeFacts:
         return None
-    return _VerifiedAgentRuntimeFacts()
+    return _VerifiedAgentRuntimeFacts(
+        base_agent_opinions=facts.base_agent_opinions,
+        degraded_events=facts.degraded_events,
+        pipeline_termination=facts.pipeline_termination,
+        risk_override_application=facts.risk_override_application,
+        risk_gate_result=facts.risk_gate_result,
+        risk_evidence=facts.risk_evidence,
+    )
 
 
 def build_agent_runtime_facts(ctx: AgentContext) -> AgentRuntimeFacts:
@@ -145,7 +174,25 @@ def build_agent_runtime_facts(ctx: AgentContext) -> AgentRuntimeFacts:
         degraded_events=tuple(_iter_degraded_events(ctx)),
         pipeline_termination=_pipeline_termination(ctx),
         risk_override_application=_risk_override_application(ctx),
+        risk_gate_result=_risk_gate_result(ctx),
+        risk_evidence=_risk_evidence(ctx),
     )
+
+
+def attach_risk_gate_result(
+    facts: Any,
+    result: RiskGateResult,
+    *,
+    evidence: Optional[RiskEvidenceFact] = None,
+) -> AgentRuntimeFacts:
+    """Return immutable runtime facts carrying the canonical gate result."""
+    if isinstance(facts, AgentRuntimeFacts):
+        return replace(
+            facts,
+            risk_gate_result=result,
+            risk_evidence=evidence if evidence is not None else facts.risk_evidence,
+        )
+    return AgentRuntimeFacts(risk_gate_result=result, risk_evidence=evidence)
 
 
 def _iter_base_agent_opinions(ctx: AgentContext):
@@ -220,6 +267,113 @@ def _risk_override_application(ctx: AgentContext) -> Optional[RiskOverrideApplic
     return application if isinstance(application, RiskOverrideApplication) else None
 
 
+def _risk_gate_result(ctx: AgentContext) -> Optional[RiskGateResult]:
+    from src.agent.risk_override import RiskGateResult
+
+    result = ctx.meta.get("risk_gate_result")
+    return result if isinstance(result, RiskGateResult) else None
+
+
+def _risk_evidence(ctx: AgentContext) -> Optional[RiskEvidenceFact]:
+    risk_opinion = next(
+        (opinion for opinion in reversed(ctx.opinions) if _is_risk_agent(opinion.agent_name)),
+        None,
+    )
+    raw = risk_opinion.raw_data if risk_opinion and isinstance(risk_opinion.raw_data, dict) else {}
+    flags = tuple(
+        (
+            str(flag.get("category") or flag.get("type") or "risk")[:64],
+            str(flag.get("description") or "risk")[:200],
+            str(flag.get("severity") or "medium")[:16],
+        )
+        for flag in ctx.risk_flags[:20]
+        if isinstance(flag, dict)
+    )
+    portfolio_exposure = _bounded_number(ctx.get_data("portfolio_exposure"))
+    volatility = _bounded_number(ctx.get_data("volatility"))
+    historical_outcomes = _bounded_json(ctx.get_data("historical_outcomes"), 500)
+    current_holdings = _bounded_json(
+        ctx.get_data("current_holdings"),
+        500,
+        truncate=True,
+    )
+    invalid_fields = tuple(
+        key
+        for key, bounded in (
+            ("portfolio_exposure", portfolio_exposure),
+            ("volatility", volatility),
+            ("historical_outcomes", historical_outcomes),
+        )
+        if _has_value(ctx.get_data(key)) and bounded is None
+    )
+    has_portfolio_facts = any(
+        _has_value(ctx.get_data(key))
+        for key in (
+            "portfolio_exposure",
+            "volatility",
+            "historical_outcomes",
+            "current_holdings",
+        )
+    )
+    if risk_opinion is None and not raw and not flags and not has_portfolio_facts:
+        return None
+    return RiskEvidenceFact(
+        signal=_effective_signal("risk", getattr(risk_opinion, "signal", "hold")),
+        confidence=_safe_confidence(getattr(risk_opinion, "confidence", 0.0)),
+        risk_level=_bounded_text(raw.get("risk_level"), 32),
+        veto_buy=raw.get("veto_buy") is True,
+        signal_adjustment=_bounded_text(raw.get("signal_adjustment"), 32),
+        flags=flags,
+        portfolio_exposure=portfolio_exposure,
+        volatility=volatility,
+        historical_outcomes=historical_outcomes,
+        current_holdings=current_holdings,
+        invalid_fields=invalid_fields,
+        as_of=_bounded_text(ctx.get_data("risk_evidence_as_of"), 64),
+    )
+
+
+def _has_value(value: Any) -> bool:
+    """Return whether a caller supplied a non-empty risk fact."""
+    return value not in (None, "", (), [], {})
+
+
+def _bounded_text(value: Any, maximum: int) -> Optional[str]:
+    text = str(value or "").strip()
+    return text[:maximum] or None
+
+
+def _bounded_json(
+    value: Any,
+    maximum: int,
+    *,
+    truncate: bool = False,
+) -> Optional[str]:
+    if value in (None, "", (), [], {}):
+        return None
+    try:
+        text = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        text = str(value)
+    if not text:
+        return None
+    if truncate:
+        return text[:maximum]
+    return text if len(text) <= maximum else None
+
+
+def _bounded_number(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not isfinite(parsed):
+        return None
+    return parsed if 0.0 <= parsed <= 1.0 else None
+
+
 def _normalize_opinion_signal(signal: Any) -> str:
     """Normalize an opinion signal without exposing arbitrary model text."""
     if not isinstance(signal, str):
@@ -249,6 +403,8 @@ def _safe_confidence(confidence: Any) -> float:
         value = float(confidence)
     except (TypeError, ValueError):
         value = 0.0
+    if not isfinite(value):
+        value = 0.0
     return round(max(0.0, min(1.0, value)), 2)
 
 
@@ -258,7 +414,9 @@ __all__ = [
     "DegradationBoundary",
     "DegradedEvent",
     "PipelineTerminationFact",
+    "RiskEvidenceFact",
     "build_agent_runtime_facts",
+    "attach_risk_gate_result",
     "build_agent_soul_runtime_facts",
     "inherit_agent_soul_runtime_facts",
     "project_agent_runtime_metadata",

@@ -202,16 +202,19 @@ def test_queued_calls_recheck_circuit_inside_fetcher_lock() -> None:
     sources: list[str] = []
     errors: list[BaseException] = []
 
-    def fetch() -> None:
+    def fetch(stock_code: str) -> None:
         try:
-            _, source = manager.get_daily_data("600519")
+            _, source = manager.get_daily_data(stock_code)
             sources.append(source)
         except BaseException as exc:  # pragma: no cover - thread assertion transport
             errors.append(exc)
 
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
-        first = threading.Thread(target=fetch)
-        second = threading.Thread(target=fetch)
+        # Different cache identities still queue on the shared provider lock.
+        # Same-identity callers are intentionally coalesced by the manager's
+        # local-first single-flight guard before reaching this circuit seam.
+        first = threading.Thread(target=fetch, args=("600519",))
+        second = threading.Thread(target=fetch, args=("600520",))
         first.start()
         assert primary.entered.wait(timeout=1)
         second.start()

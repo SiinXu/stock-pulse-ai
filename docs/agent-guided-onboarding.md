@@ -29,7 +29,7 @@
 | `interaction` | `push` / `web` / `chat` |
 | `risk_tone` | `conservative` / `balanced` / `assertive`（仅语气，非建议） |
 | `infrastructure` | `cloud_key` / `local_models` / `free_only` |
-| `report_language` | `zh` / `en` / `ko` / `ja` |
+| `report_language` | `zh` / `en` / `ko` |
 
 ## 计划引擎与诚实降级
 

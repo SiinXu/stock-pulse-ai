@@ -24,6 +24,22 @@ const NON_TRANSLATABLE_PROPERTIES = new Set([
   'path',
 ]);
 
+/** Settings-help config sample arrays are machine literals, not localized UI copy. */
+export const SETTINGS_HELP_MAPS_NAMESPACE = 'locales.settingsHelp.SETTINGS_HELP_MAPS';
+
+/**
+ * Skip the `examples` container for settings-help only, before array recursion.
+ * Array children do not retain the parent property name, so this must run on the
+ * object key — not on string leaves — and must not treat every registry `examples`
+ * field as non-translatable.
+ */
+export function shouldSkipSettingsHelpExamplesContainer(
+  namespace: string,
+  propertyName: string | undefined,
+): boolean {
+  return namespace === SETTINGS_HELP_MAPS_NAMESPACE && propertyName === 'examples';
+}
+
 type WidenLocalizedValue<T, PropertyName extends PropertyKey = never> =
   T extends string ? PropertyName extends 'value' | 'filename' | 'id' | 'key' | 'href' | 'url' | 'route' | 'path' ? T : string
     : T extends number ? number
@@ -39,6 +55,54 @@ const registeredTranslationKeys = new Set<UiTranslationKey>();
 export const getRegisteredUiTranslationKeys = (): readonly UiTranslationKey[] =>
   [...registeredTranslationKeys];
 
+function assertExampleLiteralArraysEqual(
+  english: unknown,
+  chinese: unknown,
+  path: string,
+): void {
+  if (!Array.isArray(english) || !Array.isArray(chinese)) {
+    throw new Error(`Settings-help examples parity failed at ${path}: both sides must be arrays`);
+  }
+  if (english.length !== chinese.length) {
+    throw new Error(
+      `Settings-help examples parity failed at ${path}: length ${english.length} !== ${chinese.length}`,
+    );
+  }
+  english.forEach((item, index) => {
+    if (item !== chinese[index]) {
+      throw new Error(
+        `Settings-help examples parity failed at ${path}.${index}: English and Chinese literals must match byte-for-byte`,
+      );
+    }
+  });
+}
+
+/** Walk settings-help maps and enforce parity only on `examples` arrays. Exported for unit tests. */
+export function assertSettingsHelpExamplesParity(english: unknown, chinese: unknown, path: string[] = []): void {
+  if (!english || typeof english !== 'object' || Array.isArray(english)) {
+    return;
+  }
+  if (!chinese || typeof chinese !== 'object' || Array.isArray(chinese)) {
+    return;
+  }
+
+  const englishRecord = english as Record<string, unknown>;
+  const chineseRecord = chinese as Record<string, unknown>;
+  for (const [key, child] of Object.entries(englishRecord)) {
+    const nextPath = [...path, key];
+    if (key === 'examples') {
+      assertExampleLiteralArraysEqual(child, chineseRecord[key], nextPath.join('.'));
+      continue;
+    }
+    assertSettingsHelpExamplesParity(child, chineseRecord[key], nextPath);
+  }
+  if (Object.prototype.hasOwnProperty.call(chineseRecord, 'examples')
+    && !Object.prototype.hasOwnProperty.call(englishRecord, 'examples')) {
+    throw new Error(
+      `Settings-help examples parity failed at ${[...path, 'examples'].join('.')}: present in Chinese only`,
+    );
+  }
+}
 function validateSourceValue(
   value: unknown,
   namespace: string,
@@ -62,6 +126,9 @@ function validateSourceValue(
 
   if (value && typeof value === 'object') {
     Object.entries(value).forEach(([key, item]) => {
+      if (shouldSkipSettingsHelpExamplesContainer(namespace, key)) {
+        return;
+      }
       validateSourceValue(item, namespace, [...path, key], key);
     });
   }
@@ -92,10 +159,13 @@ function translateValue<T>(
 
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        translateValue(item, translations, namespace, [...path, key], key),
-      ]),
+      Object.entries(value).map(([key, item]) => {
+        if (shouldSkipSettingsHelpExamplesContainer(namespace, key)) {
+          // Additional languages keep the canonical English source literals.
+          return [key, item];
+        }
+        return [key, translateValue(item, translations, namespace, [...path, key], key)];
+      }),
     ) as T;
   }
 
@@ -111,6 +181,9 @@ export function createUiLanguageRecord<const B extends BaseUiLanguageRecord>(
   // tests. Production builds can then tree-shake the duplicated English
   // inventory while CI still catches stale or missing translation keys.
   if (import.meta.env?.DEV || import.meta.env?.MODE === 'test') {
+    if (namespace === SETTINGS_HELP_MAPS_NAMESPACE) {
+      assertSettingsHelpExamplesParity(base.en, base.zh);
+    }
     validateSourceValue(base.en, namespace);
   }
   const record: Record<PropertyKey, unknown> = { ...base };

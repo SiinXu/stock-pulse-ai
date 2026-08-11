@@ -11,9 +11,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 PLUGIN_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+# Descriptive permission IDs (legacy plugin-id style) plus ToolSurface capability
+# form ``name:action`` so agent_tool plugins can declare the same strings their
+# ToolPolicy.permissions require. Colon is allowed only once as the separator.
+PERMISSION_ID_PATTERN = re.compile(
+    r"^(?:[a-z0-9][a-z0-9._-]*|[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31})$"
+)
 SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 API_MAJOR_PATTERN = re.compile(r"^[1-9][0-9]*$")
 _ENTRYPOINT_CLASS_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Stable load-time error when an agent_tool requires undeclared capabilities.
+MANIFEST_PERMISSIONS_UNDECLARED = "manifest_permissions_undeclared"
 
 
 def parse_semver(value: str) -> tuple[int, int, int]:
@@ -97,8 +106,14 @@ class PluginManifest(BaseModel):
     @field_validator("permissions")
     @classmethod
     def _validate_permissions(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        if any(PLUGIN_ID_PATTERN.fullmatch(permission) is None for permission in value):
-            raise ValueError("permission ids must use the plugin id syntax")
+        if any(
+            type(permission) is not str
+            or PERMISSION_ID_PATTERN.fullmatch(permission) is None
+            for permission in value
+        ):
+            raise ValueError(
+                "permission ids must use plugin-id syntax or name:action capability form"
+            )
         if len(set(value)) != len(value):
             raise ValueError("permission ids must be unique")
         return value

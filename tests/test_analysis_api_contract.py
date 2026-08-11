@@ -98,6 +98,23 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             },
         )
 
+    def test_openapi_declares_structured_local_market_data_409_payload(self) -> None:
+        if create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        schema = create_app().openapi()["paths"]["/api/v1/analysis/analyze"][
+            "post"
+        ]["responses"]["409"]["content"]["application/json"]["schema"]
+
+        refs = {item["$ref"] for item in schema["anyOf"]}
+        self.assertEqual(
+            refs,
+            {
+                "#/components/schemas/DuplicateTaskErrorResponse",
+                "#/components/schemas/LocalMarketDataMissingErrorResponse",
+            },
+        )
+
     def test_openapi_uses_canonical_task_status_components(self) -> None:
         if create_app is None:
             self.skipTest("fastapi is not installed in this test environment")

@@ -50,6 +50,22 @@ flowchart TD
 - Use the **notification bell** for unread items and deep links.
 - Use `Cmd/Ctrl + K` to jump by name.
 
+## Today's Focus data contract
+
+Today's Focus uses existing local records to produce at most five priority rows (API hard limit: ten), and never invents rows to fill the list. “Today” is the natural calendar day in `daily_brief_timezone`. Persisted timestamps without an offset are interpreted as UTC, while records without a timestamp are excluded. Pre-market, weekend, and non-trading-day requests do not roll previous-day evidence forward.
+
+The qualifying evidence is limited to:
+
+- alerts whose status is `triggered` today;
+- major corporate events observed today, when a trusted runtime event reader is configured;
+- analysis conclusions whose latest record is from today, whose preceding record is within 90 days, and whose direction changes among `buy`, `sell`, and `hold`.
+
+The watchlist and persisted active-position cache only define the candidate universe; market aliases such as Hong Kong prefix/suffix forms are canonicalized first. Lifetime unrealized P&L is not a daily move and cannot qualify a symbol. Reading Today's Focus does not refresh quotes, run analysis, replay the portfolio ledger, or write snapshots. If a local source fails, the API returns `degraded` with the affected source instead of presenting a false normal empty state.
+
+Each row has a separate **View evidence** link. Alert evidence opens the exact Signal Center trigger, while analysis evidence opens the exact history record in the Analysis workbench. Stock selection remains a separate action.
+
+> Current delivery boundary: the repository provides the strict `/api/v1/focus/today` endpoint and a standalone `TodaysFocusPanel`. Mounting it on Home, wiring the Home refresh lifecycle, and providing a production corporate-event reader remain follow-up integration work. Morning briefs and notification rendering are also out of scope here.
+
 ## Example: zero to first report
 
 1. Home shows a model gap → Settings → add a provider → Save → test OK.  

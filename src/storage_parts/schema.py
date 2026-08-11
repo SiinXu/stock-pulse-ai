@@ -678,7 +678,18 @@ class ConversationMessage(Base):
     session_id = Column(String(100), index=True, nullable=False)
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
+    turn_id = Column(String(64), nullable=True)
+    context_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now, index=True)
+
+    __table_args__ = (
+        Index(
+            'uix_conversation_messages_session_turn',
+            'session_id',
+            'turn_id',
+            unique=True,
+        ),
+    )
 
 
 class ConversationSessionState(Base):
@@ -1405,4 +1416,3 @@ class TaskQueueInflightRecord(Base):
         nullable=False,
         index=True,
     )
-

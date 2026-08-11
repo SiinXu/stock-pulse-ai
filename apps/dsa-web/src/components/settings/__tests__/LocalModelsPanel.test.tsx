@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type {
@@ -542,6 +542,7 @@ describe('LocalModelsPanel', () => {
   });
 
   it('detects Ollama after the user returns from installing it', async () => {
+    const addEventListener = vi.spyOn(window, 'addEventListener');
     const getRuntime = vi.fn()
       .mockResolvedValueOnce({
         ...AVAILABLE_RUNTIME,
@@ -554,12 +555,16 @@ describe('LocalModelsPanel', () => {
     renderPanel();
 
     expect(await screen.findByText('Ollama is unavailable')).toBeInTheDocument();
-    window.dispatchEvent(new Event('focus'));
-
     await vi.waitFor(() => {
-      expect(getRuntime).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled();
+      expect(addEventListener).toHaveBeenCalledWith('focus', expect.any(Function));
     });
+    addEventListener.mockRestore();
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(getRuntime).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled();
     expect(screen.queryByText('Ollama is unavailable')).not.toBeInTheDocument();
   });
 

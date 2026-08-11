@@ -30,7 +30,7 @@ locales/reportContent.ts
 
 设置字段标题按配置字段 key 使用 `utils.systemConfigI18n.fieldTitleMaps` 中的独立稳定资源；不能把可能被多个字段共享的 `helpKey` 标题当作字段身份。英文界面继续显示后端实时 Schema 标题，其余已知语言必须命中字段标题目录。新增或删除 `src/core/config_registry.py` 字段时，需同步该目录及全部语言资源；后端契约测试会校验字段注册表与前端标题目录完全一致。只有后端动态返回且目录未知的字段才允许显示 Schema 原文。
 
-每个领域字典必须以 `Record<UiLanguage, ...>` 或等价的类型约束保证语言结构一致。新增语言时，先扩展语言 catalog，再为每个领域补齐同一组稳定 key；不得在 JSX 中批量新增 `language === 'en' ? ... : ...`。`value`、`filename`、`id`、`key`、`href`、`url`、`route`、`path` 字段属于契约值并保持原样，股票代码和模型路由也不得作为普通文案翻译；只翻译用户可见 label。
+每个领域字典必须以 `Record<UiLanguage, ...>` 或等价的类型约束保证语言结构一致。新增语言时，先扩展语言 catalog，再为每个领域补齐同一组稳定 key；不得在 JSX 中批量新增 `language === 'en' ? ... : ...`。`value`、`filename`、`id`、`key`、`href`、`url`、`route`、`path` 字段属于契约值并保持原样，股票代码和模型路由也不得作为普通文案翻译；只翻译用户可见 label。 此外，仅限 `locales.settingsHelp.SETTINGS_HELP_MAPS` 的 `examples` 数组是可复制的配置字面量（`KEY=value`、URL、端口、枚举码等），在进入数组递归前即退出翻译 inventory；中英文 `examples` 必须结构一致且逐字节相同。其它注册表里的同名属性不自动按此规则处理。
 
 插值统一使用命名参数，例如 `{count}`、`{name}`。中英文的参数集合必须完全一致。动态服务端值只能在明确允许原文显示的字段中回退。
 
