@@ -12,6 +12,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from math import isfinite
 from typing import Any, Dict, List, Optional
 
 
@@ -231,7 +232,10 @@ class AgentOpinion:
 
     def __post_init__(self) -> None:
         """Clamp confidence to [0.0, 1.0]."""
-        self.confidence = max(0.0, min(1.0, float(self.confidence)))
+        value = float(self.confidence)
+        if not isfinite(value):
+            raise ValueError("agent opinion confidence must be finite")
+        self.confidence = max(0.0, min(1.0, value))
 
     @property
     def signal_enum(self) -> Optional[Signal]:
@@ -260,7 +264,10 @@ class StrategyOpinion:
     invalid_signal: bool = False
 
     def __post_init__(self) -> None:
-        self.confidence = max(0.0, min(1.0, float(self.confidence)))
+        value = float(self.confidence)
+        if not isfinite(value):
+            raise ValueError("strategy opinion confidence must be finite")
+        self.confidence = max(0.0, min(1.0, value))
 
 
 @dataclass

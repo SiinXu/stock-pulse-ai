@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import hashlib
+from io import StringIO
 import logging
 import os
 import re
@@ -148,14 +149,38 @@ class ConfigManager:
         """Read key-value mapping from `.env` file."""
         return self._read_config_map(normalize_values=True)
 
+    def read_config_snapshot(self) -> Tuple[Dict[str, str], str, Optional[str]]:
+        """Read values and version metadata from one immutable file payload."""
+        with self._lock:
+            if not self._env_path.exists():
+                return {}, "missing:0", None
+            content = self._env_path.read_bytes()
+            file_stat = self._env_path.stat()
+            content_hash = hashlib.sha256(content).hexdigest()
+            return (
+                self._config_map_from_content(content, normalize_values=True),
+                f"{file_stat.st_mtime_ns}:{content_hash}",
+                datetime.fromtimestamp(file_stat.st_mtime, tz=timezone.utc).isoformat(),
+            )
+
     def _read_config_map(self, *, normalize_values: bool) -> Dict[str, str]:
         """Read key-value mapping from `.env` file."""
         if not self._env_path.exists():
             return {}
 
-        raw_values = dotenv_values(self._env_path, interpolate=False)
+        return self._config_map_from_content(
+            self._env_path.read_bytes(),
+            normalize_values=normalize_values,
+        )
+
+    @staticmethod
+    def _config_map_from_content(content: bytes, *, normalize_values: bool) -> Dict[str, str]:
+        """Parse a config map from one captured `.env` payload."""
+        text = content.decode("utf-8")
+        raw_values = dotenv_values(stream=StringIO(text), interpolate=False)
+        values = dotenv_values(stream=StringIO(text)) if normalize_values else raw_values
+
         if normalize_values:
-            values = dotenv_values(self._env_path)
             for raw_key, raw_value in raw_values.items():
                 if (
                     raw_key is not None

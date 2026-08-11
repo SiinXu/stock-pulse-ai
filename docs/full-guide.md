@@ -117,6 +117,7 @@ stock-pulse-ai/
 | `SINGLE_STOCK_NOTIFY` | 单股推送模式：设为 `true` 则每分析完一只股票立即推送 | 可选 |
 | `REPORT_TYPE` | 报告类型：`simple`(精简)、`full`(完整)、`brief`(3-5句概括)，Docker环境推荐设为 `full` | 可选 |
 | `REPORT_LANGUAGE` | 报告与 Agent Chat 的默认输出语言：`zh`(默认中文) / `en`(英文) / `ko`(韩文)；会同步影响 Prompt、模板、通知 fallback、Web 报告页固定文案，以及未显式传入 `context.report_language` 的问股回复。`ko` 复用英文结构骨架并通过输出语言指令约束模型用韩文输出，通知按报告语言渲染本地化标签。仓库自带 `00-daily-analysis.yml` 已显式映射该变量，直接在 Actions Secrets/Variables 中配置即可生效 | 可选 |
+| `REPORT_MODE` | Jinja 报告呈现模式（`brief` / `standard` / `research`，默认 `standard`）。`brief` 仅 Decision Card + 关键风险；`standard` 为 Decision Card + 主要分析段落；`research` 为全量细节与更高 strata 上限。硬性上限永不丢弃 Decision Card。单次可通过 `extra_context.report_mode` 覆盖。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
 | `REPORT_SUMMARY_ONLY` | 仅分析结果摘要：设为 `true` 时只推送汇总，不含个股详情；多股时适合快速浏览（默认 false，Issue #262） | 可选 |
 | `REPORT_SHOW_LLM_MODEL` | 通知报告底部是否显示本次分析使用的 LLM 模型名称，默认 `true`；设为 `false` 可隐藏运行时模型信息。该变量仅调整展示，不影响 provider/model/Base URL、LiteLLM 路由或运行时模型保存/迁移/清理语义。 | 可选 |
 | `REPORT_TEMPLATES_DIR` | Jinja2 模板目录（相对项目根，默认 `templates`） | 可选 |
@@ -422,6 +423,11 @@ stock-pulse-ai/
 | `ENABLE_CHIP_DISTRIBUTION` | 启用筹码分布分析（该接口不稳定，云端部署建议关闭）。GitHub Actions 用户需在 Repository Variables 中设置 `ENABLE_CHIP_DISTRIBUTION=true` 方可启用；workflow 默认关闭。 | `true` | 可选 |
 | `ENABLE_EASTMONEY_PATCH` | 东财接口补丁：东财接口频繁失败（如 RemoteDisconnected、连接被关闭）时建议设为 `true`，注入 NID 令牌与随机 User-Agent 以降低被限流概率 | `false` | 可选 |
 | `REALTIME_SOURCE_PRIORITY` | 实时行情源优先级，逗号分隔，例如 `tencent,akshare_sina,efinance,akshare_em`；需要显式加入 `tickflow` 才会使用 TickFlow 实时行情。 | 见 `.env.example` | 可选 |
+| `DATA_VALIDATION_ENABLED` | 启用日线、实时行情、基本面与选定技术指标的统一数值校验，并写入版本化诊断证据。 | `true` | 可选 |
+| `DATA_VALIDATION_STRICT` | 在数据源候选被接受或缓存前拒绝错误级数据，使既有有界回退链继续尝试下一数据源。 | `false` | 可选 |
+| `DATA_VALIDATION_STRICT_SCOPES` | 严格模式适用范围，逗号分隔 `市场/品种`，如 `cn/equity,hk/etf,us/index`；`*` 为通配符。 | `*/*` | 可选 |
+| `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | 海外代码无法可靠推断 ETF/指数身份时使用的权威映射，逗号分隔 `代码=品种`。 | - | 可选 |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | 聚合基本面最终出口策略：`warn` 保留结果并记录证据，`reject` 显式抛错；该模式不是数据源回退。 | `warn` | 可选 |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | 基本面聚合总开关；关闭时仅返回 `not_supported` 块，不改变原分析链路 | `true` | 可选 |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | 基本面阶段总时延预算（秒） | `8.0` | 可选 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | 单能力源调用超时（秒）；市场结构行业/概念排行也复用该预算 | `8.0` | 可选 |
@@ -1033,6 +1039,10 @@ P5 在个股分析报告的 `dashboard.phase_decision` 中追加阶段化决策�
 
 普通分析与 Agent 分析会在保存历史前复用当次 `market_phase_summary` 和 `analysis_context_pack_overview.data_quality` 执行轻量护栏：核心 quote / daily_bars / technical 数据 stale、fallback、missing、fetch_failed、partial 或 estimated 时，不允许高置信结论；盘前、非交易日或未知阶段不得输出高置信盘中买卖；盘中、午间和临近收盘会检查主结论里的盘后复盘口吻，并把明显的"今日收盘后复盘显示""明日重点关注"类措辞改为阶段安全的观察/等待表述。护栏只补低敏 `phase_context` 和数据限制，不编造观察条件或下一次检查时间；通知摘要、告警、持仓和回测联动留给后续 P6。
 
+#### 报告三模式与 Decision Card（Issue #861）
+
+在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
+
 #### 信号归因分析（Issue #1742）
 
 Issue #1742 在个股分析报告的 `dashboard.signal_attribution` 中新增信号归因分析字段：`technical_indicators`、`news_sentiment`、`fundamentals`、`market_conditions`（四个贡献度；有效非零贡献度归一化到 100；全零表示无有效信号）、`strongest_bullish_signal` 和 `strongest_bearish_signal`。该字段解释推荐理由的构成，帮助用户理解 AI 决策的归因权重。
@@ -1409,11 +1419,13 @@ PUSHOVER_API_TOKEN=your_api_token
 
 ### 港股支持
 
-使用 `hk` 前缀指定港股代码：
+港股可使用裸 4/5 位数字、`hk` 前缀或 `.HK` 后缀：
 
 ```bash
 STOCK_LIST=600519,hk00700,hk01810
 ```
+
+CLI、Web、分析/自选 API、CSV/Excel/剪贴板智能导入以及 Bot 分析/深研共享同一输入规则。裸 4 位代码（如 `0941`）会先查询股票索引，未命中时规范为 `HK00941`；已收录的日股 `7203` 仍解析为 `7203.T`。`1810.HK`、`7203.T`、`2330.TW`、`005930.KS` 等显式市场形式，以及 API 中的显式市场参数，始终优先且不会被改判为港股。
 
 港股日线会跳过 efinance、pytdx、baostock 等不支持港股日线的数据源，避免把港股代码错配到非港股市场；默认改由 AkShare/Tushare/YFinance/Longbridge 等港股路径继续兜底。
 
@@ -1469,6 +1481,8 @@ LITELLM_FALLBACK_MODELS=anthropic/claude-sonnet-4-6,openai/gpt-5.4-mini
 > 兼容性说明：`/api/v1/stocks/extract-from-image` 响应在原 `codes` 基础上新增 `items` 字段。若下游客户端使用严格 JSON Schema 且不接受未知字段，请同步更新 schema。
 
 **智能导入**：除图片外，还支持 CSV/Excel 文件及剪贴板粘贴（`/api/v1/stocks/parse-import`），自动解析代码/名称列，名称→代码解析支持本地映射、拼音匹配及 AkShare 在线 fallback。依赖 `pypinyin`（拼音匹配）和 `openpyxl`（Excel 解析），已包含在 `requirements.txt` 中。
+
+- **代码规范化**：裸 4 位港股代码（如 `0941`）会输出为 `HK00941`；索引已收录的日股裸码（如 `7203`）仍优先输出 `7203.T`。显式前缀/后缀不受该默认规则影响。
 
 - **AkShare 名称解析缓存**：名称→代码解析使用 AkShare 在线 fallback 时，结果缓存 1 小时（TTL），避免频繁请求；首次调用或缓存过期后会自动刷新。
 - **CSV/Excel 列名**：支持 `code`、`股票代码`、`代码`、`name`、`股票名称`、`名称` 等（不区分大小写）；无表头时默认第 1 列为代码、第 2 列为名称。
@@ -1830,7 +1844,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 |------|------|------|
 | A股 | 6位数字 | `600519`、`000001`、`300750` |
 | 北交所 | 8/4/92 开头 6 位，支持 `BJ` 前缀或 `.BJ` 后缀 | `920748`、`BJ920493`、`920493.BJ` |
-| 港股 | hk + 5位数字 | `hk00700`、`hk09988` |
+| 港股 | 裸 4/5 位数字、`HK` 前缀或 `.HK` 后缀 | `0941`、`00700`、`hk00700`、`1810.HK` |
 | 美股 | 1-5 字母（可选 .X 后缀） | `AAPL`、`TSLA`、`BRK.B` |
 | 日股 | Yahoo 后缀 `.T` | `7203.T`、`6758.T` |
 | 韩股 | Yahoo 后缀 `.KS` / `.KQ` | `005930.KS`、`035720.KQ` |

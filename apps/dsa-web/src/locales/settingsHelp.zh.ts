@@ -479,6 +479,157 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响新闻上下文数量、时效性和报告长度。'],
     notes: ['窗口过长可能引入陈旧信息，过短可能遗漏慢发酵事件。'],
   },
+
+  'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
+    title: '启用加密货币数据源',
+    summary: '为 crypto:TICKER 身份注册默认关闭的 CoinGecko 行情路径。',
+    usage: '仅在确实需要分析 crypto:BTC 等加密标的时开启。关闭时股票路径保持不变。',
+    valueNotes: [
+      '裸 BTC / ETH 代码不会自动按加密货币处理。',
+      '更改 provider 注册开关后通常需要重启进程。',
+    ],
+    impact: ['控制新建生产数据 manager 是否挂载 CoinGecko 加密货币 provider。'],
+    notes: ['身份、UTC 日线与出站策略详见 docs/crypto-market-support.md。'],
+  },
+  'settings.data_source.COINGECKO_API_PLAN': {
+    title: 'CoinGecko API 方案',
+    summary: '选择 keyless、Demo 或 Pro 鉴权模式及对应官方域名。',
+    usage: 'keyless 无需密钥；demo / pro 仅在配置了匹配的 COINGECKO_API_KEY 时使用。',
+    valueNotes: [
+      'keyless 使用公共 API 且不发送凭据。',
+      'demo 与 pro 会选择对应官方 origin 与请求头。',
+      '非法值在加载时回退为 keyless。',
+    ],
+    impact: ['影响 CoinGecko 鉴权请求头与官方域名选择。'],
+    notes: ['自定义 COINGECKO_API_BASE 仅允许在 keyless 模式下使用。'],
+  },
+  'settings.data_source.COINGECKO_API_KEY': {
+    title: 'CoinGecko API Key',
+    summary: '可选的 CoinGecko Demo 或 Pro API 密钥。',
+    usage: 'keyless 模式请留空；仅当 COINGECKO_API_PLAN 为 demo 或 pro 时粘贴密钥。',
+    valueNotes: ['凭据不会发送到自定义 COINGECKO_API_BASE 地址。'],
+    impact: ['在方案匹配时启用已鉴权的 CoinGecko Demo / Pro 请求。'],
+    notes: ['不要把真实密钥提交到仓库或贴进公开 Issue / 截图。'],
+  },
+  'settings.data_source.COINGECKO_API_BASE': {
+    title: 'CoinGecko API 基础地址',
+    summary: '仅 keyless 模式下可选的自定义 HTTPS 基础地址。',
+    usage: '留空使用官方端点；仅在需要受信 keyless 镜像时填写完整 HTTPS URL。',
+    valueNotes: [
+      'Demo / Pro 始终使用官方域名，不受此字段影响。',
+      '私有主机还需加入 OUTBOUND_HTTP_ALLOWLIST。',
+    ],
+    impact: ['影响 keyless 加密货币行情请求的发送目标。'],
+    notes: ['保存自定义地址前请确认你信任该端点运营方。'],
+    examples: ['https://api.coingecko.com/api/v3'],
+  },
+  'settings.data_source.CRYPTO_COINGECKO_PRIORITY': {
+    title: 'CoinGecko 加密货币优先级',
+    summary: '控制 CoinGecko 在加密市场数据源中的尝试顺序。',
+    usage: '填写 0–99 的整数，数值越小越优先。默认 10。',
+    valueNotes: [
+      '归类在数据源优先级字段中，不会重排股票日 K 或实时行情链。',
+      '仅在 CRYPTO_PROVIDER_ENABLED=true 时生效。',
+    ],
+    impact: ['仅影响 crypto: 身份的加密货币 provider 选择顺序。'],
+    notes: ['除非新增了竞争优先级的加密 provider，否则保持默认即可。'],
+  },
+  'settings.data_source.PROVIDER_MARKET_DATA_MODE': {
+    title: '行情本地优先模式',
+    summary: '选择本地优先、仅本地或强制刷新的日线行情策略。',
+    usage: '日常保持 auto；离线完整缓存读取用 local_only；跳过本地并强制走一轮 provider 用 refresh。',
+    valueNotes: [
+      'auto：完整新鲜本地 → provider 链 → 全失败时可用 stale。',
+      'local_only：永不进入 provider/socket；本地不完整或过期则结构化失败。',
+      'refresh：跳过本地读，严格走一轮 provider，失败不回 stale。',
+      '非法非空值在配置加载时 fail-closed，不会静默变成 auto。',
+    ],
+    impact: ['影响分析、股票历史 API 与依赖行情的定时任务的日线读取路径。'],
+    notes: [
+      '与进程级出站 HTTP 门禁 LOCAL_ONLY_MODE 相互独立。',
+      '详见 docs/local-first-market-data.md。',
+    ],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS': {
+    title: '仅本地缓存最大年龄',
+    summary: 'local_only 模式下仍可使用的完整本地日线缓存最大年龄。',
+    usage: '填写秒数。默认 2592000（30 天）。必须大于 0。',
+    valueNotes: ['超过年龄的完整条目按结构化离线缺失处理，不会伪装成实时行情。'],
+    impact: ['限制 PROVIDER_MARKET_DATA_MODE=local_only 时可接受的本地缓存陈旧程度。'],
+    notes: ['不会替代 auto 模式使用的内存/持久化新鲜度 TTL。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS': {
+    title: '持久日线缓存最大年龄',
+    summary: '读写时删除超过该年龄的持久化日线缓存文件。',
+    usage: '填写秒数。默认 7776000（90 天）。设为 0 可关闭按年龄删除。',
+    valueNotes: ['保留清理是确定性的，不会把密钥等敏感信息写入缓存。'],
+    impact: ['控制 provider 日线缓存目录的磁盘占用。'],
+    notes: ['schema 与列白名单独立于保留年龄继续生效。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES': {
+    title: '持久日线缓存最大条目数',
+    summary: '限制保留的持久化日线缓存条目数量。',
+    usage: '填写正整数。默认 512。优先删除最老条目。',
+    valueNotes: ['相同时间戳时按文件名做确定性决胜。'],
+    impact: ['限制多标的长时间运行时缓存目录增长。'],
+    notes: ['可与最大年龄设置组合，同时做时间与数量维度的保留控制。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS': {
+    title: '日线缓存滚动宽限天数',
+    summary: '允许已覆盖本地区间跨若干自然日服务默认结束日期滚动窗口。',
+    usage: '填写正整数。默认 1 天滚动宽限。',
+    valueNotes: ['auto 模式仍会按新鲜度 TTL 对老化数据做在线复验。'],
+    impact: ['减少默认结束日期跨日后对重叠窗口的不必要 provider 调用。'],
+    notes: ['除非有意放宽或收紧滚动复用，否则保持默认。'],
+  },
+  'settings.data_source.DATA_VALIDATION_ENABLED': {
+    title: '启用数据校验',
+    summary: '运行统一数值校验层并写入版本化诊断证据。',
+    usage: '默认开启。仅在需要临时绕过校验诊断时关闭。',
+    valueNotes: ['开启时覆盖日线、实时、基本面及选定技术指标字段。'],
+    impact: ['控制是否产出校验证据，以及严格拒绝是否可生效。'],
+    notes: ['范围与回滚说明见 docs/data-validation-layer.md。'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT': {
+    title: '数据校验严格模式',
+    summary: '在接受或缓存前拒绝错误级数据，使既有有界回退链继续尝试下一数据源。',
+    usage: '默认关闭（偏告警）。仅在希望 reject 级发现直接丢弃候选时开启。',
+    valueNotes: ['严格模式复用既有有界 provider 回退，不会新建第二条抓取链。'],
+    impact: ['数据源返回结构不合法数值时可能触发更多回退。'],
+    notes: ['可与 DATA_VALIDATION_STRICT_SCOPES 配合，限制执行拒绝的市场/品种范围。'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT_SCOPES': {
+    title: '数据校验严格作用域',
+    summary: '用市场/品种选择器限制严格拒绝生效的范围。',
+    usage: '逗号分隔选择器，例如 cn/equity,hk/etf,us/index。默认 */* 表示全部。',
+    valueNotes: ['支持的品种包括 equity、etf、index；两侧均可用 * 通配。'],
+    impact: ['收窄或扩大 DATA_VALIDATION_STRICT 下可被拒绝的标的集合。'],
+    notes: ['空值在配置加载时会规范为默认 */*。'],
+  },
+  'settings.data_source.DATA_VALIDATION_INSTRUMENT_OVERRIDES': {
+    title: '数据校验品种覆盖',
+    summary: '为无法从代码安全推断 ETF/指数身份的海外标的提供权威品种映射。',
+    usage: '逗号分隔 SYMBOL=instrument，例如 SPY=etf,HK02800=etf,1306.T=etf。内置分类足够时请留空。',
+    valueNotes: [
+      '这是逗号分隔映射，不是 JSON 文档。',
+      '仅在 ETF/指数身份可能被误判时使用。',
+    ],
+    impact: ['影响所列标的的校验品种身份及严格作用域匹配。'],
+    notes: ['优先维护稀疏权威覆盖，避免手维护大目录。'],
+    examples: ['SPY=etf,HK02800=etf,1306.T=etf'],
+  },
+  'settings.data_source.DATA_VALIDATION_UPPER_LAYER_MODE': {
+    title: '数据校验上层模式',
+    summary: '聚合基本面在合成边界的最终处理策略。',
+    usage: '保持 warn 以保留结果并记录证据；仅在需要上层显式失败时使用 reject。',
+    valueNotes: [
+      'warn 保留聚合结果并记录证据。',
+      'reject 在上层边界抛错，不描述为数据源回退。',
+      '其他值在加载时规范为 warn。',
+    ],
+    impact: ['影响聚合基本面校验失败如何向上游调用方暴露。'],
+    notes: ['与 DATA_VALIDATION_STRICT 的 provider 候选拒绝相互独立。'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
     summary: '配置飞书自定义群机器人，用于把分析报告推送到指定飞书群。',
@@ -775,6 +926,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响定时任务、CLI 和 GitHub Actions 手动运行是否在休市日执行；Web/API 大盘复盘按钮会直接提交任务。'],
     notes: ['关闭后休市日可能生成缺少实时行情的报告。'],
   },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: '插件数据源自动绑定',
+    summary: '可选：将 PluginManager 绑定到进程级数据管理器的 plugin_registry。',
+    usage: '默认保持 PLUGIN_DATA_PROVIDER_AUTO_BIND=false 以保留手动 manager 行为。仅当希望已注册的插件数据源经默认 ApplicationServices 组合根自动路由时开启。',
+    valueNotes: [
+      '默认关闭。',
+      '开启后，不兼容绑定会在启动时 fail-closed，而不是静默降级。',
+      '修改后需要进程重启。',
+    ],
+    impact: ['影响插件注册的行情/数据源是否自动接入个股服务与主分析流水线。'],
+    notes: ['详见 docs/plugin-extension-contract.md 与 docs/plugin-development-guide_zh.md。'],
+    examples: [
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=false',
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=true',
+    ],
+  },
   'settings.system.scorecard': {
     title: '公开信号计分卡',
     summary: '控制聚合信号计分卡（GET /api/v1/scorecard）的可选公开暴露。',
@@ -796,6 +963,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=false',
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=true',
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
+    ],
+  },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: '报告导出 PDF 字体路径',
+    summary: '选择可选 PDF 报告导出使用的单字体 TTF/OTF。',
+    usage: '仅在服务器存在覆盖报告全部可见字符的字体时填写绝对路径；留空则探测文档列出的系统候选。',
+    valueNotes: [
+      '显式无效路径会 fail-closed，不会回退到其他系统字体。',
+      '能力检查验证目标语言代表字符；每次导出还会再次验证该报告的精确字符集。',
+    ],
+    impact: ['只影响可选 PDF 导出；无损 Markdown 导出始终可用。'],
+    notes: [
+      '支持 TTF/OTF 单字体，不猜测 TTC 字体集合下标。',
+      '公共能力与错误响应不会暴露绝对路径或字体解析器原始错误。',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
     ],
   },
   'settings.system.USE_PROXY': {
@@ -1136,16 +1320,27 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
-    usage: '开启后，full/specialist 模式中的风险 Agent 可将买入建议降级为观望或卖出。该保守覆写仍会自动生效，除非人工审批（/approvals）捕获了对应路径。',
+    usage: '控制 legacy 风险计划是否直接执行下调；不可关闭的 Risk Manager 最终动作仍会按 RISK_GATE_PROFILE 独立裁决。',
     valueNotes: [
-      '仅在 AGENT_ORCHESTRATOR_MODE 包含风险阶段时生效。',
+      '仅控制 legacy override；不能跳过最终动作裁决。',
       'HITL 风控绕过在 /approvals 默认关闭；在该页启用后，才可在限时窗口内一次性申请保留原始信号。',
     ],
     impact: ['影响最终投资建议的风险保守程度。'],
     notes: [
-      '关闭后风险 Agent 的意见仅作参考，不会否决决策。',
+      '关闭后 legacy override 不直接执行，但明确风险证据仍可能被最终动作裁决下调或拒绝。',
       '打开人工审批（/approvals）可配置默认关闭的 HITL 门禁。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: '风控经理档位',
+    summary: '选择最终建议发布前强制风控裁决的阈值档位。',
+    usage: 'balanced 为默认值；conservative 更早拒绝或下调，aggressive 仅在明确阻断证据下收紧。',
+    valueNotes: [
+      '支持 conservative、balanced、aggressive；非法值会阻止启动。',
+      '该闸门不可关闭；内部异常按 fail-closed 处理。',
+    ],
+    impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
+    notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
@@ -1195,6 +1390,53 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '该功能不处理 provider trace、thinking blocks、tool calls 或 tool results，也不改变同轮工具调用透传。',
       '该配置只影响问股可见历史压缩，不改变 LLM provider、模型、Base URL、保存清理或运行时优先级语义。',
     ],
+  },
+  'settings.agent.runtime_guards': {
+    title: 'Agent 运行时护栏',
+    summary: '低敏的工具循环与 Stage 失败护栏，用于约束 Agent 执行。',
+    usage: 'AGENT_TOOL_TIMEOUT_S 限制单次工具调用；AGENT_MAX_IDENTICAL_TOOL_CALLS 与 AGENT_MAX_STAGE_ENTRIES 阻止失控循环；AGENT_STAGE_FAILURE_POLICY 在 isolate 与 fail_fast 之间选择。',
+    valueNotes: [
+      '工具超时默认 120 秒；相同调用次数或 Stage 进入次数设为 0 可单独关闭对应护栏。',
+      'isolate 对非关键 Stage 降级继续；fail_fast 在普通 Stage 失败时停止 Pipeline。',
+      '有界 Critic 白名单重试使用独立一次性预算，失败时始终 fail-soft 进入 Decision。',
+    ],
+    impact: ['影响 Agent 工具循环、Stage 重入与 Pipeline 失败行为，不改变公开 SSE/API 契约。'],
+    notes: ['三层超时模型见完整指南中的 Agent 配置说明。'],
+  },
+  'settings.agent.stage_timeouts': {
+    title: 'Agent Stage 超时',
+    summary: '为 multi-agent Pipeline 各 Stage 设置可选独立超时预算。',
+    usage: '各 Stage 超时保持 0 时仅跟随 AGENT_ORCHESTRATOR_TIMEOUT_S；设为正值可单独封顶该 Stage。',
+    valueNotes: [
+      '多预算同时生效时取剩余时间最短的一项。',
+      '超时后的 late stage 状态会被 fence，不能提交到后续 Stage。',
+    ],
+    impact: ['影响 multi-agent Stage 耗时，以及 Stage 超时后的降级路径。'],
+    notes: ['无法强制终止已在运行的原生线程；仅接受时限内 COMPLETED 的 Stage。'],
+  },
+  'settings.agent.decision_memory': {
+    title: '决策记忆',
+    summary: '向个股分析注入近期已评估决策结果，供反思使用。',
+    usage: 'DECISION_MEMORY_ENABLED 为全局开关（默认开启）；LOOKBACK、MIN_AGE_DAYS、MIN_SAMPLES 控制参与反思的结果范围。',
+    valueNotes: [
+      '请求级 use_memory 可覆盖全局开关。',
+      '最小天数避免结果尚未形成时就被反思。',
+      '最小样本数抑制噪声命中率分桶。',
+    ],
+    impact: ['影响分析提示词是否包含历史决策反思上下文。'],
+    notes: ['决策信号生命周期见 docs/decision-signals.md。'],
+  },
+  'settings.agent.reasoning_trace_export': {
+    title: '推理轨迹导出',
+    summary: '可选导出已记录诊断数据的脱敏 reasoning-trace-v1 包。',
+    usage: '除非运营需要导出 API，否则保持 REASONING_TRACE_EXPORT_ENABLED=false。REASONING_TRACE_EXPORT_MAX_CHARS 控制完整响应字符预算（10000–2000000）。',
+    valueNotes: [
+      '默认关闭。',
+      '导出会脱敏凭据与本地路径，但仍属敏感运营数据。',
+      '服务不保存导出文件；已下载副本需运营自行删除。',
+    ],
+    impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
+    notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
   },
   'settings.agent.observability': {
     title: 'Agent 可观测性',
@@ -1254,6 +1496,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: '启用离线 OCR Agent 工具',
+    summary: '默认关闭的有界 Tesseract 文字提取。图片字节留在本机，但脱敏后的不可信文字会进入 Agent 上下文并可能发给远端模型；零远端出站需启用 LOCAL_ONLY_MODE。',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR 文件根目录',
+    summary: '单次打开普通图片的文件系统沙箱；拒绝越界路径、特殊文件、超限字节、解码像素与额外帧。',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR 语言',
+    summary: '用 + 连接的 Tesseract 语言码；默认 chi_sim+eng，需安装匹配的系统语言包。',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR 超时秒数',
+    summary: '1–120 秒的硬 wall-clock 上限；超时后终止并回收 OCR worker 及其子进程。',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1289,6 +1547,43 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['除非明确要求切换版本，否则保持默认。'],
   },
   // ------------------------------------------------------------------
+  // 技术指标周期（Issue #172）
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: '均线周期',
+    summary: '趋势分析使用的均线周期列表（交易日，默认 5,10,20,60）。',
+    usage: '留空使用历史默认值。可追加 120/250 等长周期用于长线趋势。历史取数窗口会随最长周期自动放宽。',
+    valueNotes: [
+      '每个周期须为正整数，上限 500。',
+      '配置周期按真实 MA 标签写入 ma_by_period 与类型化指标快照。',
+      '可用 K 线不足时该均线返回空并标注数据不足，不会用更短周期静默顶替。',
+    ],
+    impact: ['影响趋势判定、乖离率、支撑判断与报告中的均线数值。'],
+    notes: ['在数据充足时，默认配置与改造前行为一致。'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD 周期',
+    summary: 'MACD 快线/慢线/信号线 EMA 周期（默认 12/26/9）。',
+    usage: 'INDICATOR_MACD_FAST 必须小于 INDICATOR_MACD_SLOW；信号线为 DEA 平滑周期。',
+    valueNotes: [
+      '标准设置为 12/26/9；更短周期更灵敏但噪声更大。',
+      '显式非法值在进程启动与 Settings 保存时都会按同一规则拒绝。',
+    ],
+    impact: ['影响 MACD DIF/DEA/柱体及综合评分中的 MACD 分量。'],
+    notes: ['除非有意更换 MACD 口径，否则保持默认。'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI 周期',
+    summary: 'RSI 周期列表（默认 6,12,24）。',
+    usage: '配置值按真实 RSI 标签输出；第二个值（仅配置一个时为第一个）用于超买超卖主判定。',
+    valueNotes: [
+      '周期须为正整数，上限 250。',
+      'RSI 使用 Wilder/SMMA 平滑，与告警路径 RSI 一致。',
+    ],
+    impact: ['影响 RSI 数值及趋势分析中的超买超卖评分。'],
+    notes: ['兼容字段 rsi_6/rsi_12/rsi_24 始终表示对应的真实历史周期，不按位置改名。'],
+  },
+  // ------------------------------------------------------------------
   // Report configuration
   // ------------------------------------------------------------------
   'settings.report.REPORT_SUMMARY_ONLY': {
@@ -1314,6 +1609,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['需要同时开启 REPORT_RENDERER_ENABLED 才会使用模板渲染。'],
     impact: ['影响报告渲染使用的模板来源。'],
     notes: ['自定义模板需要符合 Jinja2 语法并包含必要的变量占位。'],
+  },
+  'settings.report.REPORT_MODE': {
+    title: '报告呈现模式',
+    summary: '在报告渲染引擎开启时，控制 Jinja 个股报告的呈现深度。',
+    usage: '可选 brief、standard（默认）或 research。选项来自运行时 report-mode 契约。单次可通过 extra_context.report_mode 覆盖。',
+    valueNotes: [
+      'brief 仅保留 Decision Card + 关键风险。',
+      'standard 为 Decision Card + 主要分析段落。',
+      'research 展开细节与更高 strata 上限。',
+      '硬性上限永不丢弃 Decision Card 区块。',
+    ],
+    impact: ['影响报告渲染哪些段落，以及内容截断的激进程度。'],
+    notes: [
+      '仅在 REPORT_RENDERER_ENABLED=true 时生效。',
+      '渲染关闭时的硬编码通知 fallback 路径不变。',
+    ],
   },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: '报告渲染引擎',
@@ -1475,6 +1786,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响计划简报生成与准确率回顾展示。'],
     notes: ['定时投递需要 schedule 模式。'],
   },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: '组合压力测试情景目录',
+    summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',
+    usage: '将 PORTFOLIO_STRESS_SCENARIOS_PATH 设为可读取的本地 YAML 文件；留空时仅使用内置情景。',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: '保存分析上下文快照',
     summary: '控制是否将分析历史的整份 context_snapshot 持久化到数据库。',
@@ -1572,6 +1888,13 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.portfolio_health': {
+    title: '投资组合健康度公式',
+    summary: '配置健康度的固定分母权重和预警阈值。',
+    usage: '只能使用界面范围内的有限数值；非法值会被拒绝，不会被静默修正。',
+    notes: ['修改后配置哈希会变化，需要显式刷新健康度快照。'],
+  },
+
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: '投委会模式',
     summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
@@ -1581,6 +1904,217 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['需要 Agent multi 能力。'],
   },
 
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: '启用 MCP 服务',
+    summary: '可选 MCP 进程总开关，默认关闭；主 API/Web 进程不会自动启动 MCP。',
+    usage: '仅在你明确要执行 `python -m src.mcp_server` 时设为 true。修改后需重启 MCP 进程。',
+    valueNotes: [
+      'false 时保持对外工具面关闭。',
+      '仅开启开关不够，还需要 scopes 与对应传输的安全配置。',
+    ],
+    impact: [
+      '决定独立 MCP 进程是否允许启动。',
+    ],
+    notes: [
+      'HTTP 传输属于安全敏感对外面。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP 传输方式',
+    summary: '官方 SDK 传输：stdio（本机进程）或 streamable-http。',
+    usage: '本机操作优先 stdio。仅在具备管理员认证、scopes 与会话摘要时使用 streamable-http。',
+    valueNotes: [
+      'stdio 为默认本机边界。',
+      '运行时接受 http 作为 streamable-http 别名。',
+    ],
+    impact: [
+      '决定客户端如何连接以及适用哪些安全控制。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP 绑定主机',
+    summary: 'streamable-http 绑定主机，优先 loopback。',
+    usage: '除非有可信网络控制，否则保持 127.0.0.1/localhost。',
+    valueNotes: [
+      '绑定到非本机地址会扩大攻击面。',
+    ],
+    impact: [
+      '影响 MCP HTTP 监听接受连接的位置。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP 绑定端口',
+    summary: 'streamable-http TCP 端口（1–65535）。',
+    usage: '默认 8765；端口冲突时再修改。',
+    impact: [
+      '影响 MCP HTTP 监听地址。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio 主体',
+    summary: 'stdio 审计与限速使用的稳定主体名。',
+    usage: '使用符合支持字符规则的短稳定标识。',
+    impact: [
+      '用于标注 stdio 工具调用日志与限速桶。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio 权限范围',
+    summary: 'stdio 的逗号分隔最小权限 scopes。',
+    usage: 'transport=stdio 且启用时必填。允许：market.read、history.read、portfolio.read、analysis.trigger。',
+    valueNotes: [
+      '只授予本机操作者真正需要的范围。',
+    ],
+    impact: [
+      '限制 stdio 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '放宽 scope 会扩大可调用能力。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP 权限范围',
+    summary: 'streamable-http 的逗号分隔最小权限 scopes。',
+    usage: '启用 HTTP 传输时必填；允许范围与 stdio 相同。',
+    impact: [
+      '限制 HTTP 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '远程可达传输应保持最小权限。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP 会话令牌 SHA-256',
+    summary: '唯一接受的管理员会话令牌的 SHA-256 十六进制摘要。',
+    usage: 'streamable-http 必填。只存摘要，不存原始 Bearer。',
+    valueNotes: [
+      '须为 64 位十六进制，或在未使用时留空。',
+      '设置页会掩码此敏感字段。',
+    ],
+    impact: [
+      '为 HTTP MCP 锚定可接受的管理员会话。',
+    ],
+    notes: [
+      '若 Bearer 可能泄露，应轮换摘要。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP 资源 URL',
+    summary: 'streamable-http 的绝对 http(s) 资源/受众 URL。',
+    usage: '默认 http://127.0.0.1:8765/mcp，需与客户端使用的公开 MCP 端点一致。',
+    impact: [
+      '影响 HTTP MCP 的 resource/audience 绑定。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP 允许 Host',
+    summary: 'streamable-http 的 Host 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback。通配端口使用官方 SDK 的 :* 形式。',
+    valueNotes: [
+      '放宽列表（如 * 或公网主机）会增加 Host 头与跨站风险。',
+    ],
+    impact: [
+      '控制 HTTP MCP 接受哪些 Host 值。',
+    ],
+    notes: [
+      '应把放宽视为安全决策，而非便利开关。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP 允许 Origin',
+    summary: '浏览器客户端的 Origin 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback HTTP origin。',
+    valueNotes: [
+      '放宽 origin（尤其 * 或不可信站点）会允许浏览器跨源访问 MCP 工具。',
+    ],
+    impact: [
+      '控制 HTTP MCP 的浏览器 CORS/Origin 接受策略。',
+    ],
+    notes: [
+      '保持列表尽量小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP 最大 Body 字节',
+    summary: 'streamable-http 接受的最大 JSON Body 大小。',
+    usage: '默认 1000000。仅在有真实大负载需求时上调。',
+    impact: [
+      '限制请求体内存占用。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP 最大 Header 字节',
+    summary: 'streamable-http 未完整 Header 块上限。',
+    usage: '默认 32768。通常无需修改。',
+    impact: [
+      '限制 Header 缓冲大小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP 最大连接数',
+    summary: 'streamable-http 最大并发连接数。',
+    usage: '默认 32。小主机可下调，加压测试后再上调。',
+    impact: [
+      '限制并发 HTTP MCP 客户端。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP 监听 backlog',
+    summary: 'streamable-http 接受器的 OS listen backlog。',
+    usage: '默认 16。容量调优之外很少改动。',
+    impact: [
+      '影响待处理连接队列深度。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP 读取超时',
+    summary: 'streamable-http 每个 body chunk 读取超时（秒）。',
+    usage: '默认 10，范围 1–120。',
+    impact: [
+      '控制慢客户端可占用读取的时间。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive 超时',
+    summary: 'streamable-http 连接 keep-alive 空闲超时（秒）。',
+    usage: '默认 5，范围 1–120。',
+    impact: [
+      '控制空闲连接保留时间。',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP 最大并发工具数',
+    summary: '单个 MCP 进程最大并发工具 worker 数。',
+    usage: '默认 8，范围 1–128。',
+    impact: [
+      '限制并发工具执行成本。',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 工具速率限制',
+    summary: '按主体/工具的每分钟调用上限。',
+    usage: '默认 60，范围 1–10000。',
+    impact: [
+      '限制通用工具刷量。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 分析速率限制',
+    summary: 'analysis.trigger 每分钟调用上限。',
+    usage: '默认 2。请保持较低以控制 LLM/数据成本。',
+    impact: [
+      '保护分析成本预算。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP 单次分析最大标的数',
+    summary: '单次 analysis.trigger 允许的最大标的数。',
+    usage: '默认 5，范围 1–50。',
+    impact: [
+      '限制单次分析成本。',
+    ],
+  },
 };
 
 export default settingsHelpZhCN;

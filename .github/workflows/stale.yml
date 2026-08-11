@@ -1,5 +1,5 @@
-# Mark and close inactive issues and pull requests.
-# Run daily to find items that have not received a response.
+# Mark inactive pull requests (and optionally nudge issues).
+# Planning / backlog issues must NOT be auto-closed — they are intentional todos.
 
 name: Stale Issues & PRs
 
@@ -25,16 +25,16 @@ jobs:
         uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
         with:
           # ===== Issue settings =====
-          days-before-issue-stale: 7
-          days-before-issue-close: 7
+          # Nudge only: never auto-close issues (maintainer planning backlog).
+          days-before-issue-stale: 90
+          days-before-issue-close: -1
           stale-issue-label: 'stale'
           stale-issue-message: |
-            👋 This issue has been inactive for **7 days**.
+            👋 This issue has been inactive for **90 days**.
             
-            If the problem still exists, reply with an update so we can continue investigating.
-            If it has been resolved or is no longer needed, you can close this issue.
+            It remains open as part of the planning backlog. Reply with an update when work resumes, or close it manually if it is no longer needed.
             
-            **This issue will close automatically if there is no response within 7 days.**
+            **Issues are not auto-closed for inactivity.**
           close-issue-message: |
             🔒 This issue was closed automatically because it remained inactive.
             
@@ -60,7 +60,8 @@ jobs:
           
           # ===== Exclusions =====
           # Do not mark items with these labels as stale.
-          exempt-issue-labels: 'pinned,security,enhancement,help wanted,good first issue'
+          # Include common backlog labels so planning issues are never stale-nudged.
+          exempt-issue-labels: 'pinned,security,enhancement,feature,help wanted,good first issue,documentation,P0,P1,P2,P3'
           exempt-pr-labels: 'pinned,security,work-in-progress,wip'
           
           # Exclude draft pull requests.

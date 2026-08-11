@@ -81,6 +81,7 @@ from datetime import date, datetime, timezone, timedelta
 from src.webui_frontend import prepare_webui_frontend_assets
 from src.application_services import ApplicationServices, set_application_services
 from src.config import get_config, Config
+from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.logging_config import RelativePathFormatter, setup_logging
 from src.services.stock_list_parser import split_stock_list
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis

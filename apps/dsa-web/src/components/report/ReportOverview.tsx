@@ -2,6 +2,7 @@ import type React from 'react';
 import type {
   ReportDetails as ReportDetailsType,
   ReportMeta,
+  ReportStrategy,
   ReportSummary as ReportSummaryType,
 } from '../../types/analysis';
 import { Badge, Button, Card, ScoreGauge } from '../common';
@@ -11,12 +12,14 @@ import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/mark
 import { normalizeBoardType } from '../../utils/reportDomain';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { ReportDecisionCard } from './ReportDecisionCard';
 import { ShareImageButton } from './ShareImageButton';
 
 interface ReportOverviewProps {
   meta: ReportMeta;
   summary: ReportSummaryType;
   details?: ReportDetailsType;
+  strategy?: ReportStrategy | null;
   isHistory?: boolean;
   watchlist?: {
     isInWatchlist: (code: string) => boolean;
@@ -154,6 +157,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   meta,
   summary,
   details,
+  strategy,
   watchlist,
 }) => {
   const { language, t } = useUiLanguage();
@@ -237,6 +241,15 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* Decision Card first (Issue #874 / #877 Phase 2): verdict above long evidence. */}
+      <ReportDecisionCard
+        meta={meta}
+        summary={summary}
+        strategy={strategy}
+        details={details}
+        language={reportLanguage}
+      />
+
       {/* Main Info Area - Two-Column Layout */}
       <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
         {/* Left side: Stock information and conclusions */}

@@ -1,9 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-// Event calendar workspace — independent from alerts (T32) and notifications (T20).
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { eventCalendarApi } from '../../api/eventCalendar';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -12,7 +11,6 @@ import {
   AppPage,
   Badge,
   Button,
-  Card,
   Checkbox,
   DataTable,
   type DataTableColumn,
@@ -26,29 +24,32 @@ import {
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { EVENT_CALENDAR_TEXT } from '../../locales/eventCalendar';
-import type {
-  CalendarEventItem,
-  EventCalendarResponse,
-} from '../../types/eventCalendar';
+import type { CalendarEventItem, CorporateEventCategory, EventCalendarResponse } from '../../types/eventCalendar';
 
-function isoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+function isoDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function defaultRange(): { from: string; to: string } {
-  const from = new Date();
   const to = new Date();
-  to.setDate(to.getDate() + 90);
+  const from = new Date();
+  from.setDate(from.getDate() - 30);
   return { from: isoDate(from), to: isoDate(to) };
 }
 
-function certaintyVariant(certainty: string): 'success' | 'warning' | 'default' {
-  if (certainty === 'confirmed') return 'success';
-  if (certainty === 'scheduled') return 'warning';
+function statusVariant(status: string, degraded: boolean): 'success' | 'warning' | 'danger' | 'default' {
+  if (degraded) return 'warning';
+  if (status === 'triggered') return 'success';
+  if (status === 'failed') return 'danger';
   return 'default';
+}
+
+function isCancelled(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error
+    && (error as { code?: unknown }).code === 'ERR_CANCELED');
 }
 
 const EventCalendarWorkspace: React.FC = () => {
@@ -61,124 +62,94 @@ const EventCalendarWorkspace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [data, setData] = useState<EventCalendarResponse | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
 
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
 
   const load = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     setLoading(true);
     setError(null);
     try {
-      const response = await eventCalendarApi.getCalendar({
-        dateFrom,
-        dateTo,
-        includeImpact,
-        reportLanguage: language === 'en' ? 'en' : 'zh',
-      });
-      setData(response);
-    } catch (err) {
-      setError(getParsedApiError(err));
-      setData(null);
+      const response = await eventCalendarApi.getCalendar(
+        { dateFrom, dateTo },
+        { signal: controller.signal },
+      );
+      if (generation === generationRef.current) setData(response);
+    } catch (caught) {
+      if (!controller.signal.aborted && !isCancelled(caught) && generation === generationRef.current) {
+        setError(getParsedApiError(caught));
+        setData(null);
+      }
     } finally {
-      setLoading(false);
+      if (generation === generationRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo, includeImpact, language]);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     void load();
+    return () => requestRef.current?.abort();
   }, [load]);
 
-  const certaintyLabel = useCallback(
-    (value: string) => {
-      if (value === 'confirmed') return text.certaintyConfirmed;
-      if (value === 'scheduled') return text.certaintyScheduled;
-      if (value === 'estimated') return text.certaintyEstimated;
-      return value;
-    },
-    [text],
-  );
+  const categoryLabel = useCallback((category?: CorporateEventCategory | null) => {
+    if (!category) return text.categoryUnknown;
+    return text.categories[category];
+  }, [text]);
 
-  const typeLabel = useCallback(
-    (value: string) => {
-      switch (value) {
-        case 'earnings':
-          return text.typeEarnings;
-        case 'ex_dividend':
-          return text.typeExDividend;
-        case 'unlock':
-          return text.typeUnlock;
-        case 'index_rebalance':
-          return text.typeIndexRebalance;
-        case 'macro':
-          return text.typeMacro;
-        default:
-          return value;
-      }
-    },
-    [text],
-  );
+  const statusLabel = useCallback((status: string, degraded: boolean) => {
+    if (degraded) return text.statusDegraded;
+    if (status === 'triggered') return text.statusTriggered;
+    if (status === 'failed') return text.statusFailed;
+    if (status === 'skipped') return text.statusSkipped;
+    return status;
+  }, [text]);
 
-  const columns: DataTableColumn<CalendarEventItem>[] = useMemo(
-    () => [
+  const columns: DataTableColumn<CalendarEventItem>[] = useMemo(() => {
+    const base: DataTableColumn<CalendarEventItem>[] = [
+      { id: 'date', header: text.date, cell: (row) => row.eventDate, nowrap: true },
+      { id: 'symbol', header: text.symbol, cell: (row) => row.symbol, nowrap: true },
+      { id: 'category', header: text.eventType, cell: (row) => categoryLabel(row.eventCategory) },
       {
-        id: 'date',
-        header: text.date,
-        cell: (row) => row.eventDate,
-      },
-      {
-        id: 'symbol',
-        header: text.symbol,
-        cell: (row) => row.symbol,
-      },
-      {
-        id: 'type',
-        header: text.eventType,
-        cell: (row) => typeLabel(row.eventType),
-      },
-      {
-        id: 'certainty',
-        header: text.certainty,
+        id: 'status',
+        header: text.status,
         cell: (row) => (
-          <Badge variant={certaintyVariant(row.certainty)}>
-            {certaintyLabel(row.certainty)}
+          <Badge variant={statusVariant(row.status, row.degraded)}>
+            {statusLabel(row.status, row.degraded)}
           </Badge>
         ),
       },
-      {
-        id: 'title',
-        header: text.titleColumn,
-        cell: (row) => row.title,
-      },
-      {
+      { id: 'event', header: text.titleColumn, cell: (row) => row.whatHappened || text.eventUnavailable },
+    ];
+    if (includeImpact) {
+      base.push({
         id: 'impact',
         header: text.impact,
-        cell: (row) => {
-          const impact = row.impactPreview;
-          if (!impact || !impact.available) {
-            return <span className="text-muted-foreground">{text.impactUnavailable}</span>;
-          }
-          const affected = impact.affected as Record<string, unknown> | null | undefined;
-          const bits: string[] = [];
-          if (affected?.inWatchlist) bits.push(text.inWatchlist);
-          if (affected?.inPortfolio) bits.push(text.inPortfolio);
-          return (
-            <div className="flex max-w-md flex-col gap-1 text-sm">
-              {impact.whyItMatters ? (
-                <span>
-                  <strong>{text.whyItMatters}:</strong>
-                  {' '}
-                  {impact.whyItMatters}
-                </span>
-              ) : null}
-              {bits.length > 0 ? <span>{bits.join(' · ')}</span> : null}
-            </div>
-          );
-        },
-      },
-    ],
-    [certaintyLabel, text, typeLabel],
-  );
+        cell: (row) => (
+          <div className="flex max-w-md flex-col gap-1 text-sm">
+            <span>{row.whyItMatters || text.impactUnavailable}</span>
+            {row.inWatchlist || row.inPortfolio ? (
+              <span className="text-muted-foreground">
+                {[row.inWatchlist ? text.inWatchlist : '', row.inPortfolio ? text.inPortfolio : '']
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            ) : null}
+          </div>
+        ),
+      });
+    }
+    base.push({ id: 'source', header: text.source, cell: (row) => row.source || text.sourceUnavailable });
+    return base;
+  }, [categoryLabel, includeImpact, statusLabel, text]);
+
+  const hasPartialFailure = Boolean(data?.partialErrors.length);
 
   return (
     <AppPage>
@@ -187,25 +158,15 @@ const EventCalendarWorkspace: React.FC = () => {
         title={text.title}
         description={text.description}
         actions={(
-          <Button type="button" variant="secondary" onClick={() => void load()} disabled={loading}>
+          <Button type="button" variant="secondary" onClick={() => void load()}>
             {text.refresh}
           </Button>
         )}
       />
 
       <Surface className="mb-4 flex flex-wrap items-end gap-4 p-4">
-        <DatePicker
-          label={text.dateFrom}
-          value={dateFrom}
-          onChange={setDateFrom}
-          ariaLabel={text.dateFrom}
-        />
-        <DatePicker
-          label={text.dateTo}
-          value={dateTo}
-          onChange={setDateTo}
-          ariaLabel={text.dateTo}
-        />
+        <DatePicker label={text.dateFrom} value={dateFrom} onChange={setDateFrom} ariaLabel={text.dateFrom} />
+        <DatePicker label={text.dateTo} value={dateTo} onChange={setDateTo} ariaLabel={text.dateTo} />
         <Checkbox
           label={text.includeImpact}
           checked={includeImpact}
@@ -214,65 +175,29 @@ const EventCalendarWorkspace: React.FC = () => {
       </Surface>
 
       {loading ? <Loading label={text.loading} /> : null}
-
       {!loading && error ? (
-        <ApiErrorAlert
-          error={error}
-          actionLabel={text.errorRetry}
-          onAction={() => {
-            void load();
-          }}
-        />
+        <ApiErrorAlert error={error} actionLabel={text.errorRetry} onAction={() => void load()} />
       ) : null}
 
-      {!loading && !error && data && !data.enabled ? (
-        <EmptyState
-          icon={<CalendarDays aria-hidden />}
-          title={text.disabledTitle}
-          description={text.disabledDescription}
-        />
-      ) : null}
-
-      {!loading && !error && data && data.enabled ? (
+      {!loading && !error && data ? (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-            <span>{formatUiText(text.symbolCount, { count: data.symbolCount })}</span>
-            <span>·</span>
-            <span>{formatUiText(text.eventCount, { count: data.eventCount })}</span>
-            <span>·</span>
-            <span>{data.fetchAttempted ? text.fetchAttempted : text.fetchSkipped}</span>
-            {data.fetchedAt ? (
-              <>
-                <span>·</span>
-                <span>
-                  {text.fetchedAt}
-                  :
-                  {' '}
-                  {data.fetchedAt}
-                </span>
-              </>
-            ) : null}
+          <div className="text-sm text-muted-foreground">
+            {formatUiText(text.resultSummary, { count: data.events.length, loaded: data.loadedCount, total: data.total })}
           </div>
-
-          {data.coverageNotes.length > 0 ? (
+          {hasPartialFailure ? (
             <InlineAlert
-              variant="info"
-              title={text.coverageNote}
-              message={(
-                <ul className="list-disc pl-5">
-                  {data.coverageNotes.map((note) => (
-                    <li key={note}>{note}</li>
-                  ))}
-                </ul>
-              )}
+              variant="warning"
+              title={text.partialTitle}
+              message={data.partialErrors.includes('event_calendar_result_limit_reached')
+                ? text.resultLimitReached
+                : text.partialDescription}
             />
           ) : null}
-
           {data.events.length === 0 ? (
             <EmptyState
               icon={<CalendarDays aria-hidden />}
-              title={text.emptyTitle}
-              description={text.emptyDescription}
+              title={hasPartialFailure ? text.incompleteTitle : text.emptyTitle}
+              description={hasPartialFailure ? text.incompleteDescription : text.emptyDescription}
             />
           ) : (
             <DataTable
@@ -281,44 +206,10 @@ const EventCalendarWorkspace: React.FC = () => {
               columns={columns}
               rows={data.events}
               getRowKey={(row) => row.eventId}
-              emptyState={{
-                title: text.emptyTitle,
-                description: text.emptyDescription,
-              }}
+              emptyState={{ title: text.emptyTitle, description: text.emptyDescription }}
+              minWidth="wide"
             />
           )}
-
-          {data.coverage.length > 0 ? (
-            <Card className="p-4">
-              <h3 className="mb-2 text-base font-semibold">{text.coverageTitle}</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-2 pr-3">{text.marketColumn}</th>
-                      <th className="py-2 pr-3">{text.typeEarnings}</th>
-                      <th className="py-2 pr-3">{text.typeExDividend}</th>
-                      <th className="py-2 pr-3">{text.typeUnlock}</th>
-                      <th className="py-2 pr-3">{text.typeIndexRebalance}</th>
-                      <th className="py-2 pr-3">{text.typeMacro}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.coverage.map((row) => (
-                      <tr key={row.market} className="border-b last:border-0">
-                        <td className="py-2 pr-3 font-medium">{row.market}</td>
-                        <td className="py-2 pr-3">{row.earnings}</td>
-                        <td className="py-2 pr-3">{row.exDividend}</td>
-                        <td className="py-2 pr-3">{row.unlock}</td>
-                        <td className="py-2 pr-3">{row.indexRebalance}</td>
-                        <td className="py-2 pr-3">{row.macro}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ) : null}
         </div>
       ) : null}
     </AppPage>

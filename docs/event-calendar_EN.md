@@ -1,87 +1,41 @@
-# Event Calendar (V0)
+# Corporate Event Calendar
 
-Upcoming-event calendar scoped to watchlist and holdings
-([#153](https://github.com/SiinXu/stock-pulse-ai/issues/153) / T21).
+The Web route `/events` provides a read-only calendar projection of the
+corporate-event alert contract owned by the alerts subsystem.
+
+## Contract boundary
+
+- The calendar reads `GET /api/v1/alerts/triggers` with
+  `alert_type=corporate_event`.
+- It does not define an event provider, event configuration, cache, fallback,
+  or a second event API.
+- It does not fetch market or event data. Provider governance remains in the
+  alerts event source.
+- Impact and provenance fields are displayed from the alert trigger's public
+  `impact_context` / `event_context` projection.
+
+This dependency means the event-alert contract from PR #957 must be available
+before the calendar is deployed.
+
+## Loading behavior
+
+The client requests trigger pages at the server maximum page size and continues
+until the server-reported total is reached. Reads are capped at 20 pages (2,000
+records). If a later page fails or the cap is reached, the page displays a
+localized partial-results warning and does not claim that an incomplete range is
+empty.
+
+Changing the date range or refreshing cancels the previous request. A request
+generation guard prevents an older response from replacing newer filters.
 
 ## Scope
 
-| Included | Out of scope (V0) |
-| --- | --- |
-| Event model + date certainty (`confirmed` / `scheduled` / `estimated`) | Full-market event firehose |
-| Watchlist + holdings symbols only | Edits to `event_alerts.py` |
-| Independent akshare fetch (no provider capability-table expansion) | Full US/HK calendars |
-| Impact preview via `build_impact_context` | LLM inventing events |
-| Web view at `/events` | Sidebar nav wiring (see Integration Point) |
-
-## Toggle
-
-```bash
-EVENT_CALENDAR_ENABLED=false   # default: zero extra fetch
-EVENT_CALENDAR_ENABLED=true    # opt-in before any akshare calendar call
-```
-
-When unset or `false`, the API returns `enabled=false`, `fetch_attempted=false`,
-and an empty event list.
-
-## Endpoint
-
-```http
-GET /api/v1/event-calendar
-```
-
-| Parameter | Default | Notes |
-| --- | --- | --- |
-| `date_from` | today | Range start |
-| `date_to` | today + 90d | Range end |
-| `symbols` | watchlist ∪ holdings | Intersected with managed scope only |
-| `event_types` | all | `earnings,ex_dividend,unlock,index_rebalance,macro` |
-| `include_impact` | true | Attach `build_impact_context` preview |
-| `report_language` | zh | `zh` / `en` |
-
-## Certainty
-
-| Value | Meaning |
-| --- | --- |
-| `confirmed` | Fixed announced date (ex-date, unlock batch) |
-| `scheduled` | Appointment date (earnings appointment) — **can still move** |
-| `estimated` | Lowest confidence inference |
-
-UI must show the certainty badge and `fetched_at` so appointment dates are never
-mistaken for fixed dates.
-
-## Impact preview
-
-- Reuses `build_impact_context` / `why_it_matters` from
-  `src/services/event_alerts.py` (read-only; that file is not modified).
-- Does not call an LLM to invent events; leaves `why_it_matters` empty when
-  assessment is unavailable.
-
-## Market coverage
-
-| Market | Earnings | Ex-dividend | Unlock | Index rebalance | Macro |
-| --- | --- | --- | --- | --- | --- |
-| CN A-share | akshare `stock_yysj_em` (appointment/actual) | akshare `stock_fhps_em` | akshare unlock queue | not covered (V0) | not covered (V0) |
-| HK | not covered (V0) | not covered (V0) | not covered (V0) | not covered (V0) | not covered (V0) |
-| US | not covered (V0) | not covered (V0) | not covered (V0) | not covered (V0) | not covered (V0) |
-
-**Do not assume US/HK calendars are as complete as A-share.**
-
-## Web
-
-- Route: `/events` (`APP_ROUTE_PATHS.eventCalendar`)
-- Components: `apps/dsa-web/src/components/event-calendar/`
-  (separate from `alerts` / `notifications`)
-
-## Integration Point
-
-`SidebarNav.tsx` is frozen in this batch. After merge, add one nav entry:
-
-```tsx
-{ to: APP_ROUTE_PATHS.eventCalendar, labelKey: 'layout.nav.eventCalendar' }
-```
-
-Until then, open `/events` directly.
+The page shows triggered corporate events within the selected date range and
+can display their impact summary, affected watchlist/portfolio flags, status,
+and source. It does not implement the future-event provider catalog or the
+agent-generated bull/bear/watch preview still remaining in issue #153.
 
 ## Rollback
 
-Set `EVENT_CALENDAR_ENABLED=false` or revert this change.
+Remove the `/events` route and its lazy page, or revert this change. The alerts
+data contract and event evaluation path are unaffected.

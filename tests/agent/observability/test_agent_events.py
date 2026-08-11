@@ -87,6 +87,16 @@ def test_fixture_run_emits_expected_event_sequence(monkeypatch):
         assert "payload" not in tool_end
         # Mirrored into run-flow sink.
         assert any(str(item.get("type", "")).startswith("agent_") for item in flow_events)
+        replay_events = [item for item in flow_events if str(item.get("type", "")).startswith("agent_")]
+        assert [item["metadata"]["sequence"] for item in replay_events] == list(range(1, 8))
+        assert all(item["metadata"]["schema_version"] == 1 for item in replay_events)
+        assert replay_events[-1]["metadata"]["capture"] == {
+            "original_count": 7,
+            "returned_count": 7,
+            "dropped_count": 0,
+            "truncated": False,
+        }
+        assert all(item["metadata"]["detail_integrity"] == "valid" for item in replay_events)
     finally:
         reset_run_diagnostic_context(token)
 
@@ -180,6 +190,7 @@ def test_history_run_flow_includes_agent_tool_sequence():
             ],
             "agent_events": [
                 {
+                    "schema_version": 1,
                     "event_type": "agent.phase_start",
                     "trace_id": "trace-hist",
                     "span_id": "phase1",
@@ -189,6 +200,7 @@ def test_history_run_flow_includes_agent_tool_sequence():
                     "status": "running",
                 },
                 {
+                    "schema_version": 1,
                     "event_type": "agent.tool_start",
                     "trace_id": "trace-hist",
                     "span_id": "tool1",
@@ -198,8 +210,10 @@ def test_history_run_flow_includes_agent_tool_sequence():
                     "name": "get_realtime_quote",
                     "status": "running",
                     "step": 1,
+                    "attrs": {"stock_code": "600519", "api_key": "secret"},
                 },
                 {
+                    "schema_version": 1,
                     "event_type": "agent.tool_end",
                     "trace_id": "trace-hist",
                     "span_id": "tool1",
@@ -212,6 +226,7 @@ def test_history_run_flow_includes_agent_tool_sequence():
                     "step": 1,
                 },
                 {
+                    "schema_version": 1,
                     "event_type": "agent.phase_end",
                     "trace_id": "trace-hist",
                     "span_id": "phase1",
@@ -222,6 +237,12 @@ def test_history_run_flow_includes_agent_tool_sequence():
                     "duration_ms": 30,
                 },
             ],
+            "agent_events_capture": {
+                "original_count": 4,
+                "returned_count": 4,
+                "dropped_count": 0,
+                "truncated": False,
+            },
             "history_runs": [],
             "notification_runs": [],
         }
@@ -241,3 +262,58 @@ def test_history_run_flow_includes_agent_tool_sequence():
     tool_sequence = (phase_nodes[0].metadata or {}).get("tool_sequence") or []
     assert tool_sequence
     assert tool_sequence[0]["label"] == "get_realtime_quote"
+    replay_events = [event for event in snapshot.events if event.type.startswith("agent_")]
+    assert [event.metadata["sequence"] for event in replay_events] == [1, 2, 3, 4]
+    assert all(event.metadata["schema_version"] == 1 for event in replay_events)
+    assert all(event.metadata["detail_integrity"] == "valid" for event in replay_events)
+    assert replay_events[0].metadata["capture"] == {
+        "original_count": 4,
+        "returned_count": 4,
+        "dropped_count": 0,
+        "truncated": False,
+    }
+    assert replay_events[1].metadata["attrs"] == {
+        "stock_code": "600519",
+        "api_key": "<redacted>",
+    }
+
+
+def test_agent_replay_projection_rejects_non_finite_detail():
+    class _Record:
+        query_id = "q-non-finite"
+        code = "600519"
+        name = "Kweichow Moutai"
+        report_type = "detailed"
+        created_at = "2026-08-06T10:00:00"
+        id = 43
+
+    snapshot = build_history_run_flow_snapshot(
+        _Record(),
+        context_snapshot={
+            "diagnostics": {
+                "trace_id": "trace-non-finite",
+                "agent_events": [{
+                    "schema_version": 1,
+                    "event_type": "agent.decision",
+                    "trace_id": "trace-non-finite",
+                    "span_id": "decision-1",
+                    "sequence": 1,
+                    "timestamp": "2026-08-06T10:00:01",
+                    "name": "final_answer",
+                    "status": "success",
+                    "attrs": {"confidence": float("inf"), "signal": "hold"},
+                }],
+                "agent_events_capture": {
+                    "original_count": 1,
+                    "returned_count": 1,
+                    "dropped_count": 0,
+                    "truncated": False,
+                },
+            }
+        },
+        raw_result={"success": True},
+    )
+
+    replay_event = next(event for event in snapshot.events if event.type.startswith("agent_"))
+    assert replay_event.metadata["attrs"] == {"signal": "hold"}
+    assert replay_event.metadata["detail_integrity"] == "invalid_non_finite"

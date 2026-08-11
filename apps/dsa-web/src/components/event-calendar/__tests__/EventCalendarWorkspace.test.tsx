@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { eventCalendarApi } from '../../../api/eventCalendar';
@@ -9,9 +9,7 @@ import type { EventCalendarResponse } from '../../../types/eventCalendar';
 import EventCalendarWorkspace from '../EventCalendarWorkspace';
 
 vi.mock('../../../api/eventCalendar', () => ({
-  eventCalendarApi: {
-    getCalendar: vi.fn(),
-  },
+  eventCalendarApi: { getCalendar: vi.fn() },
 }));
 
 function renderWorkspace() {
@@ -24,91 +22,79 @@ function renderWorkspace() {
   );
 }
 
-const disabledPayload: EventCalendarResponse = {
-  enabled: false,
-  fetchAttempted: false,
-  asOf: '2026-08-09',
-  dateFrom: '2026-08-09',
-  dateTo: '2026-11-07',
-  eventTypes: [],
-  symbols: [],
-  symbolCount: 0,
-  eventCount: 0,
+const emptyPayload: EventCalendarResponse = {
   events: [],
-  coverage: [],
-  sourcesAttempted: [],
-  errors: [],
-  coverageNotes: ['EVENT_CALENDAR_ENABLED is false; no provider fetch was attempted.'],
+  loadedCount: 0,
+  total: 0,
+  partialErrors: [],
 };
 
-const emptyEnabledPayload: EventCalendarResponse = {
-  ...disabledPayload,
-  enabled: true,
-  fetchAttempted: true,
-  symbolCount: 2,
-  coverageNotes: [],
-  coverage: [
-    {
-      market: 'CN A-share',
-      earnings: 'appointment',
-      exDividend: 'announced',
-      unlock: 'queue',
-      indexRebalance: 'not covered (V0)',
-      macro: 'not covered (V0)',
-    },
-  ],
-};
-
-const withEventsPayload: EventCalendarResponse = {
-  ...emptyEnabledPayload,
-  eventCount: 1,
-  events: [
-    {
-      eventId: 'earnings:cn:600519:20260630:2026-08-20',
-      eventType: 'earnings',
-      eventDate: '2026-08-20',
-      certainty: 'scheduled',
-      symbol: '600519',
-      title: '600519 earnings disclosure',
-      impactPreview: {
-        available: true,
-        whyItMatters: 'Earnings events can reprice profit expectations and valuation anchors.',
-        affected: { inWatchlist: true, inPortfolio: false },
-      },
-    },
-  ],
-};
+const eventPayload = (summary: string): EventCalendarResponse => ({
+  events: [{
+    eventId: 7,
+    eventDate: '2026-08-10',
+    symbol: '600519',
+    status: 'triggered',
+    eventCategory: 'earnings',
+    whatHappened: 'Earnings disclosure',
+    whyItMatters: summary,
+    degraded: false,
+    inWatchlist: true,
+    inPortfolio: false,
+    source: 'corporate_event_service',
+  }],
+  loadedCount: 1,
+  total: 1,
+  partialErrors: [],
+});
 
 describe('EventCalendarWorkspace', () => {
   beforeEach(() => {
     vi.mocked(eventCalendarApi.getCalendar).mockReset();
   });
 
-  it('renders disabled empty state when calendar is off', async () => {
-    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(disabledPayload);
+  it('renders an honest empty state after a complete read', async () => {
+    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(emptyPayload);
     renderWorkspace();
-    await waitFor(() => {
-      expect(screen.getByText('Event calendar is disabled')).toBeInTheDocument();
-    });
-    expect(screen.getByText(/EVENT_CALENDAR_ENABLED/i)).toBeInTheDocument();
+    expect(await screen.findByText('No corporate events in this date range')).toBeInTheDocument();
   });
 
-  it('renders empty state when enabled with no events', async () => {
-    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(emptyEnabledPayload);
+  it('renders the alert contract impact projection in the shared DataTable', async () => {
+    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(eventPayload('Profit expectations may reprice.'));
     renderWorkspace();
-    await waitFor(() => {
-      expect(screen.getByText('No events in this range')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Market coverage')).toBeInTheDocument();
+    expect(await screen.findByText('600519')).toBeInTheDocument();
+    expect(screen.getByText('Earnings')).toBeInTheDocument();
+    expect(screen.getByText('Profit expectations may reprice.')).toBeInTheDocument();
+    expect(screen.getByText('Watchlist')).toBeInTheDocument();
   });
 
-  it('renders certainty badge for scheduled events', async () => {
-    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(withEventsPayload);
-    renderWorkspace();
-    await waitFor(() => {
-      expect(screen.getByText('600519')).toBeInTheDocument();
+  it('does not claim an incomplete result is empty', async () => {
+    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue({
+      ...emptyPayload,
+      total: 25,
+      partialErrors: ['event_calendar_page_unavailable'],
     });
-    expect(screen.getByText('Scheduled (may change)')).toBeInTheDocument();
-    expect(screen.getByText(/reprice profit expectations/i)).toBeInTheDocument();
+    renderWorkspace();
+    expect(await screen.findByText('This date range cannot be confirmed empty')).toBeInTheDocument();
+    expect(screen.queryByText('No corporate events in this date range')).not.toBeInTheDocument();
+  });
+
+  it('aborts the previous generation and ignores its late response', async () => {
+    let resolveFirst: (value: EventCalendarResponse) => void = () => undefined;
+    const first = new Promise<EventCalendarResponse>((resolve) => { resolveFirst = resolve; });
+    vi.mocked(eventCalendarApi.getCalendar)
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce(eventPayload('Newest response'));
+
+    renderWorkspace();
+    await waitFor(() => expect(eventCalendarApi.getCalendar).toHaveBeenCalledTimes(1));
+    const firstSignal = vi.mocked(eventCalendarApi.getCalendar).mock.calls[0][1]?.signal;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('Newest response')).toBeInTheDocument();
+    expect(firstSignal?.aborted).toBe(true);
+    await act(async () => { resolveFirst(eventPayload('Stale response')); });
+    expect(screen.queryByText('Stale response')).not.toBeInTheDocument();
+    expect(screen.getByText('Newest response')).toBeInTheDocument();
   });
 });

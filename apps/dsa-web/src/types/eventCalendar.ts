@@ -1,76 +1,39 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export type EventCalendarEventType =
+export type CorporateEventCategory =
   | 'earnings'
-  | 'ex_dividend'
-  | 'unlock'
-  | 'index_rebalance'
-  | 'macro';
+  | 'shareholder'
+  | 'mna'
+  | 'regulatory'
+  | 'analyst';
 
-export type EventCalendarCertainty = 'confirmed' | 'scheduled' | 'estimated';
+export type EventCalendarErrorCode =
+  | 'event_calendar_page_unavailable'
+  | 'event_calendar_result_limit_reached';
 
-export type EventImpactPreview = {
-  available: boolean;
+export interface CalendarEventItem {
+  eventId: number;
+  eventDate: string;
+  symbol: string;
+  status: string;
+  eventCategory?: CorporateEventCategory | null;
   whatHappened?: string | null;
   whyItMatters?: string | null;
-  eventCategory?: string | null;
-  affected?: Record<string, unknown> | null;
-  relatedAnalysis?: string | null;
-  degraded?: boolean | null;
+  degraded: boolean;
+  inWatchlist: boolean;
+  inPortfolio: boolean;
   source?: string | null;
-  error?: string | null;
-};
+}
 
-export type CalendarEventItem = {
-  eventId: string;
-  eventType: EventCalendarEventType | string;
-  eventDate: string;
-  certainty: EventCalendarCertainty | string;
-  symbol: string;
-  title: string;
-  market?: string;
-  source?: string;
-  fetchedAt?: string | null;
-  description?: string;
-  metadata?: Record<string, unknown>;
-  impactPreview?: EventImpactPreview | null;
-};
+export interface EventCalendarResponse {
+  events: CalendarEventItem[];
+  loadedCount: number;
+  total: number;
+  partialErrors: EventCalendarErrorCode[];
+}
 
-export type EventCalendarCoverageRow = {
-  market: string;
-  earnings: string;
-  exDividend: string;
-  unlock: string;
-  indexRebalance: string;
-  macro: string;
-};
-
-export type EventCalendarResponse = {
-  enabled: boolean;
-  fetchAttempted: boolean;
-  asOf: string;
+export interface EventCalendarQuery {
   dateFrom: string;
   dateTo: string;
-  eventTypes: string[];
-  symbols: string[];
-  symbolCount: number;
-  eventCount: number;
-  events: CalendarEventItem[];
-  coverage: EventCalendarCoverageRow[];
-  sourcesAttempted: string[];
-  errors: string[];
-  coverageNotes: string[];
-  fetchedAt?: string | null;
-  impactPreviewMode?: string;
-  reusesBuildImpactContext?: boolean;
-};
-
-export type EventCalendarQuery = {
-  dateFrom?: string;
-  dateTo?: string;
-  symbols?: string;
-  eventTypes?: string;
-  includeImpact?: boolean;
-  reportLanguage?: string;
-};
+}
