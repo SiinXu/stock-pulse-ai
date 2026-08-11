@@ -9,6 +9,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union
 
+from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
 
@@ -753,6 +754,41 @@ def run_full_analysis(
 
         return True
 
+    except __LocalDataMissingError__ as exc:
+        log_safe_exception(
+            logger,
+            "Analysis stopped because local market data is incomplete",
+            exc,
+            error_code=exc.error_code,
+            level=logging.ERROR,
+            context={
+                "symbol": exc.missing.symbol,
+                "reason": exc.missing.reason,
+            },
+        )
+        try:
+            from src.services.actions_daily_run_summary import (
+                build_status_for_failure,
+                write_run_status,
+            )
+
+            status = build_status_for_failure(
+                primary_code=exc.error_code,
+                detail=str(exc),
+            )
+            status.extra["local_data_missing"] = exc.to_dict()
+            write_run_status(status)
+        except Exception as status_exc:  # broad-exception: fallback_recorded - status write must not replace primary failure
+            log_safe_exception(
+                logger,
+                "Actions run status write failed after local-only data miss",
+                status_exc,
+                error_code="actions_run_status_write_failed",
+                level=logging.WARNING,
+            )
+        if raise_errors:
+            raise
+        return False
     except Exception as exc:  # broad-exception: fallback_recorded - preserve logged workflow failure and raise_errors propagation
         log_safe_exception(
             logger,

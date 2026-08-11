@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import builtins
 import importlib
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -399,6 +400,49 @@ def test_builder_does_not_hide_broken_artifact_to_dict() -> None:
 def test_builder_rejects_non_mapping_artifact_to_dict() -> None:
     with pytest.raises(TypeError, match="to_dict\\(\\) must return a mapping"):
         AnalysisContextBuilder.build(_artifacts(trend_result=_InvalidTrend()))
+
+
+def test_builder_projects_validation_evidence_and_excludes_rejected_technical_value() -> None:
+    from data_provider.data_validation import project_technical_indicators
+    from src.services.run_diagnostics import (
+        activate_run_diagnostic_context,
+        current_diagnostic_snapshot,
+        reset_run_diagnostic_context,
+    )
+
+    token = activate_run_diagnostic_context(
+        trace_id="trace-technical-projection",
+        stock_code="600519",
+    )
+    try:
+        projected = project_technical_indicators(
+            {"trend_status": "unknown", "ma5": float("nan"), "ma10": 10.0},
+            market="cn",
+            stock_code="600519",
+        )
+        evidence = current_diagnostic_snapshot()["data_quality_evidence"]
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert "ma5" not in projected
+    pack = AnalysisContextBuilder.build(
+        _artifacts(
+            trend_result=_FakeTrend(
+                {"trend_status": "unknown", "ma5": float("nan"), "ma10": 10.0}
+            ),
+            metadata={
+                "query_id": "q-validation",
+                "data_quality_evidence": evidence,
+            },
+        )
+    )
+
+    technical = pack.blocks["technical"]
+    assert technical.status == ContextFieldStatus.PARTIAL
+    assert "ma5" not in technical.items["trend_result"].value
+    assert "dv_technical_ma5_non_finite" in pack.data_quality.warnings
+    assert pack.data_quality.metadata["validation_evidence"] == evidence
+    json.dumps(pack.model_dump(mode="json"), allow_nan=False)
 
 
 def test_news_block_treats_blank_as_missing_and_records_pack_metadata() -> None:

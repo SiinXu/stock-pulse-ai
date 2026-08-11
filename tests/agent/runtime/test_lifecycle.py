@@ -361,6 +361,48 @@ def test_runner_cancel_before_first_step_makes_no_llm_call():
     assert result.success is False
 
 
+def test_orchestrator_acknowledges_turn_after_durable_persistence():
+    orch = _orchestrator()
+    conv = MagicMock()
+    order = []
+    conv.add_user_message.side_effect = lambda *_args, **_kwargs: order.append("persist") or 41
+    conv.get_or_create.return_value.update_market_context.side_effect = (
+        lambda *_args, **_kwargs: order.append("context")
+    )
+    cancelled = OrchestratorResult(
+        success=False, content="", error="Pipeline cancelled", cancelled=True
+    )
+
+    with patch(
+        "src.agent.orchestrator.resolve_stock_scope",
+        return_value=SimpleNamespace(
+            effective_context={"stock_code": "600519"}, stock_scope=None
+        ),
+    ), patch(
+        "src.agent.orchestrator.build_visible_chat_history", return_value=[]
+    ), patch(
+        "src.agent.conversation.conversation_manager", conv
+    ), patch.object(
+        orch, "_execute_pipeline", return_value=cancelled
+    ):
+        orch.chat(
+            "hi",
+            session_id="s-1",
+            turn_id="turn-1",
+            progress_callback=lambda event: order.append(event),
+        )
+
+    assert order[:2] == ["persist", "context"]
+    assert order[2] == {
+        "type": "turn_persisted",
+        "turn_id": "turn-1",
+        "message_id": "41",
+    }
+    assert conv.add_user_message.call_args.kwargs["context"] == {
+        "stock_code": "600519"
+    }
+
+
 def test_runner_cancel_after_llm_blocks_tool_dispatch():
     calls = {"tool": 0}
 
@@ -590,6 +632,48 @@ def test_executor_chat_cancel_skips_sentinel_and_provider_trace():
     assert conv.add_message.call_count == 0  # no failure sentinel
     persist_trace.assert_not_called()
     assert result.cancelled is True
+
+
+def test_executor_acknowledges_turn_after_durable_persistence():
+    from src.agent.executor import AgentExecutor, AgentResult
+
+    executor = AgentExecutor(tool_registry=_registry(), llm_adapter=MagicMock())
+    conv = MagicMock()
+    order = []
+    conv.add_user_message.side_effect = lambda *_args, **_kwargs: order.append("persist") or 42
+    conv.get_or_create.return_value.update_market_context.side_effect = (
+        lambda *_args, **_kwargs: order.append("context")
+    )
+    cancelled = AgentResult(success=False, content="", error="cancelled", cancelled=True)
+
+    with patch(
+        "src.agent.executor.resolve_stock_scope",
+        return_value=SimpleNamespace(
+            effective_context={"stock_code": "600519"}, stock_scope=None
+        ),
+    ), patch(
+        "src.agent.executor.build_agent_chat_context_bundle",
+        return_value=SimpleNamespace(context_messages=[]),
+    ), patch(
+        "src.agent.conversation.conversation_manager", conv
+    ), patch.object(
+        executor, "_run_loop", return_value=cancelled
+    ), patch.object(
+        executor, "_persist_provider_trace"
+    ):
+        executor.chat(
+            "hi",
+            session_id="s-1",
+            turn_id="turn-1",
+            progress_callback=lambda event: order.append(event),
+        )
+
+    assert order[:2] == ["persist", "context"]
+    assert order[2] == {
+        "type": "turn_persisted",
+        "turn_id": "turn-1",
+        "message_id": "42",
+    }
 
 
 # ---------------------------------------------------------------------------

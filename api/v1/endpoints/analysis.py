@@ -35,6 +35,7 @@ from api.v1.schemas.analysis import (
     TaskStatus,
     TaskListResponse,
     DuplicateTaskErrorResponse,
+    LocalMarketDataMissingErrorResponse,
     MarketReviewRequest,
     MarketReviewAccepted,
 )
@@ -296,7 +297,13 @@ def _build_analysis_report(
             "model": Union[TaskAccepted, BatchTaskAcceptedResponse],
         },
         400: {"description": "请求参数错误", "model": ErrorResponse},
-        409: {"description": "股票正在分析中，拒绝重复提交", "model": DuplicateTaskErrorResponse},
+        409: {
+            "description": "Duplicate analysis task or incomplete local market data",
+            "model": Union[
+                DuplicateTaskErrorResponse,
+                LocalMarketDataMissingErrorResponse,
+            ],
+        },
         500: {"description": "分析失败", "model": ErrorResponse},
         503: {"description": "Security audit unavailable", "model": ErrorResponse},
     },

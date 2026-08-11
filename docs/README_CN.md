@@ -100,7 +100,15 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 
 ## 🚀 快速开始
 
-### 方式一：[GitHub Actions（推荐）](https://www.bilibili.com/video/BV11FEb66EXG/)
+### 方式一：本地零成本 · 3 步看到报告
+
+1. 按下方“本地运行 / Docker 部署”说明完成安装，然后运行 `python main.py --webui`。
+2. 在首页按检测结果进入**本机 Ollama** 路径，无需填写云端 API Key。
+3. 如果本机还没有可用模型，点击**查看示例分析**即可打开可阅读的离线演示报告；准备好后再添加本地或云端模型。
+
+云端模型 Key 仍是可选升级路径。检测规则与示例数据边界见[零配置首次成功](zero-config-first-run.md)。
+
+### 方式二：[GitHub Actions](https://www.bilibili.com/video/BV11FEb66EXG/)
 
 > 5 分钟完成部署，零成本，无需服务器。
 
@@ -191,7 +199,7 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 
 默认每个**工作日 18:00（北京时间）**自动执行，也可手动触发。默认非交易日（含 A/H/US 节假日）不执行；强制运行、交易日检查、断点续传等规则见 [完整指南](full-guide.md#定时任务配置)。
 
-### 方式二：[客户端配置教程](https://www.bilibili.com/video/BV11FEb66Eyr/) / 本地运行 / Docker 部署
+### [客户端配置教程](https://www.bilibili.com/video/BV11FEb66Eyr/) / 本地运行 / Docker 部署详情
 
 ```bash
 # 克隆项目

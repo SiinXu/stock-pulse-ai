@@ -517,6 +517,13 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   const internalTabsId = embedded ? SIGNAL_CENTER_HISTORY_TABS_ID : ALERTS_TABS_ID;
   const panelOwnedByParent = embedded && activeView === 'rules';
   const internalTabsVisible = !embedded || activeView !== 'rules';
+  const filtersActive = enabledFilter !== 'all' || alertTypeFilter !== 'all';
+  // The empty table already owns the primary create action. Keep the toolbar
+  // action for populated, filtered-empty, and loading states without rendering
+  // two same-name primary buttons for a genuinely empty Signal Center.
+  const showEmbeddedCreateAction = embedded
+    && activeView === 'rules'
+    && (rulesLoading || rulesTotal > 0 || filtersActive);
   const ActivePanel: React.ElementType = panelOwnedByParent ? 'section' : TabPanel;
   const activePanelProps = panelOwnedByParent
     ? {}
@@ -540,7 +547,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             {text.createRule}
           </Button>
         )}
-      /> : activeView === 'rules' ? (
+      /> : showEmbeddedCreateAction ? (
         <div className="flex justify-end">
           <Button
             type="button"

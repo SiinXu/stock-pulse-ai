@@ -29,7 +29,9 @@ export const ScrollArea: React.FC<ScrollAreaProps> = ({
         className={cn(
           // h-full alone fails when the parent height is content-sized; min-h-0 +
           // flex-1 keep the viewport bounded so clientHeight < scrollHeight.
-          'min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar',
+          // Do not add touch-pan-y (touch-action: pan-y): it suppresses
+          // pinch-to-zoom inside every ScrollArea (chat, history, etc.).
+          'min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar',
           viewportClassName,
         )}
       >

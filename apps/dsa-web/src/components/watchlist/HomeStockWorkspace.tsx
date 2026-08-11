@@ -25,6 +25,8 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/routes';
 import { Spinner } from '../common/Spinner';
+import { WatchlistGroupsPanel } from './WatchlistGroupsPanel';
+import type { WatchlistGroup } from '../../types/watchlist';
 
 export type HomeWorkspaceTab = HomeWorkspaceValue;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
@@ -62,6 +64,21 @@ interface HomeStockWorkspaceProps {
   onDeleteStock?: (stockCode: string) => Promise<void> | void;
   isDeleting?: boolean;
   className?: string;
+  /** Optional grouped organization layer (T23). When omitted, flat list only. */
+  watchlistGroups?: WatchlistGroup[];
+  watchlistGroupsLoading?: boolean;
+  watchlistGroupsActioning?: boolean;
+  watchlistGroupsError?: string | null;
+  onCreateWatchlistGroup?: (name: string) => Promise<boolean> | boolean;
+  onDeleteWatchlistGroup?: (groupId: string) => Promise<boolean> | boolean;
+  onReorderWatchlistGroups?: (orderedIds: string[]) => Promise<boolean> | boolean;
+  onReorderWatchlistGroupMembers?: (groupId: string, orderedCodes: string[]) => Promise<boolean> | boolean;
+  onMoveWatchlistGroupMember?: (params: {
+    stockCode: string;
+    sourceGroupId: string;
+    targetGroupId: string;
+    targetIndex?: number;
+  }) => Promise<boolean> | boolean;
 }
 
 function getTaskStatusLabel(task: TaskInfo | undefined, t: (key: UiTextKey, params?: UiTextParams) => string) {
@@ -225,6 +242,15 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   onDeleteStock,
   isDeleting = false,
   className = '',
+  watchlistGroups,
+  watchlistGroupsLoading = false,
+  watchlistGroupsActioning = false,
+  watchlistGroupsError = null,
+  onCreateWatchlistGroup,
+  onDeleteWatchlistGroup,
+  onReorderWatchlistGroups,
+  onReorderWatchlistGroupMembers,
+  onMoveWatchlistGroupMember,
 }) => {
   const { t } = useUiLanguage();
   const reactId = useId();
@@ -459,6 +485,23 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             <DashboardStateBlock compact title={t('common.noData')} />
           ) : (
             <div className="space-y-2">
+              {watchlistGroups && onCreateWatchlistGroup && onDeleteWatchlistGroup
+                && onReorderWatchlistGroups && onReorderWatchlistGroupMembers
+                && onMoveWatchlistGroupMember ? (
+                <WatchlistGroupsPanel
+                  groups={watchlistGroups}
+                  watchlistRows={watchlistRows}
+                  loading={watchlistGroupsLoading}
+                  actioning={watchlistGroupsActioning || watchlistActioning}
+                  errorMessage={watchlistGroupsError}
+                  onCreateGroup={onCreateWatchlistGroup}
+                  onDeleteGroup={onDeleteWatchlistGroup}
+                  onReorderGroups={onReorderWatchlistGroups}
+                  onReorderMembers={onReorderWatchlistGroupMembers}
+                  onMoveMember={onMoveWatchlistGroupMember}
+                  onRemoveFromWatchlist={onRemoveFromWatchlist}
+                />
+              ) : null}
               <div className="flex items-center gap-2 text-xs text-muted-text">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('watchlist.listHint')}

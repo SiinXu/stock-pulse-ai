@@ -45,6 +45,7 @@ export interface ChatRequest {
 export interface ChatStreamRequest extends ChatRequest {
   session_id?: string;
   context?: unknown;
+  turn_id?: string;
 }
 
 /** Snake_case response shapes match OpenAPI and existing Chat UI consumers. */
@@ -53,6 +54,7 @@ export interface ChatResponse {
   content: string;
   session_id: string;
   error?: string | null;
+  turn_id?: string | null;
   agent_runtime?: {
     soul_version: string;
     soul_hash: string;
@@ -85,11 +87,13 @@ export interface ChatSessionMessage {
   created_at: string | null;
   error?: string | null;
   params?: Record<string, unknown> | null;
+  turn_id?: string | null;
 }
 
 export interface ChatSessionDetail {
   session_id: string;
   messages: ChatSessionMessage[];
+  turn_identity_supported?: boolean;
   session_state: {
     selected_skill_ids: string[] | null;
   };
@@ -122,6 +126,7 @@ const chatResponseSchema = z.object({
   content: z.string(),
   session_id: z.string(),
   error: z.string().nullable().optional(),
+  turn_id: z.string().nullable().optional(),
   agent_runtime: agentRuntimeSchema.nullable().optional(),
 }).passthrough();
 
@@ -163,11 +168,20 @@ const sessionMessageSchema = z.object({
   created_at: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   params: z.record(z.string(), z.unknown()).nullable().optional(),
+  turn_id: z.string().nullable().optional(),
+}).passthrough();
+
+const sessionStateSchema = z.object({
+  selected_skill_ids: z.array(z.string()).nullable(),
 }).passthrough();
 
 const sessionMessagesResponseSchema = z.object({
   session_id: z.string(),
   messages: z.array(sessionMessageSchema),
+  session_state: sessionStateSchema,
+  // FastAPI supplies the generated default when the field is omitted by the
+  // handler, so older compliant fixtures may omit it at this boundary.
+  turn_identity_supported: z.boolean().optional(),
 }).passthrough();
 
 function parseSnakeCasePayload<T>(
@@ -253,16 +267,15 @@ export const agentApi = {
     );
     return data.sessions;
   },
-  async getChatSessionMessages(sessionId: string): Promise<ChatSessionMessage[]> {
+  async getChatSessionMessages(sessionId: string): Promise<ChatSessionDetail> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`,
     );
-    const data = parseSnakeCasePayload<{ messages: ChatSessionMessage[] }>(
+    return parseSnakeCasePayload<ChatSessionDetail>(
       response.data,
       sessionMessagesResponseSchema,
       'SessionMessagesResponse',
     );
-    return data.messages;
   },
   async deleteChatSession(sessionId: string): Promise<void> {
     // OpenAPI response body is unknown; no structured validation.
