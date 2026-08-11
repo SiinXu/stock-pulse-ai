@@ -1361,6 +1361,46 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 置信度校准和长期分析质量。'],
     notes: ['需要配合回测功能使用效果更佳。'],
   },
+  'settings.agent.AGENT_PLANNING_ENABLED': {
+    title: 'Agent 规划循环',
+    summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
+  },
+  'settings.agent.AGENT_PLANNING_STRATEGY': {
+    title: 'Agent 规划策略',
+    summary: '选择确定性模板规划或有界的 LLM 提案规划。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_PLAN_STEPS': {
+    title: '规划最大步骤数',
+    summary: '限制每个有效规划提案包含的步骤数量。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_REPLANS': {
+    title: '规划提案重试次数',
+    summary: '限制规划生成或校验失败后的重试次数。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOKENS': {
+    title: '规划提案 Token 预算',
+    summary: '限制 LLM 规划提案及其重试的 Token 总量。',
+  },
+  'settings.agent.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS': {
+    title: '规划提案超时',
+    summary: '限制规划提案阶段的墙钟时间。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS': {
+    title: '规划最大工具调用数',
+    summary: '限制规划执行与观察重规划期间的工具调用总数。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_OBSERVATION_REPLANS': {
+    title: '观察驱动重规划次数',
+    summary: '限制工具步骤失败后由观察结果触发的重规划次数。',
+  },
+  'settings.agent.AGENT_PLANNING_EXEC_TIMEOUT_SECONDS': {
+    title: '规划执行超时',
+    summary: '限制完整规划执行循环的墙钟时间。',
+  },
+  'settings.agent.AGENT_PLANNING_ON_STEP_FAILURE': {
+    title: '规划步骤失败策略',
+    summary: '选择步骤失败后在预算内重规划，或立即终止。',
+  },
   'settings.agent.AGENT_SKILL_AUTOWEIGHT': {
     title: '策略自动权重',
     summary: '根据历史回测表现自动调整策略权重。',
