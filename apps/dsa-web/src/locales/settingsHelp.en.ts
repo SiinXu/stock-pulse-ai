@@ -1302,6 +1302,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
     ],
   },
+  'settings.agent.reasoning_trace_export': {
+    title: 'Reasoning Trace Export',
+    summary: 'Opt-in export of redacted reasoning-trace-v1 packages from recorded diagnostics.',
+    usage: 'Keep REASONING_TRACE_EXPORT_ENABLED=false unless operators need the export API. REASONING_TRACE_EXPORT_MAX_CHARS sets the complete-response character budget (10000–2000000).',
+    valueNotes: [
+      'Default is off.',
+      'Exports redact credentials and local paths but remain sensitive operator data.',
+      'The service does not store export files; operators must delete downloaded copies separately.',
+    ],
+    impact: ['Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.'],
+    notes: ['See docs/reasoning-trace-export_EN.md for the contract and rollback steps.'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',

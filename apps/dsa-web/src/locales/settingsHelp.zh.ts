@@ -2040,6 +2040,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '第一阶段契约与回滚步骤见 docs/valuation-models.md。',
     ],
   },
+  'settings.agent.reasoning_trace_export': {
+    title: '推理轨迹导出',
+    summary: '可选导出已记录诊断数据的脱敏 reasoning-trace-v1 包。',
+    usage: '除非运营需要导出 API，否则保持 REASONING_TRACE_EXPORT_ENABLED=false。REASONING_TRACE_EXPORT_MAX_CHARS 控制完整响应字符预算（10000–2000000）。',
+    valueNotes: [
+      '默认关闭。',
+      '导出会脱敏凭据与本地路径，但仍属敏感运营数据。',
+      '服务不保存导出文件；已下载副本需运营自行删除。',
+    ],
+    impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
+    notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
+  },
   'settings.system.LOCAL_RUNTIME_AUTO_DETECT': {
     title: '本地运行时自动探测',
     summary: '就绪检查时对本机 Ollama 做快速回环探测（零配置首次成功）。',

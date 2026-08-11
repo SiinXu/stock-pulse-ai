@@ -490,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 158,
-        "keySetSha256": "4b1b9989e8ace31c2f176e767d9851923d2ee134c2e10e181d32894f30cc9074",
+        "keyCount": 122,
+        "keySetSha256": "7e47c96a218eba5c0aaac3f3478dd1c1ae41a2926f25719e4887ca0bc0cdd177",
         "bundleSha256": {
-          "zh": "553a9bb7e4d820a70462909a45d75123b8704e0956fa90aa9530c6c7551d064f",
-          "zh-TW": "7215dbe1c46c5353f8103587a57f13f0608ea62e521896bd20cd3b5a3c8e8275",
-          "en": "acd88080184b88090d97ab25cbaaa2e1a3423ac3066dbc7f9bdf41a64ca38277",
-          "ja": "906fe0b2a055e21db58081a1fdd1ad0de1cd453731d0f178a5b0372514ad34af",
-          "ko": "58c28d831239d59081a56a107fd736f0117f9b02f0bc1bd6d845ca516e44b056",
-          "de": "70a56480d0b13fbeb06a05e7f90919ba18bb3050d61c63440faf0de70c78de0d",
-          "es": "355ef3b88c397fc1bac166b55e3b81bfe9dc678ec158f43b74ba91cf1d9b8576",
-          "ms": "7da2f5799a01e5e59fe073aaa975a14bb19735cbe7d618cefb08cc9ac96dddac",
-          "fr": "3918e699e342b8adfbaaab10eb11da113641627a4780b3717ec07511d4750b76",
-          "id": "042fee18effc59e90d8fcfd58ff47205e382c24e1ee88243713ef45f7c733571"
+          "zh": "9f7899751aa260383fa8a5581e05cffaaf2890305c0aaf87d1ad03e46d537ba3",
+          "zh-TW": "12642a1a627129bd622dcca7e29234a145ef56e58bcc73bfe9955fd220edfd2a",
+          "en": "52ecf950222d24def6c05547614232a039945a0fbd6ea012cf3b615a99098ec9",
+          "ja": "1cbf932f7542d5498efbd736bc4919ccc619ec6c70a34ece82e810e702fb1ace",
+          "ko": "30a2fb9fec387a803055a67c18864c514cce1c7ff1a60c779fe584b487078469",
+          "de": "33072f3d241a89f352057a88caaea2ffb37e88b1683a50491537feb77aac4679",
+          "es": "8b37e3d14fb332b009809c1d1eea8d7e2ede2c089cb19ca9b494dc129ea7c1e4",
+          "ms": "a448fbd1e05a6a60c364db9e22c281b3584364a8668de7053e2240e08f44b143",
+          "fr": "46b585690946822dc741729e021d1bcece128ce557de3b3e6c89709678fbd5db",
+          "id": "4a00841844b4c5ac436c163a7839239a41c4e55d9abdd1e5e520c4398def79f2"
         }
       }
     },
@@ -657,6 +657,8 @@
         "portfolio_busy",
         "portfolio_oversell",
         "rate_limited",
+        "reasoning_trace_auth_required",
+        "reasoning_trace_export_disabled",
         "rollback_unavailable",
         "scheduler_busy",
         "security_audit_auth_required",
@@ -847,6 +849,14 @@
         "rate_limited": [
           "api.error.STABLE_ERROR_TEXT.rate_limited.title",
           "api.error.STABLE_ERROR_TEXT.rate_limited.message"
+        ],
+        "reasoning_trace_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message"
+        ],
+        "reasoning_trace_export_disabled": [
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.message"
         ],
         "rollback_unavailable": [
           "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",

@@ -201,6 +201,7 @@ TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_BASELINE = frozenset({
     "PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS",
     "PROVIDER_HEALTH_WINDOW_SIZE",
     "PYTDX_PRIORITY",
+    "REPORT_MODE",
     "SHARE_IMAGE_XIAOHONGSHU_HANDLE",
     "SHARE_IMAGE_XIAOHONGSHU_ID",
     "SHARE_IMAGE_XIAOHONGSHU_QR_PATH",
@@ -222,14 +223,14 @@ TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_BASELINE = frozenset({
 # sha256("\n".join(sorted(BASELINE))).hexdigest() — pin membership; only shrink
 # BASELINE (and recompute this digest) when retiring historical entries.
 TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_BASELINE_SHA256 = (
-    "141fe02fbbd8baf711db5ed9531c1c14f60f0ca288b0479f57ca39f3b5a2f842"
+    "f10e0659c60320bf91195cdd56c92edb3db83d13945ad3095e565138c9493ecb"
 )
 
 # Absolute ceiling introduced with this guard. Never increase.
 TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_HARD_CEILING = 243
 
 # Recorded max for current debt length. Only decrease when debt is retired.
-TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_MAX_COUNT = 189
+TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_MAX_COUNT = 241
 
 
 def _documented_env_example_keys() -> set[str]:

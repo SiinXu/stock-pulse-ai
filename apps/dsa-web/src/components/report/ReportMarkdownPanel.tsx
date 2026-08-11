@@ -19,6 +19,7 @@ import { IconButton } from '../common/IconButton';
 import { InlineAlert } from '../common/InlineAlert';
 import { Spinner } from '../common/Spinner';
 import { useClipboard } from '../common/useClipboard';
+import { ReasoningTraceExportControls } from './ReasoningTraceExportControls';
 import { ReportDecisionCard } from './ReportDecisionCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 import { ShareImageButton } from './ShareImageButton';
@@ -221,6 +222,13 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           </IconButton>
         </div>
       </div>
+
+      <ReasoningTraceExportControls
+        recordId={recordId}
+        variant="section"
+        disabled={isLoading}
+        className="mb-4"
+      />
 
       {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-4" /> : null}
       {exportError ? (
