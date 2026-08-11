@@ -1003,6 +1003,10 @@ class _ConfigLoadingMethods:
                 os.getenv('NOTIFICATION_DAILY_DIGEST_ENABLED'),
                 default=False,
             ),
+            notification_delta_first=parse_env_bool(
+                os.getenv('NOTIFICATION_DELTA_FIRST'),
+                default=False,
+            ),
             single_stock_notify=os.getenv('SINGLE_STOCK_NOTIFY', 'false').lower() == 'true',
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
