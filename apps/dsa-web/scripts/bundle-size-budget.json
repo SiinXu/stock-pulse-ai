@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-10",
-  "baselineNote": "PR #1033 MCP registry inventory + post-#1036 data-source help + #1031 model-access hub + #1022 report export chrome. Locale budgets remeasured locally with production build; 200B headroom.",
+  "measuredAt": "2026-08-11",
+  "baselineNote": "PR #1039 planning registry help and localized field inventory on post-#1033 main. Affected settings and locale chunks remeasured locally with production build; 200B headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 220606,
-      "measuredGzipBytes": 220406,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 220406 B + 200 B headroom."
+      "maxGzipBytes": 222396,
+      "measuredGzipBytes": 222196,
+      "note": "Rebaselined after adding the planning registry help inventory (PR #1039); measured 222196 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 140899,
-      "measuredGzipBytes": 140699,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 140699 B + 200 B headroom."
+      "maxGzipBytes": 141656,
+      "measuredGzipBytes": 141456,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 141456 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 135061,
-      "measuredGzipBytes": 134861,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 134861 B + 200 B headroom."
+      "maxGzipBytes": 135743,
+      "measuredGzipBytes": 135543,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 135543 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 134930,
-      "measuredGzipBytes": 134730,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 134730 B + 200 B headroom."
+      "maxGzipBytes": 135668,
+      "measuredGzipBytes": 135468,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 135468 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 135341,
-      "measuredGzipBytes": 135141,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 135141 B + 200 B headroom."
+      "maxGzipBytes": 136096,
+      "measuredGzipBytes": 135896,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 135896 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 131281,
-      "measuredGzipBytes": 131081,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 131081 B + 200 B headroom."
+      "maxGzipBytes": 132034,
+      "measuredGzipBytes": 131834,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 131834 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 127979,
-      "measuredGzipBytes": 127779,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 127779 B + 200 B headroom."
+      "maxGzipBytes": 128818,
+      "measuredGzipBytes": 128618,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 128618 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 121777,
-      "measuredGzipBytes": 121577,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 121577 B + 200 B headroom."
+      "maxGzipBytes": 122530,
+      "measuredGzipBytes": 122330,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 122330 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 121941,
-      "measuredGzipBytes": 121741,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 121741 B + 200 B headroom."
+      "maxGzipBytes": 122677,
+      "measuredGzipBytes": 122477,
+      "note": "Rebaselined after adding localized planning settings (PR #1039); measured 122477 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
