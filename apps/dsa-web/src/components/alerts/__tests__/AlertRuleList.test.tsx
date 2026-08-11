@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertRuleList } from '../AlertRuleList';
 import { chooseOption, openListbox } from '../../../test-utils';
 
@@ -12,6 +12,31 @@ if (!HTMLElement.prototype.scrollIntoView) {
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { AlertRuleItem } from '../../../types/alerts';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
+
+/** Capture before any test overrides so afterEach can restore (vi.restoreAllMocks does not undo defineProperty). */
+const originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+function setDesktopViewport(matches: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
+function restoreMatchMedia() {
+  if (originalMatchMediaDescriptor) {
+    Object.defineProperty(window, 'matchMedia', originalMatchMediaDescriptor);
+  }
+}
 
 const rules: AlertRuleItem[] = [
   {
@@ -74,6 +99,12 @@ describe('AlertRuleList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    // Default to mobile viewport so existing AdvancedFilterSheet / dialog coverage stays valid.
+    setDesktopViewport(false);
+  });
+
+  afterEach(() => {
+    restoreMatchMedia();
   });
 
   function openFilters() {
@@ -359,5 +390,35 @@ describe('AlertRuleList', () => {
     fireEvent.click(within(emptyPanel as HTMLElement).getByRole('button', { name: '清除筛选' }));
     expect(onEnabledFilterChange).toHaveBeenCalledWith('all');
     expect(onAlertTypeFilterChange).toHaveBeenCalledWith('all');
+  });
+
+  it('keeps primary filters behind the Filters dialog on mobile viewports', () => {
+    setDesktopViewport(false);
+    renderList();
+
+    expect(screen.getByRole('button', { name: /筛选/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText('启停状态')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('规则类型')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '筛选' })).toBeNull();
+
+    const dialog = openFilters();
+    expect(within(dialog).getByLabelText('启停状态')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('规则类型')).toBeInTheDocument();
+  });
+
+  it('exposes primary filters inline above the 48rem breakpoint without a Filters dialog', () => {
+    setDesktopViewport(true);
+    renderList();
+
+    expect(screen.getByLabelText('启停状态')).toBeInTheDocument();
+    expect(screen.getByLabelText('规则类型')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /筛选/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '筛选' })).toBeNull();
+
+    chooseOption(screen.getByLabelText('启停状态'), 'enabled');
+    chooseOption(screen.getByLabelText('规则类型'), 'price_cross');
+
+    expect(onEnabledFilterChange).toHaveBeenCalledWith('enabled');
+    expect(onAlertTypeFilterChange).toHaveBeenCalledWith('price_cross');
   });
 });
