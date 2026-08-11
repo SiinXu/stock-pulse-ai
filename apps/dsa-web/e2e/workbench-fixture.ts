@@ -21,6 +21,27 @@ export async function expectAnalysisWorkbenchReady(page: Page): Promise<Locator>
   return stockSearch;
 }
 
+const HISTORY_POPOVER_NAME = /历史与对比|History & comparison/u;
+
+/**
+ * Open the compact Workbench history selector through its product control.
+ * History records are intentionally no longer an always-visible rail.
+ */
+export async function openAnalysisHistoryPopover(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog', { name: HISTORY_POPOVER_NAME });
+  if (await dialog.isVisible().catch(() => false)) {
+    return dialog;
+  }
+  const trigger = page.getByRole('button', {
+    name: HISTORY_POPOVER_NAME,
+    exact: true,
+  });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 /**
  * Set a React-controlled text input value with a native setter + input event so
  * the parent onChange path runs even when a remount races Playwright fill.

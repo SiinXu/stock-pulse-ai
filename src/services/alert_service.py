@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import json
 import logging
 import re
@@ -78,6 +80,7 @@ from src.storage import (
     DatabaseManager,
 )
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
+from src.services.alert_event_context import extract_event_display_contexts
 
 
 LEGACY_RUNTIME_ALERT_TYPES = frozenset({"price_cross", "price_change_percent", "volume_spike"})
@@ -852,22 +855,63 @@ class AlertService:
         rule_id: Optional[int] = None,
         target: Optional[str] = None,
         status: Optional[str] = None,
+        alert_type: Optional[str] = None,
+        cursor: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
+        before_triggered_at, before_id = self._decode_trigger_cursor(cursor)
         rows, total = self.repo.list_triggers(
             rule_id=rule_id,
             target=target,
             status=status,
+            alert_type=alert_type,
+            before_triggered_at=before_triggered_at,
+            before_id=before_id,
             page=page,
             page_size=page_size,
+        )
+        has_more = bool(rows) and (
+            len(rows) == page_size if cursor else page * page_size < total
         )
         return {
             "items": [self._serialize_trigger(row) for row in rows],
             "total": total,
             "page": page,
             "page_size": page_size,
+            "next_cursor": self._encode_trigger_cursor(rows[-1]) if has_more else None,
         }
+
+    @staticmethod
+    def _decode_trigger_cursor(cursor: Optional[str]) -> tuple[Optional[datetime], Optional[int]]:
+        if not cursor:
+            return None, None
+        try:
+            padded = cursor + "=" * (-len(cursor) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+            if not isinstance(payload, dict) or payload.get("v") != 1:
+                raise ValueError
+            trigger_id = int(payload["id"])
+            if trigger_id <= 0:
+                raise ValueError
+            raw_time = payload.get("triggered_at")
+            triggered_at = datetime.fromisoformat(raw_time) if isinstance(raw_time, str) else None
+            if triggered_at is not None and triggered_at.tzinfo is not None:
+                triggered_at = triggered_at.replace(tzinfo=None)
+            return triggered_at, trigger_id
+        except (binascii.Error, KeyError, TypeError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+            raise AlertServiceError("invalid alert trigger cursor") from exc
+
+    @staticmethod
+    def _encode_trigger_cursor(row: AlertTriggerRecord) -> str:
+        payload = {
+            "v": 1,
+            "triggered_at": row.triggered_at.isoformat() if row.triggered_at else None,
+            "id": int(row.id),
+        }
+        return base64.urlsafe_b64encode(
+            json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        ).decode("ascii").rstrip("=")
 
     def list_notifications(
         self,
@@ -1268,6 +1312,28 @@ class AlertService:
 
     def _serialize_trigger(self, row: AlertTriggerRecord) -> Dict[str, Any]:
         visibility = self._parse_analysis_visibility(row.diagnostics)
+        alert_type = getattr(row, "_public_alert_type", None)
+        if alert_type is None and row.data_source == CORPORATE_EVENT_DATA_SOURCE:
+            alert_type = "corporate_event"
+        severity = getattr(row, "_public_severity", None)
+        is_corporate_event = alert_type == "corporate_event"
+        contexts = extract_event_display_contexts(row.diagnostics) if is_corporate_event else {
+            "impact_context": None,
+            "event_context": None,
+        }
+        impact_result = None
+        if is_corporate_event and severity in SUPPORTED_SEVERITIES:
+            impact_result = {
+                "grade": "major" if severity == "critical" else "routine",
+                "severity": severity,
+                "provenance": "rule_severity",
+            }
+        elif is_corporate_event:
+            impact_result = {
+                "grade": "unclassified",
+                "severity": None,
+                "provenance": "unavailable",
+            }
         return {
             "id": row.id,
             "rule_id": row.rule_id,
@@ -1279,11 +1345,18 @@ class AlertService:
             "data_timestamp": row.data_timestamp.isoformat() if row.data_timestamp else None,
             "triggered_at": row.triggered_at.isoformat() if row.triggered_at else None,
             "status": row.status,
-            "diagnostics": self._sanitize_text(row.diagnostics) if row.diagnostics else None,
+            "alert_type": alert_type,
+            "severity": severity,
+            "diagnostics": None if is_corporate_event else (
+                self._sanitize_text(row.diagnostics) if row.diagnostics else None
+            ),
             "market_phase_summary": visibility.get("market_phase_summary"),
             "analysis_context_pack_overview": visibility.get("analysis_context_pack_overview"),
             "analysis_visibility_source": visibility.get("analysis_visibility_source"),
             "decision_signal_summary": visibility.get("decision_signal_summary"),
+            "impact_context": contexts["impact_context"],
+            "event_context": contexts["event_context"],
+            "impact_result": impact_result,
         }
 
     @staticmethod

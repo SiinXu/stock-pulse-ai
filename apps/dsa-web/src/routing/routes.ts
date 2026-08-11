@@ -17,8 +17,10 @@ export const APP_ROUTE_PATHS = {
   researchDiscover: '/research/discover',
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
+  eventCalendar: '/events',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
+  notifications: '/notifications',
   calculators: '/tools/calculators',
 } as const;
 

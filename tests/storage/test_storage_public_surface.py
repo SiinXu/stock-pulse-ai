@@ -35,7 +35,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PortfolioCorporateAction PortfolioDailySnapshot PortfolioFxRate
     PortfolioIdempotencyRecord PortfolioPosition PortfolioPositionLot
     PortfolioTrade ScheduledTaskRecord ScheduledTaskRunRecord Session StockDaily
-    TaskQueueInflightRecord
+    TaskQueueInflightRecord NotificationInboxReadStateRecord
     String T TYPE_CHECKING Text Tuple
     TypeVar Union UniqueConstraint agent_history_public_fields and_
     apply_pending_within_transaction atexit contextmanager
@@ -96,9 +96,10 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
     "TaskQueueInflightRecord",
+    "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "ef3bda9447c18cfbd202edee46c81c37fd411cb7ca40a8843fab6271bbcf9fdd"
+    "cd766374f44ac0a456e8b27f3b247179fb873102d11f18feeb3918f53ba8c3ad"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -141,6 +142,7 @@ EXPECTED_SCHEMA_MODELS = (
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
     "TaskQueueInflightRecord",
+    "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -183,6 +185,7 @@ EXPECTED_SCHEMA_TABLES = (
     "investment_frameworks",
     "investment_framework_versions",
     "task_queue_inflight",
+    "notification_inbox_read_state",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -223,6 +226,7 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("task_queue_inflight", "created_at", "default"),
     ("task_queue_inflight", "updated_at", "default"),
     ("task_queue_inflight", "updated_at", "onupdate"),
+    ("notification_inbox_read_state", "read_at", "default"),
 )
 
 EXPECTED_GROUPS = (

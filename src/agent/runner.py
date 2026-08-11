@@ -245,12 +245,22 @@ def _try_repair_json(text: str, repair_fn: Callable) -> Optional[Dict[str, Any]]
 class _ToolCompletionFence:
     """Linearize one runner timeout against BoundToolSession completion."""
 
-    def __init__(self, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float,
+        *,
+        deadline_monotonic: Optional[float] = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._timed_out = False
         self._dispatched = False
         self._completed = False
-        self._deadline_monotonic = time.monotonic() + timeout_seconds
+        timeout_deadline = time.monotonic() + timeout_seconds
+        self._deadline_monotonic = (
+            min(timeout_deadline, deadline_monotonic)
+            if deadline_monotonic is not None
+            else timeout_deadline
+        )
 
     def mark_timed_out(self) -> bool:
         """Claim timeout ownership unless completion already won."""

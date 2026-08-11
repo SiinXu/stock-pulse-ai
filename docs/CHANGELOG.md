@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+
+- [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.
+- [Tests] Keep native tool-trace redaction coverage aligned with the shared Agent session deadline contract.
+- [Fixed] Keep Workbench history reachable through its compact Popover before a report is selected, and align end-to-end journeys with the explicit history and fallback-model selectors.
+- [Fixed] Share the Agent session deadline with per-tool completion fences so parallel late tools retain deterministic timeout evidence.
+- [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and localized full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
+- [Added] Web report and run-diagnostics surfaces expose reasoning-trace export (JSON/Markdown) with Settings enable guidance when the default-off gate is closed, truncation notice from response headers, and registry-backed `REASONING_TRACE_EXPORT_*` Settings controls (Issue #135, Refs #212).
+- [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
+- [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
+- [Tests] Align the application-shell Playwright fixture with the server-authoritative notification inbox contract so auth redirects cannot mask shell regressions.
+- [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version and response-metadata names stay visible, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths preserve registered and inferred secrets when a mask token is submitted (Refs #1023).
+- [Tests] Align Playwright analysis, history, and scheduled-task fixtures with required OpenAPI fields so runtime validation exercises successful real-contract paths.
+- [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
+- [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
 - [Fixed] Restore Popover focus during the closing commit so stale animation-frame callbacks cannot steal focus after nested-overlay keyboard navigation.
 - [Added] Wire opt-in plan→act→observe into AgentExecutor.run with Config/registry knobs, BoundToolSession tool dispatch, hard budgets, and production-path regression coverage (Refs #199).
 - [Fixed] Settings fields resolve controls from `dataType` / options / sensitivity even when `uiControl` is missing or wrong, so uncategorized booleans, enums, numbers, and secrets no longer render as free-text inputs; contract tests lock the schema→control mapping and the change/save display loop.
@@ -26,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
 - [Changed] Today's Focus uses an executable per-market “today” contract (A-share/HK/US timezones), full-set alert and position reads, and finite-only amount/weight/change validation without zero padding (Refs #157).
+- [Added] Report export delivers office-friendly HTML plus full representative-fixture roundtrips, fail-closed Chinese glyph coverage, and hard page/output/timeout bounds for large PDF reports (Refs #163).
 - [Added] Wire shared financial charts into product pages: Stock Details KlineChart (history API candles) and Portfolio RiskHeatmap (existing risk API weight/stop-loss/drawdown scores) with loading, empty, and invalid-value guards (Refs #142).
 - [Fixed] Capability inventory availability is projected only from live tool/skill/pipeline/plugin/data owners; registry and config read failures return explicit partial source errors instead of fail-open success snapshots (Refs #221).
 - [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
@@ -36,7 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
+- [Added] Read-only corporate-event calendar at `/events`, backed by the alert trigger contract with bounded pagination, partial-result provenance, and localized impact summaries (#153).
 
+- [Added] Web event-driven corporate alert view with server-filtered stable pagination, rule-severity impact grading, editable event parameters, and bounded public trigger context for issue #241.
+- [Fixed] Portfolio position analysis attaches the shared TaskPanel/RunFlow progress surface, reacts to URL `task` changes, restores stock and result identity from session/status data, preserves task identity across 401/403 responses, and drops confirmed-missing (404/not_found) task ids instead of fabricating a stuck pending card (#879 A6).
+- [Added] In-app notification inbox and header bell share best-effort durable event sources, versioned occurrence identities, server read state, stable cursor pagination, source provenance, and localized Web rendering (Refs #181).
 - [Changed] Migrated analysis-cluster Web API modules (`analysis`, `history`, `scheduledTasks`, `agent` plain JSON) to OpenAPI-generated type anchors with Zod boundary validation via `ParsedApiError` (`api_response_validation_failed`); SSE/streaming agent and analysis task stream surfaces remain documented skips for #721.
 - [Added] Signal Center Alerts filters, pagination, and `?alert=` edit deep links restore from namespaced query parameters with replace/push history, while the existing Signal Center route remains the production owner (#879 A1).
 - [Added] Declarative per-plugin settings schemas, atomic local persistence, immutable runtime projection, audited settings API, and a generated Web Settings form with persistent enable/disable controls (Fixes #277).
@@ -152,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
 - [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
 - [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
+- [Fixed] Improve Analysis Workbench report typography, evidence fallbacks, theme-aware chat input text, compact history popover behavior, and report action alignment.
+- [Fixed] Keep task-routing model names visible, expose explicit report-generation backend selection, accept connected Agent ModelRefs in readiness checks, simplify fallback-model additions, and support opt-in Clash/Mihomo TUN Fake-IP DNS for public model endpoints.
 - [Fixed] Restored the Web UI i18n resource contract that a concurrent-merge race had broken: added the missing Simplified Chinese source note for `VALUATION_AGENT_TOOL_ENABLED`, regenerated the duplicated English key inventory, and backfilled 62 drifted proxy / observability / daily-brief / valuation keys across all eight locale bundles.
 - [Fixed] Corrected stale localized Settings copy that no longer matched its English source: `HTTP_PROXY` summary and usage, the restructured `VALUATION_AGENT_TOOL_ENABLED` notes, the zh-TW `LOCAL_ONLY_MODE` allowlist reference, and the untranslated investment-framework preview description.
 - [Fixed] Reduced the screening availability status surface to a compact size.

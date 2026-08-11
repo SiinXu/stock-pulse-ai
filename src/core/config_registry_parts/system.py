@@ -539,7 +539,77 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["public_webui_requires_auth", "auth_settings_endpoint_required"],
     },
+    "SECURITY_AUDIT_RETENTION_DAYS": {
+        "title": "Security Audit Retention Days",
+        "description": (
+            "Time retention for durable security-audit-v1 events (privileged auth, "
+            "config, tools, plugins, MCP, analysis acceptance, and local process "
+            "calls). Applied on append and query. Oldest events beyond the window "
+            "are deleted."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "90",
+        "options": [],
+        "validation": {"min": 1, "max": 3650},
+        "display_order": 43,
+        "help_key": "settings.system.SECURITY_AUDIT_RETENTION_DAYS",
+        "examples": [
+            "SECURITY_AUDIT_RETENTION_DAYS=90",
+            "SECURITY_AUDIT_RETENTION_DAYS=30",
+        ],
+        "docs": [
+            {
+                "label": "Security audit (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-audit.md",
+            },
+            {
+                "label": "安全审计（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-audit_zh.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "SECURITY_AUDIT_MAX_EVENTS": {
+        "title": "Security Audit Max Events",
+        "description": (
+            "Hard capacity upper bound for security-audit-v1 rows. Independent of "
+            "time retention. When exceeded, oldest events (by occurred_at, then id) "
+            "are deleted first so recent privileged decisions stay queryable."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10000",
+        "options": [],
+        "validation": {"min": 100, "max": 1000000},
+        "display_order": 44,
+        "help_key": "settings.system.SECURITY_AUDIT_MAX_EVENTS",
+        "examples": [
+            "SECURITY_AUDIT_MAX_EVENTS=10000",
+            "SECURITY_AUDIT_MAX_EVENTS=50000",
+        ],
+        "docs": [
+            {
+                "label": "Security audit (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-audit.md",
+            },
+            {
+                "label": "安全审计（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-audit_zh.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "TRUST_X_FORWARDED_FOR": {
+
         "title": "Trust X-Forwarded-For",
         "description": "Use X-Forwarded-For as the client IP behind one trusted reverse proxy.",
         "category": "system",
@@ -1298,6 +1368,36 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
         "warning_codes": ["restart_required"],
+    },
+    "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP": {
+        "title": "Allow Trusted Proxy Fake-IP",
+        "description": (
+            "Opt in to Clash/Mihomo Fake-IP DNS ranges for syntactically public "
+            "hostnames and the exact configured loopback proxy. Literal Fake-IP, "
+            "internal, metadata, and non-loopback proxy targets remain blocked."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 68,
+        "help_key": "settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP",
+        "examples": [
+            "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=false",
+            "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=true",
+        ],
+        "docs": [
+            {
+                "label": "Outbound HTTP security policy",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md#clashmihomo-tun-fake-ip-mode",
+            },
+        ],
+        "warning_codes": ["network_scope"],
     },
     "SMARTMONEY_ENABLED": {
         "title": "SmartMoney Money-Flow Enabled",
