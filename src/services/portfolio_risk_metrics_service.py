@@ -53,6 +53,7 @@ class PortfolioRiskMetricsService:
         confidence: float = DEFAULT_CONFIDENCE,
         horizon_days: int = DEFAULT_HORIZON_DAYS,
         lookback_trading_days: int = DEFAULT_LOOKBACK_TRADING_DAYS,
+        snapshot: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         as_of_date = as_of or date.today()
         confidence_norm = self._validate_confidence(confidence)
@@ -60,14 +61,16 @@ class PortfolioRiskMetricsService:
         lookback_norm = self._validate_lookback(lookback_trading_days)
 
         # include_realtime=False: no provider calls on the hot path.
-        snapshot = self.portfolio_service.get_portfolio_snapshot(
-            account_id=account_id,
-            as_of=as_of_date,
-            cost_method=cost_method,
-            include_realtime=False,
-        )
-        currency = str(snapshot.get("currency") or "CNY")
-        weights, total_mv, _symbols = self._position_weights(snapshot)
+        snapshot_payload = snapshot
+        if snapshot_payload is None:
+            snapshot_payload = self.portfolio_service.get_portfolio_snapshot(
+                account_id=account_id,
+                as_of=as_of_date,
+                cost_method=cost_method,
+                include_realtime=False,
+            )
+        currency = str(snapshot_payload.get("currency") or "CNY")
+        weights, total_mv, _symbols = self._position_weights(snapshot_payload)
 
         assumptions = self._build_assumptions(
             confidence=confidence_norm,

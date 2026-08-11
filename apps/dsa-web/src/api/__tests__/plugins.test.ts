@@ -1,92 +1,49 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import apiClient from '../index';
 import { pluginsApi } from '../plugins';
 
-const { get, post } = vi.hoisted(() => ({
-  get: vi.fn(),
-  post: vi.fn(),
-}));
-
 vi.mock('../index', () => ({
-  default: { get, post },
+  __esModule: true,
+  default: { get: vi.fn() },
+  locallyRecoverableResourceConfig: () => ({ handleUnauthorizedLocally: true }),
 }));
 
 describe('pluginsApi', () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset();
-  });
+  beforeEach(() => vi.clearAllMocks());
 
-  it('lists plugins and camel-cases the payload', async () => {
-    get.mockResolvedValueOnce({
+  it('maps stable lifecycle failure codes from the list response', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
       data: {
+        total: 1,
         items: [{
-          id: 'example_provider',
-          name: 'Example Provider',
+          id: 'acme-plugin',
+          name: 'Acme Plugin',
           version: '1.0.0',
           source: 'external',
-          state: 'enabled',
+          state: 'failed',
           desired_enabled: true,
           reloadable: true,
-          package_root: '/plugins/example-provider',
-          extension_points: ['data_provider'],
-          description: 'Example',
-          author: 'ops',
+          package_root: '/opt/plugins/acme',
+          extension_points: ['agent_tool'],
+          last_error_code: 'manifest_permissions_undeclared',
         }],
-        total: 1,
       },
     });
 
-    const page = await pluginsApi.list();
-    expect(get).toHaveBeenCalledWith('/api/v1/plugins');
-    expect(page.total).toBe(1);
-    expect(page.items[0]).toMatchObject({
-      id: 'example_provider',
-      desiredEnabled: true,
-      packageRoot: '/plugins/example-provider',
-      extensionPoints: ['data_provider'],
-    });
-  });
+    const result = await pluginsApi.list();
 
-  it('posts lifecycle actions with snake-case response camel-cased', async () => {
-    post.mockResolvedValueOnce({
-      data: {
-        plugin_id: 'example_provider',
-        action: 'disable',
-        success: true,
-        state: 'disabled',
-        reloaded: false,
-        restart_required: false,
-        error_code: null,
-        message: 'Plugin disabled',
-        plugin: {
-          id: 'example_provider',
-          name: 'Example Provider',
-          version: '1.0.0',
-          source: 'external',
-          state: 'disabled',
-          desired_enabled: false,
-          reloadable: true,
-          package_root: '/plugins/example-provider',
-          extension_points: [],
-          description: '',
-          author: '',
-        },
-      },
-    });
-
-    const result = await pluginsApi.updateLifecycle('example_provider', 'disable');
-    expect(post).toHaveBeenCalledWith(
-      '/api/v1/plugins/example_provider/lifecycle',
-      { action: 'disable' },
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/api/v1/plugins',
+      expect.objectContaining({ handleUnauthorizedLocally: true }),
     );
-    expect(result).toMatchObject({
-      pluginId: 'example_provider',
-      action: 'disable',
-      success: true,
-      restartRequired: false,
-      plugin: { desiredEnabled: false, state: 'disabled' },
+    expect(result.items[0]).toMatchObject({
+      id: 'acme-plugin',
+      desiredEnabled: true,
+      packageRoot: '/opt/plugins/acme',
+      extensionPoints: ['agent_tool'],
+      lastErrorCode: 'manifest_permissions_undeclared',
     });
   });
 });

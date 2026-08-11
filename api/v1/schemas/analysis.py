@@ -13,6 +13,7 @@
 from typing import Optional, List, Any, Dict, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from api.v1.schemas.common import ErrorDetailsCompatibilityModel
 from src.task_execution import TaskStatusEnum
 from src.utils.analysis_metadata import SELECTION_SOURCE_PATTERN
 
@@ -425,3 +426,36 @@ class DuplicateTaskErrorResponse(BaseModel):
             "existing_task_id": "abc123def456"
         }
     })
+
+
+class LocalMarketDataMissingRange(BaseModel):
+    """One inclusive daily-bar range absent from the local store."""
+
+    start_date: str
+    end_date: str
+
+
+class LocalMarketDataMissingDetails(BaseModel):
+    """Structured coverage details returned by local-only analysis."""
+
+    symbol: str
+    start_date: str
+    end_date: str
+    days: int
+    fields: List[str] = Field(default_factory=list)
+    missing_ranges: List[LocalMarketDataMissingRange] = Field(default_factory=list)
+    mode: Literal["local_only"] = "local_only"
+    reason: str
+    available_start_date: Optional[str] = None
+    available_end_date: Optional[str] = None
+    age_seconds: Optional[int] = None
+
+
+class LocalMarketDataMissingErrorResponse(ErrorDetailsCompatibilityModel):
+    """Stable HTTP 409 envelope for an incomplete local daily-data range."""
+
+    error: Literal["local_market_data_missing"] = "local_market_data_missing"
+    message: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+    details: Optional[LocalMarketDataMissingDetails] = None
+    trace_id: Optional[str] = None

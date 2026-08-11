@@ -452,6 +452,157 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects news context size, freshness, and report length.'],
     notes: ['Too wide can include stale news; too narrow can miss slow-moving events.'],
   },
+
+  'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
+    title: 'Enable Crypto Provider',
+    summary: 'Registers the default-off CoinGecko path for crypto:TICKER market data.',
+    usage: 'Leave disabled unless you intentionally analyze crypto symbols such as crypto:BTC. Equity paths stay unchanged when this switch is off.',
+    valueNotes: [
+      'Bare BTC or ETH symbols are not auto-classified as crypto.',
+      'A process restart is required after changing provider registration switches.',
+    ],
+    impact: ['Controls whether newly created production data managers attach the CoinGecko crypto provider.'],
+    notes: ['See docs/crypto-market-support.md for identity, UTC daily bars, and outbound policy details.'],
+  },
+  'settings.data_source.COINGECKO_API_PLAN': {
+    title: 'CoinGecko API Plan',
+    summary: 'Selects keyless, Demo, or Pro authentication and the matching official origin.',
+    usage: 'Use keyless without a key. Use demo or pro only with a matching COINGECKO_API_KEY.',
+    valueNotes: [
+      'keyless uses the public API without credentials.',
+      'demo and pro select the official origin and request header for that plan.',
+      'Invalid values fall back to keyless at configuration load.',
+    ],
+    impact: ['Affects CoinGecko authentication headers and base origin selection.'],
+    notes: ['Custom COINGECKO_API_BASE is permitted only in keyless mode.'],
+  },
+  'settings.data_source.COINGECKO_API_KEY': {
+    title: 'CoinGecko API Key',
+    summary: 'Optional Demo or Pro API key for CoinGecko market data.',
+    usage: 'Leave empty in keyless mode. Paste the key only when COINGECKO_API_PLAN is demo or pro.',
+    valueNotes: ['Credentials are never sent to a custom COINGECKO_API_BASE origin.'],
+    impact: ['Enables authenticated CoinGecko Demo or Pro requests when the plan matches.'],
+    notes: ['Do not commit keys or paste them into public issues or screenshots.'],
+  },
+  'settings.data_source.COINGECKO_API_BASE': {
+    title: 'CoinGecko API Base URL',
+    summary: 'Optional custom HTTPS base for keyless CoinGecko requests only.',
+    usage: 'Leave empty for official endpoints. Enter a complete HTTPS URL only when a trusted keyless mirror is required.',
+    valueNotes: [
+      'Demo and Pro always use official origins regardless of this field.',
+      'Private hosts must also be allowed by OUTBOUND_HTTP_ALLOWLIST.',
+    ],
+    impact: ['Affects where keyless crypto market-data requests are sent.'],
+    notes: ['Verify that you trust the endpoint operator before saving a custom URL.'],
+    examples: ['https://api.coingecko.com/api/v3'],
+  },
+  'settings.data_source.CRYPTO_COINGECKO_PRIORITY': {
+    title: 'CoinGecko Crypto Provider Priority',
+    summary: 'Controls where CoinGecko sits among crypto market-data providers.',
+    usage: 'Use an integer from 0 to 99. Lower numbers are tried earlier. Default is 10.',
+    valueNotes: [
+      'This field belongs with other data-source provider priorities; it does not reorder equity daily or realtime chains.',
+      'It only applies when CRYPTO_PROVIDER_ENABLED is true.',
+    ],
+    impact: ['Affects crypto provider selection order for crypto: identities only.'],
+    notes: ['Keep the default unless you add additional crypto providers with competing priorities.'],
+  },
+  'settings.data_source.PROVIDER_MARKET_DATA_MODE': {
+    title: 'Provider Market Data Mode',
+    summary: 'Chooses local-first, offline-only, or forced-refresh daily market-data behavior.',
+    usage: 'Keep auto for normal operation. Use local_only for offline complete-cache reads. Use refresh to skip local reads and force one provider pass.',
+    valueNotes: [
+      'auto: fresh local complete data, then the provider chain, then eligible stale on total failure.',
+      'local_only: never constructs provider or socket paths; incomplete or over-age local data fails structured.',
+      'refresh: skips local read, runs the provider chain once, and does not serve stale on failure.',
+      'Invalid non-empty values fail closed at configuration load instead of silently becoming auto.',
+    ],
+    impact: ['Affects daily history reads for analysis, stock history API, and scheduled runs that depend on market data.'],
+    notes: [
+      'Independent of LOCAL_ONLY_MODE, which gates non-loopback outbound HTTP for the whole process.',
+      'See docs/local-first-market-data_EN.md.',
+    ],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS': {
+    title: 'Local-Only Cache Max Age',
+    summary: 'Maximum age of complete local daily cache entries that local_only mode may still serve.',
+    usage: 'Enter seconds. Default is 2592000 (30 days). Values must be greater than zero.',
+    valueNotes: ['Older complete entries are treated as structured offline misses, not as live quotes.'],
+    impact: ['Bounds how old local cache may be when PROVIDER_MARKET_DATA_MODE is local_only.'],
+    notes: ['Does not replace memory or persistent freshness TTL settings used by auto mode.'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS': {
+    title: 'Persistent Daily Cache Max Age',
+    summary: 'Deletes persistent daily-cache files older than this age on read and write.',
+    usage: 'Enter seconds. Default is 7776000 (90 days). Set 0 to disable age-based deletion.',
+    valueNotes: ['Retention cleanup is deterministic and does not rewrite user secrets into cache files.'],
+    impact: ['Controls disk footprint of the provider daily cache directory.'],
+    notes: ['Schema and column allowlists still apply independently of retention age.'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES': {
+    title: 'Persistent Daily Cache Max Entries',
+    summary: 'Caps how many persistent daily-cache entries are retained.',
+    usage: 'Enter a positive integer. Default is 512. Oldest entries are removed first.',
+    valueNotes: ['Equal timestamps break ties by filename for deterministic eviction.'],
+    impact: ['Bounds cache directory growth under long multi-symbol workloads.'],
+    notes: ['Combine with max-age settings for both time-based and count-based retention.'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS': {
+    title: 'Daily Cache Rollover Grace Days',
+    summary: 'Allows a covered local daily range to serve default-end-date rollover windows for a few calendar days.',
+    usage: 'Enter a positive integer. Default is 1 day of rollover grace.',
+    valueNotes: ['auto mode still revalidates aged data using freshness TTL settings.'],
+    impact: ['Reduces needless provider calls for overlapping default end-date windows after a day boundary.'],
+    notes: ['Keep the default unless you intentionally widen or tighten rollover reuse.'],
+  },
+  'settings.data_source.DATA_VALIDATION_ENABLED': {
+    title: 'Enable Data Validation',
+    summary: 'Runs the unified numeric validation layer and records versioned diagnostic evidence.',
+    usage: 'Enabled by default. Disable only when you need to bypass validation diagnostics temporarily.',
+    valueNotes: ['Validation covers daily, realtime, fundamental, and selected technical fields when enabled.'],
+    impact: ['Controls whether validation evidence is produced and whether strict rejection can apply.'],
+    notes: ['See docs/data-validation-layer.md for scope and rollback guidance.'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT': {
+    title: 'Data Validation Strict Mode',
+    summary: 'Rejects invalid provider candidates before acceptance or cache so fallback can continue.',
+    usage: 'Default is off (warn-oriented). Enable only when you want reject-severity findings to drop a candidate.',
+    valueNotes: ['Strict mode uses the existing bounded provider loop; it is not a second fetch pipeline.'],
+    impact: ['Can cause more provider fallbacks when a source returns structurally invalid numbers.'],
+    notes: ['Pair with DATA_VALIDATION_STRICT_SCOPES to limit which markets or instruments enforce rejection.'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT_SCOPES': {
+    title: 'Data Validation Strict Scopes',
+    summary: 'Limits where strict validation rejection applies using market/instrument selectors.',
+    usage: 'Comma-separated selectors such as cn/equity,hk/etf,us/index. Use */* for all scopes (default).',
+    valueNotes: ['Supported instruments include equity, etf, and index. * is a wildcard on either side.'],
+    impact: ['Narrows or widens which symbols can be rejected under DATA_VALIDATION_STRICT.'],
+    notes: ['Empty values normalize to the default */* at configuration load.'],
+  },
+  'settings.data_source.DATA_VALIDATION_INSTRUMENT_OVERRIDES': {
+    title: 'Data Validation Instrument Overrides',
+    summary: 'Authoritative symbol instrument map for offshore codes that cannot be typed safely from the code alone.',
+    usage: 'Comma-separated SYMBOL=instrument pairs, for example SPY=etf,HK02800=etf,1306.T=etf. Leave empty when built-in classification is enough.',
+    valueNotes: [
+      'This is a comma-separated mapping, not a JSON document.',
+      'Use only when ETF or index identity would otherwise be misclassified.',
+    ],
+    impact: ['Affects validation instrument identity and strict-scope matching for listed symbols.'],
+    notes: ['Prefer sparse authoritative overrides rather than a large hand-maintained catalog.'],
+    examples: ['SPY=etf,HK02800=etf,1306.T=etf'],
+  },
+  'settings.data_source.DATA_VALIDATION_UPPER_LAYER_MODE': {
+    title: 'Data Validation Upper-Layer Mode',
+    summary: 'Final policy for aggregated fundamental validation outcomes at the synthesis boundary.',
+    usage: 'Keep warn to preserve results with evidence. Use reject only when invalid aggregated fundamentals must fail the upper boundary.',
+    valueNotes: [
+      'warn records evidence and keeps the aggregated result.',
+      'reject raises at the upper layer and is not described as provider failover.',
+      'Other values normalize to warn at load time.',
+    ],
+    impact: ['Affects how final aggregated fundamental validation failures are surfaced to callers.'],
+    notes: ['Independent of DATA_VALIDATION_STRICT provider-candidate rejection.'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',
@@ -753,6 +904,24 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=false',
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=true',
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
+    ],
+  },
+  'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
+    title: 'Report Export PDF Font Path',
+    summary: 'Selects the single-face TTF/OTF used by optional PDF report export.',
+    usage:
+      'Enter an absolute path only when the server has a font that covers every visible report glyph. Leave empty to probe the documented system candidates.',
+    valueNotes: [
+      'An explicit invalid path fails closed and never falls back to another system font.',
+      'Capability checks validate representative language glyphs; each export validates the exact report glyph set again.',
+    ],
+    impact: ['Affects optional PDF export only; lossless Markdown export remains available.'],
+    notes: [
+      'TTF/OTF single faces are supported. TTC collection indices are not guessed.',
+      'Absolute paths and raw font-parser errors are omitted from public capability and error responses.',
+    ],
+    examples: [
+      'REPORT_EXPORT_PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
     ],
   },
   'settings.system.USE_PROXY': {
@@ -1106,16 +1275,27 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
-    usage: 'When enabled, the risk agent in full/specialist mode can downgrade buy recommendations to hold or sell. That conservative override still applies automatically unless Human approvals captures the path.',
+    usage: 'Controls whether the legacy risk plan directly applies a downgrade. The mandatory Risk Manager still decides the final action under RISK_GATE_PROFILE.',
     valueNotes: [
-      'Only effective when AGENT_ORCHESTRATOR_MODE includes the risk stage.',
+      'Controls only the legacy override and cannot skip final-action evaluation.',
       'HITL risk-control bypass is off by default on /approvals; enable it there for a one-shot, time-limited chance to preserve the original signal.',
     ],
     impact: ['Affects the risk conservatism of final investment recommendations.'],
     notes: [
-      'When disabled, the risk agent opinion is advisory only and cannot override decisions.',
+      'When disabled, the legacy override does not apply directly, but explicit risk evidence can still cause the final action to be downgraded or rejected.',
       'Open Human approvals (/approvals) to configure the default-off HITL gate. This is not broker or trade-order approval and does not expand Agent tool authority.',
     ],
+  },
+  'settings.agent.RISK_GATE_PROFILE': {
+    title: 'Risk Manager Profile',
+    summary: 'Selects the mandatory final-action thresholds before a recommendation is published.',
+    usage: 'Balanced is the default; conservative intervenes sooner, while aggressive requires explicit blocking evidence.',
+    valueNotes: [
+      'Supported values are conservative, balanced, and aggressive; invalid values stop startup.',
+      'The gate cannot be disabled, and internal failures fail closed.',
+    ],
+    impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
+    notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
@@ -1224,6 +1404,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.OCR_AGENT_TOOL_ENABLED': {
+    title: 'Enable Offline OCR Agent Tool',
+    summary: 'Default-off bounded Tesseract text extraction. Image bytes stay local, but redacted untrusted text enters Agent context and may reach a remote model; enable LOCAL_ONLY_MODE for zero remote egress.',
+  },
+  'settings.agent.OCR_FILE_ROOT': {
+    title: 'OCR File Root',
+    summary: 'Filesystem sandbox for single-open regular images; root escapes, special files, oversized bytes, decoded pixels, and extra frames are rejected.',
+  },
+  'settings.agent.OCR_LANGS': {
+    title: 'OCR Languages',
+    summary: 'Tesseract language codes joined by +; default chi_sim+eng requires matching system language packs.',
+  },
+  'settings.agent.OCR_TIMEOUT_SECONDS': {
+    title: 'OCR Timeout Seconds',
+    summary: 'Hard 1–120 second wall-clock limit; timed-out OCR workers and descendants are terminated and reaped.',
+  },
   // ------------------------------------------------------------------
   // Backtest configuration
   // ------------------------------------------------------------------
@@ -1257,6 +1453,43 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Different versions may use different evaluation algorithms or judgment rules.'],
     impact: ['Affects the evaluation algorithm and results.'],
     notes: ['Keep the default unless instructed to switch versions.'],
+  },
+  // ------------------------------------------------------------------
+  // Technical indicator periods (Issue #172)
+  // ------------------------------------------------------------------
+  'settings.indicators.INDICATOR_MA_PERIODS': {
+    title: 'Moving Average Periods',
+    summary: 'Comma-separated MA periods in trading days used by trend analysis (default 5,10,20,60).',
+    usage: 'Leave empty for historical defaults. Add longer horizons such as 120 or 250 for long-term trend context. The analysis history window expands automatically to cover the longest configured period.',
+    valueNotes: [
+      'Each value must be a positive integer up to 500.',
+      'Configured periods appear under their exact MA labels in ma_by_period and the typed indicator snapshot.',
+      'When bars are fewer than a period, that MA is omitted and annotated as insufficient data (no silent shorter-period substitute).',
+    ],
+    impact: ['Affects trend classification, bias ratios, support checks, and report MA values.'],
+    notes: ['Defaults preserve pre-configuration MA behavior when enough history is available.'],
+  },
+  'settings.indicators.macd_params': {
+    title: 'MACD Periods',
+    summary: 'MACD fast, slow, and signal EMA periods (default 12/26/9).',
+    usage: 'INDICATOR_MACD_FAST must be less than INDICATOR_MACD_SLOW. Signal is the DEA smoothing period.',
+    valueNotes: [
+      'Standard settings are 12/26/9; shorter pairs react faster but are noisier.',
+      'Explicit invalid values are rejected consistently at process start and by Settings validation.',
+    ],
+    impact: ['Affects MACD DIF/DEA/histogram and derived buy/sell scoring.'],
+    notes: ['Keep defaults unless you intentionally change the MACD convention.'],
+  },
+  'settings.indicators.INDICATOR_RSI_PERIODS': {
+    title: 'RSI Periods',
+    summary: 'Comma-separated RSI periods (default 6,12,24).',
+    usage: 'Configured values are exposed under their exact RSI labels. The second value (or first when only one is configured) drives RSI status thresholds.',
+    valueNotes: [
+      'Periods must be positive integers up to 250.',
+      'RSI uses Wilder/SMMA smoothing, consistent with alert-path RSI.',
+    ],
+    impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
+    notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
   },
   // ------------------------------------------------------------------
   // Report configuration
@@ -1445,6 +1678,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects scheduled brief generation and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
   },
+  'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
+    title: 'Portfolio Stress Scenario Catalog',
+    summary: 'Optional bounded YAML catalog for deterministic portfolio stress scenarios.',
+    usage: 'Set PORTFOLIO_STRESS_SCENARIOS_PATH to a readable local YAML file, or leave it empty to use only built-in scenarios.',
+  },
   'settings.system.SAVE_CONTEXT_SNAPSHOT': {
     title: 'Save Context Snapshot',
     summary: 'Controls whether the full analysis history context_snapshot is persisted to the database.',
@@ -1538,6 +1776,224 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.portfolio_health': {
+    title: 'Portfolio Health Formula',
+    summary: 'Controls the fixed-denominator health-score weights and alert thresholds.',
+    usage: 'Use finite values within the displayed ranges. Invalid values are rejected rather than clamped.',
+    notes: ['Changing these values changes the configuration hash and requires an explicit health refresh.'],
+  },
+
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: 'Enable MCP Server',
+    summary: 'Master switch for the optional MCP process. Default off; the main API/Web process never starts MCP automatically.',
+    usage: 'Set true only when you intentionally start `python -m src.mcp_server`. Requires a process restart of the MCP process.',
+    valueNotes: [
+      'false keeps the external tool surface closed.',
+      'true alone is not enough without scopes and transport-specific security settings.',
+    ],
+    impact: [
+      'Controls whether the dedicated MCP process is allowed to start.',
+    ],
+    notes: [
+      'HTTP transport is a security-sensitive external surface.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP Transport',
+    summary: 'Official SDK transport: stdio (local process) or streamable-http.',
+    usage: 'Prefer stdio for local operators. Use streamable-http only with admin auth, scopes, and a session token digest.',
+    valueNotes: [
+      'stdio is the default local boundary.',
+      'http is accepted as a runtime alias of streamable-http.',
+    ],
+    impact: [
+      'Chooses how MCP clients connect and which security controls apply.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP Bind Host',
+    summary: 'Bind host for streamable-http. Prefer loopback.',
+    usage: 'Keep 127.0.0.1/localhost unless you have trusted network controls.',
+    valueNotes: [
+      'Binding beyond loopback expands the attack surface.',
+    ],
+    impact: [
+      'Affects where the MCP HTTP listener accepts connections.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP Bind Port',
+    summary: 'TCP port for streamable-http (1–65535).',
+    usage: 'Default 8765. Change if the port is already in use.',
+    impact: [
+      'Affects the MCP HTTP listen address.',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio Principal',
+    summary: 'Stable principal name for stdio audit and rate limits.',
+    usage: 'Use a short stable identifier matching the supported character pattern.',
+    impact: [
+      'Labels stdio tool calls in logs and limiters.',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio Scopes',
+    summary: 'Comma-separated least-privilege scopes for stdio.',
+    usage: 'Required when enabled with transport=stdio. Allowed: market.read, history.read, portfolio.read, analysis.trigger.',
+    valueNotes: [
+      'Grant only scopes the local operator needs.',
+    ],
+    impact: [
+      'Limits which MCP tools stdio clients can call.',
+    ],
+    notes: [
+      'Widening scopes increases callable capabilities.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP Scopes',
+    summary: 'Comma-separated least-privilege scopes for streamable-http.',
+    usage: 'Required when HTTP transport is enabled. Same allowed scope set as stdio.',
+    impact: [
+      'Limits which MCP tools HTTP clients can call.',
+    ],
+    notes: [
+      'Keep scopes minimal for remote-capable transports.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP Session Token SHA-256',
+    summary: 'SHA-256 hex digest of the single accepted admin session token.',
+    usage: 'Required for streamable-http. Store only the digest, never the raw bearer token.',
+    valueNotes: [
+      'Must be 64 hex characters or empty when unused.',
+      'Settings masks this sensitive field.',
+    ],
+    impact: [
+      'Audience-pins the accepted admin session for HTTP MCP.',
+    ],
+    notes: [
+      'Rotate the digest if a bearer token may have leaked.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP Resource URL',
+    summary: 'Absolute http(s) audience/resource URL for streamable-http.',
+    usage: 'Default is http://127.0.0.1:8765/mcp. Keep it aligned with the public MCP endpoint clients use.',
+    impact: [
+      'Affects resource/audience binding for HTTP MCP.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP Allowed Hosts',
+    summary: 'Comma-separated Host header allowlist for streamable-http.',
+    usage: 'Default is loopback only. Wildcard ports use the official SDK :* form.',
+    valueNotes: [
+      'Widening this list (for example * or a public hostname) increases host-header and cross-site risk.',
+    ],
+    impact: [
+      'Controls which Host values HTTP MCP accepts.',
+    ],
+    notes: [
+      'Treat expansion as a security decision, not convenience.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP Allowed Origins',
+    summary: 'Comma-separated Origin allowlist for browser clients.',
+    usage: 'Default is loopback HTTP origins only.',
+    valueNotes: [
+      'Expanding origins (especially * or untrusted sites) enables cross-origin browser access to MCP tools.',
+    ],
+    impact: [
+      'Controls browser CORS/Origin acceptance for HTTP MCP.',
+    ],
+    notes: [
+      'Keep the list minimal.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP Max Body Bytes',
+    summary: 'Maximum JSON body size accepted by streamable-http.',
+    usage: 'Default 1000000. Raise only if legitimate tool payloads need more room.',
+    impact: [
+      'Bounds request body memory use.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP Max Header Bytes',
+    summary: 'Maximum incomplete header block size for streamable-http.',
+    usage: 'Default 32768. Keep unless you have a measured need.',
+    impact: [
+      'Bounds header buffer size.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP Max Connections',
+    summary: 'Maximum concurrent streamable-http connections.',
+    usage: 'Default 32. Lower on small hosts; raise carefully under load tests.',
+    impact: [
+      'Limits concurrent HTTP MCP clients.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP Listen Backlog',
+    summary: 'OS listen backlog for the streamable-http acceptor.',
+    usage: 'Default 16. Rarely needs changes outside capacity tuning.',
+    impact: [
+      'Affects pending connection queue depth.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Read Timeout',
+    summary: 'Per-body-chunk read timeout for streamable-http (seconds).',
+    usage: 'Default 10. Range 1–120.',
+    impact: [
+      'Controls how long slow clients may hold body reads.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive Timeout',
+    summary: 'Keep-alive idle timeout for streamable-http connections (seconds).',
+    usage: 'Default 5. Range 1–120.',
+    impact: [
+      'Controls idle connection retention.',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP Max Concurrent Tools',
+    summary: 'Maximum concurrent tool workers for one MCP process.',
+    usage: 'Default 8. Range 1–128.',
+    impact: [
+      'Bounds concurrent tool execution cost.',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP Tool Rate Limit',
+    summary: 'Per-principal/tool call rate limit per minute.',
+    usage: 'Default 60. Range 1–10000.',
+    impact: [
+      'Limits general tool spam.',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP Analysis Rate Limit',
+    summary: 'Rate limit for analysis.trigger invocations per minute.',
+    usage: 'Default 2. Keep low to bound LLM/data cost.',
+    impact: [
+      'Protects analysis cost budget.',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP Analysis Max Symbols',
+    summary: 'Maximum symbols accepted in one analysis.trigger call.',
+    usage: 'Default 5. Range 1–50.',
+    impact: [
+      'Bounds per-call analysis cost.',
+    ],
+  },
 };
 
 export default settingsHelpEnUS;

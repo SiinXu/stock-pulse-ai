@@ -704,6 +704,22 @@ export interface HistoryListResponse {
   items: HistoryItem[];
 }
 
+/** Bounded full-text report search response */
+export interface HistorySearchItem {
+  id: number;
+  stockCode: string;
+  stockName?: string;
+  reportType?: string;
+  summary?: string;
+  createdAt?: string;
+}
+
+export interface HistorySearchResponse {
+  query: string;
+  limit: number;
+  items: HistorySearchItem[];
+}
+
 /** News item */
 export interface NewsIntelItem {
   title: string;
