@@ -848,6 +848,46 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PLUGIN_DATA_PROVIDER_AUTO_BIND": {
+        "title": "Plugin Data Provider Auto-Bind",
+        "description": (
+            "Opt-in composition-root auto-bind of PluginManager to the process "
+            "DataFetcherManager.plugin_registry so registered data providers route without "
+            "extra glue. Default off preserves manual manager behavior. When enabled, "
+            "incompatible binding fails closed at startup instead of silently falling back. "
+            "Restart required."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 55,
+        "help_key": "settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND",
+        "examples": [
+            "PLUGIN_DATA_PROVIDER_AUTO_BIND=false",
+            "PLUGIN_DATA_PROVIDER_AUTO_BIND=true",
+        ],
+        "docs": [
+            {
+                "label": "Plugin extension contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/plugin-extension-contract.md",
+            },
+            {
+                "label": "Plugin development guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/plugin-development-guide.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
     "SIGNAL_SCORECARD_PUBLIC_ENABLED": {
         "title": "Public Signal Scorecard",
         "description": (

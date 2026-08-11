@@ -15381,6 +15381,13 @@
             "title": "Reloadable",
             "type": "boolean"
           },
+          "settings_count": {
+            "default": 0,
+            "description": "Number of declarative settings fields in the plugin manifest",
+            "minimum": 0.0,
+            "title": "Settings Count",
+            "type": "integer"
+          },
           "source": {
             "enum": [
               "builtin",
@@ -15541,6 +15548,301 @@
           "total"
         ],
         "title": "PluginListResponse",
+        "type": "object"
+      },
+      "PluginSettingFieldResponse": {
+        "additionalProperties": false,
+        "description": "One strict manifest-declared plugin settings field.",
+        "properties": {
+          "data_type": {
+            "enum": [
+              "string",
+              "integer",
+              "number",
+              "boolean"
+            ],
+            "title": "Data Type",
+            "type": "string"
+          },
+          "default_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Value"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "display_order": {
+            "default": 100,
+            "minimum": 0.0,
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "is_required": {
+            "default": false,
+            "title": "Is Required",
+            "type": "boolean"
+          },
+          "is_sensitive": {
+            "default": false,
+            "title": "Is Sensitive",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSettingOptionResponse"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "ui_control": {
+            "enum": [
+              "text",
+              "password",
+              "number",
+              "select",
+              "textarea",
+              "switch"
+            ],
+            "title": "Ui Control",
+            "type": "string"
+          },
+          "validation": {
+            "additionalProperties": true,
+            "title": "Validation",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "data_type",
+          "ui_control"
+        ],
+        "title": "PluginSettingFieldResponse",
+        "type": "object"
+      },
+      "PluginSettingOptionResponse": {
+        "additionalProperties": false,
+        "description": "One finite option for a generated plugin setting control.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "PluginSettingOptionResponse",
+        "type": "object"
+      },
+      "PluginSettingsResponse": {
+        "additionalProperties": false,
+        "description": "Generated schema and masked effective values for one plugin.",
+        "properties": {
+          "mask_token": {
+            "default": "******",
+            "title": "Mask Token",
+            "type": "string"
+          },
+          "masked_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Masked Keys",
+            "type": "array"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "schema": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSettingFieldResponse"
+            },
+            "title": "Schema",
+            "type": "array"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plugin_id"
+        ],
+        "title": "PluginSettingsResponse",
+        "type": "object"
+      },
+      "PluginSettingsUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Full replacement of explicit values; omitted keys reset to defaults.",
+        "properties": {
+          "mask_token": {
+            "default": "******",
+            "title": "Mask Token",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "title": "PluginSettingsUpdateRequest",
+        "type": "object"
+      },
+      "PluginSettingsUpdateResponse": {
+        "additionalProperties": false,
+        "description": "Persisted settings projection plus apply semantics.",
+        "properties": {
+          "changed_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Keys",
+            "type": "array"
+          },
+          "mask_token": {
+            "default": "******",
+            "title": "Mask Token",
+            "type": "string"
+          },
+          "masked_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Masked Keys",
+            "type": "array"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "schema": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSettingFieldResponse"
+            },
+            "title": "Schema",
+            "type": "array"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plugin_id"
+        ],
+        "title": "PluginSettingsUpdateResponse",
         "type": "object"
       },
       "PortfolioAccountCreateRequest": {
@@ -39436,6 +39738,180 @@
           }
         ],
         "summary": "Enable, disable, or hot-reload one plugin",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{plugin_id}/settings": {
+      "get": {
+        "description": "Return the strict manifest-declared settings schema and effective values. Sensitive values are represented only by mask_token.",
+        "operationId": "getPluginSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get one plugin's generated settings contract",
+        "tags": [
+          "Plugins"
+        ]
+      },
+      "put": {
+        "description": "Replace explicit per-plugin settings after strict manifest validation. Omitted keys reset to defaults; masked sensitive values preserve the stored secret.",
+        "operationId": "updatePluginSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginSettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettingsUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Settings validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Settings persistence failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Validate and persist one plugin's settings",
         "tags": [
           "Plugins"
         ]

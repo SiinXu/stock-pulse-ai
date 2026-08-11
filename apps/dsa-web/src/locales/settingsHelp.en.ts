@@ -883,6 +883,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects scheduled jobs, CLI runs, and GitHub Actions manual runs on holidays; the Web/API market-review button submits directly.'],
     notes: ['Disabling it can produce reports with missing realtime quotes on closed markets.'],
   },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: 'Plugin Data Provider Auto-Bind',
+    summary: 'Opt-in composition-root binding of PluginManager to the process data-manager plugin registry.',
+    usage: 'Keep PLUGIN_DATA_PROVIDER_AUTO_BIND=false for manual manager behavior. Enable only when registered plugin data providers should route through the default ApplicationServices composition root.',
+    valueNotes: [
+      'Default is off.',
+      'When enabled, incompatible binding fails closed at startup instead of silently falling back.',
+      'A process restart is required after changing this flag.',
+    ],
+    impact: ['Affects whether plugin-registered market-data providers are auto-wired into the stock service and primary analysis pipeline.'],
+    notes: ['See docs/plugin-extension-contract.md and docs/plugin-development-guide.md.'],
+    examples: [
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=false',
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=true',
+    ],
+  },
   'settings.system.scorecard': {
     title: 'Public signal scorecard',
     summary: 'Controls the opt-in aggregated signal scorecard at GET /api/v1/scorecard.',
@@ -1316,6 +1332,46 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects Agent confidence calibration and long-term analysis quality.'],
     notes: ['Works best when combined with the backtest feature.'],
   },
+  'settings.agent.AGENT_PLANNING_ENABLED': {
+    title: 'Agent Planning Loop',
+    summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
+  },
+  'settings.agent.AGENT_PLANNING_STRATEGY': {
+    title: 'Agent Planning Strategy',
+    summary: 'Selects the deterministic template planner or the bounded LLM proposal planner.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_PLAN_STEPS': {
+    title: 'Planning Max Plan Steps',
+    summary: 'Caps the number of steps in each accepted plan proposal.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_REPLANS': {
+    title: 'Planning Proposal Retries',
+    summary: 'Caps retries after proposal generation or validation fails.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOKENS': {
+    title: 'Planning Proposal Token Budget',
+    summary: 'Caps planner tokens across an LLM proposal and its retries.',
+  },
+  'settings.agent.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS': {
+    title: 'Planning Proposal Timeout',
+    summary: 'Caps wall-clock time for the proposal phase.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS': {
+    title: 'Planning Max Tool Calls',
+    summary: 'Caps total tool dispatches across the plan execution and observation replans.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_OBSERVATION_REPLANS': {
+    title: 'Planning Observation Replans',
+    summary: 'Caps replans triggered by failed tool-step observations.',
+  },
+  'settings.agent.AGENT_PLANNING_EXEC_TIMEOUT_SECONDS': {
+    title: 'Planning Execution Timeout',
+    summary: 'Caps wall-clock time for the full plan execution loop.',
+  },
+  'settings.agent.AGENT_PLANNING_ON_STEP_FAILURE': {
+    title: 'Planning Step Failure Policy',
+    summary: 'Chooses whether a failed plan step replans within budget or terminates immediately.',
+  },
   'settings.agent.AGENT_SKILL_AUTOWEIGHT': {
     title: 'Auto-Weight Strategies',
     summary: 'Automatically weights strategy opinions by their historical backtest performance.',
@@ -1345,6 +1401,53 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'This feature does not process provider traces, thinking blocks, tool calls, or tool results, and does not change same-turn tool passthrough.',
       'It only affects visible ask-stock history compression; it does not change LLM provider, model, Base URL, save cleanup, or runtime priority semantics.',
     ],
+  },
+  'settings.agent.runtime_guards': {
+    title: 'Agent Runtime Guards',
+    summary: 'Low-sensitivity tool-loop and stage-failure guards for Agent execution.',
+    usage: 'AGENT_TOOL_TIMEOUT_S limits one tool call; AGENT_MAX_IDENTICAL_TOOL_CALLS and AGENT_MAX_STAGE_ENTRIES stop runaway loops; AGENT_STAGE_FAILURE_POLICY chooses isolate vs fail_fast for ordinary stages.',
+    valueNotes: [
+      'Default tool timeout is 120 seconds; set identical-call or stage-entry guards to 0 to disable that guard.',
+      'isolate degrades non-critical stages; fail_fast stops the ordinary pipeline on stage failure.',
+      'Bounded Critic whitelist retry uses a separate one-shot budget and always fail-softs into Decision.',
+    ],
+    impact: ['Affects Agent tool loops, stage re-entry, and pipeline failure behavior without changing public SSE/API contracts.'],
+    notes: ['See the full guide Agent configuration section for the three-layer timeout model.'],
+  },
+  'settings.agent.stage_timeouts': {
+    title: 'Agent Stage Timeouts',
+    summary: 'Optional per-stage timeout budgets for multi-agent pipeline stages.',
+    usage: 'Leave each stage timeout at 0 to follow AGENT_ORCHESTRATOR_TIMEOUT_S only. Set a positive value to cap that stage independently.',
+    valueNotes: [
+      'When multiple budgets apply, the shortest remaining budget wins.',
+      'Late stage state after timeout is fenced and cannot commit into later stages.',
+    ],
+    impact: ['Affects multi-agent stage duration and degradation when a stage overruns.'],
+    notes: ['Does not forcibly kill native threads; only accepts completed stages before the limit.'],
+  },
+  'settings.agent.decision_memory': {
+    title: 'Decision Memory',
+    summary: 'Inject recent evaluated decision outcomes into stock analysis for reflection.',
+    usage: 'DECISION_MEMORY_ENABLED is the global toggle (default on). LOOKBACK, MIN_AGE_DAYS, and MIN_SAMPLES control how many aged outcomes participate.',
+    valueNotes: [
+      'Per-request use_memory can override the global toggle.',
+      'Min age keeps outcomes from being reflected before they exist.',
+      'Min samples suppress noisy hit-rate buckets.',
+    ],
+    impact: ['Affects whether analysis prompts include historical decision reflection context.'],
+    notes: ['See docs/decision-signals.md for the decision-signal lifecycle.'],
+  },
+  'settings.agent.reasoning_trace_export': {
+    title: 'Reasoning Trace Export',
+    summary: 'Opt-in export of redacted reasoning-trace-v1 packages from recorded diagnostics.',
+    usage: 'Keep REASONING_TRACE_EXPORT_ENABLED=false unless operators need the export API. REASONING_TRACE_EXPORT_MAX_CHARS sets the complete-response character budget (10000–2000000).',
+    valueNotes: [
+      'Default is off.',
+      'Exports redact credentials and local paths but remain sensitive operator data.',
+      'The service does not store export files; operators must delete downloaded copies separately.',
+    ],
+    impact: ['Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.'],
+    notes: ['See docs/reasoning-trace-export_EN.md for the contract and rollback steps.'],
   },
   'settings.agent.observability': {
     title: 'Agent Observability',
@@ -1517,6 +1620,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['REPORT_RENDERER_ENABLED must also be on for templates to take effect.'],
     impact: ['Affects the template source used for report rendering.'],
     notes: ['Custom templates must follow Jinja2 syntax and include required variable placeholders.'],
+  },
+  'settings.report.REPORT_MODE': {
+    title: 'Report Mode',
+    summary: 'Presentation depth for Jinja stock reports when the report renderer is enabled.',
+    usage: 'Choose brief, standard (default), or research. Options come from the runtime report-mode contract. Per-request override: extra_context.report_mode.',
+    valueNotes: [
+      'brief keeps Decision Card plus key risk.',
+      'standard is Decision Card plus main analysis sections.',
+      'research expands detail and strata limits.',
+      'Hard limits never drop the Decision Card block.',
+    ],
+    impact: ['Affects which report sections render and how aggressively content is truncated.'],
+    notes: [
+      'Only takes effect when REPORT_RENDERER_ENABLED=true.',
+      'The hard-coded notification fallback path is unchanged when the renderer is off.',
+    ],
   },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: 'Report Rendering Engine',

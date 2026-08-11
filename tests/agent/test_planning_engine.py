@@ -111,9 +111,11 @@ def test_template_proposal_is_bounded_and_requires_explicit_settings() -> None:
     assert outcome.to_metadata()["plan_id"] == outcome.plan.plan_id
 
 
-def test_proposal_is_not_wired_into_agent_executor_runtime() -> None:
+def test_proposal_product_path_is_opt_in_via_try_run_with_planning() -> None:
+    """RUN product path gates on try_run_with_planning; classic path remains default."""
     source = inspect.getsource(_RunMethods.run)
-    assert "planning" not in source
+    assert "try_run_with_planning" in source
+    # Direct prepare_run_with_planning must not replace the production invoker path.
     assert "prepare_run_with_planning" not in source
 
 
