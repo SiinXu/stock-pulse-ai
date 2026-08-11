@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Tests] Align Playwright analysis, history, and scheduled-task fixtures with required OpenAPI fields so runtime validation exercises successful real-contract paths.
+- [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
+- [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
 - [Fixed] Restore Popover focus during the closing commit so stale animation-frame callbacks cannot steal focus after nested-overlay keyboard navigation.
 - [Added] Wire opt-in plan→act→observe into AgentExecutor.run with Config/registry knobs, BoundToolSession tool dispatch, hard budgets, and production-path regression coverage (Refs #199).
 - [Fixed] Settings fields resolve controls from `dataType` / options / sensitivity even when `uiControl` is missing or wrong, so uncategorized booleans, enums, numbers, and secrets no longer render as free-text inputs; contract tests lock the schema→control mapping and the change/save display loop.
