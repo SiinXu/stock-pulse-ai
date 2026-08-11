@@ -376,9 +376,12 @@ export function usePortfolioAnalysisTasks({
 
   const urlTaskId = readPortfolioAnalysisTaskIdFromSearch(searchParams);
   useEffect(() => {
-    if (!enabled || !hasHydrated || !urlTaskId) return;
-    if (trackedIdsRef.current.has(urlTaskId)) return;
-    void attachExistingTask(urlTaskId, urlTaskId);
+    if (!enabled || !hasHydrated || !urlTaskId) return undefined;
+    if (trackedIdsRef.current.has(urlTaskId)) return undefined;
+    const timer = window.setTimeout(() => {
+      void attachExistingTask(urlTaskId, urlTaskId);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [attachExistingTask, enabled, hasHydrated, urlTaskId]);
 
   const applyStreamTask = useCallback((incoming: TaskInfo) => {
