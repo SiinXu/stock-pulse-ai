@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Check, Code2, Download, ExternalLink, FileText, FileDown } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
@@ -22,6 +22,8 @@ import { useClipboard } from '../common/useClipboard';
 import { ReportDecisionCard } from './ReportDecisionCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 import { ShareImageButton } from './ShareImageButton';
+
+const ReasoningTraceExportControls = lazy(() => import('./ReasoningTraceExportControls'));
 
 export interface ReportMarkdownPanelProps {
   recordId: number;
@@ -220,6 +222,14 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           </IconButton>
         </div>
       </div>
+
+      <Suspense fallback={false}>
+        <ReasoningTraceExportControls
+          recordId={recordId}
+          disabled={isLoading}
+          className="mb-4"
+        />
+      </Suspense>
 
       {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-4" /> : null}
       {exportError ? (

@@ -13,6 +13,16 @@
 
 关闭开关时，`GET /api/v1/reasoning-trace/{record_id}` 返回 `404 reasoning_trace_export_disabled`，不会读取或导出历史内容。
 
+上述键已登记到 Web 设置配置注册表（Agent 行为 → 执行），运营可在设置页启用导出并调整字符预算，而无需使用无分类自由文本框。
+
+## Web 产品入口
+
+- 报告 Markdown 面板与运行诊断均提供始终可见的 JSON / Markdown 导出操作。
+- 开关关闭时不隐藏按钮：明确提示在「设置 → Agent 行为 → 执行」开启「推理轨迹导出」（`REASONING_TRACE_EXPORT_ENABLED`），并提供设置深链。
+- 下载走浏览器 Blob 附件，不在页面内渲染完整包，避免大轨迹卡死界面。
+- 截断以响应头 `X-Reasoning-Trace-Truncated` 为准，并展示行内提示；细节见导出包 `truncation` 字段。
+- 可读错误覆盖：未启用、缺少认证、记录不存在与服务失败。
+
 ## API 与身份语义
 
 ```http
@@ -78,7 +88,7 @@ coverage 在每个返回路径（含体积预算的每一步）都与实际返�
 
 存在时可导出：历史运行元信息、`diagnostics.agent_events`、provider/LLM/pipeline stage 运行摘要、dashboard 合成摘要和 context-pack 数据质量摘要。
 
-当前 Agent 核心未完整持久化，因此仍不包含：完整 system/user prompt、未启用 deep payload 时的工具参数、chat provider thinking block、临时 SSE 事件和原始 provider API 响应。Issue #135 保持开放；Web Settings 与完整捕获也不在 T03 中交付。
+当前 Agent 核心未完整持久化，因此仍不包含：完整 system/user prompt、未启用 deep payload 时的工具参数、chat provider thinking block、临时 SSE 事件和原始 provider API 响应。Issue #135 对完整 live 捕获仍保持开放。Web Settings 登记与报告/运行详情导出入口已交付。
 
 ## 回滚
 
