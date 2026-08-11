@@ -7,6 +7,7 @@ import StockDetailsPage from '../StockDetailsPage';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
+import { estimateStockValuation } from '../../api/valuation';
 import {
   APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
@@ -24,6 +25,20 @@ vi.mock('../../api/systemConfig', () => ({
     addToWatchlist: vi.fn(),
     getConfig: vi.fn().mockResolvedValue({ configVersion: 'test', maskToken: '******', items: [] }),
   },
+}));
+
+vi.mock('../../api/valuation', () => ({
+  estimateStockValuation: vi.fn(),
+}));
+
+vi.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Line: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Tooltip: () => null,
+  CartesianGrid: () => null,
 }));
 
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
@@ -324,4 +339,38 @@ describe('StockDetailsPage', () => {
     // The page redirects 00700 -> HK00700 and loads the canonical code.
     await waitFor(() => expect(getQuoteMock).toHaveBeenCalledWith('HK00700'));
   });
+  it('mounts the DCF sensitivity panel with the stock code from the route', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+    vi.mocked(estimateStockValuation).mockResolvedValue({
+      status: 'ok',
+      stockCode: '600519',
+      dcf: {
+        status: 'ok',
+        equityValue: 100,
+        intrinsicValuePerShare: 10,
+        assumptions: {
+          growthRate: 0.05,
+          discountRate: 0.1,
+          terminalGrowthRate: 0.03,
+          projectionYears: 5,
+        },
+        sensitivity: {
+          rows: [
+            { growthRate: 0.04, discountRate: 0.1, equityValue: 90 },
+            { growthRate: 0.05, discountRate: 0.1, equityValue: 100 },
+          ],
+        },
+      },
+    });
+
+    renderPage('600519');
+
+    const section = await screen.findByTestId('stock-details-dcf-section');
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveAttribute('aria-label', 'DCF sensitivity');
+    expect(screen.getByTestId('dcf-sensitivity-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('dcf-stock-code')).toHaveValue('600519');
+  });
+
 });

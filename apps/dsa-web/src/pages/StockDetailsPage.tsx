@@ -37,6 +37,8 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
+import { DcfSensitivityPanel } from '../components/valuation';
+import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -369,6 +371,8 @@ const StockDetailsPage: React.FC = () => {
     { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatQuantity(candle.volume, language) },
   ];
 
+  const valuationText = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
+
   return (
     <AppPage className="max-w-none">
       <div className="space-y-5">
@@ -572,6 +576,10 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
+          <DcfSensitivityPanel stockCode={canonicalCode} />
+        </section>
       </div>
     </AppPage>
   );

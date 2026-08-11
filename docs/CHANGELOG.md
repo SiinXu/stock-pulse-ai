@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Register crypto, data-validation, and local-first daily-cache Settings fields in the config registry with correct controls, enums, defaults, and bilingual help so they no longer land as uncategorized free-text (Refs #1023).
 - [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
 - [Added] Layered memory lifecycle: honest outcome-pattern naming (structured + optional vector re-rank), minimize-by-default consent/retention/principal delete/access audit, and untrusted prompt isolation with adversarial tests (Refs #250, #198; no production injection hook).
+- [Changed] Mount interactive DCF sensitivity panel on Stock Details so valuation #238 UI is reachable outside Playground (Refs #238, #1008).
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
 - [Added] Wire shared financial charts into product pages: Stock Details KlineChart (history API candles) and Portfolio RiskHeatmap (existing risk API weight/stop-loss/drawdown scores) with loading, empty, and invalid-value guards (Refs #142).
 - [Fixed] Capability inventory availability is projected only from live tool/skill/pipeline/plugin/data owners; registry and config read failures return explicit partial source errors instead of fail-open success snapshots (Refs #221).
