@@ -157,7 +157,7 @@ The current repository CI mainly contains:
 
 | Check | Source | Description | Blocking? |
 | --- | --- | --- | --- |
-| `changes` | `.github/workflows/ci.yml` | Path-filter job that sets the `frontend` output used to decide whether `web-gate` / `web-e2e` run | Yes (always runs; drives triggered jobs) |
+| `changes` | `.github/workflows/ci.yml` | Path-filter job for `web-gate` / `web-e2e`. On `merge_group`, forces the full path matrix | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
 | `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest (FULL fallback); push-to-main: full suite + coverage floor | Yes |
 | `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: full offline suite on Python 3.10 | Yes |
@@ -169,6 +169,8 @@ The current repository CI mainly contains:
 | `api-real-client` | `.github/workflows/ci.yml` | `tests/api` with real Starlette TestClient | No on PR; observation on push-to-main |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
 | `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, opt-in via `workflow_dispatch` only |
+
+**Event model:** PR feedback uses the fast tier (selective pytest). Merge Queue (`merge_group`) runs the full offline suite once with shards + combined coverage. Prefer enabling GitHub Merge Queue on `main` so full rigor runs at queue time instead of on every PR resync.
 
 If there is a corresponding CI result on the existing PR, you can directly quote the CI conclusion; if the CI does not cover the changes or the local environment differs significantly from the CI environment, supplement local verification and gaps.
 

@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Hosted CI entry points:
+#   all                 — full offline suite with coverage floor (legacy / merge-group single-node)
+#   syntax|flake8|deterministic — shared preflight
+#   offline-tests       — full offline suite + coverage floor
+#   offline-tests-selective — path-mapped pytest (PR tier); FULL fallback when uncertain
+#   offline-tests-shard — one shard of the full suite; writes coverage data for combine
+#   offline-tests-combine — combine shard coverage data and enforce the floor once
+#   python-min-smoke    — 3.10 import/schema/smoke subset (PR tier)
 
 set -euo pipefail
 
@@ -76,10 +87,6 @@ offline_test_suite() {
   # still collect under --strict-markers; scheduled/manual runner:
   #   .github/workflows/benchmarks.yml  (pytest -m benchmark)
   #   python -m pytest -m benchmark
-  # Per-test timeout + thread method: hard-fail hangs with an attributed
-  # traceback instead of burning the full job budget. faulthandler_timeout
-  # dumps every thread stack when a single test (including teardown) is silent
-  # for 300s, which is complementary post-mortem signal beyond pytest-timeout.
   # Coverage is measured for src/api/data_provider/bot and enforced by the
   # checked-in floor in scripts/coverage_floor_baseline.json.
   # Keep --cov= flags in lockstep with baseline.packages (order-sensitive).

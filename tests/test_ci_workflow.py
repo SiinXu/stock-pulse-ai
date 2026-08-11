@@ -1,4 +1,4 @@
-"""Guard the hosted CI contract for the minimum supported Python runtime."""
+"""Guard the hosted CI contract for two-tier and minimum Python gates."""
 
 from pathlib import Path
 
@@ -17,7 +17,50 @@ FRONTEND_EXECUTION_CONDITION = (
 def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
     """PR uses 3.10 smoke; push-to-main keeps a full offline suite on the floor."""
 
-    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+def test_ci_triggers_include_merge_group() -> None:
+    workflow = _workflow()
+    # PyYAML loads the bare key `on:` as boolean True.
+    on = workflow[True]
+    assert "merge_group" in on
+    assert "pull_request" in on
+    assert "push" in on
+
+
+def test_backend_gate_pr_is_selective_on_non_merge_group() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-gate-pr"]
+    assert job["name"] == "backend-gate"
+    assert job["if"] == "github.event_name != 'merge_group'"
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert any("offline-tests-selective" in command for command in runs)
+    assert not any(
+        command.strip() == "./scripts/ci_gate.sh" for command in runs
+    )
+
+
+def test_backend_tests_sharded_on_merge_group() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-tests"]
+    assert job["if"] == "github.event_name == 'merge_group'"
+    assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert any("offline-tests-shard" in command for command in runs)
+
+
+def test_backend_gate_mq_combines_coverage() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-gate-mq"]
+    assert job["name"] == "backend-gate"
+    assert "merge_group" in job["if"]
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert any("offline-tests-combine" in command for command in runs)
+
+
+def test_python_minimum_smoke_on_pr_full_on_merge_group() -> None:
+    """3.10 stays real: smoke on PR, full offline suite at merge-group."""
+
+    workflow = _workflow()
     job = workflow["jobs"]["python-minimum"]
     backend_job = workflow["jobs"]["backend-gate"]
     changes_job = workflow["jobs"]["changes"]
@@ -27,9 +70,6 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
     assert job["if"] == "needs.changes.outputs.backend == 'true'"
     assert job["permissions"] == {"contents": "read"}
     assert job.get("continue-on-error", False) is False
-    assert all(
-        step.get("continue-on-error", False) is False for step in job["steps"]
-    )
 
     assert backend_job["needs"] == ["changes", "ai-governance"]
     assert backend_job["if"] == "needs.changes.outputs.backend == 'true'"
@@ -51,13 +91,21 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
     assert len(setup_steps) == 1
     assert setup_steps[0]["with"]["python-version"] == "3.10"
 
-    backend_setup_steps = [
+    smoke = [
         step
-        for step in backend_job["steps"]
-        if step.get("uses", "").startswith("actions/setup-python@")
+        for step in job["steps"]
+        if "python-min-smoke" in step.get("run", "")
     ]
-    assert len(backend_setup_steps) == 1
-    assert backend_setup_steps[0]["with"]["python-version"] == "3.11"
+    full = [
+        step
+        for step in job["steps"]
+        if "offline-tests" in step.get("run", "")
+        and "python-min-smoke" not in step.get("run", "")
+    ]
+    assert len(smoke) == 1
+    assert smoke[0]["if"] == "github.event_name != 'merge_group'"
+    assert len(full) == 1
+    assert full[0]["if"] == "github.event_name == 'merge_group'"
 
     run_commands = [step["run"] for step in job["steps"] if "run" in step]
     assert any("--constraint constraints.txt" in command for command in run_commands)

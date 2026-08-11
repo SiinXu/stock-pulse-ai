@@ -166,7 +166,11 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/ci.yml", "changes", "contents", "read"),
         (".github/workflows/ci.yml", "changes", "pull-requests", "read"),
         (".github/workflows/ci.yml", "ai-governance", "contents", "read"),
-        (".github/workflows/ci.yml", "backend-gate", "contents", "read"),
+        # Job IDs for the two-tier backend gate (PR fast + merge-group shards).
+        # Required check *name* remains "backend-gate" via the job name field.
+        (".github/workflows/ci.yml", "backend-gate-pr", "contents", "read"),
+        (".github/workflows/ci.yml", "backend-gate-mq", "contents", "read"),
+        (".github/workflows/ci.yml", "backend-tests", "contents", "read"),
         (".github/workflows/ci.yml", "python-minimum", "contents", "read"),
         (".github/workflows/ci.yml", "pydanticai-installed", "contents", "read"),
         (".github/workflows/ci.yml", "docker-build", "contents", "read"),
